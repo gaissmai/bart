@@ -103,10 +103,10 @@ func (p *prefixCBTree[V]) delete(addr uint, prefixLen int) (wasPresent bool) {
 	rnk := p.rank(baseIdx)
 
 	// delete from slice
+	// TODO: with go 1.22 the free slot is already clear'd by Delete for GC
 	p.values = slices.Delete(p.values, rnk, rnk+1)
 
 	// delete from bitset, followed by Compact to reduce memory consumption
-	// TODO: with go 1.22 the free slot is already clear'd by Delete for GC
 	p.indexes.Clear(baseIdx)
 	p.indexes.Compact()
 
@@ -192,11 +192,10 @@ func (c *childTree[V]) delete(addr uint) {
 	rnk := c.rank(addr)
 
 	// delete from slice
-	// with go 1.22 the free slot is clear'd by Delete for GC
+	// TODO: with go 1.22 the free slot is clear'd by Delete for GC
 	c.nodes = slices.Delete(c.nodes, rnk, rnk+1)
 
 	// delete from bitset, followed by Compact to reduce memory consumption
-	// TODO: with go 1.22 the free slot is already clear'd by Delete for GC
 	c.addrs.Clear(addr)
 	c.addrs.Compact()
 }
