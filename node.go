@@ -131,7 +131,7 @@ func (p *prefixCBTree[V]) lpmByIndex(idx uint) (baseIdx uint, val V, ok bool) {
 		}
 
 		// cache friendly backtracking to the next less specific route.
-		// thanks to the complete binary tree it's just an index operation.
+		// thanks to the complete binary tree it's just a shift operation.
 		idx >>= 1
 	}
 
