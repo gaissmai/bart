@@ -25,6 +25,15 @@ type kidT[V any] struct {
 
 // String returns a hierarchical tree diagram of the ordered CIDRs
 // as string, just a wrapper for [Table.Fprint].
+func (t *Table[V]) String() string {
+	t.init()
+	w := new(strings.Builder)
+	_ = t.Fprint(w)
+	return w.String()
+}
+
+// Fprint writes a hierarchical tree diagram of the ordered CIDRs to w.
+// If w is nil, Fprint panics.
 //
 // The order from top to bottom is in ascending order of the prefix address
 // and the subtree structure is determined by the CIDRs coverage.
@@ -45,15 +54,6 @@ type kidT[V any] struct {
 //	   ├─ 2000::/3 (2001:db8::1)
 //	   │  └─ 2001:db8::/32 (2001:db8::1)
 //	   └─ fe80::/10 (::1%lo)
-func (t *Table[V]) String() string {
-	t.init()
-	w := new(strings.Builder)
-	_ = t.Fprint(w)
-	return w.String()
-}
-
-// Fprint writes a hierarchical tree diagram of the ordered CIDRs to w.
-// If w is nil, Fprint panics.
 func (t *Table[V]) Fprint(w io.Writer) error {
 	is4 := true
 	root4 := t.rootNodeByVersion(is4)
