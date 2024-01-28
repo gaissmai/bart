@@ -52,6 +52,10 @@ the backtracking algorithm is as fast as possible.
   func (t *Table[V]) Dump(w io.Writer)
 ```
 
+# CREDIT
+
+Credits for many inspirations to the clever guys at tailscale!
+
 # LICENSE
 
 MIT
