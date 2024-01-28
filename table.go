@@ -193,7 +193,7 @@ func (t *Table[V]) Lookup(ip netip.Addr) (lpm netip.Prefix, val V, ok bool) {
 	if depth, baseIdx, val, ok := t.lpmByIP(ip); ok {
 
 		// add the bits from higher levels in child trie to pfxLen
-		bits := depth*8 + baseIndexToPrefixLen(baseIdx)
+		bits := depth*stride + baseIndexToPrefixLen(baseIdx)
 
 		// mask prefix from lookup ip, masked with longest prefix bits.
 		lpm = netip.PrefixFrom(ip, bits).Masked()
