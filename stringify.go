@@ -56,7 +56,7 @@ func (t *Table[V]) String() string {
 // If w is nil, Fprint panics.
 func (t *Table[V]) Fprint(w io.Writer) error {
 	is4 := true
-	root4 := t.rootNodeVersion(is4)
+	root4 := t.rootNodeByVersion(is4)
 	if root4.hasType() == nullNode {
 		return nil
 	}
@@ -68,7 +68,7 @@ func (t *Table[V]) Fprint(w io.Writer) error {
 	}
 
 	is4 = false
-	root6 := t.rootNodeVersion(is4)
+	root6 := t.rootNodeByVersion(is4)
 	if root6.hasType() == nullNode {
 		return nil
 	}

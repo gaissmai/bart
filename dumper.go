@@ -57,7 +57,7 @@ func (t *Table[V]) Dump(w io.Writer) error {
 // dump4, dumps the IPv4 routing table to w.
 func (t *Table[V]) dump4(w io.Writer) error {
 	is4 := true
-	root4 := t.rootNodeVersion(is4)
+	root4 := t.rootNodeByVersion(is4)
 	if _, err := fmt.Fprint(w, "IPv4:\n"); err != nil {
 		return err
 	}
@@ -69,7 +69,7 @@ func (t *Table[V]) dump4(w io.Writer) error {
 // dump6, dumps the IPv6 routing table to w.
 func (t *Table[V]) dump6(w io.Writer) error {
 	is4 := false
-	root6 := t.rootNodeVersion(is4)
+	root6 := t.rootNodeByVersion(is4)
 	if _, err := fmt.Fprint(w, "IPv6:\n"); err != nil {
 		return err
 	}

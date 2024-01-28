@@ -161,7 +161,7 @@ func (p *prefixCBTree[V]) getVal(baseIdx uint) *V {
 	return nil
 }
 
-// allIndexes returns all baseIndexes set in this prefixHeap.
+// allIndexes returns all baseIndexes set in this prefix tree.
 func (p *prefixCBTree[V]) allIndexes() []uint {
 	all := make([]uint, p.indexes.Count())
 	p.indexes.NextSetMany(0, all)

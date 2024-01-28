@@ -27,8 +27,8 @@ func (t *Table[V]) init() {
 	})
 }
 
-// rootNodeVersion, select root node for ip version.
-func (t *Table[V]) rootNodeVersion(is4 bool) *node[V] {
+// rootNodeByVersion, select root node for ip version.
+func (t *Table[V]) rootNodeByVersion(is4 bool) *node[V] {
 	if is4 {
 		return t.rootV4
 	}
@@ -49,7 +49,7 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	is4 := ip.Is4()
 
 	// get the root node of the routing table
-	n := t.rootNodeVersion(is4)
+	n := t.rootNodeByVersion(is4)
 
 	// insert default route, easy peasy
 	if bits == 0 {
@@ -107,7 +107,7 @@ func (t *Table[V]) Delete(pfx netip.Prefix) {
 	ip := pfx.Addr()
 	is4 := ip.Is4()
 
-	n := t.rootNodeVersion(is4)
+	n := t.rootNodeByVersion(is4)
 
 	// delete default route, easy peasy
 	if bits == 0 {
@@ -208,7 +208,7 @@ func (t *Table[V]) Lookup(ip netip.Addr) (lpm netip.Prefix, val V, ok bool) {
 // lpm prefix out of the prefix tree.
 func (t *Table[V]) lpmByIP(ip netip.Addr) (depth int, baseIdx uint, val V, ok bool) {
 	is4 := ip.Is4()
-	n := t.rootNodeVersion(is4)
+	n := t.rootNodeByVersion(is4)
 
 	// stack of the traversed nodes for fast backtracking, if needed
 	pathStack := [maxTreeDepth]*node[V]{}
