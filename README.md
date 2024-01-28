@@ -29,7 +29,9 @@ a matter of fast cache friendly bitmask operations.
 Due to the cache locality of the popcount compressed CBT,
 the backtracking algorithm is as fast as possible.
 
-# API (not stable! but the library is ready to use, comments and PR welcome)
+# API (not stable!)
+
+ ... but the library is ready to use, comments and PR welcome.
 
 ```golang
   import "github.com/gaissmai/bart"
