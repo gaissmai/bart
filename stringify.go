@@ -83,22 +83,22 @@ func (t *Table[V]) Fprint(w io.Writer) error {
 	return nil
 }
 
-// printRec, the output is a hierarchical CIDR tree.
+// printRec, the output is a hierarchical CIDR tree starting with parentIdx and byte path.
 func (n *node[V]) printRec(w io.Writer, parentIdx uint, path []byte, is4 bool, pad string) error {
 	// get direct childs for this parentIdx ...
-	kids := n.getKidsRec(parentIdx, path, is4)
+	directKids := n.getKidsRec(parentIdx, path, is4)
 
 	// sort them by netip.Prefix, not by baseIndex
-	slices.SortFunc(kids, sortPrefix[V])
+	slices.SortFunc(directKids, sortPrefix[V])
 
 	// symbols used in tree
 	glyphe := "├─ "
 	spacer := "│  "
 
-	// for all kids under this node ...
-	for i, kid := range kids {
+	// for all direct kids under this node ...
+	for i, kid := range directKids {
 		// ... treat last kid special
-		if i == len(kids)-1 {
+		if i == len(directKids)-1 {
 			glyphe = "└─ "
 			spacer = "   "
 		}
@@ -119,7 +119,7 @@ func (n *node[V]) printRec(w io.Writer, parentIdx uint, path []byte, is4 bool, p
 	return nil
 }
 
-// getKidsRec, returns the dierct kids below path and parentIdx.
+// getKidsRec, returns the direct kids below path and parentIdx.
 // It's a recursive monster together with printRec,
 // you have to know the data structure by heart to understand this function!
 //
@@ -128,15 +128,14 @@ func (n *node[V]) printRec(w io.Writer, parentIdx uint, path []byte, is4 bool, p
 func (n *node[V]) getKidsRec(parentIdx uint, path []byte, is4 bool) []kidT[V] {
 	directKids := []kidT[V]{}
 
-	// the node may have prefixes,
-	// for all prefixes in this node do ...
+	// the node may have prefixes
 	for _, idx := range n.prefixes.allIndexes() {
 		// parent or self, handled alreday in an upper stack frame.
 		if idx <= parentIdx {
 			continue
 		}
 
-		// check if lpmIdx for this idx is equal to parentIdx
+		// check if lpmIdx for this idx' parent is equal to parentIdx
 		if lpmIdx, _, _ := n.prefixes.lpmByIndex(idx >> 1); lpmIdx == parentIdx {
 			val := n.prefixes.getVal(idx)
 			path := append([]byte{}, path...)
@@ -188,6 +187,7 @@ func cidrFromPath(path []byte, idx uint, is4 bool) netip.Prefix {
 }
 
 // sortPrefix, sort the kids by addr and pfxLen.
+// All prefixes are already normalized (Masked).
 func sortPrefix[V any](a, b kidT[V]) int {
 	if cmp := a.cidr.Addr().Compare(b.cidr.Addr()); cmp != 0 {
 		return cmp
