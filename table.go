@@ -213,7 +213,7 @@ func (t *Table[V]) lpmByIP(ip netip.Addr) (depth int, baseIdx uint, val V, ok bo
 	// stack of the traversed nodes for fast backtracking, if needed
 	pathStack := [maxTreeDepth]*node[V]{}
 
-	// keep Get alloc free, don't use ip.AsSlice here
+	// keep the lpm alloc free, don't use ip.AsSlice here
 	a16 := ip.As16()
 	bs := a16[:]
 	if is4 {
