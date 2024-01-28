@@ -5,7 +5,7 @@
 // and modified for this implementation by:
 //
 // Copyright (c) Karl Gaissmaier
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: MIT
 
 package bart
 
