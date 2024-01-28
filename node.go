@@ -147,6 +147,8 @@ func (p *prefixCBTree[V]) lpmByAddr(addr uint) (baseIdx uint, val V, ok bool) {
 
 // lpmByPrefix does a route lookup for addr/pfxLen in the 8-bit (stride) routing table
 // It's an adapter to lpmByIndex.
+//
+//nolint:unused
 func (p *prefixCBTree[V]) lpmByPrefix(addr uint, prefixLen int) (baseIdx uint, val V, ok bool) {
 	return p.lpmByIndex(prefixToBaseIndex(addr, prefixLen))
 }

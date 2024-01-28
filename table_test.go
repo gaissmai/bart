@@ -1024,29 +1024,6 @@ type slowPrefixEntry[V any] struct {
 	val V
 }
 
-func (t *slowPrefixTable[V]) delete(pfx netip.Prefix) {
-	pfx = pfx.Masked()
-	ret := make([]slowPrefixEntry[V], 0, len(t.prefixes))
-	for _, ent := range t.prefixes {
-		if ent.pfx == pfx {
-			continue
-		}
-		ret = append(ret, ent)
-	}
-	t.prefixes = ret
-}
-
-func (t *slowPrefixTable[V]) insert(pfx netip.Prefix, val V) {
-	pfx = pfx.Masked()
-	for i, ent := range t.prefixes {
-		if ent.pfx == pfx {
-			t.prefixes[i].val = val
-			return
-		}
-	}
-	t.prefixes = append(t.prefixes, slowPrefixEntry[V]{pfx, val})
-}
-
 func (t *slowPrefixTable[V]) get(addr netip.Addr) (ret V, ok bool) {
 	bestLen := -1
 
@@ -1147,27 +1124,4 @@ func roundFloat64(f float64) float64 {
 		panic(err)
 	}
 	return ret
-}
-
-func minimize(pfxs []slowPrefixEntry[int], f func(skip map[netip.Prefix]bool) error) (map[netip.Prefix]bool, error) {
-	if f(nil) == nil {
-		return nil, nil
-	}
-
-	remove := map[netip.Prefix]bool{}
-	for lastLen := -1; len(remove) != lastLen; lastLen = len(remove) {
-		fmt.Println("len is ", len(remove))
-		for i, pfx := range pfxs {
-			if remove[pfx.pfx] {
-				continue
-			}
-			remove[pfx.pfx] = true
-			fmt.Printf("%d %d: trying without %s\n", i, len(remove), pfx.pfx)
-			if f(remove) == nil {
-				delete(remove, pfx.pfx)
-			}
-		}
-	}
-
-	return remove, f(remove)
 }

@@ -328,6 +328,7 @@ func fillRouteTables() {
 	}
 }
 
+//nolint:unused
 func sliceRoutes(n int) []route {
 	if n > len(routes) {
 		panic("n too big")
@@ -344,6 +345,7 @@ func sliceRoutes(n int) []route {
 
 // #########################################################
 
+//nolint:unused
 func gimmeRandomPrefix4(n int) (pfxs []netip.Prefix) {
 	set := map[netip.Prefix]netip.Prefix{}
 
@@ -360,6 +362,7 @@ func gimmeRandomPrefix4(n int) (pfxs []netip.Prefix) {
 	return
 }
 
+//nolint:unused
 func gimmeRandomPrefix6(n int) (pfxs []netip.Prefix) {
 	set := map[netip.Prefix]netip.Prefix{}
 
@@ -378,6 +381,8 @@ func gimmeRandomPrefix6(n int) (pfxs []netip.Prefix) {
 
 // randomPrefixes returns n randomly generated prefixes and
 // associated values, distributed equally between IPv4 and IPv6.
+//
+//nolint:unused
 func randomPrefix() netip.Prefix {
 	if rand.Intn(2) == 1 {
 		return randomPrefix4()
@@ -386,6 +391,7 @@ func randomPrefix() netip.Prefix {
 	}
 }
 
+//nolint:unused
 func randomPrefix4() netip.Prefix {
 	bits := rand.Intn(33)
 	pfx, err := randomIP4().Prefix(bits)
@@ -395,6 +401,7 @@ func randomPrefix4() netip.Prefix {
 	return pfx
 }
 
+//nolint:unused
 func randomPrefix6() netip.Prefix {
 	bits := rand.Intn(129)
 	pfx, err := randomIP6().Prefix(bits)
@@ -404,6 +411,7 @@ func randomPrefix6() netip.Prefix {
 	return pfx
 }
 
+//nolint:unused
 func randomIP() netip.Addr {
 	if rand.Intn(2) == 1 {
 		return randomIP4()
@@ -412,6 +420,7 @@ func randomIP() netip.Addr {
 	}
 }
 
+//nolint:unused
 func randomIP4() netip.Addr {
 	var b [4]byte
 	if _, err := crand.Read(b[:]); err != nil {
@@ -420,6 +429,7 @@ func randomIP4() netip.Addr {
 	return netip.AddrFrom4(b)
 }
 
+//nolint:unused
 func randomIP6() netip.Addr {
 	var b [16]byte
 	if _, err := crand.Read(b[:]); err != nil {

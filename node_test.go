@@ -15,7 +15,6 @@ import (
 	"math/rand"
 	"runtime"
 	"sort"
-	"strings"
 	"testing"
 )
 
@@ -222,12 +221,6 @@ func (t *slowTable[V]) String() string {
 	return ret.String()
 }
 
-func (t *slowTable[V]) insert(addr uint, prefixLen int, val V) {
-	t.delete(addr, prefixLen) // no-op if prefix doesn't exist
-
-	t.prefixes = append(t.prefixes, slowEntry[V]{addr, prefixLen, val})
-}
-
 func (t *slowTable[V]) delete(addr uint, prefixLen int) {
 	pfx := make([]slowEntry[V], 0, len(t.prefixes))
 	for _, e := range t.prefixes {
@@ -266,14 +259,6 @@ func allPrefixes() []slowEntry[int] {
 func shufflePrefixes(pfxs []slowEntry[int]) []slowEntry[int] {
 	rand.Shuffle(len(pfxs), func(i, j int) { pfxs[i], pfxs[j] = pfxs[j], pfxs[i] })
 	return pfxs
-}
-
-func formatSlowEntriesShort[V any](ents []slowEntry[V]) string {
-	var ret []string
-	for _, ent := range ents {
-		ret = append(ret, fmt.Sprintf("%d/%d", ent.addr, ent.len))
-	}
-	return "[" + strings.Join(ret, " ") + "]"
 }
 
 func getsEqual[V comparable](a V, aOK bool, b V, bOK bool) bool {

@@ -109,7 +109,9 @@ func (n *node[V]) printRec(w io.Writer, parentIdx uint, path []byte, is4 bool, p
 		// rec-descent with this prefix as parentIdx.
 		// hierarchical nested tree view, two rec-descent functions
 		// work together to spoil the reader.
-		kid.n.printRec(w, kid.idx, kid.path, is4, pad+spacer)
+		if err := kid.n.printRec(w, kid.idx, kid.path, is4, pad+spacer); err != nil {
+			return err
+		}
 	}
 
 	return nil
