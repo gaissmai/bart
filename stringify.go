@@ -55,6 +55,8 @@ func (t *Table[V]) String() string {
 //	   │  └─ 2001:db8::/32 (2001:db8::1)
 //	   └─ fe80::/10 (::1%lo)
 func (t *Table[V]) Fprint(w io.Writer) error {
+	t.init()
+
 	is4 := true
 	root4 := t.rootNodeByVersion(is4)
 	if root4.hasType() == nullNode {
