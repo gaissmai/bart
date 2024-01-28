@@ -55,8 +55,8 @@ the backtracking algorithm is as fast as possible.
 # CREDIT
 
 For many inspirations to the clever guys at tailscale,
-to Daniel Lemire for the super-fast bitset package,
-to Donald E. Knuth for the ART algorithm and all the rest of his Art.
+to Daniel Lemire for the super-fast bitset package and
+to Donald E. Knuth for the ART routing algorithm and all the rest of his Art.
 
 # LICENSE
 
