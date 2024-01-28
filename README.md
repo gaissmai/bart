@@ -54,7 +54,9 @@ the backtracking algorithm is as fast as possible.
 
 # CREDIT
 
-Credits for many inspirations to the clever guys at tailscale!
+For many inspirations to the clever guys at tailscale,
+to Daniel Lemire for the super-fast bitset package,
+to Donald E. Knuth for the ART algorithm and all the rest of his Art.
 
 # LICENSE
 
