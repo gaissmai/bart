@@ -57,23 +57,39 @@ func (t *Table[V]) String() string {
 func (t *Table[V]) Fprint(w io.Writer) error {
 	t.init()
 
+	if err := t.fprint4(w); err != nil {
+		return err
+	}
+
+	if err := t.fprint6(w); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (t *Table[V]) fprint4(w io.Writer) error {
 	is4 := true
 	root4 := t.rootNodeByVersion(is4)
-	if root4.hasType() == nullNode {
+	if root4.isEmpty() {
 		return nil
 	}
+
 	if _, err := fmt.Fprint(w, "▼\n"); err != nil {
 		return err
 	}
 	if err := root4.printRec(w, 0, nil, is4, ""); err != nil {
 		return err
 	}
+	return nil
+}
 
-	is4 = false
+func (t *Table[V]) fprint6(w io.Writer) error {
+	is4 := false
 	root6 := t.rootNodeByVersion(is4)
-	if root6.hasType() == nullNode {
+	if root6.isEmpty() {
 		return nil
 	}
+
 	if _, err := fmt.Fprint(w, "▼\n"); err != nil {
 		return err
 	}

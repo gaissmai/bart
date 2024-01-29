@@ -22,10 +22,17 @@ import (
 
 func TestInsert(t *testing.T) {
 	tbl := &Table[int]{}
-	p := netip.MustParsePrefix
+	p := func(s string) netip.Prefix {
+		pfx := netip.MustParsePrefix(s)
+		if pfx.Addr() != pfx.Masked().Addr() {
+			panic(fmt.Sprintf("%s is not normalized", s))
+		}
+		return pfx
+	}
 
 	// Create a new leaf node.
 	tbl.Insert(p("192.168.0.1/32"), 1)
+	tbl.Insert(p("192.168.0.1/32"), 1) // no-op
 	checkRoutes(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", -1},
@@ -270,6 +277,7 @@ func TestInsert(t *testing.T) {
 	// Insert that creates a new intermediate table but no new child,
 	// with an unaligned intermediate
 	tbl.Insert(p("ff:cccc::/37"), 9)
+	tbl.Insert(p("ff:cccc::/37"), 9) // no-op
 	checkRoutes(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", 2},
@@ -285,6 +293,7 @@ func TestInsert(t *testing.T) {
 
 	// Insert a default route, those have their own codepath.
 	tbl.Insert(p("::/0"), 6)
+	tbl.Insert(p("::/0"), 6) // no-op
 	checkRoutes(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", 2},
@@ -301,7 +310,13 @@ func TestInsert(t *testing.T) {
 
 func TestDelete(t *testing.T) {
 	t.Parallel()
-	p := netip.MustParsePrefix
+	p := func(s string) netip.Prefix {
+		pfx := netip.MustParsePrefix(s)
+		if pfx.Addr() != pfx.Masked().Addr() {
+			panic(fmt.Sprintf("%s is not normalized", s))
+		}
+		return pfx
+	}
 
 	t.Run("prefix_in_root", func(t *testing.T) {
 		// Add/remove prefix from root table.
@@ -746,10 +761,14 @@ func checkRoutes(t *testing.T, tbl *Table[int], tt []tableTest) {
 	for _, tc := range tt {
 		v, ok := tbl.Get(netip.MustParseAddr(tc.addr))
 		if !ok && tc.want != -1 {
-			t.Errorf("lookup %q got (%v, %v), want (_, false)", tc.addr, v, ok)
+			t.Errorf("Get %q got (%v, %v), want (_, false)", tc.addr, v, ok)
 		}
 		if ok && v != tc.want {
-			t.Errorf("lookup %q got (%v, %v), want (%v, true)", tc.addr, v, ok, tc.want)
+			t.Errorf("Get %q got (%v, %v), want (%v, true)", tc.addr, v, ok, tc.want)
+		}
+		_, v, ok = tbl.Lookup(netip.MustParseAddr(tc.addr))
+		if !ok && tc.want != -1 {
+			t.Errorf("Lookup %q got (%v, %v), want (_, false)", tc.addr, v, ok)
 		}
 	}
 }
