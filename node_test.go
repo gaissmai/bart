@@ -20,7 +20,7 @@ import (
 
 func TestInverseIndex(t *testing.T) {
 	t.Parallel()
-	for i := 0; i < maxNodeChilds; i++ {
+	for i := 0; i < maxNodeChildren; i++ {
 		for len := 0; len <= stride; len++ {
 			addr := i & (0xFF << (stride - len))
 			idx := prefixToBaseIndex(uint(addr), len)
@@ -34,7 +34,7 @@ func TestInverseIndex(t *testing.T) {
 
 func TestFringeIndex(t *testing.T) {
 	t.Parallel()
-	for i := 0; i < maxNodeChilds; i++ {
+	for i := 0; i < maxNodeChildren; i++ {
 		got := addrToBaseIndex(uint(i))
 		want := prefixToBaseIndex(uint(i), 8)
 		if got != want {

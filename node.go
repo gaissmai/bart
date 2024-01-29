@@ -14,7 +14,7 @@ import (
 const (
 	stride          = 8                 // byte
 	maxTreeDepth    = 128 / stride      // 16
-	maxNodeChilds   = 1 << stride       // 256
+	maxNodeChildren = 1 << stride       // 256
 	maxNodePrefixes = 1 << (stride + 1) // 512
 )
 
