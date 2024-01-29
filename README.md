@@ -56,9 +56,10 @@ the backtracking algorithm is as fast as possible.
 
 # TODO
 
-- more tests and better coverage
-- try a simplest implementation with a hashmap for level compression (done, see branch hashmap)
-- try Roaring Bitmaps with a stride length of >8, maybe 16 or 24 bits.
+- [ ] more tests and better coverage
+- [x] try a simplest implementation with a hashmap for level compression (done, see branch hashmap)
+- [x] ~~try Roaring Bitmaps with a stride length of >8, maybe 16 or 24 bits.~~ `Add()` and `Contains()` ok, but `Rank()` is too slow!
+- [ ] try multi level strides: 32/8
  
 # CREDIT
 
