@@ -63,10 +63,10 @@ the backtracking algorithm is as fast as possible.
  
 # CREDIT
 
-For many inspirations to the clever guys at tailscale,
+Credits for many inspirations go to the clever guys at tailscale,
 to Daniel Lemire for the super-fast bitset package and
-to Donald E. Knuth for the ART routing algorithm and
-all the rest of his Art and for keeping important algorithms
+to Donald E. Knuth for the **ART** routing algorithm and
+all the rest of his *Art* and for keeping important algorithms
 in the public domain!
 
 # LICENSE
