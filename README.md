@@ -54,6 +54,12 @@ the backtracking algorithm is as fast as possible.
   func (t *Table[V]) Dump(w io.Writer)
 ```
 
+# TODO
+
+- more tests and better coverage
+- try a simplest implementation with a hashmap for level compression (done, see branch hashmap)
+- try Roaring Bitmaps with a stride length of 32 (one level for IPv4 and four levels for IPv6)
+ 
 # CREDIT
 
 For many inspirations to the clever guys at tailscale,
