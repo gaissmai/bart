@@ -21,7 +21,7 @@ func TestDumperPanic(t *testing.T) {
 	p := netip.MustParsePrefix
 	tbl := new(Table[any])
 	tbl.Insert(p("1.2.3.4/32"), nil)
-	tbl.Dump(nil)
+	_ = tbl.Dump(nil)
 }
 
 func TestDumperEmpty(t *testing.T) {
