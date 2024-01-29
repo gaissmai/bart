@@ -67,6 +67,11 @@ func newNode[V any]() *node[V] {
 	}
 }
 
+// isEmpty returns true if node has neither prefixes nor children.
+func (n *node[V]) isEmpty() bool {
+	return len(n.prefixes.values) == 0 && len(n.children.nodes) == 0
+}
+
 // ################## prefixes ##################################
 
 // rank is the key of the popcount compression algorithm,

@@ -160,10 +160,9 @@ func (t *Table[V]) Delete(pfx netip.Prefix) {
 			break
 		}
 
-		// is this an empty node?
-		if len(n.prefixes.values) == 0 && len(n.children.nodes) == 0 {
-
-			// purge this node from parents childs
+		// an empty node?
+		if n.isEmpty() {
+			// purge this node from parents children
 			parent := pathStack[depth-1]
 			parent.children.delete(uint(bs[depth-1]))
 		}
