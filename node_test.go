@@ -21,12 +21,12 @@ import (
 func TestInverseIndex(t *testing.T) {
 	t.Parallel()
 	for i := 0; i < maxNodeChildren; i++ {
-		for len := 0; len <= stride; len++ {
-			addr := i & (0xFF << (stride - len))
-			idx := prefixToBaseIndex(uint(addr), len)
+		for bits := 0; bits <= stride; bits++ {
+			addr := i & (0xFF << (stride - bits))
+			idx := prefixToBaseIndex(uint(addr), bits)
 			addr2, len2 := baseIndexToPrefix(idx)
-			if addr2 != uint(addr) || len2 != len {
-				t.Errorf("inverse(index(%d/%d)) != %d/%d", addr, len, addr2, len2)
+			if addr2 != uint(addr) || len2 != bits {
+				t.Errorf("inverse(index(%d/%d)) != %d/%d", addr, bits, addr2, len2)
 			}
 		}
 	}

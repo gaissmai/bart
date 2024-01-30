@@ -1068,8 +1068,8 @@ func randomPrefixes4(n int) []slowPrefixEntry[int] {
 	pfxs := map[netip.Prefix]bool{}
 
 	for len(pfxs) < n {
-		len := rand.Intn(33)
-		pfx, err := randomAddr4().Prefix(len)
+		bits := rand.Intn(33)
+		pfx, err := randomAddr4().Prefix(bits)
 		if err != nil {
 			panic(err)
 		}
@@ -1089,8 +1089,8 @@ func randomPrefixes6(n int) []slowPrefixEntry[int] {
 	pfxs := map[netip.Prefix]bool{}
 
 	for len(pfxs) < n {
-		len := rand.Intn(129)
-		pfx, err := randomAddr6().Prefix(len)
+		bits := rand.Intn(129)
+		pfx, err := randomAddr6().Prefix(bits)
 		if err != nil {
 			panic(err)
 		}
@@ -1109,9 +1109,8 @@ func randomPrefixes6(n int) []slowPrefixEntry[int] {
 func randomAddr() netip.Addr {
 	if rand.Intn(2) == 1 {
 		return randomAddr6()
-	} else {
-		return randomAddr4()
 	}
+	return randomAddr4()
 }
 
 // randomAddr4 returns a randomly generated IPv4 address.
