@@ -166,7 +166,7 @@ func (p *prefixCBTree[V]) getVal(baseIdx uint) *V {
 	return nil
 }
 
-// allIndexes returns all baseIndexes set in this prefix tree.
+// allIndexes returns all baseIndexes set in this prefix tree in ascending order.
 func (p *prefixCBTree[V]) allIndexes() []uint {
 	all := make([]uint, p.indexes.Count())
 	p.indexes.NextSetMany(0, all)
@@ -214,7 +214,7 @@ func (c *childTree[V]) get(addr uint) *node[V] {
 	return c.nodes[c.rank(addr)]
 }
 
-// allAddrs returns the addrs of all child nodes.
+// allAddrs returns the addrs of all child nodes in ascending order.
 func (c *childTree[V]) allAddrs() []uint {
 	all := make([]uint, c.addrs.Count())
 	c.addrs.NextSetMany(0, all)
