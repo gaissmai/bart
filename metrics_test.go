@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestStatsticsZero(t *testing.T) {
+func TestStatisticsZero(t *testing.T) {
 	tbl := new(Table[any])
 	stats := tbl.readTableStats()
 
@@ -27,17 +27,17 @@ func TestStatsticsZero(t *testing.T) {
 	wantTypes4 := map[string]int{"ROOT": 1}
 	gotTypes4 := stats["/ipv4/types:histogram"].(map[string]int)
 	if !reflect.DeepEqual(gotTypes4, wantTypes4) {
-		t.Errorf("Delete, Types4, want: %v, got: %v", wantTypes4, gotTypes4)
+		t.Errorf("Zero, Types4, want: %v, got: %v", wantTypes4, gotTypes4)
 	}
 
 	wantTypes6 := map[string]int{"ROOT": 1}
 	gotTypes6 := stats["/ipv6/types:histogram"].(map[string]int)
 	if !reflect.DeepEqual(gotTypes6, wantTypes6) {
-		t.Errorf("Delete, Types6, want: %v, got: %v", wantTypes6, gotTypes6)
+		t.Errorf("Zero, Types6, want: %v, got: %v", wantTypes6, gotTypes6)
 	}
 }
 
-func TestStatsticsOne(t *testing.T) {
+func TestStatisticsOne(t *testing.T) {
 	p := netip.MustParsePrefix
 	tbl := new(Table[any])
 	tbl.Insert(p("10.0.0.0/8"), nil)
@@ -61,17 +61,17 @@ func TestStatsticsOne(t *testing.T) {
 	wantTypes4 := map[string]int{"LEAF": 1}
 	gotTypes4 := stats["/ipv4/types:histogram"].(map[string]int)
 	if !reflect.DeepEqual(gotTypes4, wantTypes4) {
-		t.Errorf("Delete, Types4, want: %v, got: %v", wantTypes4, gotTypes4)
+		t.Errorf("One, Types4, want: %v, got: %v", wantTypes4, gotTypes4)
 	}
 
 	wantTypes6 := map[string]int{"LEAF": 1}
 	gotTypes6 := stats["/ipv6/types:histogram"].(map[string]int)
 	if !reflect.DeepEqual(gotTypes6, wantTypes6) {
-		t.Errorf("Delete, Types6, want: %v, got: %v", wantTypes6, gotTypes6)
+		t.Errorf("One, Types6, want: %v, got: %v", wantTypes6, gotTypes6)
 	}
 }
 
-func TestStatsticsDuplicate(t *testing.T) {
+func TestStatisticsDuplicate(t *testing.T) {
 	p := netip.MustParsePrefix
 	tbl := new(Table[any])
 	tbl.Insert(p("10.0.0.1/32"), nil)
@@ -121,7 +121,7 @@ func TestStatsticsDuplicate(t *testing.T) {
 	}
 }
 
-func TestStatsticsDelete(t *testing.T) {
+func TestStatisticsDelete(t *testing.T) {
 	p := netip.MustParsePrefix
 	tbl := new(Table[any])
 	tbl.Insert(p("10.0.0.1/32"), nil)
@@ -159,7 +159,7 @@ func TestStatsticsDelete(t *testing.T) {
 	}
 }
 
-func TestStatsticsSome(t *testing.T) {
+func TestStatisticsSome(t *testing.T) {
 	p := netip.MustParsePrefix
 	tbl := new(Table[any])
 
