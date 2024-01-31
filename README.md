@@ -15,9 +15,9 @@ The lookup time is by a factor of <1.5 slower on average as the
 routing algorithms ART, SMART, CPE, ... but reduces the memory
 consumption by an order of magnitude in comparison.
 
-BART is a popcount compressed multibit-trie, using the
-'baseIndex' function from the ART algorithm to build the
-complete binary prefix tree (CBT) for each stride.
+BART is a multibit-trie, using the 'baseIndex' function from the
+ART algorithm to build the complete binary prefix tree (CBT)
+for each stride.
 
 The second key factor is popcount level compression
 and backtracking along the CBT prefix tree in O(k).
