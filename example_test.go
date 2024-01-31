@@ -8,32 +8,29 @@ import (
 	"github.com/gaissmai/bart"
 )
 
-func mustAddr(s string) netip.Addr {
-	return netip.MustParseAddr(s)
-}
-
-func mustPfx(s string) netip.Prefix {
-	return netip.MustParsePrefix(s)
-}
+var (
+	a = netip.MustParseAddr
+	p = netip.MustParsePrefix
+)
 
 var input = []struct {
 	cidr    netip.Prefix
 	nextHop netip.Addr
 }{
-	{mustPfx("fe80::/10"), mustAddr("::1%lo")},
-	{mustPfx("172.16.0.0/12"), mustAddr("8.8.8.8")},
-	{mustPfx("10.0.0.0/24"), mustAddr("8.8.8.8")},
-	{mustPfx("::1/128"), mustAddr("::1%eth0")},
-	{mustPfx("192.168.0.0/16"), mustAddr("9.9.9.9")},
-	{mustPfx("10.0.0.0/8"), mustAddr("9.9.9.9")},
-	{mustPfx("::/0"), mustAddr("2001:db8::1")},
-	{mustPfx("10.0.1.0/24"), mustAddr("10.0.0.0")},
-	{mustPfx("169.254.0.0/16"), mustAddr("10.0.0.0")},
-	{mustPfx("2000::/3"), mustAddr("2001:db8::1")},
-	{mustPfx("2001:db8::/32"), mustAddr("2001:db8::1")},
-	{mustPfx("127.0.0.0/8"), mustAddr("127.0.0.1")},
-	{mustPfx("127.0.0.1/32"), mustAddr("127.0.0.1")},
-	{mustPfx("192.168.1.0/24"), mustAddr("127.0.0.1")},
+	{p("fe80::/10"), a("::1%lo")},
+	{p("172.16.0.0/12"), a("8.8.8.8")},
+	{p("10.0.0.0/24"), a("8.8.8.8")},
+	{p("::1/128"), a("::1%eth0")},
+	{p("192.168.0.0/16"), a("9.9.9.9")},
+	{p("10.0.0.0/8"), a("9.9.9.9")},
+	{p("::/0"), a("2001:db8::1")},
+	{p("10.0.1.0/24"), a("10.0.0.0")},
+	{p("169.254.0.0/16"), a("10.0.0.0")},
+	{p("2000::/3"), a("2001:db8::1")},
+	{p("2001:db8::/32"), a("2001:db8::1")},
+	{p("127.0.0.0/8"), a("127.0.0.1")},
+	{p("127.0.0.1/32"), a("127.0.0.1")},
+	{p("192.168.1.0/24"), a("127.0.0.1")},
 }
 
 func ExampleTable_Lookup() {
@@ -45,15 +42,15 @@ func ExampleTable_Lookup() {
 
 	fmt.Println()
 
-	ip := mustAddr("42.0.0.0")
+	ip := a("42.0.0.0")
 	lpm, value, ok := rtbl.Lookup(ip)
 	fmt.Printf("Lookup: %-20v lpm: %-15v value: %11v, ok: %v\n", ip, lpm, value, ok)
 
-	ip = mustAddr("10.0.1.17")
+	ip = a("10.0.1.17")
 	lpm, value, ok = rtbl.Lookup(ip)
 	fmt.Printf("Lookup: %-20v lpm: %-15v value: %11v, ok: %v\n", ip, lpm, value, ok)
 
-	ip = mustAddr("2001:7c0:3100:1::111")
+	ip = a("2001:7c0:3100:1::111")
 	lpm, value, ok = rtbl.Lookup(ip)
 	fmt.Printf("Lookup: %-20v lpm: %-15v value: %11v, ok: %v\n", ip, lpm, value, ok)
 
