@@ -23,6 +23,11 @@ type tableStats struct {
 	// "/ipv6/types:histogram" node-type distribution, is path compression useful?
 	types4 map[string]int
 	types6 map[string]int
+
+	// "/ipv4/prefixlen:histogram" prefixlen distribution
+	// "/ipv6/prefixlen:histogram" prefixlen distribution
+	prefixlen4 map[int]int
+	prefixlen6 map[int]int
 }
 
 // readTableStats returns some metrics of the routing table.
@@ -44,6 +49,9 @@ func (t *Table[V]) readTableStats() map[string]any {
 		//
 		types4: map[string]int{},
 		types6: map[string]int{},
+		//
+		prefixlen4: map[int]int{},
+		prefixlen6: map[int]int{},
 	}
 
 	// walk the routing table, gather stats
@@ -54,11 +62,21 @@ func (t *Table[V]) readTableStats() map[string]any {
 			stats.childs4[len(n.children.nodes)]++
 			stats.depth4[depth]++
 			stats.types4[n.hasType().String()]++
+
+			for _, idx := range n.prefixes.allIndexes() {
+				pfxLen := baseIndexToPrefixLen(idx)
+				stats.prefixlen4[stride*depth+pfxLen]++
+			}
 		case false:
 			stats.size6 += len(n.prefixes.values)
 			stats.childs6[len(n.children.nodes)]++
 			stats.depth6[depth]++
 			stats.types6[n.hasType().String()]++
+
+			for _, idx := range n.prefixes.allIndexes() {
+				pfxLen := baseIndexToPrefixLen(idx)
+				stats.prefixlen6[stride*depth+pfxLen]++
+			}
 		}
 	})
 
@@ -73,6 +91,9 @@ func (t *Table[V]) readTableStats() map[string]any {
 	//
 	ret["/ipv4/types:histogram"] = stats.types4
 	ret["/ipv6/types:histogram"] = stats.types6
+	//
+	ret["/ipv4/prefixlen:histogram"] = stats.prefixlen4
+	ret["/ipv6/prefixlen:histogram"] = stats.prefixlen6
 
 	return ret
 }

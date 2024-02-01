@@ -234,4 +234,17 @@ func TestStatisticsSome(t *testing.T) {
 	if !reflect.DeepEqual(gotTypes6, wantTypes6) {
 		t.Errorf("Some, Types6, want:\n%v\ngot:\n%v", wantTypes6, gotTypes6)
 	}
+
+	// prefixLen distribution
+	wantPfxLen4 := map[int]int{8: 2, 12: 1, 16: 2, 24: 3, 32: 1}
+	gotPfxLen4 := stats["/ipv4/prefixlen:histogram"].(map[int]int)
+	if !reflect.DeepEqual(gotPfxLen4, wantPfxLen4) {
+		t.Errorf("Some, Prefixlen4, want: %v, got: %v", wantPfxLen4, gotPfxLen4)
+	}
+
+	wantPfxLen6 := map[int]int{0: 1, 3: 1, 10: 1, 32: 1, 128: 1}
+	gotPfxLen6 := stats["/ipv6/prefixlen:histogram"].(map[int]int)
+	if !reflect.DeepEqual(gotPfxLen6, wantPfxLen6) {
+		t.Errorf("Some, Prefixlen6, want: %v, got: %v", wantPfxLen6, gotPfxLen6)
+	}
 }
