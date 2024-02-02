@@ -240,11 +240,14 @@ func (t *Table[V]) lpmByIP(ip netip.Addr) (depth int, baseIdx uint, val V, ok bo
 
 	// start backtracking at leaf node in tight loop
 	for {
-		// longest prefix match?
-		if baseIdx, val, ok := n.prefixes.lpmByIndex(addrToBaseIndex(addr)); ok {
-			// return also baseIdx and the depth, needed to
-			// calculate the lpm prefix by the Lookup method.
-			return depth, baseIdx, val, true
+		// lookup only in nodes with prefixes, skip over intermediate nodes
+		if len(n.prefixes.values) != 0 {
+			// longest prefix match?
+			if baseIdx, val, ok := n.prefixes.lpmByIndex(addrToBaseIndex(addr)); ok {
+				// return also baseIdx and the depth, needed to
+				// calculate the lpm prefix by the Lookup method.
+				return depth, baseIdx, val, true
+			}
 		}
 
 		// end condition, stack is exhausted
