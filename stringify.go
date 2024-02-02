@@ -25,10 +25,13 @@ type kidT[V any] struct {
 
 // String returns a hierarchical tree diagram of the ordered CIDRs
 // as string, just a wrapper for [Table.Fprint].
+// If Fprint returns an error, String panics.
 func (t *Table[V]) String() string {
 	t.init()
 	w := new(strings.Builder)
-	_ = t.Fprint(w)
+	if err := t.Fprint(w); err != nil {
+		panic(err)
+	}
 	return w.String()
 }
 
