@@ -34,137 +34,134 @@ func TestInsert(t *testing.T) {
 	tbl.Insert(p("192.168.0.1/32"), 1)
 	tbl.Insert(p("192.168.0.1/32"), 1) // no-op
 	checkRoutes(t, tbl, []tableTest{
-		{"192.168.0.1", 1},
-		{"192.168.0.2", -1},
-		{"192.168.0.3", -1},
-		{"192.168.0.255", -1},
-		{"192.168.1.1", -1},
-		{"192.170.1.1", -1},
-		{"192.180.0.1", -1},
-		{"192.180.3.5", -1},
-		{"10.0.0.5", -1},
-		{"10.0.0.15", -1},
+		{"192.168.0.1", 1, 1},
+		{"192.168.0.2", -1, -1},
+		{"192.168.0.3", -1, -1},
+		{"192.168.0.255", -1, -1},
+		{"192.168.1.1", -1, -1},
+		{"192.170.1.1", -1, -1},
+		{"192.180.0.1", -1, -1},
+		{"192.180.3.5", -1, -1},
+		{"10.0.0.5", -1, -1},
+		{"10.0.0.15", -1, -1},
 	})
 
 	// Insert into previous leaf, no tree changes
 	tbl.Insert(p("192.168.0.2/32"), 2)
 	checkRoutes(t, tbl, []tableTest{
-		{"192.168.0.1", 1},
-		{"192.168.0.2", 2},
-		{"192.168.0.3", -1},
-		{"192.168.0.255", -1},
-		{"192.168.1.1", -1},
-		{"192.170.1.1", -1},
-		{"192.180.0.1", -1},
-		{"192.180.3.5", -1},
-		{"10.0.0.5", -1},
-		{"10.0.0.15", -1},
+		{"192.168.0.1", 1, 1},
+		{"192.168.0.2", 2, 2},
+		{"192.168.0.3", -1, -1},
+		{"192.168.0.255", -1, -1},
+		{"192.168.1.1", -1, -1},
+		{"192.170.1.1", -1, -1},
+		{"192.180.0.1", -1, -1},
+		{"192.180.3.5", -1, -1},
+		{"10.0.0.5", -1, -1},
+		{"10.0.0.15", -1, -1},
 	})
 
 	// Insert into previous leaf, unaligned prefix covering the /32s
 	tbl.Insert(p("192.168.0.0/26"), 7)
 	checkRoutes(t, tbl, []tableTest{
-		{"192.168.0.1", 1},
-		{"192.168.0.2", 2},
-		{"192.168.0.3", 7},
-		{"192.168.0.255", -1},
-		{"192.168.1.1", -1},
-		{"192.170.1.1", -1},
-		{"192.180.0.1", -1},
-		{"192.180.3.5", -1},
-		{"10.0.0.5", -1},
-		{"10.0.0.15", -1},
+		{"192.168.0.1", 1, 7},
+		{"192.168.0.2", 2, 7},
+		{"192.168.0.3", 7, 7},
+		{"192.168.0.255", -1, -1},
+		{"192.168.1.1", -1, -1},
+		{"192.170.1.1", -1, -1},
+		{"192.180.0.1", -1, -1},
+		{"192.180.3.5", -1, -1},
+		{"10.0.0.5", -1, -1},
+		{"10.0.0.15", -1, -1},
 	})
 
 	// Create a different leaf elsewhere
 	tbl.Insert(p("10.0.0.0/27"), 3)
 	checkRoutes(t, tbl, []tableTest{
-		{"192.168.0.1", 1},
-		{"192.168.0.2", 2},
-		{"192.168.0.3", 7},
-		{"192.168.0.255", -1},
-		{"192.168.1.1", -1},
-		{"192.170.1.1", -1},
-		{"192.180.0.1", -1},
-		{"192.180.3.5", -1},
-		{"10.0.0.5", 3},
-		{"10.0.0.15", 3},
+		{"192.168.0.1", 1, 7},
+		{"192.168.0.2", 2, 7},
+		{"192.168.0.3", 7, 7},
+		{"192.168.0.255", -1, -1},
+		{"192.168.1.1", -1, -1},
+		{"192.170.1.1", -1, -1},
+		{"192.180.0.1", -1, -1},
+		{"192.180.3.5", -1, -1},
+		{"10.0.0.5", 3, 3},
+		{"10.0.0.15", 3, 3},
 	})
-
 	// Insert that creates a new intermediate table and a new child
 	tbl.Insert(p("192.168.1.1/32"), 4)
 	checkRoutes(t, tbl, []tableTest{
-		{"192.168.0.1", 1},
-		{"192.168.0.2", 2},
-		{"192.168.0.3", 7},
-		{"192.168.0.255", -1},
-		{"192.168.1.1", 4},
-		{"192.170.1.1", -1},
-		{"192.180.0.1", -1},
-		{"192.180.3.5", -1},
-		{"10.0.0.5", 3},
-		{"10.0.0.15", 3},
+		{"192.168.0.1", 1, 7},
+		{"192.168.0.2", 2, 7},
+		{"192.168.0.3", 7, 7},
+		{"192.168.0.255", -1, -1},
+		{"192.168.1.1", 4, 4},
+		{"192.170.1.1", -1, -1},
+		{"192.180.0.1", -1, -1},
+		{"192.180.3.5", -1, -1},
+		{"10.0.0.5", 3, 3},
+		{"10.0.0.15", 3, 3},
 	})
-
 	// Insert that creates a new intermediate table but no new child
 	tbl.Insert(p("192.170.0.0/16"), 5)
 	checkRoutes(t, tbl, []tableTest{
-		{"192.168.0.1", 1},
-		{"192.168.0.2", 2},
-		{"192.168.0.3", 7},
-		{"192.168.0.255", -1},
-		{"192.168.1.1", 4},
-		{"192.170.1.1", 5},
-		{"192.180.0.1", -1},
-		{"192.180.3.5", -1},
-		{"10.0.0.5", 3},
-		{"10.0.0.15", 3},
+		{"192.168.0.1", 1, 7},
+		{"192.168.0.2", 2, 7},
+		{"192.168.0.3", 7, 7},
+		{"192.168.0.255", -1, -1},
+		{"192.168.1.1", 4, 4},
+		{"192.170.1.1", 5, 5},
+		{"192.180.0.1", -1, -1},
+		{"192.180.3.5", -1, -1},
+		{"10.0.0.5", 3, 3},
+		{"10.0.0.15", 3, 3},
 	})
-
 	// New leaf in a different subtree.
 	tbl.Insert(p("192.180.0.1/32"), 8)
 	checkRoutes(t, tbl, []tableTest{
-		{"192.168.0.1", 1},
-		{"192.168.0.2", 2},
-		{"192.168.0.3", 7},
-		{"192.168.0.255", -1},
-		{"192.168.1.1", 4},
-		{"192.170.1.1", 5},
-		{"192.180.0.1", 8},
-		{"192.180.3.5", -1},
-		{"10.0.0.5", 3},
-		{"10.0.0.15", 3},
+		{"192.168.0.1", 1, 7},
+		{"192.168.0.2", 2, 7},
+		{"192.168.0.3", 7, 7},
+		{"192.168.0.255", -1, -1},
+		{"192.168.1.1", 4, 4},
+		{"192.170.1.1", 5, 5},
+		{"192.180.0.1", 8, 8},
+		{"192.180.3.5", -1, -1},
+		{"10.0.0.5", 3, 3},
+		{"10.0.0.15", 3, 3},
 	})
 
 	// Insert that creates a new intermediate table but no new child,
 	// with an unaligned intermediate
 	tbl.Insert(p("192.180.0.0/21"), 9)
 	checkRoutes(t, tbl, []tableTest{
-		{"192.168.0.1", 1},
-		{"192.168.0.2", 2},
-		{"192.168.0.3", 7},
-		{"192.168.0.255", -1},
-		{"192.168.1.1", 4},
-		{"192.170.1.1", 5},
-		{"192.180.0.1", 8},
-		{"192.180.3.5", 9},
-		{"10.0.0.5", 3},
-		{"10.0.0.15", 3},
+		{"192.168.0.1", 1, 7},
+		{"192.168.0.2", 2, 7},
+		{"192.168.0.3", 7, 7},
+		{"192.168.0.255", -1, -1},
+		{"192.168.1.1", 4, 4},
+		{"192.170.1.1", 5, 5},
+		{"192.180.0.1", 8, 9},
+		{"192.180.3.5", 9, 9},
+		{"10.0.0.5", 3, 3},
+		{"10.0.0.15", 3, 3},
 	})
 
 	// Insert a default route, those have their own codepath.
 	tbl.Insert(p("0.0.0.0/0"), 6)
 	checkRoutes(t, tbl, []tableTest{
-		{"192.168.0.1", 1},
-		{"192.168.0.2", 2},
-		{"192.168.0.3", 7},
-		{"192.168.0.255", 6},
-		{"192.168.1.1", 4},
-		{"192.170.1.1", 5},
-		{"192.180.0.1", 8},
-		{"192.180.3.5", 9},
-		{"10.0.0.5", 3},
-		{"10.0.0.15", 3},
+		{"192.168.0.1", 1, 6},
+		{"192.168.0.2", 2, 6},
+		{"192.168.0.3", 7, 6},
+		{"192.168.0.255", 6, 6},
+		{"192.168.1.1", 4, 6},
+		{"192.170.1.1", 5, 6},
+		{"192.180.0.1", 8, 6},
+		{"192.180.3.5", 9, 6},
+		{"10.0.0.5", 3, 6},
+		{"10.0.0.15", 3, 6},
 	})
 
 	// Now all of the above again, but for IPv6.
@@ -172,106 +169,106 @@ func TestInsert(t *testing.T) {
 	// Create a new leaf node.
 	tbl.Insert(p("ff:aaaa::1/128"), 1)
 	checkRoutes(t, tbl, []tableTest{
-		{"ff:aaaa::1", 1},
-		{"ff:aaaa::2", -1},
-		{"ff:aaaa::3", -1},
-		{"ff:aaaa::255", -1},
-		{"ff:aaaa:aaaa::1", -1},
-		{"ff:aaaa:aaaa:bbbb::1", -1},
-		{"ff:cccc::1", -1},
-		{"ff:cccc::ff", -1},
-		{"ffff:bbbb::5", -1},
-		{"ffff:bbbb::15", -1},
+		{"ff:aaaa::1", 1, 1},
+		{"ff:aaaa::2", -1, -1},
+		{"ff:aaaa::3", -1, -1},
+		{"ff:aaaa::255", -1, -1},
+		{"ff:aaaa:aaaa::1", -1, -1},
+		{"ff:aaaa:aaaa:bbbb::1", -1, -1},
+		{"ff:cccc::1", -1, -1},
+		{"ff:cccc::ff", -1, -1},
+		{"ffff:bbbb::5", -1, -1},
+		{"ffff:bbbb::15", -1, -1},
 	})
 
 	// Insert into previous leaf, no tree changes
 	tbl.Insert(p("ff:aaaa::2/128"), 2)
 	checkRoutes(t, tbl, []tableTest{
-		{"ff:aaaa::1", 1},
-		{"ff:aaaa::2", 2},
-		{"ff:aaaa::3", -1},
-		{"ff:aaaa::255", -1},
-		{"ff:aaaa:aaaa::1", -1},
-		{"ff:aaaa:aaaa:bbbb::1", -1},
-		{"ff:cccc::1", -1},
-		{"ff:cccc::ff", -1},
-		{"ffff:bbbb::5", -1},
-		{"ffff:bbbb::15", -1},
+		{"ff:aaaa::1", 1, 1},
+		{"ff:aaaa::2", 2, 2},
+		{"ff:aaaa::3", -1, -1},
+		{"ff:aaaa::255", -1, -1},
+		{"ff:aaaa:aaaa::1", -1, -1},
+		{"ff:aaaa:aaaa:bbbb::1", -1, -1},
+		{"ff:cccc::1", -1, -1},
+		{"ff:cccc::ff", -1, -1},
+		{"ffff:bbbb::5", -1, -1},
+		{"ffff:bbbb::15", -1, -1},
 	})
 
 	// Insert into previous leaf, unaligned prefix covering the /128s
 	tbl.Insert(p("ff:aaaa::/125"), 7)
 	checkRoutes(t, tbl, []tableTest{
-		{"ff:aaaa::1", 1},
-		{"ff:aaaa::2", 2},
-		{"ff:aaaa::3", 7},
-		{"ff:aaaa::255", -1},
-		{"ff:aaaa:aaaa::1", -1},
-		{"ff:aaaa:aaaa:bbbb::1", -1},
-		{"ff:cccc::1", -1},
-		{"ff:cccc::ff", -1},
-		{"ffff:bbbb::5", -1},
-		{"ffff:bbbb::15", -1},
+		{"ff:aaaa::1", 1, 7},
+		{"ff:aaaa::2", 2, 7},
+		{"ff:aaaa::3", 7, 7},
+		{"ff:aaaa::255", -1, -1},
+		{"ff:aaaa:aaaa::1", -1, -1},
+		{"ff:aaaa:aaaa:bbbb::1", -1, -1},
+		{"ff:cccc::1", -1, -1},
+		{"ff:cccc::ff", -1, -1},
+		{"ffff:bbbb::5", -1, -1},
+		{"ffff:bbbb::15", -1, -1},
 	})
 
 	// Create a different leaf elsewhere
 	tbl.Insert(p("ffff:bbbb::/120"), 3)
 	checkRoutes(t, tbl, []tableTest{
-		{"ff:aaaa::1", 1},
-		{"ff:aaaa::2", 2},
-		{"ff:aaaa::3", 7},
-		{"ff:aaaa::255", -1},
-		{"ff:aaaa:aaaa::1", -1},
-		{"ff:aaaa:aaaa:bbbb::1", -1},
-		{"ff:cccc::1", -1},
-		{"ff:cccc::ff", -1},
-		{"ffff:bbbb::5", 3},
-		{"ffff:bbbb::15", 3},
+		{"ff:aaaa::1", 1, 7},
+		{"ff:aaaa::2", 2, 7},
+		{"ff:aaaa::3", 7, 7},
+		{"ff:aaaa::255", -1, -1},
+		{"ff:aaaa:aaaa::1", -1, -1},
+		{"ff:aaaa:aaaa:bbbb::1", -1, -1},
+		{"ff:cccc::1", -1, -1},
+		{"ff:cccc::ff", -1, -1},
+		{"ffff:bbbb::5", 3, 3},
+		{"ffff:bbbb::15", 3, 3},
 	})
 
 	// Insert that creates a new intermediate table and a new child
 	tbl.Insert(p("ff:aaaa:aaaa::1/128"), 4)
 	checkRoutes(t, tbl, []tableTest{
-		{"ff:aaaa::1", 1},
-		{"ff:aaaa::2", 2},
-		{"ff:aaaa::3", 7},
-		{"ff:aaaa::255", -1},
-		{"ff:aaaa:aaaa::1", 4},
-		{"ff:aaaa:aaaa:bbbb::1", -1},
-		{"ff:cccc::1", -1},
-		{"ff:cccc::ff", -1},
-		{"ffff:bbbb::5", 3},
-		{"ffff:bbbb::15", 3},
+		{"ff:aaaa::1", 1, 7},
+		{"ff:aaaa::2", 2, 7},
+		{"ff:aaaa::3", 7, 7},
+		{"ff:aaaa::255", -1, -1},
+		{"ff:aaaa:aaaa::1", 4, 4},
+		{"ff:aaaa:aaaa:bbbb::1", -1, -1},
+		{"ff:cccc::1", -1, -1},
+		{"ff:cccc::ff", -1, -1},
+		{"ffff:bbbb::5", 3, 3},
+		{"ffff:bbbb::15", 3, 3},
 	})
 
 	// Insert that creates a new intermediate table but no new child
 	tbl.Insert(p("ff:aaaa:aaaa:bb00::/56"), 5)
 	checkRoutes(t, tbl, []tableTest{
-		{"ff:aaaa::1", 1},
-		{"ff:aaaa::2", 2},
-		{"ff:aaaa::3", 7},
-		{"ff:aaaa::255", -1},
-		{"ff:aaaa:aaaa::1", 4},
-		{"ff:aaaa:aaaa:bbbb::1", 5},
-		{"ff:cccc::1", -1},
-		{"ff:cccc::ff", -1},
-		{"ffff:bbbb::5", 3},
-		{"ffff:bbbb::15", 3},
+		{"ff:aaaa::1", 1, 7},
+		{"ff:aaaa::2", 2, 7},
+		{"ff:aaaa::3", 7, 7},
+		{"ff:aaaa::255", -1, -1},
+		{"ff:aaaa:aaaa::1", 4, 4},
+		{"ff:aaaa:aaaa:bbbb::1", 5, 5},
+		{"ff:cccc::1", -1, -1},
+		{"ff:cccc::ff", -1, -1},
+		{"ffff:bbbb::5", 3, 3},
+		{"ffff:bbbb::15", 3, 3},
 	})
 
 	// New leaf in a different subtree.
 	tbl.Insert(p("ff:cccc::1/128"), 8)
 	checkRoutes(t, tbl, []tableTest{
-		{"ff:aaaa::1", 1},
-		{"ff:aaaa::2", 2},
-		{"ff:aaaa::3", 7},
-		{"ff:aaaa::255", -1},
-		{"ff:aaaa:aaaa::1", 4},
-		{"ff:aaaa:aaaa:bbbb::1", 5},
-		{"ff:cccc::1", 8},
-		{"ff:cccc::ff", -1},
-		{"ffff:bbbb::5", 3},
-		{"ffff:bbbb::15", 3},
+		{"ff:aaaa::1", 1, 7},
+		{"ff:aaaa::2", 2, 7},
+		{"ff:aaaa::3", 7, 7},
+		{"ff:aaaa::255", -1, -1},
+		{"ff:aaaa:aaaa::1", 4, 4},
+		{"ff:aaaa:aaaa:bbbb::1", 5, 5},
+		{"ff:cccc::1", 8, 8},
+		{"ff:cccc::ff", -1, -1},
+		{"ffff:bbbb::5", 3, 3},
+		{"ffff:bbbb::15", 3, 3},
 	})
 
 	// Insert that creates a new intermediate table but no new child,
@@ -279,32 +276,32 @@ func TestInsert(t *testing.T) {
 	tbl.Insert(p("ff:cccc::/37"), 9)
 	tbl.Insert(p("ff:cccc::/37"), 9) // no-op
 	checkRoutes(t, tbl, []tableTest{
-		{"ff:aaaa::1", 1},
-		{"ff:aaaa::2", 2},
-		{"ff:aaaa::3", 7},
-		{"ff:aaaa::255", -1},
-		{"ff:aaaa:aaaa::1", 4},
-		{"ff:aaaa:aaaa:bbbb::1", 5},
-		{"ff:cccc::1", 8},
-		{"ff:cccc::ff", 9},
-		{"ffff:bbbb::5", 3},
-		{"ffff:bbbb::15", 3},
+		{"ff:aaaa::1", 1, 7},
+		{"ff:aaaa::2", 2, 7},
+		{"ff:aaaa::3", 7, 7},
+		{"ff:aaaa::255", -1, -1},
+		{"ff:aaaa:aaaa::1", 4, 4},
+		{"ff:aaaa:aaaa:bbbb::1", 5, 5},
+		{"ff:cccc::1", 8, 9},
+		{"ff:cccc::ff", 9, 9},
+		{"ffff:bbbb::5", 3, 3},
+		{"ffff:bbbb::15", 3, 3},
 	})
 
 	// Insert a default route, those have their own codepath.
 	tbl.Insert(p("::/0"), 6)
 	tbl.Insert(p("::/0"), 6) // no-op
 	checkRoutes(t, tbl, []tableTest{
-		{"ff:aaaa::1", 1},
-		{"ff:aaaa::2", 2},
-		{"ff:aaaa::3", 7},
-		{"ff:aaaa::255", 6},
-		{"ff:aaaa:aaaa::1", 4},
-		{"ff:aaaa:aaaa:bbbb::1", 5},
-		{"ff:cccc::1", 8},
-		{"ff:cccc::ff", 9},
-		{"ffff:bbbb::5", 3},
-		{"ffff:bbbb::15", 3},
+		{"ff:aaaa::1", 1, 6},
+		{"ff:aaaa::2", 2, 6},
+		{"ff:aaaa::3", 7, 6},
+		{"ff:aaaa::255", 6, 6},
+		{"ff:aaaa:aaaa::1", 4, 6},
+		{"ff:aaaa:aaaa:bbbb::1", 5, 6},
+		{"ff:cccc::1", 8, 6},
+		{"ff:cccc::ff", 9, 6},
+		{"ffff:bbbb::5", 3, 6},
+		{"ffff:bbbb::15", 3, 6},
 	})
 }
 
@@ -325,14 +322,14 @@ func TestDelete(t *testing.T) {
 
 		tbl.Insert(p("10.0.0.0/8"), 1)
 		checkRoutes(t, tbl, []tableTest{
-			{"10.0.0.1", 1},
-			{"255.255.255.255", -1},
+			{"10.0.0.1", 1, 1},
+			{"255.255.255.255", -1, -1},
 		})
 		checkSize(t, tbl, 2)
 		tbl.Delete(p("10.0.0.0/8"))
 		checkRoutes(t, tbl, []tableTest{
-			{"10.0.0.1", -1},
-			{"255.255.255.255", -1},
+			{"10.0.0.1", -1, -1},
+			{"255.255.255.255", -1, -1},
 		})
 		checkSize(t, tbl, 2)
 	})
@@ -344,13 +341,13 @@ func TestDelete(t *testing.T) {
 
 		tbl.Insert(p("192.168.0.1/32"), 1)
 		checkRoutes(t, tbl, []tableTest{
-			{"192.168.0.1", 1},
-			{"255.255.255.255", -1},
+			{"192.168.0.1", 1, 1},
+			{"255.255.255.255", -1, -1},
 		})
 		tbl.Delete(p("192.168.0.1/32"))
 		checkRoutes(t, tbl, []tableTest{
-			{"192.168.0.1", -1},
-			{"255.255.255.255", -1},
+			{"192.168.0.1", -1, -1},
+			{"255.255.255.255", -1, -1},
 		})
 		checkSize(t, tbl, 2)
 	})
@@ -362,16 +359,16 @@ func TestDelete(t *testing.T) {
 		tbl.Insert(p("192.168.0.1/32"), 1)
 		tbl.Insert(p("192.180.0.1/32"), 2)
 		checkRoutes(t, tbl, []tableTest{
-			{"192.168.0.1", 1},
-			{"192.180.0.1", 2},
-			{"192.40.0.1", -1},
+			{"192.168.0.1", 1, 1},
+			{"192.180.0.1", 2, 2},
+			{"192.40.0.1", -1, -1},
 		})
 		checkSize(t, tbl, 7) // 2 roots, 3 intermediate, 2 leaves
 		tbl.Delete(p("192.180.0.1/32"))
 		checkRoutes(t, tbl, []tableTest{
-			{"192.168.0.1", 1},
-			{"192.180.0.1", -1},
-			{"192.40.0.1", -1},
+			{"192.168.0.1", 1, 1},
+			{"192.180.0.1", -1, -1},
+			{"192.40.0.1", -1, -1},
 		})
 		checkSize(t, tbl, 5) // 2 roots, 2 intermediates, 1 leaf
 	})
@@ -384,18 +381,18 @@ func TestDelete(t *testing.T) {
 		tbl.Insert(p("192.180.0.1/32"), 2)
 		tbl.Insert(p("192.0.0.0/10"), 3)
 		checkRoutes(t, tbl, []tableTest{
-			{"192.168.0.1", 1},
-			{"192.180.0.1", 2},
-			{"192.40.0.1", 3},
-			{"192.255.0.1", -1},
+			{"192.168.0.1", 1, 1},
+			{"192.180.0.1", 2, 2},
+			{"192.40.0.1", 3, 3},
+			{"192.255.0.1", -1, -1},
 		})
 		checkSize(t, tbl, 7) // 2 roots, 2 intermediates, 2 leaves
 		tbl.Delete(p("192.180.0.1/32"))
 		checkRoutes(t, tbl, []tableTest{
-			{"192.168.0.1", 1},
-			{"192.180.0.1", -1},
-			{"192.40.0.1", 3},
-			{"192.255.0.1", -1},
+			{"192.168.0.1", 1, 1},
+			{"192.180.0.1", -1, -1},
+			{"192.40.0.1", 3, 3},
+			{"192.255.0.1", -1, -1},
 		})
 		checkSize(t, tbl, 5) // 2 roots, 1 full, 1 intermediate, 1 leaf
 	})
@@ -408,18 +405,18 @@ func TestDelete(t *testing.T) {
 		tbl.Insert(p("192.180.0.1/32"), 2)
 		tbl.Insert(p("192.200.0.1/32"), 3)
 		checkRoutes(t, tbl, []tableTest{
-			{"192.168.0.1", 1},
-			{"192.180.0.1", 2},
-			{"192.200.0.1", 3},
-			{"192.255.0.1", -1},
+			{"192.168.0.1", 1, 1},
+			{"192.180.0.1", 2, 2},
+			{"192.200.0.1", 3, 3},
+			{"192.255.0.1", -1, -1},
 		})
 		checkSize(t, tbl, 9) // 2 roots, 4 intermediate, 3 leaves
 		tbl.Delete(p("192.180.0.1/32"))
 		checkRoutes(t, tbl, []tableTest{
-			{"192.168.0.1", 1},
-			{"192.180.0.1", -1},
-			{"192.200.0.1", 3},
-			{"192.255.0.1", -1},
+			{"192.168.0.1", 1, 1},
+			{"192.180.0.1", -1, -1},
+			{"192.200.0.1", 3, 3},
+			{"192.255.0.1", -1, -1},
 		})
 		checkSize(t, tbl, 7) // 2 roots, 3 intermediate, 2 leaves
 	})
@@ -430,14 +427,14 @@ func TestDelete(t *testing.T) {
 		checkSize(t, tbl, 2)
 		tbl.Insert(p("192.168.0.1/32"), 1)
 		checkRoutes(t, tbl, []tableTest{
-			{"192.168.0.1", 1},
-			{"192.255.0.1", -1},
+			{"192.168.0.1", 1, 1},
+			{"192.255.0.1", -1, -1},
 		})
 		checkSize(t, tbl, 5)          // 2 roots, 2 intermediate, 1 leaf
 		tbl.Delete(p("200.0.0.0/32")) // lookup miss in root
 		checkRoutes(t, tbl, []tableTest{
-			{"192.168.0.1", 1},
-			{"192.255.0.1", -1},
+			{"192.168.0.1", 1, 1},
+			{"192.255.0.1", -1, -1},
 		})
 		checkSize(t, tbl, 5) // 2 roots, 2 intermediate, 1 leaf
 	})
@@ -449,14 +446,14 @@ func TestDelete(t *testing.T) {
 		checkSize(t, tbl, 2)
 		tbl.Insert(p("192.168.0.1/32"), 1)
 		checkRoutes(t, tbl, []tableTest{
-			{"192.168.0.1", 1},
-			{"192.255.0.1", -1},
+			{"192.168.0.1", 1, 1},
+			{"192.255.0.1", -1, -1},
 		})
 		checkSize(t, tbl, 5)            // 2 roots, 2 intermediate, 1 leaf
 		tbl.Delete(p("192.168.0.5/32")) // right leaf, no route
 		checkRoutes(t, tbl, []tableTest{
-			{"192.168.0.1", 1},
-			{"192.255.0.1", -1},
+			{"192.168.0.1", 1, 1},
+			{"192.255.0.1", -1, -1},
 		})
 		checkSize(t, tbl, 5) // 2 roots, 2 intermediate, 1 leaf
 	})
@@ -469,16 +466,16 @@ func TestDelete(t *testing.T) {
 		tbl.Insert(p("192.168.0.1/32"), 1)
 		tbl.Insert(p("192.168.0.0/22"), 2)
 		checkRoutes(t, tbl, []tableTest{
-			{"192.168.0.1", 1},
-			{"192.168.0.2", 2},
-			{"192.255.0.1", -1},
+			{"192.168.0.1", 1, 2},
+			{"192.168.0.2", 2, 2},
+			{"192.255.0.1", -1, -1},
 		})
 		checkSize(t, tbl, 5) // 2 roots, 1 intermediate, 1 full, 1 leaf
 		tbl.Delete(p("192.168.0.0/22"))
 		checkRoutes(t, tbl, []tableTest{
-			{"192.168.0.1", 1},
-			{"192.168.0.2", -1},
-			{"192.255.0.1", -1},
+			{"192.168.0.1", 1, 1},
+			{"192.168.0.2", -1, -1},
+			{"192.255.0.1", -1, -1},
 		})
 		checkSize(t, tbl, 5) // 2 roots, 2 intermediate, 1 leaf
 	})
@@ -492,7 +489,8 @@ func TestDelete(t *testing.T) {
 		tbl.Delete(p("0.0.0.0/0"))
 
 		checkRoutes(t, tbl, []tableTest{
-			{"1.2.3.4", -1},
+			{"1.2.3.4", -1, -1},
+			{"::1", 1, 1},
 		})
 		checkSize(t, tbl, 2) // 2 roots
 	})
@@ -520,11 +518,31 @@ func TestInsertCompare(t *testing.T) {
 		if !getsEqual(slowVal, slowOK, fastVal, fastOK) {
 			t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", a, fastVal, fastOK, slowVal, slowOK)
 		}
+
 		if a.Is6() {
 			seenVals6[fastVal] = true
 		} else {
 			seenVals4[fastVal] = true
 		}
+
+		slowPfx, slowVal, slowOK := slow.lpm(a)
+		fastPfx, fastVal, fastOK := fast.Lookup(a)
+		if slowPfx != fastPfx {
+			t.Fatalf("lpm(%q) = (%v, %v, %v), want (%v, %v, %v)", a, fastPfx, fastVal, fastOK, slowPfx, slowVal, slowOK)
+		}
+		if !getsEqual(slowVal, slowOK, fastVal, fastOK) {
+			t.Fatalf("lpm(%q) = (%v, %v), want (%v, %v)", a, fastVal, fastOK, slowVal, slowOK)
+		}
+
+		slowPfx, slowVal, slowOK = slow.spm(a)
+		fastPfx, fastVal, fastOK = fast.LookupShortest(a)
+		if slowPfx != fastPfx {
+			t.Fatalf("spm(%q) = (%v, %v, %v), want (%v, %v, %v)", a, fastPfx, fastVal, fastOK, slowPfx, slowVal, slowOK)
+		}
+		if !getsEqual(slowVal, slowOK, fastVal, fastOK) {
+			t.Fatalf("spm(%q) = (%v, %v), want (%v, %v)", a, fastVal, fastOK, slowVal, slowOK)
+		}
+
 	}
 
 	// Empirically, 10k probes into 5k v4 prefixes and 5k v6 prefixes results in
@@ -645,6 +663,25 @@ func TestDeleteCompare(t *testing.T) {
 		} else {
 			seenVals4[fastVal] = true
 		}
+
+		slowPfx, slowVal, slowOK := slow.lpm(a)
+		fastPfx, fastVal, fastOK := fast.Lookup(a)
+		if slowPfx != fastPfx {
+			t.Fatalf("lpm(%q) = (%v, %v, %v), want (%v, %v, %v)", a, fastPfx, fastVal, fastOK, slowPfx, slowVal, slowOK)
+		}
+		if !getsEqual(slowVal, slowOK, fastVal, fastOK) {
+			t.Fatalf("lpm(%q) = (%v, %v), want (%v, %v)", a, fastVal, fastOK, slowVal, slowOK)
+		}
+
+		slowPfx, slowVal, slowOK = slow.spm(a)
+		fastPfx, fastVal, fastOK = fast.LookupShortest(a)
+		if slowPfx != fastPfx {
+			t.Fatalf("spm(%q) = (%v, %v, %v), want (%v, %v, %v)", a, fastPfx, fastVal, fastOK, slowPfx, slowVal, slowOK)
+		}
+		if !getsEqual(slowVal, slowOK, fastVal, fastOK) {
+			t.Fatalf("spm(%q) = (%v, %v), want (%v, %v)", a, fastVal, fastOK, slowVal, slowOK)
+		}
+
 	}
 	// Empirically, 10k probes into 5k v4 prefixes and 5k v6 prefixes results in
 	// ~1k distinct values for v4 and ~300 for v6. distinct routes. This sanity
@@ -733,7 +770,7 @@ func TestDeleteIsReverseOfInsert(t *testing.T) {
 		}
 	}()
 
-	want := tab.String()
+	want := tab.dumpString()
 	for _, p := range prefixes {
 		tab.Insert(p.pfx, p.val)
 	}
@@ -741,7 +778,7 @@ func TestDeleteIsReverseOfInsert(t *testing.T) {
 	for i := len(prefixes) - 1; i >= 0; i-- {
 		tab.Delete(prefixes[i].pfx)
 	}
-	if got := tab.String(); got != want {
+	if got := tab.dumpString(); got != want {
 		t.Fatalf("after delete, mismatch:\n\n got: %s\n\nwant: %s", got, want)
 	}
 }
@@ -752,23 +789,40 @@ type tableTest struct {
 	// want is the expected >=0 value associated with the route, or -1
 	// if we expect a lookup miss.
 	want int
+	// spm is the expected >=0 value associated with the spm route, or -1
+	// if we expect a lookup miss.
+	spm int
 }
 
 // checkRoutes verifies that the route lookups in tt return the
 // expected results on tbl.
 func checkRoutes(t *testing.T, tbl *Table[int], tt []tableTest) {
+	a := netip.MustParseAddr
 	t.Helper()
 	for _, tc := range tt {
-		v, ok := tbl.Get(netip.MustParseAddr(tc.addr))
+		v, ok := tbl.Get(a(tc.addr))
+
 		if !ok && tc.want != -1 {
 			t.Errorf("Get %q got (%v, %v), want (_, false)", tc.addr, v, ok)
 		}
 		if ok && v != tc.want {
 			t.Errorf("Get %q got (%v, %v), want (%v, true)", tc.addr, v, ok, tc.want)
 		}
-		_, v, ok = tbl.Lookup(netip.MustParseAddr(tc.addr))
+
+		_, v, ok = tbl.Lookup(a(tc.addr))
 		if !ok && tc.want != -1 {
 			t.Errorf("Lookup %q got (%v, %v), want (_, false)", tc.addr, v, ok)
+		}
+		if ok && v != tc.want {
+			t.Errorf("Lookup %q got (%v, %v), want (%v, true)", tc.addr, v, ok, tc.want)
+		}
+
+		_, v, ok = tbl.LookupShortest(a(tc.addr))
+		if !ok && tc.spm != -1 {
+			t.Errorf("LookupShortest %q got (%v, %v), want (_, false)", tc.addr, v, ok)
+		}
+		if ok && v != tc.spm {
+			t.Errorf("LookupShortest %q got (%v, %v), want (%v, true)", tc.addr, v, ok, tc.spm)
 		}
 	}
 }
@@ -950,6 +1004,49 @@ func BenchmarkTableLookup(b *testing.B) {
 	})
 }
 
+func BenchmarkTableLookupSPM(b *testing.B) {
+	forFamilyAndCount(b, func(b *testing.B, routes []slowPrefixEntry[int]) {
+		genAddr := randomAddr4
+		if routes[0].pfx.Addr().Is6() {
+			genAddr = randomAddr6
+		}
+		var rt Table[int]
+		for _, route := range routes {
+			rt.Insert(route.pfx, route.val)
+		}
+		addrAllocs, addrBytes := getMemCost(func() {
+			// Have to run genAddr more than once, otherwise the reported
+			// cost is 16 bytes - presumably due to some amortized costs in
+			// the memory allocator? Either way, empirically 100 iterations
+			// reliably reports the correct cost.
+			for i := 0; i < 100; i++ {
+				_ = genAddr()
+			}
+		})
+		addrAllocs /= 100
+		addrBytes /= 100
+		var t runningTimer
+		allocs, bytes := getMemCost(func() {
+			for i := 0; i < b.N; i++ {
+				addr := genAddr()
+				t.Start()
+				_, writeSink, _ = rt.LookupShortest(addr)
+				t.Stop()
+			}
+		})
+		b.ReportAllocs() // Enables the output, but we report manually below
+		allocs -= (addrAllocs * float64(b.N))
+		bytes -= (addrBytes * float64(b.N))
+		lookups := float64(b.N)
+		elapsed := float64(t.Elapsed().Nanoseconds())
+		elapsedSec := float64(t.Elapsed().Seconds())
+		b.ReportMetric(elapsed/lookups, "ns/op")
+		b.ReportMetric(lookups/elapsedSec, "addrs/s")
+		b.ReportMetric(allocs/lookups, "allocs/op")
+		b.ReportMetric(bytes/lookups, "B/op")
+	})
+}
+
 // getMemCost runs fn 100 times and returns the number of allocations and bytes
 // allocated by each call to fn.
 //
@@ -1043,16 +1140,35 @@ type slowPrefixEntry[V any] struct {
 	val V
 }
 
-func (t *slowPrefixTable[V]) get(addr netip.Addr) (ret V, ok bool) {
+func (ts *slowPrefixTable[V]) get(addr netip.Addr) (val V, ok bool) {
+	_, val, ok = ts.lpm(addr)
+	return
+}
+
+func (ts *slowPrefixTable[V]) lpm(addr netip.Addr) (lpm netip.Prefix, val V, ok bool) {
 	bestLen := -1
 
-	for _, pfx := range t.prefixes {
-		if pfx.pfx.Contains(addr) && pfx.pfx.Bits() > bestLen {
-			ret = pfx.val
-			bestLen = pfx.pfx.Bits()
+	for _, item := range ts.prefixes {
+		if item.pfx.Contains(addr) && item.pfx.Bits() > bestLen {
+			lpm = item.pfx
+			val = item.val
+			bestLen = item.pfx.Bits()
 		}
 	}
-	return ret, bestLen != -1
+	return lpm, val, bestLen != -1
+}
+
+func (ts *slowPrefixTable[V]) spm(addr netip.Addr) (spm netip.Prefix, val V, ok bool) {
+	bestLen := 129
+
+	for _, item := range ts.prefixes {
+		if item.pfx.Contains(addr) && item.pfx.Bits() < bestLen {
+			spm = item.pfx
+			val = item.val
+			bestLen = item.pfx.Bits()
+		}
+	}
+	return spm, val, bestLen != 129
 }
 
 // randomPrefixes returns n randomly generated prefixes and associated values,

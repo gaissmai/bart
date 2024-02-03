@@ -55,7 +55,7 @@ func TestPrefixInsert(t *testing.T) {
 	fast := newNode[int]()
 
 	for _, pfx := range pfxs {
-		fast.prefixes.insert(uint(pfx.addr), pfx.len, pfx.val)
+		fast.prefixes.insert(uint(pfx.addr), pfx.bits, pfx.val)
 	}
 
 	for i := 0; i < 256; i++ {
@@ -64,6 +64,12 @@ func TestPrefixInsert(t *testing.T) {
 		_, fastVal, fastOK := fast.prefixes.lpmByAddr(addr)
 		if !getsEqual(fastVal, fastOK, slowVal, slowOK) {
 			t.Fatalf("get(%d) = (%v, %v), want (%v, %v)", addr, fastVal, fastOK, slowVal, slowOK)
+		}
+
+		slowVal, slowOK = slow.spm(addr)
+		_, fastVal, fastOK = fast.prefixes.spmByAddr(addr)
+		if !getsEqual(fastVal, fastOK, slowVal, slowOK) {
+			t.Fatalf("spm(%d) = (%v, %v), want (%v, %v)", addr, fastVal, fastOK, slowVal, slowOK)
 		}
 	}
 }
@@ -76,13 +82,13 @@ func TestPrefixDelete(t *testing.T) {
 	fast := newNode[int]()
 
 	for _, pfx := range pfxs {
-		fast.prefixes.insert(pfx.addr, pfx.len, pfx.val)
+		fast.prefixes.insert(pfx.addr, pfx.bits, pfx.val)
 	}
 
 	toDelete := pfxs[:50]
 	for _, pfx := range toDelete {
-		slow.delete(pfx.addr, pfx.len)
-		fast.prefixes.delete(pfx.addr, pfx.len)
+		slow.delete(pfx.addr, pfx.bits)
+		fast.prefixes.delete(pfx.addr, pfx.bits)
 	}
 
 	// Sanity check that slowTable seems to have done the right thing.
@@ -96,6 +102,12 @@ func TestPrefixDelete(t *testing.T) {
 		_, fastVal, fastOK := fast.prefixes.lpmByAddr(addr)
 		if !getsEqual(fastVal, fastOK, slowVal, slowOK) {
 			t.Fatalf("get(%d) = (%v, %v), want (%v, %v)", addr, fastVal, fastOK, slowVal, slowOK)
+		}
+
+		slowVal, slowOK = slow.spm(addr)
+		_, fastVal, fastOK = fast.prefixes.spmByAddr(addr)
+		if !getsEqual(fastVal, fastOK, slowVal, slowOK) {
+			t.Fatalf("spm(%d) = (%v, %v), want (%v, %v)", addr, fastVal, fastOK, slowVal, slowOK)
 		}
 	}
 }
@@ -123,7 +135,7 @@ func forPrefixCount(b *testing.B, fn func(b *testing.B, routes []slowEntry[int])
 			routes := append([]slowEntry[int](nil), routes[:nroutes]...)
 			b.Run("random_order", runAndRecord)
 			sort.Slice(routes, func(i, j int) bool {
-				if routes[i].len < routes[j].len {
+				if routes[i].bits < routes[j].bits {
 					return true
 				}
 				return routes[i].addr < routes[j].addr
@@ -138,7 +150,7 @@ func BenchmarkPrefixInsertion(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			rt := newNode[int]()
 			for _, route := range routes {
-				rt.prefixes.insert(route.addr, route.len, val)
+				rt.prefixes.insert(route.addr, route.bits, val)
 			}
 		}
 		inserts := float64(b.N) * float64(len(routes))
@@ -154,14 +166,14 @@ func BenchmarkPrefixDeletion(b *testing.B) {
 		val := 0
 		rt := newNode[int]()
 		for _, route := range routes {
-			rt.prefixes.insert(route.addr, route.len, val)
+			rt.prefixes.insert(route.addr, route.bits, val)
 		}
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			rt2 := rt
 			for _, route := range routes {
-				rt2.prefixes.delete(route.addr, route.len)
+				rt2.prefixes.delete(route.addr, route.bits)
 			}
 		}
 		deletes := float64(b.N) * float64(len(routes))
@@ -180,12 +192,30 @@ func BenchmarkPrefixGet(b *testing.B) {
 	routes := shufflePrefixes(allPrefixes())[:100]
 	rt := newNode[int]()
 	for _, route := range routes {
-		rt.prefixes.insert(route.addr, route.len, route.val)
+		rt.prefixes.insert(route.addr, route.bits, route.val)
 	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, writeSink, _ = rt.prefixes.lpmByAddr(uint(i))
+	}
+	gets := float64(b.N)
+	elapsedSec := b.Elapsed().Seconds()
+	b.ReportMetric(gets/elapsedSec, "routes/s")
+}
+
+func BenchmarkPrefixSPM(b *testing.B) {
+	// No need to forCountAndOrdering here, route lookup time is independent of
+	// the route count.
+	routes := shufflePrefixes(allPrefixes())[:100]
+	rt := newNode[int]()
+	for _, route := range routes {
+		rt.prefixes.insert(route.addr, route.bits, route.val)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, writeSink, _ = rt.prefixes.spmByAddr(uint(i))
 	}
 	gets := float64(b.N)
 	elapsedSec := b.Elapsed().Seconds()
@@ -202,45 +232,60 @@ type slowTable[V any] struct {
 
 type slowEntry[V any] struct {
 	addr uint
-	len  int
+	bits int
 	val  V
 }
 
-func (t *slowTable[V]) String() string {
-	pfxs := append([]slowEntry[V](nil), t.prefixes...)
+func (stbl *slowTable[V]) String() string {
+	pfxs := append([]slowEntry[V](nil), stbl.prefixes...)
 	sort.Slice(pfxs, func(i, j int) bool {
-		if pfxs[i].len != pfxs[j].len {
-			return pfxs[i].len < pfxs[j].len
+		if pfxs[i].bits != pfxs[j].bits {
+			return pfxs[i].bits < pfxs[j].bits
 		}
 		return pfxs[i].addr < pfxs[j].addr
 	})
 	var ret bytes.Buffer
 	for _, pfx := range pfxs {
-		fmt.Fprintf(&ret, "%3d/%d (%08b/%08b) = %v\n", pfx.addr, pfx.len, pfx.addr, pfxMask(pfx.len), pfx.val)
+		fmt.Fprintf(&ret, "%3d/%d (%08b/%08b) = %v\n", pfx.addr, pfx.bits, pfx.addr, pfxMask(pfx.bits), pfx.val)
 	}
 	return ret.String()
 }
 
-func (t *slowTable[V]) delete(addr uint, prefixLen int) {
-	pfx := make([]slowEntry[V], 0, len(t.prefixes))
-	for _, e := range t.prefixes {
-		if e.addr == addr && e.len == prefixLen {
+func (stbl *slowTable[V]) delete(addr uint, prefixLen int) {
+	pfx := make([]slowEntry[V], 0, len(stbl.prefixes))
+	for _, e := range stbl.prefixes {
+		if e.addr == addr && e.bits == prefixLen {
 			continue
 		}
 		pfx = append(pfx, e)
 	}
-	t.prefixes = pfx
+	stbl.prefixes = pfx
 }
 
-func (t *slowTable[V]) get(addr uint) (ret V, ok bool) {
-	curLen := -1
-	for _, e := range t.prefixes {
-		if addr&pfxMask(e.len) == e.addr && e.len >= curLen {
+// get, longest-prefix-match
+func (stbl *slowTable[V]) get(addr uint) (ret V, ok bool) {
+	const noMatch = -1
+	longest := noMatch
+	for _, e := range stbl.prefixes {
+		if addr&pfxMask(e.bits) == e.addr && e.bits >= longest {
 			ret = e.val
-			curLen = e.len
+			longest = e.bits
 		}
 	}
-	return ret, curLen != -1
+	return ret, longest != noMatch
+}
+
+// spm, shortest-prefix-match
+func (stbl *slowTable[V]) spm(addr uint) (ret V, ok bool) {
+	const noMatch = 9
+	shortest := noMatch
+	for _, e := range stbl.prefixes {
+		if addr&pfxMask(e.bits) == e.addr && e.bits <= shortest {
+			ret = e.val
+			shortest = e.bits
+		}
+	}
+	return ret, shortest != noMatch
 }
 
 func pfxMask(pfxLen int) uint {
@@ -249,9 +294,9 @@ func pfxMask(pfxLen int) uint {
 
 func allPrefixes() []slowEntry[int] {
 	ret := make([]slowEntry[int], 0, maxNodePrefixes-1)
-	for i := 1; i < maxNodePrefixes; i++ {
-		a, l := baseIndexToPrefix(uint(i))
-		ret = append(ret, slowEntry[int]{a, l, i})
+	for idx := 1; idx < maxNodePrefixes; idx++ {
+		addr, bits := baseIndexToPrefix(uint(idx))
+		ret = append(ret, slowEntry[int]{addr, bits, idx})
 	}
 	return ret
 }

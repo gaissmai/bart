@@ -10,10 +10,17 @@ import (
 	"strings"
 )
 
-// Dump the IPv4 and IPv6 tables to w.
-// Needed during development and debugging, especially for the
-// hierarchical tree in the String method, OMG.
-// Will be removed when the API stabilizes.
+// dumpString is just a wrapper for Dump.
+func (t *Table[V]) dumpString() string {
+	w := new(strings.Builder)
+	if err := t.dump(w); err != nil {
+		panic(err)
+	}
+	return w.String()
+}
+
+// dump the IPv4 and IPv6 tables to w.
+// Useful during development and debugging.
 //
 //	 Output:
 //
@@ -40,7 +47,7 @@ import (
 //		...prefxs(#1): 1/8
 //
 // ...
-func (t *Table[V]) Dump(w io.Writer) error {
+func (t *Table[V]) dump(w io.Writer) error {
 	t.init()
 
 	if err := t.dump4(w); err != nil {

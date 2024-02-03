@@ -49,14 +49,6 @@ func TestFullNew(t *testing.T) {
 	runtime.ReadMemStats(&endMem)
 	bartBytes := endMem.TotalAlloc - startMem.TotalAlloc
 
-	// rtArt := art.Table[any]{}
-	// runtime.ReadMemStats(&startMem)
-	// for _, route := range nRoutes {
-	// 	rtArt.Insert(route.CIDR, nil)
-	// }
-	// runtime.ReadMemStats(&endMem)
-	// artBytes := endMem.TotalAlloc - startMem.TotalAlloc
-
 	t.Logf("BART: n: %d routes, raw: %d KBytes, bart: %6d KBytes, mult: %.2f (bart/raw)",
 		len(nRoutes), rawBytes/(2<<10), bartBytes/(2<<10), float32(bartBytes)/float32(rawBytes))
 
@@ -79,14 +71,6 @@ func TestFullNewV4(t *testing.T) {
 	}
 	runtime.ReadMemStats(&endMem)
 	bartBytes := endMem.TotalAlloc - startMem.TotalAlloc
-
-	// rtArt := art.Table[any]{}
-	// runtime.ReadMemStats(&startMem)
-	// for _, route := range nRoutes {
-	// 	rtArt.Insert(route.CIDR, nil)
-	// }
-	// runtime.ReadMemStats(&endMem)
-	// artBytes := endMem.TotalAlloc - startMem.TotalAlloc
 
 	t.Logf("BART: n: %d routes, raw: %d KBytes, bart: %6d KBytes, mult: %.2f (bart/raw)",
 		len(nRoutes), rawBytes/(2<<10), bartBytes/(2<<10), float32(bartBytes)/float32(rawBytes))
@@ -111,14 +95,6 @@ func TestFullNewV6(t *testing.T) {
 	runtime.ReadMemStats(&endMem)
 	bartBytes := endMem.TotalAlloc - startMem.TotalAlloc
 
-	// rtArt := art.Table[any]{}
-	// runtime.ReadMemStats(&startMem)
-	// for _, route := range nRoutes {
-	// 	rtArt.Insert(route.CIDR, nil)
-	// }
-	// runtime.ReadMemStats(&endMem)
-	// artBytes := endMem.TotalAlloc - startMem.TotalAlloc
-
 	t.Logf("BART: n: %d routes, raw: %d KBytes, bart: %6d KBytes, mult: %.2f (bart/raw)",
 		len(nRoutes), rawBytes/(2<<10), bartBytes/(2<<10), float32(bartBytes)/float32(rawBytes))
 
@@ -133,11 +109,9 @@ var (
 
 func BenchmarkFullMatchV4(b *testing.B) {
 	var rtBart bart.Table[int]
-	// var rtArt art.Table[int]
 
 	for i, route := range routes {
 		rtBart.Insert(route.CIDR, i)
-		// rtArt.Insert(route.CIDR, i)
 	}
 
 	var ip netip.Addr
@@ -151,35 +125,33 @@ func BenchmarkFullMatchV4(b *testing.B) {
 		}
 	}
 
-	// b.Run("ARTGet", func(b *testing.B) {
-	// 	b.ResetTimer()
-	// 	for k := 0; k < b.N; k++ {
-	// 		intSink, okSink = rtArt.Get(ip)
-	// 	}
-	// })
-
-	b.Run("BARTGet", func(b *testing.B) {
+	b.Run("Get", func(b *testing.B) {
 		b.ResetTimer()
 		for k := 0; k < b.N; k++ {
 			intSink, okSink = rtBart.Get(ip)
 		}
 	})
 
-	b.Run("BARTLookup", func(b *testing.B) {
+	b.Run("Lookup", func(b *testing.B) {
 		b.ResetTimer()
 		for k := 0; k < b.N; k++ {
 			_, intSink, okSink = rtBart.Lookup(ip)
+		}
+	})
+
+	b.Run("LookupSCP", func(b *testing.B) {
+		b.ResetTimer()
+		for k := 0; k < b.N; k++ {
+			_, _, okSink = rtBart.LookupShortest(ip)
 		}
 	})
 }
 
 func BenchmarkFullMatchV6(b *testing.B) {
 	var rtBart bart.Table[int]
-	// var rtArt art.Table[int]
 
 	for i, route := range routes {
 		rtBart.Insert(route.CIDR, i)
-		// rtArt.Insert(route.CIDR, i)
 	}
 
 	var ip netip.Addr
@@ -193,35 +165,33 @@ func BenchmarkFullMatchV6(b *testing.B) {
 		}
 	}
 
-	// b.Run("ARTGet", func(b *testing.B) {
-	// 	b.ResetTimer()
-	// 	for k := 0; k < b.N; k++ {
-	// 		intSink, okSink = rtArt.Get(ip)
-	// 	}
-	// })
-
-	b.Run("BARTGet", func(b *testing.B) {
+	b.Run("Get", func(b *testing.B) {
 		b.ResetTimer()
 		for k := 0; k < b.N; k++ {
 			intSink, okSink = rtBart.Get(ip)
 		}
 	})
 
-	b.Run("BARTLookup", func(b *testing.B) {
+	b.Run("Lookup", func(b *testing.B) {
 		b.ResetTimer()
 		for k := 0; k < b.N; k++ {
 			_, intSink, okSink = rtBart.Lookup(ip)
+		}
+	})
+
+	b.Run("LookupSCP", func(b *testing.B) {
+		b.ResetTimer()
+		for k := 0; k < b.N; k++ {
+			_, _, okSink = rtBart.LookupShortest(ip)
 		}
 	})
 }
 
 func BenchmarkFullMissV4(b *testing.B) {
 	var rtBart bart.Table[int]
-	// var rtArt art.Table[int]
 
 	for i, route := range routes {
 		rtBart.Insert(route.CIDR, i)
-		// rtArt.Insert(route.CIDR, i)
 	}
 
 	var ip netip.Addr
@@ -234,35 +204,33 @@ func BenchmarkFullMissV4(b *testing.B) {
 		}
 	}
 
-	// b.Run("ARTGet", func(b *testing.B) {
-	// 	b.ResetTimer()
-	// 	for k := 0; k < b.N; k++ {
-	// 		intSink, okSink = rtArt.Get(ip)
-	// 	}
-	// })
-
-	b.Run("BARTGet", func(b *testing.B) {
+	b.Run("Get", func(b *testing.B) {
 		b.ResetTimer()
 		for k := 0; k < b.N; k++ {
 			intSink, okSink = rtBart.Get(ip)
 		}
 	})
 
-	b.Run("BARTLookup", func(b *testing.B) {
+	b.Run("Lookup", func(b *testing.B) {
 		b.ResetTimer()
 		for k := 0; k < b.N; k++ {
 			_, intSink, okSink = rtBart.Lookup(ip)
+		}
+	})
+
+	b.Run("LookupSCP", func(b *testing.B) {
+		b.ResetTimer()
+		for k := 0; k < b.N; k++ {
+			_, _, okSink = rtBart.LookupShortest(ip)
 		}
 	})
 }
 
 func BenchmarkFullMissV6(b *testing.B) {
 	var rtBart bart.Table[int]
-	// var rtArt art.Table[int]
 
 	for i, route := range routes {
 		rtBart.Insert(route.CIDR, i)
-		// rtArt.Insert(route.CIDR, i)
 	}
 
 	var ip netip.Addr
@@ -275,24 +243,24 @@ func BenchmarkFullMissV6(b *testing.B) {
 		}
 	}
 
-	// b.Run("ARTGet", func(b *testing.B) {
-	// 	b.ResetTimer()
-	// 	for k := 0; k < b.N; k++ {
-	// 		intSink, okSink = rtArt.Get(ip)
-	// 	}
-	// })
-
-	b.Run("BARTGet", func(b *testing.B) {
+	b.Run("Get", func(b *testing.B) {
 		b.ResetTimer()
 		for k := 0; k < b.N; k++ {
 			intSink, okSink = rtBart.Get(ip)
 		}
 	})
 
-	b.Run("BARTLookup", func(b *testing.B) {
+	b.Run("Lookup", func(b *testing.B) {
 		b.ResetTimer()
 		for k := 0; k < b.N; k++ {
 			_, intSink, okSink = rtBart.Lookup(ip)
+		}
+	})
+
+	b.Run("LookupSCP", func(b *testing.B) {
+		b.ResetTimer()
+		for k := 0; k < b.N; k++ {
+			_, _, okSink = rtBart.LookupShortest(ip)
 		}
 	})
 }

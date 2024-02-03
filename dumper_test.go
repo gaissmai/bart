@@ -21,7 +21,7 @@ func TestDumperPanic(t *testing.T) {
 	p := netip.MustParsePrefix
 	tbl := new(Table[any])
 	tbl.Insert(p("1.2.3.4/32"), nil)
-	_ = tbl.Dump(nil)
+	_ = tbl.dump(nil)
 }
 
 func TestDumperEmpty(t *testing.T) {
@@ -263,7 +263,7 @@ func checkDump(t *testing.T, tbl *Table[any], tt dumpTest) {
 		tbl.Insert(cidr, nil)
 	}
 	w := new(strings.Builder)
-	if err := tbl.Dump(w); err != nil {
+	if err := tbl.dump(w); err != nil {
 		t.Errorf("Dump() unexpected err: %v", err)
 	}
 	got := w.String()

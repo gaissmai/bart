@@ -46,17 +46,15 @@ the backtracking algorithm is as fast as possible.
   
   func (t *Table[V]) Get(ip netip.Addr) (val V, ok bool)
   func (t *Table[V]) Lookup(ip netip.Addr) (lpm netip.Prefix, val V, ok bool)
+  func (t *Table[V]) LookupShortest(ip netip.Addr) (spm netip.Prefix, val V, ok bool)
   
   func (t *Table[V]) String() string
   func (t *Table[V]) Fprint(w io.Writer) error
-  
-  func (t *Table[V]) Dump(w io.Writer)
 ```
 
 # TODO
 
-- [x] try a simplest implementation with a hashmap for level compression (done, see branch hashmap)
-- [ ] try multi level strides
+- [ ] implement Overlaps ...
  
 # CREDIT
 

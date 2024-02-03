@@ -173,7 +173,7 @@ func (t *Table[V]) Delete(pfx netip.Prefix) {
 	}
 }
 
-// Get does a route lookup for addr and returns the associated value and true, or false if
+// Get does a route lookup for IP and returns the associated value and true, or false if
 // no route matched.
 func (t *Table[V]) Get(ip netip.Addr) (val V, ok bool) {
 	t.init()
@@ -181,7 +181,7 @@ func (t *Table[V]) Get(ip netip.Addr) (val V, ok bool) {
 	return
 }
 
-// Lookup does a route lookup for addr and returns the longest prefix,
+// Lookup does a route lookup for IP and returns the longest prefix,
 // the associated value and true for success, or false otherwise if
 // no route matched.
 //
@@ -259,5 +259,70 @@ func (t *Table[V]) lpmByIP(ip netip.Addr) (depth int, baseIdx uint, val V, ok bo
 		depth--
 		addr = uint(bs[depth])
 		n = pathStack[depth]
+	}
+}
+
+// LookupShortest does a route lookup for IP and returns the
+// shortest matching prefix, the associated value and true for success,
+// or false otherwise if no route matched.
+//
+// It is, so to speak, the opposite of lookup and is only required for very
+// special cases.
+func (t *Table[V]) LookupShortest(ip netip.Addr) (spm netip.Prefix, val V, ok bool) {
+	t.init()
+
+	if depth, baseIdx, val, ok := t.spmByIP(ip); ok {
+
+		// add the bits from higher levels in child trie to pfxLen
+		bits := depth*stride + baseIndexToPrefixLen(baseIdx)
+
+		// mask prefix from lookup ip, masked with longest prefix bits.
+		spm = netip.PrefixFrom(ip, bits).Masked()
+
+		return spm, val, ok
+	}
+	return
+}
+
+// spmByIP does a route lookup for IP with shortest prefix match.
+// Returns also depth and baseIdx for Contains to retrieve the
+// spm prefix out of the prefix tree.
+func (t *Table[V]) spmByIP(ip netip.Addr) (depth int, baseIdx uint, val V, ok bool) {
+	// some needed values, see below
+	is4 := ip.Is4()
+
+	// get the root node of the routing table
+	n := t.rootNodeByVersion(is4)
+
+	// keep the spm alloc free, don't use ip.AsSlice here
+	a16 := ip.As16()
+	bs := a16[:]
+	if is4 {
+		bs = bs[12:]
+	}
+	// depth index for the child trie
+	depth = 0
+	for {
+		addr := uint(bs[depth]) // stride = 8!
+
+		// skip intermediate nodes
+		if len(n.prefixes.values) != 0 {
+			// forward test, no level backtracking, take the first spm
+			if baseIdx, val, ok = n.prefixes.spmByIndex(addrToBaseIndex(addr)); ok {
+				return depth, baseIdx, val, ok
+			}
+		}
+
+		// descend down to next child level
+		child := n.children.get(addr)
+
+		// stop condition
+		if child == nil {
+			return
+		}
+
+		// next round
+		depth++
+		n = child
 	}
 }

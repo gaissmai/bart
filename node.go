@@ -122,7 +122,7 @@ func (p *prefixCBTree[V]) delete(addr uint, prefixLen int) (wasPresent bool) {
 // at this depth and returns (baseIdx, value, true) if a matching
 // longest prefix exists, or ok=false otherwise.
 //
-// backtracking is fast, it's just a bitset test and, if found, a popcount.
+// backtracking is fast, it's just a bitset test and, if found, one popcount.
 func (p *prefixCBTree[V]) lpmByIndex(idx uint) (baseIdx uint, val V, ok bool) {
 	// max steps in backtracking is the stride length.
 	for {
@@ -156,6 +156,43 @@ func (p *prefixCBTree[V]) lpmByAddr(addr uint) (baseIdx uint, val V, ok bool) {
 //nolint:unused
 func (p *prefixCBTree[V]) lpmByPrefix(addr uint, prefixLen int) (baseIdx uint, val V, ok bool) {
 	return p.lpmByIndex(prefixToBaseIndex(addr, prefixLen))
+}
+
+// spmByIndex does a shortest-prefix-match for idx in the 8-bit (stride) routing table
+// at this depth and returns (baseIdx, value, true) if a matching
+// shortest prefix exists, or ok=false otherwise.
+//
+// backtracking is stride*bitset-test and, if found, one popcount.
+func (p *prefixCBTree[V]) spmByIndex(idx uint) (baseIdx uint, val V, ok bool) {
+	var shortest uint
+	// steps in backtracking is always the stride length for spm,
+	for {
+		if p.indexes.Test(idx) {
+			shortest = idx
+			// no fast exit on match for shortest-prefix-match.
+		}
+
+		if idx == 0 {
+			break
+		}
+
+		// cache friendly backtracking to the next less specific route.
+		// thanks to the complete binary tree it's just a shift operation.
+		idx >>= 1
+	}
+
+	if shortest != 0 {
+		return shortest, *(p.values[p.rank(shortest)]), true
+	}
+
+	// not found (on this level)
+	return 0, val, false
+}
+
+// spmByAddr does a shortest-prefix-match for addr in the 8-bit (stride) routing table.
+// It's an adapter to spmByIndex.
+func (p *prefixCBTree[V]) spmByAddr(addr uint) (baseIdx uint, val V, ok bool) {
+	return p.spmByIndex(addrToBaseIndex(addr))
 }
 
 // getVal for baseIdx.
