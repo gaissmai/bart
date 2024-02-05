@@ -23,16 +23,9 @@ func (t *Table[V]) MarshalJSON() ([]byte, error) {
 	result := struct {
 		Ipv4 []ListElement[V] `json:"ipv4,omitempty"`
 		Ipv6 []ListElement[V] `json:"ipv6,omitempty"`
-	}{}
-
-	var err error
-	result.Ipv4, err = t.DumpList(true)
-	if err != nil {
-		return nil, err
-	}
-	result.Ipv6, err = t.DumpList(false)
-	if err != nil {
-		return nil, err
+	}{
+		Ipv4: t.DumpList(true),
+		Ipv6: t.DumpList(false),
 	}
 
 	buf, err := json.Marshal(result)
@@ -44,40 +37,28 @@ func (t *Table[V]) MarshalJSON() ([]byte, error) {
 }
 
 // DumpList dumps ipv4 od ipv6 tree into list of roots and their children
-func (t *Table[V]) DumpList(is4 bool) ([]ListElement[V], error) {
+func (t *Table[V]) DumpList(is4 bool) []ListElement[V] {
 	t.init()
 	rootNode := t.rootNodeByVersion(is4)
 	if rootNode.isEmpty() {
-		return nil, nil
+		return nil
 	}
 
-	elements, err := rootNode.dumpList(0, nil, is4)
-	if err != nil {
-		return nil, err
-	}
-
-	return elements, nil
+	return rootNode.dumpListRec(0, nil, is4)
 }
 
-func (n *node[V]) dumpList(parentIdx uint, path []byte, is4 bool) ([]ListElement[V], error) {
+func (n *node[V]) dumpListRec(parentIdx uint, path []byte, is4 bool) []ListElement[V] {
 	directKids := n.getKidsRec(parentIdx, path, is4)
 	slices.SortFunc(directKids, sortPrefix[V])
 
 	elements := make([]ListElement[V], 0, len(directKids))
 	for _, kid := range directKids {
-		element := ListElement[V]{
-			Cidr:  kid.cidr,
-			Value: kid.val,
-		}
-
-		subnetList, err := kid.n.dumpList(kid.idx, kid.path, is4)
-		if err != nil {
-			return nil, err
-		}
-		element.Subnets = subnetList
-
-		elements = append(elements, element)
+		elements = append(elements, ListElement[V]{
+			Cidr:    kid.cidr,
+			Value:   kid.val,
+			Subnets: kid.n.dumpListRec(kid.idx, kid.path, is4),
+		})
 	}
 
-	return elements, nil
+	return elements
 }
