@@ -30,7 +30,7 @@ the backtracking algorithm is as fast as possible.
 
 # API (not stable!)
 
- ... but the library is ready to use, comments and PR welcome.
+ ... but the library is ready to use but still under development.
 
 ```golang
   import "github.com/gaissmai/bart"
@@ -55,7 +55,11 @@ the backtracking algorithm is as fast as possible.
 # TODO
 
 - [ ] implement Overlaps ...
- 
+
+# CONTRIBUTION
+
+Please open an issue for discussion before sending a pull request.
+
 # CREDIT
 
 Credits for many inspirations go to the clever guys at tailscale,
