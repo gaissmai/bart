@@ -145,6 +145,14 @@ func BenchmarkFullMatchV4(b *testing.B) {
 			_, _, okSink = rtBart.LookupShortest(ip)
 		}
 	})
+
+	pfx := randomPrefix4()
+	b.Run("OverlapsBart", func(b *testing.B) {
+		b.ResetTimer()
+		for k := 0; k < b.N; k++ {
+			okSink = rtBart.OverlapsPrefix(pfx)
+		}
+	})
 }
 
 func BenchmarkFullMatchV6(b *testing.B) {
@@ -183,6 +191,14 @@ func BenchmarkFullMatchV6(b *testing.B) {
 		b.ResetTimer()
 		for k := 0; k < b.N; k++ {
 			_, _, okSink = rtBart.LookupShortest(ip)
+		}
+	})
+
+	pfx := randomPrefix6()
+	b.Run("OverlapsBart", func(b *testing.B) {
+		b.ResetTimer()
+		for k := 0; k < b.N; k++ {
+			okSink = rtBart.OverlapsPrefix(pfx)
 		}
 	})
 }

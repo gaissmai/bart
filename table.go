@@ -326,3 +326,64 @@ func (t *Table[V]) spmByIP(ip netip.Addr) (depth int, baseIdx uint, val V, ok bo
 		n = child
 	}
 }
+
+// OverlapsPrefix reports whether any IP in pfx matches a route in the table.
+func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
+	t.init()
+	// always normalize the prefix
+	pfx = pfx.Masked()
+
+	// some needed values, see below
+	bits := pfx.Bits()
+	ip := pfx.Addr()
+	is4 := ip.Is4()
+
+	// get the root node of the routing table
+	n := t.rootNodeByVersion(is4)
+
+	// keep the overlaps alloc free, don't use ip.AsSlice here
+	a16 := ip.As16()
+	bs := a16[:]
+	if is4 {
+		bs = bs[12:]
+	}
+
+	// depth index for the child trie
+	depth := 0
+	addr := uint(bs[depth])
+
+	for {
+
+		// last prefix chunk reached
+		if bits <= stride {
+			// prefix overlaps any route in this node and vice versa OR
+			// prefix overlaps any child in this node?
+			return n.prefixes.overlaps(addr, bits) ||
+				n.children.overlaps(addr, bits)
+		}
+
+		// still in the middle of prefix chunks
+		// test if any route overlaps prefix´ addr chunk so far
+
+		// but skip intermediate nodes, no routes to test?
+		if len(n.prefixes.values) != 0 {
+			if _, _, ok := n.prefixes.lpmByAddr(addr); ok {
+				return true
+			}
+		}
+
+		// no overlap so far, go down to next child
+		child := n.children.get(addr)
+
+		// no more children to explore, there can't be an overlap
+		if child == nil {
+			return false
+		}
+
+		// next round
+		depth++
+		addr = uint(bs[depth])
+		bits -= stride
+		n = child
+	}
+}

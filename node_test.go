@@ -50,6 +50,7 @@ func TestPrefixInsert(t *testing.T) {
 	// every lookup. The naive implementation is very slow, but its behavior is
 	// easy to verify by inspection.
 
+	// pfxs := shufflePrefixes(allPrefixes())[:100]
 	pfxs := shufflePrefixes(allPrefixes())[:100]
 	slow := slowTable[int]{pfxs}
 	fast := newNode[int]()
@@ -70,6 +71,14 @@ func TestPrefixInsert(t *testing.T) {
 		_, fastVal, fastOK = fast.prefixes.spmByAddr(addr)
 		if !getsEqual(fastVal, fastOK, slowVal, slowOK) {
 			t.Fatalf("spm(%d) = (%v, %v), want (%v, %v)", addr, fastVal, fastOK, slowVal, slowOK)
+		}
+
+		for j := 0; j <= 8; j++ {
+			slowOK = slow.overlapsPrefix(addr, j)
+			fastOK = fast.prefixes.overlaps(addr, j)
+			if !getsEqual(fastVal, fastOK, slowVal, slowOK) {
+				t.Fatalf("spm(%d/%d) = %v, want %v", addr, j, fastOK, slowOK)
+			}
 		}
 	}
 }
@@ -286,6 +295,20 @@ func (stbl *slowTable[V]) spm(addr uint) (ret V, ok bool) {
 		}
 	}
 	return ret, shortest != noMatch
+}
+
+func (stbl *slowTable[T]) overlapsPrefix(addr uint, prefixLen int) bool {
+	for _, e := range stbl.prefixes {
+		minBits := prefixLen
+		if e.bits < minBits {
+			minBits = e.bits
+		}
+		mask := ^addrMaskTable[minBits]
+		if addr&mask == e.addr&mask {
+			return true
+		}
+	}
+	return false
 }
 
 func pfxMask(pfxLen int) uint {

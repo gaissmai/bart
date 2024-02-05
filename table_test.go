@@ -533,16 +533,6 @@ func TestInsertCompare(t *testing.T) {
 		if !getsEqual(slowVal, slowOK, fastVal, fastOK) {
 			t.Fatalf("lpm(%q) = (%v, %v), want (%v, %v)", a, fastVal, fastOK, slowVal, slowOK)
 		}
-
-		slowPfx, slowVal, slowOK = slow.spm(a)
-		fastPfx, fastVal, fastOK = fast.LookupShortest(a)
-		if slowPfx != fastPfx {
-			t.Fatalf("spm(%q) = (%v, %v, %v), want (%v, %v, %v)", a, fastPfx, fastVal, fastOK, slowPfx, slowVal, slowOK)
-		}
-		if !getsEqual(slowVal, slowOK, fastVal, fastOK) {
-			t.Fatalf("spm(%q) = (%v, %v), want (%v, %v)", a, fastVal, fastOK, slowVal, slowOK)
-		}
-
 	}
 
 	// Empirically, 10k probes into 5k v4 prefixes and 5k v6 prefixes results in
@@ -672,16 +662,6 @@ func TestDeleteCompare(t *testing.T) {
 		if !getsEqual(slowVal, slowOK, fastVal, fastOK) {
 			t.Fatalf("lpm(%q) = (%v, %v), want (%v, %v)", a, fastVal, fastOK, slowVal, slowOK)
 		}
-
-		slowPfx, slowVal, slowOK = slow.spm(a)
-		fastPfx, fastVal, fastOK = fast.LookupShortest(a)
-		if slowPfx != fastPfx {
-			t.Fatalf("spm(%q) = (%v, %v, %v), want (%v, %v, %v)", a, fastPfx, fastVal, fastOK, slowPfx, slowVal, slowOK)
-		}
-		if !getsEqual(slowVal, slowOK, fastVal, fastOK) {
-			t.Fatalf("spm(%q) = (%v, %v), want (%v, %v)", a, fastVal, fastOK, slowVal, slowOK)
-		}
-
 	}
 	// Empirically, 10k probes into 5k v4 prefixes and 5k v6 prefixes results in
 	// ~1k distinct values for v4 and ~300 for v6. distinct routes. This sanity
@@ -780,6 +760,141 @@ func TestDeleteIsReverseOfInsert(t *testing.T) {
 	}
 	if got := tab.dumpString(); got != want {
 		t.Fatalf("after delete, mismatch:\n\n got: %s\n\nwant: %s", got, want)
+	}
+}
+
+func TestShortestCompare(t *testing.T) {
+	t.Parallel()
+	pfxs := randomPrefixes(10_000)
+
+	slow := slowPrefixTable[int]{pfxs}
+	fast := Table[int]{}
+
+	for _, pfx := range pfxs {
+		fast.Insert(pfx.pfx, pfx.val)
+	}
+
+	for i := 0; i < 10_000; i++ {
+		a := randomAddr()
+		slowPfx, slowVal, slowOK := slow.spm(a)
+		fastPfx, fastVal, fastOK := fast.LookupShortest(a)
+		if slowPfx != fastPfx {
+			t.Fatalf("spm(%q) = (%v, %v, %v), want (%v, %v, %v)", a, fastPfx, fastVal, fastOK, slowPfx, slowVal, slowOK)
+		}
+		if !getsEqual(slowVal, slowOK, fastVal, fastOK) {
+			t.Fatalf("spm(%q) = (%v, %v), want (%v, %v)", a, fastVal, fastOK, slowVal, slowOK)
+		}
+	}
+}
+
+func TestOverlapsPrefixCompare(t *testing.T) {
+	t.Parallel()
+	pfxs := randomPrefixes(100_000)
+
+	slow := slowPrefixTable[int]{pfxs}
+	fast := Table[int]{}
+
+	for _, pfx := range pfxs {
+		fast.Insert(pfx.pfx, pfx.val)
+	}
+
+	tests := randomPrefixes(10_000)
+	for _, tt := range tests {
+		gotSlow := slow.overlapsPrefix(tt.pfx)
+		gotFast := fast.OverlapsPrefix(tt.pfx)
+		if gotSlow != gotFast {
+			t.Fatalf("overlapsPrefix(%q) = %v, want %v", tt.pfx, gotFast, gotSlow)
+		}
+	}
+}
+
+// test some edge cases
+func TestOverlapsEdgeCases(t *testing.T) {
+	t.Parallel()
+
+	p := func(s string) netip.Prefix {
+		pfx := netip.MustParsePrefix(s)
+		if pfx.Addr() != pfx.Masked().Addr() {
+			panic(fmt.Sprintf("%s is not normalized", s))
+		}
+		return pfx
+	}
+
+	tbl := &Table[int]{}
+
+	// empty table
+	checkOverlaps(t, tbl, []tableOverlapsTest{
+		{"0.0.0.0/0", false},
+		{"::/0", false},
+	})
+
+	// default route
+	tbl.Insert(p("10.0.0.0/8"), 0)
+	tbl.Insert(p("2001:db8::/32"), 0)
+	checkOverlaps(t, tbl, []tableOverlapsTest{
+		{"0.0.0.0/0", true},
+		{"::/0", true},
+	})
+
+	// default route
+	tbl = &Table[int]{}
+	tbl.Insert(p("0.0.0.0/0"), 0)
+	tbl.Insert(p("::/0"), 0)
+	checkOverlaps(t, tbl, []tableOverlapsTest{
+		{"10.0.0.0/8", true},
+		{"2001:db8::/32", true},
+	})
+
+	// single IP
+	tbl = &Table[int]{}
+	tbl.Insert(p("10.0.0.0/7"), 0)
+	tbl.Insert(p("2001::/16"), 0)
+	checkOverlaps(t, tbl, []tableOverlapsTest{
+		{"10.1.2.3/32", true},
+		{"2001:db8:affe::cafe/128", true},
+	})
+
+	// single IPv
+	tbl = &Table[int]{}
+	tbl.Insert(p("10.1.2.3/32"), 0)
+	tbl.Insert(p("2001:db8:affe::cafe/128"), 0)
+	checkOverlaps(t, tbl, []tableOverlapsTest{
+		{"10.0.0.0/7", true},
+		{"2001::/16", true},
+	})
+
+	// same IPv
+	tbl = &Table[int]{}
+	tbl.Insert(p("10.1.2.3/32"), 0)
+	tbl.Insert(p("2001:db8:affe::cafe/128"), 0)
+	checkOverlaps(t, tbl, []tableOverlapsTest{
+		{"10.1.2.3/32", true},
+		{"2001:db8:affe::cafe/128", true},
+	})
+}
+
+type tableOverlapsTest struct {
+	prefix string
+	want   bool
+}
+
+// checkOverlaps verifies that the overlaps lookups in tt return the
+// expected results on tbl.
+func checkOverlaps(t *testing.T, tbl *Table[int], tests []tableOverlapsTest) {
+	p := func(s string) netip.Prefix {
+		pfx := netip.MustParsePrefix(s)
+		if pfx.Addr() != pfx.Masked().Addr() {
+			panic(fmt.Sprintf("%s is not normalized", s))
+		}
+		return pfx
+	}
+
+	for _, tt := range tests {
+		got := tbl.OverlapsPrefix(p(tt.prefix))
+		if got != tt.want {
+			t.Log(tbl.String())
+			t.Errorf("OverlapsPrefix(%v) = %v, want %v", p(tt.prefix), got, tt.want)
+		}
 	}
 }
 
@@ -1047,6 +1162,40 @@ func BenchmarkTableLookupSPM(b *testing.B) {
 	})
 }
 
+var boolSink bool
+
+func BenchmarkTableOverlapsPrefix(b *testing.B) {
+	forFamilyAndCount(b, func(b *testing.B, routes []slowPrefixEntry[int]) {
+		var rt Table[int]
+		for _, route := range routes {
+			rt.Insert(route.pfx, route.val)
+		}
+
+		genPfxs := randomPrefixes4
+		if routes[0].pfx.Addr().Is6() {
+			genPfxs = randomPrefixes6
+		}
+		const count = 10_000
+		pfxs := genPfxs(count)
+		b.ResetTimer()
+		allocs, bytes := getMemCost(func() {
+			for i := 0; i < b.N; i++ {
+				boolSink = rt.OverlapsPrefix(pfxs[i%count].pfx)
+			}
+		})
+		b.StopTimer()
+
+		b.ReportAllocs() // Enables the output, but we report manually below
+		lookups := float64(b.N)
+		elapsed := float64(b.Elapsed().Nanoseconds())
+		elapsedSec := float64(b.Elapsed().Seconds())
+		b.ReportMetric(elapsed/lookups, "ns/op")
+		b.ReportMetric(lookups/elapsedSec, "addrs/s")
+		b.ReportMetric(allocs/lookups, "allocs/op")
+		b.ReportMetric(bytes/lookups, "B/op")
+	})
+}
+
 // getMemCost runs fn 100 times and returns the number of allocations and bytes
 // allocated by each call to fn.
 //
@@ -1169,6 +1318,15 @@ func (ts *slowPrefixTable[V]) spm(addr netip.Addr) (spm netip.Prefix, val V, ok 
 		}
 	}
 	return spm, val, bestLen != 129
+}
+
+func (st *slowPrefixTable[T]) overlapsPrefix(pfx netip.Prefix) bool {
+	for _, p := range st.prefixes {
+		if p.pfx.Overlaps(pfx) {
+			return true
+		}
+	}
+	return false
 }
 
 // randomPrefixes returns n randomly generated prefixes and associated values,

@@ -148,7 +148,7 @@ func addrFmt(addr uint, is4 bool) string {
 
 // IP stride path, different formats for IPv4 and IPv6, dotted decimal or hex.
 func ancestors(bs []byte, is4 bool) string {
-	buf := &strings.Builder{}
+	buf := new(strings.Builder)
 
 	if is4 {
 		for i, b := range bs {

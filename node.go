@@ -137,7 +137,7 @@ func (p *prefixCBTree[V]) lpmByIndex(idx uint) (baseIdx uint, val V, ok bool) {
 
 		// cache friendly backtracking to the next less specific route.
 		// thanks to the complete binary tree it's just a shift operation.
-		idx >>= 1
+		idx = parentIndex(idx)
 	}
 
 	// not found (on this level)
@@ -178,7 +178,7 @@ func (p *prefixCBTree[V]) spmByIndex(idx uint) (baseIdx uint, val V, ok bool) {
 
 		// cache friendly backtracking to the next less specific route.
 		// thanks to the complete binary tree it's just a shift operation.
-		idx >>= 1
+		idx = parentIndex(idx)
 	}
 
 	if shortest != 0 {
@@ -195,6 +195,49 @@ func (p *prefixCBTree[V]) spmByAddr(addr uint) (baseIdx uint, val V, ok bool) {
 	return p.spmByIndex(addrToBaseIndex(addr))
 }
 
+// overlaps reports whether the route addr/prefixLen overlaps
+// with any prefix in this node..
+func (p *prefixCBTree[V]) overlaps(addr uint, pfxLen int) bool {
+	baseIdx := prefixToBaseIndex(addr, pfxLen)
+
+	// any route in this node overlaps prefix?
+	if _, _, ok := p.lpmByIndex(baseIdx); ok {
+		return true
+	}
+
+	// from here on: reverse direction,
+	// test if prefix overlaps any route in this node.
+
+	// lower boundary, idx == baseIdx alreday tested with lpm above,
+	// increase it
+	idx := baseIdx << 1
+
+	// upper boundary for addr/pfxLen
+	lastHostIdx := lastHostIndex(addr, pfxLen)
+
+	var ok bool
+	for {
+		if idx, ok = p.indexes.NextSet(idx); !ok {
+			return false
+		}
+
+		// out of addr/pfxLen
+		if idx > lastHostIdx {
+			return false
+		}
+
+		// e.g.: 365 -> 182 -> 91 -> 45 -> 22 -> baseIdx(11) STOP
+		//
+		for j := idx; j >= baseIdx; j = parentIndex(j) {
+			if j == baseIdx {
+				return true
+			}
+		}
+		// next round
+		idx++
+	}
+}
+
 // getVal for baseIdx.
 func (p *prefixCBTree[V]) getVal(baseIdx uint) *V {
 	if p.indexes.Test(baseIdx) {
@@ -205,8 +248,8 @@ func (p *prefixCBTree[V]) getVal(baseIdx uint) *V {
 
 // allIndexes returns all baseIndexes set in this prefix tree in ascending order.
 func (p *prefixCBTree[V]) allIndexes() []uint {
-	all := make([]uint, p.indexes.Count())
-	p.indexes.NextSetMany(0, all)
+	all := make([]uint, 0, maxNodePrefixes)
+	_, all = p.indexes.NextSetMany(0, all)
 	return all
 }
 
@@ -251,10 +294,45 @@ func (c *childTree[V]) get(addr uint) *node[V] {
 	return c.nodes[c.rank(addr)]
 }
 
+// overlaps reports whether the prefix addr/pfxLen overlaps
+// with any child in this node..
+func (c *childTree[V]) overlaps(addr uint, pfxLen int) bool {
+	// lower boundary for addr/pfxLen
+	baseIdx := prefixToBaseIndex(addr, pfxLen)
+
+	// upper boundary for addr/pfxLen
+	lastHostIdx := lastHostIndex(addr, pfxLen)
+
+	var ok bool
+	for {
+		if addr, ok = c.addrs.NextSet(addr); !ok {
+			return false
+		}
+
+		// this addrs baseIdx
+		hostIdx := addrToBaseIndex(addr)
+
+		// out of addr/pfxLen
+		if hostIdx > lastHostIdx {
+			return false
+		}
+
+		// check if prefix overlaps this child or any of his parents
+		// within the limits of addr/pfxLen
+		for idx := hostIdx; idx >= baseIdx; idx = parentIndex(idx) {
+			if idx == baseIdx {
+				return true
+			}
+		}
+		// next round
+		addr++
+	}
+}
+
 // allAddrs returns the addrs of all child nodes in ascending order.
 func (c *childTree[V]) allAddrs() []uint {
-	all := make([]uint, c.addrs.Count())
-	c.addrs.NextSetMany(0, all)
+	all := make([]uint, maxNodeChildren)
+	_, all = c.addrs.NextSetMany(0, all)
 	return all
 }
 
@@ -274,6 +352,12 @@ func addrToBaseIndex(addr uint) uint {
 	return addr + 1<<stride
 }
 
+// parentIndex returns the index of idx's parent prefix, or 0 if idx
+// is the index of 0/0.
+func parentIndex(idx uint) uint {
+	return idx >> 1
+}
+
 // baseIndexToPrefix returns the address and prefix len of baseIdx.
 // It's the inverse to prefixToBaseIndex.
 func baseIndexToPrefix(baseIdx uint) (addr uint, pfxLen int) {
@@ -283,10 +367,28 @@ func baseIndexToPrefix(baseIdx uint) (addr uint, pfxLen int) {
 	return addr, pfxLen
 }
 
-// baseIndexToPrefixLen returns the prefix len of baseIdx, partly the inverse to prefixToBaseIndex.
+// baseIndexToPrefixLen returns the prefix len of baseIdx, partly
+// the inverse to prefixToBaseIndex.
 // Needed for Lookup, it's faster than:
 //
 //	_, pfxLen := baseIndexToPrefix(idx)
 func baseIndexToPrefixLen(baseIdx uint) int {
 	return strconv.IntSize - bits.LeadingZeros(baseIdx) - 1
+}
+
+var addrMaskTable = []uint{
+	0b1111_1111,
+	0b0111_1111,
+	0b0011_1111,
+	0b0001_1111,
+	0b0000_1111,
+	0b0000_0111,
+	0b0000_0011,
+	0b0000_0001,
+	0b0000_0000,
+}
+
+// lastHostIndex returns the array index of the last address in addr/len.
+func lastHostIndex(addr uint, bits int) uint {
+	return addrToBaseIndex(addr | addrMaskTable[bits])
 }
