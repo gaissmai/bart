@@ -4,6 +4,7 @@
 package bart
 
 import (
+	"bytes"
 	"cmp"
 	"fmt"
 	"io"
@@ -22,6 +23,17 @@ type kidT[V any] struct {
 	// for printing
 	cidr netip.Prefix
 	val  V
+}
+
+// MarshalText implements the encoding.TextMarshaler interface,
+// just a wrapper for [Table.Fprint].
+func (t *Table[V]) MarshalText() ([]byte, error) {
+	t.init()
+	w := new(bytes.Buffer)
+	if err := t.Fprint(w); err != nil {
+		return nil, err
+	}
+	return w.Bytes(), nil
 }
 
 // String returns a hierarchical tree diagram of the ordered CIDRs

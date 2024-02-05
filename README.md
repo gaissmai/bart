@@ -52,6 +52,7 @@ the backtracking algorithm is as fast as possible.
   
   func (t *Table[V]) String() string
   func (t *Table[V]) Fprint(w io.Writer) error
+  func (t *Table[V]) MarshalText() ([]byte, error)
 ```
 
 # TODO

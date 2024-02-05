@@ -154,4 +154,12 @@ func checkString(t *testing.T, tbl *Table[any], tt stringTest) {
 	if tt.want != got {
 		t.Errorf("String got:\n%swant:\n%s", got, tt.want)
 	}
+
+	gotBytes, err := tbl.MarshalText()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if tt.want != string(gotBytes) {
+		t.Errorf("String got:\n%swant:\n%s", got, tt.want)
+	}
 }
