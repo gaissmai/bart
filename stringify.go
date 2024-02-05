@@ -12,7 +12,8 @@ import (
 	"strings"
 )
 
-// container for the direct kids, needed for hierarchical tree print.
+// container for the direct kids, needed for hierarchical tree print,
+// but see below.
 type kidT[V any] struct {
 	// for traversing
 	n    *node[V]
@@ -60,50 +61,34 @@ func (t *Table[V]) String() string {
 func (t *Table[V]) Fprint(w io.Writer) error {
 	t.init()
 
-	if err := t.fprint4(w); err != nil {
+	if err := t.fprint(w, true); err != nil {
 		return err
 	}
 
-	if err := t.fprint6(w); err != nil {
+	if err := t.fprint(w, false); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (t *Table[V]) fprint4(w io.Writer) error {
-	is4 := true
-	root4 := t.rootNodeByVersion(is4)
-	if root4.isEmpty() {
+// fprint is the version dependent adapter to fprintRec.
+func (t *Table[V]) fprint(w io.Writer, is4 bool) error {
+	root := t.rootNodeByVersion(is4)
+	if root.isEmpty() {
 		return nil
 	}
 
 	if _, err := fmt.Fprint(w, "▼\n"); err != nil {
 		return err
 	}
-	if err := root4.printRec(w, 0, nil, is4, ""); err != nil {
+	if err := root.fprintRec(w, 0, nil, is4, ""); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (t *Table[V]) fprint6(w io.Writer) error {
-	is4 := false
-	root6 := t.rootNodeByVersion(is4)
-	if root6.isEmpty() {
-		return nil
-	}
-
-	if _, err := fmt.Fprint(w, "▼\n"); err != nil {
-		return err
-	}
-	if err := root6.printRec(w, 0, nil, is4, ""); err != nil {
-		return err
-	}
-	return nil
-}
-
-// printRec, the output is a hierarchical CIDR tree starting with parentIdx and byte path.
-func (n *node[V]) printRec(w io.Writer, parentIdx uint, path []byte, is4 bool, pad string) error {
+// fprintRec, the output is a hierarchical CIDR tree starting with parentIdx and byte path.
+func (n *node[V]) fprintRec(w io.Writer, parentIdx uint, path []byte, is4 bool, pad string) error {
 	// get direct childs for this parentIdx ...
 	directKids := n.getKidsRec(parentIdx, path, is4)
 
@@ -130,7 +115,7 @@ func (n *node[V]) printRec(w io.Writer, parentIdx uint, path []byte, is4 bool, p
 		// rec-descent with this prefix as parentIdx.
 		// hierarchical nested tree view, two rec-descent functions
 		// work together to spoil the reader.
-		if err := kid.n.printRec(w, kid.idx, kid.path, is4, pad+spacer); err != nil {
+		if err := kid.n.fprintRec(w, kid.idx, kid.path, is4, pad+spacer); err != nil {
 			return err
 		}
 	}
