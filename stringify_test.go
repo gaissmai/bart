@@ -160,6 +160,6 @@ func checkString(t *testing.T, tbl *Table[any], tt stringTest) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if tt.want != string(gotBytes) {
-		t.Errorf("String got:\n%swant:\n%s", got, tt.want)
+		t.Errorf("MarshalText got:\n%swant:\n%s", gotBytes, tt.want)
 	}
 }
