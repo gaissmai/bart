@@ -30,7 +30,7 @@ the backtracking algorithm is as fast as possible.
 
 # API (not stable!)
 
- ... but the library is ready to use but still under development.
+ ... still under development, but the library is ready to use.
 
 ```golang
   import "github.com/gaissmai/bart"
@@ -47,6 +47,8 @@ the backtracking algorithm is as fast as possible.
   func (t *Table[V]) Get(ip netip.Addr) (val V, ok bool)
   func (t *Table[V]) Lookup(ip netip.Addr) (lpm netip.Prefix, val V, ok bool)
   func (t *Table[V]) LookupShortest(ip netip.Addr) (spm netip.Prefix, val V, ok bool)
+
+  func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool
   
   func (t *Table[V]) String() string
   func (t *Table[V]) Fprint(w io.Writer) error
