@@ -9,8 +9,9 @@ import (
 	"slices"
 )
 
+// ListElement contains CIDR, value and list of subnets (tree childrens).
 type ListElement[V any] struct {
-	Cidr    netip.Prefix     `json:"cidr"`
+	CIDR    netip.Prefix     `json:"cidr"`
 	Value   V                `json:"value"`
 	Subnets []ListElement[V] `json:"subnets,omitempty"`
 }
@@ -55,7 +56,7 @@ func (n *node[V]) dumpListRec(parentIdx uint, path []byte, is4 bool) []ListEleme
 	elements := make([]ListElement[V], 0, len(directKids))
 	for _, kid := range directKids {
 		elements = append(elements, ListElement[V]{
-			Cidr:    kid.cidr,
+			CIDR:    kid.cidr,
 			Value:   kid.val,
 			Subnets: kid.n.dumpListRec(kid.idx, kid.path, is4),
 		})
