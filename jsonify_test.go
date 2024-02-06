@@ -6,36 +6,36 @@ import (
 	"testing"
 )
 
-type jsonTestElement struct {
+type jsonTestNode struct {
 	cidr  netip.Prefix
 	value any
 }
 
-func newJsonTestElement(cidr string, value any) jsonTestElement {
-	return jsonTestElement{
+func newJsonTestNode(cidr string, value any) jsonTestNode {
+	return jsonTestNode{
 		cidr:  netip.MustParsePrefix(cidr),
 		value: value,
 	}
 }
 
 type jsonTest struct {
-	elements []jsonTestElement
-	want     string
+	nodes []jsonTestNode
+	want  string
 }
 
 func TestJsonEmpty(t *testing.T) {
 	tbl := new(Table[any])
 	checkJson(t, tbl, jsonTest{
-		elements: []jsonTestElement{},
-		want:     "{}",
+		nodes: []jsonTestNode{},
+		want:  "{}",
 	})
 }
 
 func TestJsonDefaultRouteV4(t *testing.T) {
 	tbl := new(Table[any])
 	checkJson(t, tbl, jsonTest{
-		elements: []jsonTestElement{
-			newJsonTestElement("0.0.0.0/0", nil),
+		nodes: []jsonTestNode{
+			newJsonTestNode("0.0.0.0/0", nil),
 		},
 		want: `{"ipv4":[{"cidr":"0.0.0.0/0","value":null}]}`,
 	})
@@ -44,8 +44,8 @@ func TestJsonDefaultRouteV4(t *testing.T) {
 func TestJsonDefaultRouteV6(t *testing.T) {
 	tbl := new(Table[any])
 	checkJson(t, tbl, jsonTest{
-		elements: []jsonTestElement{
-			newJsonTestElement("::/0", 31337),
+		nodes: []jsonTestNode{
+			newJsonTestNode("::/0", 31337),
 		},
 		want: `{"ipv6":[{"cidr":"::/0","value":31337}]}`,
 	})
@@ -54,16 +54,16 @@ func TestJsonDefaultRouteV6(t *testing.T) {
 func TestJsonSampleV4(t *testing.T) {
 	tbl := new(Table[any])
 	checkJson(t, tbl, jsonTest{
-		elements: []jsonTestElement{
-			newJsonTestElement("172.16.0.0/12", nil),
-			newJsonTestElement("10.0.0.0/24", nil),
-			newJsonTestElement("192.168.0.0/16", nil),
-			newJsonTestElement("10.0.0.0/8", nil),
-			newJsonTestElement("10.0.1.0/24", nil),
-			newJsonTestElement("169.254.0.0/16", nil),
-			newJsonTestElement("127.0.0.0/8", nil),
-			newJsonTestElement("127.0.0.1/32", nil),
-			newJsonTestElement("192.168.1.0/24", nil),
+		nodes: []jsonTestNode{
+			newJsonTestNode("172.16.0.0/12", nil),
+			newJsonTestNode("10.0.0.0/24", nil),
+			newJsonTestNode("192.168.0.0/16", nil),
+			newJsonTestNode("10.0.0.0/8", nil),
+			newJsonTestNode("10.0.1.0/24", nil),
+			newJsonTestNode("169.254.0.0/16", nil),
+			newJsonTestNode("127.0.0.0/8", nil),
+			newJsonTestNode("127.0.0.1/32", nil),
+			newJsonTestNode("192.168.1.0/24", nil),
 		},
 		/*
 		   {
@@ -98,11 +98,11 @@ func TestJsonSampleV4(t *testing.T) {
 func TestJsonSampleV6(t *testing.T) {
 	tbl := new(Table[any])
 	checkJson(t, tbl, jsonTest{
-		elements: []jsonTestElement{
-			newJsonTestElement("fe80::/10", nil),
-			newJsonTestElement("::1/128", nil),
-			newJsonTestElement("2000::/3", nil),
-			newJsonTestElement("2001:db8::/32", nil),
+		nodes: []jsonTestNode{
+			newJsonTestNode("fe80::/10", nil),
+			newJsonTestNode("::1/128", nil),
+			newJsonTestNode("2000::/3", nil),
+			newJsonTestNode("2001:db8::/32", nil),
 		},
 		/*
 			{
@@ -125,22 +125,22 @@ func TestJsonSample(t *testing.T) {
 	// ipv4 + ipv6 and various types of value
 	tbl := new(Table[any])
 	checkJson(t, tbl, jsonTest{
-		elements: []jsonTestElement{
-			newJsonTestElement("fe80::/10", nil),
-			newJsonTestElement("172.16.0.0/12", nil),
-			newJsonTestElement("10.0.0.0/24", nil),
-			newJsonTestElement("::1/128", nil),
-			newJsonTestElement("10.0.0.0/8", nil),
-			newJsonTestElement("::/0", nil),
-			newJsonTestElement("10.0.1.0/24", nil),
-			newJsonTestElement("2000::/3", nil),
-			newJsonTestElement("2001:db8::/32", nil),
+		nodes: []jsonTestNode{
+			newJsonTestNode("fe80::/10", nil),
+			newJsonTestNode("172.16.0.0/12", nil),
+			newJsonTestNode("10.0.0.0/24", nil),
+			newJsonTestNode("::1/128", nil),
+			newJsonTestNode("10.0.0.0/8", nil),
+			newJsonTestNode("::/0", nil),
+			newJsonTestNode("10.0.1.0/24", nil),
+			newJsonTestNode("2000::/3", nil),
+			newJsonTestNode("2001:db8::/32", nil),
 			// some different value types:
-			newJsonTestElement("127.0.0.0/8", 31337),
-			newJsonTestElement("169.254.0.0/16", 3.14),
-			newJsonTestElement("127.0.0.1/32", "some string"),
-			newJsonTestElement("192.168.0.0/16", []string{"a", "c", "ff"}),
-			newJsonTestElement("192.168.1.0/24", "550e8400-e29b-41d4-a716-446655440000"),
+			newJsonTestNode("127.0.0.0/8", 31337),
+			newJsonTestNode("169.254.0.0/16", 3.14),
+			newJsonTestNode("127.0.0.1/32", "some string"),
+			newJsonTestNode("192.168.0.0/16", []string{"a", "c", "ff"}),
+			newJsonTestNode("192.168.1.0/24", "550e8400-e29b-41d4-a716-446655440000"),
 		},
 		/*
 			{
@@ -195,8 +195,8 @@ func TestJsonSample(t *testing.T) {
 
 func checkJson(t *testing.T, tbl *Table[any], tt jsonTest) {
 	t.Helper()
-	for _, element := range tt.elements {
-		tbl.Insert(element.cidr, element.value)
+	for _, node := range tt.nodes {
+		tbl.Insert(node.cidr, node.value)
 	}
 
 	jsonBuffer, err := json.Marshal(tbl)
