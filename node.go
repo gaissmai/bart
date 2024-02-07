@@ -195,9 +195,45 @@ func (p *prefixCBTree[V]) spmByAddr(addr uint) (baseIdx uint, val V, ok bool) {
 	return p.spmByIndex(addrToBaseIndex(addr))
 }
 
+func (p *prefixCBTree[V]) overlaps(addr uint, pfxLen int) bool {
+	baseIdx := prefixToBaseIndex(addr, pfxLen)
+
+	// any route in this node overlaps prefix?
+	if _, _, ok := p.lpmByIndex(baseIdx); ok {
+		return true
+	}
+
+	// from here on: reverse direction,
+	// test if prefix overlaps any route in this node.
+
+	// lower boundary, idx == baseIdx already tested with lpm above,
+	// increase it
+	idx := baseIdx << 1
+
+	// lower/upper boundary for addr/pfxLen
+	upperBound := lastHostIndex(addr, pfxLen)
+
+	var ok bool
+	for {
+		if idx, ok = p.indexes.NextSet(idx); !ok {
+			return false
+		}
+
+		thisAddr, thisPfxLen := baseIndexToPrefix(idx)
+		thisUpperBound := lastHostIndex(thisAddr, thisPfxLen)
+
+		if thisUpperBound <= upperBound {
+			return true
+		}
+
+		// next prefix
+		idx++
+	}
+}
+
 // overlaps reports whether the route addr/prefixLen overlaps
 // with any prefix in this node..
-func (p *prefixCBTree[V]) overlaps(addr uint, pfxLen int) bool {
+func (p *prefixCBTree[V]) overlaps2(addr uint, pfxLen int) bool {
 	baseIdx := prefixToBaseIndex(addr, pfxLen)
 
 	// any route in this node overlaps prefix?
