@@ -19,9 +19,12 @@ type Table[V any] struct {
 }
 
 // init once, so no constructor is needed.
-// BitSets have to be initialized.
 func (t *Table[V]) init() {
 	t.initOnce.Do(func() {
+		// precalc lookup table
+		baseIndexToPrefixPrecalc()
+
+		// BitSets have to be initialized.
 		t.rootV4 = newNode[V]()
 		t.rootV6 = newNode[V]()
 	})
@@ -356,10 +359,7 @@ func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 
 		// last prefix chunk reached
 		if bits <= stride {
-			// prefix overlaps any route in this node and vice versa OR
-			// prefix overlaps any child in this node?
-			return n.prefixes.overlaps(addr, bits) ||
-				n.children.overlaps(addr, bits)
+			return n.overlapsPrefix(addr, bits)
 		}
 
 		// still in the middle of prefix chunks
@@ -386,4 +386,12 @@ func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 		bits -= stride
 		n = child
 	}
+}
+
+// Overlaps reports whether any IP in the table matches a route in the
+// other table.
+func (t *Table[V]) Overlaps(o *Table[V]) bool {
+	t.init()
+
+	return t.rootV4.overlapsRec(o.rootV4) || t.rootV6.overlapsRec(o.rootV6)
 }

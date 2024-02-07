@@ -20,288 +20,92 @@ import (
 	"time"
 )
 
-func TestInsert(t *testing.T) {
-	tbl := &Table[int]{}
-	p := func(s string) netip.Prefix {
-		pfx := netip.MustParsePrefix(s)
-		if pfx.Addr() != pfx.Masked().Addr() {
-			panic(fmt.Sprintf("%s is not normalized", s))
+func TestRegression(t *testing.T) {
+	// original comment by tailscale for ART,
+	// but the BART implementation is different and has other edge cases.
+	//
+	// These tests are specific triggers for subtle correctness issues
+	// that came up during initial implementation. Even if they seem
+	// arbitrary, please do not clean them up. They are checking edge
+	// cases that are very easy to get wrong, and quite difficult for
+	// the other statistical tests to trigger promptly.
+
+	t.Run("prefixes_aligned_on_stride_boundary", func(t *testing.T) {
+		tbl := &Table[int]{}
+		slow := slowPrefixTable[int]{}
+		p := netip.MustParsePrefix
+
+		tbl.Insert(p("226.205.197.0/24"), 1)
+		slow.insert(p("226.205.197.0/24"), 1)
+		tbl.Insert(p("226.205.0.0/16"), 2)
+		slow.insert(p("226.205.0.0/16"), 2)
+
+		probe := netip.MustParseAddr("226.205.121.152")
+		got, gotOK := tbl.Get(probe)
+		want, wantOK := slow.get(probe)
+		if !getsEqual(got, gotOK, want, wantOK) {
+			t.Fatalf("got (%v, %v), want (%v, %v)", got, gotOK, want, wantOK)
 		}
-		return pfx
-	}
-
-	// Create a new leaf node.
-	tbl.Insert(p("192.168.0.1/32"), 1)
-	tbl.Insert(p("192.168.0.1/32"), 1) // no-op
-	checkRoutes(t, tbl, []tableTest{
-		{"192.168.0.1", 1, 1},
-		{"192.168.0.2", -1, -1},
-		{"192.168.0.3", -1, -1},
-		{"192.168.0.255", -1, -1},
-		{"192.168.1.1", -1, -1},
-		{"192.170.1.1", -1, -1},
-		{"192.180.0.1", -1, -1},
-		{"192.180.3.5", -1, -1},
-		{"10.0.0.5", -1, -1},
-		{"10.0.0.15", -1, -1},
 	})
 
-	// Insert into previous leaf, no tree changes
-	tbl.Insert(p("192.168.0.2/32"), 2)
-	checkRoutes(t, tbl, []tableTest{
-		{"192.168.0.1", 1, 1},
-		{"192.168.0.2", 2, 2},
-		{"192.168.0.3", -1, -1},
-		{"192.168.0.255", -1, -1},
-		{"192.168.1.1", -1, -1},
-		{"192.170.1.1", -1, -1},
-		{"192.180.0.1", -1, -1},
-		{"192.180.3.5", -1, -1},
-		{"10.0.0.5", -1, -1},
-		{"10.0.0.15", -1, -1},
+	t.Run("parent_prefix_inserted_in_different_orders", func(t *testing.T) {
+		t1, t2 := &Table[int]{}, &Table[int]{}
+		p := netip.MustParsePrefix
+
+		t1.Insert(p("136.20.0.0/16"), 1)
+		t1.Insert(p("136.20.201.62/32"), 2)
+
+		t2.Insert(p("136.20.201.62/32"), 2)
+		t2.Insert(p("136.20.0.0/16"), 1)
+
+		a := netip.MustParseAddr("136.20.54.139")
+		got1, ok1 := t1.Get(a)
+		got2, ok2 := t2.Get(a)
+		if !getsEqual(got1, ok1, got2, ok2) {
+			t.Errorf("Get(%q) is insertion order dependent: t1=(%v, %v), t2=(%v, %v)", a, got1, ok1, got2, ok2)
+		}
 	})
 
-	// Insert into previous leaf, unaligned prefix covering the /32s
-	tbl.Insert(p("192.168.0.0/26"), 7)
-	checkRoutes(t, tbl, []tableTest{
-		{"192.168.0.1", 1, 7},
-		{"192.168.0.2", 2, 7},
-		{"192.168.0.3", 7, 7},
-		{"192.168.0.255", -1, -1},
-		{"192.168.1.1", -1, -1},
-		{"192.170.1.1", -1, -1},
-		{"192.180.0.1", -1, -1},
-		{"192.180.3.5", -1, -1},
-		{"10.0.0.5", -1, -1},
-		{"10.0.0.15", -1, -1},
+	t.Run("overlaps_divergent_children_with_parent_route_entry", func(t *testing.T) {
+		t1, t2 := Table[int]{}, Table[int]{}
+		p := netip.MustParsePrefix
+
+		t1.Insert(p("128.0.0.0/2"), 1)
+		t1.Insert(p("99.173.128.0/17"), 1)
+		t1.Insert(p("219.150.142.0/23"), 1)
+		t1.Insert(p("164.148.190.250/31"), 1)
+		t1.Insert(p("48.136.229.233/32"), 1)
+
+		t2.Insert(p("217.32.0.0/11"), 1)
+		t2.Insert(p("38.176.0.0/12"), 1)
+		t2.Insert(p("106.16.0.0/13"), 1)
+		t2.Insert(p("164.85.192.0/23"), 1)
+		t2.Insert(p("225.71.164.112/31"), 1)
+
+		if !t1.Overlaps(&t2) {
+			t.Fatalf("tables unexpectedly do not overlap")
+		}
 	})
 
-	// Create a different leaf elsewhere
-	tbl.Insert(p("10.0.0.0/27"), 3)
-	checkRoutes(t, tbl, []tableTest{
-		{"192.168.0.1", 1, 7},
-		{"192.168.0.2", 2, 7},
-		{"192.168.0.3", 7, 7},
-		{"192.168.0.255", -1, -1},
-		{"192.168.1.1", -1, -1},
-		{"192.170.1.1", -1, -1},
-		{"192.180.0.1", -1, -1},
-		{"192.180.3.5", -1, -1},
-		{"10.0.0.5", 3, 3},
-		{"10.0.0.15", 3, 3},
-	})
-	// Insert that creates a new intermediate table and a new child
-	tbl.Insert(p("192.168.1.1/32"), 4)
-	checkRoutes(t, tbl, []tableTest{
-		{"192.168.0.1", 1, 7},
-		{"192.168.0.2", 2, 7},
-		{"192.168.0.3", 7, 7},
-		{"192.168.0.255", -1, -1},
-		{"192.168.1.1", 4, 4},
-		{"192.170.1.1", -1, -1},
-		{"192.180.0.1", -1, -1},
-		{"192.180.3.5", -1, -1},
-		{"10.0.0.5", 3, 3},
-		{"10.0.0.15", 3, 3},
-	})
-	// Insert that creates a new intermediate table but no new child
-	tbl.Insert(p("192.170.0.0/16"), 5)
-	checkRoutes(t, tbl, []tableTest{
-		{"192.168.0.1", 1, 7},
-		{"192.168.0.2", 2, 7},
-		{"192.168.0.3", 7, 7},
-		{"192.168.0.255", -1, -1},
-		{"192.168.1.1", 4, 4},
-		{"192.170.1.1", 5, 5},
-		{"192.180.0.1", -1, -1},
-		{"192.180.3.5", -1, -1},
-		{"10.0.0.5", 3, 3},
-		{"10.0.0.15", 3, 3},
-	})
-	// New leaf in a different subtree.
-	tbl.Insert(p("192.180.0.1/32"), 8)
-	checkRoutes(t, tbl, []tableTest{
-		{"192.168.0.1", 1, 7},
-		{"192.168.0.2", 2, 7},
-		{"192.168.0.3", 7, 7},
-		{"192.168.0.255", -1, -1},
-		{"192.168.1.1", 4, 4},
-		{"192.170.1.1", 5, 5},
-		{"192.180.0.1", 8, 8},
-		{"192.180.3.5", -1, -1},
-		{"10.0.0.5", 3, 3},
-		{"10.0.0.15", 3, 3},
-	})
+	t.Run("overlaps_parent_child_comparison_with_route_in_parent", func(t *testing.T) {
+		t1, t2 := Table[int]{}, Table[int]{}
+		p := netip.MustParsePrefix
 
-	// Insert that creates a new intermediate table but no new child,
-	// with an unaligned intermediate
-	tbl.Insert(p("192.180.0.0/21"), 9)
-	checkRoutes(t, tbl, []tableTest{
-		{"192.168.0.1", 1, 7},
-		{"192.168.0.2", 2, 7},
-		{"192.168.0.3", 7, 7},
-		{"192.168.0.255", -1, -1},
-		{"192.168.1.1", 4, 4},
-		{"192.170.1.1", 5, 5},
-		{"192.180.0.1", 8, 9},
-		{"192.180.3.5", 9, 9},
-		{"10.0.0.5", 3, 3},
-		{"10.0.0.15", 3, 3},
-	})
+		t1.Insert(p("226.0.0.0/8"), 1)
+		t1.Insert(p("81.128.0.0/9"), 1)
+		t1.Insert(p("152.0.0.0/9"), 1)
+		t1.Insert(p("151.220.0.0/16"), 1)
+		t1.Insert(p("89.162.61.0/24"), 1)
 
-	// Insert a default route, those have their own codepath.
-	tbl.Insert(p("0.0.0.0/0"), 6)
-	checkRoutes(t, tbl, []tableTest{
-		{"192.168.0.1", 1, 6},
-		{"192.168.0.2", 2, 6},
-		{"192.168.0.3", 7, 6},
-		{"192.168.0.255", 6, 6},
-		{"192.168.1.1", 4, 6},
-		{"192.170.1.1", 5, 6},
-		{"192.180.0.1", 8, 6},
-		{"192.180.3.5", 9, 6},
-		{"10.0.0.5", 3, 6},
-		{"10.0.0.15", 3, 6},
-	})
+		t2.Insert(p("54.0.0.0/9"), 1)
+		t2.Insert(p("35.89.128.0/19"), 1)
+		t2.Insert(p("72.33.53.0/24"), 1)
+		t2.Insert(p("2.233.60.32/27"), 1)
+		t2.Insert(p("152.42.142.160/28"), 1)
 
-	// Now all of the above again, but for IPv6.
-
-	// Create a new leaf node.
-	tbl.Insert(p("ff:aaaa::1/128"), 1)
-	checkRoutes(t, tbl, []tableTest{
-		{"ff:aaaa::1", 1, 1},
-		{"ff:aaaa::2", -1, -1},
-		{"ff:aaaa::3", -1, -1},
-		{"ff:aaaa::255", -1, -1},
-		{"ff:aaaa:aaaa::1", -1, -1},
-		{"ff:aaaa:aaaa:bbbb::1", -1, -1},
-		{"ff:cccc::1", -1, -1},
-		{"ff:cccc::ff", -1, -1},
-		{"ffff:bbbb::5", -1, -1},
-		{"ffff:bbbb::15", -1, -1},
-	})
-
-	// Insert into previous leaf, no tree changes
-	tbl.Insert(p("ff:aaaa::2/128"), 2)
-	checkRoutes(t, tbl, []tableTest{
-		{"ff:aaaa::1", 1, 1},
-		{"ff:aaaa::2", 2, 2},
-		{"ff:aaaa::3", -1, -1},
-		{"ff:aaaa::255", -1, -1},
-		{"ff:aaaa:aaaa::1", -1, -1},
-		{"ff:aaaa:aaaa:bbbb::1", -1, -1},
-		{"ff:cccc::1", -1, -1},
-		{"ff:cccc::ff", -1, -1},
-		{"ffff:bbbb::5", -1, -1},
-		{"ffff:bbbb::15", -1, -1},
-	})
-
-	// Insert into previous leaf, unaligned prefix covering the /128s
-	tbl.Insert(p("ff:aaaa::/125"), 7)
-	checkRoutes(t, tbl, []tableTest{
-		{"ff:aaaa::1", 1, 7},
-		{"ff:aaaa::2", 2, 7},
-		{"ff:aaaa::3", 7, 7},
-		{"ff:aaaa::255", -1, -1},
-		{"ff:aaaa:aaaa::1", -1, -1},
-		{"ff:aaaa:aaaa:bbbb::1", -1, -1},
-		{"ff:cccc::1", -1, -1},
-		{"ff:cccc::ff", -1, -1},
-		{"ffff:bbbb::5", -1, -1},
-		{"ffff:bbbb::15", -1, -1},
-	})
-
-	// Create a different leaf elsewhere
-	tbl.Insert(p("ffff:bbbb::/120"), 3)
-	checkRoutes(t, tbl, []tableTest{
-		{"ff:aaaa::1", 1, 7},
-		{"ff:aaaa::2", 2, 7},
-		{"ff:aaaa::3", 7, 7},
-		{"ff:aaaa::255", -1, -1},
-		{"ff:aaaa:aaaa::1", -1, -1},
-		{"ff:aaaa:aaaa:bbbb::1", -1, -1},
-		{"ff:cccc::1", -1, -1},
-		{"ff:cccc::ff", -1, -1},
-		{"ffff:bbbb::5", 3, 3},
-		{"ffff:bbbb::15", 3, 3},
-	})
-
-	// Insert that creates a new intermediate table and a new child
-	tbl.Insert(p("ff:aaaa:aaaa::1/128"), 4)
-	checkRoutes(t, tbl, []tableTest{
-		{"ff:aaaa::1", 1, 7},
-		{"ff:aaaa::2", 2, 7},
-		{"ff:aaaa::3", 7, 7},
-		{"ff:aaaa::255", -1, -1},
-		{"ff:aaaa:aaaa::1", 4, 4},
-		{"ff:aaaa:aaaa:bbbb::1", -1, -1},
-		{"ff:cccc::1", -1, -1},
-		{"ff:cccc::ff", -1, -1},
-		{"ffff:bbbb::5", 3, 3},
-		{"ffff:bbbb::15", 3, 3},
-	})
-
-	// Insert that creates a new intermediate table but no new child
-	tbl.Insert(p("ff:aaaa:aaaa:bb00::/56"), 5)
-	checkRoutes(t, tbl, []tableTest{
-		{"ff:aaaa::1", 1, 7},
-		{"ff:aaaa::2", 2, 7},
-		{"ff:aaaa::3", 7, 7},
-		{"ff:aaaa::255", -1, -1},
-		{"ff:aaaa:aaaa::1", 4, 4},
-		{"ff:aaaa:aaaa:bbbb::1", 5, 5},
-		{"ff:cccc::1", -1, -1},
-		{"ff:cccc::ff", -1, -1},
-		{"ffff:bbbb::5", 3, 3},
-		{"ffff:bbbb::15", 3, 3},
-	})
-
-	// New leaf in a different subtree.
-	tbl.Insert(p("ff:cccc::1/128"), 8)
-	checkRoutes(t, tbl, []tableTest{
-		{"ff:aaaa::1", 1, 7},
-		{"ff:aaaa::2", 2, 7},
-		{"ff:aaaa::3", 7, 7},
-		{"ff:aaaa::255", -1, -1},
-		{"ff:aaaa:aaaa::1", 4, 4},
-		{"ff:aaaa:aaaa:bbbb::1", 5, 5},
-		{"ff:cccc::1", 8, 8},
-		{"ff:cccc::ff", -1, -1},
-		{"ffff:bbbb::5", 3, 3},
-		{"ffff:bbbb::15", 3, 3},
-	})
-
-	// Insert that creates a new intermediate table but no new child,
-	// with an unaligned intermediate
-	tbl.Insert(p("ff:cccc::/37"), 9)
-	tbl.Insert(p("ff:cccc::/37"), 9) // no-op
-	checkRoutes(t, tbl, []tableTest{
-		{"ff:aaaa::1", 1, 7},
-		{"ff:aaaa::2", 2, 7},
-		{"ff:aaaa::3", 7, 7},
-		{"ff:aaaa::255", -1, -1},
-		{"ff:aaaa:aaaa::1", 4, 4},
-		{"ff:aaaa:aaaa:bbbb::1", 5, 5},
-		{"ff:cccc::1", 8, 9},
-		{"ff:cccc::ff", 9, 9},
-		{"ffff:bbbb::5", 3, 3},
-		{"ffff:bbbb::15", 3, 3},
-	})
-
-	// Insert a default route, those have their own codepath.
-	tbl.Insert(p("::/0"), 6)
-	tbl.Insert(p("::/0"), 6) // no-op
-	checkRoutes(t, tbl, []tableTest{
-		{"ff:aaaa::1", 1, 6},
-		{"ff:aaaa::2", 2, 6},
-		{"ff:aaaa::3", 7, 6},
-		{"ff:aaaa::255", 6, 6},
-		{"ff:aaaa:aaaa::1", 4, 6},
-		{"ff:aaaa:aaaa:bbbb::1", 5, 6},
-		{"ff:cccc::1", 8, 6},
-		{"ff:cccc::ff", 9, 6},
-		{"ffff:bbbb::5", 3, 6},
-		{"ffff:bbbb::15", 3, 6},
+		if !t1.Overlaps(&t2) {
+			t.Fatalf("tables unexpectedly do not overlap")
+		}
 	})
 }
 
@@ -787,6 +591,43 @@ func TestShortestCompare(t *testing.T) {
 	}
 }
 
+func TestOverlapsCompare(t *testing.T) {
+	t.Parallel()
+
+	// Empirically, between 5 and 6 routes per table results in ~50%
+	// of random pairs overlapping. Cool example of the birthday
+	// paradox!
+	const numEntries = 6
+
+	seen := map[bool]int{}
+	for i := 0; i < 10000; i++ {
+		pfxs := randomPrefixes(numEntries)
+		slow := slowPrefixTable[int]{pfxs}
+		fast := Table[int]{}
+		for _, pfx := range pfxs {
+			fast.Insert(pfx.pfx, pfx.val)
+		}
+
+		inter := randomPrefixes(numEntries)
+		slowInter := slowPrefixTable[int]{inter}
+		fastInter := Table[int]{}
+		for _, pfx := range inter {
+			fastInter.Insert(pfx.pfx, pfx.val)
+		}
+
+		gotSlow := slow.overlaps(&slowInter)
+		gotFast := fast.Overlaps(&fastInter)
+
+		if gotSlow != gotFast {
+			t.Fatalf("Overlaps(...) = %v, want %v", gotFast, gotSlow)
+		}
+
+		seen[gotFast]++
+	}
+
+	t.Log(seen)
+}
+
 func TestOverlapsPrefixCompare(t *testing.T) {
 	t.Parallel()
 	pfxs := randomPrefixes(100_000)
@@ -809,7 +650,7 @@ func TestOverlapsPrefixCompare(t *testing.T) {
 }
 
 // test some edge cases
-func TestOverlapsEdgeCases(t *testing.T) {
+func TestOverlapsPrefixEdgeCases(t *testing.T) {
 	t.Parallel()
 
 	p := func(s string) netip.Prefix {
@@ -1196,6 +1037,52 @@ func BenchmarkTableOverlapsPrefix(b *testing.B) {
 	})
 }
 
+func BenchmarkTableOverlaps(b *testing.B) {
+	forFamilyAndCount(b, func(b *testing.B, routes []slowPrefixEntry[int]) {
+		var rt Table[int]
+		for _, route := range routes {
+			rt.Insert(route.pfx, route.val)
+		}
+
+		genPfxs := randomPrefixes4
+		if routes[0].pfx.Addr().Is6() {
+			genPfxs = randomPrefixes6
+		}
+
+		const (
+			intersectSize = 10
+			numIntersects = 1_000
+		)
+
+		intersects := make([]*Table[int], numIntersects)
+		for i := range intersects {
+			inter := &Table[int]{}
+			for _, route := range genPfxs(intersectSize) {
+				inter.Insert(route.pfx, route.val)
+			}
+			intersects[i] = inter
+		}
+
+		var t runningTimer
+		allocs, bytes := getMemCost(func() {
+			for i := 0; i < b.N; i++ {
+				t.Start()
+				boolSink = rt.Overlaps(intersects[i%numIntersects])
+				t.Stop()
+			}
+		})
+
+		b.ReportAllocs() // Enables the output, but we report manually below
+		lookups := float64(b.N)
+		elapsed := float64(t.Elapsed().Nanoseconds())
+		elapsedSec := t.Elapsed().Seconds()
+		b.ReportMetric(elapsed/lookups, "ns/op")
+		b.ReportMetric(lookups/elapsedSec, "tables/s")
+		b.ReportMetric(allocs/lookups, "allocs/op")
+		b.ReportMetric(bytes/lookups, "B/op")
+	})
+}
+
 // getMemCost runs fn 100 times and returns the number of allocations and bytes
 // allocated by each call to fn.
 //
@@ -1289,15 +1176,38 @@ type slowPrefixEntry[V any] struct {
 	val V
 }
 
-func (ts *slowPrefixTable[V]) get(addr netip.Addr) (val V, ok bool) {
-	_, val, ok = ts.lpm(addr)
+func (st *slowPrefixTable[T]) delete(pfx netip.Prefix) {
+	pfx = pfx.Masked()
+	ret := make([]slowPrefixEntry[T], 0, len(st.prefixes))
+	for _, ent := range st.prefixes {
+		if ent.pfx == pfx {
+			continue
+		}
+		ret = append(ret, ent)
+	}
+	st.prefixes = ret
+}
+
+func (st *slowPrefixTable[T]) insert(pfx netip.Prefix, val T) {
+	pfx = pfx.Masked()
+	for i, ent := range st.prefixes {
+		if ent.pfx == pfx {
+			st.prefixes[i].val = val
+			return
+		}
+	}
+	st.prefixes = append(st.prefixes, slowPrefixEntry[T]{pfx, val})
+}
+
+func (st *slowPrefixTable[V]) get(addr netip.Addr) (val V, ok bool) {
+	_, val, ok = st.lpm(addr)
 	return
 }
 
-func (ts *slowPrefixTable[V]) lpm(addr netip.Addr) (lpm netip.Prefix, val V, ok bool) {
+func (st *slowPrefixTable[V]) lpm(addr netip.Addr) (lpm netip.Prefix, val V, ok bool) {
 	bestLen := -1
 
-	for _, item := range ts.prefixes {
+	for _, item := range st.prefixes {
 		if item.pfx.Contains(addr) && item.pfx.Bits() > bestLen {
 			lpm = item.pfx
 			val = item.val
@@ -1307,10 +1217,10 @@ func (ts *slowPrefixTable[V]) lpm(addr netip.Addr) (lpm netip.Prefix, val V, ok 
 	return lpm, val, bestLen != -1
 }
 
-func (ts *slowPrefixTable[V]) spm(addr netip.Addr) (spm netip.Prefix, val V, ok bool) {
+func (st *slowPrefixTable[V]) spm(addr netip.Addr) (spm netip.Prefix, val V, ok bool) {
 	bestLen := 129
 
-	for _, item := range ts.prefixes {
+	for _, item := range st.prefixes {
 		if item.pfx.Contains(addr) && item.pfx.Bits() < bestLen {
 			spm = item.pfx
 			val = item.val
@@ -1324,6 +1234,17 @@ func (st *slowPrefixTable[T]) overlapsPrefix(pfx netip.Prefix) bool {
 	for _, p := range st.prefixes {
 		if p.pfx.Overlaps(pfx) {
 			return true
+		}
+	}
+	return false
+}
+
+func (st *slowPrefixTable[T]) overlaps(so *slowPrefixTable[T]) bool {
+	for _, tp := range st.prefixes {
+		for _, op := range so.prefixes {
+			if tp.pfx.Overlaps(op.pfx) {
+				return true
+			}
 		}
 	}
 	return false
