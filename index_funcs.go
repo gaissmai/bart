@@ -78,8 +78,8 @@ var baseIdx2Pfx [512]struct {
 	bits int
 }
 
-// baseIndexToPrefixPrecalci, inverse baseIndex mapping,
-// bits.LeadingZeros is slow.
+// baseIndexToPrefixPrecalc, inverse baseIndex mapping,
+// precalc the lookup table since bits.LeadingZeros is slow.
 func baseIndexToPrefixPrecalc() {
 	var idx uint
 
