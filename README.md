@@ -59,10 +59,6 @@ the backtracking algorithm is as fast as possible.
   func (t *Table[V]) DumpList(is4 bool) []DumpListNode[V]
 ```
 
-# TODO
-
-- [ ] implement Overlaps ...
-
 # CONTRIBUTION
 
 Please open an issue for discussion before sending a pull request.
