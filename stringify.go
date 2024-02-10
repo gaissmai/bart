@@ -85,6 +85,8 @@ func (t *Table[V]) Fprint(w io.Writer) error {
 
 // fprint is the version dependent adapter to fprintRec.
 func (t *Table[V]) fprint(w io.Writer, is4 bool) error {
+	t.init()
+
 	rootNode := t.rootNodeByVersion(is4)
 	if rootNode.isEmpty() {
 		return nil
