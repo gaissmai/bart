@@ -1006,7 +1006,7 @@ func BenchmarkTableLookupSPM(b *testing.B) {
 
 var boolSink bool
 
-func BenchmarkTableOverlapsPrefix(b *testing.B) {
+func BenchmarkTablePrefixOverlaps(b *testing.B) {
 	forFamilyAndCount(b, func(b *testing.B, routes []slowPrefixEntry[int]) {
 		var rt Table[int]
 		for _, route := range routes {
