@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-// dumpString is just a wrapper for Dump.
+// dumpString is just a wrapper for dump.
 func (t *Table[V]) dumpString() string {
 	w := new(strings.Builder)
 	if err := t.dump(w); err != nil {
