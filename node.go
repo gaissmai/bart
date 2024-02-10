@@ -44,13 +44,7 @@ type childTree[V any] struct {
 	nodes []*node[V]
 }
 
-// newNode, bitSets have to be initialized.
-//
-// The maximum length of the bitsets are known in advance
-// (maxNodeChilds and maxNodePrefixes), so you could create correspondingly
-// large slices for every node, this would save minimal computing time
-// during insert, but if you let the bitset slices grow when necessary,
-// we save a lot of memory on average.
+// newNode, BitSets have to be initialized.
 func newNode[V any]() *node[V] {
 	return &node[V]{
 		prefixes: &prefixCBTree[V]{

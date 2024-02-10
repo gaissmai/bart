@@ -3,18 +3,10 @@
 
 package bart
 
-// Please read the ART paper to understand the algorithm.
-// https://cseweb.ucsd.edu//~varghese/TEACH/cs228/artlookup.pdf
+// Please read the ART paper ./doc/artlookup.pdf
+// to understand the algorithm.
 
-const (
-
-	// baseIndex of the first host route: prefixToBaseIndex(0/8)
-	firstHostIndex = 0b1_0000_0000 // 256
-
-	// baseIndex of the last host route: prefixToBaseIndex(255/8)
-	lastHostIndex = 0b1_1111_1111 // 511
-)
-
+// hostMasks as lookup table
 var hostMasks = []uint8{
 	0b1111_1111, // bits == 0
 	0b0111_1111, // bits == 1
@@ -27,6 +19,15 @@ var hostMasks = []uint8{
 	0b0000_0000, // bits == 8
 }
 
+const (
+
+	// baseIndex of the first host route: prefixToBaseIndex(0,8)
+	firstHostIndex = 0b1_0000_0000 // 256
+
+	// baseIndex of the last host route: prefixToBaseIndex(255,8)
+	lastHostIndex = 0b1_1111_1111 // 511
+)
+
 // prefixToBaseIndex, maps a prefix table as a 'complete binary tree'.
 // This is the so-called baseIndex a.k.a heapFunc:
 func prefixToBaseIndex(addr uint, prefixLen int) uint {
@@ -36,7 +37,7 @@ func prefixToBaseIndex(addr uint, prefixLen int) uint {
 // addrToBaseIndex, just prefixToBaseIndex(addr, 8), a.k.a host routes
 // but faster, use it for host routes in Get and Lookup.
 func addrToBaseIndex(addr uint) uint {
-	return addr + firstHostIndex
+	return addr + firstHostIndex // addr + 256
 }
 
 // parentIndex returns the index of idx's parent prefix, or 0 if idx
@@ -63,14 +64,21 @@ func lowerUpperBound(idx uint) (uint, uint) {
 
 // baseIndexToPrefix returns the address and prefix len of baseIdx.
 // It's the inverse to prefixToBaseIndex.
-//
-// Use the lookup table for speed, bits.LeadingZeros is too slow.
 func baseIndexToPrefix(baseIdx uint) (addr uint, pfxLen int) {
 	pfx := baseIdx2Pfx[baseIdx]
 	return pfx.addr, pfx.bits
 }
 
 // baseIdx2Pfx, address and CIDR bits of baseIdx as lookup table.
+// Use the pre computed lookup table, bits.LeadingZeros is too slow.
+//
+//  func baseIndexToPrefix(baseIdx uint) (addr uint, pfxLen int) {
+//  	nlz := bits.LeadingZeros(baseIdx)
+//  	pfxLen = strconv.IntSize - nlz - 1
+//  	addr = (baseIdx & (0xFF >> (8 - pfxLen))) << (8 - pfxLen)
+//  	return addr, pfxLen
+//  }
+
 var baseIdx2Pfx = [512]struct {
 	addr uint
 	bits int
