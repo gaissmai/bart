@@ -1177,18 +1177,6 @@ type slowPrefixEntry[V any] struct {
 	val V
 }
 
-func (st *slowPrefixTable[T]) delete(pfx netip.Prefix) {
-	pfx = pfx.Masked()
-	ret := make([]slowPrefixEntry[T], 0, len(st.prefixes))
-	for _, ent := range st.prefixes {
-		if ent.pfx == pfx {
-			continue
-		}
-		ret = append(ret, ent)
-	}
-	st.prefixes = ret
-}
-
 func (st *slowPrefixTable[T]) insert(pfx netip.Prefix, val T) {
 	pfx = pfx.Masked()
 	for i, ent := range st.prefixes {

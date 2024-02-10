@@ -268,42 +268,47 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 
 	// 1. test if any routes overlaps?
 
-	var oOk, nOk bool
+	nOk := len(n.prefixes.values) > 0
+	oOk := len(o.prefixes.values) > 0
 	var nIdx, oIdx uint
 	// zig-zag, for all routes in both nodes ...
 	for {
-		// range over bitset, node n
-		if nIdx, nOk = n.prefixes.indexes.NextSet(nIdx); nOk {
-			// get range of host routes for this prefix
-			lowerBound, upperBound := lowerUpperBound(nIdx)
+		if nOk {
+			// range over bitset, node n
+			if nIdx, nOk = n.prefixes.indexes.NextSet(nIdx); nOk {
+				// get range of host routes for this prefix
+				lowerBound, upperBound := lowerUpperBound(nIdx)
 
-			// insert host routes (addr/8) for this prefix,
-			// some sort of allotment
-			for i := lowerBound; i <= upperBound; i++ {
-				// zig-zag, fast return
-				if oAllotIndex[i] {
-					return true
+				// insert host routes (addr/8) for this prefix,
+				// some sort of allotment
+				for i := lowerBound; i <= upperBound; i++ {
+					// zig-zag, fast return
+					if oAllotIndex[i] {
+						return true
+					}
+					nAllotIndex[i] = true
 				}
-				nAllotIndex[i] = true
+				nIdx++
 			}
-			nIdx++
 		}
 
-		// range over bitset, node o
-		if oIdx, oOk = o.prefixes.indexes.NextSet(oIdx); oOk {
-			// get range of host routes for this prefix
-			lowerBound, upperBound := lowerUpperBound(oIdx)
+		if oOk {
+			// range over bitset, node o
+			if oIdx, oOk = o.prefixes.indexes.NextSet(oIdx); oOk {
+				// get range of host routes for this prefix
+				lowerBound, upperBound := lowerUpperBound(oIdx)
 
-			// insert host routes (addr/8) for this prefix,
-			// some sort of allotment
-			for i := lowerBound; i <= upperBound; i++ {
-				// zig-zag, fast return
-				if nAllotIndex[i] {
-					return true
+				// insert host routes (addr/8) for this prefix,
+				// some sort of allotment
+				for i := lowerBound; i <= upperBound; i++ {
+					// zig-zag, fast return
+					if nAllotIndex[i] {
+						return true
+					}
+					oAllotIndex[i] = true
 				}
-				oAllotIndex[i] = true
+				oIdx++
 			}
-			oIdx++
 		}
 		if !nOk && !oOk {
 			break
@@ -311,9 +316,11 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 	}
 
 	// full run, zig-zag didn't already match
-	for i := firstHostIndex; i <= lastHostIndex; i++ {
-		if nAllotIndex[i] && oAllotIndex[i] {
-			return true
+	if len(n.prefixes.values) > 0 && len(o.prefixes.values) > 0 {
+		for i := firstHostIndex; i <= lastHostIndex; i++ {
+			if nAllotIndex[i] && oAllotIndex[i] {
+				return true
+			}
 		}
 	}
 
@@ -322,25 +329,31 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 	nAddresses := [maxNodeChildren]bool{}
 	oAddresses := [maxNodeChildren]bool{}
 
+	nOk = len(n.children.nodes) > 0
+	oOk = len(o.children.nodes) > 0
 	var nAddr, oAddr uint
 	// zig-zag, for all addrs in both nodes ...
 	for {
 		// range over bitset, node n
-		if nAddr, nOk = n.children.addrs.NextSet(nAddr); nOk {
-			if oAllotIndex[nAddr+firstHostIndex] {
-				return true
+		if nOk {
+			if nAddr, nOk = n.children.addrs.NextSet(nAddr); nOk {
+				if oAllotIndex[nAddr+firstHostIndex] {
+					return true
+				}
+				nAddresses[nAddr] = true
+				nAddr++
 			}
-			nAddresses[nAddr] = true
-			nAddr++
 		}
 
 		// range over bitset, node o
-		if oAddr, oOk = o.children.addrs.NextSet(oAddr); oOk {
-			if nAllotIndex[oAddr+firstHostIndex] {
-				return true
+		if oOk {
+			if oAddr, oOk = o.children.addrs.NextSet(oAddr); oOk {
+				if nAllotIndex[oAddr+firstHostIndex] {
+					return true
+				}
+				oAddresses[oAddr] = true
+				oAddr++
 			}
-			oAddresses[oAddr] = true
-			oAddr++
 		}
 
 		if !nOk && !oOk {
@@ -350,14 +363,18 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 
 	// 3. rec-descent call for childs with same addr
 
-	for i := 0; i < len(nAddresses); i++ {
-		if nAddresses[i] && oAddresses[i] {
-			// get next child node for this addr
-			n = n.children.get(uint(i))
-			o = o.children.get(uint(i))
+	if len(n.children.nodes) > 0 && len(o.children.nodes) > 0 {
+		for i := 0; i < len(nAddresses); i++ {
+			if nAddresses[i] && oAddresses[i] {
+				// get next child node for this addr
+				nc := n.children.get(uint(i))
+				oc := o.children.get(uint(i))
 
-			// rec-descent
-			return n.overlapsRec(o)
+				// rec-descent
+				if nc.overlapsRec(oc) {
+					return true
+				}
+			}
 		}
 	}
 
@@ -370,7 +387,9 @@ func (n *node[V]) overlapsPrefix(addr uint, pfxLen int) bool {
 	pfxLowerBound := addrToBaseIndex(addr)
 	pfxUpperBound := lastHostIndexOfPrefix(addr, pfxLen)
 
-	// test if prefix overlaps any child in this node.
+	// #################################################
+	// 1. test if prefix overlaps any child in this node
+
 	// set start address in bitset search with prefix addr
 	childAddr := addr
 	var ok bool
@@ -389,14 +408,16 @@ func (n *node[V]) overlapsPrefix(addr uint, pfxLen int) bool {
 		childAddr++
 	}
 
-	// test if any route in this node overlaps prefix?
+	// ##################################################
+	// 2. test if any route in this node overlaps prefix?
+
 	pfxIdx := prefixToBaseIndex(addr, pfxLen)
 	if _, _, ok := n.prefixes.lpmByIndex(pfxIdx); ok {
 		return true
 	}
 
-	// reverse direction: prefix overlaps routes in node
-	// test if prefix overlaps any route in this node.
+	// #################################################
+	// 3. test if prefix overlaps any route in this node
 
 	// increment to 'next' routeIdx for start in bitset search
 	// since routeIdx already testet by lpm in other direction
@@ -411,7 +432,7 @@ func (n *node[V]) overlapsPrefix(addr uint, pfxLen int) bool {
 			return true
 		}
 
-		// next prefix
+		// next route
 		routeIdx++
 	}
 

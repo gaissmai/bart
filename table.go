@@ -392,6 +392,6 @@ func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 // other table.
 func (t *Table[V]) Overlaps(o *Table[V]) bool {
 	t.init()
-
+	o.init()
 	return t.rootV4.overlapsRec(o.rootV4) || t.rootV6.overlapsRec(o.rootV6)
 }
