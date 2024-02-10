@@ -21,9 +21,6 @@ type Table[V any] struct {
 // init once, so no constructor is needed.
 func (t *Table[V]) init() {
 	t.initOnce.Do(func() {
-		// precalc lookup table
-		baseIndexToPrefixPrecalc()
-
 		// BitSets have to be initialized.
 		t.rootV4 = newNode[V]()
 		t.rootV6 = newNode[V]()
