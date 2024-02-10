@@ -18,10 +18,6 @@ import (
 	"testing"
 )
 
-func init() {
-	baseIndexToPrefixPrecalc()
-}
-
 func TestInverseIndex(t *testing.T) {
 	t.Parallel()
 	for i := 0; i < maxNodeChildren; i++ {

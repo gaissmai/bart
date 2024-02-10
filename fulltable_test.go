@@ -9,6 +9,7 @@ import (
 	"net/netip"
 	"os"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -97,9 +98,6 @@ func TestFullNewV6(t *testing.T) {
 
 	t.Logf("BART: n: %d routes, raw: %d KBytes, bart: %6d KBytes, mult: %.2f (bart/raw)",
 		len(nRoutes), rawBytes/(2<<10), bartBytes/(2<<10), float32(bartBytes)/float32(rawBytes))
-
-	// t.Logf("ART:  n: %d routes, raw: %d KBytes, art:  %6d KBytes, mult: %.2f (art/raw)",
-	// 	len(nRoutes), rawBytes/(2<<10), artBytes/(2<<10), float32(artBytes)/float32(rawBytes))
 }
 
 var (
@@ -147,7 +145,7 @@ func BenchmarkFullMatchV4(b *testing.B) {
 	})
 
 	pfx := randomPrefix4()
-	b.Run("Overlaps", func(b *testing.B) {
+	b.Run("OverlapsPfx", func(b *testing.B) {
 		b.ResetTimer()
 		for k := 0; k < b.N; k++ {
 			okSink = rt.OverlapsPrefix(pfx)
@@ -195,7 +193,7 @@ func BenchmarkFullMatchV6(b *testing.B) {
 	})
 
 	pfx := randomPrefix6()
-	b.Run("Overlaps", func(b *testing.B) {
+	b.Run("OverlapsPfx", func(b *testing.B) {
 		b.ResetTimer()
 		for k := 0; k < b.N; k++ {
 			okSink = rt.OverlapsPrefix(pfx)
@@ -279,6 +277,77 @@ func BenchmarkFullMissV6(b *testing.B) {
 			_, _, okSink = rt.LookupShortest(ip)
 		}
 	})
+}
+
+var boolSink bool
+
+func BenchmarkFullTableOverlapsV4(b *testing.B) {
+	var rt bart.Table[int]
+
+	for i, route := range routes4 {
+		rt.Insert(route.CIDR, i)
+	}
+
+	for i := 1; i <= 1024; i *= 2 {
+		inter := new(bart.Table[int])
+		for j := 0; j <= i; j++ {
+			pfx := randomPrefix4()
+			inter.Insert(pfx, j)
+		}
+
+		b.Run(strconv.Itoa(i), func(b *testing.B) {
+			b.ResetTimer()
+			for k := 0; k < b.N; k++ {
+				boolSink = rt.Overlaps(inter)
+			}
+		})
+	}
+}
+
+func BenchmarkFullTableOverlapsV6(b *testing.B) {
+	var rt bart.Table[int]
+
+	for i, route := range routes6 {
+		rt.Insert(route.CIDR, i)
+	}
+
+	for i := 1; i <= 1024; i *= 2 {
+		inter := new(bart.Table[int])
+		for j := 0; j <= i; j++ {
+			pfx := randomPrefix6()
+			inter.Insert(pfx, j)
+		}
+
+		b.Run(strconv.Itoa(i), func(b *testing.B) {
+			b.ResetTimer()
+			for k := 0; k < b.N; k++ {
+				boolSink = rt.Overlaps(inter)
+			}
+		})
+	}
+}
+
+func BenchmarkFullTableOverlaps(b *testing.B) {
+	var rt bart.Table[int]
+
+	for i, route := range routes {
+		rt.Insert(route.CIDR, i)
+	}
+
+	for i := 1; i <= 1024; i *= 2 {
+		inter := new(bart.Table[int])
+		for j := 0; j <= i; j++ {
+			pfx := randomPrefix()
+			inter.Insert(pfx, j)
+		}
+
+		b.Run(strconv.Itoa(i), func(b *testing.B) {
+			b.ResetTimer()
+			for k := 0; k < b.N; k++ {
+				boolSink = rt.Overlaps(inter)
+			}
+		})
+	}
 }
 
 func fillRouteTables() {
