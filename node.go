@@ -383,33 +383,8 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 
 // overlapsPrefix returns true if node overlaps with prefix.
 func (n *node[V]) overlapsPrefix(addr uint, pfxLen int) bool {
-	// lower/upper boundary for addr/pfxLen
-	pfxLowerBound := addrToBaseIndex(addr)
-	pfxUpperBound := lastHostIndexOfPrefix(addr, pfxLen)
-
-	// #################################################
-	// 1. test if prefix overlaps any child in this node
-
-	// set start address in bitset search with prefix addr
-	childAddr := addr
-	var ok bool
-	for {
-		if childAddr, ok = n.children.addrs.NextSet(childAddr); !ok {
-			break
-		}
-
-		childIdx := addrToBaseIndex(childAddr)
-
-		if childIdx >= pfxLowerBound && childIdx <= pfxUpperBound {
-			return true
-		}
-
-		// next round
-		childAddr++
-	}
-
 	// ##################################################
-	// 2. test if any route in this node overlaps prefix?
+	// 1. test if any route in this node overlaps prefix?
 
 	pfxIdx := prefixToBaseIndex(addr, pfxLen)
 	if _, _, ok := n.prefixes.lpmByIndex(pfxIdx); ok {
@@ -417,23 +392,47 @@ func (n *node[V]) overlapsPrefix(addr uint, pfxLen int) bool {
 	}
 
 	// #################################################
-	// 3. test if prefix overlaps any route in this node
+	// 2. test if prefix overlaps any route in this node
+
+	// lower/upper boundary for addr/pfxLen host routes
+	pfxLowerBound := addr + firstHostIndex
+	pfxUpperBound := lastHostIndexOfPrefix(addr, pfxLen)
 
 	// increment to 'next' routeIdx for start in bitset search
-	// since routeIdx already testet by lpm in other direction
+	// since pfxIdx already testet by lpm in other direction
 	routeIdx := pfxIdx << 1
+	var ok bool
 	for {
 		if routeIdx, ok = n.prefixes.indexes.NextSet(routeIdx); !ok {
 			break
 		}
 
-		lowerBound, upperBound := lowerUpperBound(routeIdx)
-		if lowerBound >= pfxLowerBound && upperBound <= pfxUpperBound {
+		routeLowerBound, routeUpperBound := lowerUpperBound(routeIdx)
+		if routeLowerBound >= pfxLowerBound && routeUpperBound <= pfxUpperBound {
 			return true
 		}
 
 		// next route
 		routeIdx++
+	}
+
+	// #################################################
+	// 3. test if prefix overlaps any child in this node
+
+	// set start address in bitset search with prefix addr
+	childAddr := addr
+	for {
+		if childAddr, ok = n.children.addrs.NextSet(childAddr); !ok {
+			break
+		}
+
+		childIdx := childAddr + firstHostIndex
+		if childIdx >= pfxLowerBound && childIdx <= pfxUpperBound {
+			return true
+		}
+
+		// next round
+		childAddr++
 	}
 
 	return false
