@@ -18,6 +18,10 @@ import (
 	"testing"
 )
 
+func init() {
+	baseIndexToPrefixPrecalc()
+}
+
 func TestInverseIndex(t *testing.T) {
 	t.Parallel()
 	for i := 0; i < maxNodeChildren; i++ {
@@ -50,7 +54,6 @@ func TestPrefixInsert(t *testing.T) {
 	// every lookup. The naive implementation is very slow, but its behavior is
 	// easy to verify by inspection.
 
-	// pfxs := shufflePrefixes(allPrefixes())[:100]
 	pfxs := shufflePrefixes(allPrefixes())[:100]
 	slow := slowTable[int]{pfxs}
 	fast := newNode[int]()
@@ -71,14 +74,6 @@ func TestPrefixInsert(t *testing.T) {
 		_, fastVal, fastOK = fast.prefixes.spmByAddr(addr)
 		if !getsEqual(fastVal, fastOK, slowVal, slowOK) {
 			t.Fatalf("spm(%d) = (%v, %v), want (%v, %v)", addr, fastVal, fastOK, slowVal, slowOK)
-		}
-
-		for j := 0; j <= 8; j++ {
-			slowOK = slow.overlapsPrefix(addr, j)
-			fastOK = fast.prefixes.overlaps(addr, j)
-			if !getsEqual(fastVal, fastOK, slowVal, slowOK) {
-				t.Fatalf("spm(%d/%d) = %v, want %v", addr, j, fastOK, slowOK)
-			}
 		}
 	}
 }
@@ -121,7 +116,66 @@ func TestPrefixDelete(t *testing.T) {
 	}
 }
 
-var prefixRouteCount = []int{10, 50, 100, 200}
+func TestPrefixOverlaps(t *testing.T) {
+	t.Parallel()
+
+	pfxs := shufflePrefixes(allPrefixes())[:100]
+	slow := slowTable[int]{pfxs}
+	fast := newNode[int]()
+
+	for _, pfx := range pfxs {
+		fast.prefixes.insert(pfx.addr, pfx.bits, pfx.val)
+	}
+
+	for _, tt := range allPrefixes() {
+		slowOK := slow.overlapsPrefix(uint8(tt.addr), tt.bits)
+		fastOK := fast.overlapsPrefix(tt.addr, tt.bits)
+		if slowOK != fastOK {
+			t.Fatalf("overlapsPrefix(%d, %d) = %v, want %v", tt.addr, tt.bits, fastOK, slowOK)
+		}
+	}
+}
+
+func TestNodeOverlaps(t *testing.T) {
+	t.Parallel()
+
+	// Empirically, between 5 and 6 routes per table results in ~50%
+	// of random pairs overlapping. Cool example of the birthday
+	// paradox!
+	const numEntries = 6
+	all := allPrefixes()
+
+	seenResult := map[bool]int{}
+	for i := 0; i < 100_000; i++ {
+		shufflePrefixes(all)
+		pfxs := all[:numEntries]
+		slow := slowTable[int]{pfxs}
+		fast := newNode[int]()
+		for _, pfx := range pfxs {
+			fast.prefixes.insert(pfx.addr, pfx.bits, pfx.val)
+		}
+
+		inter := all[numEntries : 2*numEntries]
+		slowInter := slowTable[int]{inter}
+		fastInter := newNode[int]()
+		for _, pfx := range inter {
+			fastInter.prefixes.insert(pfx.addr, pfx.bits, pfx.val)
+		}
+
+		gotSlow := slow.overlaps(&slowInter)
+		gotFast := fast.overlapsRec(fastInter)
+		if gotSlow != gotFast {
+			t.Fatalf("node.overlaps = %v, want %v", gotFast, gotSlow)
+		}
+		seenResult[gotFast]++
+	}
+	t.Log(seenResult)
+	if len(seenResult) != 2 { // saw both intersections and non-intersections
+		t.Fatalf("didn't see both intersections and non-intersections\nIntersects: %d\nNon-intersects: %d", seenResult[true], seenResult[false])
+	}
+}
+
+var prefixRouteCount = []int{10, 20, 50, 100, 200, 500}
 
 // forPrefixCount runs the benchmark fn with different sets of routes.
 func forPrefixCount(b *testing.B, fn func(b *testing.B, routes []slowEntry[int])) {
@@ -195,40 +249,42 @@ func BenchmarkPrefixDeletion(b *testing.B) {
 
 var writeSink int
 
-func BenchmarkPrefixGet(b *testing.B) {
-	// No need to forCountAndOrdering here, route lookup time is independent of
-	// the route count.
-	routes := shufflePrefixes(allPrefixes())[:100]
-	rt := newNode[int]()
-	for _, route := range routes {
-		rt.prefixes.insert(route.addr, route.bits, route.val)
-	}
+func BenchmarkPrefixLPM(b *testing.B) {
+	forPrefixCount(b, func(b *testing.B, routes []slowEntry[int]) {
+		val := 0
+		rt := newNode[int]()
+		for _, route := range routes {
+			rt.prefixes.insert(route.addr, route.bits, val)
+		}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, writeSink, _ = rt.prefixes.lpmByAddr(uint(i))
-	}
-	gets := float64(b.N)
-	elapsedSec := b.Elapsed().Seconds()
-	b.ReportMetric(gets/elapsedSec, "routes/s")
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_, writeSink, _ = rt.prefixes.lpmByAddr(uint(uint8(i)))
+		}
+
+		lpm := float64(b.N)
+		elapsed := float64(b.Elapsed().Nanoseconds())
+		b.ReportMetric(elapsed/lpm, "ns/op")
+	})
 }
 
 func BenchmarkPrefixSPM(b *testing.B) {
-	// No need to forCountAndOrdering here, route lookup time is independent of
-	// the route count.
-	routes := shufflePrefixes(allPrefixes())[:100]
-	rt := newNode[int]()
-	for _, route := range routes {
-		rt.prefixes.insert(route.addr, route.bits, route.val)
-	}
+	forPrefixCount(b, func(b *testing.B, routes []slowEntry[int]) {
+		val := 0
+		rt := newNode[int]()
+		for _, route := range routes {
+			rt.prefixes.insert(route.addr, route.bits, val)
+		}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, writeSink, _ = rt.prefixes.spmByAddr(uint(i))
-	}
-	gets := float64(b.N)
-	elapsedSec := b.Elapsed().Seconds()
-	b.ReportMetric(gets/elapsedSec, "routes/s")
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_, writeSink, _ = rt.prefixes.spmByAddr(uint(uint8(i)))
+		}
+
+		spm := float64(b.N)
+		elapsed := float64(b.Elapsed().Nanoseconds())
+		b.ReportMetric(elapsed/spm, "ns/op")
+	})
 }
 
 // slowTable is an 8-bit routing table implemented as a set of prefixes that are
@@ -245,8 +301,8 @@ type slowEntry[V any] struct {
 	val  V
 }
 
-func (stbl *slowTable[V]) String() string {
-	pfxs := append([]slowEntry[V](nil), stbl.prefixes...)
+func (st *slowTable[V]) String() string {
+	pfxs := append([]slowEntry[V](nil), st.prefixes...)
 	sort.Slice(pfxs, func(i, j int) bool {
 		if pfxs[i].bits != pfxs[j].bits {
 			return pfxs[i].bits < pfxs[j].bits
@@ -260,22 +316,22 @@ func (stbl *slowTable[V]) String() string {
 	return ret.String()
 }
 
-func (stbl *slowTable[V]) delete(addr uint, prefixLen int) {
-	pfx := make([]slowEntry[V], 0, len(stbl.prefixes))
-	for _, e := range stbl.prefixes {
+func (st *slowTable[V]) delete(addr uint, prefixLen int) {
+	pfx := make([]slowEntry[V], 0, len(st.prefixes))
+	for _, e := range st.prefixes {
 		if e.addr == addr && e.bits == prefixLen {
 			continue
 		}
 		pfx = append(pfx, e)
 	}
-	stbl.prefixes = pfx
+	st.prefixes = pfx
 }
 
 // get, longest-prefix-match
-func (stbl *slowTable[V]) get(addr uint) (ret V, ok bool) {
+func (st *slowTable[V]) get(addr uint) (ret V, ok bool) {
 	const noMatch = -1
 	longest := noMatch
-	for _, e := range stbl.prefixes {
+	for _, e := range st.prefixes {
 		if addr&pfxMask(e.bits) == e.addr && e.bits >= longest {
 			ret = e.val
 			longest = e.bits
@@ -285,10 +341,10 @@ func (stbl *slowTable[V]) get(addr uint) (ret V, ok bool) {
 }
 
 // spm, shortest-prefix-match
-func (stbl *slowTable[V]) spm(addr uint) (ret V, ok bool) {
+func (st *slowTable[V]) spm(addr uint) (ret V, ok bool) {
 	const noMatch = 9
 	shortest := noMatch
-	for _, e := range stbl.prefixes {
+	for _, e := range st.prefixes {
 		if addr&pfxMask(e.bits) == e.addr && e.bits <= shortest {
 			ret = e.val
 			shortest = e.bits
@@ -297,15 +353,30 @@ func (stbl *slowTable[V]) spm(addr uint) (ret V, ok bool) {
 	return ret, shortest != noMatch
 }
 
-func (stbl *slowTable[T]) overlapsPrefix(addr uint, prefixLen int) bool {
-	for _, e := range stbl.prefixes {
+func (st *slowTable[T]) overlapsPrefix(addr uint8, prefixLen int) bool {
+	for _, e := range st.prefixes {
 		minBits := prefixLen
 		if e.bits < minBits {
 			minBits = e.bits
 		}
-		mask := ^addrMaskTable[minBits]
-		if addr&mask == e.addr&mask {
+		mask := ^hostMasks[minBits]
+		if addr&mask == uint8(e.addr)&mask {
 			return true
+		}
+	}
+	return false
+}
+
+func (st *slowTable[T]) overlaps(so *slowTable[T]) bool {
+	for _, tp := range st.prefixes {
+		for _, op := range so.prefixes {
+			minBits := tp.bits
+			if op.bits < minBits {
+				minBits = op.bits
+			}
+			if tp.addr&pfxMask(minBits) == op.addr&pfxMask(minBits) {
+				return true
+			}
 		}
 	}
 	return false

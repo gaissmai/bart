@@ -48,18 +48,16 @@ the backtracking algorithm is as fast as possible.
   func (t *Table[V]) Lookup(ip netip.Addr) (lpm netip.Prefix, val V, ok bool)
   func (t *Table[V]) LookupShortest(ip netip.Addr) (spm netip.Prefix, val V, ok bool)
 
+  func (t *Table[V]) Overlaps(o *Table[V]) bool
   func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool
   
   func (t *Table[V]) String() string
   func (t *Table[V]) Fprint(w io.Writer) error
-  func (t *Table[V]) DumpList(is4 bool) []DumpListNode[V]
-  func (t *Table[V]) MarshalJSON() ([]byte, error)
   func (t *Table[V]) MarshalText() ([]byte, error)
+  func (t *Table[V]) MarshalJSON() ([]byte, error)
+
+  func (t *Table[V]) DumpList(is4 bool) []DumpListNode[V]
 ```
-
-# TODO
-
-- [ ] implement Overlaps ...
 
 # CONTRIBUTION
 

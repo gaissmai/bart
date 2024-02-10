@@ -4,9 +4,7 @@
 package bart
 
 import (
-	"math/bits"
 	"slices"
-	"strconv"
 
 	"github.com/bits-and-blooms/bitset"
 )
@@ -65,11 +63,6 @@ func newNode[V any]() *node[V] {
 			nodes: nil,
 		},
 	}
-}
-
-// isEmpty returns true if node has neither prefixes nor children.
-func (n *node[V]) isEmpty() bool {
-	return len(n.prefixes.values) == 0 && len(n.children.nodes) == 0
 }
 
 // ################## prefixes ##################################
@@ -195,49 +188,6 @@ func (p *prefixCBTree[V]) spmByAddr(addr uint) (baseIdx uint, val V, ok bool) {
 	return p.spmByIndex(addrToBaseIndex(addr))
 }
 
-// overlaps reports whether the route addr/prefixLen overlaps
-// with any prefix in this node..
-func (p *prefixCBTree[V]) overlaps(addr uint, pfxLen int) bool {
-	baseIdx := prefixToBaseIndex(addr, pfxLen)
-
-	// any route in this node overlaps prefix?
-	if _, _, ok := p.lpmByIndex(baseIdx); ok {
-		return true
-	}
-
-	// from here on: reverse direction,
-	// test if prefix overlaps any route in this node.
-
-	// lower boundary, idx == baseIdx alreday tested with lpm above,
-	// increase it
-	idx := baseIdx << 1
-
-	// upper boundary for addr/pfxLen
-	lastHostIdx := lastHostIndex(addr, pfxLen)
-
-	var ok bool
-	for {
-		if idx, ok = p.indexes.NextSet(idx); !ok {
-			return false
-		}
-
-		// out of addr/pfxLen
-		if idx > lastHostIdx {
-			return false
-		}
-
-		// e.g.: 365 -> 182 -> 91 -> 45 -> 22 -> baseIdx(11) STOP
-		//
-		for j := idx; j >= baseIdx; j = parentIndex(j) {
-			if j == baseIdx {
-				return true
-			}
-		}
-		// next round
-		idx++
-	}
-}
-
 // getVal for baseIdx.
 func (p *prefixCBTree[V]) getVal(baseIdx uint) *V {
 	if p.indexes.Test(baseIdx) {
@@ -294,41 +244,6 @@ func (c *childTree[V]) get(addr uint) *node[V] {
 	return c.nodes[c.rank(addr)]
 }
 
-// overlaps reports whether the prefix addr/pfxLen overlaps
-// with any child in this node..
-func (c *childTree[V]) overlaps(addr uint, pfxLen int) bool {
-	// lower boundary for addr/pfxLen
-	baseIdx := prefixToBaseIndex(addr, pfxLen)
-
-	// upper boundary for addr/pfxLen
-	lastHostIdx := lastHostIndex(addr, pfxLen)
-
-	var ok bool
-	for {
-		if addr, ok = c.addrs.NextSet(addr); !ok {
-			return false
-		}
-
-		// this addrs baseIdx
-		hostIdx := addrToBaseIndex(addr)
-
-		// out of addr/pfxLen
-		if hostIdx > lastHostIdx {
-			return false
-		}
-
-		// check if prefix overlaps this child or any of his parents
-		// within the limits of addr/pfxLen
-		for idx := hostIdx; idx >= baseIdx; idx = parentIndex(idx) {
-			if idx == baseIdx {
-				return true
-			}
-		}
-		// next round
-		addr++
-	}
-}
-
 // allAddrs returns the addrs of all child nodes in ascending order.
 func (c *childTree[V]) allAddrs() []uint {
 	all := make([]uint, maxNodeChildren)
@@ -336,59 +251,190 @@ func (c *childTree[V]) allAddrs() []uint {
 	return all
 }
 
-// ################## helpers ###################################
+// ################## node ###################################
 
-// prefixToBaseIndex, maps a prefix table as a 'complete binary tree'.
-// This is the so-called baseIndex a.k.a heapFunc:
-//
-// https://cseweb.ucsd.edu//~varghese/TEACH/cs228/artlookup.pdf
-func prefixToBaseIndex(addr uint, prefixLen int) uint {
-	return (addr >> (stride - prefixLen)) + (1 << prefixLen)
+// isEmpty returns true if node has neither prefixes nor children.
+func (n *node[V]) isEmpty() bool {
+	return len(n.prefixes.values) == 0 && len(n.children.nodes) == 0
 }
 
-// addrToBaseIndex, just prefixToBaseIndex(addr, 8), a.k.a host routes
-// but faster, use it for host routes in Get and Lookup.
-func addrToBaseIndex(addr uint) uint {
-	return addr + 1<<stride
+// overlapsRec returns true if any IP in the nodes n or o overlaps.
+// First test the routes, then the children and if no match rec-descent
+// for child nodes with same addr.
+func (n *node[V]) overlapsRec(o *node[V]) bool {
+	// dynamically allot the host routes from prefixes
+	nAllotIndex := [maxNodePrefixes]bool{}
+	oAllotIndex := [maxNodePrefixes]bool{}
+
+	// 1. test if any routes overlaps?
+
+	nOk := len(n.prefixes.values) > 0
+	oOk := len(o.prefixes.values) > 0
+	var nIdx, oIdx uint
+	// zig-zag, for all routes in both nodes ...
+	for {
+		if nOk {
+			// range over bitset, node n
+			if nIdx, nOk = n.prefixes.indexes.NextSet(nIdx); nOk {
+				// get range of host routes for this prefix
+				lowerBound, upperBound := lowerUpperBound(nIdx)
+
+				// insert host routes (addr/8) for this prefix,
+				// some sort of allotment
+				for i := lowerBound; i <= upperBound; i++ {
+					// zig-zag, fast return
+					if oAllotIndex[i] {
+						return true
+					}
+					nAllotIndex[i] = true
+				}
+				nIdx++
+			}
+		}
+
+		if oOk {
+			// range over bitset, node o
+			if oIdx, oOk = o.prefixes.indexes.NextSet(oIdx); oOk {
+				// get range of host routes for this prefix
+				lowerBound, upperBound := lowerUpperBound(oIdx)
+
+				// insert host routes (addr/8) for this prefix,
+				// some sort of allotment
+				for i := lowerBound; i <= upperBound; i++ {
+					// zig-zag, fast return
+					if nAllotIndex[i] {
+						return true
+					}
+					oAllotIndex[i] = true
+				}
+				oIdx++
+			}
+		}
+		if !nOk && !oOk {
+			break
+		}
+	}
+
+	// full run, zig-zag didn't already match
+	if len(n.prefixes.values) > 0 && len(o.prefixes.values) > 0 {
+		for i := firstHostIndex; i <= lastHostIndex; i++ {
+			if nAllotIndex[i] && oAllotIndex[i] {
+				return true
+			}
+		}
+	}
+
+	// 2. test if routes overlaps any child
+
+	nAddresses := [maxNodeChildren]bool{}
+	oAddresses := [maxNodeChildren]bool{}
+
+	nOk = len(n.children.nodes) > 0
+	oOk = len(o.children.nodes) > 0
+	var nAddr, oAddr uint
+	// zig-zag, for all addrs in both nodes ...
+	for {
+		// range over bitset, node n
+		if nOk {
+			if nAddr, nOk = n.children.addrs.NextSet(nAddr); nOk {
+				if oAllotIndex[nAddr+firstHostIndex] {
+					return true
+				}
+				nAddresses[nAddr] = true
+				nAddr++
+			}
+		}
+
+		// range over bitset, node o
+		if oOk {
+			if oAddr, oOk = o.children.addrs.NextSet(oAddr); oOk {
+				if nAllotIndex[oAddr+firstHostIndex] {
+					return true
+				}
+				oAddresses[oAddr] = true
+				oAddr++
+			}
+		}
+
+		if !nOk && !oOk {
+			break
+		}
+	}
+
+	// 3. rec-descent call for childs with same addr
+
+	if len(n.children.nodes) > 0 && len(o.children.nodes) > 0 {
+		for i := 0; i < len(nAddresses); i++ {
+			if nAddresses[i] && oAddresses[i] {
+				// get next child node for this addr
+				nc := n.children.get(uint(i))
+				oc := o.children.get(uint(i))
+
+				// rec-descent
+				if nc.overlapsRec(oc) {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
 }
 
-// parentIndex returns the index of idx's parent prefix, or 0 if idx
-// is the index of 0/0.
-func parentIndex(idx uint) uint {
-	return idx >> 1
-}
+// overlapsPrefix returns true if node overlaps with prefix.
+func (n *node[V]) overlapsPrefix(addr uint, pfxLen int) bool {
+	// lower/upper boundary for addr/pfxLen
+	pfxLowerBound := addrToBaseIndex(addr)
+	pfxUpperBound := lastHostIndexOfPrefix(addr, pfxLen)
 
-// baseIndexToPrefix returns the address and prefix len of baseIdx.
-// It's the inverse to prefixToBaseIndex.
-func baseIndexToPrefix(baseIdx uint) (addr uint, pfxLen int) {
-	nlz := bits.LeadingZeros(baseIdx)
-	pfxLen = strconv.IntSize - nlz - 1
-	addr = baseIdx & (0xFF >> (stride - pfxLen)) << (stride - pfxLen)
-	return addr, pfxLen
-}
+	// #################################################
+	// 1. test if prefix overlaps any child in this node
 
-// baseIndexToPrefixLen returns the prefix len of baseIdx, partly
-// the inverse to prefixToBaseIndex.
-// Needed for Lookup, it's faster than:
-//
-//	_, pfxLen := baseIndexToPrefix(idx)
-func baseIndexToPrefixLen(baseIdx uint) int {
-	return strconv.IntSize - bits.LeadingZeros(baseIdx) - 1
-}
+	// set start address in bitset search with prefix addr
+	childAddr := addr
+	var ok bool
+	for {
+		if childAddr, ok = n.children.addrs.NextSet(childAddr); !ok {
+			break
+		}
 
-var addrMaskTable = []uint{
-	0b1111_1111,
-	0b0111_1111,
-	0b0011_1111,
-	0b0001_1111,
-	0b0000_1111,
-	0b0000_0111,
-	0b0000_0011,
-	0b0000_0001,
-	0b0000_0000,
-}
+		childIdx := addrToBaseIndex(childAddr)
 
-// lastHostIndex returns the array index of the last address in addr/len.
-func lastHostIndex(addr uint, bits int) uint {
-	return addrToBaseIndex(addr | addrMaskTable[bits])
+		if childIdx >= pfxLowerBound && childIdx <= pfxUpperBound {
+			return true
+		}
+
+		// next round
+		childAddr++
+	}
+
+	// ##################################################
+	// 2. test if any route in this node overlaps prefix?
+
+	pfxIdx := prefixToBaseIndex(addr, pfxLen)
+	if _, _, ok := n.prefixes.lpmByIndex(pfxIdx); ok {
+		return true
+	}
+
+	// #################################################
+	// 3. test if prefix overlaps any route in this node
+
+	// increment to 'next' routeIdx for start in bitset search
+	// since routeIdx already testet by lpm in other direction
+	routeIdx := pfxIdx << 1
+	for {
+		if routeIdx, ok = n.prefixes.indexes.NextSet(routeIdx); !ok {
+			break
+		}
+
+		lowerBound, upperBound := lowerUpperBound(routeIdx)
+		if lowerBound >= pfxLowerBound && upperBound <= pfxUpperBound {
+			return true
+		}
+
+		// next route
+		routeIdx++
+	}
+
+	return false
 }

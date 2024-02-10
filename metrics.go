@@ -64,7 +64,7 @@ func (t *Table[V]) readTableStats() map[string]any {
 			stats.types4[n.hasType().String()]++
 
 			for _, idx := range n.prefixes.allIndexes() {
-				pfxLen := baseIndexToPrefixLen(idx)
+				_, pfxLen := baseIndexToPrefix(idx)
 				stats.prefixlen4[stride*depth+pfxLen]++
 			}
 		case false:
@@ -74,7 +74,7 @@ func (t *Table[V]) readTableStats() map[string]any {
 			stats.types6[n.hasType().String()]++
 
 			for _, idx := range n.prefixes.allIndexes() {
-				pfxLen := baseIndexToPrefixLen(idx)
+				_, pfxLen := baseIndexToPrefix(idx)
 				stats.prefixlen6[stride*depth+pfxLen]++
 			}
 		}
