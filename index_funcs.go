@@ -1,26 +1,30 @@
+// Copyright (c) 2024 Karl Gaissmaier
+// SPDX-License-Identifier: MIT
+
 package bart
 
 // Please read the ART paper to understand the algorithm.
 // https://cseweb.ucsd.edu//~varghese/TEACH/cs228/artlookup.pdf
 
 const (
-	// firstHostIndex is the baseIndex of the first host route. This is hostIndex(0/8).
+
+	// baseIndex of the first host route: prefixToBaseIndex(0/8)
 	firstHostIndex = 0b1_0000_0000 // 256
 
-	// lastHostIndex is the baseIndex of the last host route. This is hostIndex(0xFF/8).
+	// baseIndex of the last host route: prefixToBaseIndex(255/8)
 	lastHostIndex = 0b1_1111_1111 // 511
 )
 
 var hostMasks = []uint8{
-	/* bits = 0 */ 0b1111_1111,
-	/* bits = 1 */ 0b0111_1111,
-	/* bits = 2 */ 0b0011_1111,
-	/* bits = 3 */ 0b0001_1111,
-	/* bits = 4 */ 0b0000_1111,
-	/* bits = 5 */ 0b0000_0111,
-	/* bits = 6 */ 0b0000_0011,
-	/* bits = 7 */ 0b0000_0001,
-	/* bits = 8 */ 0b0000_0000,
+	0b1111_1111, // bits == 0
+	0b0111_1111, // bits == 1
+	0b0011_1111, // bits == 2
+	0b0001_1111, // bits == 3
+	0b0000_1111, // bits == 4
+	0b0000_0111, // bits == 5
+	0b0000_0011, // bits == 6
+	0b0000_0001, // bits == 7
+	0b0000_0000, // bits == 8
 }
 
 // prefixToBaseIndex, maps a prefix table as a 'complete binary tree'.
@@ -327,7 +331,7 @@ var baseIdx2Pfx = [512]struct {
 	{250, 7}, // idx == 253
 	{252, 7}, // idx == 254
 	{254, 7}, // idx == 255
-	{0, 8},   // idx == 256 fristHostIndex
+	{0, 8},   // idx == 256 firstHostIndex
 	{1, 8},   // idx == 257
 	{2, 8},   // idx == 258
 	{3, 8},   // idx == 259
