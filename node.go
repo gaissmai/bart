@@ -68,9 +68,13 @@ func (p *prefixCBTree[V]) rank(treeIdx uint) int {
 }
 
 // insert adds the route addr/prefixLen, with value val.
+// Just an adapter for insertIdx.
 func (p *prefixCBTree[V]) insert(addr uint, prefixLen int, val V) {
-	baseIdx := prefixToBaseIndex(addr, prefixLen)
+	p.insertIdx(prefixToBaseIndex(addr, prefixLen), val)
+}
 
+// insertIdx adds the route for baseIdx, with value val.
+func (p *prefixCBTree[V]) insertIdx(baseIdx uint, val V) {
 	// prefix exists, overwrite val
 	if p.indexes.Test(baseIdx) {
 		p.values[p.rank(baseIdx)] = &val
@@ -430,4 +434,41 @@ func (n *node[V]) overlapsPrefix(addr uint, pfxLen int) bool {
 	}
 
 	return false
+}
+
+// unionRec combines two nodes, changing the receiver node.
+// If there are duplicate entries, the value is taken from the other node.
+func (n *node[V]) unionRec(o *node[V]) {
+	var oIdx uint
+	var oOk bool
+	// for all prefixes in other node do ...
+	for {
+		if oIdx, oOk = o.prefixes.indexes.NextSet(oIdx); !oOk {
+			break
+		}
+		oVal := *(o.prefixes.getVal(oIdx))
+		// insert/overwrite prefix/value from oNode to nNode
+		n.prefixes.insertIdx(oIdx, oVal)
+		oIdx++
+	}
+
+	var oAddr uint
+	// for all children in other node do ...
+	for {
+		if oAddr, oOk = o.children.addrs.NextSet(oAddr); !oOk {
+			break
+		}
+		oNode := o.children.get(oAddr)
+
+		// get nNode with same addr
+		nNode := n.children.get(oAddr)
+		if nNode == nil {
+			// union child from oNode into nNode
+			n.children.insert(oAddr, oNode)
+		} else {
+			// both nodes have child with addr, call union rec-descent
+			nNode.unionRec(oNode)
+		}
+		oAddr++
+	}
 }
