@@ -10,11 +10,13 @@
 package bart
 
 import (
+	"cmp"
 	crand "crypto/rand"
 	"fmt"
 	"math/rand"
 	"net/netip"
 	"runtime"
+	"slices"
 	"strconv"
 	"testing"
 	"time"
@@ -650,6 +652,168 @@ func TestOverlapsPrefixCompare(t *testing.T) {
 	}
 }
 
+func TestUnionEdgeCases(t *testing.T) {
+	t.Parallel()
+
+	p := func(s string) netip.Prefix {
+		pfx := netip.MustParsePrefix(s)
+		if pfx.Addr() != pfx.Masked().Addr() {
+			panic(fmt.Sprintf("%s is not normalized", s))
+		}
+		return pfx
+	}
+
+	t.Run("empty", func(t *testing.T) {
+		aTbl := &Table[int]{}
+		bTbl := &Table[int]{}
+
+		// union empty tables
+		aTbl.Union(bTbl)
+
+		want := ""
+		got := aTbl.String()
+		if got != want {
+			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
+		}
+	})
+
+	t.Run("other empty", func(t *testing.T) {
+		aTbl := &Table[int]{}
+		bTbl := &Table[int]{}
+
+		// one empty table, b
+		aTbl.Insert(p("0.0.0.0/0"), 0)
+
+		aTbl.Union(bTbl)
+		want := `▼
+└─ 0.0.0.0/0 (0)
+`
+		got := aTbl.String()
+		if got != want {
+			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
+		}
+	})
+
+	t.Run("other empty", func(t *testing.T) {
+		aTbl := &Table[int]{}
+		bTbl := &Table[int]{}
+
+		// one empty table, a
+		bTbl.Insert(p("0.0.0.0/0"), 0)
+
+		aTbl.Union(bTbl)
+		want := `▼
+└─ 0.0.0.0/0 (0)
+`
+		got := aTbl.String()
+		if got != want {
+			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
+		}
+	})
+
+	t.Run("duplicate prefix", func(t *testing.T) {
+		aTbl := &Table[string]{}
+		bTbl := &Table[string]{}
+
+		// one empty table
+		aTbl.Insert(p("::/0"), "orig value")
+		bTbl.Insert(p("::/0"), "overwrite")
+
+		aTbl.Union(bTbl)
+		want := `▼
+└─ ::/0 (overwrite)
+`
+		got := aTbl.String()
+		if got != want {
+			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
+		}
+	})
+
+	t.Run("different IP versions", func(t *testing.T) {
+		aTbl := &Table[int]{}
+		bTbl := &Table[int]{}
+
+		// one empty table
+		aTbl.Insert(p("0.0.0.0/0"), 1)
+		bTbl.Insert(p("::/0"), 2)
+
+		aTbl.Union(bTbl)
+		want := `▼
+└─ 0.0.0.0/0 (1)
+▼
+└─ ::/0 (2)
+`
+		got := aTbl.String()
+		if got != want {
+			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
+		}
+	})
+
+	t.Run("same children", func(t *testing.T) {
+		aTbl := &Table[int]{}
+		bTbl := &Table[int]{}
+
+		aTbl.Insert(p("127.0.0.1/32"), 1)
+		aTbl.Insert(p("::1/128"), 1)
+
+		bTbl.Insert(p("127.0.0.2/32"), 2)
+		bTbl.Insert(p("::2/128"), 2)
+
+		aTbl.Union(bTbl)
+		want := `▼
+├─ 127.0.0.1/32 (1)
+└─ 127.0.0.2/32 (2)
+▼
+├─ ::1/128 (1)
+└─ ::2/128 (2)
+`
+		got := aTbl.String()
+		if got != want {
+			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
+		}
+	})
+}
+
+func TestUnionCompare(t *testing.T) {
+	t.Parallel()
+
+	const numEntries = 200
+
+	for i := 0; i < 100; i++ {
+		pfxs := randomPrefixes(numEntries)
+		slow := slowPrefixTable[int]{pfxs}
+		fast := Table[int]{}
+		for _, pfx := range pfxs {
+			fast.Insert(pfx.pfx, pfx.val)
+		}
+
+		pfxs2 := randomPrefixes(numEntries)
+		slow2 := slowPrefixTable[int]{pfxs2}
+		fast2 := Table[int]{}
+		for _, pfx := range pfxs2 {
+			fast2.Insert(pfx.pfx, pfx.val)
+		}
+
+		slow.union(&slow2)
+		fast.Union(&fast2)
+
+		// dump as slow table for comparison
+		fastAsSlowTable := fast.dumpAsPrefixTable()
+
+		// sort for comparison
+		slow.sort()
+		fastAsSlowTable.sort()
+
+		for i := range slow.prefixes {
+			slowI := slow.prefixes[i]
+			fastI := fastAsSlowTable.prefixes[i]
+			if slowI != fastI {
+				t.Fatalf("Union(...): items[%d] differ slow(%v) != fast(%v)", i, slowI, fastI)
+			}
+		}
+	}
+}
+
 // test some edge cases
 func TestOverlapsPrefixEdgeCases(t *testing.T) {
 	t.Parallel()
@@ -1164,6 +1328,24 @@ func (t *Table[V]) numNodesRec(seen map[*node[V]]bool, n *node[V]) int {
 	return ret
 }
 
+// dumpAsPrefixTable, just a helper to compare with slowPrefixTable
+func (t *Table[V]) dumpAsPrefixTable() slowPrefixTable[V] {
+	pfxs := []slowPrefixEntry[V]{}
+	pfxs = dumpListRec(pfxs, t.DumpList(true))  // ipv4
+	pfxs = dumpListRec(pfxs, t.DumpList(false)) // ipv6
+
+	ret := slowPrefixTable[V]{pfxs}
+	return ret
+}
+
+func dumpListRec[V any](pfxs []slowPrefixEntry[V], dumpList []DumpListNode[V]) []slowPrefixEntry[V] {
+	for _, node := range dumpList {
+		pfxs = append(pfxs, slowPrefixEntry[V]{pfx: node.CIDR, val: node.Value})
+		pfxs = append(pfxs, dumpListRec[V](nil, node.Subnets)...)
+	}
+	return pfxs
+}
+
 // slowPrefixTable is a routing table implemented as a set of prefixes that are
 // explicitly scanned in full for every route lookup. It is very slow, but also
 // reasonably easy to verify by inspection, and so a good correctness reference
@@ -1177,26 +1359,52 @@ type slowPrefixEntry[V any] struct {
 	val V
 }
 
-func (st *slowPrefixTable[T]) insert(pfx netip.Prefix, val T) {
+func (s *slowPrefixTable[V]) insert(pfx netip.Prefix, val V) {
 	pfx = pfx.Masked()
-	for i, ent := range st.prefixes {
+	for i, ent := range s.prefixes {
 		if ent.pfx == pfx {
-			st.prefixes[i].val = val
+			s.prefixes[i].val = val
 			return
 		}
 	}
-	st.prefixes = append(st.prefixes, slowPrefixEntry[T]{pfx, val})
+	s.prefixes = append(s.prefixes, slowPrefixEntry[V]{pfx, val})
 }
 
-func (st *slowPrefixTable[V]) get(addr netip.Addr) (val V, ok bool) {
-	_, val, ok = st.lpm(addr)
+func (s *slowPrefixTable[T]) union(o *slowPrefixTable[T]) {
+	for _, op := range o.prefixes {
+		var match bool
+		for i, sp := range s.prefixes {
+			if sp.pfx == op.pfx {
+				s.prefixes[i] = op
+				match = true
+				break
+			}
+		}
+		if !match {
+			s.prefixes = append(s.prefixes, op)
+		}
+	}
+}
+
+// sort, inplace by netip.Prefix
+func (s *slowPrefixTable[T]) sort() {
+	slices.SortFunc(s.prefixes, func(a, b slowPrefixEntry[T]) int {
+		if cmp := a.pfx.Masked().Addr().Compare(b.pfx.Masked().Addr()); cmp != 0 {
+			return cmp
+		}
+		return cmp.Compare(a.pfx.Bits(), b.pfx.Bits())
+	})
+}
+
+func (s *slowPrefixTable[V]) get(addr netip.Addr) (val V, ok bool) {
+	_, val, ok = s.lpm(addr)
 	return
 }
 
-func (st *slowPrefixTable[V]) lpm(addr netip.Addr) (lpm netip.Prefix, val V, ok bool) {
+func (s *slowPrefixTable[V]) lpm(addr netip.Addr) (lpm netip.Prefix, val V, ok bool) {
 	bestLen := -1
 
-	for _, item := range st.prefixes {
+	for _, item := range s.prefixes {
 		if item.pfx.Contains(addr) && item.pfx.Bits() > bestLen {
 			lpm = item.pfx
 			val = item.val
@@ -1206,10 +1414,10 @@ func (st *slowPrefixTable[V]) lpm(addr netip.Addr) (lpm netip.Prefix, val V, ok 
 	return lpm, val, bestLen != -1
 }
 
-func (st *slowPrefixTable[V]) spm(addr netip.Addr) (spm netip.Prefix, val V, ok bool) {
+func (s *slowPrefixTable[V]) spm(addr netip.Addr) (spm netip.Prefix, val V, ok bool) {
 	bestLen := 129
 
-	for _, item := range st.prefixes {
+	for _, item := range s.prefixes {
 		if item.pfx.Contains(addr) && item.pfx.Bits() < bestLen {
 			spm = item.pfx
 			val = item.val
@@ -1219,8 +1427,8 @@ func (st *slowPrefixTable[V]) spm(addr netip.Addr) (spm netip.Prefix, val V, ok 
 	return spm, val, bestLen != 129
 }
 
-func (st *slowPrefixTable[T]) overlapsPrefix(pfx netip.Prefix) bool {
-	for _, p := range st.prefixes {
+func (s *slowPrefixTable[T]) overlapsPrefix(pfx netip.Prefix) bool {
+	for _, p := range s.prefixes {
 		if p.pfx.Overlaps(pfx) {
 			return true
 		}
@@ -1228,9 +1436,9 @@ func (st *slowPrefixTable[T]) overlapsPrefix(pfx netip.Prefix) bool {
 	return false
 }
 
-func (st *slowPrefixTable[T]) overlaps(so *slowPrefixTable[T]) bool {
-	for _, tp := range st.prefixes {
-		for _, op := range so.prefixes {
+func (s *slowPrefixTable[T]) overlaps(o *slowPrefixTable[T]) bool {
+	for _, tp := range s.prefixes {
+		for _, op := range o.prefixes {
 			if tp.pfx.Overlaps(op.pfx) {
 				return true
 			}

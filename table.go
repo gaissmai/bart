@@ -396,3 +396,12 @@ func (t *Table[V]) Overlaps(o *Table[V]) bool {
 	o.init()
 	return t.rootV4.overlapsRec(o.rootV4) || t.rootV6.overlapsRec(o.rootV6)
 }
+
+// Union combines two tables, changing the receiver table.
+// If there are duplicate entries, the value is taken from the other table.
+func (t *Table[V]) Union(o *Table[V]) {
+	t.init()
+	o.init()
+	t.rootV4.unionRec(o.rootV4)
+	t.rootV6.unionRec(o.rootV6)
+}
