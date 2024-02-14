@@ -814,6 +814,33 @@ func TestUnionCompare(t *testing.T) {
 	}
 }
 
+func TestTableClone(t *testing.T) {
+	p := netip.MustParsePrefix
+	tbl := new(Table[int])
+	clone := tbl.Clone()
+	if tbl.String() != clone.String() {
+		t.Errorf("empty Clone: got:\n%swant:\n%s", clone.String(), tbl.String())
+	}
+
+	tbl.Insert(p("10.0.0.1/32"), 1)
+	tbl.Insert(p("::1/128"), 1)
+	clone = tbl.Clone()
+	if tbl.String() != clone.String() {
+		t.Errorf("Clone: got:\n%swant:\n%s", clone.String(), tbl.String())
+	}
+
+	// overwrite value
+	tbl.Insert(p("::1/128"), 2)
+	if tbl.String() == clone.String() {
+		t.Errorf("overwrite, clone must be different: clone:\n%sorig:\n%s", clone.String(), tbl.String())
+	}
+
+	tbl.Delete(p("10.0.0.1/32"))
+	if tbl.String() == clone.String() {
+		t.Errorf("delete, clone must be different: clone:\n%sorig:\n%s", clone.String(), tbl.String())
+	}
+}
+
 // test some edge cases
 func TestOverlapsPrefixEdgeCases(t *testing.T) {
 	t.Parallel()

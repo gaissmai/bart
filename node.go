@@ -472,3 +472,26 @@ func (n *node[V]) unionRec(o *node[V]) {
 		oAddr++
 	}
 }
+
+func (n *node[V]) cloneRec() *node[V] {
+	c := newNode[V]()
+	if n.isEmpty() {
+		return c
+	}
+
+	c.prefixes.indexes = n.prefixes.indexes.Clone()     // deep
+	c.prefixes.values = slices.Clone(n.prefixes.values) // shallow
+	// make it deep
+	for i := range c.prefixes.values {
+		c.prefixes.values[i] = &(*(c.prefixes.values[i]))
+	}
+
+	c.children.addrs = n.children.addrs.Clone()       // deep
+	c.children.nodes = slices.Clone(n.children.nodes) // shallow
+	// make it deep
+	for i, child := range c.children.nodes {
+		c.children.nodes[i] = child.cloneRec()
+	}
+
+	return c
+}

@@ -405,3 +405,16 @@ func (t *Table[V]) Union(o *Table[V]) {
 	t.rootV4.unionRec(o.rootV4)
 	t.rootV6.unionRec(o.rootV6)
 }
+
+// Clone, deep cloning of the routing table.
+func (t *Table[V]) Clone() *Table[V] {
+	t.init()
+
+	c := new(Table[V])
+	c.init()
+
+	c.rootV4 = t.rootV4.cloneRec()
+	c.rootV6 = t.rootV6.cloneRec()
+
+	return c
+}

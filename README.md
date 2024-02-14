@@ -44,6 +44,7 @@ the backtracking algorithm is as fast as possible.
   func (t *Table[V]) Insert(pfx netip.Prefix, val V)
   func (t *Table[V]) Delete(pfx netip.Prefix)
   func (t *Table[V]) Union(o *Table[V])
+  func (t *Table[V]) Clone() *Table[V]
   
   func (t *Table[V]) Get(ip netip.Addr) (val V, ok bool)
   func (t *Table[V]) Lookup(ip netip.Addr) (lpm netip.Prefix, val V, ok bool)

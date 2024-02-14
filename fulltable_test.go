@@ -353,6 +353,47 @@ func BenchmarkFullTableOverlaps(b *testing.B) {
 	}
 }
 
+var cloneSink *bart.Table[int]
+
+func BenchmarkFullTableCloneV4(b *testing.B) {
+	var rt bart.Table[int]
+
+	for i, route := range routes4 {
+		rt.Insert(route.CIDR, i)
+	}
+
+	b.ResetTimer()
+	for k := 0; k < b.N; k++ {
+		cloneSink = rt.Clone()
+	}
+}
+
+func BenchmarkFullTableCloneV6(b *testing.B) {
+	var rt bart.Table[int]
+
+	for i, route := range routes6 {
+		rt.Insert(route.CIDR, i)
+	}
+
+	b.ResetTimer()
+	for k := 0; k < b.N; k++ {
+		cloneSink = rt.Clone()
+	}
+}
+
+func BenchmarkFullTableClone(b *testing.B) {
+	var rt bart.Table[int]
+
+	for i, route := range routes {
+		rt.Insert(route.CIDR, i)
+	}
+
+	b.ResetTimer()
+	for k := 0; k < b.N; k++ {
+		cloneSink = rt.Clone()
+	}
+}
+
 func fillRouteTables() {
 	file, err := os.Open(prefixFile)
 	if err != nil {
