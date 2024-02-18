@@ -38,6 +38,7 @@ func init() {
 }
 
 func TestFullNew(t *testing.T) {
+	t.Parallel()
 	var startMem, endMem runtime.MemStats
 	runtime.ReadMemStats(&startMem)
 	nRoutes := make([]route, len(routes))
@@ -61,6 +62,7 @@ func TestFullNew(t *testing.T) {
 }
 
 func TestFullNewV4(t *testing.T) {
+	t.Parallel()
 	var startMem, endMem runtime.MemStats
 	runtime.ReadMemStats(&startMem)
 	nRoutes := make([]route, len(routes4))
@@ -84,6 +86,7 @@ func TestFullNewV4(t *testing.T) {
 }
 
 func TestFullNewV6(t *testing.T) {
+	t.Parallel()
 	var startMem, endMem runtime.MemStats
 	runtime.ReadMemStats(&startMem)
 	nRoutes := make([]route, len(routes6))
