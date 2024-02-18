@@ -50,38 +50,16 @@ func (t *Table[V]) dumpString() string {
 func (t *Table[V]) dump(w io.Writer) error {
 	t.init()
 
-	if err := t.dump4(w); err != nil {
-		return err
-	}
-
-	if err := t.dump6(w); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// dump4, dumps the IPv4 routing table to w.
-func (t *Table[V]) dump4(w io.Writer) error {
-	t.init()
-
 	if _, err := fmt.Fprint(w, "IPv4:\n"); err != nil {
 		return err
 	}
-
 	t.rootV4.dumpRec(w, nil, true)
-	return nil
-}
-
-// dump6, dumps the IPv6 routing table to w.
-func (t *Table[V]) dump6(w io.Writer) error {
-	t.init()
 
 	if _, err := fmt.Fprint(w, "IPv6:\n"); err != nil {
 		return err
 	}
-
 	t.rootV6.dumpRec(w, nil, false)
+
 	return nil
 }
 
