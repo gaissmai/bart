@@ -23,6 +23,7 @@ import (
 )
 
 func TestRegression(t *testing.T) {
+	t.Parallel()
 	// original comment by tailscale for ART,
 	// but the BART implementation is different and has other edge cases.
 	//
@@ -542,6 +543,7 @@ func TestDeleteShuffled(t *testing.T) {
 }
 
 func TestDeleteIsReverseOfInsert(t *testing.T) {
+	t.Parallel()
 	// Insert N prefixes, then delete those same prefixes in reverse
 	// order. Each deletion should exactly undo the internal structure
 	// changes that each insert did.
@@ -815,6 +817,8 @@ func TestUnionCompare(t *testing.T) {
 }
 
 func TestTableClone(t *testing.T) {
+	t.Parallel()
+
 	p := netip.MustParsePrefix
 	tbl := new(Table[int])
 	clone := tbl.Clone()
