@@ -15,6 +15,7 @@ type dumpTest struct {
 }
 
 func TestDumperPanic(t *testing.T) {
+	t.Parallel()
 	defer func() {
 		if r := recover(); r == nil {
 			t.Errorf("Dump(nil) did not panic")
@@ -28,6 +29,7 @@ func TestDumperPanic(t *testing.T) {
 }
 
 func TestDumperEmpty(t *testing.T) {
+	t.Parallel()
 	tbl := new(Table[any])
 	checkDump(t, tbl, dumpTest{
 		cidrs: []netip.Prefix{},
@@ -42,6 +44,7 @@ IPv6:
 }
 
 func TestDumpDefaultRouteV4(t *testing.T) {
+	t.Parallel()
 	p := netip.MustParsePrefix
 	tbl := new(Table[any])
 	checkDump(t, tbl, dumpTest{
@@ -61,6 +64,7 @@ IPv6:
 }
 
 func TestDumpDefaultRouteV6(t *testing.T) {
+	t.Parallel()
 	p := netip.MustParsePrefix
 	tbl := new(Table[any])
 	checkDump(t, tbl, dumpTest{
@@ -80,6 +84,7 @@ prefxs(#1): 0x00/0
 }
 
 func TestDumpSampleV4(t *testing.T) {
+	t.Parallel()
 	p := netip.MustParsePrefix
 	tbl := new(Table[any])
 	checkDump(t, tbl, dumpTest{
@@ -142,6 +147,7 @@ IPv6:
 }
 
 func TestDumpSampleV6(t *testing.T) {
+	t.Parallel()
 	p := netip.MustParsePrefix
 	tbl := new(Table[any])
 	checkDump(t, tbl, dumpTest{
@@ -178,6 +184,7 @@ childs(#2): 0x20 0xfe
 }
 
 func TestDumpSample(t *testing.T) {
+	t.Parallel()
 	p := netip.MustParsePrefix
 	tbl := new(Table[any])
 	checkDump(t, tbl, dumpTest{

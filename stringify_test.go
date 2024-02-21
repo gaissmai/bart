@@ -14,6 +14,7 @@ type stringTest struct {
 }
 
 func TestStringPanic(t *testing.T) {
+	t.Parallel()
 	defer func() {
 		if r := recover(); r == nil {
 			t.Errorf("Fprint(nil) did not panic")
@@ -27,6 +28,7 @@ func TestStringPanic(t *testing.T) {
 }
 
 func TestStringEmpty(t *testing.T) {
+	t.Parallel()
 	tbl := new(Table[any])
 	checkString(t, tbl, stringTest{
 		cidrs: []netip.Prefix{},
@@ -35,6 +37,7 @@ func TestStringEmpty(t *testing.T) {
 }
 
 func TestStringDefaultRouteV4(t *testing.T) {
+	t.Parallel()
 	p := netip.MustParsePrefix
 	tbl := new(Table[any])
 	checkString(t, tbl, stringTest{
@@ -48,6 +51,7 @@ func TestStringDefaultRouteV4(t *testing.T) {
 }
 
 func TestStringDefaultRouteV6(t *testing.T) {
+	t.Parallel()
 	p := netip.MustParsePrefix
 	tbl := new(Table[any])
 	checkString(t, tbl, stringTest{
@@ -61,6 +65,7 @@ func TestStringDefaultRouteV6(t *testing.T) {
 }
 
 func TestStringSampleV4(t *testing.T) {
+	t.Parallel()
 	p := netip.MustParsePrefix
 	tbl := new(Table[any])
 	checkString(t, tbl, stringTest{
@@ -90,6 +95,7 @@ func TestStringSampleV4(t *testing.T) {
 }
 
 func TestStringSampleV6(t *testing.T) {
+	t.Parallel()
 	p := netip.MustParsePrefix
 	tbl := new(Table[any])
 	checkString(t, tbl, stringTest{
@@ -109,6 +115,7 @@ func TestStringSampleV6(t *testing.T) {
 }
 
 func TestStringSample(t *testing.T) {
+	t.Parallel()
 	p := netip.MustParsePrefix
 	tbl := new(Table[any])
 	checkString(t, tbl, stringTest{
