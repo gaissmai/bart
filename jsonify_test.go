@@ -27,6 +27,7 @@ type jsonTest struct {
 }
 
 func TestJsonEmpty(t *testing.T) {
+	t.Parallel()
 	tbl := new(Table[any])
 	checkJson(t, tbl, jsonTest{
 		nodes: []jsonTestNode{},
@@ -35,6 +36,7 @@ func TestJsonEmpty(t *testing.T) {
 }
 
 func TestJsonDefaultRouteV4(t *testing.T) {
+	t.Parallel()
 	tbl := new(Table[any])
 	checkJson(t, tbl, jsonTest{
 		nodes: []jsonTestNode{
@@ -45,6 +47,7 @@ func TestJsonDefaultRouteV4(t *testing.T) {
 }
 
 func TestJsonDefaultRouteV6(t *testing.T) {
+	t.Parallel()
 	tbl := new(Table[any])
 	checkJson(t, tbl, jsonTest{
 		nodes: []jsonTestNode{
@@ -55,6 +58,7 @@ func TestJsonDefaultRouteV6(t *testing.T) {
 }
 
 func TestJsonSampleV4(t *testing.T) {
+	t.Parallel()
 	tbl := new(Table[any])
 	checkJson(t, tbl, jsonTest{
 		nodes: []jsonTestNode{
@@ -99,6 +103,7 @@ func TestJsonSampleV4(t *testing.T) {
 }
 
 func TestJsonSampleV6(t *testing.T) {
+	t.Parallel()
 	tbl := new(Table[any])
 	checkJson(t, tbl, jsonTest{
 		nodes: []jsonTestNode{
@@ -125,6 +130,7 @@ func TestJsonSampleV6(t *testing.T) {
 }
 
 func TestJsonSample(t *testing.T) {
+	t.Parallel()
 	// ipv4 + ipv6 and various types of value
 	tbl := new(Table[any])
 	checkJson(t, tbl, jsonTest{

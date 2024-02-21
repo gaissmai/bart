@@ -10,6 +10,7 @@ import (
 )
 
 func TestStatisticsZero(t *testing.T) {
+	t.Parallel()
 	tbl := new(Table[any])
 	stats := tbl.readTableStats()
 
@@ -41,6 +42,7 @@ func TestStatisticsZero(t *testing.T) {
 }
 
 func TestStatisticsOne(t *testing.T) {
+	t.Parallel()
 	p := netip.MustParsePrefix
 	tbl := new(Table[any])
 	tbl.Insert(p("10.0.0.0/8"), nil)
@@ -75,6 +77,7 @@ func TestStatisticsOne(t *testing.T) {
 }
 
 func TestStatisticsDuplicate(t *testing.T) {
+	t.Parallel()
 	p := netip.MustParsePrefix
 	tbl := new(Table[any])
 	tbl.Insert(p("10.0.0.1/32"), nil)
@@ -125,6 +128,7 @@ func TestStatisticsDuplicate(t *testing.T) {
 }
 
 func TestStatisticsDelete(t *testing.T) {
+	t.Parallel()
 	p := netip.MustParsePrefix
 	tbl := new(Table[any])
 	tbl.Insert(p("10.0.0.1/32"), nil)
@@ -163,6 +167,7 @@ func TestStatisticsDelete(t *testing.T) {
 }
 
 func TestStatisticsSome(t *testing.T) {
+	t.Parallel()
 	p := netip.MustParsePrefix
 	tbl := new(Table[any])
 
