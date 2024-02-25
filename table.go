@@ -71,7 +71,7 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 		//
 		// 8.0.0.0/5 ->       depth 0, addr byte  8,  bits 5
 		// 10.0.0.0/8 ->      depth 0, addr byte  10, bits 8
-		// 192.168.0.0/16  -> depth 1, addr byte 168, bits 0, (16-1*8 = 8)
+		// 192.168.0.0/16  -> depth 1, addr byte 168, bits 8, (16-1*8 = 8)
 		// 192.168.20.0/19 -> depth 2, addr byte  20, bits 3, (19-2*8 = 3)
 		// 172.16.19.12/32 -> depth 3, addr byte  12, bits 8, (32-3*8 = 8)
 		//
