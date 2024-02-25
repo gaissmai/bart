@@ -28,7 +28,7 @@ a matter of fast cache friendly bitmask operations.
 Due to the cache locality of the popcount compressed CBT,
 the backtracking algorithm is as fast as possible.
 
-# API (not stable!)
+# API
 
  ... still under development, but the library is ready to use.
 
