@@ -35,7 +35,7 @@ type node[V any] struct {
 // prefixCBTree, complete binary tree, popcount-compressed.
 type prefixCBTree[V any] struct {
 	indexes *bitset.BitSet
-	values  []*V
+	values  []V
 }
 
 // childTree, just a slice with nodes, but also popcount-compressed
@@ -77,13 +77,13 @@ func (p *prefixCBTree[V]) insert(addr uint, prefixLen int, val V) {
 func (p *prefixCBTree[V]) insertIdx(baseIdx uint, val V) {
 	// prefix exists, overwrite val
 	if p.indexes.Test(baseIdx) {
-		p.values[p.rank(baseIdx)] = &val
+		p.values[p.rank(baseIdx)] = val
 		return
 	}
 
 	// new, insert into bitset and slice
 	p.indexes.Set(baseIdx)
-	p.values = slices.Insert(p.values, p.rank(baseIdx), &val)
+	p.values = slices.Insert(p.values, p.rank(baseIdx), val)
 }
 
 // delete removes the route addr/prefixLen. Reports whether the
@@ -119,7 +119,7 @@ func (p *prefixCBTree[V]) lpmByIndex(idx uint) (baseIdx uint, val V, ok bool) {
 	for {
 		if p.indexes.Test(idx) {
 			// longest prefix match
-			return idx, *(p.values[p.rank(idx)]), true
+			return idx, p.values[p.rank(idx)], true
 		}
 
 		if idx == 0 {
@@ -173,7 +173,7 @@ func (p *prefixCBTree[V]) spmByIndex(idx uint) (baseIdx uint, val V, ok bool) {
 	}
 
 	if shortest != 0 {
-		return shortest, *(p.values[p.rank(shortest)]), true
+		return shortest, p.values[p.rank(shortest)], true
 	}
 
 	// not found (on this level)
@@ -187,11 +187,11 @@ func (p *prefixCBTree[V]) spmByAddr(addr uint) (baseIdx uint, val V, ok bool) {
 }
 
 // getVal for baseIdx.
-func (p *prefixCBTree[V]) getVal(baseIdx uint) *V {
+func (p *prefixCBTree[V]) getVal(baseIdx uint) (val V) {
 	if p.indexes.Test(baseIdx) {
 		return p.values[p.rank(baseIdx)]
 	}
-	return nil
+	return
 }
 
 // allIndexes returns all baseIndexes set in this prefix tree in ascending order.
@@ -446,7 +446,7 @@ func (n *node[V]) unionRec(o *node[V]) {
 		if oIdx, oOk = o.prefixes.indexes.NextSet(oIdx); !oOk {
 			break
 		}
-		oVal := *(o.prefixes.getVal(oIdx))
+		oVal := o.prefixes.getVal(oIdx)
 		// insert/overwrite prefix/value from oNode to nNode
 		n.prefixes.insertIdx(oIdx, oVal)
 		oIdx++
@@ -481,10 +481,6 @@ func (n *node[V]) cloneRec() *node[V] {
 
 	c.prefixes.indexes = n.prefixes.indexes.Clone()     // deep
 	c.prefixes.values = slices.Clone(n.prefixes.values) // shallow
-	// make it deep
-	for i := range c.prefixes.values {
-		c.prefixes.values[i] = &(*(c.prefixes.values[i]))
-	}
 
 	c.children.addrs = n.children.addrs.Clone()       // deep
 	c.children.nodes = slices.Clone(n.children.nodes) // shallow

@@ -158,7 +158,7 @@ func (n *node[V]) getKidsRec(parentIdx uint, path []byte, is4 bool) []kidT[V] {
 			val := n.prefixes.getVal(idx)
 			path := append([]byte{}, path...)
 			cidr := cidrFromPath(path, idx, is4)
-			directKids = append(directKids, kidT[V]{n, path, idx, cidr, *val})
+			directKids = append(directKids, kidT[V]{n, path, idx, cidr, val})
 		}
 	}
 

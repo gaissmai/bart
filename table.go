@@ -406,7 +406,8 @@ func (t *Table[V]) Union(o *Table[V]) {
 	t.rootV6.unionRec(o.rootV6)
 }
 
-// Clone, deep cloning of the routing table.
+// Clone returns a copy of the routing table.
+// The payloads V are copied using assignment, so this is a shallow clone.
 func (t *Table[V]) Clone() *Table[V] {
 	t.init()
 
