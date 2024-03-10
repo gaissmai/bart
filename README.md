@@ -12,11 +12,11 @@
 BART is balanced in terms of memory consumption versus
 lookup time.
 
-The lookup time is by a factor of <1.5 slower on average as the
+The lookup time is by a factor of ~2 slower on average as the
 routing algorithms ART, SMART, CPE, ... but reduces the memory
 consumption by an order of magnitude in comparison.
 
-BART is a multibit-trie, using the 'baseIndex' function from the
+BART is a multibit-trie, using the _baseIndex_ function from the
 ART algorithm to build the complete binary prefix tree (CBT)
 for each stride.
 
@@ -61,6 +61,10 @@ the backtracking algorithm is as fast as possible.
 
   func (t *Table[V]) DumpList(is4 bool) []DumpListNode[V]
 ```
+
+# benchmarks
+
+Please see the extensive [benchmarks](https://github.com/gaissmai/iprbench) comparing `bart` with other IP routing table implementations.
 
 # CONTRIBUTION
 
