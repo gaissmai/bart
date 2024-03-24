@@ -39,8 +39,10 @@ the backtracking algorithm is as fast as possible.
   type Table[V any] struct {
   	// Has unexported fields.
   }
-      Table is an IPv4 and IPv6 routing table with payload V. The zero value is
-      ready to use.
+    Table is an IPv4 and IPv6 routing table with payload V. The zero value is
+    ready to use.
+
+    The Table is not safe for concurrent use.
   
   func (t *Table[V]) Insert(pfx netip.Prefix, val V)
   func (t *Table[V]) Delete(pfx netip.Prefix)

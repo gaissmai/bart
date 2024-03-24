@@ -5,26 +5,32 @@ package bart
 
 import (
 	"net/netip"
-	"sync"
 )
 
 // Table is an IPv4 and IPv6 routing table with payload V.
 // The zero value is ready to use.
+//
+// The Table is not safe for concurrent use.
 type Table[V any] struct {
 	rootV4 *node[V]
 	rootV6 *node[V]
 
 	// simple API, no constructor needed
-	initOnce sync.Once
+	isInitialized bool
 }
 
-// init once, so no constructor is needed.
+// init BitSets once, so no constructor is needed
+// racy, Table is not safe for concurrent use anyway.
 func (t *Table[V]) init() {
-	t.initOnce.Do(func() {
-		// BitSets have to be initialized.
-		t.rootV4 = newNode[V]()
-		t.rootV6 = newNode[V]()
-	})
+	// racy
+	if t.isInitialized {
+		return
+	}
+	t.isInitialized = true
+
+	// BitSets have to be initialized.
+	t.rootV4 = newNode[V]()
+	t.rootV6 = newNode[V]()
 }
 
 // rootNodeByVersion, select root node for ip version.
@@ -206,8 +212,6 @@ func (t *Table[V]) Lookup(ip netip.Addr) (lpm netip.Prefix, val V, ok bool) {
 // Returns also depth and baseIdx for Lookup to retrieve the
 // lpm prefix out of the prefix tree.
 func (t *Table[V]) lpmByIP(ip netip.Addr) (depth int, baseIdx uint, val V, ok bool) {
-	t.init()
-
 	is4 := ip.Is4()
 	n := t.rootNodeByVersion(is4)
 
@@ -290,8 +294,6 @@ func (t *Table[V]) LookupShortest(ip netip.Addr) (spm netip.Prefix, val V, ok bo
 // Returns also depth and baseIdx for Contains to retrieve the
 // spm prefix out of the prefix tree.
 func (t *Table[V]) spmByIP(ip netip.Addr) (depth int, baseIdx uint, val V, ok bool) {
-	t.init()
-
 	// some needed values, see below
 	is4 := ip.Is4()
 
