@@ -464,7 +464,7 @@ func (n *node[V]) unionRec(o *node[V]) {
 		nNode := n.children.get(oAddr)
 		if nNode == nil {
 			// union child from oNode into nNode
-			n.children.insert(oAddr, oNode)
+			n.children.insert(oAddr, oNode.cloneRec())
 		} else {
 			// both nodes have child with addr, call union rec-descent
 			nNode.unionRec(oNode)
