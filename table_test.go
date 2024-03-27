@@ -776,6 +776,41 @@ func TestUnionEdgeCases(t *testing.T) {
 	})
 }
 
+// TestUnionMemoryAliasing tests that the Union method does not alias memory
+// between the two tables.
+func TestUnionMemoryAliasing(t *testing.T) {
+	newTable := func(pfx ...string) *Table[struct{}] {
+		var t Table[struct{}]
+		for _, s := range pfx {
+			t.Insert(netip.MustParsePrefix(s), struct{}{})
+		}
+		return &t
+	}
+	// First create two tables with disjoint prefixes.
+	stable := newTable("0.0.0.0/24")
+	temp := newTable("100.69.1.0/24")
+
+	// Verify that the tables are disjoint.
+	if stable.Overlaps(temp) {
+		t.Error("stable should not overlap temp")
+	}
+
+	// Now union them.
+	temp.Union(stable)
+
+	// Add a new prefix to temp.
+	temp.Insert(netip.MustParsePrefix("0.0.1.0/24"), struct{}{})
+
+	// Ensure that stable is unchanged.
+	_, ok := stable.Get(netip.MustParseAddr("0.0.1.1"))
+	if ok {
+		t.Error("stable should not contain 0.0.1.1")
+	}
+	if stable.OverlapsPrefix(netip.MustParsePrefix("0.0.1.1/32")) {
+		t.Error("stable should not overlap 0.0.1.1/32")
+	}
+}
+
 func TestUnionCompare(t *testing.T) {
 	t.Parallel()
 
