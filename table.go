@@ -290,10 +290,7 @@ func (t *Table[V]) LookupShortest(ip netip.Addr) (spm netip.Prefix, val V, ok bo
 // Returns also depth and baseIdx for Contains to retrieve the
 // spm prefix out of the prefix tree.
 func (t *Table[V]) spmByIP(ip netip.Addr) (depth int, baseIdx uint, val V, ok bool) {
-	// some needed values, see below
 	is4 := ip.Is4()
-
-	// get the root node of the routing table
 	n := t.rootNodeByVersion(is4)
 	if n == nil {
 		return
@@ -334,8 +331,6 @@ func (t *Table[V]) spmByIP(ip netip.Addr) (depth int, baseIdx uint, val V, ok bo
 
 // OverlapsPrefix reports whether any IP in pfx matches a route in the table.
 func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
-	t.init()
-
 	// always normalize the prefix
 	pfx = pfx.Masked()
 
@@ -346,6 +341,9 @@ func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 
 	// get the root node of the routing table
 	n := t.rootNodeByVersion(is4)
+	if n == nil {
+		return false
+	}
 
 	// keep the overlaps alloc free, don't use ip.AsSlice here
 	a16 := ip.As16()
