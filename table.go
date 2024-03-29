@@ -10,18 +10,20 @@ import (
 
 // Table is an IPv4 and IPv6 routing table with payload V.
 // The zero value is ready to use.
+//
+// The Table is safe for concurrent readers but not for
+// concurrent readers and/or writers.
 type Table[V any] struct {
 	rootV4 *node[V]
 	rootV6 *node[V]
 
-	// simple API, no constructor needed
+	// BitSets have to be initialized.
 	initOnce sync.Once
 }
 
-// init once, so no constructor is needed.
+// init BitSets once, so no constructor is needed
 func (t *Table[V]) init() {
 	t.initOnce.Do(func() {
-		// BitSets have to be initialized.
 		t.rootV4 = newNode[V]()
 		t.rootV6 = newNode[V]()
 	})
@@ -98,8 +100,6 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 
 // Delete removes pfx from the tree, pfx does not have to be present.
 func (t *Table[V]) Delete(pfx netip.Prefix) {
-	t.init()
-
 	// always normalize the prefix
 	pfx = pfx.Masked()
 
@@ -108,6 +108,9 @@ func (t *Table[V]) Delete(pfx netip.Prefix) {
 	is4 := ip.Is4()
 
 	n := t.rootNodeByVersion(is4)
+	if n == nil {
+		return
+	}
 
 	// delete default route, easy peasy
 	if bits == 0 {
@@ -176,7 +179,6 @@ func (t *Table[V]) Delete(pfx netip.Prefix) {
 // Get does a route lookup for IP and returns the associated value and true, or false if
 // no route matched.
 func (t *Table[V]) Get(ip netip.Addr) (val V, ok bool) {
-	t.init()
 	_, _, val, ok = t.lpmByIP(ip)
 	return
 }
@@ -188,7 +190,6 @@ func (t *Table[V]) Get(ip netip.Addr) (val V, ok bool) {
 // Lookup is a bit slower than Get, so if you only need the payload V
 // and not the matching longest-prefix back, you should use just Get.
 func (t *Table[V]) Lookup(ip netip.Addr) (lpm netip.Prefix, val V, ok bool) {
-	t.init()
 	if depth, baseIdx, val, ok := t.lpmByIP(ip); ok {
 
 		// add the bits from higher levels in child trie to pfxLen
@@ -206,10 +207,11 @@ func (t *Table[V]) Lookup(ip netip.Addr) (lpm netip.Prefix, val V, ok bool) {
 // Returns also depth and baseIdx for Lookup to retrieve the
 // lpm prefix out of the prefix tree.
 func (t *Table[V]) lpmByIP(ip netip.Addr) (depth int, baseIdx uint, val V, ok bool) {
-	t.init()
-
 	is4 := ip.Is4()
 	n := t.rootNodeByVersion(is4)
+	if n == nil {
+		return
+	}
 
 	// stack of the traversed nodes for fast backtracking, if needed
 	pathStack := [maxTreeDepth]*node[V]{}
@@ -271,8 +273,6 @@ func (t *Table[V]) lpmByIP(ip netip.Addr) (depth int, baseIdx uint, val V, ok bo
 // It is, so to speak, the opposite of lookup and is only required for very
 // special cases.
 func (t *Table[V]) LookupShortest(ip netip.Addr) (spm netip.Prefix, val V, ok bool) {
-	t.init()
-
 	if depth, baseIdx, val, ok := t.spmByIP(ip); ok {
 
 		// add the bits from higher levels in child trie to pfxLen
@@ -290,13 +290,11 @@ func (t *Table[V]) LookupShortest(ip netip.Addr) (spm netip.Prefix, val V, ok bo
 // Returns also depth and baseIdx for Contains to retrieve the
 // spm prefix out of the prefix tree.
 func (t *Table[V]) spmByIP(ip netip.Addr) (depth int, baseIdx uint, val V, ok bool) {
-	t.init()
-
-	// some needed values, see below
 	is4 := ip.Is4()
-
-	// get the root node of the routing table
 	n := t.rootNodeByVersion(is4)
+	if n == nil {
+		return
+	}
 
 	// keep the spm alloc free, don't use ip.AsSlice here
 	a16 := ip.As16()
@@ -333,7 +331,6 @@ func (t *Table[V]) spmByIP(ip netip.Addr) (depth int, baseIdx uint, val V, ok bo
 
 // OverlapsPrefix reports whether any IP in pfx matches a route in the table.
 func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
-	t.init()
 	// always normalize the prefix
 	pfx = pfx.Masked()
 
@@ -344,6 +341,9 @@ func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 
 	// get the root node of the routing table
 	n := t.rootNodeByVersion(is4)
+	if n == nil {
+		return false
+	}
 
 	// keep the overlaps alloc free, don't use ip.AsSlice here
 	a16 := ip.As16()
@@ -394,6 +394,7 @@ func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 func (t *Table[V]) Overlaps(o *Table[V]) bool {
 	t.init()
 	o.init()
+
 	return t.rootV4.overlapsRec(o.rootV4) || t.rootV6.overlapsRec(o.rootV6)
 }
 
@@ -402,6 +403,7 @@ func (t *Table[V]) Overlaps(o *Table[V]) bool {
 func (t *Table[V]) Union(o *Table[V]) {
 	t.init()
 	o.init()
+
 	t.rootV4.unionRec(o.rootV4)
 	t.rootV6.unionRec(o.rootV6)
 }
