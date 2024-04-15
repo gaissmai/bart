@@ -176,6 +176,56 @@ func (t *Table[V]) Delete(pfx netip.Prefix) {
 	}
 }
 
+// Value returns the associated payload for prefix and true, or false if
+// prefix is not set in the routing table.
+func (t *Table[V]) Value(pfx netip.Prefix) (val V, ok bool) {
+	// always normalize the prefix
+	pfx = pfx.Masked()
+
+	bits := pfx.Bits()
+	ip := pfx.Addr()
+	is4 := ip.Is4()
+
+	n := t.rootNodeByVersion(is4)
+	if n == nil {
+		return
+	}
+
+	// get value for default route, easy peasy
+	if bits == 0 {
+		return n.prefixes.getVal(prefixToBaseIndex(0, 0))
+	}
+
+	// keep this method alloc free, don't use ip.AsSlice here
+	a16 := ip.As16()
+	bs := a16[:]
+	if is4 {
+		bs = bs[12:]
+	}
+
+	depth := 0
+	for {
+		addr := uint(bs[depth]) // stride = 8!
+
+		// last non-masked byte
+		if bits <= stride {
+			return n.prefixes.getVal(prefixToBaseIndex(addr, bits))
+		}
+
+		// descend down to next level, no path compression
+		child := n.children.get(addr)
+		if child == nil {
+			// no child, prefix is not set
+			return
+		}
+
+		// go down
+		depth++
+		bits -= stride
+		n = child
+	}
+}
+
 // Get does a route lookup for IP and returns the associated value and true, or false if
 // no route matched.
 func (t *Table[V]) Get(ip netip.Addr) (val V, ok bool) {
