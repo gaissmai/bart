@@ -112,6 +112,74 @@ func TestRegression(t *testing.T) {
 	})
 }
 
+func TestValue(t *testing.T) {
+	t.Parallel()
+	p := func(s string) netip.Prefix {
+		pfx := netip.MustParsePrefix(s)
+		if pfx.Addr() != pfx.Masked().Addr() {
+			panic(fmt.Sprintf("%s is not normalized", s))
+		}
+		return pfx
+	}
+
+	tests := []struct {
+		name string
+		pfx  netip.Prefix
+		val  int
+	}{
+		{
+			name: "default route v4",
+			pfx:  p("0.0.0.0/0"),
+			val:  0,
+		},
+		{
+			name: "default route v6",
+			pfx:  p("::/0"),
+			val:  0,
+		},
+		{
+			name: "set v4",
+			pfx:  p("1.2.3.4/32"),
+			val:  1234,
+		},
+		{
+			name: "set v6",
+			pfx:  p("2001:db8::/32"),
+			val:  2001,
+		},
+	}
+
+	rt := new(Table[int])
+
+	for _, tt := range tests {
+		rt.Insert(tt.pfx, tt.val)
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := rt.Value(tt.pfx)
+
+			if !ok {
+				t.Errorf("%s: ok=%v, expected: %v", tt.name, ok, true)
+			}
+
+			if got != tt.val {
+				t.Errorf("%s: val=%v, expected: %v", tt.name, got, tt.val)
+			}
+		})
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rt.Delete(tt.pfx)
+
+			if _, ok := rt.Value(tt.pfx); ok {
+				t.Errorf("%s: ok=%v, expected: %v", tt.name, ok, false)
+			}
+		})
+	}
+}
+
 func TestDelete(t *testing.T) {
 	t.Parallel()
 	p := func(s string) netip.Prefix {
@@ -1102,6 +1170,21 @@ func BenchmarkTableDelete(b *testing.B) {
 		b.ReportMetric(inserts/elapsedSec, "routes/s")
 		b.ReportMetric(roundFloat64(allocs/inserts), "avg-allocs/op")
 		b.ReportMetric(roundFloat64(bytes/inserts), "avg-B/op")
+	})
+}
+
+func BenchmarkTableValue(b *testing.B) {
+	forFamilyAndCount(b, func(b *testing.B, routes []slowPrefixEntry[int]) {
+		var rt Table[int]
+		for _, route := range routes {
+			rt.Insert(route.pfx, route.val)
+		}
+		pfx := routes[rand.Intn(len(routes))].pfx
+
+		b.StartTimer()
+		for i := 0; i < b.N; i++ {
+			writeSink, _ = rt.Value(pfx)
+		}
 	})
 }
 
