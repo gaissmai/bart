@@ -22,6 +22,15 @@ import (
 	"time"
 )
 
+// pfx string must be normalized
+var p = func(s string) netip.Prefix {
+	pfx := netip.MustParsePrefix(s)
+	if pfx.Addr() != pfx.Masked().Addr() {
+		panic(fmt.Sprintf("%s is not normalized", s))
+	}
+	return pfx
+}
+
 func TestRegression(t *testing.T) {
 	t.Parallel()
 	// original comment by tailscale for ART,
@@ -36,7 +45,6 @@ func TestRegression(t *testing.T) {
 	t.Run("prefixes_aligned_on_stride_boundary", func(t *testing.T) {
 		tbl := &Table[int]{}
 		slow := slowPrefixTable[int]{}
-		p := netip.MustParsePrefix
 
 		tbl.Insert(p("226.205.197.0/24"), 1)
 		slow.insert(p("226.205.197.0/24"), 1)
@@ -53,7 +61,6 @@ func TestRegression(t *testing.T) {
 
 	t.Run("parent_prefix_inserted_in_different_orders", func(t *testing.T) {
 		t1, t2 := &Table[int]{}, &Table[int]{}
-		p := netip.MustParsePrefix
 
 		t1.Insert(p("136.20.0.0/16"), 1)
 		t1.Insert(p("136.20.201.62/32"), 2)
@@ -71,7 +78,6 @@ func TestRegression(t *testing.T) {
 
 	t.Run("overlaps_divergent_children_with_parent_route_entry", func(t *testing.T) {
 		t1, t2 := Table[int]{}, Table[int]{}
-		p := netip.MustParsePrefix
 
 		t1.Insert(p("128.0.0.0/2"), 1)
 		t1.Insert(p("99.173.128.0/17"), 1)
@@ -92,7 +98,6 @@ func TestRegression(t *testing.T) {
 
 	t.Run("overlaps_parent_child_comparison_with_route_in_parent", func(t *testing.T) {
 		t1, t2 := Table[int]{}, Table[int]{}
-		p := netip.MustParsePrefix
 
 		t1.Insert(p("226.0.0.0/8"), 1)
 		t1.Insert(p("81.128.0.0/9"), 1)
@@ -112,83 +117,8 @@ func TestRegression(t *testing.T) {
 	})
 }
 
-func TestValue(t *testing.T) {
-	t.Parallel()
-	p := func(s string) netip.Prefix {
-		pfx := netip.MustParsePrefix(s)
-		if pfx.Addr() != pfx.Masked().Addr() {
-			panic(fmt.Sprintf("%s is not normalized", s))
-		}
-		return pfx
-	}
-
-	tests := []struct {
-		name string
-		pfx  netip.Prefix
-		val  int
-	}{
-		{
-			name: "default route v4",
-			pfx:  p("0.0.0.0/0"),
-			val:  0,
-		},
-		{
-			name: "default route v6",
-			pfx:  p("::/0"),
-			val:  0,
-		},
-		{
-			name: "set v4",
-			pfx:  p("1.2.3.4/32"),
-			val:  1234,
-		},
-		{
-			name: "set v6",
-			pfx:  p("2001:db8::/32"),
-			val:  2001,
-		},
-	}
-
-	rt := new(Table[int])
-
-	for _, tt := range tests {
-		rt.Insert(tt.pfx, tt.val)
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, ok := rt.Value(tt.pfx)
-
-			if !ok {
-				t.Errorf("%s: ok=%v, expected: %v", tt.name, ok, true)
-			}
-
-			if got != tt.val {
-				t.Errorf("%s: val=%v, expected: %v", tt.name, got, tt.val)
-			}
-		})
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			rt.Delete(tt.pfx)
-
-			if _, ok := rt.Value(tt.pfx); ok {
-				t.Errorf("%s: ok=%v, expected: %v", tt.name, ok, false)
-			}
-		})
-	}
-}
-
 func TestDelete(t *testing.T) {
 	t.Parallel()
-	p := func(s string) netip.Prefix {
-		pfx := netip.MustParsePrefix(s)
-		if pfx.Addr() != pfx.Masked().Addr() {
-			panic(fmt.Sprintf("%s is not normalized", s))
-		}
-		return pfx
-	}
 
 	t.Run("prefix_in_root", func(t *testing.T) {
 		// Add/remove prefix from root table.
@@ -386,6 +316,7 @@ func TestInsertCompare(t *testing.T) {
 
 	seenVals4 := map[int]bool{}
 	seenVals6 := map[int]bool{}
+
 	for i := 0; i < 10_000; i++ {
 		a := randomAddr()
 		slowVal, slowOK := slow.get(a)
@@ -408,6 +339,149 @@ func TestInsertCompare(t *testing.T) {
 		if !getsEqual(slowVal, slowOK, fastVal, fastOK) {
 			t.Fatalf("lpm(%q) = (%v, %v), want (%v, %v)", a, fastVal, fastOK, slowVal, slowOK)
 		}
+	}
+
+	// Empirically, 10k probes into 5k v4 prefixes and 5k v6 prefixes results in
+	// ~1k distinct values for v4 and ~300 for v6. distinct routes. This sanity
+	// check that we didn't just return a single route for everything should be
+	// very generous indeed.
+	if cnt := len(seenVals4); cnt < 10 {
+		t.Fatalf("saw %d distinct v4 route results, statistically expected ~1000", cnt)
+	}
+	if cnt := len(seenVals6); cnt < 10 {
+		t.Fatalf("saw %d distinct v6 route results, statistically expected ~300", cnt)
+	}
+}
+
+func TestLookupCompare(t *testing.T) {
+	// Create large route tables repeatedly, and compare Table's
+	// behavior to a naive and slow but correct implementation.
+	t.Parallel()
+	pfxs := randomPrefixes(10_000)
+
+	slow := slowPrefixTable[int]{pfxs}
+	fast := Table[int]{}
+
+	for _, pfx := range pfxs {
+		fast.Insert(pfx.pfx, pfx.val)
+	}
+
+	seenVals4 := map[int]bool{}
+	seenVals6 := map[int]bool{}
+
+	for i := 0; i < 10_000; i++ {
+		a := randomAddr()
+
+		slowPfx, slowVal, slowOK := slow.lpm(a)
+		fastPfx, fastVal, fastOK := fast.Lookup(a)
+
+		if !getsEqual(slowVal, slowOK, fastVal, fastOK) {
+			t.Fatalf("Lookup(%q) = (%v, %v), want (%v, %v)", a, fastVal, fastOK, slowVal, slowOK)
+		}
+
+		if slowPfx != fastPfx {
+			t.Fatalf("Lookup(%q) = (%v, %v, %v), want (%v, %v, %v)",
+				a, fastPfx, fastVal, fastOK, slowPfx, slowVal, slowOK)
+		}
+
+		if a.Is6() {
+			seenVals6[fastVal] = true
+		} else {
+			seenVals4[fastVal] = true
+		}
+
+	}
+
+	// Empirically, 10k probes into 5k v4 prefixes and 5k v6 prefixes results in
+	// ~1k distinct values for v4 and ~300 for v6. distinct routes. This sanity
+	// check that we didn't just return a single route for everything should be
+	// very generous indeed.
+	if cnt := len(seenVals4); cnt < 10 {
+		t.Fatalf("saw %d distinct v4 route results, statistically expected ~1000", cnt)
+	}
+	if cnt := len(seenVals6); cnt < 10 {
+		t.Fatalf("saw %d distinct v6 route results, statistically expected ~300", cnt)
+	}
+}
+
+func TestLookupShortestCompare(t *testing.T) {
+	// Create large route tables repeatedly, and compare Table's
+	// behavior to a naive and slow but correct implementation.
+	t.Parallel()
+	pfxs := randomPrefixes(10_000)
+
+	slow := slowPrefixTable[int]{pfxs}
+	fast := Table[int]{}
+
+	for _, pfx := range pfxs {
+		fast.Insert(pfx.pfx, pfx.val)
+	}
+
+	seenVals4 := map[int]bool{}
+	seenVals6 := map[int]bool{}
+
+	for i := 0; i < 10_000; i++ {
+		a := randomAddr()
+
+		slowPfx, slowVal, slowOK := slow.spmLookup(a)
+		fastPfx, fastVal, fastOK := fast.LookupShortest(a)
+
+		if !getsEqual(slowVal, slowOK, fastVal, fastOK) {
+			t.Fatalf("LookupShortest(%q) = (%v, %v), want (%v, %v)", a, fastVal, fastOK, slowVal, slowOK)
+		}
+
+		if slowPfx != fastPfx {
+			t.Fatalf("LookupShortest(%q) = (%v, %v, %v), want (%v, %v, %v)",
+				a, fastPfx, fastVal, fastOK, slowPfx, slowVal, slowOK)
+		}
+
+		if a.Is6() {
+			seenVals6[fastVal] = true
+		} else {
+			seenVals4[fastVal] = true
+		}
+
+	}
+}
+
+func TestLookupPrefixCompare(t *testing.T) {
+	// Create large route tables repeatedly, and compare Table's
+	// behavior to a naive and slow but correct implementation.
+	t.Parallel()
+	pfxs := randomPrefixes(10_000)
+
+	slow := slowPrefixTable[int]{pfxs}
+	fast := Table[int]{}
+
+	for _, pfx := range pfxs {
+		fast.Insert(pfx.pfx, pfx.val)
+	}
+
+	seenVals4 := map[int]bool{}
+	seenVals6 := map[int]bool{}
+
+	for i := 0; i < 10_000; i++ {
+		a := randomAddr()
+		pfx := netip.PrefixFrom(a, a.BitLen())
+
+		slowPfx, slowVal, slowOK := slow.lpmPfx(pfx)
+		fastPfx, fastVal, fastOK := fast.LookupPrefix(pfx)
+
+		if !getsEqual(slowVal, slowOK, fastVal, fastOK) {
+			t.Fatalf("LookupPrefix(%q) = (%v, %v), want (%v, %v)", a, fastVal, fastOK, slowVal, slowOK)
+		}
+
+		if slowPfx != fastPfx {
+			t.Fatalf("LookupPrefix(%q) = (%v, %v, %v), want (%v, %v, %v)",
+				a, fastPfx, fastVal, fastOK, slowPfx, slowVal, slowOK)
+		}
+
+		if a.Is6() {
+			seenVals6[fastVal] = true
+		} else {
+			seenVals4[fastVal] = true
+		}
+
 	}
 
 	// Empirically, 10k probes into 5k v4 prefixes and 5k v6 prefixes results in
@@ -639,27 +713,174 @@ func TestDeleteIsReverseOfInsert(t *testing.T) {
 	}
 }
 
-func TestShortestCompare(t *testing.T) {
+func TestValue(t *testing.T) {
 	t.Parallel()
-	pfxs := randomPrefixes(10_000)
-
-	slow := slowPrefixTable[int]{pfxs}
-	fast := Table[int]{}
-
-	for _, pfx := range pfxs {
-		fast.Insert(pfx.pfx, pfx.val)
+	p := func(s string) netip.Prefix {
+		pfx := netip.MustParsePrefix(s)
+		if pfx.Addr() != pfx.Masked().Addr() {
+			panic(fmt.Sprintf("%s is not normalized", s))
+		}
+		return pfx
 	}
 
-	for i := 0; i < 10_000; i++ {
-		a := randomAddr()
-		slowPfx, slowVal, slowOK := slow.spm(a)
-		fastPfx, fastVal, fastOK := fast.LookupShortest(a)
-		if slowPfx != fastPfx {
-			t.Fatalf("spm(%q) = (%v, %v, %v), want (%v, %v, %v)", a, fastPfx, fastVal, fastOK, slowPfx, slowVal, slowOK)
+	tests := []struct {
+		name string
+		pfx  netip.Prefix
+		val  int
+	}{
+		{
+			name: "default route v4",
+			pfx:  p("0.0.0.0/0"),
+			val:  0,
+		},
+		{
+			name: "default route v6",
+			pfx:  p("::/0"),
+			val:  0,
+		},
+		{
+			name: "set v4",
+			pfx:  p("1.2.3.4/32"),
+			val:  1234,
+		},
+		{
+			name: "set v6",
+			pfx:  p("2001:db8::/32"),
+			val:  2001,
+		},
+	}
+
+	rt := new(Table[int])
+
+	for _, tt := range tests {
+		rt.Insert(tt.pfx, tt.val)
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := rt.Value(tt.pfx)
+
+			if !ok {
+				t.Errorf("%s: ok=%v, expected: %v", tt.name, ok, true)
+			}
+
+			if got != tt.val {
+				t.Errorf("%s: val=%v, expected: %v", tt.name, got, tt.val)
+			}
+		})
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rt.Delete(tt.pfx)
+
+			if _, ok := rt.Value(tt.pfx); ok {
+				t.Errorf("%s: ok=%v, expected: %v", tt.name, ok, false)
+			}
+		})
+	}
+}
+
+func TestUpdate(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		pfx  netip.Prefix
+	}{
+		{
+			name: "default route v4",
+			pfx:  p("0.0.0.0/0"),
+		},
+		{
+			name: "default route v6",
+			pfx:  p("::/0"),
+		},
+		{
+			name: "set v4",
+			pfx:  p("1.2.3.4/32"),
+		},
+		{
+			name: "set v6",
+			pfx:  p("2001:db8::/32"),
+		},
+	}
+
+	rt := new(Table[int])
+
+	// just increment val
+	cb := func(val int, ok bool) int {
+		if ok {
+			return val + 1
 		}
-		if !getsEqual(slowVal, slowOK, fastVal, fastOK) {
-			t.Fatalf("spm(%q) = (%v, %v), want (%v, %v)", a, fastVal, fastOK, slowVal, slowOK)
-		}
+		return 0
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			val := rt.Update(tt.pfx, cb)
+			got, ok := rt.Value(tt.pfx)
+
+			if !ok {
+				t.Errorf("%s: ok=%v, expected: %v", tt.name, ok, true)
+			}
+
+			if got != 0 || got != val {
+				t.Errorf("%s: got=%v, expected: %v", tt.name, got, 0)
+			}
+		})
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			val := rt.Update(tt.pfx, cb)
+			got, ok := rt.Value(tt.pfx)
+
+			if !ok {
+				t.Errorf("%s: ok=%v, expected: %v", tt.name, ok, true)
+			}
+
+			if got != 1 || got != val {
+				t.Errorf("%s: got=%v, expected: %v", tt.name, got, 1)
+			}
+		})
+	}
+}
+
+// quick and dirty, not ready yet
+func TestLookupPrefixAll(t *testing.T) {
+	t.Parallel()
+
+	pfxs := []netip.Prefix{
+		p("0.0.0.0/0"),
+		p("0.0.0.0/1"),
+		p("0.0.0.0/2"),
+		p("0.0.0.0/8"),
+		p("0.0.0.0/12"),
+		p("0.0.0.0/18"),
+		p("0.0.0.0/23"),
+		p("0.0.0.0/24"),
+		p("0.0.0.0/29"),
+		p("0.0.0.0/32"),
+
+		p("10.0.0.0/8"),
+		p("10.0.0.0/9"),
+		p("10.0.0.0/16"),
+		p("10.0.0.0/18"),
+		p("10.0.0.0/24"),
+		p("10.0.0.0/27"),
+	}
+
+	rt := new(Table[int])
+
+	for _, pfx := range pfxs {
+		rt.Insert(pfx, 0)
+	}
+
+	got := rt.LookupPrefixAll(p("0.0.0.0/32"))
+	if len(got) != 10 {
+		t.Errorf("LookupPrefixAll(), expected len=%d, got: %d", 10, len(got))
+		t.Fatalf("%v", got)
 	}
 }
 
@@ -1072,6 +1293,15 @@ func checkRoutes(t *testing.T, tbl *Table[int], tt []tableTest) {
 			t.Errorf("Lookup %q got (%v, %v), want (%v, true)", tc.addr, v, ok, tc.want)
 		}
 
+		pfx := netip.PrefixFrom(a(tc.addr), a(tc.addr).BitLen())
+		_, v, ok = tbl.LookupPrefix(pfx)
+		if !ok && tc.want != -1 {
+			t.Errorf("LookupPrefix %q got (%v, %v), want (_, false)", pfx, v, ok)
+		}
+		if ok && v != tc.want {
+			t.Errorf("LookupPrefix %q got (%v, %v), want (%v, true)", pfx, v, ok, tc.want)
+		}
+
 		_, v, ok = tbl.LookupShortest(a(tc.addr))
 		if !ok && tc.spm != -1 {
 			t.Errorf("LookupShortest %q got (%v, %v), want (_, false)", tc.addr, v, ok)
@@ -1258,6 +1488,51 @@ func BenchmarkTableLookup(b *testing.B) {
 				addr := genAddr()
 				t.Start()
 				_, writeSink, _ = rt.Lookup(addr)
+				t.Stop()
+			}
+		})
+		b.ReportAllocs() // Enables the output, but we report manually below
+		allocs -= (addrAllocs * float64(b.N))
+		bytes -= (addrBytes * float64(b.N))
+		lookups := float64(b.N)
+		elapsed := float64(t.Elapsed().Nanoseconds())
+		elapsedSec := float64(t.Elapsed().Seconds())
+		b.ReportMetric(elapsed/lookups, "ns/op")
+		b.ReportMetric(lookups/elapsedSec, "addrs/s")
+		b.ReportMetric(allocs/lookups, "allocs/op")
+		b.ReportMetric(bytes/lookups, "B/op")
+	})
+}
+
+func BenchmarkTableLookupPrefix(b *testing.B) {
+	forFamilyAndCount(b, func(b *testing.B, routes []slowPrefixEntry[int]) {
+		genPfx := randomPrefixes4
+		if routes[0].pfx.Addr().Is6() {
+			genPfx = randomPrefixes6
+		}
+
+		var rt Table[int]
+		for _, route := range routes {
+			rt.Insert(route.pfx, route.val)
+		}
+
+		addrAllocs, addrBytes := getMemCost(func() {
+			// Have to run genAddr more than once, otherwise the reported
+			// cost is 16 bytes - presumably due to some amortized costs in
+			// the memory allocator? Either way, empirically 100 iterations
+			// reliably reports the correct cost.
+			for i := 0; i < 100; i++ {
+				_ = genPfx(1)[0].pfx
+			}
+		})
+		addrAllocs /= 100
+		addrBytes /= 100
+		var t runningTimer
+		allocs, bytes := getMemCost(func() {
+			for i := 0; i < b.N; i++ {
+				pfx := genPfx(1)[0].pfx
+				t.Start()
+				_, writeSink, _ = rt.LookupPrefix(pfx)
 				t.Stop()
 			}
 		})
@@ -1563,7 +1838,32 @@ func (s *slowPrefixTable[V]) lpm(addr netip.Addr) (lpm netip.Prefix, val V, ok b
 	return lpm, val, bestLen != -1
 }
 
-func (s *slowPrefixTable[V]) spm(addr netip.Addr) (spm netip.Prefix, val V, ok bool) {
+func (s *slowPrefixTable[V]) lpmPfx(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) {
+	bestLen := -1
+
+	for _, item := range s.prefixes {
+		if item.pfx.Overlaps(pfx) && item.pfx.Bits() <= pfx.Bits() && item.pfx.Bits() > bestLen {
+			lpm = item.pfx
+			val = item.val
+			bestLen = item.pfx.Bits()
+		}
+	}
+	return lpm, val, bestLen != -1
+}
+
+func (s *slowPrefixTable[V]) allLookupPfx(pfx netip.Prefix) []netip.Prefix {
+	var result []netip.Prefix
+
+	for _, item := range s.prefixes {
+		if item.pfx.Overlaps(pfx) && item.pfx.Bits() <= pfx.Bits() {
+			result = append(result, item.pfx)
+		}
+	}
+	slices.SortFunc(result, sortByPrefix)
+	return result
+}
+
+func (s *slowPrefixTable[V]) spmLookup(addr netip.Addr) (spm netip.Prefix, val V, ok bool) {
 	bestLen := 129
 
 	for _, item := range s.prefixes {
@@ -1683,4 +1983,12 @@ func roundFloat64(f float64) float64 {
 		panic(err)
 	}
 	return ret
+}
+
+// sortByPrefix
+func sortByPrefix(a, b netip.Prefix) int {
+	if cmp := a.Masked().Addr().Compare(b.Masked().Addr()); cmp != 0 {
+		return cmp
+	}
+	return cmp.Compare(a.Bits(), b.Bits())
 }

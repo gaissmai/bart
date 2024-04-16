@@ -178,8 +178,6 @@ func (p *prefixCBTree[V]) lpmByAddr(addr uint) (baseIdx uint, val V, ok bool) {
 
 // lpmByPrefix does a route lookup for addr/pfxLen in the 8-bit (stride) routing table
 // It's an adapter to lpmByIndex.
-//
-//nolint:unused
 func (p *prefixCBTree[V]) lpmByPrefix(addr uint, prefixLen int) (baseIdx uint, val V, ok bool) {
 	return p.lpmByIndex(prefixToBaseIndex(addr, prefixLen))
 }
@@ -219,6 +217,32 @@ func (p *prefixCBTree[V]) spmByIndex(idx uint) (baseIdx uint, val V, ok bool) {
 // It's an adapter to spmByIndex.
 func (p *prefixCBTree[V]) spmByAddr(addr uint) (baseIdx uint, val V, ok bool) {
 	return p.spmByIndex(addrToBaseIndex(addr))
+}
+
+// apmByPrefix does an all prefix match in the 8-bit (stride) routing table
+// at this depth and returns all matching baseIdx's.
+func (p *prefixCBTree[V]) apmByPrefix(addr uint, bits int) (result []uint) {
+	// skip intermediate nodes
+	if len(p.values) == 0 {
+		return
+	}
+
+	idx := prefixToBaseIndex(addr, bits)
+	for {
+		if p.indexes.Test(idx) {
+			result = append(result, idx)
+		}
+
+		if idx == 0 {
+			break
+		}
+
+		idx = parentIndex(idx)
+	}
+
+	// sort in ascending order
+	slices.Sort(result)
+	return result
 }
 
 // getValByIndex for baseIdx.
