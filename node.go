@@ -86,6 +86,41 @@ func (p *prefixCBTree[V]) insertIdx(baseIdx uint, val V) {
 	p.values = slices.Insert(p.values, p.rank(baseIdx), val)
 }
 
+// update or set the value at prefix via callback.
+func (p *prefixCBTree[V]) update(addr uint, prefixLen int, cb func(V, bool) V) (val V) {
+	// calculate idx once
+	baseIdx := prefixToBaseIndex(addr, prefixLen)
+
+	var ok bool
+	var rnk int
+
+	// if prefix is set, get current value
+	if ok = p.indexes.Test(baseIdx); ok {
+		rnk = p.rank(baseIdx)
+		val = p.values[rnk]
+	}
+
+	// callback function to get updated or new value
+	val = cb(val, ok)
+
+	// prefix is already set, update and return value
+	if ok {
+		p.values[rnk] = val
+		return val
+	}
+
+	// new prefix, insert into bitset ...
+	p.indexes.Set(baseIdx)
+
+	// bitset has changed, recalc rank
+	rnk = p.rank(baseIdx)
+
+	// ... and insert value into slice
+	p.values = slices.Insert(p.values, rnk, val)
+
+	return val
+}
+
 // delete removes the route addr/prefixLen. Reports whether the
 // prefix existed in the table prior to deletion.
 func (p *prefixCBTree[V]) delete(addr uint, prefixLen int) (wasPresent bool) {
