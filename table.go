@@ -370,6 +370,179 @@ func (t *Table[V]) lpmByIP(ip netip.Addr) (depth int, baseIdx uint, val V, ok bo
 	}
 }
 
+func (t *Table[V]) LookupPrefix(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) {
+	if depth, baseIdx, val, ok := t.lpmByPrefix(pfx); ok {
+
+		// add the bits from higher levels in child trie to pfxLen
+		bits := depth*stride + baseIndexToPrefixLen(baseIdx)
+
+		// mask prefix from lookup ip, masked with longest prefix bits.
+		lpm = netip.PrefixFrom(pfx.Addr(), bits).Masked()
+
+		return lpm, val, ok
+	}
+	return
+}
+
+// lpmByPrefix does a route lookup for pfx with longest prefix match.
+// Returns also depth and baseIdx for Lookup to retrieve the
+// lpm prefix out of the prefix tree.
+func (t *Table[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V, ok bool) {
+	// always normalize the prefix
+	pfx = pfx.Masked()
+
+	// some needed values, see below
+	bits := pfx.Bits()
+	ip := pfx.Addr()
+	is4 := ip.Is4()
+
+	n := t.rootNodeByVersion(is4)
+	if n == nil {
+		return
+	}
+
+	// default route, easy peasy
+	if bits == 0 {
+		baseIdx, val, ok = n.prefixes.lpmByPrefix(0, 0)
+		return
+	}
+
+	// stack of the traversed nodes for fast backtracking, if needed
+	pathStack := [maxTreeDepth]*node[V]{}
+
+	// keep the lpm alloc free, don't use ip.AsSlice here
+	a16 := ip.As16()
+	bs := a16[:]
+	if is4 {
+		bs = bs[12:]
+	}
+
+	addr := uint(bs[depth])
+	// find leaf tree
+	for {
+		// push current node on stack for fast backtracking
+		pathStack[depth] = n
+
+		if bits <= stride {
+			break
+		}
+
+		// go down to next child
+		child := n.children.get(addr)
+		if child == nil {
+			bits = stride
+			break
+		}
+
+		// go down
+		depth++
+		n = child
+		bits -= stride
+		addr = uint(bs[depth])
+	}
+
+	// start backtracking at leaf node in tight loop
+	for {
+		// lookup only in nodes with prefixes, skip over intermediate nodes
+		if len(n.prefixes.values) != 0 {
+			if baseIdx, val, ok = n.prefixes.lpmByPrefix(addr, bits); ok {
+				return
+			}
+		}
+
+		// bits must be full stride for all upper levels
+		if bits < stride {
+			bits = stride
+		}
+
+		// end condition, stack is exhausted
+		if depth == 0 {
+			return
+		}
+
+		// go one level up, backtracking
+		depth--
+		n = pathStack[depth]
+
+		addr = uint(bs[depth])
+	}
+}
+
+// LookupPrefixAll returns all the matching prefixes,
+// sorted from shortest to longest prefix.
+func (t *Table[V]) LookupPrefixAll(pfx netip.Prefix) []netip.Prefix {
+	var result []netip.Prefix
+
+	// always normalize the prefix
+	pfx = pfx.Masked()
+
+	// some needed values, see below
+	bits := pfx.Bits()
+	ip := pfx.Addr()
+	is4 := ip.Is4()
+
+	n := t.rootNodeByVersion(is4)
+	if n == nil {
+		return nil
+	}
+
+	// pfx is default route
+	if bits == 0 {
+		// test if default route is in table
+		if _, ok := n.prefixes.getValByPrefix(0, 0); ok {
+			result = append(result, pfx)
+		}
+		return result
+	}
+
+	bs := ip.AsSlice()
+	depth := 0
+
+	for {
+		addr := uint(bs[depth])
+
+		pfxLen := 8
+		// already at leaf node?
+		if bits <= stride {
+			pfxLen = bits
+		}
+
+		// make an all-prefix-match at this level
+		allIndices := n.prefixes.apmByPrefix(addr, pfxLen)
+
+		// get back the matching prefix from baseIdx
+		for _, baseIdx := range allIndices {
+			// calc supernet mask
+			mask := depth*stride + baseIndexToPrefixLen(baseIdx)
+
+			// lookup ip, masked with supernet mask
+			matchPfx := netip.PrefixFrom(ip, mask).Masked()
+
+			result = append(result, matchPfx)
+		}
+
+		// stop condition
+		if bits <= stride {
+			break
+		}
+
+		// descend down to next child level
+		child := n.children.get(addr)
+
+		// stop condition, no more childs
+		if child == nil {
+			break
+		}
+
+		// next round
+		depth++
+		n = child
+		bits -= stride
+	}
+
+	return result
+}
+
 // LookupShortest does a route lookup for IP and returns the
 // shortest matching prefix, the associated value and true for success,
 // or false otherwise if no route matched.
