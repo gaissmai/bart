@@ -193,7 +193,7 @@ func (t *Table[V]) Value(pfx netip.Prefix) (val V, ok bool) {
 
 	// get value for default route, easy peasy
 	if bits == 0 {
-		return n.prefixes.getVal(prefixToBaseIndex(0, 0))
+		return n.prefixes.getValByPrefix(0, 0)
 	}
 
 	// keep this method alloc free, don't use ip.AsSlice here
@@ -209,7 +209,7 @@ func (t *Table[V]) Value(pfx netip.Prefix) (val V, ok bool) {
 
 		// last non-masked byte
 		if bits <= stride {
-			return n.prefixes.getVal(prefixToBaseIndex(addr, bits))
+			return n.prefixes.getValByPrefix(addr, bits)
 		}
 
 		// descend down to next level, no path compression

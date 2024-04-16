@@ -186,12 +186,17 @@ func (p *prefixCBTree[V]) spmByAddr(addr uint) (baseIdx uint, val V, ok bool) {
 	return p.spmByIndex(addrToBaseIndex(addr))
 }
 
-// getVal for baseIdx.
-func (p *prefixCBTree[V]) getVal(baseIdx uint) (val V, ok bool) {
+// getValByIndex for baseIdx.
+func (p *prefixCBTree[V]) getValByIndex(baseIdx uint) (val V, ok bool) {
 	if p.indexes.Test(baseIdx) {
 		return p.values[p.rank(baseIdx)], true
 	}
 	return
+}
+
+// getValByPrefix, adapter for getValByIndex.
+func (p *prefixCBTree[V]) getValByPrefix(addr uint, bits int) (val V, ok bool) {
+	return p.getValByIndex(prefixToBaseIndex(addr, bits))
 }
 
 // allIndexes returns all baseIndexes set in this prefix tree in ascending order.
@@ -446,7 +451,7 @@ func (n *node[V]) unionRec(o *node[V]) {
 		if oIdx, oOk = o.prefixes.indexes.NextSet(oIdx); !oOk {
 			break
 		}
-		oVal, _ := o.prefixes.getVal(oIdx)
+		oVal, _ := o.prefixes.getValByIndex(oIdx)
 		// insert/overwrite prefix/value from oNode to nNode
 		n.prefixes.insertIdx(oIdx, oVal)
 		oIdx++

@@ -153,7 +153,7 @@ func (n *node[V]) getKidsRec(parentIdx uint, path []byte, is4 bool) []kidT[V] {
 
 		// check if lpmIdx for this idx' parent is equal to parentIdx
 		if lpmIdx, _, _ := n.prefixes.lpmByIndex(idx >> 1); lpmIdx == parentIdx {
-			val, _ := n.prefixes.getVal(idx)
+			val, _ := n.prefixes.getValByIndex(idx)
 			path := append([]byte{}, path...)
 			cidr := cidrFromPath(path, idx, is4)
 			directKids = append(directKids, kidT[V]{n, path, idx, cidr, val})
