@@ -98,6 +98,60 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	}
 }
 
+// Update or set the value at prefix with a callback function,
+// returns the updated or new value.
+func (t *Table[V]) Update(pfx netip.Prefix, cb func(V, bool) V) V {
+	t.init()
+
+	// always normalize the prefix
+	pfx = pfx.Masked()
+
+	// some needed values, see below
+	bits := pfx.Bits()
+	ip := pfx.Addr()
+	is4 := ip.Is4()
+
+	// get the root node of the routing table
+	n := t.rootNodeByVersion(is4)
+
+	// update default route, easy peasy
+	if bits == 0 {
+		return n.prefixes.update(0, 0, cb)
+	}
+
+	// keep this method alloc free, don't use ip.AsSlice here
+	a16 := ip.As16()
+	bs := a16[:]
+	if is4 {
+		bs = bs[12:]
+	}
+
+	// depth index for the child trie
+	depth := 0
+	for {
+		addr := uint(bs[depth]) // stride = 8!
+
+		// loop stop condition
+		if bits <= stride {
+			return n.prefixes.update(addr, bits, cb)
+		}
+
+		// descend down to next child level
+		child := n.children.get(addr)
+
+		// create and insert missing intermediate child, no path compression!
+		if child == nil {
+			child = newNode[V]()
+			n.children.insert(addr, child)
+		}
+
+		// go down
+		depth++
+		n = child
+		bits -= stride
+	}
+}
+
 // Delete removes pfx from the tree, pfx does not have to be present.
 func (t *Table[V]) Delete(pfx netip.Prefix) {
 	// always normalize the prefix
