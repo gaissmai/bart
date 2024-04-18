@@ -98,30 +98,30 @@ func (t *Table[V]) readTableStats() map[string]any {
 	return ret
 }
 
-// walkFunc is the type of the function called by walk to visit each node
+// metricWalkFunc is the type of the function called by walk to visit each node
 // in the routing table. The depth argument is the depth in the tree,
 // starting with 0.
 // The is4 argument indicates whether the node is from the IPv4 routing
 // table or from the IPv6 table.
-type walkFunc[V any] func(n *node[V], depth int, is4 bool)
+type metricWalkFunc[V any] func(n *node[V], depth int, is4 bool)
 
 // walk the routing table, calling cb for each node.
-func (t *Table[V]) walk(cb walkFunc[V]) {
+func (t *Table[V]) walk(cb metricWalkFunc[V]) {
 	t.init()
 
 	is4 := true
 	root4 := t.rootNodeByVersion(is4)
-	root4.walkRec(cb, 0, is4)
+	root4.metricWalkRec(cb, 0, is4)
 
 	is4 = false
 	root6 := t.rootNodeByVersion(is4)
-	root6.walkRec(cb, 0, is4)
+	root6.metricWalkRec(cb, 0, is4)
 }
 
-func (n *node[V]) walkRec(cb walkFunc[V], depth int, is4 bool) {
+func (n *node[V]) metricWalkRec(cb metricWalkFunc[V], depth int, is4 bool) {
 	cb(n, depth, is4)
 
 	for _, child := range n.children.nodes {
-		child.walkRec(cb, depth+1, is4)
+		child.metricWalkRec(cb, depth+1, is4)
 	}
 }

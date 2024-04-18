@@ -48,12 +48,15 @@ the backtracking algorithm is as fast as possible.
   
   func (t *Table[V]) Insert(pfx netip.Prefix, val V)
   func (t *Table[V]) Delete(pfx netip.Prefix)
+  func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool)
+  func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V
+
   func (t *Table[V]) Union(o *Table[V])
   func (t *Table[V]) Clone() *Table[V]
   
-  func (t *Table[V]) Get(ip netip.Addr) (val V, ok bool)
-  func (t *Table[V]) Lookup(ip netip.Addr) (lpm netip.Prefix, val V, ok bool)
-  func (t *Table[V]) LookupShortest(ip netip.Addr) (spm netip.Prefix, val V, ok bool)
+  func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool)
+  func (t *Table[V]) Subnets(pfx netip.Prefix) []netip.Prefix
+  func (t *Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix
 
   func (t *Table[V]) Overlaps(o *Table[V]) bool
   func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool
@@ -63,7 +66,12 @@ the backtracking algorithm is as fast as possible.
   func (t *Table[V]) MarshalText() ([]byte, error)
   func (t *Table[V]) MarshalJSON() ([]byte, error)
 
-  func (t *Table[V]) DumpList(is4 bool) []DumpListNode[V]
+  func (t *Table[V]) Walk(cb func(pfx netip.Prefix, val V) bool) bool
+  func (t *Table[V]) Walk4(cb func(pfx netip.Prefix, val V) bool) bool
+  func (t *Table[V]) Walk6(cb func(pfx netip.Prefix, val V) bool) bool
+
+  func (t *Table[V]) DumpList4() []DumpListNode[V]
+  func (t *Table[V]) DumpList6() []DumpListNode[V]
 ```
 
 # benchmarks

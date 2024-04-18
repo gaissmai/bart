@@ -4,6 +4,8 @@
 package bart
 
 import (
+	"cmp"
+	"net/netip"
 	"slices"
 
 	"github.com/bits-and-blooms/bitset"
@@ -180,43 +182,6 @@ func (p *prefixCBTree[V]) lpmByAddr(addr uint) (baseIdx uint, val V, ok bool) {
 // It's an adapter to lpmByIndex.
 func (p *prefixCBTree[V]) lpmByPrefix(addr uint, prefixLen int) (baseIdx uint, val V, ok bool) {
 	return p.lpmByIndex(prefixToBaseIndex(addr, prefixLen))
-}
-
-// spmByIndex does a shortest-prefix-match for idx in the 8-bit (stride) routing table
-// at this depth and returns (baseIdx, value, true) if a matching
-// shortest prefix exists, or ok=false otherwise.
-//
-// backtracking is stride*bitset-test and, if found, one popcount.
-func (p *prefixCBTree[V]) spmByIndex(idx uint) (baseIdx uint, val V, ok bool) {
-	var shortest uint
-	// steps in backtracking is always the stride length for spm,
-	for {
-		if p.indexes.Test(idx) {
-			shortest = idx
-			// no fast exit on match for shortest-prefix-match.
-		}
-
-		if idx == 0 {
-			break
-		}
-
-		// cache friendly backtracking to the next less specific route.
-		// thanks to the complete binary tree it's just a shift operation.
-		idx = parentIndex(idx)
-	}
-
-	if shortest != 0 {
-		return shortest, p.values[p.rank(shortest)], true
-	}
-
-	// not found (on this level)
-	return 0, val, false
-}
-
-// spmByAddr does a shortest-prefix-match for addr in the 8-bit (stride) routing table.
-// It's an adapter to spmByIndex.
-func (p *prefixCBTree[V]) spmByAddr(addr uint) (baseIdx uint, val V, ok bool) {
-	return p.spmByIndex(addrToBaseIndex(addr))
 }
 
 // apmByPrefix does an all prefix match in the 8-bit (stride) routing table
@@ -554,4 +519,84 @@ func (n *node[V]) cloneRec() *node[V] {
 	}
 
 	return c
+}
+
+// walkRec runs recursive the trie, starting at node in depth-first order
+// and calls the cb function for each route entry with prefix and value.
+//
+// If the cb function returns the value false,
+// the walk ends prematurely and returns false.
+func (n *node[V]) walkRec(path []byte, is4 bool, cb func(netip.Prefix, V) bool) bool {
+	// for all prefixes in this node do ...
+	for _, idx := range n.prefixes.allIndexes() {
+		val, _ := n.prefixes.getValByIndex(idx)
+		pfx := cidrFromPath(path, idx, is4)
+
+		if !cb(pfx, val) {
+			// premature end of recursion
+			return false
+		}
+	}
+
+	// for all children in this node do ...
+	for _, addr := range n.children.allAddrs() {
+		path := append(slices.Clone(path), byte(addr))
+		child := n.children.get(addr)
+
+		if !child.walkRec(path, is4, cb) {
+			// premature end of recursion
+			return false
+		}
+	}
+
+	return true
+}
+
+// subnets retuns all CIDRs covered by parent pfx.
+func (n *node[V]) subnets(path []byte, parentIdx uint, is4 bool) (result []netip.Prefix) {
+	// for all routes in this node do ...
+	for _, idx := range n.prefixes.allIndexes() {
+		// is this route covered by pfx?
+		for i := idx; i >= parentIdx; i >>= 1 {
+			if i == parentIdx { // match
+				// get CIDR back for idx
+				pfx := cidrFromPath(path, idx, is4)
+
+				result = append(result, pfx)
+				break
+			}
+		}
+	}
+
+	// for all children in this node do ...
+	for _, addr := range n.children.allAddrs() {
+		idx := addrToBaseIndex(addr)
+
+		// is this child covered by pfx?
+		for i := idx; i >= parentIdx; i >>= 1 {
+			if i == parentIdx { // match
+				// get child for addr
+				c := n.children.get(addr)
+
+				// append addr to path
+				path := append(slices.Clone(path), byte(addr))
+
+				// all cidrs under this child are covered by pfx
+				c.walkRec(path, is4, func(pfx netip.Prefix, _ V) bool {
+					result = append(result, pfx)
+					return true
+				})
+			}
+		}
+	}
+
+	return result
+}
+
+// sortByPrefix
+func sortByPrefix(a, b netip.Prefix) int {
+	if cmp := a.Masked().Addr().Compare(b.Masked().Addr()); cmp != 0 {
+		return cmp
+	}
+	return cmp.Compare(a.Bits(), b.Bits())
 }

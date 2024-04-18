@@ -5,6 +5,7 @@ package bart
 
 import (
 	"net/netip"
+	"slices"
 	"sync"
 )
 
@@ -98,9 +99,11 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	}
 }
 
-// Update or set the value at prefix with a callback function,
-// returns the updated or new value.
-func (t *Table[V]) Update(pfx netip.Prefix, cb func(V, bool) V) V {
+// Update or set the value at pfx with a callback function.
+//
+// If the pfx does not yet exist, then ok=false and the pfx
+// is set with the new value.
+func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 	t.init()
 
 	// always normalize the prefix
@@ -230,9 +233,9 @@ func (t *Table[V]) Delete(pfx netip.Prefix) {
 	}
 }
 
-// Value returns the associated payload for prefix and true, or false if
+// Get returns the associated payload for prefix and true, or false if
 // prefix is not set in the routing table.
-func (t *Table[V]) Value(pfx netip.Prefix) (val V, ok bool) {
+func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 	// always normalize the prefix
 	pfx = pfx.Masked()
 
@@ -280,37 +283,9 @@ func (t *Table[V]) Value(pfx netip.Prefix) (val V, ok bool) {
 	}
 }
 
-// Get does a route lookup for IP and returns the associated value and true, or false if
-// no route matched.
-func (t *Table[V]) Get(ip netip.Addr) (val V, ok bool) {
-	_, _, val, ok = t.lpmByIP(ip)
-	return
-}
-
-// Lookup does a route lookup for IP and returns the longest prefix,
-// the associated value and true for success, or false otherwise if
-// no route matched.
-//
-// Lookup is a bit slower than Get, so if you only need the payload V
-// and not the matching longest-prefix back, you should use just Get.
-func (t *Table[V]) Lookup(ip netip.Addr) (lpm netip.Prefix, val V, ok bool) {
-	if depth, baseIdx, val, ok := t.lpmByIP(ip); ok {
-
-		// add the bits from higher levels in child trie to pfxLen
-		bits := depth*stride + baseIndexToPrefixLen(baseIdx)
-
-		// mask prefix from lookup ip, masked with longest prefix bits.
-		lpm = netip.PrefixFrom(ip, bits).Masked()
-
-		return lpm, val, ok
-	}
-	return
-}
-
-// lpmByIP does a route lookup for IP with longest prefix match.
-// Returns also depth and baseIdx for Lookup to retrieve the
-// lpm prefix out of the prefix tree.
-func (t *Table[V]) lpmByIP(ip netip.Addr) (depth int, baseIdx uint, val V, ok bool) {
+// Lookup does a route lookup (longest prefix match) for IP and
+// returns the associated value and true, or false if no route matched.
+func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	is4 := ip.Is4()
 	n := t.rootNodeByVersion(is4)
 	if n == nil {
@@ -327,7 +302,7 @@ func (t *Table[V]) lpmByIP(ip netip.Addr) (depth int, baseIdx uint, val V, ok bo
 		bs = bs[12:]
 	}
 
-	depth = 0
+	depth := 0
 	addr := uint(bs[depth]) // bytewise, stride = 8
 	// find leaf tree
 	for {
@@ -351,10 +326,10 @@ func (t *Table[V]) lpmByIP(ip netip.Addr) (depth int, baseIdx uint, val V, ok bo
 		// lookup only in nodes with prefixes, skip over intermediate nodes
 		if len(n.prefixes.values) != 0 {
 			// longest prefix match?
-			if baseIdx, val, ok := n.prefixes.lpmByIndex(addrToBaseIndex(addr)); ok {
+			if _, val, ok := n.prefixes.lpmByIndex(addrToBaseIndex(addr)); ok {
 				// return also baseIdx and the depth, needed to
 				// calculate the lpm prefix by the Lookup method.
-				return depth, baseIdx, val, true
+				return val, true
 			}
 		}
 
@@ -370,24 +345,10 @@ func (t *Table[V]) lpmByIP(ip netip.Addr) (depth int, baseIdx uint, val V, ok bo
 	}
 }
 
-func (t *Table[V]) LookupPrefix(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) {
-	if depth, baseIdx, val, ok := t.lpmByPrefix(pfx); ok {
+// Subnets return all prefixes covered by pfx in natural CIDR sort order.
+func (t *Table[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
+	var result []netip.Prefix
 
-		// add the bits from higher levels in child trie to pfxLen
-		bits := depth*stride + baseIndexToPrefixLen(baseIdx)
-
-		// mask prefix from lookup ip, masked with longest prefix bits.
-		lpm = netip.PrefixFrom(pfx.Addr(), bits).Masked()
-
-		return lpm, val, ok
-	}
-	return
-}
-
-// lpmByPrefix does a route lookup for pfx with longest prefix match.
-// Returns also depth and baseIdx for Lookup to retrieve the
-// lpm prefix out of the prefix tree.
-func (t *Table[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V, ok bool) {
 	// always normalize the prefix
 	pfx = pfx.Masked()
 
@@ -398,79 +359,54 @@ func (t *Table[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V
 
 	n := t.rootNodeByVersion(is4)
 	if n == nil {
-		return
+		return nil
 	}
 
-	// default route, easy peasy
+	// pfx is default route
 	if bits == 0 {
-		baseIdx, val, ok = n.prefixes.lpmByPrefix(0, 0)
-		return
+
+		// return all routes for this IP version.
+		n.walkRec(nil, is4, func(pfx netip.Prefix, _ V) bool {
+			result = append(result, pfx)
+			return true
+		})
+
+		slices.SortFunc(result, sortByPrefix)
+		return result
 	}
 
-	// stack of the traversed nodes for fast backtracking, if needed
-	pathStack := [maxTreeDepth]*node[V]{}
+	bs := ip.AsSlice()
+	depth := 0
 
-	// keep the lpm alloc free, don't use ip.AsSlice here
-	a16 := ip.As16()
-	bs := a16[:]
-	if is4 {
-		bs = bs[12:]
-	}
-
-	addr := uint(bs[depth])
-	// find leaf tree
 	for {
-		// push current node on stack for fast backtracking
-		pathStack[depth] = n
+		addr := uint(bs[depth])
 
+		// already at leaf node?
 		if bits <= stride {
-			break
+			result = n.subnets(bs[:depth], prefixToBaseIndex(addr, bits), is4)
+
+			slices.SortFunc(result, sortByPrefix)
+			return result
 		}
 
-		// go down to next child
+		// descend down to next child level
 		child := n.children.get(addr)
+
+		// stop condition, no more childs
 		if child == nil {
-			bits = stride
-			break
+			return nil
 		}
 
-		// go down
+		// next round
 		depth++
 		n = child
 		bits -= stride
-		addr = uint(bs[depth])
-	}
-
-	// start backtracking at leaf node in tight loop
-	for {
-		// lookup only in nodes with prefixes, skip over intermediate nodes
-		if len(n.prefixes.values) != 0 {
-			if baseIdx, val, ok = n.prefixes.lpmByPrefix(addr, bits); ok {
-				return
-			}
-		}
-
-		// bits must be full stride for all upper levels
-		if bits < stride {
-			bits = stride
-		}
-
-		// end condition, stack is exhausted
-		if depth == 0 {
-			return
-		}
-
-		// go one level up, backtracking
-		depth--
-		n = pathStack[depth]
-
-		addr = uint(bs[depth])
 	}
 }
 
-// LookupPrefixAll returns all the matching prefixes,
-// sorted from shortest to longest prefix.
-func (t *Table[V]) LookupPrefixAll(pfx netip.Prefix) []netip.Prefix {
+// Supernets return all matching routes for pfx,
+// in natural CIDR sort order.
+func (t *Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 	var result []netip.Prefix
 
 	// always normalize the prefix
@@ -508,10 +444,10 @@ func (t *Table[V]) LookupPrefixAll(pfx netip.Prefix) []netip.Prefix {
 		}
 
 		// make an all-prefix-match at this level
-		allIndices := n.prefixes.apmByPrefix(addr, pfxLen)
+		superStrides := n.prefixes.apmByPrefix(addr, pfxLen)
 
 		// get back the matching prefix from baseIdx
-		for _, baseIdx := range allIndices {
+		for _, baseIdx := range superStrides {
 			// calc supernet mask
 			mask := depth*stride + baseIndexToPrefixLen(baseIdx)
 
@@ -541,69 +477,6 @@ func (t *Table[V]) LookupPrefixAll(pfx netip.Prefix) []netip.Prefix {
 	}
 
 	return result
-}
-
-// LookupShortest does a route lookup for IP and returns the
-// shortest matching prefix, the associated value and true for success,
-// or false otherwise if no route matched.
-//
-// It is, so to speak, the opposite of lookup and is only required for very
-// special cases.
-func (t *Table[V]) LookupShortest(ip netip.Addr) (spm netip.Prefix, val V, ok bool) {
-	if depth, baseIdx, val, ok := t.spmByIP(ip); ok {
-
-		// add the bits from higher levels in child trie to pfxLen
-		bits := depth*stride + baseIndexToPrefixLen(baseIdx)
-
-		// mask prefix from lookup ip, masked with longest prefix bits.
-		spm = netip.PrefixFrom(ip, bits).Masked()
-
-		return spm, val, ok
-	}
-	return
-}
-
-// spmByIP does a route lookup for IP with shortest prefix match.
-// Returns also depth and baseIdx for Contains to retrieve the
-// spm prefix out of the prefix tree.
-func (t *Table[V]) spmByIP(ip netip.Addr) (depth int, baseIdx uint, val V, ok bool) {
-	is4 := ip.Is4()
-	n := t.rootNodeByVersion(is4)
-	if n == nil {
-		return
-	}
-
-	// keep the spm alloc free, don't use ip.AsSlice here
-	a16 := ip.As16()
-	bs := a16[:]
-	if is4 {
-		bs = bs[12:]
-	}
-	// depth index for the child trie
-	depth = 0
-	for {
-		addr := uint(bs[depth]) // stride = 8!
-
-		// skip intermediate nodes
-		if len(n.prefixes.values) != 0 {
-			// forward test, no level backtracking, take the first spm
-			if baseIdx, val, ok = n.prefixes.spmByIndex(addrToBaseIndex(addr)); ok {
-				return depth, baseIdx, val, ok
-			}
-		}
-
-		// descend down to next child level
-		child := n.children.get(addr)
-
-		// stop condition
-		if child == nil {
-			return
-		}
-
-		// next round
-		depth++
-		n = child
-	}
 }
 
 // OverlapsPrefix reports whether any IP in pfx matches a route in the table.
@@ -697,4 +570,31 @@ func (t *Table[V]) Clone() *Table[V] {
 	c.rootV6 = t.rootV6.cloneRec()
 
 	return c
+}
+
+// Walk runs through the routing table in depth-first order
+// and calls the cb function for each route entry with prefix and value.
+//
+// If the cb function returns the value false,
+// the walk ends prematurely and returns false.
+func (t *Table[V]) Walk(cb func(pfx netip.Prefix, val V) bool) bool {
+	t.init()
+
+	if !t.Walk4(cb) {
+		return false
+	}
+
+	return t.Walk6(cb)
+}
+
+// Walk4, like Walk but only for the v4 routing table.
+func (t *Table[V]) Walk4(cb func(pfx netip.Prefix, val V) bool) bool {
+	t.init()
+	return t.rootV4.walkRec(nil, true, cb)
+}
+
+// Walk6, like Walk but only for the v6 routing table.
+func (t *Table[V]) Walk6(cb func(pfx netip.Prefix, val V) bool) bool {
+	t.init()
+	return t.rootV6.walkRec(nil, false, cb)
 }

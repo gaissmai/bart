@@ -123,30 +123,16 @@ func BenchmarkFullMatchV4(b *testing.B) {
 	// find a random match
 	for {
 		ip = randomIP4()
-		_, ok := rt.Get(ip)
+		_, ok := rt.Lookup(ip)
 		if ok {
 			break
 		}
 	}
 
-	b.Run("Get", func(b *testing.B) {
-		b.ResetTimer()
-		for k := 0; k < b.N; k++ {
-			intSink, okSink = rt.Get(ip)
-		}
-	})
-
 	b.Run("Lookup", func(b *testing.B) {
 		b.ResetTimer()
 		for k := 0; k < b.N; k++ {
-			_, intSink, okSink = rt.Lookup(ip)
-		}
-	})
-
-	b.Run("LookupSCP", func(b *testing.B) {
-		b.ResetTimer()
-		for k := 0; k < b.N; k++ {
-			_, _, okSink = rt.LookupShortest(ip)
+			intSink, okSink = rt.Lookup(ip)
 		}
 	})
 
@@ -171,30 +157,16 @@ func BenchmarkFullMatchV6(b *testing.B) {
 	// find a random match
 	for {
 		ip = randomIP6()
-		_, ok := rt.Get(ip)
+		_, ok := rt.Lookup(ip)
 		if ok {
 			break
 		}
 	}
 
-	b.Run("Get", func(b *testing.B) {
-		b.ResetTimer()
-		for k := 0; k < b.N; k++ {
-			intSink, okSink = rt.Get(ip)
-		}
-	})
-
 	b.Run("Lookup", func(b *testing.B) {
 		b.ResetTimer()
 		for k := 0; k < b.N; k++ {
-			_, intSink, okSink = rt.Lookup(ip)
-		}
-	})
-
-	b.Run("LookupSCP", func(b *testing.B) {
-		b.ResetTimer()
-		for k := 0; k < b.N; k++ {
-			_, _, okSink = rt.LookupShortest(ip)
+			intSink, okSink = rt.Lookup(ip)
 		}
 	})
 
@@ -218,30 +190,16 @@ func BenchmarkFullMissV4(b *testing.B) {
 
 	for {
 		ip = randomIP4()
-		_, ok := rt.Get(ip)
+		_, ok := rt.Lookup(ip)
 		if !ok {
 			break
 		}
 	}
 
-	b.Run("Get", func(b *testing.B) {
-		b.ResetTimer()
-		for k := 0; k < b.N; k++ {
-			intSink, okSink = rt.Get(ip)
-		}
-	})
-
 	b.Run("Lookup", func(b *testing.B) {
 		b.ResetTimer()
 		for k := 0; k < b.N; k++ {
-			_, intSink, okSink = rt.Lookup(ip)
-		}
-	})
-
-	b.Run("LookupSCP", func(b *testing.B) {
-		b.ResetTimer()
-		for k := 0; k < b.N; k++ {
-			_, _, okSink = rt.LookupShortest(ip)
+			intSink, okSink = rt.Lookup(ip)
 		}
 	})
 }
@@ -257,30 +215,16 @@ func BenchmarkFullMissV6(b *testing.B) {
 
 	for {
 		ip = randomIP6()
-		_, ok := rt.Get(ip)
+		_, ok := rt.Lookup(ip)
 		if !ok {
 			break
 		}
 	}
 
-	b.Run("Get", func(b *testing.B) {
-		b.ResetTimer()
-		for k := 0; k < b.N; k++ {
-			intSink, okSink = rt.Get(ip)
-		}
-	})
-
 	b.Run("Lookup", func(b *testing.B) {
 		b.ResetTimer()
 		for k := 0; k < b.N; k++ {
-			_, intSink, okSink = rt.Lookup(ip)
-		}
-	})
-
-	b.Run("LookupSCP", func(b *testing.B) {
-		b.ResetTimer()
-		for k := 0; k < b.N; k++ {
-			_, _, okSink = rt.LookupShortest(ip)
+			intSink, okSink = rt.Lookup(ip)
 		}
 	})
 }

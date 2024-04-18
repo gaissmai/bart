@@ -46,16 +46,16 @@ func ExampleTable_Lookup() {
 	fmt.Println()
 
 	ip := a("42.0.0.0")
-	lpm, value, ok := rtbl.Lookup(ip)
-	fmt.Printf("Lookup: %-20v lpm: %-15v value: %11v, ok: %v\n", ip, lpm, value, ok)
+	value, ok := rtbl.Lookup(ip)
+	fmt.Printf("Lookup: %-20v value: %11v, ok: %v\n", ip, value, ok)
 
 	ip = a("10.0.1.17")
-	lpm, value, ok = rtbl.Lookup(ip)
-	fmt.Printf("Lookup: %-20v lpm: %-15v value: %11v, ok: %v\n", ip, lpm, value, ok)
+	value, ok = rtbl.Lookup(ip)
+	fmt.Printf("Lookup: %-20v value: %11v, ok: %v\n", ip, value, ok)
 
 	ip = a("2001:7c0:3100:1::111")
-	lpm, value, ok = rtbl.Lookup(ip)
-	fmt.Printf("Lookup: %-20v lpm: %-15v value: %11v, ok: %v\n", ip, lpm, value, ok)
+	value, ok = rtbl.Lookup(ip)
+	fmt.Printf("Lookup: %-20v value: %11v, ok: %v\n", ip, value, ok)
 
 	// Output:
 	// ▼
@@ -75,7 +75,29 @@ func ExampleTable_Lookup() {
 	//    │  └─ 2001:db8::/32 (2001:db8::1)
 	//    └─ fe80::/10 (::1%lo)
 	//
-	// Lookup: 42.0.0.0             lpm: invalid Prefix  value:  invalid IP, ok: false
-	// Lookup: 10.0.1.17            lpm: 10.0.1.0/24     value:    10.0.0.0, ok: true
-	// Lookup: 2001:7c0:3100:1::111 lpm: 2000::/3        value: 2001:db8::1, ok: true
+	// Lookup: 42.0.0.0             value:  invalid IP, ok: false
+	// Lookup: 10.0.1.17            value:    10.0.0.0, ok: true
+	// Lookup: 2001:7c0:3100:1::111 value: 2001:db8::1, ok: true
+}
+
+func ExampleTable_Walk4() {
+	rtbl := new(bart.Table[netip.Addr])
+	for _, item := range input {
+		rtbl.Insert(item.cidr, item.nextHop)
+	}
+	rtbl.Walk4(func(pfx netip.Prefix, val netip.Addr) bool {
+		fmt.Printf("%v\t%v\n", pfx, val)
+		return true
+	})
+
+	// Output:
+	// 10.0.0.0/8	9.9.9.9
+	// 127.0.0.0/8	127.0.0.1
+	// 10.0.0.0/24	8.8.8.8
+	// 10.0.1.0/24	10.0.0.0
+	// 127.0.0.1/32	127.0.0.1
+	// 169.254.0.0/16	10.0.0.0
+	// 172.16.0.0/12	8.8.8.8
+	// 192.168.0.0/16	9.9.9.9
+	// 192.168.1.0/24	127.0.0.1
 }
