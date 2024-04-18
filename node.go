@@ -136,7 +136,6 @@ func (p *prefixCBTree[V]) delete(addr uint, prefixLen int) (wasPresent bool) {
 	rnk := p.rank(baseIdx)
 
 	// delete from slice
-	// TODO: with go 1.22 the free slot is already clear'd by Delete for GC
 	p.values = slices.Delete(p.values, rnk, rnk+1)
 
 	// delete from bitset, followed by Compact to reduce memory consumption
@@ -176,12 +175,6 @@ func (p *prefixCBTree[V]) lpmByIndex(idx uint) (baseIdx uint, val V, ok bool) {
 // It's an adapter to lpmByIndex.
 func (p *prefixCBTree[V]) lpmByAddr(addr uint) (baseIdx uint, val V, ok bool) {
 	return p.lpmByIndex(addrToBaseIndex(addr))
-}
-
-// lpmByPrefix does a route lookup for addr/pfxLen in the 8-bit (stride) routing table
-// It's an adapter to lpmByIndex.
-func (p *prefixCBTree[V]) lpmByPrefix(addr uint, prefixLen int) (baseIdx uint, val V, ok bool) {
-	return p.lpmByIndex(prefixToBaseIndex(addr, prefixLen))
 }
 
 // apmByPrefix does an all prefix match in the 8-bit (stride) routing table
@@ -254,7 +247,6 @@ func (c *childTree[V]) delete(addr uint) {
 	rnk := c.rank(addr)
 
 	// delete from slice
-	// TODO: with go 1.22 the free slot is clear'd by Delete for GC
 	c.nodes = slices.Delete(c.nodes, rnk, rnk+1)
 
 	// delete from bitset, followed by Compact to reduce memory consumption

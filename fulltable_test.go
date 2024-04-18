@@ -26,6 +26,9 @@ var (
 	routes  []route
 	routes4 []route
 	routes6 []route
+
+	randRoute4 route
+	randRoute6 route
 )
 
 type route struct {
@@ -35,6 +38,9 @@ type route struct {
 
 func init() {
 	fillRouteTables()
+
+	randRoute4 = routes4[rand.Intn(len(routes4))]
+	randRoute6 = routes6[rand.Intn(len(routes6))]
 }
 
 func TestFullNew(t *testing.T) {
@@ -56,9 +62,6 @@ func TestFullNew(t *testing.T) {
 
 	t.Logf("BART: n: %d routes, raw: %d KBytes, bart: %6d KBytes, mult: %.2f (bart/raw)",
 		len(nRoutes), rawBytes/(2<<10), bartBytes/(2<<10), float32(bartBytes)/float32(rawBytes))
-
-	// t.Logf("ART:  n: %d routes, raw: %d KBytes, art:  %6d KBytes, mult: %.2f (art/raw)",
-	// 	len(nRoutes), rawBytes/(2<<10), artBytes/(2<<10), float32(artBytes)/float32(rawBytes))
 }
 
 func TestFullNewV4(t *testing.T) {
@@ -80,9 +83,6 @@ func TestFullNewV4(t *testing.T) {
 
 	t.Logf("BART: n: %d routes, raw: %d KBytes, bart: %6d KBytes, mult: %.2f (bart/raw)",
 		len(nRoutes), rawBytes/(2<<10), bartBytes/(2<<10), float32(bartBytes)/float32(rawBytes))
-
-	// t.Logf("ART:  n: %d routes, raw: %d KBytes, art:  %6d KBytes, mult: %.2f (art/raw)",
-	// 	len(nRoutes), rawBytes/(2<<10), artBytes/(2<<10), float32(artBytes)/float32(rawBytes))
 }
 
 func TestFullNewV6(t *testing.T) {
@@ -338,6 +338,60 @@ func BenchmarkFullTableClone(b *testing.B) {
 	b.ResetTimer()
 	for k := 0; k < b.N; k++ {
 		cloneSink = rt.Clone()
+	}
+}
+
+var pfxSliceSink []netip.Prefix
+
+func BenchmarkFullTableSubnetsV4(b *testing.B) {
+	var rt bart.Table[int]
+
+	for i, route := range routes4 {
+		rt.Insert(route.CIDR, i)
+	}
+
+	b.ResetTimer()
+	for k := 0; k < b.N; k++ {
+		pfxSliceSink = rt.Subnets(randRoute4.CIDR)
+	}
+}
+
+func BenchmarkFullTableSubnetsV6(b *testing.B) {
+	var rt bart.Table[int]
+
+	for i, route := range routes6 {
+		rt.Insert(route.CIDR, i)
+	}
+
+	b.ResetTimer()
+	for k := 0; k < b.N; k++ {
+		pfxSliceSink = rt.Subnets(randRoute6.CIDR)
+	}
+}
+
+func BenchmarkFullTableSupernetsV4(b *testing.B) {
+	var rt bart.Table[int]
+
+	for i, route := range routes4 {
+		rt.Insert(route.CIDR, i)
+	}
+
+	b.ResetTimer()
+	for k := 0; k < b.N; k++ {
+		pfxSliceSink = rt.Supernets(randRoute4.CIDR)
+	}
+}
+
+func BenchmarkFullTableSupernetsV6(b *testing.B) {
+	var rt bart.Table[int]
+
+	for i, route := range routes6 {
+		rt.Insert(route.CIDR, i)
+	}
+
+	b.ResetTimer()
+	for k := 0; k < b.N; k++ {
+		pfxSliceSink = rt.Supernets(randRoute6.CIDR)
 	}
 }
 
