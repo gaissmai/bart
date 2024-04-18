@@ -35,7 +35,7 @@ func prefixToBaseIndex(addr uint, prefixLen int) uint {
 }
 
 // addrToBaseIndex, just prefixToBaseIndex(addr, 8), a.k.a host routes
-// but faster, use it for host routes in Get and Lookup.
+// but faster, use it for host routes in Lookup.
 func addrToBaseIndex(addr uint) uint {
 	return addr + firstHostIndex // addr + 256
 }

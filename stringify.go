@@ -105,7 +105,7 @@ func (n *node[V]) fprintRec(w io.Writer, parentIdx uint, path []byte, is4 bool, 
 	directKids := n.getKidsRec(parentIdx, path, is4)
 
 	// sort them by netip.Prefix, not by baseIndex
-	slices.SortFunc(directKids, sortPrefix[V])
+	slices.SortFunc(directKids, sortKidsByPrefix[V])
 
 	// symbols used in tree
 	glyphe := "├─ "
@@ -202,9 +202,9 @@ func cidrFromPath(path []byte, idx uint, is4 bool) netip.Prefix {
 	return netip.PrefixFrom(ip, bits).Masked()
 }
 
-// sortPrefix, sort the kids by addr and pfxLen.
+// sortKidsByPrefix, sort the kids by addr and pfxLen.
 // All prefixes are already normalized (Masked).
-func sortPrefix[V any](a, b kidT[V]) int {
+func sortKidsByPrefix[V any](a, b kidT[V]) int {
 	if cmp := a.cidr.Addr().Compare(b.cidr.Addr()); cmp != 0 {
 		return cmp
 	}

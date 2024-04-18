@@ -25,8 +25,8 @@ func (t *Table[V]) MarshalJSON() ([]byte, error) {
 		Ipv4 []DumpListNode[V] `json:"ipv4,omitempty"`
 		Ipv6 []DumpListNode[V] `json:"ipv6,omitempty"`
 	}{
-		Ipv4: t.DumpList(true),
-		Ipv6: t.DumpList(false),
+		Ipv4: t.DumpList4(),
+		Ipv6: t.DumpList6(),
 	}
 
 	buf, err := json.Marshal(result)
@@ -37,21 +37,29 @@ func (t *Table[V]) MarshalJSON() ([]byte, error) {
 	return buf, nil
 }
 
-// DumpList dumps ipv4 or ipv6 tree into list of roots and their subnets.
+// DumpList4 dumps ipv4 tree into list of roots and their subnets.
 // It can be used to analyze tree or build custom json representation.
-func (t *Table[V]) DumpList(is4 bool) []DumpListNode[V] {
+func (t *Table[V]) DumpList4() []DumpListNode[V] {
 	t.init()
-	rootNode := t.rootNodeByVersion(is4)
-	if rootNode.isEmpty() {
+	if t.rootV4 == nil {
 		return nil
 	}
+	return t.rootV4.dumpListRec(0, nil, true)
+}
 
-	return rootNode.dumpListRec(0, nil, is4)
+// DumpList6 dumps ipv4 tree into list of roots and their subnets.
+// It can be used to analyze tree or build custom json representation.
+func (t *Table[V]) DumpList6() []DumpListNode[V] {
+	t.init()
+	if t.rootV6 == nil {
+		return nil
+	}
+	return t.rootV6.dumpListRec(0, nil, false)
 }
 
 func (n *node[V]) dumpListRec(parentIdx uint, path []byte, is4 bool) []DumpListNode[V] {
 	directKids := n.getKidsRec(parentIdx, path, is4)
-	slices.SortFunc(directKids, sortPrefix[V])
+	slices.SortFunc(directKids, sortKidsByPrefix[V])
 
 	nodes := make([]DumpListNode[V], 0, len(directKids))
 	for _, kid := range directKids {

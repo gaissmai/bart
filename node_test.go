@@ -65,12 +65,6 @@ func TestPrefixInsert(t *testing.T) {
 		if !getsEqual(fastVal, fastOK, slowVal, slowOK) {
 			t.Fatalf("get(%d) = (%v, %v), want (%v, %v)", addr, fastVal, fastOK, slowVal, slowOK)
 		}
-
-		slowVal, slowOK = slow.spm(addr)
-		_, fastVal, fastOK = fast.prefixes.spmByAddr(addr)
-		if !getsEqual(fastVal, fastOK, slowVal, slowOK) {
-			t.Fatalf("spm(%d) = (%v, %v), want (%v, %v)", addr, fastVal, fastOK, slowVal, slowOK)
-		}
 	}
 }
 
@@ -102,12 +96,6 @@ func TestPrefixDelete(t *testing.T) {
 		_, fastVal, fastOK := fast.prefixes.lpmByAddr(addr)
 		if !getsEqual(fastVal, fastOK, slowVal, slowOK) {
 			t.Fatalf("get(%d) = (%v, %v), want (%v, %v)", addr, fastVal, fastOK, slowVal, slowOK)
-		}
-
-		slowVal, slowOK = slow.spm(addr)
-		_, fastVal, fastOK = fast.prefixes.spmByAddr(addr)
-		if !getsEqual(fastVal, fastOK, slowVal, slowOK) {
-			t.Fatalf("spm(%d) = (%v, %v), want (%v, %v)", addr, fastVal, fastOK, slowVal, slowOK)
 		}
 	}
 }
@@ -261,25 +249,6 @@ func BenchmarkPrefixLPM(b *testing.B) {
 		lpm := float64(b.N)
 		elapsed := float64(b.Elapsed().Nanoseconds())
 		b.ReportMetric(elapsed/lpm, "ns/op")
-	})
-}
-
-func BenchmarkPrefixSPM(b *testing.B) {
-	forPrefixCount(b, func(b *testing.B, routes []slowEntry[int]) {
-		val := 0
-		rt := newNode[int]()
-		for _, route := range routes {
-			rt.prefixes.insert(route.addr, route.bits, val)
-		}
-
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			_, writeSink, _ = rt.prefixes.spmByAddr(uint(uint8(i)))
-		}
-
-		spm := float64(b.N)
-		elapsed := float64(b.Elapsed().Nanoseconds())
-		b.ReportMetric(elapsed/spm, "ns/op")
 	})
 }
 
