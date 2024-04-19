@@ -366,9 +366,9 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 	if bits == 0 {
 
 		// return all routes for this IP version.
-		n.walkRec(nil, is4, func(pfx netip.Prefix, _ V) bool {
+		_ = n.walkRec(nil, is4, func(pfx netip.Prefix, _ V) error {
 			result = append(result, pfx)
-			return true
+			return nil
 		})
 
 		slices.SortFunc(result, sortByPrefix)
@@ -572,29 +572,31 @@ func (t *Table[V]) Clone() *Table[V] {
 	return c
 }
 
-// Walk runs through the routing table in depth-first order
-// and calls the cb function for each route entry with prefix and value.
+// Walk runs through the routing table and calls the cb function
+// for each route entry with prefix and value.
+// If the cb function returns an error,
+// the walk ends prematurely and the error is propagated.
 //
-// If the cb function returns the value false,
-// the walk ends prematurely and returns false.
-func (t *Table[V]) Walk(cb func(pfx netip.Prefix, val V) bool) bool {
+// The sort order is not specified and is not part of the
+// public interface, you must not rely on it.
+func (t *Table[V]) Walk(cb func(pfx netip.Prefix, val V) error) error {
 	t.init()
 
-	if !t.Walk4(cb) {
-		return false
+	if err := t.Walk4(cb); err != nil {
+		return err
 	}
 
 	return t.Walk6(cb)
 }
 
-// Walk4, like Walk but only for the v4 routing table.
-func (t *Table[V]) Walk4(cb func(pfx netip.Prefix, val V) bool) bool {
+// Walk4, like [Table.Walk] but only for the v4 routing table.
+func (t *Table[V]) Walk4(cb func(pfx netip.Prefix, val V) error) error {
 	t.init()
 	return t.rootV4.walkRec(nil, true, cb)
 }
 
-// Walk6, like Walk but only for the v6 routing table.
-func (t *Table[V]) Walk6(cb func(pfx netip.Prefix, val V) bool) bool {
+// Walk6, like [Table.Walk] but only for the v6 routing table.
+func (t *Table[V]) Walk6(cb func(pfx netip.Prefix, val V) error) error {
 	t.init()
 	return t.rootV6.walkRec(nil, false, cb)
 }
