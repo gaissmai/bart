@@ -171,10 +171,14 @@ func (p *prefixCBTree[V]) lpmByIndex(idx uint) (baseIdx uint, val V, ok bool) {
 	return 0, val, false
 }
 
-// lpmByAddr does a route lookup for addr in the 8-bit (stride) routing table.
-// It's an adapter to lpmByIndex.
+// lpmByAddr is an adapter to lpmByIndex.
 func (p *prefixCBTree[V]) lpmByAddr(addr uint) (baseIdx uint, val V, ok bool) {
 	return p.lpmByIndex(addrToBaseIndex(addr))
+}
+
+// lpmByPrefix is an adapter to lpmByIndex.
+func (p *prefixCBTree[V]) lpmByPrefix(addr uint, bits int) (baseIdx uint, val V, ok bool) {
+	return p.lpmByIndex(prefixToBaseIndex(addr, bits))
 }
 
 // apmByPrefix does an all prefix match in the 8-bit (stride) routing table

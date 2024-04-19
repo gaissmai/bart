@@ -345,6 +345,98 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	}
 }
 
+// Lookup2 ...
+func (t *Table[V]) Lookup2(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) {
+	// always normalize the prefix
+	pfx = pfx.Masked()
+
+	bits := pfx.Bits()
+	ip := pfx.Addr()
+	is4 := ip.Is4()
+	n := t.rootNodeByVersion(is4)
+	if n == nil {
+		return
+	}
+
+	// pfx is default route, easy peasy
+	if bits == 0 {
+		if val, ok = n.prefixes.getValByPrefix(0, 0); !ok {
+			return
+		}
+		return pfx, val, ok
+	}
+
+	// stack of the traversed nodes for fast backtracking, if needed
+	pathStack := [maxTreeDepth]*node[V]{}
+
+	// keep the lpm alloc free, don't use ip.AsSlice here
+	a16 := ip.As16()
+	bs := a16[:]
+	if is4 {
+		bs = bs[12:]
+	}
+
+	depth := 0
+	addr := uint(bs[depth]) // bytewise, stride = 8
+	// find leaf tree
+	for {
+
+		// push current node on stack for fast backtracking
+		pathStack[depth] = n
+
+		// already at leaf node?
+		if bits <= stride {
+			break
+		}
+
+		// go down in tight loop to leaf node
+		if child := n.children.get(addr); child != nil {
+			depth++
+			bits -= stride
+			addr = uint(bs[depth])
+			n = child
+			continue
+		}
+
+		break
+	}
+
+	// start backtracking at leaf node in tight loop
+	for {
+
+		pfxLen := 8
+		if bits <= stride {
+			pfxLen = bits
+		}
+
+		// lookup only in nodes with prefixes, skip over intermediate nodes
+		if len(n.prefixes.values) != 0 {
+			// longest prefix match?
+			if baseIdx, val, ok := n.prefixes.lpmByPrefix(addr, pfxLen); ok {
+				// calculate the mask from baseIdx and depth
+				mask := depth*stride + baseIndexToPrefixLen(baseIdx)
+
+				// calculate the lpm from ip and mask
+				lpm = netip.PrefixFrom(ip, mask).Masked()
+
+				// match
+				return lpm, val, true
+			}
+		}
+
+		// end condition, stack is exhausted
+		if depth == 0 {
+			return
+		}
+
+		// go up, backtracking
+		depth--
+		bits += stride
+		addr = uint(bs[depth])
+		n = pathStack[depth]
+	}
+}
+
 // Subnets return all prefixes covered by pfx in natural CIDR sort order.
 func (t *Table[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 	var result []netip.Prefix
