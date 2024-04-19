@@ -1088,14 +1088,6 @@ func TestTableClone(t *testing.T) {
 func TestOverlapsPrefixEdgeCases(t *testing.T) {
 	t.Parallel()
 
-	p := func(s string) netip.Prefix {
-		pfx := mpp(s)
-		if pfx.Addr() != pfx.Masked().Addr() {
-			panic(fmt.Sprintf("%s is not normalized", s))
-		}
-		return pfx
-	}
-
 	tbl := &Table[int]{}
 
 	// empty table
@@ -1105,8 +1097,8 @@ func TestOverlapsPrefixEdgeCases(t *testing.T) {
 	})
 
 	// default route
-	tbl.Insert(p("10.0.0.0/8"), 0)
-	tbl.Insert(p("2001:db8::/32"), 0)
+	tbl.Insert(mpp("10.0.0.0/8"), 0)
+	tbl.Insert(mpp("2001:db8::/32"), 0)
 	checkOverlaps(t, tbl, []tableOverlapsTest{
 		{"0.0.0.0/0", true},
 		{"::/0", true},
@@ -1114,8 +1106,8 @@ func TestOverlapsPrefixEdgeCases(t *testing.T) {
 
 	// default route
 	tbl = &Table[int]{}
-	tbl.Insert(p("0.0.0.0/0"), 0)
-	tbl.Insert(p("::/0"), 0)
+	tbl.Insert(mpp("0.0.0.0/0"), 0)
+	tbl.Insert(mpp("::/0"), 0)
 	checkOverlaps(t, tbl, []tableOverlapsTest{
 		{"10.0.0.0/8", true},
 		{"2001:db8::/32", true},
@@ -1123,8 +1115,8 @@ func TestOverlapsPrefixEdgeCases(t *testing.T) {
 
 	// single IP
 	tbl = &Table[int]{}
-	tbl.Insert(p("10.0.0.0/7"), 0)
-	tbl.Insert(p("2001::/16"), 0)
+	tbl.Insert(mpp("10.0.0.0/7"), 0)
+	tbl.Insert(mpp("2001::/16"), 0)
 	checkOverlaps(t, tbl, []tableOverlapsTest{
 		{"10.1.2.3/32", true},
 		{"2001:db8:affe::cafe/128", true},
@@ -1132,8 +1124,8 @@ func TestOverlapsPrefixEdgeCases(t *testing.T) {
 
 	// single IPv
 	tbl = &Table[int]{}
-	tbl.Insert(p("10.1.2.3/32"), 0)
-	tbl.Insert(p("2001:db8:affe::cafe/128"), 0)
+	tbl.Insert(mpp("10.1.2.3/32"), 0)
+	tbl.Insert(mpp("2001:db8:affe::cafe/128"), 0)
 	checkOverlaps(t, tbl, []tableOverlapsTest{
 		{"10.0.0.0/7", true},
 		{"2001::/16", true},
@@ -1182,19 +1174,11 @@ type tableOverlapsTest struct {
 // checkOverlaps verifies that the overlaps lookups in tt return the
 // expected results on tbl.
 func checkOverlaps(t *testing.T, tbl *Table[int], tests []tableOverlapsTest) {
-	p := func(s string) netip.Prefix {
-		pfx := mpp(s)
-		if pfx.Addr() != pfx.Masked().Addr() {
-			panic(fmt.Sprintf("%s is not normalized", s))
-		}
-		return pfx
-	}
-
 	for _, tt := range tests {
-		got := tbl.OverlapsPrefix(p(tt.prefix))
+		got := tbl.OverlapsPrefix(mpp(tt.prefix))
 		if got != tt.want {
 			t.Log(tbl.String())
-			t.Errorf("OverlapsPrefix(%v) = %v, want %v", p(tt.prefix), got, tt.want)
+			t.Errorf("OverlapsPrefix(%v) = %v, want %v", mpp(tt.prefix), got, tt.want)
 		}
 	}
 }
