@@ -327,8 +327,6 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 		if len(n.prefixes.values) != 0 {
 			// longest prefix match?
 			if _, val, ok := n.prefixes.lpmByIndex(addrToBaseIndex(addr)); ok {
-				// return also baseIdx and the depth, needed to
-				// calculate the lpm prefix by the Lookup method.
 				return val, true
 			}
 		}
@@ -345,16 +343,34 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	}
 }
 
-// Lookup2 is similar to [Table.Lookup], but has a prefix as input parameter
-// and returns the lpm prefix in addition to value,ok.
+// LookupPrefix does a route lookup (longest prefix match) for pfx and
+// returns the associated value and true, or false if no route matched.
+func (t *Table[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
+	_, _, val, ok = t.lpmByPrefix(pfx)
+	return
+}
+
+// LookupPrefixLPM is similar to [Table.LookupPrefix],
+// but it returns the lpm prefix in addition to value,ok.
 //
-// This method is about 20-30% slower than Lookup and should
-// only be used if you either explicitly have a prefix as an input parameter
-// or the prefix of the matching lpm entry is also required for other reasons.
+// This method is about 20-30% slower than LookupPrefix and should only
+// be used if the matching lpm entry is also required for other reasons.
 //
-// If Lookup2 is to be used for IP addresses,
+// If LookupPrefixLPM is to be used for IP addresses,
 // they must be converted to /32 or /128 prefixes.
-func (t *Table[V]) Lookup2(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) {
+func (t *Table[V]) LookupPrefixLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) {
+	depth, baseIdx, val, ok := t.lpmByPrefix(pfx)
+
+	// calculate the mask from baseIdx and depth
+	mask := depth*stride + baseIndexToPrefixLen(baseIdx)
+
+	// calculate the lpm from ip and mask
+	lpm, _ = pfx.Addr().Prefix(mask)
+
+	return lpm, val, ok
+}
+
+func (t *Table[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V, ok bool) {
 	// always normalize the prefix
 	pfx = pfx.Masked()
 
@@ -368,11 +384,9 @@ func (t *Table[V]) Lookup2(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) 
 
 	// pfx is default route, easy peasy
 	if bits == 0 {
-		if val, ok = n.prefixes.getValByPrefix(0, 0); !ok {
-			// default route not set in table
-			return
-		}
-		return pfx, val, ok
+		baseIdx = prefixToBaseIndex(0, 0)
+		val, ok = n.prefixes.getValByIndex(baseIdx)
+		return
 	}
 
 	// stack of the traversed nodes for fast backtracking, if needed
@@ -385,8 +399,7 @@ func (t *Table[V]) Lookup2(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) 
 		bs = bs[12:]
 	}
 
-	depth := 0
-	addr := uint(bs[depth]) // bytewise, stride = 8
+	addr := uint(bs[depth])
 	// find leaf tree
 	for {
 
@@ -407,9 +420,9 @@ func (t *Table[V]) Lookup2(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) 
 			continue
 		}
 
-		if bits > stride {
-			bits = stride
-		}
+		// stop condition is missing child, cut the bits to stride length
+		bits = stride
+
 		break
 	}
 
@@ -420,21 +433,12 @@ func (t *Table[V]) Lookup2(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) 
 		if len(n.prefixes.values) != 0 {
 			// longest prefix match?
 			if baseIdx, val, ok := n.prefixes.lpmByPrefix(addr, bits); ok {
-				// calculate the mask from baseIdx and depth
-				mask := depth*stride + baseIndexToPrefixLen(baseIdx)
-
-				// calculate the lpm from ip and mask
-				lpm = netip.PrefixFrom(ip, mask).Masked()
-
-				// match
-				return lpm, val, true
+				return depth, baseIdx, val, true
 			}
 		}
 
-		// bits must be full stride for all upper levels
-		if bits < stride {
-			bits = stride
-		}
+		// bits must be full stride for next upper levels
+		bits = stride
 
 		// end condition, stack is exhausted
 		if depth == 0 {
@@ -555,7 +559,7 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 			mask := depth*stride + baseIndexToPrefixLen(baseIdx)
 
 			// lookup ip, masked with supernet mask
-			matchPfx := netip.PrefixFrom(ip, mask).Masked()
+			matchPfx, _ := ip.Prefix(mask)
 
 			result = append(result, matchPfx)
 		}

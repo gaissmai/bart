@@ -349,7 +349,7 @@ func TestInsertLookupCompare(t *testing.T) {
 	}
 }
 
-func TestInsertLookup2Compare(t *testing.T) {
+func TestInsertLookupPrefixCompare(t *testing.T) {
 	// Create large route tables repeatedly, and compare Table's
 	// behavior to a naive and slow but correct implementation.
 	t.Parallel()
@@ -368,8 +368,53 @@ func TestInsertLookup2Compare(t *testing.T) {
 	for i := 0; i < 10_000; i++ {
 		pfx := randomPrefix()
 
-		slowLPM, slowVal, slowOK := slow.lookup2(pfx)
-		fastLPM, fastVal, fastOK := fast.Lookup2(pfx)
+		slowVal, slowOK := slow.lookupPfx(pfx)
+		fastVal, fastOK := fast.LookupPrefix(pfx)
+
+		if !getsEqual(slowVal, slowOK, fastVal, fastOK) {
+			t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", pfx, fastVal, fastOK, slowVal, slowOK)
+		}
+
+		if pfx.Addr().Is6() {
+			seenVals6[fastVal] = true
+		} else {
+			seenVals4[fastVal] = true
+		}
+	}
+
+	// Empirically, 10k probes into 5k v4 prefixes and 5k v6 prefixes results in
+	// ~1k distinct values for v4 and ~300 for v6. distinct routes. This sanity
+	// check that we didn't just return a single route for everything should be
+	// very generous indeed.
+	if cnt := len(seenVals4); cnt < 10 {
+		t.Fatalf("saw %d distinct v4 route results, statistically expected ~1000", cnt)
+	}
+	if cnt := len(seenVals6); cnt < 10 {
+		t.Fatalf("saw %d distinct v6 route results, statistically expected ~300", cnt)
+	}
+}
+
+func TestInsertLookupPrefixLPMCompare(t *testing.T) {
+	// Create large route tables repeatedly, and compare Table's
+	// behavior to a naive and slow but correct implementation.
+	t.Parallel()
+	pfxs := randomPrefixes(10_000)
+
+	slow := slowPrefixTable[int]{pfxs}
+	fast := Table[int]{}
+
+	for _, pfx := range pfxs {
+		fast.Insert(pfx.pfx, pfx.val)
+	}
+
+	seenVals4 := map[int]bool{}
+	seenVals6 := map[int]bool{}
+
+	for i := 0; i < 10_000; i++ {
+		pfx := randomPrefix()
+
+		slowLPM, slowVal, slowOK := slow.lookupPfxLPM(pfx)
+		fastLPM, fastVal, fastOK := fast.LookupPrefixLPM(pfx)
 
 		if !getsEqual(slowVal, slowOK, fastVal, fastOK) {
 			t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", pfx, fastVal, fastOK, slowVal, slowOK)

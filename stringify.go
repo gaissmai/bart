@@ -179,7 +179,7 @@ func (n *node[V]) getKidsRec(parentIdx uint, path []byte, is4 bool) []kidT[V] {
 }
 
 // cidrFromPath, make prefix from byte path, next addr (byte, stride) and pfxLen.
-func cidrFromPath(path []byte, idx uint, is4 bool) netip.Prefix {
+func cidrFromPath(path []byte, idx uint, is4 bool) (pfx netip.Prefix) {
 	addr, pfxLen := baseIndexToPrefix(idx)
 
 	// append last (partially) masked byte to path and
@@ -199,7 +199,8 @@ func cidrFromPath(path []byte, idx uint, is4 bool) netip.Prefix {
 	}
 
 	// make a normalized prefix from ip/bits
-	return netip.PrefixFrom(ip, bits).Masked()
+	pfx, _ = ip.Prefix(bits)
+	return
 }
 
 // sortKidsByPrefix, sort the kids by addr and pfxLen.
