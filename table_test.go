@@ -1145,23 +1145,57 @@ func TestWalk(t *testing.T) {
 	pfxs := randomPrefixes(10_000)
 	seen := make(map[netip.Prefix]int, 10_000)
 
-	rtbl := new(Table[int])
-	for _, item := range pfxs {
-		rtbl.Insert(item.pfx, item.val)
-		seen[item.pfx] = item.val
-	}
-
-	rtbl.Walk(func(pfx netip.Prefix, val int) error {
-		if seen[pfx] != val {
-			t.Errorf("%v got value: %v, expected: %v", pfx, val, seen[pfx])
+	t.Run("Walk", func(t *testing.T) {
+		rtbl := new(Table[int])
+		for _, item := range pfxs {
+			rtbl.Insert(item.pfx, item.val)
+			seen[item.pfx] = item.val
 		}
-		delete(seen, pfx)
-		return nil
+
+		// check if pfx/val is as expected
+		rtbl.Walk(func(pfx netip.Prefix, val int) error {
+			if seen[pfx] != val {
+				t.Errorf("%v got value: %v, expected: %v", pfx, val, seen[pfx])
+			}
+			delete(seen, pfx)
+			return nil
+		})
+
+		// check if all entries visited
+		if len(seen) != 0 {
+			t.Fatalf("traverse error, not all entries visited")
+		}
 	})
 
-	if len(seen) != 0 {
-		t.Fatalf("traverse error, not all entries visited")
-	}
+	// make a walk and update the values in the walk callback
+	t.Run("Walk and Update", func(t *testing.T) {
+		rtbl := new(Table[int])
+		for _, item := range pfxs {
+			rtbl.Insert(item.pfx, item.val)
+			seen[item.pfx] = item.val + 1
+		}
+
+		// update callback, add 1 to val
+		updateCallback := func(val int, ok bool) int {
+			return val + 1
+		}
+
+		walkCallback := func(pfx netip.Prefix, val int) error {
+			rtbl.Update(pfx, updateCallback)
+			return nil
+		}
+
+		// walk and update the values
+		rtbl.Walk(walkCallback)
+
+		// test if all values got updated, cb now as closure
+		rtbl.Walk(func(pfx netip.Prefix, val int) error {
+			if seen[pfx] != val {
+				t.Errorf("%v got value: %v, expected: %v", pfx, val, seen[pfx])
+			}
+			return nil
+		})
+	})
 }
 
 // ############################################################################

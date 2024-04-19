@@ -680,11 +680,11 @@ func (t *Table[V]) Clone() *Table[V] {
 // If the cb function returns an error,
 // the walk ends prematurely and the error is propagated.
 //
+// Prefixes must not be inserted or deleted by the callback function, otherwise
+// the behavior is undefined. However, value updates are permitted.
+//
 // The sort order is not specified and is not part of the
 // public interface, you must not rely on it.
-//
-// The table must not be changed during the run by the callback function,
-// otherwise the behavior is not defined.
 func (t *Table[V]) Walk(cb func(pfx netip.Prefix, val V) error) error {
 	t.init()
 
