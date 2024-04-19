@@ -407,6 +407,21 @@ func BenchmarkFullTableClone(b *testing.B) {
 	}
 }
 
+func BenchmarkFullTableWalk(b *testing.B) {
+	var rt bart.Table[int]
+
+	for i, route := range routes {
+		rt.Insert(route.CIDR, i)
+	}
+
+	b.ResetTimer()
+	for k := 0; k < b.N; k++ {
+		_ = rt.Walk(func(pfx netip.Prefix, val int) error {
+			return nil
+		})
+	}
+}
+
 var pfxSliceSink []netip.Prefix
 
 func BenchmarkFullTableSubnetsV4(b *testing.B) {
