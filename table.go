@@ -345,7 +345,15 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	}
 }
 
-// Lookup2 ...
+// Lookup2 is similar to [Table.Lookup], but has a prefix as input parameter
+// and returns the lpm prefix in addition to value,ok.
+//
+// This method is about 20-30% slower than Lookup and should
+// only be used if you either explicitly have a prefix as an input parameter
+// or the prefix of the matching lpm entry is also required for other reasons.
+//
+// If Lookup2 is to be used for IP addresses,
+// they must be converted to /32 or /128 prefixes.
 func (t *Table[V]) Lookup2(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) {
 	// always normalize the prefix
 	pfx = pfx.Masked()
@@ -361,6 +369,7 @@ func (t *Table[V]) Lookup2(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) 
 	// pfx is default route, easy peasy
 	if bits == 0 {
 		if val, ok = n.prefixes.getValByPrefix(0, 0); !ok {
+			// default route not set in table
 			return
 		}
 		return pfx, val, ok
@@ -398,21 +407,19 @@ func (t *Table[V]) Lookup2(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) 
 			continue
 		}
 
+		if bits > stride {
+			bits = stride
+		}
 		break
 	}
 
 	// start backtracking at leaf node in tight loop
 	for {
 
-		pfxLen := 8
-		if bits <= stride {
-			pfxLen = bits
-		}
-
 		// lookup only in nodes with prefixes, skip over intermediate nodes
 		if len(n.prefixes.values) != 0 {
 			// longest prefix match?
-			if baseIdx, val, ok := n.prefixes.lpmByPrefix(addr, pfxLen); ok {
+			if baseIdx, val, ok := n.prefixes.lpmByPrefix(addr, bits); ok {
 				// calculate the mask from baseIdx and depth
 				mask := depth*stride + baseIndexToPrefixLen(baseIdx)
 
@@ -424,6 +431,11 @@ func (t *Table[V]) Lookup2(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) 
 			}
 		}
 
+		// bits must be full stride for all upper levels
+		if bits < stride {
+			bits = stride
+		}
+
 		// end condition, stack is exhausted
 		if depth == 0 {
 			return
@@ -431,7 +443,6 @@ func (t *Table[V]) Lookup2(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) 
 
 		// go up, backtracking
 		depth--
-		bits += stride
 		addr = uint(bs[depth])
 		n = pathStack[depth]
 	}
