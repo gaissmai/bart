@@ -1198,7 +1198,7 @@ func TestWalk(t *testing.T) {
 		}
 
 		// check if pfx/val is as expected
-		rtbl.Walk(func(pfx netip.Prefix, val int) error {
+		_ = rtbl.Walk(func(pfx netip.Prefix, val int) error {
 			if seen[pfx] != val {
 				t.Errorf("%v got value: %v, expected: %v", pfx, val, seen[pfx])
 			}
@@ -1231,15 +1231,38 @@ func TestWalk(t *testing.T) {
 		}
 
 		// walk and update the values
-		rtbl.Walk(walkCallback)
+		_ = rtbl.Walk(walkCallback)
 
 		// test if all values got updated, cb now as closure
-		rtbl.Walk(func(pfx netip.Prefix, val int) error {
+		_ = rtbl.Walk(func(pfx netip.Prefix, val int) error {
 			if seen[pfx] != val {
 				t.Errorf("%v got value: %v, expected: %v", pfx, val, seen[pfx])
 			}
 			return nil
 		})
+	})
+
+	t.Run("Walk with error exit", func(t *testing.T) {
+		rtbl := new(Table[int])
+		for _, item := range pfxs {
+			rtbl.Insert(item.pfx, item.val)
+		}
+
+		count := 0
+
+		// check if pfx/val is as expected
+		err := rtbl.Walk(func(pfx netip.Prefix, val int) error {
+			count++
+			if count >= 1000 {
+				return fmt.Errorf("premature STOP condirion")
+			}
+			return nil
+		})
+
+		// check if walk stopped with error
+		if err == nil || count > 1000 {
+			t.Fatalf("expected premature stop with error")
+		}
 	})
 }
 
