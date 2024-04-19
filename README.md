@@ -1,3 +1,5 @@
+# package bart
+
 [![Go Reference](https://pkg.go.dev/badge/github.com/gaissmai/bart.svg)](https://pkg.go.dev/github.com/gaissmai/bart#section-documentation)
 ![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/gaissmai/bart)
 [![CI](https://github.com/gaissmai/bart/actions/workflows/go.yml/badge.svg)](https://github.com/gaissmai/bart/actions/workflows/go.yml)
@@ -5,7 +7,11 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Stand With Ukraine](https://raw.githubusercontent.com/vshymanskyy/StandWithUkraine/main/badges/StandWithUkraine.svg)](https://stand-with-ukraine.pp.ua)
 
-# package bart
+## ATTENTION: API change
+
+The API has changed since v0.4.2 !!!
+
+## Overview
 
 `package bart` provides a Balanced-Routing-Table (BART).
 
@@ -18,9 +24,9 @@ consumption by an order of magnitude in comparison.
 
 BART is a multibit-trie, using the _baseIndex_ function from the
 ART algorithm to build the complete binary prefix tree (CBT)
-for each stride.
+for each stride. The stride has a fixed length of 8 bits.
 
-The second key factor is popcount level compression
+The second key factor is popcount array compression at each stride level
 and backtracking along the CBT prefix tree in O(k).
 
 The CBT is implemented as a bitvector, backtracking is just
@@ -29,9 +35,9 @@ a matter of fast cache friendly bitmask operations.
 Due to the cache locality of the popcount compressed CBT,
 the backtracking algorithm is as fast as possible.
 
-# API
+## API
 
- ... still under development, but the library is ready to use.
+The API has changed since v0.4.2
 
 ```golang
   import "github.com/gaissmai/bart"
@@ -66,23 +72,23 @@ the backtracking algorithm is as fast as possible.
   func (t *Table[V]) MarshalText() ([]byte, error)
   func (t *Table[V]) MarshalJSON() ([]byte, error)
 
-  func (t *Table[V]) Walk(cb func(pfx netip.Prefix, val V) bool) bool
-  func (t *Table[V]) Walk4(cb func(pfx netip.Prefix, val V) bool) bool
-  func (t *Table[V]) Walk6(cb func(pfx netip.Prefix, val V) bool) bool
+  func (t *Table[V]) Walk(cb func(pfx netip.Prefix, val V) error) error
+  func (t *Table[V]) Walk4(cb func(pfx netip.Prefix, val V) error) error
+  func (t *Table[V]) Walk6(cb func(pfx netip.Prefix, val V) error) error
 
   func (t *Table[V]) DumpList4() []DumpListNode[V]
   func (t *Table[V]) DumpList6() []DumpListNode[V]
 ```
 
-# benchmarks
+## benchmarks
 
 Please see the extensive [benchmarks](https://github.com/gaissmai/iprbench) comparing `bart` with other IP routing table implementations.
 
-# CONTRIBUTION
+## CONTRIBUTION
 
 Please open an issue for discussion before sending a pull request.
 
-# CREDIT
+## CREDIT
 
 Credits for many inspirations go to the clever guys at tailscale,
 to Daniel Lemire for the super-fast bitset package and
@@ -90,6 +96,6 @@ to Donald E. Knuth for the **ART** routing algorithm and
 all the rest of his *Art* and for keeping important algorithms
 in the public domain!
 
-# LICENSE
+## LICENSE
 
 MIT

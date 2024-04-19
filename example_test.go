@@ -85,9 +85,9 @@ func ExampleTable_Walk4() {
 	for _, item := range input {
 		rtbl.Insert(item.cidr, item.nextHop)
 	}
-	rtbl.Walk4(func(pfx netip.Prefix, val netip.Addr) bool {
+	_ = rtbl.Walk4(func(pfx netip.Prefix, val netip.Addr) error {
 		fmt.Printf("%v\t%v\n", pfx, val)
-		return true
+		return nil
 	})
 
 	// Output:
