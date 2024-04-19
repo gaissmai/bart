@@ -1125,12 +1125,35 @@ func TestOverlapsPrefixEdgeCases(t *testing.T) {
 
 	// same IPv
 	tbl = &Table[int]{}
-	tbl.Insert(p("10.1.2.3/32"), 0)
-	tbl.Insert(p("2001:db8:affe::cafe/128"), 0)
+	tbl.Insert(mpp("10.1.2.3/32"), 0)
+	tbl.Insert(mpp("2001:db8:affe::cafe/128"), 0)
 	checkOverlaps(t, tbl, []tableOverlapsTest{
 		{"10.1.2.3/32", true},
 		{"2001:db8:affe::cafe/128", true},
 	})
+}
+
+func TestWalk(t *testing.T) {
+	pfxs := randomPrefixes(10_000)
+	seen := make(map[netip.Prefix]int, 10_000)
+
+	rtbl := new(Table[int])
+	for _, item := range pfxs {
+		rtbl.Insert(item.pfx, item.val)
+		seen[item.pfx] = item.val
+	}
+
+	rtbl.Walk(func(pfx netip.Prefix, val int) error {
+		if seen[pfx] != val {
+			t.Errorf("%v got value: %v, expected: %v", pfx, val, seen[pfx])
+		}
+		delete(seen, pfx)
+		return nil
+	})
+
+	if len(seen) != 0 {
+		t.Fatalf("traverse error, not all entries visited")
+	}
 }
 
 // ############################################################################
