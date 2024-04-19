@@ -682,6 +682,9 @@ func (t *Table[V]) Clone() *Table[V] {
 //
 // The sort order is not specified and is not part of the
 // public interface, you must not rely on it.
+//
+// The table must not be changed during the run by the callback function,
+// otherwise the behavior is not defined.
 func (t *Table[V]) Walk(cb func(pfx netip.Prefix, val V) error) error {
 	t.init()
 
