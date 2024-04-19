@@ -119,12 +119,14 @@ func BenchmarkFullMatchV4(b *testing.B) {
 	}
 
 	var ip netip.Addr
+	var ipAsPfx netip.Prefix
 
 	// find a random match
 	for {
 		ip = randomIP4()
 		_, ok := rt.Lookup(ip)
 		if ok {
+			ipAsPfx, _ = ip.Prefix(ip.BitLen())
 			break
 		}
 	}
@@ -133,6 +135,13 @@ func BenchmarkFullMatchV4(b *testing.B) {
 		b.ResetTimer()
 		for k := 0; k < b.N; k++ {
 			intSink, okSink = rt.Lookup(ip)
+		}
+	})
+
+	b.Run("Lookup2", func(b *testing.B) {
+		b.ResetTimer()
+		for k := 0; k < b.N; k++ {
+			_, intSink, okSink = rt.Lookup2(ipAsPfx)
 		}
 	})
 
@@ -153,12 +162,14 @@ func BenchmarkFullMatchV6(b *testing.B) {
 	}
 
 	var ip netip.Addr
+	var ipAsPfx netip.Prefix
 
 	// find a random match
 	for {
-		ip = randomIP6()
+		ip = randomIP4()
 		_, ok := rt.Lookup(ip)
 		if ok {
+			ipAsPfx, _ = ip.Prefix(ip.BitLen())
 			break
 		}
 	}
@@ -167,6 +178,13 @@ func BenchmarkFullMatchV6(b *testing.B) {
 		b.ResetTimer()
 		for k := 0; k < b.N; k++ {
 			intSink, okSink = rt.Lookup(ip)
+		}
+	})
+
+	b.Run("Lookup2", func(b *testing.B) {
+		b.ResetTimer()
+		for k := 0; k < b.N; k++ {
+			_, intSink, okSink = rt.Lookup2(ipAsPfx)
 		}
 	})
 
@@ -187,11 +205,14 @@ func BenchmarkFullMissV4(b *testing.B) {
 	}
 
 	var ip netip.Addr
+	var ipAsPfx netip.Prefix
 
+	// find a random match
 	for {
 		ip = randomIP4()
 		_, ok := rt.Lookup(ip)
-		if !ok {
+		if ok {
+			ipAsPfx, _ = ip.Prefix(ip.BitLen())
 			break
 		}
 	}
@@ -200,6 +221,13 @@ func BenchmarkFullMissV4(b *testing.B) {
 		b.ResetTimer()
 		for k := 0; k < b.N; k++ {
 			intSink, okSink = rt.Lookup(ip)
+		}
+	})
+
+	b.Run("Lookup2", func(b *testing.B) {
+		b.ResetTimer()
+		for k := 0; k < b.N; k++ {
+			_, intSink, okSink = rt.Lookup2(ipAsPfx)
 		}
 	})
 }
@@ -212,11 +240,14 @@ func BenchmarkFullMissV6(b *testing.B) {
 	}
 
 	var ip netip.Addr
+	var ipAsPfx netip.Prefix
 
+	// find a random match
 	for {
-		ip = randomIP6()
+		ip = randomIP4()
 		_, ok := rt.Lookup(ip)
-		if !ok {
+		if ok {
+			ipAsPfx, _ = ip.Prefix(ip.BitLen())
 			break
 		}
 	}
@@ -225,6 +256,13 @@ func BenchmarkFullMissV6(b *testing.B) {
 		b.ResetTimer()
 		for k := 0; k < b.N; k++ {
 			intSink, okSink = rt.Lookup(ip)
+		}
+	})
+
+	b.Run("Lookup2", func(b *testing.B) {
+		b.ResetTimer()
+		for k := 0; k < b.N; k++ {
+			_, intSink, okSink = rt.Lookup2(ipAsPfx)
 		}
 	})
 }

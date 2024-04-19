@@ -65,10 +65,25 @@ func (s *slowPrefixTable[V]) lookup(addr netip.Addr) (val V, ok bool) {
 	for _, item := range s.prefixes {
 		if item.pfx.Contains(addr) && item.pfx.Bits() > bestLen {
 			val = item.val
+			ok = true
 			bestLen = item.pfx.Bits()
 		}
 	}
-	return val, bestLen != -1
+	return
+}
+
+func (s *slowPrefixTable[V]) lookup2(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) {
+	bestLen := -1
+
+	for _, item := range s.prefixes {
+		if item.pfx.Overlaps(pfx) && item.pfx.Bits() <= pfx.Bits() && item.pfx.Bits() > bestLen {
+			val = item.val
+			lpm = item.pfx
+			ok = true
+			bestLen = item.pfx.Bits()
+		}
+	}
+	return
 }
 
 func (s *slowPrefixTable[V]) subnets(pfx netip.Prefix) []netip.Prefix {
