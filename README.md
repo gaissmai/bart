@@ -61,7 +61,8 @@ The API has changed since v0.4.2
   func (t *Table[V]) Clone() *Table[V]
   
   func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool)
-  func (t *Table[V]) Lookup2(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool)
+  func (t *Table[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool)
+  func (t *Table[V]) LookupPrefixLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool)
 
   func (t *Table[V]) Subnets(pfx netip.Prefix) []netip.Prefix
   func (t *Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix

@@ -72,7 +72,20 @@ func (s *slowPrefixTable[V]) lookup(addr netip.Addr) (val V, ok bool) {
 	return
 }
 
-func (s *slowPrefixTable[V]) lookup2(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) {
+func (s *slowPrefixTable[V]) lookupPfx(pfx netip.Prefix) (val V, ok bool) {
+	bestLen := -1
+
+	for _, item := range s.prefixes {
+		if item.pfx.Overlaps(pfx) && item.pfx.Bits() <= pfx.Bits() && item.pfx.Bits() > bestLen {
+			val = item.val
+			ok = true
+			bestLen = item.pfx.Bits()
+		}
+	}
+	return
+}
+
+func (s *slowPrefixTable[V]) lookupPfxLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) {
 	bestLen := -1
 
 	for _, item := range s.prefixes {
