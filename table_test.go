@@ -647,6 +647,22 @@ func TestGet(t *testing.T) {
 
 	rt := new(Table[int])
 
+	t.Run("empty table", func(t *testing.T) {
+		_, ok := rt.Get(randomPrefix4())
+
+		if ok {
+			t.Errorf("empty table: ok=%v, expected: %v", ok, false)
+		}
+	})
+
+	t.Run("empty table", func(t *testing.T) {
+		_, ok := rt.Get(randomPrefix6())
+
+		if ok {
+			t.Errorf("empty table: ok=%v, expected: %v", ok, false)
+		}
+	})
+
 	for _, tt := range tests {
 		rt.Insert(tt.pfx, tt.val)
 	}
