@@ -154,7 +154,7 @@ func (n *node[V]) getKidsRec(parentIdx uint, path []byte, is4 bool) []kidT[V] {
 		// check if lpmIdx for this idx' parent is equal to parentIdx
 		if lpmIdx, _, _ := n.prefixes.lpmByIndex(idx >> 1); lpmIdx == parentIdx {
 			val, _ := n.prefixes.getValByIndex(idx)
-			path := append([]byte{}, path...)
+			path := slices.Clone(path)
 			cidr := cidrFromPath(path, idx, is4)
 			directKids = append(directKids, kidT[V]{n, path, idx, cidr, val})
 		}
@@ -164,14 +164,14 @@ func (n *node[V]) getKidsRec(parentIdx uint, path []byte, is4 bool) []kidT[V] {
 	for _, addr := range n.children.allAddrs() {
 		// do a longest-prefix-match
 		if lpmIdx, _, _ := n.prefixes.lpmByAddr(addr); lpmIdx == parentIdx {
-			// child is directKid, but we need the prefix for this child
-			path := append([]byte{}, path...)
+			// child is directKid, the path is needed to get back the prefixes
+			path := append(slices.Clone(path), byte(addr))
 
 			// get next child node
 			c := n.children.get(addr)
 
 			// traverse, rec-descent call with next child node
-			directKids = append(directKids, c.getKidsRec(0, append(path, byte(addr)), is4)...)
+			directKids = append(directKids, c.getKidsRec(0, path, is4)...)
 		}
 	}
 
@@ -184,8 +184,8 @@ func cidrFromPath(path []byte, idx uint, is4 bool) (pfx netip.Prefix) {
 
 	// append last (partially) masked byte to path and
 	// calc bits with pathLen and pfxLen
-	bs := append(path, byte(addr))
-	bits := len(path)*stride + pfxLen
+	bs := append(slices.Clone(path), byte(addr))
+	bits := len(path)*strideLen + pfxLen
 
 	var ip netip.Addr
 	if is4 {
