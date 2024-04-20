@@ -82,7 +82,7 @@ func (n *node[V]) dump(w io.Writer, path []byte, is4 bool) {
 	}
 
 	depth := len(path)
-	bits := depth * stride
+	bits := depth * strideLen
 	indent := strings.Repeat(".", depth)
 
 	// node type with depth and addr path and bits.
@@ -125,11 +125,11 @@ func addrFmt(addr uint, is4 bool) string {
 }
 
 // IP stride path, different formats for IPv4 and IPv6, dotted decimal or hex.
-func ancestors(bs []byte, is4 bool) string {
+func ancestors(path []byte, is4 bool) string {
 	buf := new(strings.Builder)
 
 	if is4 {
-		for i, b := range bs {
+		for i, b := range path {
 			if i != 0 {
 				buf.WriteString(".")
 			}
@@ -138,7 +138,7 @@ func ancestors(bs []byte, is4 bool) string {
 		return buf.String()
 	}
 
-	for i, b := range bs {
+	for i, b := range path {
 		if i != 0 && i%2 == 0 {
 			buf.WriteString(":")
 		}

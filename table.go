@@ -60,13 +60,13 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 		return
 	}
 
-	// the ip is chunked in bytes, the multibit stride is 8
-	bs := ip.AsSlice()
+	// the ip is chunked in bytes, the multibit strideLen is 8
+	ipAsByteSlice := ip.AsSlice()
 
 	// depth index for the child trie
 	depth := 0
 	for {
-		addr := uint(bs[depth]) // stride = 8!
+		addr := uint(ipAsByteSlice[depth])
 
 		// loop stop condition:
 		// last non-masked addr chunk of prefix, insert the
@@ -78,7 +78,7 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 		// 192.168.20.0/19 -> depth 2, addr byte  20, bits 3, (19-2*8 = 3)
 		// 172.16.19.12/32 -> depth 3, addr byte  12, bits 8, (32-3*8 = 8)
 		//
-		if bits <= stride {
+		if bits <= strideLen {
 			n.prefixes.insert(addr, bits, val)
 			return
 		}
@@ -95,7 +95,7 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 		// go down
 		depth++
 		n = child
-		bits -= stride
+		bits -= strideLen
 	}
 }
 
@@ -124,18 +124,18 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 
 	// keep this method alloc free, don't use ip.AsSlice here
 	a16 := ip.As16()
-	bs := a16[:]
+	ipAsByteSlice := a16[:]
 	if is4 {
-		bs = bs[12:]
+		ipAsByteSlice = ipAsByteSlice[12:]
 	}
 
 	// depth index for the child trie
 	depth := 0
 	for {
-		addr := uint(bs[depth]) // stride = 8!
+		addr := uint(ipAsByteSlice[depth])
 
 		// loop stop condition
-		if bits <= stride {
+		if bits <= strideLen {
 			return n.prefixes.update(addr, bits, cb)
 		}
 
@@ -151,7 +151,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 		// go down
 		depth++
 		n = child
-		bits -= stride
+		bits -= strideLen
 	}
 }
 
@@ -179,16 +179,16 @@ func (t *Table[V]) Delete(pfx netip.Prefix) {
 	// purge dangling paths after deletion
 	pathStack := [maxTreeDepth]*node[V]{}
 
-	bs := ip.AsSlice()
+	ipAsByteSlice := ip.AsSlice()
 	depth := 0
 	for {
-		addr := uint(bs[depth]) // stride = 8!
+		addr := uint(ipAsByteSlice[depth])
 
 		// push current node on stack for path recording
 		pathStack[depth] = n
 
 		// last non-masked byte
-		if bits <= stride {
+		if bits <= strideLen {
 			// found a child on proper depth ...
 			if !n.prefixes.delete(addr, bits) {
 				// ... but prefix not in tree, nothing deleted
@@ -208,7 +208,7 @@ func (t *Table[V]) Delete(pfx netip.Prefix) {
 
 		// go down
 		depth++
-		bits -= stride
+		bits -= strideLen
 		n = child
 	}
 
@@ -224,7 +224,7 @@ func (t *Table[V]) Delete(pfx netip.Prefix) {
 		if n.isEmpty() {
 			// purge this node from parents children
 			parent := pathStack[depth-1]
-			parent.children.delete(uint(bs[depth-1]))
+			parent.children.delete(uint(ipAsByteSlice[depth-1]))
 		}
 
 		// go up
@@ -255,17 +255,17 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 
 	// keep this method alloc free, don't use ip.AsSlice here
 	a16 := ip.As16()
-	bs := a16[:]
+	ipAsByteSlice := a16[:]
 	if is4 {
-		bs = bs[12:]
+		ipAsByteSlice = ipAsByteSlice[12:]
 	}
 
 	depth := 0
 	for {
-		addr := uint(bs[depth]) // stride = 8!
+		addr := uint(ipAsByteSlice[depth])
 
 		// last non-masked byte
-		if bits <= stride {
+		if bits <= strideLen {
 			return n.prefixes.getValByPrefix(addr, bits)
 		}
 
@@ -278,7 +278,7 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 
 		// go down
 		depth++
-		bits -= stride
+		bits -= strideLen
 		n = child
 	}
 }
@@ -297,13 +297,13 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 
 	// keep the lpm alloc free, don't use ip.AsSlice here
 	a16 := ip.As16()
-	bs := a16[:]
+	ipAsByteSlice := a16[:]
 	if is4 {
-		bs = bs[12:]
+		ipAsByteSlice = ipAsByteSlice[12:]
 	}
 
 	depth := 0
-	addr := uint(bs[depth]) // bytewise, stride = 8
+	addr := uint(ipAsByteSlice[depth])
 	// find leaf tree
 	for {
 
@@ -313,7 +313,7 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 		// go down in tight loop to leaf tree
 		if child := n.children.get(addr); child != nil {
 			depth++
-			addr = uint(bs[depth])
+			addr = uint(ipAsByteSlice[depth])
 			n = child
 			continue
 		}
@@ -338,7 +338,7 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 
 		// go up, backtracking
 		depth--
-		addr = uint(bs[depth])
+		addr = uint(ipAsByteSlice[depth])
 		n = pathStack[depth]
 	}
 }
@@ -362,7 +362,7 @@ func (t *Table[V]) LookupPrefixLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, o
 	depth, baseIdx, val, ok := t.lpmByPrefix(pfx)
 
 	// calculate the mask from baseIdx and depth
-	mask := depth*stride + baseIndexToPrefixLen(baseIdx)
+	mask := depth*strideLen + baseIndexToPrefixLen(baseIdx)
 
 	// calculate the lpm from ip and mask
 	lpm, _ = pfx.Addr().Prefix(mask)
@@ -394,12 +394,12 @@ func (t *Table[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V
 
 	// keep the lpm alloc free, don't use ip.AsSlice here
 	a16 := ip.As16()
-	bs := a16[:]
+	ipAsByteSlice := a16[:]
 	if is4 {
-		bs = bs[12:]
+		ipAsByteSlice = ipAsByteSlice[12:]
 	}
 
-	addr := uint(bs[depth])
+	addr := uint(ipAsByteSlice[depth])
 	// find leaf tree
 	for {
 
@@ -407,21 +407,21 @@ func (t *Table[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V
 		pathStack[depth] = n
 
 		// already at leaf node?
-		if bits <= stride {
+		if bits <= strideLen {
 			break
 		}
 
 		// go down in tight loop to leaf node
 		if child := n.children.get(addr); child != nil {
 			depth++
-			bits -= stride
-			addr = uint(bs[depth])
+			bits -= strideLen
+			addr = uint(ipAsByteSlice[depth])
 			n = child
 			continue
 		}
 
-		// stop condition is missing child, cut the bits to stride length
-		bits = stride
+		// stop condition was missing child, cut the bits to strideLen
+		bits = strideLen
 
 		break
 	}
@@ -437,8 +437,8 @@ func (t *Table[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V
 			}
 		}
 
-		// bits must be full stride for next upper levels
-		bits = stride
+		// bits must be full strideLen for next upper levels
+		bits = strideLen
 
 		// end condition, stack is exhausted
 		if depth == 0 {
@@ -447,7 +447,7 @@ func (t *Table[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V
 
 		// go up, backtracking
 		depth--
-		addr = uint(bs[depth])
+		addr = uint(ipAsByteSlice[depth])
 		n = pathStack[depth]
 	}
 }
@@ -482,15 +482,15 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 		return result
 	}
 
-	bs := ip.AsSlice()
+	ipAsByteSlice := ip.AsSlice()
 	depth := 0
 
 	for {
-		addr := uint(bs[depth])
+		addr := uint(ipAsByteSlice[depth])
 
 		// already at leaf node?
-		if bits <= stride {
-			result = n.subnets(bs[:depth], prefixToBaseIndex(addr, bits), is4)
+		if bits <= strideLen {
+			result = n.subnets(ipAsByteSlice[:depth], prefixToBaseIndex(addr, bits), is4)
 
 			slices.SortFunc(result, sortByPrefix)
 			return result
@@ -507,7 +507,7 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 		// next round
 		depth++
 		n = child
-		bits -= stride
+		bits -= strideLen
 	}
 }
 
@@ -538,15 +538,15 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 		return result
 	}
 
-	bs := ip.AsSlice()
+	ipAsByteSlice := ip.AsSlice()
 	depth := 0
 
 	for {
-		addr := uint(bs[depth])
+		addr := uint(ipAsByteSlice[depth])
 
 		pfxLen := 8
 		// already at leaf node?
-		if bits <= stride {
+		if bits <= strideLen {
 			pfxLen = bits
 		}
 
@@ -556,7 +556,7 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 		// get back the matching prefix from baseIdx
 		for _, baseIdx := range superStrides {
 			// calc supernet mask
-			mask := depth*stride + baseIndexToPrefixLen(baseIdx)
+			mask := depth*strideLen + baseIndexToPrefixLen(baseIdx)
 
 			// lookup ip, masked with supernet mask
 			matchPfx, _ := ip.Prefix(mask)
@@ -565,7 +565,7 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 		}
 
 		// stop condition
-		if bits <= stride {
+		if bits <= strideLen {
 			break
 		}
 
@@ -580,7 +580,7 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 		// next round
 		depth++
 		n = child
-		bits -= stride
+		bits -= strideLen
 	}
 
 	return result
@@ -604,19 +604,19 @@ func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 
 	// keep the overlaps alloc free, don't use ip.AsSlice here
 	a16 := ip.As16()
-	bs := a16[:]
+	ipAsByteSlice := a16[:]
 	if is4 {
-		bs = bs[12:]
+		ipAsByteSlice = ipAsByteSlice[12:]
 	}
 
 	// depth index for the child trie
 	depth := 0
-	addr := uint(bs[depth])
+	addr := uint(ipAsByteSlice[depth])
 
 	for {
 
 		// last prefix chunk reached
-		if bits <= stride {
+		if bits <= strideLen {
 			return n.overlapsPrefix(addr, bits)
 		}
 
@@ -640,8 +640,8 @@ func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 
 		// next round
 		depth++
-		addr = uint(bs[depth])
-		bits -= stride
+		addr = uint(ipAsByteSlice[depth])
+		bits -= strideLen
 		n = child
 	}
 }

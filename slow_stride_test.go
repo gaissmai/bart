@@ -99,7 +99,7 @@ func (st *slowTable[T]) overlaps(so *slowTable[T]) bool {
 }
 
 func pfxMask(pfxLen int) uint {
-	return 0xFF << (stride - pfxLen)
+	return 0xFF << (strideLen - pfxLen)
 }
 
 func allPrefixes() []slowEntry[int] {

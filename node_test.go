@@ -19,8 +19,8 @@ import (
 func TestInverseIndex(t *testing.T) {
 	t.Parallel()
 	for i := 0; i < maxNodeChildren; i++ {
-		for bits := 0; bits <= stride; bits++ {
-			addr := i & (0xFF << (stride - bits))
+		for bits := 0; bits <= strideLen; bits++ {
+			addr := i & (0xFF << (strideLen - bits))
 			idx := prefixToBaseIndex(uint(addr), bits)
 			addr2, len2 := baseIndexToPrefix(idx)
 			if addr2 != uint(addr) || len2 != bits {

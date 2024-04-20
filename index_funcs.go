@@ -31,7 +31,7 @@ const (
 // prefixToBaseIndex, maps a prefix table as a 'complete binary tree'.
 // This is the so-called baseIndex a.k.a heapFunc:
 func prefixToBaseIndex(addr uint, prefixLen int) uint {
-	return (addr >> (stride - prefixLen)) + (1 << prefixLen)
+	return (addr >> (strideLen - prefixLen)) + (1 << prefixLen)
 }
 
 // addrToBaseIndex, just prefixToBaseIndex(addr, 8), a.k.a host routes
@@ -57,6 +57,7 @@ func lastHostIndexOfPrefix(addr uint, bits int) uint {
 	return addrToBaseIndex(addr | uint(hostMasks[bits]))
 }
 
+// lowerUpperBound, get range of host routes for this prefix
 func lowerUpperBound(idx uint) (uint, uint) {
 	addr, bits := baseIndexToPrefix(idx)
 	return addrToBaseIndex(addr), lastHostIndexOfPrefix(addr, bits)
