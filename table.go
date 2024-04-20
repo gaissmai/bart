@@ -61,35 +61,35 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	}
 
 	// the ip is chunked in bytes, the multibit strideLen is 8
-	ipAsByteSlice := ip.AsSlice()
+	octets := ip.AsSlice()
 
 	// depth index for the child trie
 	depth := 0
 	for {
-		addr := uint(ipAsByteSlice[depth])
+		octet := uint(octets[depth])
 
 		// loop stop condition:
-		// last non-masked addr chunk of prefix, insert the
-		// byte and bits into the prefixHeap on this depth
+		// last non-masked octet of prefix, insert the
+		// octet and bits into the prefixHeap on this depth
 		//
-		// 8.0.0.0/5 ->       depth 0, addr byte  8,  bits 5
-		// 10.0.0.0/8 ->      depth 0, addr byte  10, bits 8
-		// 192.168.0.0/16  -> depth 1, addr byte 168, bits 8, (16-1*8 = 8)
-		// 192.168.20.0/19 -> depth 2, addr byte  20, bits 3, (19-2*8 = 3)
-		// 172.16.19.12/32 -> depth 3, addr byte  12, bits 8, (32-3*8 = 8)
+		// 8.0.0.0/5 ->       depth 0, octet 8,   bits 5
+		// 10.0.0.0/8 ->      depth 0, octet 10,  bits 8
+		// 192.168.0.0/16  -> depth 1, octet 168, bits 8, (16-1*8 = 8)
+		// 192.168.20.0/19 -> depth 2, octet 20,  bits 3, (19-2*8 = 3)
+		// 172.16.19.12/32 -> depth 3, octet 12,  bits 8, (32-3*8 = 8)
 		//
 		if bits <= strideLen {
-			n.prefixes.insert(addr, bits, val)
+			n.prefixes.insert(octet, bits, val)
 			return
 		}
 
 		// descend down to next child level
-		child := n.children.get(addr)
+		child := n.children.get(octet)
 
 		// create and insert missing intermediate child, no path compression!
 		if child == nil {
 			child = newNode[V]()
-			n.children.insert(addr, child)
+			n.children.insert(octet, child)
 		}
 
 		// go down
@@ -124,28 +124,28 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 
 	// keep this method alloc free, don't use ip.AsSlice here
 	a16 := ip.As16()
-	ipAsByteSlice := a16[:]
+	octets := a16[:]
 	if is4 {
-		ipAsByteSlice = ipAsByteSlice[12:]
+		octets = octets[12:]
 	}
 
 	// depth index for the child trie
 	depth := 0
 	for {
-		addr := uint(ipAsByteSlice[depth])
+		octet := uint(octets[depth])
 
 		// loop stop condition
 		if bits <= strideLen {
-			return n.prefixes.update(addr, bits, cb)
+			return n.prefixes.update(octet, bits, cb)
 		}
 
 		// descend down to next child level
-		child := n.children.get(addr)
+		child := n.children.get(octet)
 
 		// create and insert missing intermediate child, no path compression!
 		if child == nil {
 			child = newNode[V]()
-			n.children.insert(addr, child)
+			n.children.insert(octet, child)
 		}
 
 		// go down
@@ -179,10 +179,10 @@ func (t *Table[V]) Delete(pfx netip.Prefix) {
 	// purge dangling paths after deletion
 	pathStack := [maxTreeDepth]*node[V]{}
 
-	ipAsByteSlice := ip.AsSlice()
+	octets := ip.AsSlice()
 	depth := 0
 	for {
-		addr := uint(ipAsByteSlice[depth])
+		octet := uint(octets[depth])
 
 		// push current node on stack for path recording
 		pathStack[depth] = n
@@ -190,7 +190,7 @@ func (t *Table[V]) Delete(pfx netip.Prefix) {
 		// last non-masked byte
 		if bits <= strideLen {
 			// found a child on proper depth ...
-			if !n.prefixes.delete(addr, bits) {
+			if !n.prefixes.delete(octet, bits) {
 				// ... but prefix not in tree, nothing deleted
 				return
 			}
@@ -200,7 +200,7 @@ func (t *Table[V]) Delete(pfx netip.Prefix) {
 		}
 
 		// descend down to next level, no path compression
-		child := n.children.get(addr)
+		child := n.children.get(octet)
 		if child == nil {
 			// no child, nothing to delete
 			return
@@ -224,7 +224,7 @@ func (t *Table[V]) Delete(pfx netip.Prefix) {
 		if n.isEmpty() {
 			// purge this node from parents children
 			parent := pathStack[depth-1]
-			parent.children.delete(uint(ipAsByteSlice[depth-1]))
+			parent.children.delete(uint(octets[depth-1]))
 		}
 
 		// go up
@@ -255,22 +255,22 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 
 	// keep this method alloc free, don't use ip.AsSlice here
 	a16 := ip.As16()
-	ipAsByteSlice := a16[:]
+	octets := a16[:]
 	if is4 {
-		ipAsByteSlice = ipAsByteSlice[12:]
+		octets = octets[12:]
 	}
 
 	depth := 0
 	for {
-		addr := uint(ipAsByteSlice[depth])
+		octet := uint(octets[depth])
 
 		// last non-masked byte
 		if bits <= strideLen {
-			return n.prefixes.getValByPrefix(addr, bits)
+			return n.prefixes.getValByPrefix(octet, bits)
 		}
 
 		// descend down to next level, no path compression
-		child := n.children.get(addr)
+		child := n.children.get(octet)
 		if child == nil {
 			// no child, prefix is not set
 			return
@@ -297,13 +297,13 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 
 	// keep the lpm alloc free, don't use ip.AsSlice here
 	a16 := ip.As16()
-	ipAsByteSlice := a16[:]
+	octets := a16[:]
 	if is4 {
-		ipAsByteSlice = ipAsByteSlice[12:]
+		octets = octets[12:]
 	}
 
 	depth := 0
-	addr := uint(ipAsByteSlice[depth])
+	octet := uint(octets[depth])
 	// find leaf tree
 	for {
 
@@ -311,9 +311,9 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 		pathStack[depth] = n
 
 		// go down in tight loop to leaf tree
-		if child := n.children.get(addr); child != nil {
+		if child := n.children.get(octet); child != nil {
 			depth++
-			addr = uint(ipAsByteSlice[depth])
+			octet = uint(octets[depth])
 			n = child
 			continue
 		}
@@ -326,7 +326,7 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 		// lookup only in nodes with prefixes, skip over intermediate nodes
 		if len(n.prefixes.values) != 0 {
 			// longest prefix match?
-			if _, val, ok := n.prefixes.lpmByIndex(addrToBaseIndex(addr)); ok {
+			if _, val, ok := n.prefixes.lpmByIndex(octetToBaseIndex(octet)); ok {
 				return val, true
 			}
 		}
@@ -338,7 +338,7 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 
 		// go up, backtracking
 		depth--
-		addr = uint(ipAsByteSlice[depth])
+		octet = uint(octets[depth])
 		n = pathStack[depth]
 	}
 }
@@ -394,12 +394,12 @@ func (t *Table[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V
 
 	// keep the lpm alloc free, don't use ip.AsSlice here
 	a16 := ip.As16()
-	ipAsByteSlice := a16[:]
+	octets := a16[:]
 	if is4 {
-		ipAsByteSlice = ipAsByteSlice[12:]
+		octets = octets[12:]
 	}
 
-	addr := uint(ipAsByteSlice[depth])
+	octet := uint(octets[depth])
 	// find leaf tree
 	for {
 
@@ -412,10 +412,10 @@ func (t *Table[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V
 		}
 
 		// go down in tight loop to leaf node
-		if child := n.children.get(addr); child != nil {
+		if child := n.children.get(octet); child != nil {
 			depth++
 			bits -= strideLen
-			addr = uint(ipAsByteSlice[depth])
+			octet = uint(octets[depth])
 			n = child
 			continue
 		}
@@ -432,7 +432,7 @@ func (t *Table[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V
 		// lookup only in nodes with prefixes, skip over intermediate nodes
 		if len(n.prefixes.values) != 0 {
 			// longest prefix match?
-			if baseIdx, val, ok := n.prefixes.lpmByPrefix(addr, bits); ok {
+			if baseIdx, val, ok := n.prefixes.lpmByPrefix(octet, bits); ok {
 				return depth, baseIdx, val, true
 			}
 		}
@@ -447,12 +447,12 @@ func (t *Table[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V
 
 		// go up, backtracking
 		depth--
-		addr = uint(ipAsByteSlice[depth])
+		octet = uint(octets[depth])
 		n = pathStack[depth]
 	}
 }
 
-// Subnets return all prefixes covered by pfx in natural CIDR sort order.
+// Subnets, return all prefixes covered by pfx in natural CIDR sort order.
 func (t *Table[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 	var result []netip.Prefix
 
@@ -482,22 +482,22 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 		return result
 	}
 
-	ipAsByteSlice := ip.AsSlice()
+	octets := ip.AsSlice()
 	depth := 0
 
 	for {
-		addr := uint(ipAsByteSlice[depth])
+		octet := uint(octets[depth])
 
 		// already at leaf node?
 		if bits <= strideLen {
-			result = n.subnets(ipAsByteSlice[:depth], prefixToBaseIndex(addr, bits), is4)
+			result = n.subnets(octets[:depth], prefixToBaseIndex(octet, bits), is4)
 
 			slices.SortFunc(result, sortByPrefix)
 			return result
 		}
 
 		// descend down to next child level
-		child := n.children.get(addr)
+		child := n.children.get(octet)
 
 		// stop condition, no more childs
 		if child == nil {
@@ -511,7 +511,7 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 	}
 }
 
-// Supernets return all matching routes for pfx,
+// Supernets, return all matching routes for pfx,
 // in natural CIDR sort order.
 func (t *Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 	var result []netip.Prefix
@@ -538,11 +538,11 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 		return result
 	}
 
-	ipAsByteSlice := ip.AsSlice()
+	octets := ip.AsSlice()
 	depth := 0
 
 	for {
-		addr := uint(ipAsByteSlice[depth])
+		octet := uint(octets[depth])
 
 		pfxLen := 8
 		// already at leaf node?
@@ -551,7 +551,7 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 		}
 
 		// make an all-prefix-match at this level
-		superStrides := n.prefixes.apmByPrefix(addr, pfxLen)
+		superStrides := n.prefixes.apmByPrefix(octet, pfxLen)
 
 		// get back the matching prefix from baseIdx
 		for _, baseIdx := range superStrides {
@@ -570,7 +570,7 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 		}
 
 		// descend down to next child level
-		child := n.children.get(addr)
+		child := n.children.get(octet)
 
 		// stop condition, no more childs
 		if child == nil {
@@ -604,20 +604,20 @@ func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 
 	// keep the overlaps alloc free, don't use ip.AsSlice here
 	a16 := ip.As16()
-	ipAsByteSlice := a16[:]
+	octets := a16[:]
 	if is4 {
-		ipAsByteSlice = ipAsByteSlice[12:]
+		octets = octets[12:]
 	}
 
 	// depth index for the child trie
 	depth := 0
-	addr := uint(ipAsByteSlice[depth])
+	octet := uint(octets[depth])
 
 	for {
 
 		// last prefix chunk reached
 		if bits <= strideLen {
-			return n.overlapsPrefix(addr, bits)
+			return n.overlapsPrefix(octet, bits)
 		}
 
 		// still in the middle of prefix chunks
@@ -625,13 +625,13 @@ func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 
 		// but skip intermediate nodes, no routes to test?
 		if len(n.prefixes.values) != 0 {
-			if _, _, ok := n.prefixes.lpmByAddr(addr); ok {
+			if _, _, ok := n.prefixes.lpmByOctet(octet); ok {
 				return true
 			}
 		}
 
 		// no overlap so far, go down to next child
-		child := n.children.get(addr)
+		child := n.children.get(octet)
 
 		// no more children to explore, there can't be an overlap
 		if child == nil {
@@ -640,7 +640,7 @@ func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 
 		// next round
 		depth++
-		addr = uint(ipAsByteSlice[depth])
+		octet = uint(octets[depth])
 		bits -= strideLen
 		n = child
 	}

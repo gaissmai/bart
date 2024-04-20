@@ -15,6 +15,7 @@ import (
 	"net/netip"
 	"reflect"
 	"runtime"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -46,7 +47,7 @@ func TestRegression(t *testing.T) {
 
 	t.Run("prefixes_aligned_on_stride_boundary", func(t *testing.T) {
 		fast := &Table[int]{}
-		slow := slowPrefixTable[int]{}
+		slow := slowRT[int]{}
 
 		fast.Insert(mpp("226.205.197.0/24"), 1)
 		slow.insert(mpp("226.205.197.0/24"), 1)
@@ -310,7 +311,7 @@ func TestInsertLookupCompare(t *testing.T) {
 	t.Parallel()
 	pfxs := randomPrefixes(10_000)
 
-	slow := slowPrefixTable[int]{pfxs}
+	slow := slowRT[int]{pfxs}
 	fast := Table[int]{}
 
 	for _, pfx := range pfxs {
@@ -355,7 +356,7 @@ func TestInsertLookupPrefixCompare(t *testing.T) {
 	t.Parallel()
 	pfxs := randomPrefixes(10_000)
 
-	slow := slowPrefixTable[int]{pfxs}
+	slow := slowRT[int]{pfxs}
 	fast := Table[int]{}
 
 	for _, pfx := range pfxs {
@@ -400,7 +401,7 @@ func TestInsertLookupPrefixLPMCompare(t *testing.T) {
 	t.Parallel()
 	pfxs := randomPrefixes(10_000)
 
-	slow := slowPrefixTable[int]{pfxs}
+	slow := slowRT[int]{pfxs}
 	fast := Table[int]{}
 
 	for _, pfx := range pfxs {
@@ -449,7 +450,7 @@ func TestInsertShuffled(t *testing.T) {
 	// routes.
 	t.Parallel()
 	pfxs := randomPrefixes(1000)
-	var pfxs2 []slowPrefixEntry[int]
+	var pfxs2 []slowRTEntry[int]
 
 	defer func() {
 		if t.Failed() {
@@ -459,7 +460,7 @@ func TestInsertShuffled(t *testing.T) {
 	}()
 
 	for i := 0; i < 10; i++ {
-		pfxs2 := append([]slowPrefixEntry[int](nil), pfxs...)
+		pfxs2 := append([]slowRTEntry[int](nil), pfxs...)
 		rand.Shuffle(len(pfxs2), func(i, j int) { pfxs2[i], pfxs2[j] = pfxs2[j], pfxs2[i] })
 
 		addrs := make([]netip.Addr, 0, 10_000)
@@ -505,10 +506,10 @@ func TestDeleteCompare(t *testing.T) {
 	// because we want pfxs and toDelete to be non-overlapping sets.
 	all4, all6 := randomPrefixes4(numPerFamily), randomPrefixes6(numPerFamily)
 
-	pfxs := append([]slowPrefixEntry[int](nil), all4[:deleteCut]...)
+	pfxs := append([]slowRTEntry[int](nil), all4[:deleteCut]...)
 	pfxs = append(pfxs, all6[:deleteCut]...)
 
-	toDelete := append([]slowPrefixEntry[int](nil), all4[deleteCut:]...)
+	toDelete := append([]slowRTEntry[int](nil), all4[deleteCut:]...)
 	toDelete = append(toDelete, all6[deleteCut:]...)
 
 	defer func() {
@@ -524,7 +525,7 @@ func TestDeleteCompare(t *testing.T) {
 		}
 	}()
 
-	slow := slowPrefixTable[int]{pfxs}
+	slow := slowRT[int]{pfxs}
 	fast := Table[int]{}
 
 	for _, pfx := range pfxs {
@@ -586,10 +587,10 @@ func TestDeleteShuffled(t *testing.T) {
 	// because we want pfxs and toDelete to be non-overlapping sets.
 	all4, all6 := randomPrefixes4(numPerFamily), randomPrefixes6(numPerFamily)
 
-	pfxs := append([]slowPrefixEntry[int](nil), all4[:deleteCut]...)
+	pfxs := append([]slowRTEntry[int](nil), all4[:deleteCut]...)
 	pfxs = append(pfxs, all6[:deleteCut]...)
 
-	toDelete := append([]slowPrefixEntry[int](nil), all4[deleteCut:]...)
+	toDelete := append([]slowRTEntry[int](nil), all4[deleteCut:]...)
 	toDelete = append(toDelete, all6[deleteCut:]...)
 
 	rt1 := Table[int]{}
@@ -604,8 +605,8 @@ func TestDeleteShuffled(t *testing.T) {
 	}
 
 	for i := 0; i < 10; i++ {
-		pfxs2 := append([]slowPrefixEntry[int](nil), pfxs...)
-		toDelete2 := append([]slowPrefixEntry[int](nil), toDelete...)
+		pfxs2 := append([]slowRTEntry[int](nil), pfxs...)
+		toDelete2 := append([]slowRTEntry[int](nil), toDelete...)
 		rand.Shuffle(len(toDelete2), func(i, j int) { toDelete2[i], toDelete2[j] = toDelete2[j], toDelete2[i] })
 		rt2 := Table[int]{}
 		for _, pfx := range pfxs2 {
@@ -814,14 +815,14 @@ func TestOverlapsCompare(t *testing.T) {
 	seen := map[bool]int{}
 	for i := 0; i < 10000; i++ {
 		pfxs := randomPrefixes(numEntries)
-		slow := slowPrefixTable[int]{pfxs}
+		slow := slowRT[int]{pfxs}
 		fast := Table[int]{}
 		for _, pfx := range pfxs {
 			fast.Insert(pfx.pfx, pfx.val)
 		}
 
 		inter := randomPrefixes(numEntries)
-		slowInter := slowPrefixTable[int]{inter}
+		slowInter := slowRT[int]{inter}
 		fastInter := Table[int]{}
 		for _, pfx := range inter {
 			fastInter.Insert(pfx.pfx, pfx.val)
@@ -845,7 +846,7 @@ func TestOverlapsPrefixCompare(t *testing.T) {
 	t.Parallel()
 	pfxs := randomPrefixes(100_000)
 
-	slow := slowPrefixTable[int]{pfxs}
+	slow := slowRT[int]{pfxs}
 	fast := Table[int]{}
 
 	for _, pfx := range pfxs {
@@ -1018,14 +1019,14 @@ func TestUnionCompare(t *testing.T) {
 
 	for i := 0; i < 100; i++ {
 		pfxs := randomPrefixes(numEntries)
-		slow := slowPrefixTable[int]{pfxs}
+		slow := slowRT[int]{pfxs}
 		fast := Table[int]{}
 		for _, pfx := range pfxs {
 			fast.Insert(pfx.pfx, pfx.val)
 		}
 
 		pfxs2 := randomPrefixes(numEntries)
-		slow2 := slowPrefixTable[int]{pfxs2}
+		slow2 := slowRT[int]{pfxs2}
 		fast2 := Table[int]{}
 		for _, pfx := range pfxs2 {
 			fast2.Insert(pfx.pfx, pfx.val)
@@ -1041,9 +1042,9 @@ func TestUnionCompare(t *testing.T) {
 		slow.sort()
 		fastAsSlowTable.sort()
 
-		for i := range slow.prefixes {
-			slowI := slow.prefixes[i]
-			fastI := fastAsSlowTable.prefixes[i]
+		for i := range slow.entries {
+			slowI := slow.entries[i]
+			fastI := fastAsSlowTable.entries[i]
 			if slowI != fastI {
 				t.Fatalf("Union(...): items[%d] differ slow(%v) != fast(%v)", i, slowI, fastI)
 			}
@@ -1056,7 +1057,7 @@ func TestSubnetsCompare(t *testing.T) {
 
 	pfxs := randomPrefixes(10_000)
 
-	slow := slowPrefixTable[int]{pfxs}
+	slow := slowRT[int]{pfxs}
 	fast := Table[int]{}
 
 	for _, pfx := range pfxs {
@@ -1081,7 +1082,7 @@ func TestSupernets(t *testing.T) {
 
 	pfxs := randomPrefixes(10_000)
 
-	slow := slowPrefixTable[int]{pfxs}
+	slow := slowRT[int]{pfxs}
 	fast := Table[int]{}
 
 	for _, pfx := range pfxs {
@@ -1317,7 +1318,7 @@ var benchRouteCount = []int{10, 100, 1000, 10_000, 100_000}
 // fn is called once for each combination of {addr_family, num_routes},
 // where addr_family is ipv4 or ipv6, num_routes is the values in
 // benchRouteCount.
-func forFamilyAndCount(b *testing.B, fn func(b *testing.B, routes []slowPrefixEntry[int])) {
+func forFamilyAndCount(b *testing.B, fn func(b *testing.B, routes []slowRTEntry[int])) {
 	for _, fam := range []string{"ipv4", "ipv6"} {
 		rng := randomPrefixes4
 		if fam == "ipv6" {
@@ -1363,18 +1364,18 @@ func (t *Table[V]) numNodesRec(seen map[*node[V]]bool, n *node[V]) int {
 }
 
 // dumpAsPrefixTable, just a helper to compare with slowPrefixTable
-func (t *Table[V]) dumpAsPrefixTable() slowPrefixTable[V] {
-	pfxs := []slowPrefixEntry[V]{}
+func (t *Table[V]) dumpAsPrefixTable() slowRT[V] {
+	pfxs := []slowRTEntry[V]{}
 	pfxs = dumpListRec(pfxs, t.DumpList4())
 	pfxs = dumpListRec(pfxs, t.DumpList6())
 
-	ret := slowPrefixTable[V]{pfxs}
+	ret := slowRT[V]{pfxs}
 	return ret
 }
 
-func dumpListRec[V any](pfxs []slowPrefixEntry[V], dumpList []DumpListNode[V]) []slowPrefixEntry[V] {
+func dumpListRec[V any](pfxs []slowRTEntry[V], dumpList []DumpListNode[V]) []slowRTEntry[V] {
 	for _, node := range dumpList {
-		pfxs = append(pfxs, slowPrefixEntry[V]{pfx: node.CIDR, val: node.Value})
+		pfxs = append(pfxs, slowRTEntry[V]{pfx: node.CIDR, val: node.Value})
 		pfxs = append(pfxs, dumpListRec[V](nil, node.Subnets)...)
 	}
 	return pfxs
@@ -1383,7 +1384,7 @@ func dumpListRec[V any](pfxs []slowPrefixEntry[V], dumpList []DumpListNode[V]) [
 // #########################################################
 
 func BenchmarkTableInsertion(b *testing.B) {
-	forFamilyAndCount(b, func(b *testing.B, routes []slowPrefixEntry[int]) {
+	forFamilyAndCount(b, func(b *testing.B, routes []slowRTEntry[int]) {
 		b.StopTimer()
 		b.ResetTimer()
 		var startMem, endMem runtime.MemStats
@@ -1410,7 +1411,7 @@ func BenchmarkTableInsertion(b *testing.B) {
 }
 
 func BenchmarkTableDelete(b *testing.B) {
-	forFamilyAndCount(b, func(b *testing.B, routes []slowPrefixEntry[int]) {
+	forFamilyAndCount(b, func(b *testing.B, routes []slowRTEntry[int]) {
 		// Collect memstats for one round of insertions, so we can remove it
 		// from the total at the end and get only the deletion alloc count.
 		insertAllocs, insertBytes := getMemCost(func() {
@@ -1449,7 +1450,7 @@ func BenchmarkTableDelete(b *testing.B) {
 }
 
 func BenchmarkTableGet(b *testing.B) {
-	forFamilyAndCount(b, func(b *testing.B, routes []slowPrefixEntry[int]) {
+	forFamilyAndCount(b, func(b *testing.B, routes []slowRTEntry[int]) {
 		var rt Table[int]
 		for _, route := range routes {
 			rt.Insert(route.pfx, route.val)
@@ -1464,7 +1465,7 @@ func BenchmarkTableGet(b *testing.B) {
 }
 
 func BenchmarkTableLookup(b *testing.B) {
-	forFamilyAndCount(b, func(b *testing.B, routes []slowPrefixEntry[int]) {
+	forFamilyAndCount(b, func(b *testing.B, routes []slowRTEntry[int]) {
 		genAddr := randomAddr4
 		if routes[0].pfx.Addr().Is6() {
 			genAddr = randomAddr6
@@ -1509,7 +1510,7 @@ func BenchmarkTableLookup(b *testing.B) {
 var boolSink bool
 
 func BenchmarkTablePrefixOverlaps(b *testing.B) {
-	forFamilyAndCount(b, func(b *testing.B, routes []slowPrefixEntry[int]) {
+	forFamilyAndCount(b, func(b *testing.B, routes []slowRTEntry[int]) {
 		var rt Table[int]
 		for _, route := range routes {
 			rt.Insert(route.pfx, route.val)
@@ -1541,7 +1542,7 @@ func BenchmarkTablePrefixOverlaps(b *testing.B) {
 }
 
 func BenchmarkTableOverlaps(b *testing.B) {
-	forFamilyAndCount(b, func(b *testing.B, routes []slowPrefixEntry[int]) {
+	forFamilyAndCount(b, func(b *testing.B, routes []slowRTEntry[int]) {
 		var rt Table[int]
 		for _, route := range routes {
 			rt.Insert(route.pfx, route.val)
@@ -1636,4 +1637,17 @@ func (t *runningTimer) Stop() {
 
 func (t *runningTimer) Elapsed() time.Duration {
 	return t.cumulative
+}
+
+// roundFloat64 rounds f to 2 decimal places, for display.
+//
+// It round-trips through a float->string->float conversion, so should not be
+// used in a performance critical setting.
+func roundFloat64(f float64) float64 {
+	s := fmt.Sprintf("%.2f", f)
+	ret, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		panic(err)
+	}
+	return ret
 }

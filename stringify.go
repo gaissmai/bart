@@ -161,14 +161,14 @@ func (n *node[V]) getKidsRec(parentIdx uint, path []byte, is4 bool) []kidT[V] {
 	}
 
 	// the node may have childs, the rec-descent monster starts
-	for _, addr := range n.children.allAddrs() {
+	for _, octet := range n.children.allOctets() {
 		// do a longest-prefix-match
-		if lpmIdx, _, _ := n.prefixes.lpmByAddr(addr); lpmIdx == parentIdx {
+		if lpmIdx, _, _ := n.prefixes.lpmByOctet(octet); lpmIdx == parentIdx {
 			// child is directKid, the path is needed to get back the prefixes
-			path := append(slices.Clone(path), byte(addr))
+			path := append(slices.Clone(path), byte(octet))
 
 			// get next child node
-			c := n.children.get(addr)
+			c := n.children.get(octet)
 
 			// traverse, rec-descent call with next child node
 			directKids = append(directKids, c.getKidsRec(0, path, is4)...)
@@ -178,13 +178,13 @@ func (n *node[V]) getKidsRec(parentIdx uint, path []byte, is4 bool) []kidT[V] {
 	return directKids
 }
 
-// cidrFromPath, make prefix from byte path, next addr (byte, stride) and pfxLen.
+// cidrFromPath, make prefix from byte path, next octet (byte, stride) and pfxLen.
 func cidrFromPath(path []byte, idx uint, is4 bool) (pfx netip.Prefix) {
-	addr, pfxLen := baseIndexToPrefix(idx)
+	octet, pfxLen := baseIndexToPrefix(idx)
 
 	// append last (partially) masked byte to path and
 	// calc bits with pathLen and pfxLen
-	bs := append(slices.Clone(path), byte(addr))
+	bs := append(slices.Clone(path), byte(octet))
 	bits := len(path)*strideLen + pfxLen
 
 	var ip netip.Addr
@@ -203,8 +203,7 @@ func cidrFromPath(path []byte, idx uint, is4 bool) (pfx netip.Prefix) {
 	return
 }
 
-// sortKidsByPrefix, sort the kids by addr and pfxLen.
-// All prefixes are already normalized (Masked).
+// sortKidsByPrefix, all prefixes are already normalized (Masked).
 func sortKidsByPrefix[V any](a, b kidT[V]) int {
 	if cmp := a.cidr.Addr().Compare(b.cidr.Addr()); cmp != 0 {
 		return cmp
