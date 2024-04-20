@@ -67,7 +67,7 @@ func (t *Table[V]) dump(w io.Writer) error {
 func (n *node[V]) dumpRec(w io.Writer, path []byte, is4 bool) {
 	n.dump(w, path, is4)
 
-	for i, child := range n.children.nodes {
+	for i, child := range n.children.childs {
 		octet := n.children.Select(uint(i))
 		child.dumpRec(w, append(path, byte(octet)), is4)
 	}
@@ -104,11 +104,11 @@ func (n *node[V]) dump(w io.Writer, path []byte, is4 bool) {
 		must(fmt.Fprintln(w))
 	}
 
-	if len(n.children.nodes) != 0 {
+	if len(n.children.childs) != 0 {
 		// print the childs for this node
-		must(fmt.Fprintf(w, "%schilds(#%d): ", indent, len(n.children.nodes)))
+		must(fmt.Fprintf(w, "%schilds(#%d): ", indent, len(n.children.childs)))
 
-		for i := range n.children.nodes {
+		for i := range n.children.childs {
 			octet := n.children.Select(uint(i))
 			must(fmt.Fprintf(w, "%s ", octetFmt(octet, is4)))
 		}
@@ -165,7 +165,7 @@ func (nt nodeType) String() string {
 // hasType returns the nodeType.
 func (n *node[V]) hasType() nodeType {
 	lenPefixes := len(n.prefixes.values)
-	lenChilds := len(n.children.nodes)
+	lenChilds := len(n.children.childs)
 
 	if lenPefixes == 0 && lenChilds != 0 {
 		return intermediateNode

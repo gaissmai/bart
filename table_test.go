@@ -1350,10 +1350,10 @@ func (t *Table[V]) numNodes() int {
 
 func (t *Table[V]) numNodesRec(seen map[*node[V]]bool, n *node[V]) int {
 	ret := 1
-	if len(n.children.nodes) == 0 {
+	if len(n.children.childs) == 0 {
 		return ret
 	}
-	for _, c := range n.children.nodes {
+	for _, c := range n.children.childs {
 		if seen[c] {
 			continue
 		}

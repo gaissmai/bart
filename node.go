@@ -31,7 +31,7 @@ const (
 // A node can have prefixes or child nodes or both.
 type node[V any] struct {
 	prefixes *strideTree[V]
-	children *childTree[V]
+	children *childSlice[V]
 }
 
 // strideTree, complete-binary-tree, popcount-compressed.
@@ -40,10 +40,10 @@ type strideTree[V any] struct {
 	values []V
 }
 
-// childTree, just a slice with nodes, also popcount-compressed
-type childTree[V any] struct {
+// childSlice, a slice with nodes, popcount-compressed
+type childSlice[V any] struct {
 	*bitset.BitSet
-	nodes []*node[V]
+	childs []*node[V]
 }
 
 // newNode, BitSets have to be initialized.
@@ -54,9 +54,9 @@ func newNode[V any]() *node[V] {
 			values: nil,
 		},
 
-		children: &childTree[V]{
+		children: &childSlice[V]{
 			BitSet: bitset.New(0), // init BitSet
-			nodes:  nil,
+			childs: nil,
 		},
 	}
 }
@@ -231,19 +231,19 @@ func (p *strideTree[V]) allIndexes() []uint {
 
 // rank is the key of the popcount compression algorithm,
 // mapping between bitset index and slice index.
-func (c *childTree[V]) rank(octet uint) int {
+func (c *childSlice[V]) rank(octet uint) int {
 	return int(c.Rank(octet)) - 1
 }
 
 // insert the child into childTree.
-func (c *childTree[V]) insert(octet uint, child *node[V]) {
+func (c *childSlice[V]) insert(octet uint, child *node[V]) {
 	// insert into bitset and slice
 	c.Set(octet)
-	c.nodes = slices.Insert(c.nodes, c.rank(octet), child)
+	c.childs = slices.Insert(c.childs, c.rank(octet), child)
 }
 
 // delete the child at octet. It is valid to delete a non-existent child.
-func (c *childTree[V]) delete(octet uint) {
+func (c *childSlice[V]) delete(octet uint) {
 	if !c.Test(octet) {
 		return
 	}
@@ -251,7 +251,7 @@ func (c *childTree[V]) delete(octet uint) {
 	rnk := c.rank(octet)
 
 	// delete from slice
-	c.nodes = slices.Delete(c.nodes, rnk, rnk+1)
+	c.childs = slices.Delete(c.childs, rnk, rnk+1)
 
 	// delete from bitset, followed by Compact to reduce memory consumption
 	c.Clear(octet)
@@ -259,16 +259,16 @@ func (c *childTree[V]) delete(octet uint) {
 }
 
 // get returns the child pointer for octet, or nil if none.
-func (c *childTree[V]) get(octet uint) *node[V] {
+func (c *childSlice[V]) get(octet uint) *node[V] {
 	if !c.Test(octet) {
 		return nil
 	}
 
-	return c.nodes[c.rank(octet)]
+	return c.childs[c.rank(octet)]
 }
 
 // allOctets returns the octets of all child nodes in ascending order.
-func (c *childTree[V]) allOctets() []uint {
+func (c *childSlice[V]) allOctets() []uint {
 	all := make([]uint, maxNodeChildren)
 	_, all = c.NextSetMany(0, all)
 	return all
@@ -278,7 +278,7 @@ func (c *childTree[V]) allOctets() []uint {
 
 // isEmpty returns true if node has neither prefixes nor children.
 func (n *node[V]) isEmpty() bool {
-	return len(n.prefixes.values) == 0 && len(n.children.nodes) == 0
+	return len(n.prefixes.values) == 0 && len(n.children.childs) == 0
 }
 
 // overlapsRec returns true if any IP in the nodes n or o overlaps.
@@ -352,8 +352,8 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 	nOctets := [maxNodeChildren]bool{}
 	oOctets := [maxNodeChildren]bool{}
 
-	nOk = len(n.children.nodes) > 0
-	oOk = len(o.children.nodes) > 0
+	nOk = len(n.children.childs) > 0
+	oOk = len(o.children.childs) > 0
 	var nOctet, oOctet uint
 	// zig-zag, for all octets in both nodes ...
 	for {
@@ -386,7 +386,7 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 
 	// 3. rec-descent call for childs with same octet
 
-	if len(n.children.nodes) > 0 && len(o.children.nodes) > 0 {
+	if len(n.children.childs) > 0 && len(o.children.childs) > 0 {
 		for i := 0; i < len(nOctets); i++ {
 			if nOctets[i] && oOctets[i] {
 				// get next child node for this octet
@@ -504,14 +504,14 @@ func (n *node[V]) cloneRec() *node[V] {
 		return c
 	}
 
-	c.prefixes.BitSet = n.prefixes.Clone()              // deep
+	c.prefixes.BitSet = n.prefixes.BitSet.Clone()       // deep
 	c.prefixes.values = slices.Clone(n.prefixes.values) // shallow
 
-	c.children.BitSet = n.children.Clone()            // deep
-	c.children.nodes = slices.Clone(n.children.nodes) // shallow
+	c.children.BitSet = n.children.BitSet.Clone()       // deep
+	c.children.childs = slices.Clone(n.children.childs) // shallow
 	// make it deep
-	for i, child := range c.children.nodes {
-		c.children.nodes[i] = child.cloneRec()
+	for i, child := range c.children.childs {
+		c.children.childs[i] = child.cloneRec()
 	}
 
 	return c

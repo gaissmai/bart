@@ -59,7 +59,7 @@ func (t *Table[V]) readTableStats() map[string]any {
 		switch is4 {
 		case true:
 			stats.size4 += len(n.prefixes.values)
-			stats.childs4[len(n.children.nodes)]++
+			stats.childs4[len(n.children.childs)]++
 			stats.depth4[depth]++
 			stats.types4[n.hasType().String()]++
 
@@ -69,7 +69,7 @@ func (t *Table[V]) readTableStats() map[string]any {
 			}
 		case false:
 			stats.size6 += len(n.prefixes.values)
-			stats.childs6[len(n.children.nodes)]++
+			stats.childs6[len(n.children.childs)]++
 			stats.depth6[depth]++
 			stats.types6[n.hasType().String()]++
 
@@ -121,7 +121,7 @@ func (t *Table[V]) walk(cb metricWalkFunc[V]) {
 func (n *node[V]) metricWalkRec(cb metricWalkFunc[V], depth int, is4 bool) {
 	cb(n, depth, is4)
 
-	for _, child := range n.children.nodes {
+	for _, child := range n.children.childs {
 		child.metricWalkRec(cb, depth+1, is4)
 	}
 }
