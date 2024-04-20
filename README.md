@@ -87,6 +87,28 @@ The API has changed since v0.4.2
 
 Please see the extensive [benchmarks](https://github.com/gaissmai/iprbench) comparing `bart` with other IP routing table implementations.
 
+Just a teaser, LPM lookups against the full Internet routing table with random probes:
+
+```
+cpu: Intel(R) Core(TM) i5-8250U CPU @ 1.60GHz
+
+BenchmarkFullMatchV4/Lookup             29107173         41.22 ns/op
+BenchmarkFullMatchV4/LookupPrefix       24154027         49.73 ns/op
+BenchmarkFullMatchV4/LookupPrefixLPM    21278923         56.34 ns/op
+
+BenchmarkFullMatchV6/Lookup             28551670         42.03 ns/op
+BenchmarkFullMatchV6/LookupPrefix       23813694         50.38 ns/op
+BenchmarkFullMatchV6/LookupPrefixLPM    21109486         56.82 ns/op
+
+BenchmarkFullMissV4/Lookup              21568196         56.01 ns/op
+BenchmarkFullMissV4/LookupPrefix        18887606         63.51 ns/op
+BenchmarkFullMissV4/LookupPrefixLPM     17191287         69.82 ns/op
+
+BenchmarkFullMissV6/Lookup              18382587         65.18 ns/op
+BenchmarkFullMissV6/LookupPrefix        15761524         76.13 ns/op
+BenchmarkFullMissV6/LookupPrefixLPM     14565033         82.41 ns/op
+```
+
 ## CONTRIBUTION
 
 Please open an issue for discussion before sending a pull request.
