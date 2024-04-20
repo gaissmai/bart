@@ -12,10 +12,10 @@ import (
 )
 
 const (
-	stride          = 8                 // byte
-	maxTreeDepth    = 128 / stride      // 16
-	maxNodeChildren = 1 << stride       // 256
-	maxNodePrefixes = 1 << (stride + 1) // 512
+	strideLen       = 8                    // byte
+	maxTreeDepth    = 128 / strideLen      // 16
+	maxNodeChildren = 1 << strideLen       // 256
+	maxNodePrefixes = 1 << (strideLen + 1) // 512
 )
 
 type nodeType byte
@@ -65,8 +65,8 @@ func newNode[V any]() *node[V] {
 
 // rank is the key of the popcount compression algorithm,
 // mapping between bitset index and slice index.
-func (p *prefixCBTree[V]) rank(treeIdx uint) int {
-	return int(p.indexes.Rank(treeIdx)) - 1
+func (p *prefixCBTree[V]) rank(baseIdx uint) int {
+	return int(p.indexes.Rank(baseIdx)) - 1
 }
 
 // insert adds the route addr/prefixLen, with value val.
@@ -548,7 +548,7 @@ func (n *node[V]) walkRec(path []byte, is4 bool, cb func(netip.Prefix, V) error)
 	return nil
 }
 
-// subnets retuns all CIDRs covered by parent pfx.
+// subnets returns all CIDRs covered by parent pfx.
 func (n *node[V]) subnets(path []byte, parentIdx uint, is4 bool) (result []netip.Prefix) {
 	// for all routes in this node do ...
 	for _, idx := range n.prefixes.allIndexes() {

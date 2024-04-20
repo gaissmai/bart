@@ -65,7 +65,7 @@ func (t *Table[V]) readTableStats() map[string]any {
 
 			for _, idx := range n.prefixes.allIndexes() {
 				_, pfxLen := baseIndexToPrefix(idx)
-				stats.prefixlen4[stride*depth+pfxLen]++
+				stats.prefixlen4[strideLen*depth+pfxLen]++
 			}
 		case false:
 			stats.size6 += len(n.prefixes.values)
@@ -75,7 +75,7 @@ func (t *Table[V]) readTableStats() map[string]any {
 
 			for _, idx := range n.prefixes.allIndexes() {
 				_, pfxLen := baseIndexToPrefix(idx)
-				stats.prefixlen6[stride*depth+pfxLen]++
+				stats.prefixlen6[strideLen*depth+pfxLen]++
 			}
 		}
 	})
