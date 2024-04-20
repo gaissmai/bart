@@ -68,8 +68,8 @@ func (n *node[V]) dumpRec(w io.Writer, path []byte, is4 bool) {
 	n.dump(w, path, is4)
 
 	for i, child := range n.children.nodes {
-		addr := n.children.addrs.Select(uint(i))
-		child.dumpRec(w, append(path, byte(addr)), is4)
+		octet := n.children.Select(uint(i))
+		child.dumpRec(w, append(path, byte(octet)), is4)
 	}
 }
 
@@ -85,7 +85,7 @@ func (n *node[V]) dump(w io.Writer, path []byte, is4 bool) {
 	bits := depth * strideLen
 	indent := strings.Repeat(".", depth)
 
-	// node type with depth and addr path and bits.
+	// node type with depth and octet path and bits.
 	must(fmt.Fprintf(w, "\n%s[%s] depth:  %d path: [%v] / %d\n",
 		indent, n.hasType(), depth, ancestors(path, is4), bits))
 
@@ -98,8 +98,8 @@ func (n *node[V]) dump(w io.Writer, path []byte, is4 bool) {
 		must(fmt.Fprintf(w, "%sprefxs(#%d): ", indent, len(n.prefixes.values)))
 
 		for _, idx := range indices {
-			addr, bits := baseIndexToPrefix(idx)
-			must(fmt.Fprintf(w, "%s/%d ", addrFmt(addr, is4), bits))
+			octet, bits := baseIndexToPrefix(idx)
+			must(fmt.Fprintf(w, "%s/%d ", octetFmt(octet, is4), bits))
 		}
 		must(fmt.Fprintln(w))
 	}
@@ -109,19 +109,19 @@ func (n *node[V]) dump(w io.Writer, path []byte, is4 bool) {
 		must(fmt.Fprintf(w, "%schilds(#%d): ", indent, len(n.children.nodes)))
 
 		for i := range n.children.nodes {
-			addr := n.children.addrs.Select(uint(i))
-			must(fmt.Fprintf(w, "%s ", addrFmt(addr, is4)))
+			octet := n.children.Select(uint(i))
+			must(fmt.Fprintf(w, "%s ", octetFmt(octet, is4)))
 		}
 		must(fmt.Fprintln(w))
 	}
 }
 
-// addrFmt, different format strings for IPv4 and IPv6, decimal versus hex.
-func addrFmt(addr uint, is4 bool) string {
+// octetFmt, different format strings for IPv4 and IPv6, decimal versus hex.
+func octetFmt(octet uint, is4 bool) string {
 	if is4 {
-		return fmt.Sprintf("%d", addr)
+		return fmt.Sprintf("%d", octet)
 	}
-	return fmt.Sprintf("0x%02x", addr)
+	return fmt.Sprintf("0x%02x", octet)
 }
 
 // IP stride path, different formats for IPv4 and IPv6, dotted decimal or hex.

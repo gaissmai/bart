@@ -30,14 +30,14 @@ const (
 
 // prefixToBaseIndex, maps a prefix table as a 'complete binary tree'.
 // This is the so-called baseIndex a.k.a heapFunc:
-func prefixToBaseIndex(addr uint, prefixLen int) uint {
-	return (addr >> (strideLen - prefixLen)) + (1 << prefixLen)
+func prefixToBaseIndex(octet uint, prefixLen int) uint {
+	return (octet >> (strideLen - prefixLen)) + (1 << prefixLen)
 }
 
-// addrToBaseIndex, just prefixToBaseIndex(addr, 8), a.k.a host routes
+// octetToBaseIndex, just prefixToBaseIndex(octet, 8), a.k.a host routes
 // but faster, use it for host routes in Lookup.
-func addrToBaseIndex(addr uint) uint {
-	return addr + firstHostIndex // addr + 256
+func octetToBaseIndex(octet uint) uint {
+	return octet + firstHostIndex // octet + 256
 }
 
 // parentIndex returns the index of idx's parent prefix, or 0 if idx
@@ -52,37 +52,37 @@ func baseIndexToPrefixLen(baseIdx uint) int {
 	return bits
 }
 
-// lastHostIndexOfPrefix returns the bitset index of the last address in addr/len.
-func lastHostIndexOfPrefix(addr uint, bits int) uint {
-	return addrToBaseIndex(addr | uint(hostMasks[bits]))
+// lastHostIndexOfPrefix returns the bitset index of the last octet in octet/len.
+func lastHostIndexOfPrefix(octet uint, bits int) uint {
+	return octetToBaseIndex(octet | uint(hostMasks[bits]))
 }
 
 // lowerUpperBound, get range of host routes for this prefix
 func lowerUpperBound(idx uint) (uint, uint) {
-	addr, bits := baseIndexToPrefix(idx)
-	return addrToBaseIndex(addr), lastHostIndexOfPrefix(addr, bits)
+	octet, bits := baseIndexToPrefix(idx)
+	return octetToBaseIndex(octet), lastHostIndexOfPrefix(octet, bits)
 }
 
-// baseIndexToPrefix returns the address and prefix len of baseIdx.
+// baseIndexToPrefix returns the octet and prefix len of baseIdx.
 // It's the inverse to prefixToBaseIndex.
-func baseIndexToPrefix(baseIdx uint) (addr uint, pfxLen int) {
+func baseIndexToPrefix(baseIdx uint) (octet uint, pfxLen int) {
 	pfx := baseIdx2Pfx[baseIdx]
-	return pfx.addr, pfx.bits
+	return pfx.octet, pfx.bits
 }
 
-// baseIdx2Pfx, address and CIDR bits of baseIdx as lookup table.
+// baseIdx2Pfx, octet and CIDR bits of baseIdx as lookup table.
 // Use the pre computed lookup table, bits.LeadingZeros is too slow.
 //
-//  func baseIndexToPrefix(baseIdx uint) (addr uint, pfxLen int) {
+//  func baseIndexToPrefix(baseIdx uint) (octet uint, pfxLen int) {
 //  	nlz := bits.LeadingZeros(baseIdx)
 //  	pfxLen = strconv.IntSize - nlz - 1
-//  	addr = (baseIdx & (0xFF >> (8 - pfxLen))) << (8 - pfxLen)
-//  	return addr, pfxLen
+//  	octet = (baseIdx & (0xFF >> (8 - pfxLen))) << (8 - pfxLen)
+//  	return octet, pfxLen
 //  }
 
 var baseIdx2Pfx = [512]struct {
-	addr uint
-	bits int
+	octet uint
+	bits  int
 }{
 	{0, -1},  // idx ==   0 invalid!
 	{0, 0},   // idx ==   1
