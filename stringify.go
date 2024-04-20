@@ -145,15 +145,15 @@ func (n *node[V]) getKidsRec(parentIdx uint, path []byte, is4 bool) []kidT[V] {
 	directKids := []kidT[V]{}
 
 	// the node may have prefixes
-	for _, idx := range n.prefixes.allIndexes() {
+	for _, idx := range n.allStrideIndexes() {
 		// parent or self, handled alreday in an upper stack frame.
 		if idx <= parentIdx {
 			continue
 		}
 
 		// check if lpmIdx for this idx' parent is equal to parentIdx
-		if lpmIdx, _, _ := n.prefixes.lpmByIndex(idx >> 1); lpmIdx == parentIdx {
-			val, _ := n.prefixes.getValByIndex(idx)
+		if lpmIdx, _, _ := n.lpmByIndex(idx >> 1); lpmIdx == parentIdx {
+			val, _ := n.getValByIndex(idx)
 			path := slices.Clone(path)
 			cidr := cidrFromPath(path, idx, is4)
 			directKids = append(directKids, kidT[V]{n, path, idx, cidr, val})
@@ -161,14 +161,14 @@ func (n *node[V]) getKidsRec(parentIdx uint, path []byte, is4 bool) []kidT[V] {
 	}
 
 	// the node may have childs, the rec-descent monster starts
-	for _, octet := range n.children.allOctets() {
+	for _, octet := range n.allChildOctets() {
 		// do a longest-prefix-match
-		if lpmIdx, _, _ := n.prefixes.lpmByOctet(octet); lpmIdx == parentIdx {
+		if lpmIdx, _, _ := n.lpmByOctet(octet); lpmIdx == parentIdx {
 			// child is directKid, the path is needed to get back the prefixes
 			path := append(slices.Clone(path), byte(octet))
 
 			// get next child node
-			c := n.children.get(octet)
+			c := n.getChild(octet)
 
 			// traverse, rec-descent call with next child node
 			directKids = append(directKids, c.getKidsRec(0, path, is4)...)

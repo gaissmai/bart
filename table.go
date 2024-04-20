@@ -56,7 +56,7 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 
 	// insert default route, easy peasy
 	if bits == 0 {
-		n.prefixes.insert(0, 0, val)
+		n.insertPrefix(0, 0, val)
 		return
 	}
 
@@ -79,73 +79,17 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 		// 172.16.19.12/32 -> depth 3, octet 12,  bits 8, (32-3*8 = 8)
 		//
 		if bits <= strideLen {
-			n.prefixes.insert(octet, bits, val)
+			n.insertPrefix(octet, bits, val)
 			return
 		}
 
 		// descend down to next child level
-		child := n.children.get(octet)
+		child := n.getChild(octet)
 
 		// create and insert missing intermediate child, no path compression!
 		if child == nil {
 			child = newNode[V]()
-			n.children.insert(octet, child)
-		}
-
-		// go down
-		depth++
-		n = child
-		bits -= strideLen
-	}
-}
-
-// Update or set the value at pfx with a callback function.
-//
-// If the pfx does not yet exist, then ok=false and the pfx
-// is set with the new value.
-func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
-	t.init()
-
-	// always normalize the prefix
-	pfx = pfx.Masked()
-
-	// some needed values, see below
-	bits := pfx.Bits()
-	ip := pfx.Addr()
-	is4 := ip.Is4()
-
-	// get the root node of the routing table
-	n := t.rootNodeByVersion(is4)
-
-	// update default route, easy peasy
-	if bits == 0 {
-		return n.prefixes.update(0, 0, cb)
-	}
-
-	// keep this method alloc free, don't use ip.AsSlice here
-	a16 := ip.As16()
-	octets := a16[:]
-	if is4 {
-		octets = octets[12:]
-	}
-
-	// depth index for the child trie
-	depth := 0
-	for {
-		octet := uint(octets[depth])
-
-		// loop stop condition
-		if bits <= strideLen {
-			return n.prefixes.update(octet, bits, cb)
-		}
-
-		// descend down to next child level
-		child := n.children.get(octet)
-
-		// create and insert missing intermediate child, no path compression!
-		if child == nil {
-			child = newNode[V]()
-			n.children.insert(octet, child)
+			n.insertChild(octet, child)
 		}
 
 		// go down
@@ -171,7 +115,7 @@ func (t *Table[V]) Delete(pfx netip.Prefix) {
 
 	// delete default route, easy peasy
 	if bits == 0 {
-		n.prefixes.delete(0, 0)
+		n.deletePrefix(0, 0)
 		return
 	}
 
@@ -190,7 +134,7 @@ func (t *Table[V]) Delete(pfx netip.Prefix) {
 		// last non-masked byte
 		if bits <= strideLen {
 			// found a child on proper depth ...
-			if !n.prefixes.delete(octet, bits) {
+			if !n.deletePrefix(octet, bits) {
 				// ... but prefix not in tree, nothing deleted
 				return
 			}
@@ -200,7 +144,7 @@ func (t *Table[V]) Delete(pfx netip.Prefix) {
 		}
 
 		// descend down to next level, no path compression
-		child := n.children.get(octet)
+		child := n.getChild(octet)
 		if child == nil {
 			// no child, nothing to delete
 			return
@@ -224,12 +168,68 @@ func (t *Table[V]) Delete(pfx netip.Prefix) {
 		if n.isEmpty() {
 			// purge this node from parents children
 			parent := pathStack[depth-1]
-			parent.children.delete(uint(octets[depth-1]))
+			parent.deleteChild(uint(octets[depth-1]))
 		}
 
 		// go up
 		depth--
 		n = pathStack[depth]
+	}
+}
+
+// Update or set the value at pfx with a callback function.
+//
+// If the pfx does not yet exist, then ok=false and the pfx
+// is set with the new value.
+func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
+	t.init()
+
+	// always normalize the prefix
+	pfx = pfx.Masked()
+
+	// some needed values, see below
+	bits := pfx.Bits()
+	ip := pfx.Addr()
+	is4 := ip.Is4()
+
+	// get the root node of the routing table
+	n := t.rootNodeByVersion(is4)
+
+	// update default route, easy peasy
+	if bits == 0 {
+		return n.update(0, 0, cb)
+	}
+
+	// keep this method alloc free, don't use ip.AsSlice here
+	a16 := ip.As16()
+	octets := a16[:]
+	if is4 {
+		octets = octets[12:]
+	}
+
+	// depth index for the child trie
+	depth := 0
+	for {
+		octet := uint(octets[depth])
+
+		// loop stop condition
+		if bits <= strideLen {
+			return n.update(octet, bits, cb)
+		}
+
+		// descend down to next child level
+		child := n.getChild(octet)
+
+		// create and insert missing intermediate child, no path compression!
+		if child == nil {
+			child = newNode[V]()
+			n.insertChild(octet, child)
+		}
+
+		// go down
+		depth++
+		n = child
+		bits -= strideLen
 	}
 }
 
@@ -250,7 +250,7 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 
 	// get value for default route, easy peasy
 	if bits == 0 {
-		return n.prefixes.getValByPrefix(0, 0)
+		return n.getValByPrefix(0, 0)
 	}
 
 	// keep this method alloc free, don't use ip.AsSlice here
@@ -266,11 +266,11 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 
 		// last non-masked byte
 		if bits <= strideLen {
-			return n.prefixes.getValByPrefix(octet, bits)
+			return n.getValByPrefix(octet, bits)
 		}
 
 		// descend down to next level, no path compression
-		child := n.children.get(octet)
+		child := n.getChild(octet)
 		if child == nil {
 			// no child, prefix is not set
 			return
@@ -311,7 +311,7 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 		pathStack[depth] = n
 
 		// go down in tight loop to leaf tree
-		if child := n.children.get(octet); child != nil {
+		if child := n.getChild(octet); child != nil {
 			depth++
 			octet = uint(octets[depth])
 			n = child
@@ -324,9 +324,9 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	// start backtracking at leaf node in tight loop
 	for {
 		// lookup only in nodes with prefixes, skip over intermediate nodes
-		if len(n.prefixes.values) != 0 {
+		if len(n.prefixes) != 0 {
 			// longest prefix match?
-			if _, val, ok := n.prefixes.lpmByIndex(octetToBaseIndex(octet)); ok {
+			if _, val, ok := n.lpmByIndex(octetToBaseIndex(octet)); ok {
 				return val, true
 			}
 		}
@@ -385,7 +385,7 @@ func (t *Table[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V
 	// pfx is default route, easy peasy
 	if bits == 0 {
 		baseIdx = prefixToBaseIndex(0, 0)
-		val, ok = n.prefixes.getValByIndex(baseIdx)
+		val, ok = n.getValByIndex(baseIdx)
 		return
 	}
 
@@ -412,7 +412,7 @@ func (t *Table[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V
 		}
 
 		// go down in tight loop to leaf node
-		if child := n.children.get(octet); child != nil {
+		if child := n.getChild(octet); child != nil {
 			depth++
 			bits -= strideLen
 			octet = uint(octets[depth])
@@ -430,9 +430,9 @@ func (t *Table[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V
 	for {
 
 		// lookup only in nodes with prefixes, skip over intermediate nodes
-		if len(n.prefixes.values) != 0 {
+		if len(n.prefixes) != 0 {
 			// longest prefix match?
-			if baseIdx, val, ok := n.prefixes.lpmByPrefix(octet, bits); ok {
+			if baseIdx, val, ok := n.lpmByPrefix(octet, bits); ok {
 				return depth, baseIdx, val, true
 			}
 		}
@@ -478,7 +478,7 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 			return nil
 		})
 
-		slices.SortFunc(result, sortByPrefix)
+		slices.SortFunc(result, cmpPrefix)
 		return result
 	}
 
@@ -492,12 +492,12 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 		if bits <= strideLen {
 			result = n.subnets(octets[:depth], prefixToBaseIndex(octet, bits), is4)
 
-			slices.SortFunc(result, sortByPrefix)
+			slices.SortFunc(result, cmpPrefix)
 			return result
 		}
 
 		// descend down to next child level
-		child := n.children.get(octet)
+		child := n.getChild(octet)
 
 		// stop condition, no more childs
 		if child == nil {
@@ -532,7 +532,7 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 	// pfx is default route
 	if bits == 0 {
 		// test if default route is in table
-		if _, ok := n.prefixes.getValByPrefix(0, 0); ok {
+		if _, ok := n.getValByPrefix(0, 0); ok {
 			result = append(result, pfx)
 		}
 		return result
@@ -551,7 +551,7 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 		}
 
 		// make an all-prefix-match at this level
-		superStrides := n.prefixes.apmByPrefix(octet, pfxLen)
+		superStrides := n.apmByPrefix(octet, pfxLen)
 
 		// get back the matching prefix from baseIdx
 		for _, baseIdx := range superStrides {
@@ -570,7 +570,7 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 		}
 
 		// descend down to next child level
-		child := n.children.get(octet)
+		child := n.getChild(octet)
 
 		// stop condition, no more childs
 		if child == nil {
@@ -624,14 +624,14 @@ func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 		// test if any route overlaps prefix´ addr chunk so far
 
 		// but skip intermediate nodes, no routes to test?
-		if len(n.prefixes.values) != 0 {
-			if _, _, ok := n.prefixes.lpmByOctet(octet); ok {
+		if len(n.prefixes) != 0 {
+			if _, _, ok := n.lpmByOctet(octet); ok {
 				return true
 			}
 		}
 
 		// no overlap so far, go down to next child
-		child := n.children.get(octet)
+		child := n.getChild(octet)
 
 		// no more children to explore, there can't be an overlap
 		if child == nil {

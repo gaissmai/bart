@@ -58,22 +58,22 @@ func (t *Table[V]) readTableStats() map[string]any {
 	t.walk(func(n *node[V], depth int, is4 bool) {
 		switch is4 {
 		case true:
-			stats.size4 += len(n.prefixes.values)
-			stats.childs4[len(n.children.childs)]++
+			stats.size4 += len(n.prefixes)
+			stats.childs4[len(n.children)]++
 			stats.depth4[depth]++
 			stats.types4[n.hasType().String()]++
 
-			for _, idx := range n.prefixes.allIndexes() {
+			for _, idx := range n.allStrideIndexes() {
 				_, pfxLen := baseIndexToPrefix(idx)
 				stats.prefixlen4[strideLen*depth+pfxLen]++
 			}
 		case false:
-			stats.size6 += len(n.prefixes.values)
-			stats.childs6[len(n.children.childs)]++
+			stats.size6 += len(n.prefixes)
+			stats.childs6[len(n.children)]++
 			stats.depth6[depth]++
 			stats.types6[n.hasType().String()]++
 
-			for _, idx := range n.prefixes.allIndexes() {
+			for _, idx := range n.allStrideIndexes() {
 				_, pfxLen := baseIndexToPrefix(idx)
 				stats.prefixlen6[strideLen*depth+pfxLen]++
 			}
@@ -121,7 +121,7 @@ func (t *Table[V]) walk(cb metricWalkFunc[V]) {
 func (n *node[V]) metricWalkRec(cb metricWalkFunc[V], depth int, is4 bool) {
 	cb(n, depth, is4)
 
-	for _, child := range n.children.childs {
+	for _, child := range n.children {
 		child.metricWalkRec(cb, depth+1, is4)
 	}
 }
