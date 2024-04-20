@@ -11,7 +11,6 @@ import (
 	"math/rand"
 	"net/netip"
 	"os"
-	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -41,69 +40,6 @@ func init() {
 
 	randRoute4 = routes4[rand.Intn(len(routes4))]
 	randRoute6 = routes6[rand.Intn(len(routes6))]
-}
-
-func TestFullNew(t *testing.T) {
-	t.Parallel()
-	var startMem, endMem runtime.MemStats
-	runtime.ReadMemStats(&startMem)
-	nRoutes := make([]route, len(routes))
-	copy(nRoutes, routes)
-	runtime.ReadMemStats(&endMem)
-	rawBytes := endMem.TotalAlloc - startMem.TotalAlloc
-
-	rt := bart.Table[any]{}
-	runtime.ReadMemStats(&startMem)
-	for _, route := range nRoutes {
-		rt.Insert(route.CIDR, nil)
-	}
-	runtime.ReadMemStats(&endMem)
-	bartBytes := endMem.TotalAlloc - startMem.TotalAlloc
-
-	t.Logf("BART: n: %d routes, raw: %d KBytes, bart: %6d KBytes, mult: %.2f (bart/raw)",
-		len(nRoutes), rawBytes/(2<<10), bartBytes/(2<<10), float32(bartBytes)/float32(rawBytes))
-}
-
-func TestFullNewV4(t *testing.T) {
-	t.Parallel()
-	var startMem, endMem runtime.MemStats
-	runtime.ReadMemStats(&startMem)
-	nRoutes := make([]route, len(routes4))
-	copy(nRoutes, routes4)
-	runtime.ReadMemStats(&endMem)
-	rawBytes := endMem.TotalAlloc - startMem.TotalAlloc
-
-	rt := bart.Table[any]{}
-	runtime.ReadMemStats(&startMem)
-	for _, route := range nRoutes {
-		rt.Insert(route.CIDR, nil)
-	}
-	runtime.ReadMemStats(&endMem)
-	bartBytes := endMem.TotalAlloc - startMem.TotalAlloc
-
-	t.Logf("BART: n: %d routes, raw: %d KBytes, bart: %6d KBytes, mult: %.2f (bart/raw)",
-		len(nRoutes), rawBytes/(2<<10), bartBytes/(2<<10), float32(bartBytes)/float32(rawBytes))
-}
-
-func TestFullNewV6(t *testing.T) {
-	t.Parallel()
-	var startMem, endMem runtime.MemStats
-	runtime.ReadMemStats(&startMem)
-	nRoutes := make([]route, len(routes6))
-	copy(nRoutes, routes4)
-	runtime.ReadMemStats(&endMem)
-	rawBytes := endMem.TotalAlloc - startMem.TotalAlloc
-
-	rt := bart.Table[any]{}
-	runtime.ReadMemStats(&startMem)
-	for _, route := range nRoutes {
-		rt.Insert(route.CIDR, nil)
-	}
-	runtime.ReadMemStats(&endMem)
-	bartBytes := endMem.TotalAlloc - startMem.TotalAlloc
-
-	t.Logf("BART: n: %d routes, raw: %d KBytes, bart: %6d KBytes, mult: %.2f (bart/raw)",
-		len(nRoutes), rawBytes/(2<<10), bartBytes/(2<<10), float32(bartBytes)/float32(rawBytes))
 }
 
 var (

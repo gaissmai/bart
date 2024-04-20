@@ -67,8 +67,8 @@ func (t *Table[V]) dump(w io.Writer) error {
 func (n *node[V]) dumpRec(w io.Writer, path []byte, is4 bool) {
 	n.dump(w, path, is4)
 
-	for i, child := range n.children.childs {
-		octet := n.children.Select(uint(i))
+	for i, child := range n.children {
+		octet := n.childrenBitset.Select(uint(i))
 		child.dumpRec(w, append(path, byte(octet)), is4)
 	}
 }
@@ -89,13 +89,13 @@ func (n *node[V]) dump(w io.Writer, path []byte, is4 bool) {
 	must(fmt.Fprintf(w, "\n%s[%s] depth:  %d path: [%v] / %d\n",
 		indent, n.hasType(), depth, ancestors(path, is4), bits))
 
-	if len(n.prefixes.values) != 0 {
-		indices := n.prefixes.allIndexes()
+	if len(n.prefixes) != 0 {
+		indices := n.allStrideIndexes()
 		// print the baseIndices for this node.
-		must(fmt.Fprintf(w, "%sindexs(#%d): %v\n", indent, len(n.prefixes.values), indices))
+		must(fmt.Fprintf(w, "%sindexs(#%d): %v\n", indent, len(n.prefixes), indices))
 
 		// print the prefixes for this node
-		must(fmt.Fprintf(w, "%sprefxs(#%d): ", indent, len(n.prefixes.values)))
+		must(fmt.Fprintf(w, "%sprefxs(#%d): ", indent, len(n.prefixes)))
 
 		for _, idx := range indices {
 			octet, bits := baseIndexToPrefix(idx)
@@ -104,12 +104,12 @@ func (n *node[V]) dump(w io.Writer, path []byte, is4 bool) {
 		must(fmt.Fprintln(w))
 	}
 
-	if len(n.children.childs) != 0 {
+	if len(n.children) != 0 {
 		// print the childs for this node
-		must(fmt.Fprintf(w, "%schilds(#%d): ", indent, len(n.children.childs)))
+		must(fmt.Fprintf(w, "%schilds(#%d): ", indent, len(n.children)))
 
-		for i := range n.children.childs {
-			octet := n.children.Select(uint(i))
+		for i := range n.children {
+			octet := n.childrenBitset.Select(uint(i))
 			must(fmt.Fprintf(w, "%s ", octetFmt(octet, is4)))
 		}
 		must(fmt.Fprintln(w))
@@ -164,8 +164,8 @@ func (nt nodeType) String() string {
 
 // hasType returns the nodeType.
 func (n *node[V]) hasType() nodeType {
-	lenPefixes := len(n.prefixes.values)
-	lenChilds := len(n.children.childs)
+	lenPefixes := len(n.prefixes)
+	lenChilds := len(n.children)
 
 	if lenPefixes == 0 && lenChilds != 0 {
 		return intermediateNode

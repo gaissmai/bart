@@ -53,13 +53,13 @@ func TestPrefixInsert(t *testing.T) {
 	fast := newNode[int]()
 
 	for _, pfx := range pfxs {
-		fast.prefixes.insert(uint(pfx.octet), pfx.bits, pfx.val)
+		fast.insertPrefix(uint(pfx.octet), pfx.bits, pfx.val)
 	}
 
 	for i := 0; i < 256; i++ {
 		octet := uint(i)
 		slowVal, slowOK := slow.lpm(octet)
-		_, fastVal, fastOK := fast.prefixes.lpmByOctet(octet)
+		_, fastVal, fastOK := fast.lpmByOctet(octet)
 		if !getsEqual(fastVal, fastOK, slowVal, slowOK) {
 			t.Fatalf("get(%d) = (%v, %v), want (%v, %v)", octet, fastVal, fastOK, slowVal, slowOK)
 		}
@@ -74,13 +74,13 @@ func TestPrefixDelete(t *testing.T) {
 	fast := newNode[int]()
 
 	for _, pfx := range pfxs {
-		fast.prefixes.insert(pfx.octet, pfx.bits, pfx.val)
+		fast.insertPrefix(pfx.octet, pfx.bits, pfx.val)
 	}
 
 	toDelete := pfxs[:50]
 	for _, pfx := range toDelete {
 		slow.delete(pfx.octet, pfx.bits)
-		fast.prefixes.delete(pfx.octet, pfx.bits)
+		fast.deletePrefix(pfx.octet, pfx.bits)
 	}
 
 	// Sanity check that slowTable seems to have done the right thing.
@@ -91,7 +91,7 @@ func TestPrefixDelete(t *testing.T) {
 	for i := 0; i < 256; i++ {
 		octet := uint(i)
 		slowVal, slowOK := slow.lpm(octet)
-		_, fastVal, fastOK := fast.prefixes.lpmByOctet(octet)
+		_, fastVal, fastOK := fast.lpmByOctet(octet)
 		if !getsEqual(fastVal, fastOK, slowVal, slowOK) {
 			t.Fatalf("get(%d) = (%v, %v), want (%v, %v)", octet, fastVal, fastOK, slowVal, slowOK)
 		}
@@ -106,7 +106,7 @@ func TestPrefixOverlaps(t *testing.T) {
 	fast := newNode[int]()
 
 	for _, pfx := range pfxs {
-		fast.prefixes.insert(pfx.octet, pfx.bits, pfx.val)
+		fast.insertPrefix(pfx.octet, pfx.bits, pfx.val)
 	}
 
 	for _, tt := range allPrefixes() {
@@ -134,14 +134,14 @@ func TestNodeOverlaps(t *testing.T) {
 		slow := slowST[int]{pfxs}
 		fast := newNode[int]()
 		for _, pfx := range pfxs {
-			fast.prefixes.insert(pfx.octet, pfx.bits, pfx.val)
+			fast.insertPrefix(pfx.octet, pfx.bits, pfx.val)
 		}
 
 		inter := all[numEntries : 2*numEntries]
 		slowInter := slowST[int]{inter}
 		fastInter := newNode[int]()
 		for _, pfx := range inter {
-			fastInter.prefixes.insert(pfx.octet, pfx.bits, pfx.val)
+			fastInter.insertPrefix(pfx.octet, pfx.bits, pfx.val)
 		}
 
 		gotSlow := slow.overlaps(&slowInter)
@@ -195,7 +195,7 @@ func BenchmarkPrefixInsertion(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			rt := newNode[int]()
 			for _, route := range routes {
-				rt.prefixes.insert(route.octet, route.bits, val)
+				rt.insertPrefix(route.octet, route.bits, val)
 			}
 		}
 		inserts := float64(b.N) * float64(len(routes))
@@ -211,14 +211,14 @@ func BenchmarkPrefixDeletion(b *testing.B) {
 		val := 0
 		rt := newNode[int]()
 		for _, route := range routes {
-			rt.prefixes.insert(route.octet, route.bits, val)
+			rt.insertPrefix(route.octet, route.bits, val)
 		}
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			rt2 := rt
 			for _, route := range routes {
-				rt2.prefixes.delete(route.octet, route.bits)
+				rt2.deletePrefix(route.octet, route.bits)
 			}
 		}
 		deletes := float64(b.N) * float64(len(routes))
@@ -236,12 +236,12 @@ func BenchmarkPrefixLPM(b *testing.B) {
 		val := 0
 		rt := newNode[int]()
 		for _, route := range routes {
-			rt.prefixes.insert(route.octet, route.bits, val)
+			rt.insertPrefix(route.octet, route.bits, val)
 		}
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			_, writeSink, _ = rt.prefixes.lpmByOctet(uint(uint8(i)))
+			_, writeSink, _ = rt.lpmByOctet(uint(uint8(i)))
 		}
 
 		lpm := float64(b.N)

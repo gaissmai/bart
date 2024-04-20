@@ -97,7 +97,7 @@ func (s *slowRT[V]) subnets(pfx netip.Prefix) []netip.Prefix {
 			result = append(result, item.pfx)
 		}
 	}
-	slices.SortFunc(result, sortByPrefix)
+	slices.SortFunc(result, cmpPrefix)
 	return result
 }
 
@@ -109,7 +109,7 @@ func (s *slowRT[V]) supernets(pfx netip.Prefix) []netip.Prefix {
 			result = append(result, item.pfx)
 		}
 	}
-	slices.SortFunc(result, sortByPrefix)
+	slices.SortFunc(result, cmpPrefix)
 	return result
 }
 

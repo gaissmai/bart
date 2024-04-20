@@ -11,85 +11,109 @@ import (
 	"github.com/bits-and-blooms/bitset"
 )
 
+type nodeType byte
+
 const (
-	strideLen       = 8                    // byte
+	nullNode         nodeType = iota // empty node
+	fullNode                         // prefixes and children
+	leafNode                         // only prefixes
+	intermediateNode                 // only children
+)
+
+const (
+	strideLen       = 8                    // octet
 	maxTreeDepth    = 128 / strideLen      // 16
 	maxNodeChildren = 1 << strideLen       // 256
 	maxNodePrefixes = 1 << (strideLen + 1) // 512
 )
 
-type nodeType byte
-
-const (
-	nullNode         nodeType = iota // empty node
-	fullNode                         // prefixes and childs
-	leafNode                         // only prefix(es)
-	intermediateNode                 // only child(s)
-)
-
-// node, a level node in the multibit-trie.
-// A node can have prefixes or child nodes or both.
+// node is a level node in the multibit-trie.
+// A node has prefixes and children.
+//
+// The prefixes form a complete binary tree, see the artlookup.pdf
+// paper in the doc folder to understand the data structure.
+//
+// In contrast to the ART algorithm, popcount-compressed slices are used
+// instead of fixed-size arrays.
+//
+// The array slots are also not pre-allocated as in the ART algorithm,
+// but backtracking is used for the longest-prefix-match.
+//
+// The lookup is then slower by a factor of about 2, but this is
+// the intended trade-off to prevent memory consumption from exploding.
 type node[V any] struct {
-	prefixes *strideTree[V]
-	children *childSlice[V]
-}
+	prefixesBitset *bitset.BitSet
+	childrenBitset *bitset.BitSet
 
-// strideTree, complete-binary-tree, popcount-compressed.
-type strideTree[V any] struct {
-	*bitset.BitSet
-	values []V
-}
-
-// childSlice, a slice with nodes, popcount-compressed
-type childSlice[V any] struct {
-	*bitset.BitSet
-	childs []*node[V]
+	// popcount compressed slices
+	prefixes []V
+	children []*node[V]
 }
 
 // newNode, BitSets have to be initialized.
 func newNode[V any]() *node[V] {
 	return &node[V]{
-		prefixes: &strideTree[V]{
-			BitSet: bitset.New(0), // init BitSet
-			values: nil,
-		},
-
-		children: &childSlice[V]{
-			BitSet: bitset.New(0), // init BitSet
-			childs: nil,
-		},
+		prefixesBitset: bitset.New(0), // init BitSet
+		childrenBitset: bitset.New(0), // init BitSet
 	}
 }
 
-// ################## prefixes ##################################
-
-// rank is the key of the popcount compression algorithm,
-// mapping between bitset index and slice index.
-func (p *strideTree[V]) rank(baseIdx uint) int {
-	return int(p.Rank(baseIdx)) - 1
+// isEmpty returns true if node has neither prefixes nor children.
+func (n *node[V]) isEmpty() bool {
+	return len(n.prefixes) == 0 && len(n.children) == 0
 }
 
-// insert adds the route octet/prefixLen, with value val.
+// ################## prefixes ################################
+
+// rankOfPrefix, Rank() is the key of the popcount compression algorithm,
+// mapping between bitset index and slice index.
+func (n *node[V]) rankOfPrefix(baseIdx uint) int {
+	return int(n.prefixesBitset.Rank(baseIdx)) - 1
+}
+
+// insertPrefix adds the route octet/prefixLen, with value val.
 // Just an adapter for insertIdx.
-func (p *strideTree[V]) insert(octet uint, prefixLen int, val V) {
-	p.insertIdx(prefixToBaseIndex(octet, prefixLen), val)
+func (n *node[V]) insertPrefix(octet uint, prefixLen int, val V) {
+	n.insertIdx(prefixToBaseIndex(octet, prefixLen), val)
 }
 
 // insertIdx adds the route for baseIdx, with value val.
-func (p *strideTree[V]) insertIdx(baseIdx uint, val V) {
+func (n *node[V]) insertIdx(baseIdx uint, val V) {
 	// prefix exists, overwrite val
-	if p.Test(baseIdx) {
-		p.values[p.rank(baseIdx)] = val
+	if n.prefixesBitset.Test(baseIdx) {
+		n.prefixes[n.rankOfPrefix(baseIdx)] = val
 		return
 	}
 
 	// new, insert into bitset and slice
-	p.Set(baseIdx)
-	p.values = slices.Insert(p.values, p.rank(baseIdx), val)
+	n.prefixesBitset.Set(baseIdx)
+	n.prefixes = slices.Insert(n.prefixes, n.rankOfPrefix(baseIdx), val)
+}
+
+// deletePrefix removes the route octet/prefixLen. Reports whether the
+// prefix existed in the table prior to deletion.
+func (n *node[V]) deletePrefix(octet uint, prefixLen int) (wasPresent bool) {
+	baseIdx := prefixToBaseIndex(octet, prefixLen)
+
+	// no route entry
+	if !n.prefixesBitset.Test(baseIdx) {
+		return false
+	}
+
+	rnk := n.rankOfPrefix(baseIdx)
+
+	// delete from slice
+	n.prefixes = slices.Delete(n.prefixes, rnk, rnk+1)
+
+	// delete from bitset, followed by Compact to reduce memory consumption
+	n.prefixesBitset.Clear(baseIdx)
+	n.prefixesBitset.Compact()
+
+	return true
 }
 
 // update or set the value at prefix via callback.
-func (p *strideTree[V]) update(octet uint, prefixLen int, cb func(V, bool) V) (val V) {
+func (n *node[V]) update(octet uint, prefixLen int, cb func(V, bool) V) (val V) {
 	// calculate idx once
 	baseIdx := prefixToBaseIndex(octet, prefixLen)
 
@@ -97,9 +121,9 @@ func (p *strideTree[V]) update(octet uint, prefixLen int, cb func(V, bool) V) (v
 	var rnk int
 
 	// if prefix is set, get current value
-	if ok = p.Test(baseIdx); ok {
-		rnk = p.rank(baseIdx)
-		val = p.values[rnk]
+	if ok = n.prefixesBitset.Test(baseIdx); ok {
+		rnk = n.rankOfPrefix(baseIdx)
+		val = n.prefixes[rnk]
 	}
 
 	// callback function to get updated or new value
@@ -107,42 +131,20 @@ func (p *strideTree[V]) update(octet uint, prefixLen int, cb func(V, bool) V) (v
 
 	// prefix is already set, update and return value
 	if ok {
-		p.values[rnk] = val
+		n.prefixes[rnk] = val
 		return val
 	}
 
 	// new prefix, insert into bitset ...
-	p.Set(baseIdx)
+	n.prefixesBitset.Set(baseIdx)
 
 	// bitset has changed, recalc rank
-	rnk = p.rank(baseIdx)
+	rnk = n.rankOfPrefix(baseIdx)
 
 	// ... and insert value into slice
-	p.values = slices.Insert(p.values, rnk, val)
+	n.prefixes = slices.Insert(n.prefixes, rnk, val)
 
 	return val
-}
-
-// delete removes the route octet/prefixLen. Reports whether the
-// prefix existed in the table prior to deletion.
-func (p *strideTree[V]) delete(octet uint, prefixLen int) (wasPresent bool) {
-	baseIdx := prefixToBaseIndex(octet, prefixLen)
-
-	// no route entry
-	if !p.Test(baseIdx) {
-		return false
-	}
-
-	rnk := p.rank(baseIdx)
-
-	// delete from slice
-	p.values = slices.Delete(p.values, rnk, rnk+1)
-
-	// delete from bitset, followed by Compact to reduce memory consumption
-	p.Clear(baseIdx)
-	p.Compact()
-
-	return true
 }
 
 // lpmByIndex does a route lookup for idx in the 8-bit (stride) routing table
@@ -150,12 +152,12 @@ func (p *strideTree[V]) delete(octet uint, prefixLen int) (wasPresent bool) {
 // longest prefix exists, or ok=false otherwise.
 //
 // backtracking is fast, it's just a bitset test and, if found, one popcount.
-func (p *strideTree[V]) lpmByIndex(idx uint) (baseIdx uint, val V, ok bool) {
+func (n *node[V]) lpmByIndex(idx uint) (baseIdx uint, val V, ok bool) {
 	// max steps in backtracking is the stride length.
 	for {
-		if p.Test(idx) {
+		if n.prefixesBitset.Test(idx) {
 			// longest prefix match
-			return idx, p.values[p.rank(idx)], true
+			return idx, n.prefixes[n.rankOfPrefix(idx)], true
 		}
 
 		if idx == 0 {
@@ -172,26 +174,39 @@ func (p *strideTree[V]) lpmByIndex(idx uint) (baseIdx uint, val V, ok bool) {
 }
 
 // lpmByOctet is an adapter to lpmByIndex.
-func (p *strideTree[V]) lpmByOctet(octet uint) (baseIdx uint, val V, ok bool) {
-	return p.lpmByIndex(octetToBaseIndex(octet))
+func (n *node[V]) lpmByOctet(octet uint) (baseIdx uint, val V, ok bool) {
+	return n.lpmByIndex(octetToBaseIndex(octet))
 }
 
 // lpmByPrefix is an adapter to lpmByIndex.
-func (p *strideTree[V]) lpmByPrefix(octet uint, bits int) (baseIdx uint, val V, ok bool) {
-	return p.lpmByIndex(prefixToBaseIndex(octet, bits))
+func (n *node[V]) lpmByPrefix(octet uint, bits int) (baseIdx uint, val V, ok bool) {
+	return n.lpmByIndex(prefixToBaseIndex(octet, bits))
+}
+
+// getValByIndex for baseIdx.
+func (n *node[V]) getValByIndex(baseIdx uint) (val V, ok bool) {
+	if n.prefixesBitset.Test(baseIdx) {
+		return n.prefixes[n.rankOfPrefix(baseIdx)], true
+	}
+	return
+}
+
+// getValByPrefix, adapter for getValByIndex.
+func (n *node[V]) getValByPrefix(octet uint, bits int) (val V, ok bool) {
+	return n.getValByIndex(prefixToBaseIndex(octet, bits))
 }
 
 // apmByPrefix does an all prefix match in the 8-bit (stride) routing table
 // at this depth and returns all matching baseIdx's.
-func (p *strideTree[V]) apmByPrefix(octet uint, bits int) (result []uint) {
+func (n *node[V]) apmByPrefix(octet uint, bits int) (result []uint) {
 	// skip intermediate nodes
-	if len(p.values) == 0 {
+	if len(n.prefixes) == 0 {
 		return
 	}
 
 	idx := prefixToBaseIndex(octet, bits)
 	for {
-		if p.Test(idx) {
+		if n.prefixesBitset.Test(idx) {
 			result = append(result, idx)
 		}
 
@@ -207,79 +222,61 @@ func (p *strideTree[V]) apmByPrefix(octet uint, bits int) (result []uint) {
 	return result
 }
 
-// getValByIndex for baseIdx.
-func (p *strideTree[V]) getValByIndex(baseIdx uint) (val V, ok bool) {
-	if p.Test(baseIdx) {
-		return p.values[p.rank(baseIdx)], true
-	}
-	return
-}
-
-// getValByPrefix, adapter for getValByIndex.
-func (p *strideTree[V]) getValByPrefix(octet uint, bits int) (val V, ok bool) {
-	return p.getValByIndex(prefixToBaseIndex(octet, bits))
-}
-
-// allIndexes returns all baseIndexes set in this prefix tree in ascending order.
-func (p *strideTree[V]) allIndexes() []uint {
+// allStrideIndexes returns all baseIndexes set in this stride node in ascending order.
+func (n *node[V]) allStrideIndexes() []uint {
 	all := make([]uint, 0, maxNodePrefixes)
-	_, all = p.NextSetMany(0, all)
+	_, all = n.prefixesBitset.NextSetMany(0, all)
 	return all
 }
 
-// ################## childs ####################################
+// ################## children ################################
 
-// rank is the key of the popcount compression algorithm,
+// rankOfChild, Rank() is the key of the popcount compression algorithm,
 // mapping between bitset index and slice index.
-func (c *childSlice[V]) rank(octet uint) int {
-	return int(c.Rank(octet)) - 1
+func (n *node[V]) rankOfChild(octet uint) int {
+	return int(n.childrenBitset.Rank(octet)) - 1
 }
 
-// insert the child into childTree.
-func (c *childSlice[V]) insert(octet uint, child *node[V]) {
+// insertChild, insert the child
+func (n *node[V]) insertChild(octet uint, child *node[V]) {
 	// insert into bitset and slice
-	c.Set(octet)
-	c.childs = slices.Insert(c.childs, c.rank(octet), child)
+	n.childrenBitset.Set(octet)
+	n.children = slices.Insert(n.children, n.rankOfChild(octet), child)
 }
 
-// delete the child at octet. It is valid to delete a non-existent child.
-func (c *childSlice[V]) delete(octet uint) {
-	if !c.Test(octet) {
+// deleteChild, delete the child at octet. It is valid to delete a non-existent child.
+func (n *node[V]) deleteChild(octet uint) {
+	if !n.childrenBitset.Test(octet) {
 		return
 	}
 
-	rnk := c.rank(octet)
+	rnk := n.rankOfChild(octet)
 
 	// delete from slice
-	c.childs = slices.Delete(c.childs, rnk, rnk+1)
+	n.children = slices.Delete(n.children, rnk, rnk+1)
 
 	// delete from bitset, followed by Compact to reduce memory consumption
-	c.Clear(octet)
-	c.Compact()
+	n.childrenBitset.Clear(octet)
+	n.childrenBitset.Compact()
 }
 
-// get returns the child pointer for octet, or nil if none.
-func (c *childSlice[V]) get(octet uint) *node[V] {
-	if !c.Test(octet) {
+// getChild returns the child pointer for octet, or nil if none.
+func (n *node[V]) getChild(octet uint) *node[V] {
+	if !n.childrenBitset.Test(octet) {
 		return nil
 	}
 
-	return c.childs[c.rank(octet)]
+	return n.children[n.rankOfChild(octet)]
 }
 
-// allOctets returns the octets of all child nodes in ascending order.
-func (c *childSlice[V]) allOctets() []uint {
+// allChildOctets returns the octets of all child nodes in ascending order.
+func (n *node[V]) allChildOctets() []uint {
 	all := make([]uint, maxNodeChildren)
-	_, all = c.NextSetMany(0, all)
+	_, all = n.childrenBitset.NextSetMany(0, all)
 	return all
 }
 
-// ################## node ###################################
-
-// isEmpty returns true if node has neither prefixes nor children.
-func (n *node[V]) isEmpty() bool {
-	return len(n.prefixes.values) == 0 && len(n.children.childs) == 0
-}
+// #################### nodes #############################################
 
 // overlapsRec returns true if any IP in the nodes n or o overlaps.
 // First test the routes, then the children and if no match rec-descent
@@ -291,14 +288,14 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 
 	// 1. test if any routes overlaps?
 
-	nOk := len(n.prefixes.values) > 0
-	oOk := len(o.prefixes.values) > 0
+	nOk := len(n.prefixes) > 0
+	oOk := len(o.prefixes) > 0
 	var nIdx, oIdx uint
 	// zig-zag, for all routes in both nodes ...
 	for {
 		if nOk {
 			// range over bitset, node n
-			if nIdx, nOk = n.prefixes.NextSet(nIdx); nOk {
+			if nIdx, nOk = n.prefixesBitset.NextSet(nIdx); nOk {
 				// get range of host routes for this prefix
 				lowerBound, upperBound := lowerUpperBound(nIdx)
 
@@ -317,7 +314,7 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 
 		if oOk {
 			// range over bitset, node o
-			if oIdx, oOk = o.prefixes.NextSet(oIdx); oOk {
+			if oIdx, oOk = o.prefixesBitset.NextSet(oIdx); oOk {
 				// get range of host routes for this prefix
 				lowerBound, upperBound := lowerUpperBound(oIdx)
 
@@ -339,7 +336,7 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 	}
 
 	// full run, zig-zag didn't already match
-	if len(n.prefixes.values) > 0 && len(o.prefixes.values) > 0 {
+	if len(n.prefixes) > 0 && len(o.prefixes) > 0 {
 		for i := firstHostIndex; i <= lastHostIndex; i++ {
 			if nAllotIndex[i] && oAllotIndex[i] {
 				return true
@@ -352,14 +349,14 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 	nOctets := [maxNodeChildren]bool{}
 	oOctets := [maxNodeChildren]bool{}
 
-	nOk = len(n.children.childs) > 0
-	oOk = len(o.children.childs) > 0
+	nOk = len(n.children) > 0
+	oOk = len(o.children) > 0
 	var nOctet, oOctet uint
 	// zig-zag, for all octets in both nodes ...
 	for {
 		// range over bitset, node n
 		if nOk {
-			if nOctet, nOk = n.children.NextSet(nOctet); nOk {
+			if nOctet, nOk = n.childrenBitset.NextSet(nOctet); nOk {
 				if oAllotIndex[nOctet+firstHostIndex] {
 					return true
 				}
@@ -370,7 +367,7 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 
 		// range over bitset, node o
 		if oOk {
-			if oOctet, oOk = o.children.NextSet(oOctet); oOk {
+			if oOctet, oOk = o.childrenBitset.NextSet(oOctet); oOk {
 				if nAllotIndex[oOctet+firstHostIndex] {
 					return true
 				}
@@ -386,12 +383,12 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 
 	// 3. rec-descent call for childs with same octet
 
-	if len(n.children.childs) > 0 && len(o.children.childs) > 0 {
+	if len(n.children) > 0 && len(o.children) > 0 {
 		for i := 0; i < len(nOctets); i++ {
 			if nOctets[i] && oOctets[i] {
 				// get next child node for this octet
-				nc := n.children.get(uint(i))
-				oc := o.children.get(uint(i))
+				nc := n.getChild(uint(i))
+				oc := o.getChild(uint(i))
 
 				// rec-descent
 				if nc.overlapsRec(oc) {
@@ -410,7 +407,7 @@ func (n *node[V]) overlapsPrefix(octet uint, pfxLen int) bool {
 	// 1. test if any route in this node overlaps prefix?
 
 	pfxIdx := prefixToBaseIndex(octet, pfxLen)
-	if _, _, ok := n.prefixes.lpmByIndex(pfxIdx); ok {
+	if _, _, ok := n.lpmByIndex(pfxIdx); ok {
 		return true
 	}
 
@@ -426,7 +423,7 @@ func (n *node[V]) overlapsPrefix(octet uint, pfxLen int) bool {
 	routeIdx := pfxIdx << 1
 	var ok bool
 	for {
-		if routeIdx, ok = n.prefixes.NextSet(routeIdx); !ok {
+		if routeIdx, ok = n.prefixesBitset.NextSet(routeIdx); !ok {
 			break
 		}
 
@@ -445,7 +442,7 @@ func (n *node[V]) overlapsPrefix(octet uint, pfxLen int) bool {
 	// set start octet in bitset search with prefix octet
 	childOctet := octet
 	for {
-		if childOctet, ok = n.children.NextSet(childOctet); !ok {
+		if childOctet, ok = n.childrenBitset.NextSet(childOctet); !ok {
 			break
 		}
 
@@ -468,28 +465,28 @@ func (n *node[V]) unionRec(o *node[V]) {
 	var oOk bool
 	// for all prefixes in other node do ...
 	for {
-		if oIdx, oOk = o.prefixes.NextSet(oIdx); !oOk {
+		if oIdx, oOk = o.prefixesBitset.NextSet(oIdx); !oOk {
 			break
 		}
-		oVal, _ := o.prefixes.getValByIndex(oIdx)
+		oVal, _ := o.getValByIndex(oIdx)
 		// insert/overwrite prefix/value from oNode to nNode
-		n.prefixes.insertIdx(oIdx, oVal)
+		n.insertIdx(oIdx, oVal)
 		oIdx++
 	}
 
 	var oOctet uint
 	// for all children in other node do ...
 	for {
-		if oOctet, oOk = o.children.NextSet(oOctet); !oOk {
+		if oOctet, oOk = o.childrenBitset.NextSet(oOctet); !oOk {
 			break
 		}
-		oNode := o.children.get(oOctet)
+		oNode := o.getChild(oOctet)
 
 		// get nNode with same octet
-		nNode := n.children.get(oOctet)
+		nNode := n.getChild(oOctet)
 		if nNode == nil {
 			// union child from oNode into nNode
-			n.children.insert(oOctet, oNode.cloneRec())
+			n.insertChild(oOctet, oNode.cloneRec())
 		} else {
 			// both nodes have child with octet, call union rec-descent
 			nNode.unionRec(oNode)
@@ -504,14 +501,15 @@ func (n *node[V]) cloneRec() *node[V] {
 		return c
 	}
 
-	c.prefixes.BitSet = n.prefixes.BitSet.Clone()       // deep
-	c.prefixes.values = slices.Clone(n.prefixes.values) // shallow
+	c.prefixesBitset = n.prefixesBitset.Clone() // deep
+	c.prefixes = slices.Clone(n.prefixes)       // shallow
 
-	c.children.BitSet = n.children.BitSet.Clone()       // deep
-	c.children.childs = slices.Clone(n.children.childs) // shallow
+	c.childrenBitset = n.childrenBitset.Clone() // deep
+	c.children = slices.Clone(n.children)       // shallow
+
 	// make it deep
-	for i, child := range c.children.childs {
-		c.children.childs[i] = child.cloneRec()
+	for i, child := range c.children {
+		c.children[i] = child.cloneRec()
 	}
 
 	return c
@@ -523,8 +521,8 @@ func (n *node[V]) cloneRec() *node[V] {
 // error is propagated.
 func (n *node[V]) walkRec(path []byte, is4 bool, cb func(netip.Prefix, V) error) error {
 	// for all prefixes in this node do ...
-	for _, idx := range n.prefixes.allIndexes() {
-		val, _ := n.prefixes.getValByIndex(idx)
+	for _, idx := range n.allStrideIndexes() {
+		val, _ := n.getValByIndex(idx)
 		pfx := cidrFromPath(path, idx, is4)
 
 		// make the callback for this prefix
@@ -535,9 +533,9 @@ func (n *node[V]) walkRec(path []byte, is4 bool, cb func(netip.Prefix, V) error)
 	}
 
 	// for all children in this node do ...
-	for _, octet := range n.children.allOctets() {
+	for _, octet := range n.allChildOctets() {
 		path := append(slices.Clone(path), byte(octet))
-		child := n.children.get(octet)
+		child := n.getChild(octet)
 
 		if err := child.walkRec(path, is4, cb); err != nil {
 			// premature end of recursion
@@ -551,7 +549,7 @@ func (n *node[V]) walkRec(path []byte, is4 bool, cb func(netip.Prefix, V) error)
 // subnets returns all CIDRs covered by parent pfx.
 func (n *node[V]) subnets(path []byte, parentIdx uint, is4 bool) (result []netip.Prefix) {
 	// for all routes in this node do ...
-	for _, idx := range n.prefixes.allIndexes() {
+	for _, idx := range n.allStrideIndexes() {
 		// is this route covered by pfx?
 		for i := idx; i >= parentIdx; i >>= 1 {
 			if i == parentIdx { // match
@@ -565,14 +563,14 @@ func (n *node[V]) subnets(path []byte, parentIdx uint, is4 bool) (result []netip
 	}
 
 	// for all children in this node do ...
-	for _, octet := range n.children.allOctets() {
+	for _, octet := range n.allChildOctets() {
 		idx := octetToBaseIndex(octet)
 
 		// is this child covered by pfx?
 		for i := idx; i >= parentIdx; i >>= 1 {
 			if i == parentIdx { // match
 				// get child for octet
-				c := n.children.get(octet)
+				c := n.getChild(octet)
 
 				// append octet to path
 				path := append(slices.Clone(path), byte(octet))
@@ -589,9 +587,9 @@ func (n *node[V]) subnets(path []byte, parentIdx uint, is4 bool) (result []netip
 	return result
 }
 
-// sortByPrefix
-func sortByPrefix(a, b netip.Prefix) int {
-	if cmp := a.Masked().Addr().Compare(b.Masked().Addr()); cmp != 0 {
+// cmpPrefix, all cidrs are normalized
+func cmpPrefix(a, b netip.Prefix) int {
+	if cmp := a.Addr().Compare(b.Addr()); cmp != 0 {
 		return cmp
 	}
 	return cmp.Compare(a.Bits(), b.Bits())
