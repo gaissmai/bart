@@ -4,7 +4,7 @@
 package bart
 
 // Please read the ART paper ./doc/artlookup.pdf
-// to understand the algorithm.
+// to understand the baseIndex algorithm.
 
 // hostMasks as lookup table
 var hostMasks = []uint8{
@@ -37,20 +37,7 @@ func prefixToBaseIndex(octet uint, prefixLen int) uint {
 // octetToBaseIndex, just prefixToBaseIndex(octet, 8), a.k.a host routes
 // but faster, use it for host routes in Lookup.
 func octetToBaseIndex(octet uint) uint {
-	return octet + firstHostIndex // octet + 256
-}
-
-// parentIndex returns the index of idx's parent prefix, or 0 if idx
-// is the index of 0/0.
-// nolint:unused
-func parentIndex(idx uint) uint {
-	return idx >> 1
-}
-
-// baseIndexToPrefixLen, just an adapter
-func baseIndexToPrefixLen(baseIdx uint) int {
-	_, bits := baseIndexToPrefix(baseIdx)
-	return bits
+	return octet + firstHostIndex // just: octet + 256
 }
 
 // lastHostIndexOfPrefix returns the bitset index of the last octet in octet/len.
@@ -62,6 +49,12 @@ func lastHostIndexOfPrefix(octet uint, bits int) uint {
 func lowerUpperBound(idx uint) (uint, uint) {
 	octet, bits := baseIndexToPrefix(idx)
 	return octetToBaseIndex(octet), lastHostIndexOfPrefix(octet, bits)
+}
+
+// baseIndexToPrefixMask, calc the bits from baseIndex and octect depth
+func baseIndexToPrefixMask(baseIdx uint, depth int) int {
+	_, pfxLen := baseIndexToPrefix(baseIdx)
+	return depth*strideLen + pfxLen
 }
 
 // baseIndexToPrefix returns the octet and prefix len of baseIdx.
