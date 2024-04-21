@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 //
 // tests and benchmarks copied from github.com/tailscale/art
-// and modified for this implementation by:
+// and massive modified for this implementation by:
 //
 // Copyright (c) Karl Gaissmaier
 // SPDX-License-Identifier: MIT
@@ -11,8 +11,7 @@ package bart
 
 import (
 	"fmt"
-	"runtime"
-	"sort"
+	"math/rand"
 	"testing"
 )
 
@@ -49,7 +48,7 @@ func TestPrefixInsert(t *testing.T) {
 	// easy to verify by inspection.
 
 	pfxs := shufflePrefixes(allPrefixes())[:100]
-	slow := slowST[int]{pfxs}
+	slow := slowNT[int]{pfxs}
 	fast := newNode[int]()
 
 	for _, pfx := range pfxs {
@@ -70,7 +69,7 @@ func TestPrefixDelete(t *testing.T) {
 	t.Parallel()
 	// Compare route deletion to our reference slowTable.
 	pfxs := shufflePrefixes(allPrefixes())[:100]
-	slow := slowST[int]{pfxs}
+	slow := slowNT[int]{pfxs}
 	fast := newNode[int]()
 
 	for _, pfx := range pfxs {
@@ -102,7 +101,7 @@ func TestPrefixOverlaps(t *testing.T) {
 	t.Parallel()
 
 	pfxs := shufflePrefixes(allPrefixes())[:100]
-	slow := slowST[int]{pfxs}
+	slow := slowNT[int]{pfxs}
 	fast := newNode[int]()
 
 	for _, pfx := range pfxs {
@@ -122,8 +121,7 @@ func TestNodeOverlaps(t *testing.T) {
 	t.Parallel()
 
 	// Empirically, between 5 and 6 routes per table results in ~50%
-	// of random pairs overlapping. Cool example of the birthday
-	// paradox!
+	// of random pairs overlapping. Cool example of the birthday paradox!
 	const numEntries = 6
 	all := allPrefixes()
 
@@ -131,14 +129,14 @@ func TestNodeOverlaps(t *testing.T) {
 	for i := 0; i < 100_000; i++ {
 		shufflePrefixes(all)
 		pfxs := all[:numEntries]
-		slow := slowST[int]{pfxs}
+		slow := slowNT[int]{pfxs}
 		fast := newNode[int]()
 		for _, pfx := range pfxs {
 			fast.insertPrefix(pfx.octet, pfx.bits, pfx.val)
 		}
 
 		inter := all[numEntries : 2*numEntries]
-		slowInter := slowST[int]{inter}
+		slowInter := slowNT[int]{inter}
 		fastInter := newNode[int]()
 		for _, pfx := range inter {
 			fastInter.insertPrefix(pfx.octet, pfx.bits, pfx.val)
@@ -157,97 +155,193 @@ func TestNodeOverlaps(t *testing.T) {
 	}
 }
 
-var prefixRouteCount = []int{10, 20, 50, 100, 200, 500}
+var (
+	prefixCount = []int{10, 20, 50, 100, 200, 500}
+	childCount  = []int{10, 20, 50, 100, 200, 250}
+)
 
-// forPrefixCount runs the benchmark fn with different sets of routes.
-func forPrefixCount(b *testing.B, fn func(b *testing.B, routes []slowSTEntry[int])) {
+func BenchmarkNodePrefixInsert(b *testing.B) {
 	routes := shufflePrefixes(allPrefixes())
-	for _, nroutes := range prefixRouteCount {
-		b.Run(fmt.Sprint(nroutes), func(b *testing.B) {
-			runAndRecord := func(b *testing.B) {
-				b.ReportAllocs()
-				var startMem, endMem runtime.MemStats
-				runtime.ReadMemStats(&startMem)
-				fn(b, routes)
-				runtime.ReadMemStats(&endMem)
-				ops := float64(b.N) * float64(len(routes))
-				allocs := float64(endMem.Mallocs - startMem.Mallocs)
-				bytes := float64(endMem.TotalAlloc - startMem.TotalAlloc)
-				b.ReportMetric(roundFloat64(allocs/ops), "allocs/op")
-				b.ReportMetric(roundFloat64(bytes/ops), "B/op")
-			}
 
-			routes := append([]slowSTEntry[int](nil), routes[:nroutes]...)
-			b.Run("random_order", runAndRecord)
-			sort.Slice(routes, func(i, j int) bool {
-				if routes[i].bits < routes[j].bits {
-					return true
-				}
-				return routes[i].octet < routes[j].octet
-			})
+	for _, nroutes := range prefixCount {
+		node := newNode[int]()
+
+		for i, route := range routes {
+			if i >= nroutes {
+				break
+			}
+			node.insertPrefix(route.octet, route.bits, 0)
+		}
+
+		b.Run(fmt.Sprintf("Into %d", nroutes), func(b *testing.B) {
+			route := routes[rand.Intn(len(routes))]
+
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				node.insertPrefix(route.octet, route.bits, 0)
+			}
 		})
 	}
 }
 
-func BenchmarkPrefixInsertion(b *testing.B) {
-	forPrefixCount(b, func(b *testing.B, routes []slowSTEntry[int]) {
-		val := 0
-		for i := 0; i < b.N; i++ {
-			rt := newNode[int]()
-			for _, route := range routes {
-				rt.insertPrefix(route.octet, route.bits, val)
+func BenchmarkNodePrefixUpdate(b *testing.B) {
+	routes := shufflePrefixes(allPrefixes())
+
+	for _, nroutes := range prefixCount {
+		node := newNode[int]()
+
+		for i, route := range routes {
+			if i >= nroutes {
+				break
 			}
+			node.insertPrefix(route.octet, route.bits, 0)
 		}
-		inserts := float64(b.N) * float64(len(routes))
-		elapsed := float64(b.Elapsed().Nanoseconds())
-		elapsedSec := b.Elapsed().Seconds()
-		b.ReportMetric(elapsed/inserts, "ns/op")
-		b.ReportMetric(inserts/elapsedSec, "routes/s")
-	})
+
+		b.Run(fmt.Sprintf("In %d", nroutes), func(b *testing.B) {
+			route := routes[rand.Intn(len(routes))]
+
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				node.updatePrefix(route.octet, route.bits, func(int, bool) int { return 1 })
+			}
+		})
+	}
 }
 
-func BenchmarkPrefixDeletion(b *testing.B) {
-	forPrefixCount(b, func(b *testing.B, routes []slowSTEntry[int]) {
-		val := 0
-		rt := newNode[int]()
-		for _, route := range routes {
-			rt.insertPrefix(route.octet, route.bits, val)
+func BenchmarkNodePrefixDelete(b *testing.B) {
+	routes := shufflePrefixes(allPrefixes())
+
+	for _, nroutes := range prefixCount {
+		node := newNode[int]()
+
+		for i, route := range routes {
+			if i >= nroutes {
+				break
+			}
+			node.insertPrefix(route.octet, route.bits, 0)
 		}
 
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			rt2 := rt
-			for _, route := range routes {
-				rt2.deletePrefix(route.octet, route.bits)
+		b.Run(fmt.Sprintf("From %d", nroutes), func(b *testing.B) {
+			route := routes[rand.Intn(len(routes))]
+
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				node.deletePrefix(route.octet, route.bits)
 			}
-		}
-		deletes := float64(b.N) * float64(len(routes))
-		elapsed := float64(b.Elapsed().Nanoseconds())
-		elapsedSec := b.Elapsed().Seconds()
-		b.ReportMetric(elapsed/deletes, "ns/op")
-		b.ReportMetric(deletes/elapsedSec, "routes/s")
-	})
+		})
+	}
 }
 
 var writeSink int
 
-func BenchmarkPrefixLPM(b *testing.B) {
-	forPrefixCount(b, func(b *testing.B, routes []slowSTEntry[int]) {
-		val := 0
-		rt := newNode[int]()
-		for _, route := range routes {
-			rt.insertPrefix(route.octet, route.bits, val)
+func BenchmarkNodePrefixLPM(b *testing.B) {
+	routes := shufflePrefixes(allPrefixes())
+
+	for _, nroutes := range prefixCount {
+		node := newNode[int]()
+
+		for i, route := range routes {
+			if i >= nroutes {
+				break
+			}
+			node.insertPrefix(route.octet, route.bits, 0)
 		}
 
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			_, writeSink, _ = rt.lpmByOctet(uint(uint8(i)))
+		b.Run(fmt.Sprintf("IN %d", nroutes), func(b *testing.B) {
+			route := routes[rand.Intn(len(routes))]
+
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				_, writeSink, _ = node.lpmByPrefix(route.octet, route.bits)
+			}
+		})
+	}
+}
+
+func BenchmarkNodePrefixRank(b *testing.B) {
+	routes := shufflePrefixes(allPrefixes())
+
+	for _, nroutes := range prefixCount {
+		node := newNode[int]()
+
+		for i, route := range routes {
+			if i >= nroutes {
+				break
+			}
+			node.insertPrefix(route.octet, route.bits, 0)
 		}
 
-		lpm := float64(b.N)
-		elapsed := float64(b.Elapsed().Nanoseconds())
-		b.ReportMetric(elapsed/lpm, "ns/op")
-	})
+		b.Run(fmt.Sprintf("IN %d", nroutes), func(b *testing.B) {
+			route := routes[rand.Intn(len(routes))]
+			baseIdx := prefixToBaseIndex(route.octet, route.bits)
+
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				writeSink = node.prefixRank(baseIdx)
+			}
+		})
+	}
+}
+
+func BenchmarkNodeChildInsert(b *testing.B) {
+	for _, nchilds := range childCount {
+		node := newNode[int]()
+
+		for i := 0; i < nchilds; i++ {
+			octet := rand.Intn(maxNodeChildren)
+			node.insertChild(uint(octet), nil)
+		}
+
+		b.Run(fmt.Sprintf("Into %d", nchilds), func(b *testing.B) {
+			octet := rand.Intn(maxNodeChildren)
+
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				node.insertChild(uint(octet), nil)
+			}
+		})
+	}
+}
+
+func BenchmarkNodeChildDelete(b *testing.B) {
+	for _, nchilds := range childCount {
+		node := newNode[int]()
+
+		for i := 0; i < nchilds; i++ {
+			octet := rand.Intn(maxNodeChildren)
+			node.insertChild(uint(octet), nil)
+		}
+
+		b.Run(fmt.Sprintf("From %d", nchilds), func(b *testing.B) {
+			octet := rand.Intn(maxNodeChildren)
+
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				node.deleteChild(uint(octet))
+			}
+		})
+	}
+}
+
+func BenchmarkNodeChildRank(b *testing.B) {
+	for _, nchilds := range childCount {
+		node := newNode[int]()
+
+		for i := 0; i < nchilds; i++ {
+			octet := rand.Intn(maxNodeChildren)
+			node.insertChild(uint(octet), nil)
+		}
+
+		b.Run(fmt.Sprintf("In %d", nchilds), func(b *testing.B) {
+			octet := rand.Intn(maxNodeChildren)
+			baseIdx := octetToBaseIndex(uint(octet))
+
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				node.childRank(baseIdx)
+			}
+		})
+	}
 }
 
 func getsEqual[V comparable](a V, aOK bool, b V, bOK bool) bool {
