@@ -152,11 +152,13 @@ func randomPrefixes(n int) []slowRTEntry[int] {
 }
 
 // randomPrefixes4 returns n randomly generated IPv4 prefixes and associated values.
+// skip default route
 func randomPrefixes4(n int) []slowRTEntry[int] {
 	pfxs := map[netip.Prefix]bool{}
 
 	for len(pfxs) < n {
-		bits := rand.Intn(33)
+		bits := rand.Intn(32)
+		bits += 1
 		pfx, err := randomAddr4().Prefix(bits)
 		if err != nil {
 			panic(err)
@@ -173,11 +175,13 @@ func randomPrefixes4(n int) []slowRTEntry[int] {
 }
 
 // randomPrefixes6 returns n randomly generated IPv4 prefixes and associated values.
+// skip default route
 func randomPrefixes6(n int) []slowRTEntry[int] {
 	pfxs := map[netip.Prefix]bool{}
 
 	for len(pfxs) < n {
-		bits := rand.Intn(129)
+		bits := rand.Intn(128)
+		bits += 1
 		pfx, err := randomAddr6().Prefix(bits)
 		if err != nil {
 			panic(err)

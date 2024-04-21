@@ -7,11 +7,11 @@ import (
 	"bufio"
 	"compress/gzip"
 	crand "crypto/rand"
+	"fmt"
 	"log"
 	"math/rand"
 	"net/netip"
 	"os"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -247,7 +247,7 @@ func BenchmarkFullTableOverlapsV4(b *testing.B) {
 			inter.Insert(pfx, j)
 		}
 
-		b.Run(strconv.Itoa(i), func(b *testing.B) {
+		b.Run(fmt.Sprintf("With_%4d", i), func(b *testing.B) {
 			b.ResetTimer()
 			for k := 0; k < b.N; k++ {
 				boolSink = rt.Overlaps(inter)
@@ -270,7 +270,7 @@ func BenchmarkFullTableOverlapsV6(b *testing.B) {
 			inter.Insert(pfx, j)
 		}
 
-		b.Run(strconv.Itoa(i), func(b *testing.B) {
+		b.Run(fmt.Sprintf("With_%4d", i), func(b *testing.B) {
 			b.ResetTimer()
 			for k := 0; k < b.N; k++ {
 				boolSink = rt.Overlaps(inter)
@@ -293,7 +293,7 @@ func BenchmarkFullTableOverlaps(b *testing.B) {
 			inter.Insert(pfx, j)
 		}
 
-		b.Run(strconv.Itoa(i), func(b *testing.B) {
+		b.Run(fmt.Sprintf("With_%4d", i), func(b *testing.B) {
 			b.ResetTimer()
 			for k := 0; k < b.N; k++ {
 				boolSink = rt.Overlaps(inter)
