@@ -10,6 +10,10 @@ import (
 	"strings"
 )
 
+// ###################################################
+// Useful during development or debugging and testing.
+// ###################################################
+
 // dumpString is just a wrapper for dump.
 func (t *Table[V]) dumpString() string {
 	w := new(strings.Builder)
@@ -19,8 +23,7 @@ func (t *Table[V]) dumpString() string {
 	return w.String()
 }
 
-// dump the IPv4 and IPv6 tables to w.
-// Useful during development and debugging.
+// dump the table structure and all the nodes to w.
 //
 //	 Output:
 //
