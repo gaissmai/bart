@@ -113,8 +113,8 @@ func (n *node[V]) deletePrefix(octet uint, prefixLen int) (wasPresent bool) {
 	return true
 }
 
-// update or set the value at prefix via callback.
-func (n *node[V]) update(octet uint, prefixLen int, cb func(V, bool) V) (val V) {
+// updatePrefix, update or set the value at prefix via callback.
+func (n *node[V]) updatePrefix(octet uint, prefixLen int, cb func(V, bool) V) (val V) {
 	// calculate idx once
 	baseIdx := prefixToBaseIndex(octet, prefixLen)
 
@@ -580,9 +580,9 @@ func (n *node[V]) subnets(path []byte, parentIdx uint, is4 bool) (result []netip
 				path := append(slices.Clone(path), byte(octet))
 
 				// all cidrs under this child are covered by pfx
-				_ = c.walkRec(path, is4, func(pfx netip.Prefix, _ V) error {
+				_ = c.walkRec(path, is4, func(pfx netip.Prefix, _ V) (err error) {
 					result = append(result, pfx)
-					return nil
+					return
 				})
 			}
 		}

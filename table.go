@@ -68,9 +68,9 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	for {
 		octet := uint(octets[depth])
 
-		// loop stop condition:
-		// last non-masked octet of prefix, insert the
-		// octet and bits into the prefixHeap on this depth
+		// loop stop condition: last significant octet reached
+		//
+		// insert the (octet, bits, val) into the node at this depth
 		//
 		// 8.0.0.0/5 ->       depth 0, octet 8,   bits 5
 		// 10.0.0.0/8 ->      depth 0, octet 10,  bits 8
@@ -83,7 +83,7 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 			return
 		}
 
-		// descend down to next child level
+		// descend down to next trie level
 		child := n.getChild(octet)
 
 		// create and insert missing intermediate child, no path compression!
@@ -123,7 +123,13 @@ func (t *Table[V]) Delete(pfx netip.Prefix) {
 	// purge dangling paths after deletion
 	pathStack := [maxTreeDepth]*node[V]{}
 
-	octets := ip.AsSlice()
+	// does not allocate
+	a16 := ip.As16()
+	octets := a16[:]
+	if is4 {
+		octets = octets[12:]
+	}
+
 	depth := 0
 	for {
 		octet := uint(octets[depth])
@@ -131,7 +137,7 @@ func (t *Table[V]) Delete(pfx netip.Prefix) {
 		// push current node on stack for path recording
 		pathStack[depth] = n
 
-		// last non-masked byte
+		// last significant octet reached
 		if bits <= strideLen {
 			// found a child on proper depth ...
 			if !n.deletePrefix(octet, bits) {
@@ -212,12 +218,12 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 	for {
 		octet := uint(octets[depth])
 
-		// loop stop condition
+		// last significant octet reached
 		if bits <= strideLen {
 			return n.update(octet, bits, cb)
 		}
 
-		// descend down to next child level
+		// descend down to next trie level
 		child := n.getChild(octet)
 
 		// create and insert missing intermediate child, no path compression!
@@ -264,7 +270,7 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 	for {
 		octet := uint(octets[depth])
 
-		// last non-masked byte
+		// last significant octet reached
 		if bits <= strideLen {
 			return n.getValByPrefix(octet, bits)
 		}
@@ -304,13 +310,13 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 
 	depth := 0
 	octet := uint(octets[depth])
-	// find leaf tree
+	// find leaf node
 	for {
 
 		// push current node on stack for fast backtracking
 		pathStack[depth] = n
 
-		// go down in tight loop to leaf tree
+		// go down in tight loop to leaf node
 		if child := n.getChild(octet); child != nil {
 			depth++
 			octet = uint(octets[depth])
@@ -362,7 +368,7 @@ func (t *Table[V]) LookupPrefixLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, o
 	depth, baseIdx, val, ok := t.lpmByPrefix(pfx)
 
 	// calculate the mask from baseIdx and depth
-	mask := depth*strideLen + baseIndexToPrefixLen(baseIdx)
+	mask := baseIndexToPrefixMask(baseIdx, depth)
 
 	// calculate the lpm from ip and mask
 	lpm, _ = pfx.Addr().Prefix(mask)
@@ -400,18 +406,19 @@ func (t *Table[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V
 	}
 
 	octet := uint(octets[depth])
-	// find leaf tree
+
+	// go down to stride node for pfx
 	for {
 
 		// push current node on stack for fast backtracking
 		pathStack[depth] = n
 
-		// already at leaf node?
+		// last significant octet reached
 		if bits <= strideLen {
 			break
 		}
 
-		// go down in tight loop to leaf node
+		// go down in tight loop the trie levels
 		if child := n.getChild(octet); child != nil {
 			depth++
 			bits -= strideLen
@@ -420,25 +427,22 @@ func (t *Table[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V
 			continue
 		}
 
-		// stop condition was missing child, cut the bits to strideLen
+		// stop condition was missing child and not bits len,
+		// so cut the bits to strideLen
 		bits = strideLen
 
 		break
 	}
 
-	// start backtracking at leaf node in tight loop
+	// start backtracking at matching stride node in tight loop
 	for {
 
 		// lookup only in nodes with prefixes, skip over intermediate nodes
 		if len(n.prefixes) != 0 {
-			// longest prefix match?
 			if baseIdx, val, ok := n.lpmByPrefix(octet, bits); ok {
 				return depth, baseIdx, val, true
 			}
 		}
-
-		// bits must be full strideLen for next upper levels
-		bits = strideLen
 
 		// end condition, stack is exhausted
 		if depth == 0 {
@@ -446,7 +450,9 @@ func (t *Table[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V
 		}
 
 		// go up, backtracking
+		// bits are now full strideLen for all upper levels
 		depth--
+		bits = strideLen
 		octet = uint(octets[depth])
 		n = pathStack[depth]
 	}
@@ -472,23 +478,27 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 	// pfx is default route
 	if bits == 0 {
 
-		// return all routes for this IP version.
-		_ = n.walkRec(nil, is4, func(pfx netip.Prefix, _ V) error {
+		// return *all* routes for this IP version, sic!
+		_ = n.walkRec(nil, is4, func(pfx netip.Prefix, _ V) (err error) {
 			result = append(result, pfx)
-			return nil
+			return
 		})
 
+		// walk order is wierd, needed sort after walk
 		slices.SortFunc(result, cmpPrefix)
+
 		return result
 	}
 
+	// heap allocation does not matter here
 	octets := ip.AsSlice()
+
 	depth := 0
 
 	for {
 		octet := uint(octets[depth])
 
-		// already at leaf node?
+		// last significant octet reached
 		if bits <= strideLen {
 			result = n.subnets(octets[:depth], prefixToBaseIndex(octet, bits), is4)
 
@@ -496,10 +506,10 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 			return result
 		}
 
-		// descend down to next child level
+		// descend down to next trie level
 		child := n.getChild(octet)
 
-		// stop condition, no more childs
+		// stop condition, found no matching stride node
 		if child == nil {
 			return nil
 		}
@@ -538,43 +548,47 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 		return result
 	}
 
+	// heap allocation does not matter here
 	octets := ip.AsSlice()
+
 	depth := 0
 
 	for {
 		octet := uint(octets[depth])
 
-		pfxLen := 8
-		// already at leaf node?
+		// max bits in baseIndex functions is strideLen
+		pfxLen := strideLen
+
+		// last significant octet reached
 		if bits <= strideLen {
 			pfxLen = bits
 		}
 
 		// make an all-prefix-match at this level
-		superStrides := n.apmByPrefix(octet, pfxLen)
+		superIndexes := n.apmByPrefix(octet, pfxLen)
 
 		// get back the matching prefix from baseIdx
-		for _, baseIdx := range superStrides {
+		for _, baseIdx := range superIndexes {
 			// calc supernet mask
-			mask := depth*strideLen + baseIndexToPrefixLen(baseIdx)
+			mask := baseIndexToPrefixMask(baseIdx, depth)
 
-			// lookup ip, masked with supernet mask
-			matchPfx, _ := ip.Prefix(mask)
+			// calculate the pfx from ip and mask
+			superPfx, _ := ip.Prefix(mask)
 
-			result = append(result, matchPfx)
+			result = append(result, superPfx)
 		}
 
-		// stop condition
+		// last significant octet reached
 		if bits <= strideLen {
-			break
+			return result
 		}
 
-		// descend down to next child level
+		// descend down to next trie level
 		child := n.getChild(octet)
 
 		// stop condition, no more childs
 		if child == nil {
-			break
+			return result
 		}
 
 		// next round
@@ -582,8 +596,6 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 		n = child
 		bits -= strideLen
 	}
-
-	return result
 }
 
 // OverlapsPrefix reports whether any IP in pfx matches a route in the table.
@@ -615,13 +627,13 @@ func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 
 	for {
 
-		// last prefix chunk reached
+		// last significant octet reached
 		if bits <= strideLen {
 			return n.overlapsPrefix(octet, bits)
 		}
 
 		// still in the middle of prefix chunks
-		// test if any route overlaps prefix´ addr chunk so far
+		// test if any route overlaps prefix´ octet chunk so far
 
 		// but skip intermediate nodes, no routes to test?
 		if len(n.prefixes) != 0 {
