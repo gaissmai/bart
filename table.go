@@ -200,7 +200,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 		return n.update(0, 0, cb)
 	}
 
-	// keep this method alloc free, don't use ip.AsSlice here
+	// does not allocate
 	a16 := ip.As16()
 	octets := a16[:]
 	if is4 {
@@ -253,7 +253,7 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 		return n.getValByPrefix(0, 0)
 	}
 
-	// keep this method alloc free, don't use ip.AsSlice here
+	// does not allocate
 	a16 := ip.As16()
 	octets := a16[:]
 	if is4 {
@@ -295,7 +295,7 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	// stack of the traversed nodes for fast backtracking, if needed
 	pathStack := [maxTreeDepth]*node[V]{}
 
-	// keep the lpm alloc free, don't use ip.AsSlice here
+	// does not allocate
 	a16 := ip.As16()
 	octets := a16[:]
 	if is4 {
@@ -392,7 +392,7 @@ func (t *Table[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V
 	// stack of the traversed nodes for fast backtracking, if needed
 	pathStack := [maxTreeDepth]*node[V]{}
 
-	// keep the lpm alloc free, don't use ip.AsSlice here
+	// does not allocate
 	a16 := ip.As16()
 	octets := a16[:]
 	if is4 {
@@ -602,7 +602,7 @@ func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 		return false
 	}
 
-	// keep the overlaps alloc free, don't use ip.AsSlice here
+	// does not allocate
 	a16 := ip.As16()
 	octets := a16[:]
 	if is4 {

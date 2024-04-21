@@ -65,9 +65,10 @@ func (n *node[V]) isEmpty() bool {
 
 // ################## prefixes ################################
 
-// rankOfPrefix, Rank() is the key of the popcount compression algorithm,
+// prefixRank, Rank() is the key of the popcount compression algorithm,
 // mapping between bitset index and slice index.
-func (n *node[V]) rankOfPrefix(baseIdx uint) int {
+func (n *node[V]) prefixRank(baseIdx uint) int {
+	// adjust offset by one to slice index
 	return int(n.prefixesBitset.Rank(baseIdx)) - 1
 }
 
@@ -81,13 +82,13 @@ func (n *node[V]) insertPrefix(octet uint, prefixLen int, val V) {
 func (n *node[V]) insertIdx(baseIdx uint, val V) {
 	// prefix exists, overwrite val
 	if n.prefixesBitset.Test(baseIdx) {
-		n.prefixes[n.rankOfPrefix(baseIdx)] = val
+		n.prefixes[n.prefixRank(baseIdx)] = val
 		return
 	}
 
 	// new, insert into bitset and slice
 	n.prefixesBitset.Set(baseIdx)
-	n.prefixes = slices.Insert(n.prefixes, n.rankOfPrefix(baseIdx), val)
+	n.prefixes = slices.Insert(n.prefixes, n.prefixRank(baseIdx), val)
 }
 
 // deletePrefix removes the route octet/prefixLen. Reports whether the
@@ -100,7 +101,7 @@ func (n *node[V]) deletePrefix(octet uint, prefixLen int) (wasPresent bool) {
 		return false
 	}
 
-	rnk := n.rankOfPrefix(baseIdx)
+	rnk := n.prefixRank(baseIdx)
 
 	// delete from slice
 	n.prefixes = slices.Delete(n.prefixes, rnk, rnk+1)
@@ -122,7 +123,7 @@ func (n *node[V]) update(octet uint, prefixLen int, cb func(V, bool) V) (val V) 
 
 	// if prefix is set, get current value
 	if ok = n.prefixesBitset.Test(baseIdx); ok {
-		rnk = n.rankOfPrefix(baseIdx)
+		rnk = n.prefixRank(baseIdx)
 		val = n.prefixes[rnk]
 	}
 
@@ -139,7 +140,7 @@ func (n *node[V]) update(octet uint, prefixLen int, cb func(V, bool) V) (val V) 
 	n.prefixesBitset.Set(baseIdx)
 
 	// bitset has changed, recalc rank
-	rnk = n.rankOfPrefix(baseIdx)
+	rnk = n.prefixRank(baseIdx)
 
 	// ... and insert value into slice
 	n.prefixes = slices.Insert(n.prefixes, rnk, val)
@@ -157,7 +158,7 @@ func (n *node[V]) lpmByIndex(idx uint) (baseIdx uint, val V, ok bool) {
 	for {
 		if n.prefixesBitset.Test(idx) {
 			// longest prefix match
-			return idx, n.prefixes[n.rankOfPrefix(idx)], true
+			return idx, n.prefixes[n.prefixRank(idx)], true
 		}
 
 		if idx == 0 {
@@ -166,7 +167,7 @@ func (n *node[V]) lpmByIndex(idx uint) (baseIdx uint, val V, ok bool) {
 
 		// cache friendly backtracking to the next less specific route.
 		// thanks to the complete binary tree it's just a shift operation.
-		idx = parentIndex(idx)
+		idx >>= 1
 	}
 
 	// not found (on this level)
@@ -186,7 +187,7 @@ func (n *node[V]) lpmByPrefix(octet uint, bits int) (baseIdx uint, val V, ok boo
 // getValByIndex for baseIdx.
 func (n *node[V]) getValByIndex(baseIdx uint) (val V, ok bool) {
 	if n.prefixesBitset.Test(baseIdx) {
-		return n.prefixes[n.rankOfPrefix(baseIdx)], true
+		return n.prefixes[n.prefixRank(baseIdx)], true
 	}
 	return
 }
@@ -214,7 +215,9 @@ func (n *node[V]) apmByPrefix(octet uint, bits int) (result []uint) {
 			break
 		}
 
-		idx = parentIndex(idx)
+		// cache friendly backtracking to the next less specific route.
+		// thanks to the complete binary tree it's just a shift operation.
+		idx >>= 1
 	}
 
 	// sort in ascending order
@@ -231,9 +234,10 @@ func (n *node[V]) allStrideIndexes() []uint {
 
 // ################## children ################################
 
-// rankOfChild, Rank() is the key of the popcount compression algorithm,
+// childRank, Rank() is the key of the popcount compression algorithm,
 // mapping between bitset index and slice index.
-func (n *node[V]) rankOfChild(octet uint) int {
+func (n *node[V]) childRank(octet uint) int {
+	// adjust offset by one to slice index
 	return int(n.childrenBitset.Rank(octet)) - 1
 }
 
@@ -241,7 +245,7 @@ func (n *node[V]) rankOfChild(octet uint) int {
 func (n *node[V]) insertChild(octet uint, child *node[V]) {
 	// insert into bitset and slice
 	n.childrenBitset.Set(octet)
-	n.children = slices.Insert(n.children, n.rankOfChild(octet), child)
+	n.children = slices.Insert(n.children, n.childRank(octet), child)
 }
 
 // deleteChild, delete the child at octet. It is valid to delete a non-existent child.
@@ -250,7 +254,7 @@ func (n *node[V]) deleteChild(octet uint) {
 		return
 	}
 
-	rnk := n.rankOfChild(octet)
+	rnk := n.childRank(octet)
 
 	// delete from slice
 	n.children = slices.Delete(n.children, rnk, rnk+1)
@@ -266,7 +270,7 @@ func (n *node[V]) getChild(octet uint) *node[V] {
 		return nil
 	}
 
-	return n.children[n.rankOfChild(octet)]
+	return n.children[n.childRank(octet)]
 }
 
 // allChildOctets returns the octets of all child nodes in ascending order.

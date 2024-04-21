@@ -42,6 +42,7 @@ func octetToBaseIndex(octet uint) uint {
 
 // parentIndex returns the index of idx's parent prefix, or 0 if idx
 // is the index of 0/0.
+// nolint:unused
 func parentIndex(idx uint) uint {
 	return idx >> 1
 }
