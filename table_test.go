@@ -1,7 +1,7 @@
 // Copyright (c) Tailscale Inc & AUTHORS
 // SPDX-License-Identifier: BSD-3-Clause
 //
-// some tests and benchmarks copied from github.com/tailscale/art
+// some tests copied from github.com/tailscale/art
 // and modified for this implementation by:
 //
 // Copyright (c) 2024 Karl Gaissmaier
@@ -14,10 +14,7 @@ import (
 	"math/rand"
 	"net/netip"
 	"reflect"
-	"runtime"
-	"strconv"
 	"testing"
-	"time"
 )
 
 var mpa = netip.MustParseAddr
@@ -305,7 +302,7 @@ func TestDelete(t *testing.T) {
 	})
 }
 
-func TestInsertLookupCompare(t *testing.T) {
+func TestLookupCompare(t *testing.T) {
 	// Create large route tables repeatedly, and compare Table's
 	// behavior to a naive and slow but correct implementation.
 	t.Parallel()
@@ -350,7 +347,7 @@ func TestInsertLookupCompare(t *testing.T) {
 	}
 }
 
-func TestInsertLookupPrefixCompare(t *testing.T) {
+func TestLookupPrefixCompare(t *testing.T) {
 	// Create large route tables repeatedly, and compare Table's
 	// behavior to a naive and slow but correct implementation.
 	t.Parallel()
@@ -395,7 +392,7 @@ func TestInsertLookupPrefixCompare(t *testing.T) {
 	}
 }
 
-func TestInsertLookupPrefixLPMCompare(t *testing.T) {
+func TestLookupPrefixLPMCompare(t *testing.T) {
 	// Create large route tables repeatedly, and compare Table's
 	// behavior to a naive and slow but correct implementation.
 	t.Parallel()
@@ -449,15 +446,17 @@ func TestInsertShuffled(t *testing.T) {
 	// should not matter, as long as you're inserting the same set of
 	// routes.
 	t.Parallel()
-	pfxs := randomPrefixes(1000)
-	var pfxs2 []slowRTEntry[int]
 
+	pfxs := randomPrefixes(1000)
+	/* uncomment for failure debugging
+	var pfxs2 []slowRTEntry[int]
 	defer func() {
 		if t.Failed() {
 			t.Logf("pre-shuffle: %#v", pfxs)
 			t.Logf("post-shuffle: %#v", pfxs2)
 		}
 	}()
+	*/
 
 	for i := 0; i < 10; i++ {
 		pfxs2 := append([]slowRTEntry[int](nil), pfxs...)
@@ -512,6 +511,7 @@ func TestDeleteCompare(t *testing.T) {
 	toDelete := append([]slowRTEntry[int](nil), all4[deleteCut:]...)
 	toDelete = append(toDelete, all6[deleteCut:]...)
 
+	/* uncomment for failure debugging
 	defer func() {
 		if t.Failed() {
 			for _, pfx := range pfxs {
@@ -524,6 +524,7 @@ func TestDeleteCompare(t *testing.T) {
 			fmt.Println("")
 		}
 	}()
+	*/
 
 	slow := slowRT[int]{pfxs}
 	fast := Table[int]{}
@@ -808,8 +809,7 @@ func TestOverlapsCompare(t *testing.T) {
 	t.Parallel()
 
 	// Empirically, between 5 and 6 routes per table results in ~50%
-	// of random pairs overlapping. Cool example of the birthday
-	// paradox!
+	// of random pairs overlapping. Cool example of the birthday paradox!
 	const numEntries = 6
 
 	seen := map[bool]int{}
@@ -1102,6 +1102,92 @@ func TestSupernets(t *testing.T) {
 	}
 }
 
+func TestSubnetsEdgeCases(t *testing.T) {
+	t.Parallel()
+
+	t.Run("empty", func(t *testing.T) {
+		rtbl := &Table[int]{}
+
+		defaultRoute4 := mpp("0.0.0.0/0")
+		defaultRoute6 := mpp("::/0")
+
+		got := rtbl.Subnets(defaultRoute4)
+		if got != nil {
+			t.Fatalf("empty: got:\n%v\nwant:\n%v", got, nil)
+		}
+
+		got = rtbl.Subnets(defaultRoute6)
+		if got != nil {
+			t.Fatalf("empty: got:\n%v\nwant:\n%v", got, nil)
+		}
+	})
+
+	t.Run("default route", func(t *testing.T) {
+		rtbl := &Table[int]{}
+
+		defaultRoute4 := mpp("0.0.0.0/0")
+		defaultRoute6 := mpp("::/0")
+
+		rtbl.Insert(defaultRoute4, 0)
+		rtbl.Insert(defaultRoute6, 0)
+
+		got := rtbl.Subnets(defaultRoute4)
+		want := []netip.Prefix{defaultRoute4}
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("default routev4: got:\n%v\nwant:\n%v", got, want)
+		}
+
+		got = rtbl.Subnets(defaultRoute6)
+		want = []netip.Prefix{defaultRoute6}
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("default routev6: got:\n%v\nwant:\n%v", got, want)
+		}
+	})
+}
+
+func TestSupernetsEdgeCases(t *testing.T) {
+	t.Parallel()
+
+	t.Run("empty", func(t *testing.T) {
+		rtbl := &Table[int]{}
+
+		defaultRoute4 := mpp("0.0.0.0/0")
+		defaultRoute6 := mpp("::/0")
+
+		got := rtbl.Supernets(defaultRoute4)
+		if got != nil {
+			t.Fatalf("empty: got:\n%v\nwant:\n%v", got, nil)
+		}
+
+		got = rtbl.Supernets(defaultRoute6)
+		if got != nil {
+			t.Fatalf("empty: got:\n%v\nwant:\n%v", got, nil)
+		}
+	})
+
+	t.Run("default route", func(t *testing.T) {
+		rtbl := &Table[int]{}
+
+		defaultRoute4 := mpp("0.0.0.0/0")
+		defaultRoute6 := mpp("::/0")
+
+		rtbl.Insert(defaultRoute4, 0)
+		rtbl.Insert(defaultRoute6, 0)
+
+		got := rtbl.Supernets(defaultRoute4)
+		want := []netip.Prefix{defaultRoute4}
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("default routev4: got:\n%v\nwant:\n%v", got, want)
+		}
+
+		got = rtbl.Supernets(defaultRoute6)
+		want = []netip.Prefix{defaultRoute6}
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("default routev6: got:\n%v\nwant:\n%v", got, want)
+		}
+	})
+}
+
 func TestTableClone(t *testing.T) {
 	t.Parallel()
 
@@ -1312,29 +1398,6 @@ func checkRoutes(t *testing.T, tbl *Table[int], tt []tableTest) {
 
 var benchRouteCount = []int{10, 100, 1000, 10_000, 100_000}
 
-// forFamilyAndCount runs the benchmark fn with different sets of
-// routes.
-//
-// fn is called once for each combination of {addr_family, num_routes},
-// where addr_family is ipv4 or ipv6, num_routes is the values in
-// benchRouteCount.
-func forFamilyAndCount(b *testing.B, fn func(b *testing.B, routes []slowRTEntry[int])) {
-	for _, fam := range []string{"ipv4", "ipv6"} {
-		rng := randomPrefixes4
-		if fam == "ipv6" {
-			rng = randomPrefixes6
-		}
-		b.Run(fam, func(b *testing.B) {
-			for _, nroutes := range benchRouteCount {
-				routes := rng(nroutes)
-				b.Run(fmt.Sprint(nroutes), func(b *testing.B) {
-					fn(b, routes)
-				})
-			}
-		})
-	}
-}
-
 func checkSize(t *testing.T, tbl *Table[int], want int) {
 	tbl.init()
 	t.Helper()
@@ -1383,271 +1446,180 @@ func dumpListRec[V any](pfxs []slowRTEntry[V], dumpList []DumpListNode[V]) []slo
 
 // #########################################################
 
-func BenchmarkTableInsertion(b *testing.B) {
-	forFamilyAndCount(b, func(b *testing.B, routes []slowRTEntry[int]) {
-		b.StopTimer()
-		b.ResetTimer()
-		var startMem, endMem runtime.MemStats
-		runtime.ReadMemStats(&startMem)
-		b.StartTimer()
-		for i := 0; i < b.N; i++ {
-			var rt Table[int]
-			for _, route := range routes {
-				rt.Insert(route.pfx, route.val)
-			}
+func BenchmarkTableInsert(b *testing.B) {
+	for _, fam := range []string{"ipv4", "ipv6"} {
+		rng := randomPrefixes4
+		if fam == "ipv6" {
+			rng = randomPrefixes6
 		}
-		b.StopTimer()
-		runtime.ReadMemStats(&endMem)
-		inserts := float64(b.N) * float64(len(routes))
-		allocs := float64(endMem.Mallocs - startMem.Mallocs)
-		bytes := float64(endMem.TotalAlloc - startMem.TotalAlloc)
-		elapsed := float64(b.Elapsed().Nanoseconds())
-		elapsedSec := b.Elapsed().Seconds()
-		b.ReportMetric(elapsed/inserts, "ns/op")
-		b.ReportMetric(inserts/elapsedSec, "routes/s")
-		b.ReportMetric(roundFloat64(allocs/inserts), "avg-allocs/op")
-		b.ReportMetric(roundFloat64(bytes/inserts), "avg-B/op")
-	})
+
+		for _, nroutes := range benchRouteCount {
+			var rt Table[struct{}]
+			for _, route := range rng(nroutes) {
+				rt.Insert(route.pfx, struct{}{})
+			}
+
+			probe := rng(1)[0]
+
+			b.ResetTimer()
+			b.Run(fmt.Sprintf("%s/Into_%d", fam, nroutes), func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					rt.Insert(probe.pfx, struct{}{})
+				}
+			})
+		}
+	}
 }
 
 func BenchmarkTableDelete(b *testing.B) {
-	forFamilyAndCount(b, func(b *testing.B, routes []slowRTEntry[int]) {
-		// Collect memstats for one round of insertions, so we can remove it
-		// from the total at the end and get only the deletion alloc count.
-		insertAllocs, insertBytes := getMemCost(func() {
+	for _, fam := range []string{"ipv4", "ipv6"} {
+		rng := randomPrefixes4
+		if fam == "ipv6" {
+			rng = randomPrefixes6
+		}
+
+		for _, nroutes := range benchRouteCount {
 			var rt Table[int]
-			for _, route := range routes {
+			for _, route := range rng(nroutes) {
 				rt.Insert(route.pfx, route.val)
 			}
-		})
-		insertAllocs *= float64(b.N)
-		insertBytes *= float64(b.N)
 
-		var t runningTimer
-		allocs, bytes := getMemCost(func() {
-			for i := 0; i < b.N; i++ {
-				var rt Table[int]
-				for _, route := range routes {
-					rt.Insert(route.pfx, route.val)
+			probe := rng(1)[0]
+
+			b.ResetTimer()
+			b.Run(fmt.Sprintf("%s/From_%d", fam, nroutes), func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					rt.Delete(probe.pfx)
 				}
-				t.Start()
-				for _, route := range routes {
-					rt.Delete(route.pfx)
-				}
-				t.Stop()
-			}
-		})
-		inserts := float64(b.N) * float64(len(routes))
-		allocs -= insertAllocs
-		bytes -= insertBytes
-		elapsed := float64(t.Elapsed().Nanoseconds())
-		elapsedSec := t.Elapsed().Seconds()
-		b.ReportMetric(elapsed/inserts, "ns/op")
-		b.ReportMetric(inserts/elapsedSec, "routes/s")
-		b.ReportMetric(roundFloat64(allocs/inserts), "avg-allocs/op")
-		b.ReportMetric(roundFloat64(bytes/inserts), "avg-B/op")
-	})
+			})
+		}
+	}
 }
 
 func BenchmarkTableGet(b *testing.B) {
-	forFamilyAndCount(b, func(b *testing.B, routes []slowRTEntry[int]) {
-		var rt Table[int]
-		for _, route := range routes {
-			rt.Insert(route.pfx, route.val)
+	for _, fam := range []string{"ipv4", "ipv6"} {
+		rng := randomPrefixes4
+		if fam == "ipv6" {
+			rng = randomPrefixes6
 		}
-		pfx := routes[rand.Intn(len(routes))].pfx
 
-		b.StartTimer()
-		for i := 0; i < b.N; i++ {
-			writeSink, _ = rt.Get(pfx)
+		for _, nroutes := range benchRouteCount {
+			var rt Table[int]
+			for _, route := range rng(nroutes) {
+				rt.Insert(route.pfx, route.val)
+			}
+
+			probe := rng(1)[0]
+
+			b.ResetTimer()
+			b.Run(fmt.Sprintf("%s/From_%d", fam, nroutes), func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					writeSink, _ = rt.Get(probe.pfx)
+				}
+			})
 		}
-	})
+	}
 }
 
 func BenchmarkTableLookup(b *testing.B) {
-	forFamilyAndCount(b, func(b *testing.B, routes []slowRTEntry[int]) {
-		genAddr := randomAddr4
-		if routes[0].pfx.Addr().Is6() {
-			genAddr = randomAddr6
+	for _, fam := range []string{"ipv4", "ipv6"} {
+		rng := randomPrefixes4
+		if fam == "ipv6" {
+			rng = randomPrefixes6
 		}
-		var rt Table[int]
-		for _, route := range routes {
-			rt.Insert(route.pfx, route.val)
+
+		for _, nroutes := range benchRouteCount {
+			var rt Table[int]
+			for _, route := range rng(nroutes) {
+				rt.Insert(route.pfx, route.val)
+			}
+
+			probe := rng(1)[0]
+
+			b.ResetTimer()
+			b.Run(fmt.Sprintf("%s/In_%6d/%s", fam, nroutes, "IP"), func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					writeSink, _ = rt.Lookup(probe.pfx.Addr())
+				}
+			})
+
+			b.ResetTimer()
+			b.Run(fmt.Sprintf("%s/In_%6d/%s", fam, nroutes, "Prefix"), func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					writeSink, _ = rt.LookupPrefix(probe.pfx)
+				}
+			})
+
+			b.ResetTimer()
+			b.Run(fmt.Sprintf("%s/In_%6d/%s", fam, nroutes, "PrefixLPM"), func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					_, writeSink, _ = rt.LookupPrefixLPM(probe.pfx)
+				}
+			})
 		}
-		addrAllocs, addrBytes := getMemCost(func() {
-			// Have to run genAddr more than once, otherwise the reported
-			// cost is 16 bytes - presumably due to some amortized costs in
-			// the memory allocator? Either way, empirically 100 iterations
-			// reliably reports the correct cost.
-			for i := 0; i < 100; i++ {
-				_ = genAddr()
-			}
-		})
-		addrAllocs /= 100
-		addrBytes /= 100
-		var t runningTimer
-		allocs, bytes := getMemCost(func() {
-			for i := 0; i < b.N; i++ {
-				addr := genAddr()
-				t.Start()
-				writeSink, _ = rt.Lookup(addr)
-				t.Stop()
-			}
-		})
-		b.ReportAllocs() // Enables the output, but we report manually below
-		allocs -= (addrAllocs * float64(b.N))
-		bytes -= (addrBytes * float64(b.N))
-		lookups := float64(b.N)
-		elapsed := float64(t.Elapsed().Nanoseconds())
-		elapsedSec := float64(t.Elapsed().Seconds())
-		b.ReportMetric(elapsed/lookups, "ns/op")
-		b.ReportMetric(lookups/elapsedSec, "addrs/s")
-		b.ReportMetric(allocs/lookups, "allocs/op")
-		b.ReportMetric(bytes/lookups, "B/op")
-	})
+	}
 }
 
 var boolSink bool
 
-func BenchmarkTablePrefixOverlaps(b *testing.B) {
-	forFamilyAndCount(b, func(b *testing.B, routes []slowRTEntry[int]) {
-		var rt Table[int]
-		for _, route := range routes {
-			rt.Insert(route.pfx, route.val)
+func BenchmarkTableOverlapsPrefix(b *testing.B) {
+	for _, fam := range []string{"ipv4", "ipv6"} {
+		rng := randomPrefixes4
+		if fam == "ipv6" {
+			rng = randomPrefixes6
 		}
 
-		genPfxs := randomPrefixes4
-		if routes[0].pfx.Addr().Is6() {
-			genPfxs = randomPrefixes6
-		}
-		const count = 10_000
-		pfxs := genPfxs(count)
-		b.ResetTimer()
-		allocs, bytes := getMemCost(func() {
-			for i := 0; i < b.N; i++ {
-				boolSink = rt.OverlapsPrefix(pfxs[i%count].pfx)
+		for _, nroutes := range benchRouteCount {
+			var rt Table[int]
+			for _, route := range rng(nroutes) {
+				rt.Insert(route.pfx, route.val)
 			}
-		})
-		b.StopTimer()
 
-		b.ReportAllocs() // Enables the output, but we report manually below
-		lookups := float64(b.N)
-		elapsed := float64(b.Elapsed().Nanoseconds())
-		elapsedSec := float64(b.Elapsed().Seconds())
-		b.ReportMetric(elapsed/lookups, "ns/op")
-		b.ReportMetric(lookups/elapsedSec, "addrs/s")
-		b.ReportMetric(allocs/lookups, "allocs/op")
-		b.ReportMetric(bytes/lookups, "B/op")
-	})
+			probe := rng(1)[0]
+
+			b.ResetTimer()
+			b.Run(fmt.Sprintf("%s/With_%d", fam, nroutes), func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					boolSink = rt.OverlapsPrefix(probe.pfx)
+				}
+			})
+		}
+	}
 }
 
 func BenchmarkTableOverlaps(b *testing.B) {
-	forFamilyAndCount(b, func(b *testing.B, routes []slowRTEntry[int]) {
-		var rt Table[int]
-		for _, route := range routes {
-			rt.Insert(route.pfx, route.val)
+	for _, fam := range []string{"ipv4", "ipv6"} {
+		rng := randomPrefixes4
+		if fam == "ipv6" {
+			rng = randomPrefixes6
 		}
 
-		genPfxs := randomPrefixes4
-		if routes[0].pfx.Addr().Is6() {
-			genPfxs = randomPrefixes6
-		}
-
-		const (
-			intersectSize = 10
-			numIntersects = 1_000
-		)
-
-		intersects := make([]*Table[int], numIntersects)
-		for i := range intersects {
-			inter := &Table[int]{}
-			for _, route := range genPfxs(intersectSize) {
-				inter.Insert(route.pfx, route.val)
+		for _, nroutes := range benchRouteCount {
+			var rt Table[int]
+			for _, route := range rng(nroutes) {
+				rt.Insert(route.pfx, route.val)
 			}
-			intersects[i] = inter
-		}
 
-		var t runningTimer
-		allocs, bytes := getMemCost(func() {
-			for i := 0; i < b.N; i++ {
-				t.Start()
-				boolSink = rt.Overlaps(intersects[i%numIntersects])
-				t.Stop()
+			const (
+				intersectSize = 100
+				numIntersects = 1_000
+			)
+
+			intersects := make([]*Table[int], numIntersects)
+			for i := range intersects {
+				inter := &Table[int]{}
+				for _, route := range rng(intersectSize) {
+					inter.Insert(route.pfx, route.val)
+				}
+				intersects[i] = inter
 			}
-		})
 
-		b.ReportAllocs() // Enables the output, but we report manually below
-		lookups := float64(b.N)
-		elapsed := float64(t.Elapsed().Nanoseconds())
-		elapsedSec := t.Elapsed().Seconds()
-		b.ReportMetric(elapsed/lookups, "ns/op")
-		b.ReportMetric(lookups/elapsedSec, "tables/s")
-		b.ReportMetric(allocs/lookups, "allocs/op")
-		b.ReportMetric(bytes/lookups, "B/op")
-	})
-}
-
-// getMemCost runs fn 100 times and returns the number of allocations and bytes
-// allocated by each call to fn.
-//
-// Note that if your fn allocates very little memory (less than ~16 bytes), you
-// should make fn run its workload ~100 times and divide the results of
-// getMemCost yourself. Otherwise, the byte count you get will be rounded up due
-// to the memory allocator's bucketing granularity.
-func getMemCost(fn func()) (allocs, bytes float64) {
-	var start, end runtime.MemStats
-	runtime.ReadMemStats(&start)
-	fn()
-	runtime.ReadMemStats(&end)
-	return float64(end.Mallocs - start.Mallocs), float64(end.TotalAlloc - start.TotalAlloc)
-}
-
-// runningTimer is a timer that keeps track of the cumulative time it's spent
-// running since creation. A newly created runningTimer is stopped.
-//
-// This timer exists because some of our benchmarks have to interleave costly
-// ancillary logic in each benchmark iteration, rather than being able to
-// front-load all the work before a single b.ResetTimer().
-//
-// As it turns out, b.StartTimer() and b.StopTimer() are expensive function
-// calls, because they do costly memory allocation accounting on every call.
-// Starting and stopping the benchmark timer in every b.N loop iteration slows
-// the benchmarks down by orders of magnitude.
-//
-// So, rather than rely on testing.B's timing facility, we use this very
-// lightweight timer combined with getMemCost to do our own accounting more
-// efficiently.
-type runningTimer struct {
-	cumulative time.Duration
-	start      time.Time
-}
-
-func (t *runningTimer) Start() {
-	t.Stop()
-	t.start = time.Now()
-}
-
-func (t *runningTimer) Stop() {
-	if t.start.IsZero() {
-		return
+			b.ResetTimer()
+			b.Run(fmt.Sprintf("%s/%d_with_%d", fam, nroutes, intersectSize), func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					boolSink = rt.Overlaps(intersects[i%numIntersects])
+				}
+			})
+		}
 	}
-	t.cumulative += time.Since(t.start)
-	t.start = time.Time{}
-}
-
-func (t *runningTimer) Elapsed() time.Duration {
-	return t.cumulative
-}
-
-// roundFloat64 rounds f to 2 decimal places, for display.
-//
-// It round-trips through a float->string->float conversion, so should not be
-// used in a performance critical setting.
-func roundFloat64(f float64) float64 {
-	s := fmt.Sprintf("%.2f", f)
-	ret, err := strconv.ParseFloat(s, 64)
-	if err != nil {
-		panic(err)
-	}
-	return ret
 }
