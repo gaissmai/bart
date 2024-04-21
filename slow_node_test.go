@@ -7,20 +7,20 @@ import (
 	"math/rand"
 )
 
-// slowST is an 8-bit slow routing table, implemented as a slice
+// slowNT, slow NodeTable is an 8-bit slow routing table, implemented as a slice
 // as a correctness reference.
-type slowST[V any] struct {
-	entries []slowSTEntry[V]
+type slowNT[V any] struct {
+	entries []slowNTEntry[V]
 }
 
-type slowSTEntry[V any] struct {
+type slowNTEntry[V any] struct {
 	octet uint
 	bits  int
 	val   V
 }
 
-func (st *slowST[V]) delete(octet uint, prefixLen int) {
-	pfx := make([]slowSTEntry[V], 0, len(st.entries))
+func (st *slowNT[V]) delete(octet uint, prefixLen int) {
+	pfx := make([]slowNTEntry[V], 0, len(st.entries))
 	for _, e := range st.entries {
 		if e.octet == octet && e.bits == prefixLen {
 			continue
@@ -31,7 +31,7 @@ func (st *slowST[V]) delete(octet uint, prefixLen int) {
 }
 
 // lpm, longest-prefix-match
-func (st *slowST[V]) lpm(octet uint) (ret V, ok bool) {
+func (st *slowNT[V]) lpm(octet uint) (ret V, ok bool) {
 	const noMatch = -1
 	longest := noMatch
 	for _, e := range st.entries {
@@ -43,7 +43,7 @@ func (st *slowST[V]) lpm(octet uint) (ret V, ok bool) {
 	return ret, longest != noMatch
 }
 
-func (st *slowST[T]) overlapsPrefix(octet uint8, prefixLen int) bool {
+func (st *slowNT[T]) overlapsPrefix(octet uint8, prefixLen int) bool {
 	for _, e := range st.entries {
 		minBits := prefixLen
 		if e.bits < minBits {
@@ -57,7 +57,7 @@ func (st *slowST[T]) overlapsPrefix(octet uint8, prefixLen int) bool {
 	return false
 }
 
-func (st *slowST[T]) overlaps(so *slowST[T]) bool {
+func (st *slowNT[T]) overlaps(so *slowNT[T]) bool {
 	for _, tp := range st.entries {
 		for _, op := range so.entries {
 			minBits := tp.bits
@@ -76,16 +76,16 @@ func pfxMask(pfxLen int) uint {
 	return 0xFF << (strideLen - pfxLen)
 }
 
-func allPrefixes() []slowSTEntry[int] {
-	ret := make([]slowSTEntry[int], 0, maxNodePrefixes-1)
+func allPrefixes() []slowNTEntry[int] {
+	ret := make([]slowNTEntry[int], 0, maxNodePrefixes-1)
 	for idx := 1; idx < maxNodePrefixes; idx++ {
 		octet, bits := baseIndexToPrefix(uint(idx))
-		ret = append(ret, slowSTEntry[int]{octet, bits, idx})
+		ret = append(ret, slowNTEntry[int]{octet, bits, idx})
 	}
 	return ret
 }
 
-func shufflePrefixes(pfxs []slowSTEntry[int]) []slowSTEntry[int] {
+func shufflePrefixes(pfxs []slowNTEntry[int]) []slowNTEntry[int] {
 	rand.Shuffle(len(pfxs), func(i, j int) { pfxs[i], pfxs[j] = pfxs[j], pfxs[i] })
 	return pfxs
 }
