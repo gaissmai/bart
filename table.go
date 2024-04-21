@@ -203,7 +203,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 
 	// update default route, easy peasy
 	if bits == 0 {
-		return n.update(0, 0, cb)
+		return n.updatePrefix(0, 0, cb)
 	}
 
 	// does not allocate
@@ -220,7 +220,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 
 		// last significant octet reached
 		if bits <= strideLen {
-			return n.update(octet, bits, cb)
+			return n.updatePrefix(octet, bits, cb)
 		}
 
 		// descend down to next trie level
