@@ -243,7 +243,13 @@ func (n *node[V]) childRank(octet uint) int {
 
 // insertChild, insert the child
 func (n *node[V]) insertChild(octet uint, child *node[V]) {
-	// insert into bitset and slice
+	// child exists, overwrite it
+	if n.childrenBitset.Test(octet) {
+		n.children[n.childRank(octet)] = child
+		return
+	}
+
+	// new insert into bitset and slice
 	n.childrenBitset.Set(octet)
 	n.children = slices.Insert(n.children, n.childRank(octet), child)
 }
