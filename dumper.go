@@ -10,6 +10,15 @@ import (
 	"strings"
 )
 
+type nodeType byte
+
+const (
+	nullNode         nodeType = iota // empty node
+	fullNode                         // prefixes and children
+	leafNode                         // only prefixes
+	intermediateNode                 // only children
+)
+
 // ###################################################
 // Useful during development or debugging and testing.
 // ###################################################
@@ -112,7 +121,7 @@ func (n *node[V]) dump(w io.Writer, path []byte, is4 bool) {
 		must(fmt.Fprintf(w, "%schilds(#%d): ", indent, len(n.children)))
 
 		for i := range n.children {
-			octet := n.childrenBitset.Select(uint(i))
+			octet := byte(n.childrenBitset.Select(uint(i)))
 			must(fmt.Fprintf(w, "%s ", octetFmt(octet, is4)))
 		}
 		must(fmt.Fprintln(w))
@@ -120,7 +129,7 @@ func (n *node[V]) dump(w io.Writer, path []byte, is4 bool) {
 }
 
 // octetFmt, different format strings for IPv4 and IPv6, decimal versus hex.
-func octetFmt(octet uint, is4 bool) string {
+func octetFmt(octet byte, is4 bool) string {
 	if is4 {
 		return fmt.Sprintf("%d", octet)
 	}

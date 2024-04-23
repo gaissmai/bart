@@ -19,10 +19,10 @@ func TestInverseIndex(t *testing.T) {
 	t.Parallel()
 	for i := 0; i < maxNodeChildren; i++ {
 		for bits := 0; bits <= strideLen; bits++ {
-			octet := i & (0xFF << (strideLen - bits))
-			idx := prefixToBaseIndex(uint(octet), bits)
+			octet := byte(i & (0xFF << (strideLen - bits)))
+			idx := prefixToBaseIndex(byte(octet), bits)
 			octet2, len2 := baseIndexToPrefix(idx)
-			if octet2 != uint(octet) || len2 != bits {
+			if octet2 != octet || len2 != bits {
 				t.Errorf("inverse(index(%d/%d)) != %d/%d", octet, bits, octet2, len2)
 			}
 		}
@@ -32,8 +32,8 @@ func TestInverseIndex(t *testing.T) {
 func TestFringeIndex(t *testing.T) {
 	t.Parallel()
 	for i := 0; i < maxNodeChildren; i++ {
-		got := octetToBaseIndex(uint(i))
-		want := prefixToBaseIndex(uint(i), 8)
+		got := octetToBaseIndex(byte(i))
+		want := prefixToBaseIndex(byte(i), 8)
 		if got != want {
 			t.Errorf("fringeIndex(%d) = %d, want %d", i, got, want)
 		}
@@ -52,11 +52,11 @@ func TestPrefixInsert(t *testing.T) {
 	fast := newNode[int]()
 
 	for _, pfx := range pfxs {
-		fast.insertPrefix(uint(pfx.octet), pfx.bits, pfx.val)
+		fast.insertPrefix(pfx.octet, pfx.bits, pfx.val)
 	}
 
 	for i := 0; i < 256; i++ {
-		octet := uint(i)
+		octet := byte(i)
 		slowVal, slowOK := slow.lpm(octet)
 		_, fastVal, fastOK := fast.lpmByOctet(octet)
 		if !getsEqual(fastVal, fastOK, slowVal, slowOK) {
@@ -88,7 +88,7 @@ func TestPrefixDelete(t *testing.T) {
 	}
 
 	for i := 0; i < 256; i++ {
-		octet := uint(i)
+		octet := byte(i)
 		slowVal, slowOK := slow.lpm(octet)
 		_, fastVal, fastOK := fast.lpmByOctet(octet)
 		if !getsEqual(fastVal, fastOK, slowVal, slowOK) {
@@ -289,7 +289,7 @@ func BenchmarkNodeChildInsert(b *testing.B) {
 
 		for i := 0; i < nchilds; i++ {
 			octet := rand.Intn(maxNodeChildren)
-			node.insertChild(uint(octet), nil)
+			node.insertChild(byte(octet), nil)
 		}
 
 		b.Run(fmt.Sprintf("Into %d", nchilds), func(b *testing.B) {
@@ -297,7 +297,7 @@ func BenchmarkNodeChildInsert(b *testing.B) {
 
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				node.insertChild(uint(octet), nil)
+				node.insertChild(byte(octet), nil)
 			}
 		})
 	}
@@ -309,7 +309,7 @@ func BenchmarkNodeChildDelete(b *testing.B) {
 
 		for i := 0; i < nchilds; i++ {
 			octet := rand.Intn(maxNodeChildren)
-			node.insertChild(uint(octet), nil)
+			node.insertChild(byte(octet), nil)
 		}
 
 		b.Run(fmt.Sprintf("From %d", nchilds), func(b *testing.B) {
@@ -317,7 +317,7 @@ func BenchmarkNodeChildDelete(b *testing.B) {
 
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				node.deleteChild(uint(octet))
+				node.deleteChild(byte(octet))
 			}
 		})
 	}
@@ -328,17 +328,17 @@ func BenchmarkNodeChildRank(b *testing.B) {
 		node := newNode[int]()
 
 		for i := 0; i < nchilds; i++ {
-			octet := rand.Intn(maxNodeChildren)
-			node.insertChild(uint(octet), nil)
+			octet := byte(rand.Intn(maxNodeChildren))
+			node.insertChild(octet, nil)
 		}
 
 		b.Run(fmt.Sprintf("In %d", nchilds), func(b *testing.B) {
-			octet := rand.Intn(maxNodeChildren)
-			baseIdx := octetToBaseIndex(uint(octet))
+			octet := byte(rand.Intn(maxNodeChildren))
+			baseIdx := octetToBaseIndex(octet)
 
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				node.childRank(baseIdx)
+				node.childRank(byte(baseIdx))
 			}
 		})
 	}

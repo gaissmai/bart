@@ -30,19 +30,19 @@ const (
 
 // prefixToBaseIndex, maps a prefix table as a 'complete binary tree'.
 // This is the so-called baseIndex a.k.a heapFunc:
-func prefixToBaseIndex(octet uint, prefixLen int) uint {
-	return (octet >> (strideLen - prefixLen)) + (1 << prefixLen)
+func prefixToBaseIndex(octet byte, prefixLen int) uint {
+	return uint(octet>>(strideLen-prefixLen)) + (1 << prefixLen)
 }
 
 // octetToBaseIndex, just prefixToBaseIndex(octet, 8), a.k.a host routes
 // but faster, use it for host routes in Lookup.
-func octetToBaseIndex(octet uint) uint {
-	return octet + firstHostIndex // just: octet + 256
+func octetToBaseIndex(octet byte) uint {
+	return uint(octet) + firstHostIndex // just: octet + 256
 }
 
 // lastHostIndexOfPrefix returns the bitset index of the last octet in octet/len.
-func lastHostIndexOfPrefix(octet uint, bits int) uint {
-	return octetToBaseIndex(octet | uint(hostMasks[bits]))
+func lastHostIndexOfPrefix(octet byte, bits int) uint {
+	return octetToBaseIndex(octet | hostMasks[bits])
 }
 
 // lowerUpperBound, get range of host routes for this prefix
@@ -59,7 +59,7 @@ func baseIndexToPrefixMask(baseIdx uint, depth int) int {
 
 // baseIndexToPrefix returns the octet and prefix len of baseIdx.
 // It's the inverse to prefixToBaseIndex.
-func baseIndexToPrefix(baseIdx uint) (octet uint, pfxLen int) {
+func baseIndexToPrefix(baseIdx uint) (octet byte, pfxLen int) {
 	pfx := baseIdx2Pfx[baseIdx]
 	return pfx.octet, pfx.bits
 }
@@ -75,7 +75,7 @@ func baseIndexToPrefix(baseIdx uint) (octet uint, pfxLen int) {
 //  }
 
 var baseIdx2Pfx = [512]struct {
-	octet uint
+	octet byte
 	bits  int
 }{
 	{0, -1},  // idx ==   0 invalid!

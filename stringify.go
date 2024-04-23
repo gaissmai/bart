@@ -161,14 +161,14 @@ func (n *node[V]) getKidsRec(parentIdx uint, path []byte, is4 bool) []kidT[V] {
 	}
 
 	// the node may have childs, the rec-descent monster starts
-	for _, octet := range n.allChildOctets() {
+	for _, octet := range n.allChildAddrs() {
 		// do a longest-prefix-match
-		if lpmIdx, _, _ := n.lpmByOctet(octet); lpmIdx == parentIdx {
+		if lpmIdx, _, _ := n.lpmByOctet(byte(octet)); lpmIdx == parentIdx {
 			// child is directKid, the path is needed to get back the prefixes
 			path := append(slices.Clone(path), byte(octet))
 
 			// get next child node
-			c := n.getChild(octet)
+			c := n.getChild(byte(octet))
 
 			// traverse, rec-descent call with next child node
 			directKids = append(directKids, c.getKidsRec(0, path, is4)...)
@@ -184,7 +184,7 @@ func cidrFromPath(path []byte, idx uint, is4 bool) (pfx netip.Prefix) {
 
 	// append last (partially) masked byte to path and
 	// calc bits with pathLen and pfxLen
-	bs := append(slices.Clone(path), byte(octet))
+	bs := append(slices.Clone(path), octet)
 	bits := len(path)*strideLen + pfxLen
 
 	var ip netip.Addr
