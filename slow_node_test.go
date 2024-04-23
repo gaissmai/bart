@@ -14,12 +14,12 @@ type slowNT[V any] struct {
 }
 
 type slowNTEntry[V any] struct {
-	octet uint
+	octet byte
 	bits  int
 	val   V
 }
 
-func (st *slowNT[V]) delete(octet uint, prefixLen int) {
+func (st *slowNT[V]) delete(octet byte, prefixLen int) {
 	pfx := make([]slowNTEntry[V], 0, len(st.entries))
 	for _, e := range st.entries {
 		if e.octet == octet && e.bits == prefixLen {
@@ -31,7 +31,7 @@ func (st *slowNT[V]) delete(octet uint, prefixLen int) {
 }
 
 // lpm, longest-prefix-match
-func (st *slowNT[V]) lpm(octet uint) (ret V, ok bool) {
+func (st *slowNT[V]) lpm(octet byte) (ret V, ok bool) {
 	const noMatch = -1
 	longest := noMatch
 	for _, e := range st.entries {
@@ -72,7 +72,7 @@ func (st *slowNT[T]) overlaps(so *slowNT[T]) bool {
 	return false
 }
 
-func pfxMask(pfxLen int) uint {
+func pfxMask(pfxLen int) byte {
 	return 0xFF << (strideLen - pfxLen)
 }
 

@@ -60,13 +60,13 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 		return
 	}
 
-	// the ip is chunked in bytes, the multibit strideLen is 8
-	octets := ip.AsSlice()
+	a16 := ip.As16()
+	octets := a16[:]
+	if is4 {
+		octets = octets[12:]
+	}
 
-	// depth index for the child trie
-	depth := 0
-	for {
-		octet := uint(octets[depth])
+	for _, octet := range octets {
 
 		// loop stop condition: last significant octet reached
 		//
@@ -93,7 +93,6 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 		}
 
 		// go down
-		depth++
 		n = child
 		bits -= strideLen
 	}
@@ -130,10 +129,10 @@ func (t *Table[V]) Delete(pfx netip.Prefix) {
 		octets = octets[12:]
 	}
 
-	depth := 0
-	for {
-		octet := uint(octets[depth])
+	var depth int
+	var octet byte
 
+	for depth, octet = range octets {
 		// push current node on stack for path recording
 		pathStack[depth] = n
 
@@ -157,7 +156,6 @@ func (t *Table[V]) Delete(pfx netip.Prefix) {
 		}
 
 		// go down
-		depth++
 		bits -= strideLen
 		n = child
 	}
@@ -174,7 +172,7 @@ func (t *Table[V]) Delete(pfx netip.Prefix) {
 		if n.isEmpty() {
 			// purge this node from parents children
 			parent := pathStack[depth-1]
-			parent.deleteChild(uint(octets[depth-1]))
+			parent.deleteChild(octets[depth-1])
 		}
 
 		// go up
@@ -184,9 +182,9 @@ func (t *Table[V]) Delete(pfx netip.Prefix) {
 }
 
 // Update or set the value at pfx with a callback function.
+// The callback function is called with (value, ok) and returns a new value..
 //
-// If the pfx does not yet exist, then ok=false and the pfx
-// is set with the new value.
+// If the pfx does not already exist, it is set with the new value.
 func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 	t.init()
 
@@ -213,11 +211,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 		octets = octets[12:]
 	}
 
-	// depth index for the child trie
-	depth := 0
-	for {
-		octet := uint(octets[depth])
-
+	for _, octet := range octets {
 		// last significant octet reached
 		if bits <= strideLen {
 			return n.updatePrefix(octet, bits, cb)
@@ -233,10 +227,11 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 		}
 
 		// go down
-		depth++
 		n = child
 		bits -= strideLen
 	}
+
+	panic("unreachable")
 }
 
 // Get returns the associated payload for prefix and true, or false if
@@ -266,9 +261,7 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 		octets = octets[12:]
 	}
 
-	depth := 0
-	for {
-		octet := uint(octets[depth])
+	for _, octet := range octets {
 
 		// last significant octet reached
 		if bits <= strideLen {
@@ -278,15 +271,16 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 		// descend down to next level, no path compression
 		child := n.getChild(octet)
 		if child == nil {
-			// no child, prefix is not set
-			return
+			break
 		}
 
 		// go down
-		depth++
 		bits -= strideLen
 		n = child
 	}
+
+	// prefix does not exist
+	return
 }
 
 // Lookup does a route lookup (longest prefix match) for IP and
@@ -308,18 +302,17 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 		octets = octets[12:]
 	}
 
-	depth := 0
-	octet := uint(octets[depth])
+	var depth int
+	var octet byte
+
 	// find leaf node
-	for {
+	for depth, octet = range octets {
 
 		// push current node on stack for fast backtracking
 		pathStack[depth] = n
 
 		// go down in tight loop to leaf node
 		if child := n.getChild(octet); child != nil {
-			depth++
-			octet = uint(octets[depth])
 			n = child
 			continue
 		}
@@ -344,7 +337,7 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 
 		// go up, backtracking
 		depth--
-		octet = uint(octets[depth])
+		octet = octets[depth]
 		n = pathStack[depth]
 	}
 }
@@ -405,10 +398,10 @@ func (t *Table[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V
 		octets = octets[12:]
 	}
 
-	octet := uint(octets[depth])
+	var octet byte
 
 	// go down to stride node for pfx
-	for {
+	for depth, octet = range octets {
 
 		// push current node on stack for fast backtracking
 		pathStack[depth] = n
@@ -420,9 +413,7 @@ func (t *Table[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V
 
 		// go down in tight loop the trie levels
 		if child := n.getChild(octet); child != nil {
-			depth++
 			bits -= strideLen
-			octet = uint(octets[depth])
 			n = child
 			continue
 		}
@@ -453,7 +444,7 @@ func (t *Table[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V
 		// bits are now full strideLen for all upper levels
 		depth--
 		bits = strideLen
-		octet = uint(octets[depth])
+		octet = octets[depth]
 		n = pathStack[depth]
 	}
 }
@@ -493,14 +484,10 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 	// heap allocation does not matter here
 	octets := ip.AsSlice()
 
-	depth := 0
-
-	for {
-		octet := uint(octets[depth])
-
+	for depth, octet := range octets {
 		// last significant octet reached
 		if bits <= strideLen {
-			result = n.subnets(octets[:depth], prefixToBaseIndex(octet, bits), is4)
+			result := n.subnets(octets[:depth], prefixToBaseIndex(octet, bits), is4)
 
 			slices.SortFunc(result, cmpPrefix)
 			return result
@@ -515,10 +502,11 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 		}
 
 		// next round
-		depth++
 		n = child
 		bits -= strideLen
 	}
+
+	return result
 }
 
 // Supernets, return all matching routes for pfx,
@@ -548,14 +536,13 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 		return result
 	}
 
-	// heap allocation does not matter here
-	octets := ip.AsSlice()
+	a16 := ip.As16()
+	octets := a16[:]
+	if is4 {
+		octets = octets[12:]
+	}
 
-	depth := 0
-
-	for {
-		octet := uint(octets[depth])
-
+	for depth, octet := range octets {
 		// max bits in baseIndex functions is strideLen
 		pfxLen := strideLen
 
@@ -580,7 +567,7 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 
 		// last significant octet reached
 		if bits <= strideLen {
-			return result
+			break
 		}
 
 		// descend down to next trie level
@@ -588,14 +575,15 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 
 		// stop condition, no more childs
 		if child == nil {
-			return result
+			break
 		}
 
 		// next round
-		depth++
 		n = child
 		bits -= strideLen
 	}
+
+	return result
 }
 
 // OverlapsPrefix reports whether any IP in pfx matches a route in the table.
@@ -621,11 +609,7 @@ func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 		octets = octets[12:]
 	}
 
-	// depth index for the child trie
-	depth := 0
-	octet := uint(octets[depth])
-
-	for {
+	for _, octet := range octets {
 
 		// last significant octet reached
 		if bits <= strideLen {
@@ -651,11 +635,11 @@ func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 		}
 
 		// next round
-		depth++
-		octet = uint(octets[depth])
 		bits -= strideLen
 		n = child
 	}
+
+	return false
 }
 
 // Overlaps reports whether any IP in the table matches a route in the
