@@ -14,6 +14,7 @@ import (
 	"math/rand"
 	"net/netip"
 	"reflect"
+	"runtime"
 	"testing"
 )
 
@@ -1618,6 +1619,40 @@ func BenchmarkTableOverlaps(b *testing.B) {
 			b.Run(fmt.Sprintf("%s/%d_with_%d", fam, nroutes, intersectSize), func(b *testing.B) {
 				for i := 0; i < b.N; i++ {
 					boolSink = rt.Overlaps(intersects[i%numIntersects])
+				}
+			})
+		}
+	}
+}
+
+func BenchmarkSize(b *testing.B) {
+	for _, fam := range []string{"ipv4", "ipv6"} {
+		rng := randomPrefixes4
+		if fam == "ipv6" {
+			rng = randomPrefixes6
+		}
+
+		var startMem, endMem runtime.MemStats
+		for _, nroutes := range benchRouteCount {
+			rt := new(Table[any])
+
+			b.Run(fmt.Sprintf("%d/%s", nroutes, fam), func(b *testing.B) {
+				b.ResetTimer()
+
+				for i := 0; i < b.N; i++ {
+					rt = new(Table[any])
+					runtime.GC()
+					runtime.ReadMemStats(&startMem)
+
+					for _, route := range rng(nroutes) {
+						rt.Insert(route.pfx, struct{}{})
+					}
+
+					runtime.GC()
+					runtime.ReadMemStats(&endMem)
+
+					b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
+					b.ReportMetric(0, "ns/op") // silence
 				}
 			})
 		}
