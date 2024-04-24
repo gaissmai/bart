@@ -67,38 +67,113 @@ func (t *Table2[V]) Insert(pfx netip.Prefix, val V) {
 		octets = octets[12:]
 	}
 
+	// 10.0.0.0/8    -> 0
+	// 10.12.0.0/15  -> 1
+	// 10.12.0.0/16  -> 1
+	// 10.12.10.9/32 -> 3
 	lastOctetIdx := (bits - 1) / strideLen
 
-	for depth, octet := range octets[:lastOctetIdx+1] {
+	// 10.0.0.0/8    -> 10
+	// 10.12.0.0/15  -> 12
+	// 10.12.0.0/16  -> 12
+	// 10.12.10.9/32 -> 9
+	lastOctet := octets[lastOctetIdx]
 
-		// last non-masked octet reached
+	// 10.0.0.0/8    -> 8
+	// 10.12.0.0/15  -> 7
+	// 10.12.0.0/16  -> 8
+	// 10.12.10.9/32 -> 8
+	lastPfxLen := bits - (lastOctetIdx * strideLen)
+
+	// find the proper trie node to insert prefix
+	for depth, octet := range octets {
+
+		// last octet reached
 		if depth == lastOctetIdx {
-			// insert prefix
+			// insert prefix into node
 			pfxLen := bits - (depth * strideLen)
-			n.insertPrefix(octet, pfxLen, val)
+			n.insertPrefix(lastOctet, pfxLen, val)
 			return
 		}
 
-		// descend down to next trie level
-		child := n.getChild(octet)
+		// descend down the trie
+		c := n.getChild(octet)
 
-		// go down
-		if child != nil {
-			n = child
+		// child not nil and not path compressed, tight loop
+		if c != nil && len(c.path) == depth+1 {
+			n = c
 			continue
 		}
 
-		// handle new child, path compressed
-		child = newNode2[V]()
-		child.path = octets[:lastOctetIdx]
-		n.insertChild(octet, child)
+		// #########################################
+		//  path compression, here will be dragons!
+		// #########################################
 
-		// insert prefix into child
-		lastPfxLen := bits - (lastOctetIdx * strideLen)
-		child.insertPrefix(octets[lastOctetIdx], lastPfxLen, val)
+		// make new node, already set path and insert prefix
+		nn := newNode2[V]()
+		nn.path = octets[:lastOctetIdx]
+		nn.insertPrefix(lastOctet, lastPfxLen, val)
 
+		// just insert new leaf node
+		if c == nil {
+			n.insertChild(octet, nn)
+			return
+		}
+
+		// just insert prefix into existing child
+		if bytes.Equal(c.path, octets[:lastOctetIdx]) {
+			c.insertPrefix(lastOctet, lastPfxLen, val)
+			return
+		}
+
+		// child path is prefix in octets[...]
+		if bytes.HasPrefix(octets[:lastOctetIdx], c.path) {
+			// link new node under current child
+			c.insertChild(octets[len(c.path)], nn)
+			return
+		}
+
+		// octets[...] is prefix in child.path
+		if bytes.HasPrefix(c.path, octets[:lastOctetIdx]) {
+			// move current child under new node
+			nn.insertChild(c.path[lastOctetIdx], c)
+
+			// link new node under current n
+			n.insertChild(octet, nn)
+			return
+		}
+
+		// from here we need a new intermediate node
+
+		// find idx+1 for common path, insert intermediate node,
+		// insert old and new child into intermdiate node
+
+		// TODO: rewrite with bytes.CutPrefix
+		divergentIdx := pathInCommon(depth, c.path, octets[:lastOctetIdx])
+
+		// make intermediate node with path until divergence
+		imedNode := newNode2[V]()
+		imedNode.path = c.path[:divergentIdx]
+
+		// insert old and new child into intermediate node
+		imedNode.insertChild(c.path[divergentIdx], c)
+		imedNode.insertChild(octets[divergentIdx], nn)
+
+		// insert intermediate node into n, overwrites the old link
+		n.insertChild(octet, imedNode)
 		return
 	}
+}
+
+func pathInCommon(start int, a, b []byte) int {
+	idx := start
+	for i := start; i < min(len(a), len(b)); i++ {
+		if a[i] != b[i] {
+			return idx + 1
+		}
+		idx = i
+	}
+	return idx + 1
 }
 
 // Delete removes pfx from the tree, pfx does not have to be present.
@@ -265,8 +340,10 @@ func (t *Table2[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 	}
 
 	lastOctetIdx := (bits - 1) / strideLen
+	lastOctet := octets[lastOctetIdx]
+	lastPfxLen := bits - (lastOctetIdx * strideLen)
 
-	for depth, octet := range octets[:lastOctetIdx+1] {
+	for depth, octet := range octets {
 
 		// last non-masked octet reached
 		if depth == lastOctetIdx {
@@ -279,18 +356,10 @@ func (t *Table2[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 			return
 		}
 
-		// handle path compressed child
-		if len(child.path) > depth+1 {
-			if !bytes.Equal(child.path, octets[:lastOctetIdx]) {
-				return
-			}
-
-			lastPfxLen := bits - (lastOctetIdx * strideLen)
-			return child.getValByPrefix(octets[lastOctetIdx], lastPfxLen)
+		if bytes.Equal(child.path, octets[:lastOctetIdx]) {
+			return child.getValByPrefix(lastOctet, lastPfxLen)
 		}
 
-		// go down
-		bits -= strideLen
 		n = child
 	}
 
@@ -307,7 +376,12 @@ func (t *Table2[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	}
 
 	// stack of the traversed nodes for fast backtracking, if needed
-	pathStack := [maxTreeDepth]*node2[V]{}
+	type stackItem struct {
+		node  *node2[V]
+		octet byte
+	}
+
+	pathStack := [maxTreeDepth]stackItem{}
 
 	// does not allocate
 	a16 := ip.As16()
@@ -316,44 +390,44 @@ func (t *Table2[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 		octets = octets[12:]
 	}
 
-	var depth int
-	var octet byte
+	depth := 0
 
 	// find leaf node
-	for depth, octet = range octets {
+	var i int
+	for {
+		octet := octets[depth]
 
-		// push current node on stack for fast backtracking
-		pathStack[depth] = n
+		// push current node on stack for backtracking
+		pathStack[i] = stackItem{n, octet}
 
-		// go down in tight loop to leaf node
-		if child := n.getChild(octet); child != nil {
-			n = child
-			continue
+		// end of childs
+		c := n.getChild(octet)
+		if c == nil {
+			break
 		}
 
-		break
+		// maybe path compressed child
+		if !bytes.HasPrefix(octets, c.path) {
+			break
+		}
+
+		depth = len(c.path)
+		n = c
+		i++
 	}
 
 	// start backtracking at leaf node in tight loop
-	for {
+	for j := i; j >= 0; j-- {
+		item := pathStack[j]
 		// lookup only in nodes with prefixes, skip over intermediate nodes
-		if len(n.prefixes) != 0 {
+		if len(item.node.prefixes) != 0 {
 			// longest prefix match?
-			if _, val, ok := n.lpmByIndex(octetToBaseIndex(octet)); ok {
+			if _, val, ok := n.lpmByOctet(item.octet); ok {
 				return val, true
 			}
 		}
-
-		// end condition, stack is exhausted
-		if depth == 0 {
-			return
-		}
-
-		// go up, backtracking
-		depth--
-		octet = octets[depth]
-		n = pathStack[depth]
 	}
+	return
 }
 
 // LookupPrefix does a route lookup (longest prefix match) for pfx and

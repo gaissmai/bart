@@ -22,6 +22,22 @@ func (t *Table2[V]) dumpString() string {
 	return w.String()
 }
 
+func (t *Table2[V]) dumpString4() string {
+	w := new(strings.Builder)
+	if err := t.dump4(w); err != nil {
+		panic(err)
+	}
+	return w.String()
+}
+
+func (t *Table2[V]) dumpString6() string {
+	w := new(strings.Builder)
+	if err := t.dump6(w); err != nil {
+		panic(err)
+	}
+	return w.String()
+}
+
 // dump the table structure and all the nodes to w.
 //
 //	 Output:
@@ -65,6 +81,18 @@ func (t *Table2[V]) dump(w io.Writer) error {
 	return nil
 }
 
+func (t *Table2[V]) dump4(w io.Writer) error {
+	t.init()
+	t.rootV4.dumpRec(w, 0, true)
+	return nil
+}
+
+func (t *Table2[V]) dump6(w io.Writer) error {
+	t.init()
+	t.rootV6.dumpRec(w, 0, false)
+	return nil
+}
+
 // dumpRec, rec-descent the trie.
 func (n *node2[V]) dumpRec(w io.Writer, depth int, is4 bool) {
 	n.dump(w, depth, is4)
@@ -82,11 +110,12 @@ func (n *node2[V]) dump(w io.Writer, depth int, is4 bool) {
 		}
 	}
 
+	bits := len(n.path) * strideLen
 	indent := strings.Repeat(".", depth)
 
 	// node type with depth and octet path and bits.
-	must(fmt.Fprintf(w, "\n%s[%s] depth:  %d path: [%v]\n",
-		indent, n.hasType(), depth, ancestors(n.path, is4)))
+	must(fmt.Fprintf(w, "\n%s[%s] path: [%v] bits: +%d depth: %d\n",
+		indent, n.hasType(), ancestors(n.path, is4), bits, depth))
 
 	if len(n.prefixes) != 0 {
 		indices := n.allStrideIndexes()
@@ -99,6 +128,14 @@ func (n *node2[V]) dump(w io.Writer, depth int, is4 bool) {
 		for _, idx := range indices {
 			octet, bits := baseIndexToPrefix(idx)
 			must(fmt.Fprintf(w, "%s/%d ", octetFmt(octet, is4), bits))
+		}
+		must(fmt.Fprintln(w))
+
+		// print the values for this node
+		must(fmt.Fprintf(w, "%svalues(#%d): ", indent, len(n.prefixes)))
+
+		for _, val := range n.prefixes {
+			must(fmt.Fprintf(w, "%v ", val))
 		}
 		must(fmt.Fprintln(w))
 	}
