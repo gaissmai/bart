@@ -178,23 +178,24 @@ func (n *node[V]) getKidsRec(parentIdx uint, path []byte, is4 bool) []kidT[V] {
 	return directKids
 }
 
-// cidrFromPath, make prefix from byte path, next octet (byte, stride) and pfxLen.
+// cidrFromPath, make prefix from byte path, next octet and pfxLen.
 func cidrFromPath(path []byte, idx uint, is4 bool) (pfx netip.Prefix) {
 	octet, pfxLen := baseIndexToPrefix(idx)
 
 	// append last (partially) masked byte to path and
 	// calc bits with pathLen and pfxLen
-	bs := append(slices.Clone(path), octet)
+	octets := append(slices.Clone(path), octet)
 	bits := len(path)*strideLen + pfxLen
 
+	// make ip addr from octets
 	var ip netip.Addr
 	if is4 {
 		b4 := [4]byte{}
-		copy(b4[:], bs)
+		copy(b4[:], octets)
 		ip = netip.AddrFrom4(b4)
 	} else {
 		b16 := [16]byte{}
-		copy(b16[:], bs)
+		copy(b16[:], octets)
 		ip = netip.AddrFrom16(b16)
 	}
 

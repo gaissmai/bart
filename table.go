@@ -683,7 +683,7 @@ func (t *Table[V]) Clone() *Table[V] {
 // Prefixes must not be inserted or deleted by the callback function, otherwise
 // the behavior is undefined. However, value updates are permitted.
 //
-// The sort order is not specified and is not part of the
+// The walk order is not specified and is not part of the
 // public interface, you must not rely on it.
 func (t *Table[V]) Walk(cb func(pfx netip.Prefix, val V) error) error {
 	t.init()
