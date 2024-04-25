@@ -109,7 +109,7 @@ func BenchmarkFullMatchV6(b *testing.B) {
 
 	// find a random match
 	for {
-		ip = randomIP4()
+		ip = randomIP6()
 		_, ok := rt.Lookup(ip)
 		if ok {
 			ipAsPfx, _ = ip.Prefix(ip.BitLen())
@@ -157,11 +157,11 @@ func BenchmarkFullMissV4(b *testing.B) {
 	var ip netip.Addr
 	var ipAsPfx netip.Prefix
 
-	// find a random match
+	// find a random miss
 	for {
 		ip = randomIP4()
 		_, ok := rt.Lookup(ip)
-		if ok {
+		if !ok {
 			ipAsPfx, _ = ip.Prefix(ip.BitLen())
 			break
 		}
@@ -199,11 +199,11 @@ func BenchmarkFullMissV6(b *testing.B) {
 	var ip netip.Addr
 	var ipAsPfx netip.Prefix
 
-	// find a random match
+	// find a random miss
 	for {
-		ip = randomIP4()
+		ip = randomIP6()
 		_, ok := rt.Lookup(ip)
-		if ok {
+		if !ok {
 			ipAsPfx, _ = ip.Prefix(ip.BitLen())
 			break
 		}
