@@ -325,7 +325,7 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 		// lookup only in nodes with prefixes, skip over intermediate nodes
 		if len(n.prefixes) != 0 {
 			// longest prefix match?
-			if _, val, ok := n.lpmByIndex(octetToBaseIndex(octet)); ok {
+			if _, val, ok := n.lpmByOctet(octet); ok {
 				return val, true
 			}
 		}
@@ -359,8 +359,8 @@ func (t *Table[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
 // they must be converted to /32 or /128 prefixes.
 func (t *Table[V]) LookupPrefixLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) {
 	depth, baseIdx, val, ok := t.lpmByPrefix(pfx)
-	if ok {
 
+	if ok {
 		// calculate the mask from baseIdx and depth
 		mask := baseIndexToPrefixMask(baseIdx, depth)
 
@@ -420,14 +420,14 @@ func (t *Table[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V
 			continue
 		}
 
-		// stop condition was missing child and not bits len,
+		// stop condition was missing child and not bitsLen,
 		// so cut the bits to strideLen
 		bits = strideLen
 
 		break
 	}
 
-	// start backtracking at matching stride node in tight loop
+	// start backtracking at matching stride-node in tight loop
 	for {
 
 		// lookup only in nodes with prefixes, skip over intermediate nodes
@@ -538,11 +538,8 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 		return result
 	}
 
-	a16 := ip.As16()
-	octets := a16[:]
-	if is4 {
-		octets = octets[12:]
-	}
+	// heap allocation does not matter here
+	octets := ip.AsSlice()
 
 	for depth, octet := range octets {
 		// max bits in baseIndex functions is strideLen
