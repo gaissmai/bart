@@ -1408,21 +1408,16 @@ func checkSize(t *testing.T, tbl *Table[int], want int) {
 }
 
 func (t *Table[V]) numNodes() int {
-	seen := map[*node[V]]bool{}
-	return t.numNodesRec(seen, t.rootV4) + t.numNodesRec(seen, t.rootV6)
+	return t.numNodesRec(t.rootV4) + t.numNodesRec(t.rootV6)
 }
 
-func (t *Table[V]) numNodesRec(seen map[*node[V]]bool, n *node[V]) int {
+func (t *Table[V]) numNodesRec(n *node[V]) int {
 	ret := 1
 	if len(n.children) == 0 {
 		return ret
 	}
 	for _, c := range n.children {
-		if seen[c] {
-			continue
-		}
-		seen[c] = true
-		ret += t.numNodesRec(seen, c)
+		ret += t.numNodesRec(c)
 	}
 	return ret
 }
