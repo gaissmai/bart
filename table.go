@@ -359,12 +359,14 @@ func (t *Table[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
 // they must be converted to /32 or /128 prefixes.
 func (t *Table[V]) LookupPrefixLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) {
 	depth, baseIdx, val, ok := t.lpmByPrefix(pfx)
+	if ok {
 
-	// calculate the mask from baseIdx and depth
-	mask := baseIndexToPrefixMask(baseIdx, depth)
+		// calculate the mask from baseIdx and depth
+		mask := baseIndexToPrefixMask(baseIdx, depth)
 
-	// calculate the lpm from ip and mask
-	lpm, _ = pfx.Addr().Prefix(mask)
+		// calculate the lpm from ip and mask
+		lpm, _ = pfx.Addr().Prefix(mask)
+	}
 
 	return lpm, val, ok
 }
