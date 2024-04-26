@@ -1408,6 +1408,7 @@ func checkSize(t *testing.T, tbl *Table[int], want int) {
 }
 
 func (t *Table[V]) numNodes() int {
+	t.init()
 	return t.numNodesRec(t.rootV4) + t.numNodesRec(t.rootV6)
 }
 
@@ -1424,6 +1425,7 @@ func (t *Table[V]) numNodesRec(n *node[V]) int {
 
 // dumpAsPrefixTable, just a helper to compare with slowPrefixTable
 func (t *Table[V]) dumpAsPrefixTable() slowRT[V] {
+	t.init()
 	pfxs := []slowRTEntry[V]{}
 	pfxs = dumpListRec(pfxs, t.DumpList4())
 	pfxs = dumpListRec(pfxs, t.DumpList6())
