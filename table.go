@@ -472,12 +472,12 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 	if bits == 0 {
 
 		// return *all* routes for this IP version, sic!
-		_ = n.walkRec(nil, is4, func(pfx netip.Prefix, _ V) (err error) {
+		n.allRec(nil, is4, func(pfx netip.Prefix, _ V) bool {
 			result = append(result, pfx)
-			return
+			return true
 		})
 
-		// walk order is wierd, needed sort after walk
+		// iteration order is wierd, sort needed
 		slices.SortFunc(result, cmpPrefix)
 
 		return result
@@ -674,34 +674,30 @@ func (t *Table[V]) Clone() *Table[V] {
 	return c
 }
 
-// Walk runs through the routing table and calls the cb function
+// All iterates through the routing table and calls the yield function
 // for each route entry with prefix and value.
-// If the cb function returns an error,
-// the walk ends prematurely and the error is propagated.
+// If the yield function returns false the iteration ends prematurely
+// and the false is propagated.
 //
-// Prefixes must not be inserted or deleted by the callback function, otherwise
+// Prefixes must not be inserted or deleted by the yield function, otherwise
 // the behavior is undefined. However, value updates are permitted.
 //
-// The walk order is not specified and is not part of the
+// The iteration order is not specified and is not part of the
 // public interface, you must not rely on it.
-func (t *Table[V]) Walk(cb func(pfx netip.Prefix, val V) error) error {
+func (t *Table[V]) All(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
-
-	if err := t.Walk4(cb); err != nil {
-		return err
-	}
-
-	return t.Walk6(cb)
+	// respect premature end of allRec()
+	_ = t.rootV4.allRec(nil, true, yield) && t.rootV6.allRec(nil, false, yield)
 }
 
-// Walk4, like [Table.Walk] but only for the v4 routing table.
-func (t *Table[V]) Walk4(cb func(pfx netip.Prefix, val V) error) error {
+// All4, like [Table.All] but only for the v4 routing table.
+func (t *Table[V]) All4(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
-	return t.rootV4.walkRec(nil, true, cb)
+	t.rootV4.allRec(nil, true, yield)
 }
 
-// Walk6, like [Table.Walk] but only for the v6 routing table.
-func (t *Table[V]) Walk6(cb func(pfx netip.Prefix, val V) error) error {
+// All6, like [Table.All] but only for the v6 routing table.
+func (t *Table[V]) All6(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
-	return t.rootV6.walkRec(nil, false, cb)
+	t.rootV6.allRec(nil, false, yield)
 }

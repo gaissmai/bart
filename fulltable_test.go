@@ -352,8 +352,8 @@ func BenchmarkFullTableWalk(b *testing.B) {
 
 	b.ResetTimer()
 	for k := 0; k < b.N; k++ {
-		_ = rt.Walk(func(pfx netip.Prefix, val int) error {
-			return nil
+		rt.All(func(pfx netip.Prefix, val int) bool {
+			return true
 		})
 	}
 }

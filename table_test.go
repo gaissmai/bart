@@ -1274,11 +1274,12 @@ func TestOverlapsPrefixEdgeCases(t *testing.T) {
 	})
 }
 
-func TestWalk(t *testing.T) {
+// After go version 1.22 we can use range iterators
+func TestAll(t *testing.T) {
 	pfxs := randomPrefixes(10_000)
 	seen := make(map[netip.Prefix]int, 10_000)
 
-	t.Run("Walk", func(t *testing.T) {
+	t.Run("All", func(t *testing.T) {
 		rtbl := new(Table[int])
 		for _, item := range pfxs {
 			rtbl.Insert(item.pfx, item.val)
@@ -1286,12 +1287,12 @@ func TestWalk(t *testing.T) {
 		}
 
 		// check if pfx/val is as expected
-		_ = rtbl.Walk(func(pfx netip.Prefix, val int) error {
+		rtbl.All(func(pfx netip.Prefix, val int) bool {
 			if seen[pfx] != val {
 				t.Errorf("%v got value: %v, expected: %v", pfx, val, seen[pfx])
 			}
 			delete(seen, pfx)
-			return nil
+			return true
 		})
 
 		// check if all entries visited
@@ -1300,8 +1301,8 @@ func TestWalk(t *testing.T) {
 		}
 	})
 
-	// make a walk and update the values in the walk callback
-	t.Run("Walk and Update", func(t *testing.T) {
+	// make an interation and update the values in the callback
+	t.Run("All and Update", func(t *testing.T) {
 		rtbl := new(Table[int])
 		for _, item := range pfxs {
 			rtbl.Insert(item.pfx, item.val)
@@ -1309,46 +1310,47 @@ func TestWalk(t *testing.T) {
 		}
 
 		// update callback, add 1 to val
-		updateCallback := func(val int, ok bool) int {
+		updateValue := func(val int, ok bool) int {
 			return val + 1
 		}
 
-		walkCallback := func(pfx netip.Prefix, val int) error {
-			rtbl.Update(pfx, updateCallback)
-			return nil
+		yield := func(pfx netip.Prefix, val int) bool {
+			rtbl.Update(pfx, updateValue)
+			return true
 		}
 
-		// walk and update the values
-		_ = rtbl.Walk(walkCallback)
+		// iterate and update the values
+		rtbl.All(yield)
 
-		// test if all values got updated, cb now as closure
-		_ = rtbl.Walk(func(pfx netip.Prefix, val int) error {
+		// test if all values got updated, yield now as closure
+		rtbl.All(func(pfx netip.Prefix, val int) bool {
 			if seen[pfx] != val {
 				t.Errorf("%v got value: %v, expected: %v", pfx, val, seen[pfx])
 			}
-			return nil
+			return true
 		})
 	})
 
-	t.Run("Walk with error exit", func(t *testing.T) {
+	t.Run("All with premature exit", func(t *testing.T) {
 		rtbl := new(Table[int])
 		for _, item := range pfxs {
 			rtbl.Insert(item.pfx, item.val)
 		}
 
-		count := 0
-
-		// check if pfx/val is as expected
-		err := rtbl.Walk(func(pfx netip.Prefix, val int) error {
-			count++
-			if count >= 1000 {
-				return fmt.Errorf("premature STOP condirion")
+		// check if callback stops prematurely
+		countV6 := 0
+		rtbl.All(func(pfx netip.Prefix, val int) bool {
+			// max 1000 IPv6 prefixes
+			if !pfx.Addr().Is4() {
+				countV6++
 			}
-			return nil
+
+			// premature STOP condition
+			return countV6 < 1000
 		})
 
-		// check if walk stopped with error
-		if err == nil || count > 1000 {
+		// check if iteration stopped with error
+		if countV6 > 1000 {
 			t.Fatalf("expected premature stop with error")
 		}
 	})

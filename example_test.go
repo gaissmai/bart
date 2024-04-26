@@ -80,14 +80,14 @@ func ExampleTable_Lookup() {
 	// Lookup: 2001:7c0:3100:1::111 value: 2001:db8::1, ok: true
 }
 
-func ExampleTable_Walk4() {
+func ExampleTable_All4() {
 	rtbl := new(bart.Table[netip.Addr])
 	for _, item := range input {
 		rtbl.Insert(item.cidr, item.nextHop)
 	}
-	_ = rtbl.Walk4(func(pfx netip.Prefix, val netip.Addr) error {
+	rtbl.All4(func(pfx netip.Prefix, val netip.Addr) bool {
 		fmt.Printf("%v\t%v\n", pfx, val)
-		return nil
+		return true
 	})
 
 	// Output:

@@ -7,9 +7,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Stand With Ukraine](https://raw.githubusercontent.com/vshymanskyy/StandWithUkraine/main/badges/StandWithUkraine.svg)](https://stand-with-ukraine.pp.ua)
 
-## ATTENTION: API change
+## ATTENTION: API change!!!
 
-The API has changed since v0.4.2 !!!
+API change again, Walk() is ready for range-over-func iterators and renamed to All().
 
 ## Overview
 
@@ -37,7 +37,7 @@ the backtracking algorithm is as fast as possible.
 
 ## API
 
-The API has changed since v0.4.2
+The API has changed since v0.4.2 and 0.5.3.
 
 ```golang
   import "github.com/gaissmai/bart"
@@ -75,9 +75,9 @@ The API has changed since v0.4.2
   func (t *Table[V]) MarshalText() ([]byte, error)
   func (t *Table[V]) MarshalJSON() ([]byte, error)
 
-  func (t *Table[V]) Walk(cb func(pfx netip.Prefix, val V) error) error
-  func (t *Table[V]) Walk4(cb func(pfx netip.Prefix, val V) error) error
-  func (t *Table[V]) Walk6(cb func(pfx netip.Prefix, val V) error) error
+  func (t *Table[V]) All(yield func(pfx netip.Prefix, val V) bool) bool
+  func (t *Table[V]) All4(yield func(pfx netip.Prefix, val V) bool) bool
+  func (t *Table[V]) All6(yield func(pfx netip.Prefix, val V) bool) bool
 
   func (t *Table[V]) DumpList4() []DumpListNode[V]
   func (t *Table[V]) DumpList6() []DumpListNode[V]
