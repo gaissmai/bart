@@ -516,20 +516,20 @@ func (n *node[V]) cloneRec() *node[V] {
 	return c
 }
 
-// walkRec runs recursive the trie, starting at node and
-// the cb function is called for each route entry with prefix and value.
-// If the cb function returns an error the walk ends prematurely and the
-// error is propagated.
-func (n *node[V]) walkRec(path []byte, is4 bool, cb func(netip.Prefix, V) error) error {
+// allRec runs recursive the trie, starting at node and
+// the yield function is called for each route entry with prefix and value.
+// If the yield function returns false the recursion ends prematurely and the
+// false value is propagated.
+func (n *node[V]) allRec(path []byte, is4 bool, yield func(netip.Prefix, V) bool) bool {
 	// for all prefixes in this node do ...
 	for _, idx := range n.allStrideIndexes() {
 		val, _ := n.getValByIndex(idx)
 		pfx := cidrFromPath(path, idx, is4)
 
 		// make the callback for this prefix
-		if err := cb(pfx, val); err != nil {
+		if !yield(pfx, val) {
 			// premature end of recursion
-			return err
+			return false
 		}
 	}
 
@@ -539,13 +539,13 @@ func (n *node[V]) walkRec(path []byte, is4 bool, cb func(netip.Prefix, V) error)
 		path := append(slices.Clone(path), octet)
 		child := n.getChild(octet)
 
-		if err := child.walkRec(path, is4, cb); err != nil {
+		if !child.allRec(path, is4, yield) {
 			// premature end of recursion
-			return err
+			return false
 		}
 	}
 
-	return nil
+	return true
 }
 
 // subnets returns all CIDRs covered by parent pfx.
@@ -579,9 +579,9 @@ func (n *node[V]) subnets(path []byte, parentIdx uint, is4 bool) (result []netip
 				path := append(slices.Clone(path), octet)
 
 				// all cidrs under this child are covered by pfx
-				_ = c.walkRec(path, is4, func(pfx netip.Prefix, _ V) (err error) {
+				c.allRec(path, is4, func(pfx netip.Prefix, _ V) bool {
 					result = append(result, pfx)
-					return
+					return true
 				})
 			}
 		}
