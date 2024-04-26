@@ -11,153 +11,11 @@ package bart
 
 import (
 	"fmt"
+	"math/rand"
 	"net/netip"
 	"runtime"
 	"testing"
 )
-
-func TestPathComp(t *testing.T) {
-	t.Run("empty", func(t *testing.T) {
-		rt2 := new(Table2[any])
-
-		t.Log(rt2.String())
-
-		exp := 2
-		if got := rt2.numNodes(); got != exp {
-			t.Log(rt2.dumpString())
-			t.Errorf("numNodes: expected %v, got %v", exp, got)
-		}
-
-		exp = 0
-		if got := rt2.numPrefixes(); got != exp {
-			t.Log(rt2.dumpString())
-			t.Errorf("numPrefixes: expected %v, got %v", exp, got)
-		}
-	})
-
-	t.Run("default", func(t *testing.T) {
-		rt2 := new(Table2[any])
-		rt2.Insert(mpp("0.0.0.0/0"), nil)
-		rt2.Insert(mpp("::/0"), nil)
-
-		t.Log(rt2.String())
-
-		exp := 2
-		if got := rt2.numNodes(); got != exp {
-			t.Log(rt2.dumpString())
-			t.Errorf("numNodes: expected %v, got %v", exp, got)
-		}
-
-		exp = 2
-		if got := rt2.numPrefixes(); got != exp {
-			t.Log(rt2.dumpString())
-			t.Errorf("numPrefixes: expected %v, got %v", exp, got)
-		}
-	})
-
-	t.Run("insert sorted", func(t *testing.T) {
-		rt2 := new(Table2[any])
-		rt2.Insert(mpp("192.0.0.0/4"), nil)
-		t.Log(rt2.dumpString4())
-
-		rt2.Insert(mpp("192.0.0.0/12"), nil)
-		t.Log(rt2.dumpString4())
-
-		rt2.Insert(mpp("192.0.0.0/20"), nil)
-		t.Log(rt2.dumpString4())
-
-		rt2.Insert(mpp("192.0.0.0/28"), nil)
-		t.Log(rt2.dumpString4())
-
-		rt2.Insert(mpp("192.0.0.0/32"), nil)
-		t.Log(rt2.dumpString4())
-
-		t.Log(rt2.String())
-
-		exp := 5
-		if got := rt2.numNodes(); got != exp {
-			t.Log(rt2.dumpString4())
-			t.Errorf("numNodes: expected %v, got %v", exp, got)
-		}
-
-		exp = 5
-		if got := rt2.numPrefixes(); got != exp {
-			t.Log(rt2.dumpString4())
-			t.Errorf("numPrefixes: expected %v, got %v", exp, got)
-		}
-	})
-
-	t.Run("insert inverse", func(t *testing.T) {
-		rt2 := new(Table2[any])
-		rt2.Insert(mpp("192.0.0.0/32"), nil)
-		t.Log(rt2.dumpString4())
-
-		rt2.Insert(mpp("192.0.0.0/28"), nil)
-		t.Log(rt2.dumpString4())
-
-		rt2.Insert(mpp("192.0.0.0/20"), nil)
-		t.Log(rt2.dumpString4())
-
-		rt2.Insert(mpp("192.0.0.0/12"), nil)
-		t.Log(rt2.dumpString4())
-
-		rt2.Insert(mpp("192.0.0.0/4"), nil)
-		t.Log(rt2.dumpString4())
-
-		t.Log(rt2.String())
-
-		exp := 5
-		if got := rt2.numNodes(); got != exp {
-			t.Log(rt2.dumpString4())
-			t.Errorf("numNodes: expected %v, got %v", exp, got)
-		}
-
-		exp = 5
-		if got := rt2.numPrefixes(); got != exp {
-			t.Log(rt2.dumpString4())
-			t.Errorf("numPrefixes: expected %v, got %v", exp, got)
-		}
-	})
-}
-
-func BenchmarkSize2(b *testing.B) {
-	for _, fam := range []string{"ipv4", "ipv6"} {
-		rng := randomPrefixes4
-		if fam == "ipv6" {
-			rng = randomPrefixes6
-		}
-
-		var startMem, endMem runtime.MemStats
-		for _, nroutes := range benchRouteCount {
-			rt := new(Table2[any])
-
-			b.Run(fmt.Sprintf("%d/%s", nroutes, fam), func(b *testing.B) {
-				b.ResetTimer()
-
-				for i := 0; i < b.N; i++ {
-					rt = new(Table2[any])
-					runtime.GC()
-					runtime.ReadMemStats(&startMem)
-
-					for _, route := range rng(nroutes) {
-						rt.Insert(route.pfx, struct{}{})
-					}
-
-					runtime.GC()
-					runtime.ReadMemStats(&endMem)
-					if npfx := rt.numPrefixes(); npfx != nroutes {
-						b.Fatalf("expect %v prefixes, got %v", nroutes, npfx)
-					}
-
-					b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
-					b.ReportMetric(float64(rt.numNodes()), "Nodes")
-					b.ReportMetric(float64(rt.numPrefixes()), "Prefixes")
-					b.ReportMetric(0, "ns/op") // silence
-				}
-			})
-		}
-	}
-}
 
 func TestRegression2(t *testing.T) {
 	t.Parallel()
@@ -267,6 +125,98 @@ func TestGet2(t *testing.T) {
 	}
 }
 
+func TestLookupCompare2(t *testing.T) {
+	// Create large route tables repeatedly, and compare Table's
+	// behavior to a naive and slow but correct implementation.
+	t.Parallel()
+	pfxs := randomPrefixes(10_000)
+
+	slow := slowRT[int]{pfxs}
+	fast := Table2[int]{}
+
+	for _, pfx := range pfxs {
+		fast.Insert(pfx.pfx, pfx.val)
+	}
+
+	seenVals4 := map[int]bool{}
+	seenVals6 := map[int]bool{}
+
+	for i := 0; i < 10_000; i++ {
+		a := randomAddr()
+
+		slowVal, slowOK := slow.lookup(a)
+		fastVal, fastOK := fast.Lookup(a)
+
+		if !getsEqual(slowVal, slowOK, fastVal, fastOK) {
+			t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", a, fastVal, fastOK, slowVal, slowOK)
+		}
+
+		if a.Is6() {
+			seenVals6[fastVal] = true
+		} else {
+			seenVals4[fastVal] = true
+		}
+	}
+
+	// Empirically, 10k probes into 5k v4 prefixes and 5k v6 prefixes results in
+	// ~1k distinct values for v4 and ~300 for v6. distinct routes. This sanity
+	// check that we didn't just return a single route for everything should be
+	// very generous indeed.
+	if cnt := len(seenVals4); cnt < 10 {
+		t.Fatalf("saw %d distinct v4 route results, statistically expected ~1000", cnt)
+	}
+	if cnt := len(seenVals6); cnt < 10 {
+		t.Fatalf("saw %d distinct v6 route results, statistically expected ~300", cnt)
+	}
+}
+
+func TestInsertShuffled2(t *testing.T) {
+	// The order in which you insert prefixes into a route table
+	// should not matter, as long as you're inserting the same set of
+	// routes.
+	t.Parallel()
+
+	pfxs := randomPrefixes(1000)
+	/* uncomment for failure debugging
+	var pfxs2 []slowRTEntry[int]
+	defer func() {
+		if t.Failed() {
+			t.Logf("pre-shuffle: %#v", pfxs)
+			t.Logf("post-shuffle: %#v", pfxs2)
+		}
+	}()
+	*/
+
+	for i := 0; i < 10; i++ {
+		pfxs2 := append([]slowRTEntry[int](nil), pfxs...)
+		rand.Shuffle(len(pfxs2), func(i, j int) { pfxs2[i], pfxs2[j] = pfxs2[j], pfxs2[i] })
+
+		addrs := make([]netip.Addr, 0, 10_000)
+		for i := 0; i < 10_000; i++ {
+			addrs = append(addrs, randomAddr())
+		}
+
+		rt1 := Table2[int]{}
+		rt2 := Table2[int]{}
+
+		for _, pfx := range pfxs {
+			rt1.Insert(pfx.pfx, pfx.val)
+		}
+		for _, pfx := range pfxs2 {
+			rt2.Insert(pfx.pfx, pfx.val)
+		}
+
+		for _, a := range addrs {
+			val1, ok1 := rt1.Lookup(a)
+			val2, ok2 := rt2.Lookup(a)
+
+			if !getsEqual(val1, ok1, val2, ok2) {
+				t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", a, val2, ok2, val1, ok1)
+			}
+		}
+	}
+}
+
 // ############################################################################
 
 // checkOverlaps2 verifies that the overlaps lookups in tt return the
@@ -360,7 +310,10 @@ func BenchmarkTableLookup2(b *testing.B) {
 			rng = randomPrefixes6
 		}
 
-		for _, nroutes := range []int{100_000, 1_000_000} {
+		// same routes
+		for _, nroutes := range []int{100, 1_000, 10_000, 100_000, 1_000_000} {
+			runtime.GC()
+
 			var rt1 Table[int]
 			var rt2 Table2[int]
 			for _, route := range rng(nroutes) {
@@ -368,10 +321,11 @@ func BenchmarkTableLookup2(b *testing.B) {
 				rt2.Insert(route.pfx, route.val)
 			}
 
+			// same probe
 			probe := rng(1)[0]
 
 			b.ResetTimer()
-			b.Run(fmt.Sprintf("none: %s/In_%6d/%s", fam, nroutes, "IP"), func(b *testing.B) {
+			b.Run(fmt.Sprintf("orig: %s/In_%6d/%s", fam, nroutes, "IP"), func(b *testing.B) {
 				for i := 0; i < b.N; i++ {
 					writeSink, _ = rt1.Lookup(probe.pfx.Addr())
 				}
@@ -386,6 +340,68 @@ func BenchmarkTableLookup2(b *testing.B) {
 				b.ReportMetric(float64(rt2.numNodes()), "Nodes")
 			})
 
+		}
+	}
+}
+
+func BenchmarkSize2(b *testing.B) {
+	for _, fam := range []string{"ipv4", "ipv6"} {
+		rng := randomPrefixes4
+		if fam == "ipv6" {
+			rng = randomPrefixes6
+		}
+
+		var startMem, endMem runtime.MemStats
+		for _, nroutes := range []int{10, 100, 1_000, 10_000, 100_000, 1_000_000} {
+			rt1 := new(Table[any])
+			rt2 := new(Table2[any])
+
+			b.Run(fmt.Sprintf("orig:%7d/%s", nroutes, fam), func(b *testing.B) {
+				b.ResetTimer()
+
+				for i := 0; i < b.N; i++ {
+					rt1 = new(Table[any])
+					runtime.GC()
+					runtime.ReadMemStats(&startMem)
+
+					for _, route := range rng(nroutes) {
+						rt1.Insert(route.pfx, struct{}{})
+					}
+
+					runtime.GC()
+					runtime.ReadMemStats(&endMem)
+					if npfx := rt1.numPrefixes(); npfx != nroutes {
+						b.Fatalf("expect %v prefixes, got %v", nroutes, npfx)
+					}
+
+					b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
+					b.ReportMetric(float64(rt1.numNodes()), "Nodes")
+					b.ReportMetric(0, "ns/op") // silence
+				}
+			})
+			b.Run(fmt.Sprintf("comp:%7d/%s", nroutes, fam), func(b *testing.B) {
+				b.ResetTimer()
+
+				for i := 0; i < b.N; i++ {
+					rt2 = new(Table2[any])
+					runtime.GC()
+					runtime.ReadMemStats(&startMem)
+
+					for _, route := range rng(nroutes) {
+						rt2.Insert(route.pfx, struct{}{})
+					}
+
+					runtime.GC()
+					runtime.ReadMemStats(&endMem)
+					if npfx := rt2.numPrefixes(); npfx != nroutes {
+						b.Fatalf("expect %v prefixes, got %v", nroutes, npfx)
+					}
+
+					b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
+					b.ReportMetric(float64(rt2.numNodes()), "Nodes")
+					b.ReportMetric(0, "ns/op") // silence
+				}
+			})
 		}
 	}
 }

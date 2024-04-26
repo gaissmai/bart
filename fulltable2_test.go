@@ -132,6 +132,7 @@ func BenchmarkFull2MissV6(b *testing.B) {
 	var rt2 Table2[int]
 
 	for i, route := range routes {
+		rt1.Insert(route.CIDR, i)
 		rt2.Insert(route.CIDR, i)
 	}
 

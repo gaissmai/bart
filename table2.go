@@ -145,19 +145,17 @@ func (t *Table2[V]) Insert(pfx netip.Prefix, val V) {
 
 		// from here we need a new intermediate node
 
-		// find idx+1 for common path, insert intermediate node,
+		// find the idx from which they differ, insert intermediate node,
 		// insert old and new child into intermdiate node
-
-		// TODO: rewrite with bytes.CutPrefix
-		divergentIdx := pathInCommon(depth, c.path, octets[:lastOctetIdx])
+		diffIdx := findDiffIndex(depth, c.path, octets[:lastOctetIdx])
 
 		// make intermediate node with path until divergence
 		imedNode := newNode2[V]()
-		imedNode.path = c.path[:divergentIdx]
+		imedNode.path = c.path[:diffIdx]
 
 		// insert old and new child into intermediate node
-		imedNode.insertChild(c.path[divergentIdx], c)
-		imedNode.insertChild(octets[divergentIdx], nn)
+		imedNode.insertChild(c.path[diffIdx], c)
+		imedNode.insertChild(octets[diffIdx], nn)
 
 		// insert intermediate node into n, overwrites the old link
 		n.insertChild(octet, imedNode)
@@ -165,7 +163,8 @@ func (t *Table2[V]) Insert(pfx netip.Prefix, val V) {
 	}
 }
 
-func pathInCommon(start int, a, b []byte) int {
+// findDiffIndex from which they differ, but we know they must be equal until depth.
+func findDiffIndex(start int, a, b []byte) int {
 	idx := start
 	for i := start; i < min(len(a), len(b)); i++ {
 		if a[i] != b[i] {
@@ -176,6 +175,7 @@ func pathInCommon(start int, a, b []byte) int {
 	return idx + 1
 }
 
+// TODO path compressed algo
 // Delete removes pfx from the tree, pfx does not have to be present.
 func (t *Table2[V]) Delete(pfx netip.Prefix) {
 	// always normalize the prefix
@@ -262,6 +262,7 @@ func (t *Table2[V]) Delete(pfx netip.Prefix) {
 // Update or set the value at pfx with a callback function.
 // The callback function is called with (value, ok) and returns a new value..
 //
+// TODO path compressed algo
 // If the pfx does not already exist, it is set with the new value.
 func (t *Table2[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 	t.init()
@@ -375,13 +376,9 @@ func (t *Table2[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 		return
 	}
 
-	// stack of the traversed nodes for fast backtracking, if needed
-	type stackItem struct {
-		node  *node2[V]
-		octet byte
-	}
-
-	pathStack := [maxTreeDepth]stackItem{}
+	// stacks of the traversed nodes for fast backtracking, if needed
+	nodeStack := [maxTreeDepth]*node2[V]{}
+	octetStack := [maxTreeDepth]byte{}
 
 	// does not allocate
 	a16 := ip.As16()
@@ -390,15 +387,19 @@ func (t *Table2[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 		octets = octets[12:]
 	}
 
-	depth := 0
+	// octetIdx is allowed to make jumps due to path compression
+	octetIdx := 0
+
+	// stackIndex is monotonic
+	stackIdx := 0
 
 	// find leaf node
-	var i int
 	for {
-		octet := octets[depth]
+		octet := octets[octetIdx]
 
-		// push current node on stack for backtracking
-		pathStack[i] = stackItem{n, octet}
+		// insert node and corresponding octet into stacks for backtracking
+		nodeStack[stackIdx] = n
+		octetStack[stackIdx] = octet
 
 		// end of childs
 		c := n.getChild(octet)
@@ -406,30 +407,41 @@ func (t *Table2[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 			break
 		}
 
-		// maybe path compressed child
+		// octets does not overlap c.path
 		if !bytes.HasPrefix(octets, c.path) {
 			break
 		}
 
-		depth = len(c.path)
+		// path compression, allowed to make jumps
+		octetIdx = len(c.path)
+
+		stackIdx++
 		n = c
-		i++
 	}
 
 	// start backtracking at leaf node in tight loop
-	for j := i; j >= 0; j-- {
-		item := pathStack[j]
-		// lookup only in nodes with prefixes, skip over intermediate nodes
-		if len(item.node.prefixes) != 0 {
-			// longest prefix match?
-			if _, val, ok := n.lpmByOctet(item.octet); ok {
+	for {
+		n := nodeStack[stackIdx]
+		octet := octetStack[stackIdx]
+
+		// LPM lookup only in nodes with prefixes, skip over intermediate nodes
+		if len(n.prefixes) != 0 {
+			if _, val, ok := n.lpmByIndex(octetToBaseIndex(octet)); ok {
 				return val, true
 			}
 		}
+
+		// next round?
+		if stackIdx == 0 {
+			break
+		}
+		stackIdx--
 	}
+
 	return
 }
 
+// TODO path compressed algo
 // LookupPrefix does a route lookup (longest prefix match) for pfx and
 // returns the associated value and true, or false if no route matched.
 func (t *Table2[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
@@ -437,6 +449,7 @@ func (t *Table2[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
 	return
 }
 
+// TODO path compressed algo
 // LookupPrefixLPM is similar to [Table.LookupPrefix],
 // but it returns the lpm prefix in addition to value,ok.
 //
@@ -448,15 +461,18 @@ func (t *Table2[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
 func (t *Table2[V]) LookupPrefixLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) {
 	depth, baseIdx, val, ok := t.lpmByPrefix(pfx)
 
-	// calculate the mask from baseIdx and depth
-	mask := baseIndexToPrefixMask(baseIdx, depth)
+	if ok {
+		// calculate the mask from baseIdx and depth
+		mask := baseIndexToPrefixMask(baseIdx, depth)
 
-	// calculate the lpm from ip and mask
-	lpm, _ = pfx.Addr().Prefix(mask)
+		// calculate the lpm from ip and mask
+		lpm, _ = pfx.Addr().Prefix(mask)
+	}
 
 	return lpm, val, ok
 }
 
+// TODO path compressed algo
 func (t *Table2[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V, ok bool) {
 	// always normalize the prefix
 	pfx = pfx.Masked()
@@ -471,8 +487,7 @@ func (t *Table2[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val 
 
 	// pfx is default route, easy peasy
 	if bits == 0 {
-		baseIdx = prefixToBaseIndex(0, 0)
-		val, ok = n.getValByIndex(baseIdx)
+		val, ok = n.getValByPrefix(0, 0)
 		return
 	}
 
@@ -537,6 +552,7 @@ func (t *Table2[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val 
 	}
 }
 
+// TODO path compressed algo
 // Subnets, return all prefixes covered by pfx in natural CIDR sort order.
 func (t *Table2[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 	var result []netip.Prefix
@@ -597,6 +613,7 @@ func (t *Table2[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 	return result
 }
 
+// TODO path compressed algo
 // Supernets, return all matching routes for pfx,
 // in natural CIDR sort order.
 func (t *Table2[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
@@ -674,6 +691,7 @@ func (t *Table2[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 	return result
 }
 
+// TODO path compressed algo
 // OverlapsPrefix reports whether any IP in pfx matches a route in the table.
 func (t *Table2[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 	// always normalize the prefix
@@ -730,6 +748,7 @@ func (t *Table2[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 	return false
 }
 
+// TODO path compressed algo
 // Overlaps reports whether any IP in the table matches a route in the
 // other table.
 func (t *Table2[V]) Overlaps(o *Table2[V]) bool {
@@ -739,6 +758,7 @@ func (t *Table2[V]) Overlaps(o *Table2[V]) bool {
 	return t.rootV4.overlapsRec(o.rootV4) || t.rootV6.overlapsRec(o.rootV6)
 }
 
+// TODO path compressed algo
 // Union combines two tables, changing the receiver table.
 // If there are duplicate entries, the value is taken from the other table.
 func (t *Table2[V]) Union(o *Table2[V]) {
@@ -749,6 +769,7 @@ func (t *Table2[V]) Union(o *Table2[V]) {
 	t.rootV6.unionRec(o.rootV6)
 }
 
+// TODO path compressed algo
 // Clone returns a copy of the routing table.
 // The payloads V are copied using assignment, so this is a shallow clone.
 func (t *Table2[V]) Clone() *Table2[V] {
@@ -763,6 +784,7 @@ func (t *Table2[V]) Clone() *Table2[V] {
 	return c
 }
 
+// TODO path compressed algo
 // Walk runs through the routing table and calls the cb function
 // for each route entry with prefix and value.
 // If the cb function returns an error,
@@ -783,12 +805,14 @@ func (t *Table2[V]) Walk(cb func(pfx netip.Prefix, val V) error) error {
 	return t.Walk6(cb)
 }
 
+// TODO path compressed algo
 // Walk4, like [Table.Walk] but only for the v4 routing table.
 func (t *Table2[V]) Walk4(cb func(pfx netip.Prefix, val V) error) error {
 	t.init()
 	return t.rootV4.walkRec(nil, true, cb)
 }
 
+// TODO path compressed algo
 // Walk6, like [Table.Walk] but only for the v6 routing table.
 func (t *Table2[V]) Walk6(cb func(pfx netip.Prefix, val V) error) error {
 	t.init()
