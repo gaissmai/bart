@@ -125,6 +125,146 @@ func TestGet2(t *testing.T) {
 	}
 }
 
+func TestUpdateCompare2(t *testing.T) {
+	// use update as insert and compare with slow implementation
+	t.Parallel()
+	pfxs := randomPrefixes(10_000)
+	slow := slowRT[int]{pfxs}
+	fast := Table2[int]{}
+
+	t.Run("update as insert", func(t *testing.T) {
+		for _, pfx := range pfxs {
+			// contrived insert
+			fast.Update(pfx.pfx, func(_ int, _ bool) int {
+				return pfx.val
+			})
+		}
+
+		seenVals4 := map[int]bool{}
+		seenVals6 := map[int]bool{}
+
+		for i := 0; i < 10_000; i++ {
+			a := randomAddr()
+
+			slowVal, slowOK := slow.lookup(a)
+			fastVal, fastOK := fast.Lookup(a)
+
+			if !getsEqual(slowVal, slowOK, fastVal, fastOK) {
+				t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", a, fastVal, fastOK, slowVal, slowOK)
+			}
+
+			if a.Is6() {
+				seenVals6[fastVal] = true
+			} else {
+				seenVals4[fastVal] = true
+			}
+		}
+
+		// Empirically, 10k probes into 5k v4 prefixes and 5k v6 prefixes results in
+		// ~1k distinct values for v4 and ~300 for v6. distinct routes. This sanity
+		// check that we didn't just return a single route for everything should be
+		// very generous indeed.
+		if cnt := len(seenVals4); cnt < 10 {
+			t.Fatalf("saw %d distinct v4 route results, statistically expected ~1000", cnt)
+		}
+		if cnt := len(seenVals6); cnt < 10 {
+			t.Fatalf("saw %d distinct v6 route results, statistically expected ~300", cnt)
+		}
+	})
+
+	t.Run("update", func(t *testing.T) {
+		// update half of the prefixes
+
+		cb := func(val int, ok bool) int {
+			return val + 42
+		}
+
+		for _, pfx := range pfxs[len(pfxs)/2:] {
+			slow.update(pfx.pfx, cb)
+			fast.Update(pfx.pfx, cb)
+		}
+
+		for i := 0; i < 10_000; i++ {
+			a := randomAddr()
+
+			slowVal, slowOK := slow.lookup(a)
+			fastVal, fastOK := fast.Lookup(a)
+
+			if !getsEqual(slowVal, slowOK, fastVal, fastOK) {
+				t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", a, fastVal, fastOK, slowVal, slowOK)
+			}
+		}
+	})
+}
+
+func TestUpdate2(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		pfx  netip.Prefix
+	}{
+		{
+			name: "default route v4",
+			pfx:  mpp("0.0.0.0/0"),
+		},
+		{
+			name: "default route v6",
+			pfx:  mpp("::/0"),
+		},
+		{
+			name: "set v4",
+			pfx:  mpp("1.2.3.4/32"),
+		},
+		{
+			name: "set v6",
+			pfx:  mpp("2001:db8::/32"),
+		},
+	}
+
+	rt := new(Table2[int])
+
+	// just increment val
+	cb := func(val int, ok bool) int {
+		if ok {
+			return val + 1
+		}
+		return 0
+	}
+
+	// update as insert
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("insert: %s", tt.name), func(t *testing.T) {
+			val := rt.Update(tt.pfx, cb)
+			got, ok := rt.Get(tt.pfx)
+
+			if !ok {
+				t.Errorf("%s: ok=%v, expected: %v", tt.name, ok, true)
+			}
+
+			if got != 0 || got != val {
+				t.Errorf("%s: got=%v, expected: %v", tt.name, got, 0)
+			}
+		})
+	}
+
+	// update as update
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("update: %s", tt.name), func(t *testing.T) {
+			val := rt.Update(tt.pfx, cb)
+			got, ok := rt.Get(tt.pfx)
+
+			if !ok {
+				t.Errorf("%s: ok=%v, expected: %v", tt.name, ok, true)
+			}
+
+			if got != 1 || got != val {
+				t.Errorf("%s: got=%v, expected: %v", tt.name, got, 1)
+			}
+		})
+	}
+}
+
 func TestLookupCompare2(t *testing.T) {
 	// Create large route tables repeatedly, and compare Table's
 	// behavior to a naive and slow but correct implementation.
