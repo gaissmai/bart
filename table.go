@@ -674,12 +674,10 @@ func (t *Table[V]) Clone() *Table[V] {
 	return c
 }
 
-// All iterates through the routing table and calls the yield function
-// for each route entry with prefix and value.
-// If the yield function returns false the iteration ends prematurely
-// and the false is propagated.
+// All may be used in a for/range loop to iterate
+// through all the prefixes.
 //
-// Prefixes must not be inserted or deleted by the yield function, otherwise
+// Prefixes must not be inserted or deleted during iteration, otherwise
 // the behavior is undefined. However, value updates are permitted.
 //
 // The iteration order is not specified and is not part of the
