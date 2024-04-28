@@ -110,12 +110,12 @@ func (n *node2[V]) dump(w io.Writer, depth int, is4 bool) {
 		}
 	}
 
-	bits := len(n.path) * strideLen
+	bits := n.pathLen() * strideLen
 	indent := strings.Repeat(".", depth)
 
 	// node type with depth and octet path and bits.
 	must(fmt.Fprintf(w, "\n%s[%s] path: [%v] bits: +%d depth: %d\n",
-		indent, n.hasType(), ancestors(n.path, is4), bits, depth))
+		indent, n.hasType(), ancestors(n.pathAsSlice(), is4), bits, depth))
 
 	if len(n.prefixes) != 0 {
 		indices := n.allStrideIndexes()

@@ -4,6 +4,7 @@
 package bart
 
 import (
+	"bytes"
 	"net/netip"
 	"slices"
 
@@ -26,7 +27,7 @@ import (
 // the intended trade-off to prevent memory consumption from exploding.
 type node2[V any] struct {
 	// for path compression
-	path []byte
+	path pathT
 
 	prefixesBitset *bitset.BitSet
 	childrenBitset *bitset.BitSet
@@ -34,6 +35,49 @@ type node2[V any] struct {
 	// popcount compressed slices
 	prefixes []V
 	children []*node2[V]
+}
+
+// pathT for path compression
+type pathT struct {
+	octets [16]byte
+	length uint8
+}
+
+func (n *node2[V]) pathSet(octets []byte) {
+	copy(n.path.octets[:], octets)
+	n.path.length = uint8(len(octets))
+}
+
+func (n *node2[V]) pathAsSlice() (octets []byte) {
+	return n.path.octets[:n.path.length]
+}
+
+func (n *node2[V]) pathLen() int {
+	return int(n.path.length)
+}
+
+func (n *node2[V]) pathEqual(o *node2[V]) bool {
+	return bytes.Equal(n.pathAsSlice(), o.pathAsSlice())
+}
+
+func (n *node2[V]) pathHasPrefix(o *node2[V]) bool {
+	return bytes.HasPrefix(n.pathAsSlice(), o.pathAsSlice())
+}
+
+// commonPathIdx, return idx until path differ.
+// Start is the idx we know already they are equal.
+func (n *node2[V]) commonPathIdx(start int, o *node2[V]) int {
+	a := n.pathAsSlice()
+	b := o.pathAsSlice()
+
+	idx := start
+	for i := start; i < min(len(a), len(b)); i++ {
+		if a[i] != b[i] {
+			return idx
+		}
+		idx = i
+	}
+	return idx
 }
 
 // newNode2, BitSets have to be initialized.
