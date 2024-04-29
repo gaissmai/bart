@@ -56,12 +56,20 @@ func (n *node2[V]) pathLen() int {
 	return int(n.path.length)
 }
 
-func (n *node2[V]) pathEqual(o *node2[V]) bool {
+func (n *node2[V]) pathIsEqual(o *node2[V]) bool {
 	return bytes.Equal(n.pathAsSlice(), o.pathAsSlice())
 }
 
 func (n *node2[V]) pathHasPrefix(o *node2[V]) bool {
 	return bytes.HasPrefix(n.pathAsSlice(), o.pathAsSlice())
+}
+
+func (n *node2[V]) pathIsPrefix(o *node2[V]) bool {
+	return bytes.HasPrefix(o.pathAsSlice(), n.pathAsSlice())
+}
+
+func (n *node2[V]) pathCutPrefixFrom(o *node2[V]) (after []byte, ok bool) {
+	return bytes.CutPrefix(o.pathAsSlice(), n.pathAsSlice())
 }
 
 // commonPathIdx, return idx until path differ.
@@ -91,6 +99,81 @@ func newNode2[V any]() *node2[V] {
 // isEmpty returns true if node has neither prefixes nor children.
 func (n *node2[V]) isEmpty() bool {
 	return len(n.prefixes) == 0 && len(n.children) == 0
+}
+
+// insertRec, inserts o into n. Will panic if n or o is nil.
+func (n *node2[V]) insertRec(o *node2[V]) *node2[V] {
+	// n and o have equal paths, just insert (idx/val) from o into n, return n
+	if n.pathIsEqual(o) {
+		for _, idx := range o.allStrideIndexes() {
+			val, _ := o.getValByIndex(idx)
+			n.insertIdx(idx, val)
+		}
+		return n
+	}
+
+	// n is prefix for o
+	if after, ok := n.pathCutPrefixFrom(o); ok {
+		// after[0] must be defined, they can't be equal, see above
+		octet := after[0]
+
+		// is there already a child under octet slot
+		child := n.getChild(octet)
+		if child == nil {
+			n.insertChild(octet, o)
+			return n
+		}
+
+		// insert rec-descent
+		n.insertChild(octet, child.insertRec(o))
+		return n
+	}
+
+	// o is prefix for n
+	if after, ok := o.pathCutPrefixFrom(n); ok {
+		// after[0] must be defined, they can't be equal, see above
+		octet := after[0]
+
+		// is there already a child under octet slot
+		child := o.getChild(octet)
+		if child == nil {
+			o.insertChild(octet, n)
+			return o
+		}
+
+		// insert rec-descent
+		o.insertChild(octet, child.insertRec(n))
+		return o
+	}
+
+	// n and o may have parts in common
+	commonPathIdx := n.commonPathIdx(0, o)
+
+	// totally divergent
+	if commonPathIdx == 0 {
+		octet := o.pathAsSlice()[0]
+
+		// is there already a child in octet slot
+		child := n.getChild(octet)
+		if child == nil {
+			n.insertChild(octet, o)
+			return n
+		}
+
+		// insert rec-descent
+		n.insertChild(octet, child.insertRec(o))
+		return n
+	}
+
+	// make intermediate node with path until divergence
+	imed := newNode2[V]()
+	imed.pathSet(n.pathAsSlice()[:commonPathIdx+1])
+
+	// insert both nodes as child into intermediate node
+	imed.insertChild(n.pathAsSlice()[commonPathIdx+1], n)
+	imed.insertChild(o.pathAsSlice()[commonPathIdx+1], o)
+
+	return imed
 }
 
 // ################## prefixes ################################

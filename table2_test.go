@@ -67,10 +67,9 @@ func TestRegression2(t *testing.T) {
 
 func TestInsert2(t *testing.T) {
 	tbl := &Table2[int]{}
-	p := netip.MustParsePrefix
 
 	// Create a new leaf strideTable, with compressed path
-	tbl.Insert(p("192.168.0.1/32"), 1)
+	tbl.Insert(mpp("192.168.0.1/32"), 1)
 	checkRoutes2(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", -1},
@@ -85,7 +84,7 @@ func TestInsert2(t *testing.T) {
 	})
 
 	// Insert into previous leaf, no tree changes
-	tbl.Insert(p("192.168.0.2/32"), 2)
+	tbl.Insert(mpp("192.168.0.2/32"), 2)
 	checkRoutes2(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", 2},
@@ -100,7 +99,7 @@ func TestInsert2(t *testing.T) {
 	})
 
 	// Insert into previous leaf, unaligned prefix covering the /32s
-	tbl.Insert(p("192.168.0.0/26"), 7)
+	tbl.Insert(mpp("192.168.0.0/26"), 7)
 	checkRoutes2(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", 2},
@@ -115,7 +114,7 @@ func TestInsert2(t *testing.T) {
 	})
 
 	// Create a different leaf elsewhere
-	tbl.Insert(p("10.0.0.0/27"), 3)
+	tbl.Insert(mpp("10.0.0.0/27"), 3)
 	checkRoutes2(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", 2},
@@ -130,7 +129,7 @@ func TestInsert2(t *testing.T) {
 	})
 
 	// Insert that creates a new intermediate table and a new child
-	tbl.Insert(p("192.168.1.1/32"), 4)
+	tbl.Insert(mpp("192.168.1.1/32"), 4)
 	checkRoutes2(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", 2},
@@ -145,7 +144,7 @@ func TestInsert2(t *testing.T) {
 	})
 
 	// Insert that creates a new intermediate table but no new child
-	tbl.Insert(p("192.170.0.0/16"), 5)
+	tbl.Insert(mpp("192.170.0.0/16"), 5)
 	checkRoutes2(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", 2},
@@ -161,7 +160,7 @@ func TestInsert2(t *testing.T) {
 
 	// New leaf in a different subtree, so the next insert can test a
 	// variant of decompression.
-	tbl.Insert(p("192.180.0.1/32"), 8)
+	tbl.Insert(mpp("192.180.0.1/32"), 8)
 	checkRoutes2(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", 2},
@@ -177,7 +176,7 @@ func TestInsert2(t *testing.T) {
 
 	// Insert that creates a new intermediate table but no new child,
 	// with an unaligned intermediate
-	tbl.Insert(p("192.180.0.0/21"), 9)
+	tbl.Insert(mpp("192.180.0.0/21"), 9)
 	checkRoutes2(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", 2},
@@ -192,7 +191,7 @@ func TestInsert2(t *testing.T) {
 	})
 
 	// Insert a default route, those have their own codepath.
-	tbl.Insert(p("0.0.0.0/0"), 6)
+	tbl.Insert(mpp("0.0.0.0/0"), 6)
 	checkRoutes2(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", 2},
@@ -209,7 +208,7 @@ func TestInsert2(t *testing.T) {
 	// Now all of the above again, but for IPv6.
 
 	// Create a new leaf strideTable, with compressed path
-	tbl.Insert(p("ff:aaaa::1/128"), 1)
+	tbl.Insert(mpp("ff:aaaa::1/128"), 1)
 	checkRoutes2(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", -1},
@@ -224,7 +223,7 @@ func TestInsert2(t *testing.T) {
 	})
 
 	// Insert into previous leaf, no tree changes
-	tbl.Insert(p("ff:aaaa::2/128"), 2)
+	tbl.Insert(mpp("ff:aaaa::2/128"), 2)
 	checkRoutes2(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", 2},
@@ -239,7 +238,7 @@ func TestInsert2(t *testing.T) {
 	})
 
 	// Insert into previous leaf, unaligned prefix covering the /128s
-	tbl.Insert(p("ff:aaaa::/125"), 7)
+	tbl.Insert(mpp("ff:aaaa::/125"), 7)
 	checkRoutes2(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", 2},
@@ -254,7 +253,7 @@ func TestInsert2(t *testing.T) {
 	})
 
 	// Create a different leaf elsewhere
-	tbl.Insert(p("ffff:bbbb::/120"), 3)
+	tbl.Insert(mpp("ffff:bbbb::/120"), 3)
 	checkRoutes2(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", 2},
@@ -269,7 +268,7 @@ func TestInsert2(t *testing.T) {
 	})
 
 	// Insert that creates a new intermediate table and a new child
-	tbl.Insert(p("ff:aaaa:aaaa::1/128"), 4)
+	tbl.Insert(mpp("ff:aaaa:aaaa::1/128"), 4)
 	checkRoutes2(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", 2},
@@ -284,7 +283,7 @@ func TestInsert2(t *testing.T) {
 	})
 
 	// Insert that creates a new intermediate table but no new child
-	tbl.Insert(p("ff:aaaa:aaaa:bb00::/56"), 5)
+	tbl.Insert(mpp("ff:aaaa:aaaa:bb00::/56"), 5)
 	checkRoutes2(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", 2},
@@ -300,7 +299,7 @@ func TestInsert2(t *testing.T) {
 
 	// New leaf in a different subtree, so the next insert can test a
 	// variant of decompression.
-	tbl.Insert(p("ff:cccc::1/128"), 8)
+	tbl.Insert(mpp("ff:cccc::1/128"), 8)
 	checkRoutes2(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", 2},
@@ -316,7 +315,7 @@ func TestInsert2(t *testing.T) {
 
 	// Insert that creates a new intermediate table but no new child,
 	// with an unaligned intermediate
-	tbl.Insert(p("ff:cccc::/37"), 9)
+	tbl.Insert(mpp("ff:cccc::/37"), 9)
 	checkRoutes2(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", 2},
@@ -331,7 +330,7 @@ func TestInsert2(t *testing.T) {
 	})
 
 	// Insert a default route, those have their own codepath.
-	tbl.Insert(p("::/0"), 6)
+	tbl.Insert(mpp("::/0"), 6)
 	checkRoutes2(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", 2},
@@ -406,7 +405,6 @@ func TestGet2(t *testing.T) {
 	}
 }
 
-/*
 func TestUpdateCompare2(t *testing.T) {
 	// use update as insert and compare with slow implementation
 	t.Parallel()
@@ -546,7 +544,6 @@ func TestUpdate2(t *testing.T) {
 		})
 	}
 }
-*/
 
 func TestLookupCompare2(t *testing.T) {
 	// Create large route tables repeatedly, and compare Table's
@@ -823,6 +820,40 @@ func BenchmarkSize2(b *testing.B) {
 					b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
 					b.ReportMetric(float64(rt2.numNodes()), "Nodes")
 					b.ReportMetric(0, "ns/op") // silence
+				}
+			})
+		}
+	}
+}
+
+func BenchmarkTableInsert2(b *testing.B) {
+	for _, fam := range []string{"ipv4", "ipv6"} {
+		rng := randomPrefixes4
+		if fam == "ipv6" {
+			rng = randomPrefixes6
+		}
+
+		for _, nroutes := range benchRouteCount {
+			var rt1 Table[struct{}]
+			var rt2 Table2[struct{}]
+			for _, route := range rng(nroutes) {
+				rt1.Insert(route.pfx, struct{}{})
+				rt2.Insert(route.pfx, struct{}{})
+			}
+
+			probe := rng(1)[0]
+
+			b.ResetTimer()
+			b.Run(fmt.Sprintf("orig/%s/Into_%d", fam, nroutes), func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					rt1.Insert(probe.pfx, struct{}{})
+				}
+			})
+
+			b.ResetTimer()
+			b.Run(fmt.Sprintf("comp/%s/Into_%d", fam, nroutes), func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					rt2.Insert(probe.pfx, struct{}{})
 				}
 			})
 		}

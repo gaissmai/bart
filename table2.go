@@ -85,90 +85,12 @@ func (t *Table2[V]) Insert(pfx netip.Prefix, val V) {
 	// 10.12.10.9/32 -> 8
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
-	// find the proper trie node to insert prefix
-	for octetIdx, octet := range octets {
+	// make new node, set path and insert prefix
+	other := newNode2[V]()
+	other.pathSet(octets[:lastOctetIdx])
+	other.insertPrefix(lastOctet, lastOctetBits, val)
 
-		// last octet reached
-		if octetIdx == lastOctetIdx {
-			// insert prefix into node
-			n.insertPrefix(lastOctet, lastOctetBits, val)
-			return
-		}
-
-		// descend down the trie
-		child := n.getChild(octet)
-
-		// child not nil and not path compressed, tight loop
-		if child != nil && child.pathLen() == octetIdx+1 {
-			n = child
-			continue
-		}
-
-		// #########################################
-		//  path compression, here will be dragons!
-		// #########################################
-
-		// make new node, already set path and insert prefix
-		other := newNode2[V]()
-		other.pathSet(octets[:lastOctetIdx])
-		other.insertPrefix(lastOctet, lastOctetBits, val)
-
-		// just insert new leaf node
-		if child == nil {
-			n.insertChild(octet, other)
-			return
-		}
-
-		// just insert prefix into existing child
-		if child.pathEqual(other) {
-			child.insertPrefix(lastOctet, lastOctetBits, val)
-			return
-		}
-
-		// other is prefix for child
-		if child.pathHasPrefix(other) {
-			commonPathIdx := child.commonPathIdx(octetIdx, other)
-			nextOctet := child.pathAsSlice()[commonPathIdx+1]
-
-			// move current child under new node
-			other.insertChild(nextOctet, child)
-
-			// link new node under current n
-			n.insertChild(octet, other)
-			return
-		}
-
-		// child is prefix for other
-		if other.pathHasPrefix(child) {
-			// is there already a child under octet slot
-			if next := child.getChild(octet); next != nil {
-				// just insert the prefix
-				next.insertPrefix(lastOctet, lastOctetBits, val)
-				return
-			}
-			// insert other
-			child.insertChild(octet, other)
-			return
-		}
-
-		// from here we need a new intermediate node
-
-		// find the idx until they differ, insert intermediate node,
-		// insert old and new child into intermdiate node
-		commonPathIdx := child.commonPathIdx(octetIdx, other)
-
-		// make intermediate node with path until divergence
-		imed := newNode2[V]()
-		imed.pathSet(child.pathAsSlice()[:commonPathIdx+1])
-
-		// insert old and new child into intermediate node
-		imed.insertChild(child.pathAsSlice()[commonPathIdx+1], child)
-		imed.insertChild(other.pathAsSlice()[commonPathIdx+1], other)
-
-		// insert intermediate node into n, overwrites the old link
-		n.insertChild(octet, imed)
-		return
-	}
+	n.insertRec(other)
 }
 
 // findCommonPathIdx until they differ, but we know they must be equal until start.
@@ -277,15 +199,13 @@ func (t *Table2[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 	// always normalize the prefix
 	pfx = pfx.Masked()
 
-	// some needed values, see below
 	bits := pfx.Bits()
 	ip := pfx.Addr()
 	is4 := ip.Is4()
 
-	// get the root node of the routing table
 	n := t.rootNodeByVersion(is4)
 
-	// update default route, easy peasy
+	// update value for default route, easy peasy
 	if bits == 0 {
 		return n.updatePrefix(0, 0, cb)
 	}
@@ -301,77 +221,32 @@ func (t *Table2[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 	lastOctet := octets[lastOctetIdx]
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
-	// find the proper trie node to update or insert prefix
 	for octetIdx, octet := range octets {
 
-		// last octet reached
+		// last non-masked octet reached
 		if octetIdx == lastOctetIdx {
-			return n.updatePrefix(octet, lastOctetBits, cb)
+			return n.updatePrefix(lastOctet, lastOctetBits, cb)
 		}
 
-		// descend down to next trie level
+		// descend down to next level
 		c := n.getChild(octet)
-
-		// child not nil and not path compressed, tight loop
-		if c != nil && c.pathLen() == octetIdx+1 {
-			n = c
-			continue
-		}
-
-		// from here on pretty similar to Insert()
-
-		// #########################################
-		//  path compression, here will be dragons!
-		// #########################################
-
-		// make new node and already set path and update prefix
-		nn := newNode2[V]()
-		nn.pathSet(octets[:lastOctetIdx])
-		val := nn.updatePrefix(lastOctet, lastOctetBits, cb)
-
-		// just insert new leaf node
 		if c == nil {
-			n.insertChild(octet, nn)
-			return val
+			break
 		}
 
-		// just insert prefix into existing child
-		if c.pathEqual(nn) {
+		if bytes.Equal(c.pathAsSlice(), octets[:lastOctetIdx]) {
 			return c.updatePrefix(lastOctet, lastOctetBits, cb)
 		}
 
-		// octets[...] is prefix for c.path
-		if c.pathHasPrefix(nn) {
-
-			// move current child under new node
-			nn.insertChild(lastOctet, c)
-
-			// link new node under current n
-			n.insertChild(octet, nn)
-			return val
-		}
-
-		// TODO TODO
-		// from here we need a new intermediate node
-
-		// find the idx until they differ, insert intermediate node,
-		// insert old and new child into intermdiate node
-		commonPathIdx := c.commonPathIdx(octetIdx, nn)
-
-		// make intermediate node with path until divergence
-		imedNode := newNode2[V]()
-		imedNode.pathSet(c.pathAsSlice()[:commonPathIdx])
-
-		// insert old and new child into intermediate node
-		imedNode.insertChild(c.pathAsSlice()[commonPathIdx+1], c)
-		imedNode.insertChild(octets[commonPathIdx+1], nn)
-
-		// insert intermediate node into n, overwrites the old link
-		n.insertChild(octet, imedNode)
-		return val
+		n = c
 	}
 
-	panic("unreachable")
+	// no matching node found for update, make new insertion
+	var val V
+	val = cb(val, false)
+	t.Insert(pfx, val)
+
+	return val
 }
 
 // Get returns the associated payload for prefix and true, or false if
