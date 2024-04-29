@@ -85,12 +85,72 @@ func (t *Table2[V]) Insert(pfx netip.Prefix, val V) {
 	// 10.12.10.9/32 -> 8
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
-	// make new node, set path and insert prefix
+	// make new node, already set path and insert prefix
 	other := newNode2[V]()
 	other.pathSet(octets[:lastOctetIdx])
 	other.insertPrefix(lastOctet, lastOctetBits, val)
 
-	n.insertRec(other)
+	// find the proper trie node to insert prefix
+	// path compression, the idx may jump
+	idx := 0
+	for {
+		octet := octets[idx]
+
+		// last octet reached
+		if idx == lastOctetIdx {
+			// insert prefix into node
+			n.insertPrefix(lastOctet, lastOctetBits, val)
+			return
+		}
+
+		// descend down the trie
+		child := n.getChild(octet)
+
+		// just insert other node as new leaf
+		if child == nil {
+			n.insertChild(octet, other)
+			return
+		}
+
+		// paths are equal
+		if child.pathIsEqual(other) {
+			// just insert prefix into existing child
+			child.insertPrefix(lastOctet, lastOctetBits, val)
+			return
+		}
+
+		// child is prefix for other node
+		if child.pathIsPrefixFor(other) {
+			// go down, path compression -> idx jump
+			// TODO !!!
+			idx = child.pathLen()
+			n = child
+			continue
+		}
+
+		// other is prefix for child node
+		if other.pathIsPrefixFor(child) {
+			// splice other between n and child: n -> other -> child
+			other.insertChild(child.pathAsSlice()[idx+1], child)
+			n.insertChild(octet, other)
+			return
+		}
+
+		// The paths are different from a certain index.
+		commonPathIdx := child.commonPathIdx(idx, other)
+
+		// make intermediate node with path until divergence
+		imed := newNode2[V]()
+		imed.pathSet(child.pathAsSlice()[:commonPathIdx+1])
+
+		// insert old and new child into intermediate node
+		imed.insertChild(child.pathAsSlice()[commonPathIdx+1], child)
+		imed.insertChild(other.pathAsSlice()[commonPathIdx+1], other)
+
+		// splice intermediate: n -> imed -> (child, other)
+		n.insertChild(octet, imed)
+		return
+	}
 }
 
 // findCommonPathIdx until they differ, but we know they must be equal until start.

@@ -64,7 +64,7 @@ func (n *node2[V]) pathHasPrefix(o *node2[V]) bool {
 	return bytes.HasPrefix(n.pathAsSlice(), o.pathAsSlice())
 }
 
-func (n *node2[V]) pathIsPrefix(o *node2[V]) bool {
+func (n *node2[V]) pathIsPrefixFor(o *node2[V]) bool {
 	return bytes.HasPrefix(o.pathAsSlice(), n.pathAsSlice())
 }
 
@@ -101,6 +101,7 @@ func (n *node2[V]) isEmpty() bool {
 	return len(n.prefixes) == 0 && len(n.children) == 0
 }
 
+/*
 // insertRec, inserts o into n. Will panic if n or o is nil.
 func (n *node2[V]) insertRec(o *node2[V]) *node2[V] {
 	// n and o have equal paths, just insert (idx/val) from o into n, return n
@@ -175,6 +176,7 @@ func (n *node2[V]) insertRec(o *node2[V]) *node2[V] {
 
 	return imed
 }
+*/
 
 // ################## prefixes ################################
 
