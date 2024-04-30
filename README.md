@@ -9,7 +9,7 @@
 
 ## ATTENTION: API change!!!
 
-API change, Walk() got a signatur change and renamded to All(), ready for range-over-func iterations.
+API change, Walk() got a signature change and renamed to All(), ready for range-over-func iterations.
 
 ## Overview
 
