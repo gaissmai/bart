@@ -16,8 +16,8 @@ type DumpListNode[V any] struct {
 	Subnets []DumpListNode[V] `json:"subnets,omitempty"`
 }
 
-// MarshalJSON dumps table into two sorted lists: for ipv4 and ipv6.
-// Every root and subnet are array, not map, because the order matters.
+// MarshalJSON dumps the table into two sorted lists: for ipv4 and ipv6.
+// Every root and subnet is an array, not a map, because the order matters.
 func (t *Table[V]) MarshalJSON() ([]byte, error) {
 	t.init()
 
@@ -37,8 +37,8 @@ func (t *Table[V]) MarshalJSON() ([]byte, error) {
 	return buf, nil
 }
 
-// DumpList4 dumps ipv4 tree into list of roots and their subnets.
-// It can be used to analyze tree or build custom json representation.
+// DumpList4 dumps the ipv4 tree into a list of roots and their subnets.
+// It can be used to analyze the tree or build custom json representation.
 func (t *Table[V]) DumpList4() []DumpListNode[V] {
 	t.init()
 	if t.rootV4 == nil {
@@ -47,8 +47,8 @@ func (t *Table[V]) DumpList4() []DumpListNode[V] {
 	return t.rootV4.dumpListRec(0, nil, true)
 }
 
-// DumpList6 dumps ipv4 tree into list of roots and their subnets.
-// It can be used to analyze tree or build custom json representation.
+// DumpList6 dumps the ipv6 tree into a list of roots and their subnets.
+// It can be used to analyze the tree or build custom json representation.
 func (t *Table[V]) DumpList6() []DumpListNode[V] {
 	t.init()
 	if t.rootV6 == nil {
