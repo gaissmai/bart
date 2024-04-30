@@ -9,7 +9,7 @@
 
 ## ATTENTION: API change!!!
 
-API change again, Walk() is ready for range-over-func iterators and renamed to All().
+API change, Walk() got a signatur change and renamded to All(), ready for range-over-func iterations.
 
 ## Overview
 
@@ -22,18 +22,17 @@ The lookup time is by a factor of ~2 slower on average as the
 routing algorithms ART, SMART, CPE, ... but reduces the memory
 consumption by an order of magnitude in comparison.
 
-BART is a multibit-trie, using the _baseIndex_ function from the
-ART algorithm to build the complete binary prefix tree (CBT)
-for each stride. The stride has a fixed length of 8 bits.
+BART is a multibit-trie with fixed stride length of 8 bits,
+using the _baseIndex_ function from the ART algorithm to
+build the complete-binary-tree (CBT) of prefixes for each stride.
 
 The second key factor is popcount array compression at each stride level
-and backtracking along the CBT prefix tree in O(k).
+of the CBT prefix tree and backtracking along the CBT in O(k).
 
 The CBT is implemented as a bitvector, backtracking is just
 a matter of fast cache friendly bitmask operations.
 
-Due to the cache locality of the popcount compressed CBT,
-the backtracking algorithm is as fast as possible.
+The child array at each stride level is also popcount compressed.
 
 ## API
 
