@@ -68,153 +68,151 @@ func TestRegression2(t *testing.T) {
 func TestInsert2(t *testing.T) {
 	tbl := &Table2[int]{}
 
-	/*
-		// Create a new leaf strideTable, with compressed path
-		tbl.Insert(mpp("192.168.0.1/32"), 1)
-		t.Log(tbl.dumpString4())
-		checkRoutes2(t, tbl, []tableTest{
-			{"192.168.0.1", 1},
-			{"192.168.0.2", -1},
-			{"192.168.0.3", -1},
-			{"192.168.0.255", -1},
-			{"192.168.1.1", -1},
-			{"192.170.1.1", -1},
-			{"192.180.0.1", -1},
-			{"192.180.3.5", -1},
-			{"10.0.0.5", -1},
-			{"10.0.0.15", -1},
-		})
+	// Create a new leaf strideTable, with compressed path
+	tbl.Insert(mpp("192.168.0.1/32"), 1)
+	t.Log(tbl.dumpString4())
+	checkRoutes2(t, tbl, []tableTest{
+		{"192.168.0.1", 1},
+		{"192.168.0.2", -1},
+		{"192.168.0.3", -1},
+		{"192.168.0.255", -1},
+		{"192.168.1.1", -1},
+		{"192.170.1.1", -1},
+		{"192.180.0.1", -1},
+		{"192.180.3.5", -1},
+		{"10.0.0.5", -1},
+		{"10.0.0.15", -1},
+	})
 
-		// Insert into previous leaf, no tree changes
-		tbl.Insert(mpp("192.168.0.2/32"), 2)
-		t.Log(tbl.dumpString4())
-		checkRoutes2(t, tbl, []tableTest{
-			{"192.168.0.1", 1},
-			{"192.168.0.2", 2},
-			{"192.168.0.3", -1},
-			{"192.168.0.255", -1},
-			{"192.168.1.1", -1},
-			{"192.170.1.1", -1},
-			{"192.180.0.1", -1},
-			{"192.180.3.5", -1},
-			{"10.0.0.5", -1},
-			{"10.0.0.15", -1},
-		})
+	// Insert into previous leaf, no tree changes
+	tbl.Insert(mpp("192.168.0.2/32"), 2)
+	t.Log(tbl.dumpString4())
+	checkRoutes2(t, tbl, []tableTest{
+		{"192.168.0.1", 1},
+		{"192.168.0.2", 2},
+		{"192.168.0.3", -1},
+		{"192.168.0.255", -1},
+		{"192.168.1.1", -1},
+		{"192.170.1.1", -1},
+		{"192.180.0.1", -1},
+		{"192.180.3.5", -1},
+		{"10.0.0.5", -1},
+		{"10.0.0.15", -1},
+	})
 
-		// Insert into previous leaf, unaligned prefix covering the /32s
-		tbl.Insert(mpp("192.168.0.0/26"), 7)
-		t.Log(tbl.dumpString4())
-		checkRoutes2(t, tbl, []tableTest{
-			{"192.168.0.1", 1},
-			{"192.168.0.2", 2},
-			{"192.168.0.3", 7},
-			{"192.168.0.255", -1},
-			{"192.168.1.1", -1},
-			{"192.170.1.1", -1},
-			{"192.180.0.1", -1},
-			{"192.180.3.5", -1},
-			{"10.0.0.5", -1},
-			{"10.0.0.15", -1},
-		})
+	// Insert into previous leaf, unaligned prefix covering the /32s
+	tbl.Insert(mpp("192.168.0.0/26"), 7)
+	t.Log(tbl.dumpString4())
+	checkRoutes2(t, tbl, []tableTest{
+		{"192.168.0.1", 1},
+		{"192.168.0.2", 2},
+		{"192.168.0.3", 7},
+		{"192.168.0.255", -1},
+		{"192.168.1.1", -1},
+		{"192.170.1.1", -1},
+		{"192.180.0.1", -1},
+		{"192.180.3.5", -1},
+		{"10.0.0.5", -1},
+		{"10.0.0.15", -1},
+	})
 
-		// Create a different leaf elsewhere
-		tbl.Insert(mpp("10.0.0.0/27"), 3)
-		t.Log(tbl.dumpString4())
-		checkRoutes2(t, tbl, []tableTest{
-			{"192.168.0.1", 1},
-			{"192.168.0.2", 2},
-			{"192.168.0.3", 7},
-			{"192.168.0.255", -1},
-			{"192.168.1.1", -1},
-			{"192.170.1.1", -1},
-			{"192.180.0.1", -1},
-			{"192.180.3.5", -1},
-			{"10.0.0.5", 3},
-			{"10.0.0.15", 3},
-		})
+	// Create a different leaf elsewhere
+	tbl.Insert(mpp("10.0.0.0/27"), 3)
+	t.Log(tbl.dumpString4())
+	checkRoutes2(t, tbl, []tableTest{
+		{"192.168.0.1", 1},
+		{"192.168.0.2", 2},
+		{"192.168.0.3", 7},
+		{"192.168.0.255", -1},
+		{"192.168.1.1", -1},
+		{"192.170.1.1", -1},
+		{"192.180.0.1", -1},
+		{"192.180.3.5", -1},
+		{"10.0.0.5", 3},
+		{"10.0.0.15", 3},
+	})
 
-		// Insert that creates a new intermediate table and a new child
-		tbl.Insert(mpp("192.168.1.1/32"), 4)
-		t.Log(tbl.dumpString4())
-		checkRoutes2(t, tbl, []tableTest{
-			{"192.168.0.1", 1},
-			{"192.168.0.2", 2},
-			{"192.168.0.3", 7},
-			{"192.168.0.255", -1},
-			{"192.168.1.1", 4},
-			{"192.170.1.1", -1},
-			{"192.180.0.1", -1},
-			{"192.180.3.5", -1},
-			{"10.0.0.5", 3},
-			{"10.0.0.15", 3},
-		})
+	// Insert that creates a new intermediate table and a new child
+	tbl.Insert(mpp("192.168.1.1/32"), 4)
+	t.Log(tbl.dumpString4())
+	checkRoutes2(t, tbl, []tableTest{
+		{"192.168.0.1", 1},
+		{"192.168.0.2", 2},
+		{"192.168.0.3", 7},
+		{"192.168.0.255", -1},
+		{"192.168.1.1", 4},
+		{"192.170.1.1", -1},
+		{"192.180.0.1", -1},
+		{"192.180.3.5", -1},
+		{"10.0.0.5", 3},
+		{"10.0.0.15", 3},
+	})
 
-		// Insert that creates a new intermediate table but no new child
-		tbl.Insert(mpp("192.170.0.0/16"), 5)
-		t.Log(tbl.dumpString4())
-		checkRoutes2(t, tbl, []tableTest{
-			{"192.168.0.1", 1},
-			{"192.168.0.2", 2},
-			{"192.168.0.3", 7},
-			{"192.168.0.255", -1},
-			{"192.168.1.1", 4},
-			{"192.170.1.1", 5},
-			{"192.180.0.1", -1},
-			{"192.180.3.5", -1},
-			{"10.0.0.5", 3},
-			{"10.0.0.15", 3},
-		})
+	// Insert that creates a new intermediate table but no new child
+	tbl.Insert(mpp("192.170.0.0/16"), 5)
+	t.Log(tbl.dumpString4())
+	checkRoutes2(t, tbl, []tableTest{
+		{"192.168.0.1", 1},
+		{"192.168.0.2", 2},
+		{"192.168.0.3", 7},
+		{"192.168.0.255", -1},
+		{"192.168.1.1", 4},
+		{"192.170.1.1", 5},
+		{"192.180.0.1", -1},
+		{"192.180.3.5", -1},
+		{"10.0.0.5", 3},
+		{"10.0.0.15", 3},
+	})
 
-		// New leaf in a different subtree, so the next insert can test a
-		// variant of decompression.
-		tbl.Insert(mpp("192.180.0.1/32"), 8)
-		t.Log(tbl.dumpString4())
-		checkRoutes2(t, tbl, []tableTest{
-			{"192.168.0.1", 1},
-			{"192.168.0.2", 2},
-			{"192.168.0.3", 7},
-			{"192.168.0.255", -1},
-			{"192.168.1.1", 4},
-			{"192.170.1.1", 5},
-			{"192.180.0.1", 8},
-			{"192.180.3.5", -1},
-			{"10.0.0.5", 3},
-			{"10.0.0.15", 3},
-		})
+	// New leaf in a different subtree, so the next insert can test a
+	// variant of decompression.
+	tbl.Insert(mpp("192.180.0.1/32"), 8)
+	t.Log(tbl.dumpString4())
+	checkRoutes2(t, tbl, []tableTest{
+		{"192.168.0.1", 1},
+		{"192.168.0.2", 2},
+		{"192.168.0.3", 7},
+		{"192.168.0.255", -1},
+		{"192.168.1.1", 4},
+		{"192.170.1.1", 5},
+		{"192.180.0.1", 8},
+		{"192.180.3.5", -1},
+		{"10.0.0.5", 3},
+		{"10.0.0.15", 3},
+	})
 
-		// Insert that creates a new intermediate table but no new child,
-		// with an unaligned intermediate
-		tbl.Insert(mpp("192.180.0.0/21"), 9)
-		t.Log(tbl.dumpString4())
-		checkRoutes2(t, tbl, []tableTest{
-			{"192.168.0.1", 1},
-			{"192.168.0.2", 2},
-			{"192.168.0.3", 7},
-			{"192.168.0.255", -1},
-			{"192.168.1.1", 4},
-			{"192.170.1.1", 5},
-			{"192.180.0.1", 8},
-			{"192.180.3.5", 9},
-			{"10.0.0.5", 3},
-			{"10.0.0.15", 3},
-		})
+	// Insert that creates a new intermediate table but no new child,
+	// with an unaligned intermediate
+	tbl.Insert(mpp("192.180.0.0/21"), 9)
+	t.Log(tbl.dumpString4())
+	checkRoutes2(t, tbl, []tableTest{
+		{"192.168.0.1", 1},
+		{"192.168.0.2", 2},
+		{"192.168.0.3", 7},
+		{"192.168.0.255", -1},
+		{"192.168.1.1", 4},
+		{"192.170.1.1", 5},
+		{"192.180.0.1", 8},
+		{"192.180.3.5", 9},
+		{"10.0.0.5", 3},
+		{"10.0.0.15", 3},
+	})
 
-		// Insert a default route, those have their own codepath.
-		tbl.Insert(mpp("0.0.0.0/0"), 6)
-		t.Log(tbl.dumpString4())
-		checkRoutes2(t, tbl, []tableTest{
-			{"192.168.0.1", 1},
-			{"192.168.0.2", 2},
-			{"192.168.0.3", 7},
-			{"192.168.0.255", 6},
-			{"192.168.1.1", 4},
-			{"192.170.1.1", 5},
-			{"192.180.0.1", 8},
-			{"192.180.3.5", 9},
-			{"10.0.0.5", 3},
-			{"10.0.0.15", 3},
-		})
-	*/
+	// Insert a default route, those have their own codepath.
+	tbl.Insert(mpp("0.0.0.0/0"), 6)
+	t.Log(tbl.dumpString4())
+	checkRoutes2(t, tbl, []tableTest{
+		{"192.168.0.1", 1},
+		{"192.168.0.2", 2},
+		{"192.168.0.3", 7},
+		{"192.168.0.255", 6},
+		{"192.168.1.1", 4},
+		{"192.170.1.1", 5},
+		{"192.180.0.1", 8},
+		{"192.180.3.5", 9},
+		{"10.0.0.5", 3},
+		{"10.0.0.15", 3},
+	})
 
 	// Now all of the above again, but for IPv6.
 
@@ -314,57 +312,55 @@ func TestInsert2(t *testing.T) {
 		{"ffff:bbbb::15", 3},
 	})
 
-	/*
-			// New leaf in a different subtree, so the next insert can test a
-			// variant of decompression.
-			tbl.Insert(mpp("ff:cccc::1/128"), 8)
-		t.Log(tbl.dumpString6())
-			checkRoutes2(t, tbl, []tableTest{
-				{"ff:aaaa::1", 1},
-				{"ff:aaaa::2", 2},
-				{"ff:aaaa::3", 7},
-				{"ff:aaaa::255", -1},
-				{"ff:aaaa:aaaa::1", 4},
-				{"ff:aaaa:aaaa:bbbb::1", 5},
-				{"ff:cccc::1", 8},
-				{"ff:cccc::ff", -1},
-				{"ffff:bbbb::5", 3},
-				{"ffff:bbbb::15", 3},
-			})
+	// New leaf in a different subtree, so the next insert can test a
+	// variant of decompression.
+	tbl.Insert(mpp("ff:cccc::1/128"), 8)
+	t.Log(tbl.dumpString6())
+	checkRoutes2(t, tbl, []tableTest{
+		{"ff:aaaa::1", 1},
+		{"ff:aaaa::2", 2},
+		{"ff:aaaa::3", 7},
+		{"ff:aaaa::255", -1},
+		{"ff:aaaa:aaaa::1", 4},
+		{"ff:aaaa:aaaa:bbbb::1", 5},
+		{"ff:cccc::1", 8},
+		{"ff:cccc::ff", -1},
+		{"ffff:bbbb::5", 3},
+		{"ffff:bbbb::15", 3},
+	})
 
-			// Insert that creates a new intermediate table but no new child,
-			// with an unaligned intermediate
-			tbl.Insert(mpp("ff:cccc::/37"), 9)
-		t.Log(tbl.dumpString6())
-			checkRoutes2(t, tbl, []tableTest{
-				{"ff:aaaa::1", 1},
-				{"ff:aaaa::2", 2},
-				{"ff:aaaa::3", 7},
-				{"ff:aaaa::255", -1},
-				{"ff:aaaa:aaaa::1", 4},
-				{"ff:aaaa:aaaa:bbbb::1", 5},
-				{"ff:cccc::1", 8},
-				{"ff:cccc::ff", 9},
-				{"ffff:bbbb::5", 3},
-				{"ffff:bbbb::15", 3},
-			})
+	// Insert that creates a new intermediate table but no new child,
+	// with an unaligned intermediate
+	tbl.Insert(mpp("ff:cccc::/37"), 9)
+	t.Log(tbl.dumpString6())
+	checkRoutes2(t, tbl, []tableTest{
+		{"ff:aaaa::1", 1},
+		{"ff:aaaa::2", 2},
+		{"ff:aaaa::3", 7},
+		{"ff:aaaa::255", -1},
+		{"ff:aaaa:aaaa::1", 4},
+		{"ff:aaaa:aaaa:bbbb::1", 5},
+		{"ff:cccc::1", 8},
+		{"ff:cccc::ff", 9},
+		{"ffff:bbbb::5", 3},
+		{"ffff:bbbb::15", 3},
+	})
 
-			// Insert a default route, those have their own codepath.
-			tbl.Insert(mpp("::/0"), 6)
-		t.Log(tbl.dumpString6())
-			checkRoutes2(t, tbl, []tableTest{
-				{"ff:aaaa::1", 1},
-				{"ff:aaaa::2", 2},
-				{"ff:aaaa::3", 7},
-				{"ff:aaaa::255", 6},
-				{"ff:aaaa:aaaa::1", 4},
-				{"ff:aaaa:aaaa:bbbb::1", 5},
-				{"ff:cccc::1", 8},
-				{"ff:cccc::ff", 9},
-				{"ffff:bbbb::5", 3},
-				{"ffff:bbbb::15", 3},
-			})
-	*/
+	// Insert a default route, those have their own codepath.
+	tbl.Insert(mpp("::/0"), 6)
+	t.Log(tbl.dumpString6())
+	checkRoutes2(t, tbl, []tableTest{
+		{"ff:aaaa::1", 1},
+		{"ff:aaaa::2", 2},
+		{"ff:aaaa::3", 7},
+		{"ff:aaaa::255", 6},
+		{"ff:aaaa:aaaa::1", 4},
+		{"ff:aaaa:aaaa:bbbb::1", 5},
+		{"ff:cccc::1", 8},
+		{"ff:cccc::ff", 9},
+		{"ffff:bbbb::5", 3},
+		{"ffff:bbbb::15", 3},
+	})
 }
 
 func TestGet2(t *testing.T) {
@@ -427,76 +423,65 @@ func TestGet2(t *testing.T) {
 	}
 }
 
-func TestUpdateCompare2(t *testing.T) {
-	// use update as insert and compare with slow implementation
+func TestGetCompare2(t *testing.T) {
 	t.Parallel()
+
 	pfxs := randomPrefixes(10_000)
 	slow := slowRT[int]{pfxs}
 	fast := Table2[int]{}
 
-	t.Run("update as insert", func(t *testing.T) {
-		for _, pfx := range pfxs {
-			// contrived insert
-			fast.Update(pfx.pfx, func(_ int, _ bool) int {
-				return pfx.val
-			})
+	for _, pfx := range pfxs {
+		fast.Insert(pfx.pfx, pfx.val)
+	}
+
+	for _, pfx := range pfxs {
+		slowVal, slowOK := slow.get(pfx.pfx)
+		fastVal, fastOK := fast.Get(pfx.pfx)
+
+		if !getsEqual(slowVal, slowOK, fastVal, fastOK) {
+			t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", pfx.pfx, fastVal, fastOK, slowVal, slowOK)
 		}
+	}
+}
 
-		seenVals4 := map[int]bool{}
-		seenVals6 := map[int]bool{}
+func TestUpdateCompare2(t *testing.T) {
+	t.Parallel()
 
-		for i := 0; i < 10_000; i++ {
-			a := randomAddr()
+	pfxs := randomPrefixes(10_000)
+	slow := slowRT[int]{pfxs}
+	fast := Table2[int]{}
 
-			slowVal, slowOK := slow.lookup(a)
-			fastVal, fastOK := fast.Lookup(a)
+	// Update as insert
+	for _, pfx := range pfxs {
+		fast.Update(pfx.pfx, func(int, bool) int { return pfx.val })
+	}
 
-			if !getsEqual(slowVal, slowOK, fastVal, fastOK) {
-				t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", a, fastVal, fastOK, slowVal, slowOK)
-			}
+	for _, pfx := range pfxs {
+		slowVal, slowOK := slow.get(pfx.pfx)
+		fastVal, fastOK := fast.Get(pfx.pfx)
 
-			if a.Is6() {
-				seenVals6[fastVal] = true
-			} else {
-				seenVals4[fastVal] = true
-			}
+		if !getsEqual(slowVal, slowOK, fastVal, fastOK) {
+			t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", pfx.pfx, fastVal, fastOK, slowVal, slowOK)
 		}
+	}
 
-		// Empirically, 10k probes into 5k v4 prefixes and 5k v6 prefixes results in
-		// ~1k distinct values for v4 and ~300 for v6. distinct routes. This sanity
-		// check that we didn't just return a single route for everything should be
-		// very generous indeed.
-		if cnt := len(seenVals4); cnt < 10 {
-			t.Fatalf("saw %d distinct v4 route results, statistically expected ~1000", cnt)
+	cb := func(val int, _ bool) int { return val + 1 }
+
+	// Update as update
+	for _, pfx := range pfxs[:len(pfxs)/2] {
+		slow.update(pfx.pfx, cb)
+		fast.Update(pfx.pfx, cb)
+	}
+
+	for _, pfx := range pfxs {
+		slowVal, slowOK := slow.get(pfx.pfx)
+		fastVal, fastOK := fast.Get(pfx.pfx)
+
+		if !getsEqual(slowVal, slowOK, fastVal, fastOK) {
+			t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", pfx.pfx, fastVal, fastOK, slowVal, slowOK)
 		}
-		if cnt := len(seenVals6); cnt < 10 {
-			t.Fatalf("saw %d distinct v6 route results, statistically expected ~300", cnt)
-		}
-	})
+	}
 
-	t.Run("update", func(t *testing.T) {
-		// update half of the prefixes
-
-		cb := func(val int, ok bool) int {
-			return val + 42
-		}
-
-		for _, pfx := range pfxs[len(pfxs)/2:] {
-			slow.update(pfx.pfx, cb)
-			fast.Update(pfx.pfx, cb)
-		}
-
-		for i := 0; i < 10_000; i++ {
-			a := randomAddr()
-
-			slowVal, slowOK := slow.lookup(a)
-			fastVal, fastOK := fast.Lookup(a)
-
-			if !getsEqual(slowVal, slowOK, fastVal, fastOK) {
-				t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", a, fastVal, fastOK, slowVal, slowOK)
-			}
-		}
-	})
 }
 
 func TestUpdate2(t *testing.T) {
@@ -753,7 +738,8 @@ func BenchmarkTableLookup2(b *testing.B) {
 		}
 
 		// same routes
-		for _, nroutes := range []int{100, 1_000, 10_000, 100_000, 1_000_000} {
+		//for _, nroutes := range []int{100, 1_000, 10_000, 100_000, 1_000_000} {
+		for _, nroutes := range []int{10_000, 100_000, 1_000_000} {
 			runtime.GC()
 
 			var rt1 Table[int]

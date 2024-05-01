@@ -122,7 +122,6 @@ func (t *Table2[V]) Insert(pfx netip.Prefix, val V) {
 		// child is prefix for other node
 		if child.pathIsPrefixFor(other) {
 			// go down, path compression -> idx jump
-			// TODO !!!
 			idx = child.pathLen()
 			n = child
 			continue
@@ -131,7 +130,9 @@ func (t *Table2[V]) Insert(pfx netip.Prefix, val V) {
 		// other is prefix for child node
 		if other.pathIsPrefixFor(child) {
 			// splice other between n and child: n -> other -> child
-			other.insertChild(child.pathAsSlice()[idx+1], child)
+			// path compression -> idx jump
+			idx = other.pathLen()
+			other.insertChild(child.pathAsSlice()[idx], child)
 			n.insertChild(octet, other)
 			return
 		}
@@ -281,32 +282,72 @@ func (t *Table2[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 	lastOctet := octets[lastOctetIdx]
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
-	for octetIdx, octet := range octets {
+	// make new node, already set path and insert prefix
+	other := newNode2[V]()
+	other.pathSet(octets[:lastOctetIdx])
+	val := other.updatePrefix(lastOctet, lastOctetBits, cb)
 
-		// last non-masked octet reached
-		if octetIdx == lastOctetIdx {
+	// find the proper trie node to insert prefix
+	// path compression, the idx may jump
+	idx := 0
+	for {
+		octet := octets[idx]
+
+		// last octet reached
+		if idx == lastOctetIdx {
+			// insert prefix into node
 			return n.updatePrefix(lastOctet, lastOctetBits, cb)
 		}
 
-		// descend down to next level
-		c := n.getChild(octet)
-		if c == nil {
-			break
+		// descend down the trie
+		child := n.getChild(octet)
+
+		// just insert other node as new leaf
+		if child == nil {
+			n.insertChild(octet, other)
+			return val
 		}
 
-		if bytes.Equal(c.pathAsSlice(), octets[:lastOctetIdx]) {
-			return c.updatePrefix(lastOctet, lastOctetBits, cb)
+		// paths are equal
+		if child.pathIsEqual(other) {
+			// just insert prefix into existing child
+			return child.updatePrefix(lastOctet, lastOctetBits, cb)
 		}
 
-		n = c
+		// child is prefix for other node
+		if child.pathIsPrefixFor(other) {
+			// go down, path compression -> idx jump
+			idx = child.pathLen()
+			n = child
+			continue
+		}
+
+		// other is prefix for child node
+		if other.pathIsPrefixFor(child) {
+			// splice other between n and child: n -> other -> child
+			// path compression -> idx jump
+			idx = other.pathLen()
+			other.insertChild(child.pathAsSlice()[idx], child)
+			n.insertChild(octet, other)
+			return val
+		}
+
+		// The paths are different from a certain index.
+		commonPathIdx := child.commonPathIdx(idx, other)
+
+		// make intermediate node with path until divergence
+		imed := newNode2[V]()
+		imed.pathSet(child.pathAsSlice()[:commonPathIdx+1])
+
+		// insert old and new child into intermediate node
+		imed.insertChild(child.pathAsSlice()[commonPathIdx+1], child)
+		imed.insertChild(other.pathAsSlice()[commonPathIdx+1], other)
+
+		// splice intermediate: n -> imed -> (child, other)
+		n.insertChild(octet, imed)
+		return val
 	}
 
-	// no matching node found for update, make new insertion
-	var val V
-	val = cb(val, false)
-	t.Insert(pfx, val)
-
-	return val
 }
 
 // Get returns the associated payload for prefix and true, or false if
@@ -340,11 +381,18 @@ func (t *Table2[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 	lastOctet := octets[lastOctetIdx]
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
-	for octetIdx, octet := range octets {
+	// make new node with path
+	other := newNode2[V]()
+	other.pathSet(octets[:lastOctetIdx])
+
+	// path compression, the idx may jump
+	idx := 0
+	for {
+		octet := octets[idx]
 
 		// last non-masked octet reached
-		if octetIdx == lastOctetIdx {
-			return n.getValByPrefix(octet, bits)
+		if idx == lastOctetIdx {
+			return n.getValByPrefix(octet, lastOctetBits)
 		}
 
 		// descend down to next level
@@ -353,14 +401,19 @@ func (t *Table2[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 			return
 		}
 
-		if bytes.Equal(c.pathAsSlice(), octets[:lastOctetIdx]) {
+		if c.pathIsEqual(other) {
 			return c.getValByPrefix(lastOctet, lastOctetBits)
 		}
 
-		n = c
+		// child is prefix for other node
+		if c.pathIsPrefixFor(other) {
+			// go down, path compression -> idx jump
+			idx = c.pathLen()
+			n = c
+			continue
+		}
+		return
 	}
-
-	panic("unreachable")
 }
 
 // Lookup does a route lookup (longest prefix match) for IP and
