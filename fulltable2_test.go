@@ -4,7 +4,9 @@
 package bart
 
 import (
+	"fmt"
 	"net/netip"
+	"runtime"
 	"testing"
 )
 
@@ -32,7 +34,7 @@ func BenchmarkFull2MatchV4(b *testing.B) {
 		}
 	}
 
-	b.Run("Lookup1", func(b *testing.B) {
+	b.Run("orig", func(b *testing.B) {
 		b.ResetTimer()
 		for k := 0; k < b.N; k++ {
 			_, okSink = rt1.Lookup(ip)
@@ -40,7 +42,7 @@ func BenchmarkFull2MatchV4(b *testing.B) {
 		b.ReportMetric(float64(rt1.numNodes()), "Nodes")
 	})
 
-	b.Run("Lookup2", func(b *testing.B) {
+	b.Run("comp", func(b *testing.B) {
 		b.ResetTimer()
 		for k := 0; k < b.N; k++ {
 			_, okSink = rt2.Lookup(ip)
@@ -73,7 +75,7 @@ func BenchmarkFull2MatchV6(b *testing.B) {
 		}
 	}
 
-	b.Run("Lookup1", func(b *testing.B) {
+	b.Run("orig", func(b *testing.B) {
 		b.ResetTimer()
 		for k := 0; k < b.N; k++ {
 			_, okSink = rt1.Lookup(ip)
@@ -81,7 +83,7 @@ func BenchmarkFull2MatchV6(b *testing.B) {
 		b.ReportMetric(float64(rt1.numNodes()), "Nodes")
 	})
 
-	b.Run("Lookup2", func(b *testing.B) {
+	b.Run("comp", func(b *testing.B) {
 		b.ResetTimer()
 		for k := 0; k < b.N; k++ {
 			intSink, okSink = rt2.Lookup(ip)
@@ -110,7 +112,7 @@ func BenchmarkFull2MissV4(b *testing.B) {
 		}
 	}
 
-	b.Run("Lookup1", func(b *testing.B) {
+	b.Run("orig", func(b *testing.B) {
 		b.ResetTimer()
 		for k := 0; k < b.N; k++ {
 			_, okSink = rt1.Lookup(ip)
@@ -118,7 +120,7 @@ func BenchmarkFull2MissV4(b *testing.B) {
 		b.ReportMetric(float64(rt1.numNodes()), "Nodes")
 	})
 
-	b.Run("Lookup2", func(b *testing.B) {
+	b.Run("comp", func(b *testing.B) {
 		b.ResetTimer()
 		for k := 0; k < b.N; k++ {
 			_, okSink = rt2.Lookup(ip)
@@ -147,7 +149,7 @@ func BenchmarkFull2MissV6(b *testing.B) {
 		}
 	}
 
-	b.Run("Lookup1", func(b *testing.B) {
+	b.Run("orig", func(b *testing.B) {
 		b.ResetTimer()
 		for k := 0; k < b.N; k++ {
 			_, okSink = rt1.Lookup(ip)
@@ -155,11 +157,77 @@ func BenchmarkFull2MissV6(b *testing.B) {
 		b.ReportMetric(float64(rt1.numNodes()), "Nodes")
 	})
 
-	b.Run("Lookup2", func(b *testing.B) {
+	b.Run("comp", func(b *testing.B) {
 		b.ResetTimer()
 		for k := 0; k < b.N; k++ {
 			_, okSink = rt2.Lookup(ip)
 		}
 		b.ReportMetric(float64(rt2.numNodes()), "Nodes")
 	})
+}
+
+func BenchmarkFull2Size2(b *testing.B) {
+
+	var startMem, endMem runtime.MemStats
+
+	for _, nroutes := range []int{10, 100, 1_000, 10_000, 100_000, 1_000_000} {
+		rt1 := new(Table[any])
+		rt2 := new(Table2[any])
+
+		b.Run(fmt.Sprintf("orig:%7d", nroutes), func(b *testing.B) {
+			b.ResetTimer()
+
+			for i := 0; i < b.N; i++ {
+				rt1 = new(Table[any])
+				runtime.GC()
+				runtime.ReadMemStats(&startMem)
+
+				for j, route := range routes {
+					if j >= nroutes {
+						break
+					}
+					rt1.Insert(route.CIDR, struct{}{})
+				}
+
+				runtime.GC()
+				runtime.ReadMemStats(&endMem)
+
+				if npfx := rt1.numPrefixes(); npfx != nroutes {
+					b.Fatalf("expect %v prefixes, got %v", nroutes, npfx)
+				}
+
+				b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
+				b.ReportMetric(float64(rt1.numNodes()), "Nodes")
+				b.ReportMetric(0, "ns/op") // silence
+			}
+		})
+
+		b.Run(fmt.Sprintf("comp:%7d", nroutes), func(b *testing.B) {
+			b.ResetTimer()
+
+			for i := 0; i < b.N; i++ {
+				rt2 = new(Table2[any])
+				runtime.GC()
+				runtime.ReadMemStats(&startMem)
+
+				for j, route := range routes {
+					if j >= nroutes {
+						break
+					}
+					rt2.Insert(route.CIDR, struct{}{})
+				}
+
+				runtime.GC()
+				runtime.ReadMemStats(&endMem)
+
+				if npfx := rt2.numPrefixes(); npfx != nroutes {
+					b.Fatalf("expect %v prefixes, got %v", nroutes, npfx)
+				}
+
+				b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
+				b.ReportMetric(float64(rt2.numNodes()), "Nodes")
+				b.ReportMetric(0, "ns/op") // silence
+			}
+		})
+	}
 }

@@ -86,9 +86,9 @@ func (t *Table2[V]) Insert(pfx netip.Prefix, val V) {
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
 	// make new node, already set path and insert prefix
-	other := newNode2[V]()
-	other.pathSet(octets[:lastOctetIdx])
-	other.insertPrefix(lastOctet, lastOctetBits, val)
+	o := newNode2[V]()
+	o.pathSet(octets[:lastOctetIdx])
+	o.insertPrefix(lastOctet, lastOctetBits, val)
 
 	// find the proper trie node to insert prefix
 	// path compression, the idx may jump
@@ -104,66 +104,54 @@ func (t *Table2[V]) Insert(pfx netip.Prefix, val V) {
 		}
 
 		// descend down the trie
-		child := n.getChild(octet)
+		c := n.getChild(octet)
 
 		// just insert other node as new leaf
-		if child == nil {
-			n.insertChild(octet, other)
+		if c == nil {
+			n.insertChild(octet, o)
 			return
 		}
 
 		// paths are equal
-		if child.pathIsEqual(other) {
+		if c.pathIsEqual(o) {
 			// just insert prefix into existing child
-			child.insertPrefix(lastOctet, lastOctetBits, val)
+			c.insertPrefix(lastOctet, lastOctetBits, val)
 			return
 		}
 
 		// child is prefix for other node
-		if child.pathIsPrefixFor(other) {
+		if c.pathIsPrefixFor(o) {
 			// go down, path compression -> idx jump
-			idx = child.pathLen()
-			n = child
+			idx = c.pathLen()
+			n = c
 			continue
 		}
 
 		// other is prefix for child node
-		if other.pathIsPrefixFor(child) {
+		if o.pathIsPrefixFor(c) {
 			// splice other between n and child: n -> other -> child
 			// path compression -> idx jump
-			idx = other.pathLen()
-			other.insertChild(child.pathAsSlice()[idx], child)
-			n.insertChild(octet, other)
+			idx = o.pathLen()
+			o.insertChild(c.pathAsSlice()[idx], c)
+			n.insertChild(octet, o)
 			return
 		}
 
 		// The paths are different from a certain index.
-		commonPathIdx := child.commonPathIdx(idx, other)
+		commonPathIdx := c.commonPathIdx(idx, o)
 
 		// make intermediate node with path until divergence
 		imed := newNode2[V]()
-		imed.pathSet(child.pathAsSlice()[:commonPathIdx+1])
+		imed.pathSet(c.pathAsSlice()[:commonPathIdx+1])
 
 		// insert old and new child into intermediate node
-		imed.insertChild(child.pathAsSlice()[commonPathIdx+1], child)
-		imed.insertChild(other.pathAsSlice()[commonPathIdx+1], other)
+		imed.insertChild(c.pathAsSlice()[commonPathIdx+1], c)
+		imed.insertChild(o.pathAsSlice()[commonPathIdx+1], o)
 
 		// splice intermediate: n -> imed -> (child, other)
 		n.insertChild(octet, imed)
 		return
 	}
-}
-
-// findCommonPathIdx until they differ, but we know they must be equal until start.
-func findCommonPathIdx(start int, a, b []byte) int {
-	idx := start
-	for i := start; i < min(len(a), len(b)); i++ {
-		if a[i] != b[i] {
-			return idx
-		}
-		idx = i
-	}
-	return idx
 }
 
 // TODO path compressed algo
@@ -283,9 +271,9 @@ func (t *Table2[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
 	// make new node, already set path and insert prefix
-	other := newNode2[V]()
-	other.pathSet(octets[:lastOctetIdx])
-	val := other.updatePrefix(lastOctet, lastOctetBits, cb)
+	o := newNode2[V]()
+	o.pathSet(octets[:lastOctetIdx])
+	val := o.updatePrefix(lastOctet, lastOctetBits, cb)
 
 	// find the proper trie node to insert prefix
 	// path compression, the idx may jump
@@ -300,48 +288,48 @@ func (t *Table2[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 		}
 
 		// descend down the trie
-		child := n.getChild(octet)
+		c := n.getChild(octet)
 
 		// just insert other node as new leaf
-		if child == nil {
-			n.insertChild(octet, other)
+		if c == nil {
+			n.insertChild(octet, o)
 			return val
 		}
 
 		// paths are equal
-		if child.pathIsEqual(other) {
+		if c.pathIsEqual(o) {
 			// just insert prefix into existing child
-			return child.updatePrefix(lastOctet, lastOctetBits, cb)
+			return c.updatePrefix(lastOctet, lastOctetBits, cb)
 		}
 
 		// child is prefix for other node
-		if child.pathIsPrefixFor(other) {
+		if c.pathIsPrefixFor(o) {
 			// go down, path compression -> idx jump
-			idx = child.pathLen()
-			n = child
+			idx = c.pathLen()
+			n = c
 			continue
 		}
 
 		// other is prefix for child node
-		if other.pathIsPrefixFor(child) {
+		if o.pathIsPrefixFor(c) {
 			// splice other between n and child: n -> other -> child
 			// path compression -> idx jump
-			idx = other.pathLen()
-			other.insertChild(child.pathAsSlice()[idx], child)
-			n.insertChild(octet, other)
+			idx = o.pathLen()
+			o.insertChild(c.pathAsSlice()[idx], c)
+			n.insertChild(octet, o)
 			return val
 		}
 
 		// The paths are different from a certain index.
-		commonPathIdx := child.commonPathIdx(idx, other)
+		commonPathIdx := c.commonPathIdx(idx, o)
 
 		// make intermediate node with path until divergence
 		imed := newNode2[V]()
-		imed.pathSet(child.pathAsSlice()[:commonPathIdx+1])
+		imed.pathSet(c.pathAsSlice()[:commonPathIdx+1])
 
 		// insert old and new child into intermediate node
-		imed.insertChild(child.pathAsSlice()[commonPathIdx+1], child)
-		imed.insertChild(other.pathAsSlice()[commonPathIdx+1], other)
+		imed.insertChild(c.pathAsSlice()[commonPathIdx+1], c)
+		imed.insertChild(o.pathAsSlice()[commonPathIdx+1], o)
 
 		// splice intermediate: n -> imed -> (child, other)
 		n.insertChild(octet, imed)
@@ -382,8 +370,8 @@ func (t *Table2[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
 	// make new node with path
-	other := newNode2[V]()
-	other.pathSet(octets[:lastOctetIdx])
+	o := newNode2[V]()
+	o.pathSet(octets[:lastOctetIdx])
 
 	// path compression, the idx may jump
 	idx := 0
@@ -401,12 +389,12 @@ func (t *Table2[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 			return
 		}
 
-		if c.pathIsEqual(other) {
+		if c.pathIsEqual(o) {
 			return c.getValByPrefix(lastOctet, lastOctetBits)
 		}
 
 		// child is prefix for other node
-		if c.pathIsPrefixFor(other) {
+		if c.pathIsPrefixFor(o) {
 			// go down, path compression -> idx jump
 			idx = c.pathLen()
 			n = c
