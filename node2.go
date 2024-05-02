@@ -37,15 +37,33 @@ type node2[V any] struct {
 	children []*node2[V]
 }
 
-// pathT for path compression
+// pathT, for path compression.
+// Use array and length instead of slice, 17 bytes instead of 40 bytes (24 + <= 16 bytes))
 type pathT struct {
 	octets [16]byte
 	length uint8
 }
 
-func (n *node2[V]) pathSet(octets []byte) {
-	copy(n.path.octets[:], octets)
-	n.path.length = uint8(len(octets))
+// newNode2, BitSets and path have to be initialized.
+func newNode2[V any](path []byte) *node2[V] {
+	n := &node2[V]{
+		prefixesBitset: bitset.New(0), // init BitSet
+		childrenBitset: bitset.New(0), // init BitSet
+	}
+
+	n.path = newPath(path)
+	return n
+}
+
+func newPath(path []byte) pathT {
+	p := pathT{}
+	p.length = uint8(len(path))
+	copy(p.octets[:], path)
+	return p
+}
+
+func (p *pathT) asSlice() (octets []byte) {
+	return p.octets[:p.length]
 }
 
 func (n *node2[V]) pathAsSlice() (octets []byte) {
@@ -56,36 +74,25 @@ func (n *node2[V]) pathLen() int {
 	return int(n.path.length)
 }
 
-func (n *node2[V]) pathIsEqual(o *node2[V]) bool {
-	return bytes.Equal(n.pathAsSlice(), o.pathAsSlice())
+func (n *node2[V]) childpathIsEqual(buf []byte) bool {
+	return bytes.Equal(n.pathAsSlice(), buf)
 }
 
-func (n *node2[V]) pathIsPrefixFor(o *node2[V]) bool {
-	return bytes.HasPrefix(o.pathAsSlice(), n.pathAsSlice())
+func (n *node2[V]) pathIsPrefixFor(buf []byte) bool {
+	return bytes.HasPrefix(buf, n.pathAsSlice())
 }
 
 // commonPathIdx, return idx until path differ.
 // Start is the idx we know already they are in common.
 func (n *node2[V]) commonPathIdx(start int, o *node2[V]) int {
-	a := n.pathAsSlice()
-	b := o.pathAsSlice()
-
 	idx := start
-	for i := start; i < min(len(a), len(b)); i++ {
-		if a[i] != b[i] {
+	for i := start; i < min(n.pathLen(), o.pathLen()); i++ {
+		if n.path.octets[i] != o.path.octets[i] {
 			return idx
 		}
 		idx = i
 	}
 	return idx
-}
-
-// newNode2, BitSets have to be initialized.
-func newNode2[V any]() *node2[V] {
-	return &node2[V]{
-		prefixesBitset: bitset.New(0), // init BitSet
-		childrenBitset: bitset.New(0), // init BitSet
-	}
 }
 
 // isEmpty returns true if node has neither prefixes nor children.
@@ -536,7 +543,7 @@ func (n *node2[V]) unionRec(o *node2[V]) {
 }
 
 func (n *node2[V]) cloneRec() *node2[V] {
-	c := newNode2[V]()
+	c := newNode2[V](nil)
 	if n.isEmpty() {
 		return c
 	}
