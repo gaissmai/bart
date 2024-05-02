@@ -51,15 +51,10 @@ func newNode2[V any](path []byte) *node2[V] {
 		childrenBitset: bitset.New(0), // init BitSet
 	}
 
-	n.path = newPath(path)
-	return n
-}
+	copy(n.path.octets[:], path)
+	n.path.length = uint8(len(path))
 
-func newPath(path []byte) pathT {
-	p := pathT{}
-	p.length = uint8(len(path))
-	copy(p.octets[:], path)
-	return p
+	return n
 }
 
 func (p *pathT) asSlice() (octets []byte) {
@@ -74,11 +69,7 @@ func (n *node2[V]) pathLen() int {
 	return int(n.path.length)
 }
 
-func (n *node2[V]) childpathIsEqual(buf []byte) bool {
-	return bytes.Equal(n.pathAsSlice(), buf)
-}
-
-func (n *node2[V]) pathIsPrefixFor(buf []byte) bool {
+func (n *node2[V]) pathIsPrefixOrEqual(buf []byte) bool {
 	return bytes.HasPrefix(buf, n.pathAsSlice())
 }
 

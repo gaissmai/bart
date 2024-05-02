@@ -4,7 +4,6 @@
 package bart
 
 import (
-	"bytes"
 	"net/netip"
 	"slices"
 	"sync"
@@ -55,12 +54,6 @@ func (t *Table2[V]) Insert(pfx netip.Prefix, val V) {
 	// get the root node of the routing table
 	n := t.rootNodeByVersion(is4)
 
-	// insert default route, easy peasy
-	if bits == 0 {
-		n.insertPrefix(0, 0, val)
-		return
-	}
-
 	a16 := ip.As16()
 	octets := a16[:]
 	if is4 {
@@ -85,19 +78,14 @@ func (t *Table2[V]) Insert(pfx netip.Prefix, val V) {
 	// 10.12.10.9/32 -> 8
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
-	// make new node, already set path and insert prefix
-	// o := newNode2[V]()
-	// o.pathSet(octets[:lastOctetIdx])
-	// o.insertPrefix(lastOctet, lastOctetBits, val)
+	// path of pfx to insert
+	path := octets[:lastOctetIdx]
 
-	path := newPath(octets[:lastOctetIdx])
+	idx := 0
+	cursor := octets[idx]
 
 	// find the proper trie node to insert prefix
-	// path compression, the idx may jump
-	idx := 0
 	for {
-		octet := octets[idx]
-
 		// last octet reached
 		if idx == lastOctetIdx {
 			// insert prefix into node
@@ -106,44 +94,38 @@ func (t *Table2[V]) Insert(pfx netip.Prefix, val V) {
 		}
 
 		// descend down the trie
-		c := n.getChild(octet)
+		c := n.getChild(cursor)
 
 		// just insert other node as new leaf
 		if c == nil {
 			// make new node
-			o := newNode2[V](path.asSlice())
+			o := newNode2[V](path)
 			o.insertPrefix(lastOctet, lastOctetBits, val)
 
-			n.insertChild(octet, o)
-			return
-		}
-
-		// paths are equal
-		if c.childpathIsEqual(path.asSlice()) {
-			// just insert prefix into existing child
-			c.insertPrefix(lastOctet, lastOctetBits, val)
+			n.insertChild(cursor, o)
 			return
 		}
 
 		// child is prefix for other node
-		if c.pathIsPrefixFor(path.asSlice()) {
-			// go down, path compression -> idx jump
+		if c.pathIsPrefixOrEqual(path) {
+			// go down, path compression -> idx may jump
 			idx = c.pathLen()
+			cursor = octets[idx]
 			n = c
 			continue
 		}
 
 		// make new node
-		o := newNode2[V](path.asSlice())
+		o := newNode2[V](path)
 		o.insertPrefix(lastOctet, lastOctetBits, val)
 
 		// other is prefix for child node
-		if o.pathIsPrefixFor(c.pathAsSlice()) {
+		if o.pathIsPrefixOrEqual(c.pathAsSlice()) {
 			// splice other between n and child: n -> other -> child
 			// path compression -> idx jump
 			idx = o.pathLen()
 			o.insertChild(c.pathAsSlice()[idx], c)
-			n.insertChild(octet, o)
+			n.insertChild(cursor, o)
 			return
 		}
 
@@ -158,12 +140,11 @@ func (t *Table2[V]) Insert(pfx netip.Prefix, val V) {
 		imed.insertChild(o.pathAsSlice()[commonPathIdx+1], o)
 
 		// splice intermediate: n -> imed -> (child, other)
-		n.insertChild(octet, imed)
+		n.insertChild(cursor, imed)
 		return
 	}
 }
 
-// TODO path compressed algo
 // Delete removes pfx from the tree, pfx does not have to be present.
 func (t *Table2[V]) Delete(pfx netip.Prefix) {
 	// always normalize the prefix
@@ -178,15 +159,12 @@ func (t *Table2[V]) Delete(pfx netip.Prefix) {
 		return
 	}
 
-	// delete default route, easy peasy
-	if bits == 0 {
-		n.deletePrefix(0, 0)
-		return
-	}
-
-	// stack of the traversed child path in order to
-	// purge dangling paths after deletion
-	pathStack := [maxTreeDepth]*node2[V]{}
+	// record path to deleted node
+	// purge or compact dangling nodes after deletion
+	stack := [maxTreeDepth]struct {
+		node  *node2[V]
+		octet byte
+	}{}
 
 	// does not allocate
 	a16 := ip.As16()
@@ -195,55 +173,99 @@ func (t *Table2[V]) Delete(pfx netip.Prefix) {
 		octets = octets[12:]
 	}
 
-	var depth int
-	var octet byte
+	// see comment in Insert()
+	lastOctetIdx := (bits - 1) / strideLen
+	lastOctet := octets[lastOctetIdx]
+	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
-	for depth, octet = range octets {
-		// push current node on stack for path recording
-		pathStack[depth] = n
+	// path of pfx to delete
+	path := octets[:lastOctetIdx]
+
+	// stackIndex is monotonic
+	stackIdx := 0
+
+	// path compression, octet index may jump
+	idx := 0
+
+	cursor := octets[idx]
+
+	// find the trie node
+	for {
+		// insert cursor and corresponding node into stacks for path recording
+		stack[stackIdx].octet = cursor
+		stack[stackIdx].node = n
 
 		// last significant octet reached
-		if bits <= strideLen {
+		if idx == lastOctetIdx {
 			// found a child on proper depth ...
-			if !n.deletePrefix(octet, bits) {
+			if !n.deletePrefix(lastOctet, lastOctetBits) {
 				// ... but prefix not in tree, nothing deleted
 				return
 			}
 
-			// purge dangling path, if needed
+			// escape, but purge dangling path if needed, see below
 			break
 		}
 
-		// descend down to next level, no path compression
-		child := n.getChild(octet)
-		if child == nil {
-			// no child, nothing to delete
+		// descend down to next level
+		c := n.getChild(cursor)
+
+		// no child, stopp
+		if c == nil {
 			return
 		}
 
-		// go down
-		bits -= strideLen
-		n = child
+		// no match, stopp
+		if !c.pathIsPrefixOrEqual(path) {
+			return
+		}
+
+		// go down, path compression, idx may jump
+		idx = c.pathLen()
+
+		// increase stackIdx monotonic
+		stackIdx++
+
+		cursor = octets[idx]
+		n = c
 	}
 
-	// check for dangling path
+	var parent *node2[V]
+
+	// pruning parent nodes along the path?
 	for {
-
-		// loop stop condition
-		if depth == 0 {
-			break
+		// stop condition
+		if stackIdx == 0 {
+			return
 		}
 
-		// an empty node?
-		if n.isEmpty() {
+		switch {
+		case n.isEmpty():
+			// get parent and slot
+			parent = stack[stackIdx-1].node
+			cursor = stack[stackIdx-1].octet
+
 			// purge this node from parents children
-			parent := pathStack[depth-1]
-			parent.deleteChild(octets[depth-1])
+			parent.deleteChild(cursor)
+
+		case len(n.prefixes) == 0 && len(n.children) == 1:
+			// n is pure intermediate and has only one child left, compact path
+
+			// get this single child
+			child := n.children[0]
+
+			// get parent and slot
+			parent = stack[stackIdx-1].node
+			cursor = stack[stackIdx-1].octet
+
+			// overwrite intermediate node with child, compacting the path
+			parent.insertChild(cursor, child)
 		}
 
-		// go up
-		depth--
-		n = pathStack[depth]
+		// cascade up
+		stackIdx--
+		n = stack[stackIdx].node
+		continue
 	}
 }
 
@@ -263,11 +285,6 @@ func (t *Table2[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 
 	n := t.rootNodeByVersion(is4)
 
-	// update value for default route, easy peasy
-	if bits == 0 {
-		return n.updatePrefix(0, 0, cb)
-	}
-
 	// does not allocate
 	a16 := ip.As16()
 	octets := a16[:]
@@ -275,60 +292,56 @@ func (t *Table2[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 		octets = octets[12:]
 	}
 
+	// see comment in Insert()
 	lastOctetIdx := (bits - 1) / strideLen
 	lastOctet := octets[lastOctetIdx]
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
-	path := newPath(octets[:lastOctetIdx])
+	// path of pfx to update
+	path := octets[:lastOctetIdx]
 
-	// find the proper trie node to insert prefix
-	// path compression, the idx may jump
 	idx := 0
-	for {
-		octet := octets[idx]
+	cursor := octets[idx]
 
+	// find the proper trie node to update prefix
+	for {
 		// last octet reached
 		if idx == lastOctetIdx {
-			// insert prefix into node
+			// update/insert prefix into node
 			return n.updatePrefix(lastOctet, lastOctetBits, cb)
 		}
 
 		// descend down the trie
-		c := n.getChild(octet)
+		c := n.getChild(cursor)
 
 		// just insert other node as new leaf
 		if c == nil {
 			// make new node, already set path and insert prefix
-			o := newNode2[V](path.asSlice())
-			n.insertChild(octet, o)
+			o := newNode2[V](path)
+			n.insertChild(cursor, o)
 
 			return o.updatePrefix(lastOctet, lastOctetBits, cb)
 		}
 
-		// paths are equal
-		if c.childpathIsEqual(path.asSlice()) {
-			// just insert prefix into existing child
-			return c.updatePrefix(lastOctet, lastOctetBits, cb)
-		}
-
-		// child is prefix for other node
-		if c.pathIsPrefixFor(path.asSlice()) {
-			// go down, path compression -> idx jump
+		// child is prefix or equal to other node
+		if c.pathIsPrefixOrEqual(path) {
+			// go down, path compression, idx may jump
 			idx = c.pathLen()
+			cursor = octets[idx]
 			n = c
 			continue
 		}
 
-		o := newNode2[V](path.asSlice())
+		o := newNode2[V](path)
 
 		// other is prefix for child node
-		if o.pathIsPrefixFor(c.pathAsSlice()) {
+		if o.pathIsPrefixOrEqual(c.pathAsSlice()) {
 			// splice other between n and child: n -> other -> child
-			// path compression -> idx jump
+			// path compression, idx may jump
 			idx = o.pathLen()
 
 			o.insertChild(c.pathAsSlice()[idx], c)
-			n.insertChild(octet, o)
+			n.insertChild(cursor, o)
 
 			return o.updatePrefix(lastOctet, lastOctetBits, cb)
 		}
@@ -344,7 +357,7 @@ func (t *Table2[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 		imed.insertChild(o.pathAsSlice()[commonPathIdx+1], o)
 
 		// splice intermediate: n -> imed -> (child, other)
-		n.insertChild(octet, imed)
+		n.insertChild(cursor, imed)
 		return o.updatePrefix(lastOctet, lastOctetBits, cb)
 	}
 }
@@ -364,11 +377,6 @@ func (t *Table2[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 		return
 	}
 
-	// get value for default route, easy peasy
-	if bits == 0 {
-		return n.getValByPrefix(0, 0)
-	}
-
 	// does not allocate
 	a16 := ip.As16()
 	octets := a16[:]
@@ -376,36 +384,35 @@ func (t *Table2[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 		octets = octets[12:]
 	}
 
+	// see comment in Insert()
 	lastOctetIdx := (bits - 1) / strideLen
 	lastOctet := octets[lastOctetIdx]
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
-	path := newPath(octets[:lastOctetIdx])
+	// path of pfx to get
+	path := octets[:lastOctetIdx]
 
-	// path compression, the idx may jump
 	idx := 0
-	for {
-		octet := octets[idx]
+	cursor := octets[idx]
 
+	// find the trie node
+	for {
 		// last non-masked octet reached
 		if idx == lastOctetIdx {
-			return n.getValByPrefix(octet, lastOctetBits)
+			return n.getValByPrefix(lastOctet, lastOctetBits)
 		}
 
 		// descend down to next level
-		c := n.getChild(octet)
+		c := n.getChild(cursor)
 		if c == nil {
 			return
 		}
 
-		if c.childpathIsEqual(path.asSlice()) {
-			return c.getValByPrefix(lastOctet, lastOctetBits)
-		}
-
 		// child is prefix for other node
-		if c.pathIsPrefixFor(path.asSlice()) {
-			// go down, path compression -> idx jump
+		if c.pathIsPrefixOrEqual(path) {
+			// go down, path compression, idx may jump
 			idx = c.pathLen()
+			cursor = octets[idx]
 			n = c
 			continue
 		}
@@ -422,72 +429,78 @@ func (t *Table2[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 		return
 	}
 
-	// stacks of the traversed nodes for fast backtracking, if needed
-	nodeStack := [maxTreeDepth]*node2[V]{}
-	octetStack := [maxTreeDepth]byte{}
-
 	// does not allocate
 	a16 := ip.As16()
 	octets := a16[:]
+	lastOctetIdx := 15
+
 	if is4 {
 		octets = octets[12:]
+		lastOctetIdx = 3
 	}
 
-	// octetIdx is allowed to make jumps due to path compression
-	octetIdx := 0
+	// stack of the traversed nodes for fast backtracking, if needed
+	stack := [maxTreeDepth]struct {
+		node  *node2[V]
+		octet byte
+	}{}
 
 	// stackIndex is monotonic
-	stackIdx := 0
+	var stackIdx int
+
+	// idx is allowed to make jumps due to path compression
+	var idx int
+
+	// current octet in loop
+	cursor := octets[idx]
 
 	// find leaf node
 	for {
-		octet := octets[octetIdx]
-
 		// insert node and corresponding octet into stacks for backtracking
-		nodeStack[stackIdx] = n
-		octetStack[stackIdx] = octet
+		stack[stackIdx].node = n
+		stack[stackIdx].octet = cursor
+
+		if idx == lastOctetIdx {
+			break
+		}
+
+		c := n.getChild(cursor)
 
 		// end of childs
-		c := n.getChild(octet)
 		if c == nil {
 			break
 		}
 
-		// octets does not overlap c.path
-		if !bytes.HasPrefix(octets, c.pathAsSlice()) {
+		// c is no prefix for octets
+		if !c.pathIsPrefixOrEqual(octets) {
 			break
 		}
 
 		// path compression, allowed to make jumps
-		octetIdx = c.pathLen()
+		idx = c.pathLen()
 
 		stackIdx++
+		cursor = octets[idx]
 		n = c
 	}
 
-	// start backtracking at leaf node in tight loop
+	// start backtracking in tight loop
 	for {
-		n := nodeStack[stackIdx]
-		octet := octetStack[stackIdx]
-
-		// LPM lookup only in nodes with prefixes, skip over intermediate nodes
-		if len(n.prefixes) != 0 {
-			if _, val, ok := n.lpmByIndex(octetToBaseIndex(octet)); ok {
-				return val, true
-			}
+		if _, val, ok := n.lpmByIndex(octetToBaseIndex(cursor)); ok {
+			return val, true
 		}
 
 		// next round?
 		if stackIdx == 0 {
-			break
+			return
 		}
 		stackIdx--
-	}
 
-	return
+		cursor = stack[stackIdx].octet
+		n = stack[stackIdx].node
+	}
 }
 
-// TODO path compressed algo
 // LookupPrefix does a route lookup (longest prefix match) for pfx and
 // returns the associated value and true, or false if no route matched.
 func (t *Table2[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
@@ -495,7 +508,6 @@ func (t *Table2[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
 	return
 }
 
-// TODO path compressed algo
 // LookupPrefixLPM is similar to [Table.LookupPrefix],
 // but it returns the lpm prefix in addition to value,ok.
 //
@@ -518,7 +530,6 @@ func (t *Table2[V]) LookupPrefixLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, 
 	return lpm, val, ok
 }
 
-// TODO path compressed algo
 func (t *Table2[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V, ok bool) {
 	// always normalize the prefix
 	pfx = pfx.Masked()
@@ -526,19 +537,18 @@ func (t *Table2[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val 
 	bits := pfx.Bits()
 	ip := pfx.Addr()
 	is4 := ip.Is4()
+
 	n := t.rootNodeByVersion(is4)
 	if n == nil {
 		return
 	}
 
-	// pfx is default route, easy peasy
-	if bits == 0 {
-		val, ok = n.getValByPrefix(0, 0)
-		return
-	}
-
-	// stack of the traversed nodes for fast backtracking, if needed
-	pathStack := [maxTreeDepth]*node2[V]{}
+	// record path to leaf node
+	stack := [maxTreeDepth]struct {
+		node  *node2[V]
+		octet byte
+		bits  int
+	}{}
 
 	// does not allocate
 	a16 := ip.As16()
@@ -547,54 +557,74 @@ func (t *Table2[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val 
 		octets = octets[12:]
 	}
 
-	var octet byte
+	// see comment in Insert()
+	lastOctetIdx := (bits - 1) / strideLen
+	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
-	// go down to stride node for pfx
-	for depth, octet = range octets {
+	// path of pfx to lookup
+	path := octets[:lastOctetIdx]
 
-		// push current node on stack for fast backtracking
-		pathStack[depth] = n
+	// stackIndex is monotonic
+	stackIdx := 0
+
+	// path compression, octet index may jump
+	idx := 0
+
+	// start with first octet
+	cursor := octets[idx]
+
+	// find the trie node
+	for {
+		// insert cursor and corresponding node into stacks for path recording
+		stack[stackIdx].octet = cursor
+		stack[stackIdx].node = n
 
 		// last significant octet reached
-		if bits <= strideLen {
+		if idx == lastOctetIdx {
+			// only the lastOctet has a different prefix len (prefix route)
+			stack[stackIdx].bits = lastOctetBits
 			break
 		}
 
-		// go down in tight loop the trie levels
-		if child := n.getChild(octet); child != nil {
-			bits -= strideLen
-			n = child
-			continue
+		// for all other octets it's equal to strideLen (host route)
+		stack[stackIdx].bits = strideLen
+
+		// get next child
+		c := n.getChild(cursor)
+
+		// no child, stopp
+		if c == nil {
+			break
 		}
 
-		// stop condition was missing child and not bits len,
-		// so cut the bits to strideLen
-		bits = strideLen
+		// no match, stopp
+		if !c.pathIsPrefixOrEqual(path) {
+			break
+		}
 
-		break
+		// go down, path compression, idx may jump
+		idx = c.pathLen()
+		cursor = octets[idx]
+		n = c
+
+		// increase stackIdx monotonic
+		stackIdx++
 	}
 
-	// start backtracking at matching stride node in tight loop
+	// start backtracking with last node and cursor
 	for {
-
-		// lookup only in nodes with prefixes, skip over intermediate nodes
-		if len(n.prefixes) != 0 {
-			if baseIdx, val, ok := n.lpmByPrefix(octet, bits); ok {
-				return depth, baseIdx, val, true
-			}
+		if baseIdx, val, ok := n.lpmByPrefix(cursor, stack[stackIdx].bits); ok {
+			return n.pathLen(), baseIdx, val, true
 		}
 
-		// end condition, stack is exhausted
-		if depth == 0 {
+		// if stack is exhausted?
+		if stackIdx == 0 {
 			return
 		}
+		stackIdx--
 
-		// go up, backtracking
-		// bits are now full strideLen for all upper levels
-		depth--
-		bits = strideLen
-		octet = octets[depth]
-		n = pathStack[depth]
+		cursor = stack[stackIdx].octet
+		n = stack[stackIdx].node
 	}
 }
 

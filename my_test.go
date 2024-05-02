@@ -1,6 +1,8 @@
 package bart
 
 import (
+	"net/netip"
+	"runtime"
 	"testing"
 )
 
@@ -19,69 +21,92 @@ func BenchmarkMyInsert(b *testing.B) {
 		rt2.Insert(route.pfx, struct{}{})
 	}
 
-	b.Run("table1/InsertV4", func(b *testing.B) {
+	b.Run("v4-pfx/orig/random 1_000_000 pfxs", func(b *testing.B) {
 		for range b.N {
 			rt1.Insert(pfx4, struct{}{})
 		}
+		b.ReportMetric(float64(rt1.numNodes()), "Nodes")
 	})
 
-	b.Run("table2/InsertV4", func(b *testing.B) {
+	b.Run("v4-pfx/comp/random 1_000_000 pfxs", func(b *testing.B) {
 		for range b.N {
 			rt2.Insert(pfx4, struct{}{})
 		}
+		b.ReportMetric(float64(rt2.numNodes()), "Nodes")
 	})
 
-	b.Run("table1/InsertV6", func(b *testing.B) {
+	b.Run("v6-pfx/orig/random 1_000_000 pfxs", func(b *testing.B) {
 		for range b.N {
 			rt1.Insert(pfx6, struct{}{})
 		}
+		b.ReportMetric(float64(rt1.numNodes()), "Nodes")
 	})
 
-	b.Run("table2/InsertV6", func(b *testing.B) {
+	b.Run("v6-pfx/comp/random 1_000_000 pfxs", func(b *testing.B) {
 		for range b.N {
 			rt2.Insert(pfx6, struct{}{})
 		}
+		b.ReportMetric(float64(rt2.numNodes()), "Nodes")
 	})
 }
 
-func BenchmarkMyV4(b *testing.B) {
+func BenchmarkMyLookupV4(b *testing.B) {
+	var rt1 Table[int]
 	var rt2 Table2[int]
 
 	for i, route := range randomPrefixes4(1_000_000) {
+		rt1.Insert(route.pfx, i)
 		rt2.Insert(route.pfx, i)
 	}
 
 	ip := randomIP4()
 
-	b.Run("comp", func(b *testing.B) {
+	b.Run("orig/random/1_000_000", func(b *testing.B) {
 		b.ResetTimer()
-		for k := 0; k < b.N; k++ {
+		for range b.N {
+			intSink, okSink = rt1.Lookup(ip)
+		}
+		b.ReportMetric(float64(rt1.numNodes()), "Nodes")
+	})
+
+	b.Run("comp/random/1_000_000", func(b *testing.B) {
+		b.ResetTimer()
+		for range b.N {
 			intSink, okSink = rt2.Lookup(ip)
 		}
 		b.ReportMetric(float64(rt2.numNodes()), "Nodes")
 	})
 }
 
-func BenchmarkMyV6(b *testing.B) {
+func BenchmarkMyLookupV6(b *testing.B) {
+	var rt1 Table[int]
 	var rt2 Table2[int]
 
 	for i, route := range randomPrefixes6(1_000_000) {
+		rt1.Insert(route.pfx, i)
 		rt2.Insert(route.pfx, i)
 	}
 
 	ip := randomIP6()
 
-	b.Run("comp", func(b *testing.B) {
+	b.Run("orig/random/1_000_000", func(b *testing.B) {
 		b.ResetTimer()
-		for k := 0; k < b.N; k++ {
+		for range b.N {
+			intSink, okSink = rt1.Lookup(ip)
+		}
+		b.ReportMetric(float64(rt1.numNodes()), "Nodes")
+	})
+
+	b.Run("comp/random/1_000_000", func(b *testing.B) {
+		b.ResetTimer()
+		for range b.N {
 			intSink, okSink = rt2.Lookup(ip)
 		}
 		b.ReportMetric(float64(rt2.numNodes()), "Nodes")
 	})
 }
 
-/*
-func BenchmarkFull2MatchV4(b *testing.B) {
+func BenchmarkMyFullMatchV4(b *testing.B) {
 	var rt1 Table[int]
 	var rt2 Table2[int]
 
@@ -122,7 +147,7 @@ func BenchmarkFull2MatchV4(b *testing.B) {
 	})
 }
 
-func BenchmarkFull2MatchV6(b *testing.B) {
+func BenchmarkMyFullMatchV6(b *testing.B) {
 	var rt1 Table[int]
 	var rt2 Table2[int]
 
@@ -163,7 +188,7 @@ func BenchmarkFull2MatchV6(b *testing.B) {
 	})
 }
 
-func BenchmarkFull2MissV4(b *testing.B) {
+func BenchmarkMyFullMissV4(b *testing.B) {
 	var rt1 Table[int]
 	var rt2 Table2[int]
 
@@ -200,7 +225,7 @@ func BenchmarkFull2MissV4(b *testing.B) {
 	})
 }
 
-func BenchmarkFull2MissV6(b *testing.B) {
+func BenchmarkMyFullMissV6(b *testing.B) {
 	var rt1 Table[int]
 	var rt2 Table2[int]
 
@@ -237,68 +262,56 @@ func BenchmarkFull2MissV6(b *testing.B) {
 	})
 }
 
-func BenchmarkFull2Size2(b *testing.B) {
+func BenchmarkMyFullSize(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 
-	for _, nroutes := range []int{10, 100, 1_000, 10_000, 100_000, 1_000_000} {
+	b.Run("orig", func(b *testing.B) {
 		rt1 := new(Table[any])
+
+		for range b.N {
+			rt1 = new(Table[any])
+			runtime.GC()
+			runtime.ReadMemStats(&startMem)
+
+			for _, route := range routes {
+				rt1.Insert(route.CIDR, struct{}{})
+			}
+
+			runtime.GC()
+			runtime.ReadMemStats(&endMem)
+
+			if npfx := rt1.numPrefixes(); npfx != len(routes) {
+				b.Fatalf("expect %v prefixes, got %v", len(routes), npfx)
+			}
+
+			b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
+			b.ReportMetric(float64(rt1.numNodes()), "Nodes")
+			b.ReportMetric(0, "ns/op") // silence
+		}
+	})
+
+	b.Run("comp", func(b *testing.B) {
 		rt2 := new(Table2[any])
 
-		b.Run(fmt.Sprintf("orig:%7d", nroutes), func(b *testing.B) {
-			b.ResetTimer()
+		for range b.N {
+			rt2 = new(Table2[any])
+			runtime.GC()
+			runtime.ReadMemStats(&startMem)
 
-			for i := 0; i < b.N; i++ {
-				rt1 = new(Table[any])
-				runtime.GC()
-				runtime.ReadMemStats(&startMem)
-
-				for j, route := range routes {
-					if j >= nroutes {
-						break
-					}
-					rt1.Insert(route.CIDR, struct{}{})
-				}
-
-				runtime.GC()
-				runtime.ReadMemStats(&endMem)
-
-				if npfx := rt1.numPrefixes(); npfx != nroutes {
-					b.Fatalf("expect %v prefixes, got %v", nroutes, npfx)
-				}
-
-				b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
-				b.ReportMetric(float64(rt1.numNodes()), "Nodes")
-				b.ReportMetric(0, "ns/op") // silence
+			for _, route := range routes {
+				rt2.Insert(route.CIDR, struct{}{})
 			}
-		})
 
-		b.Run(fmt.Sprintf("comp:%7d", nroutes), func(b *testing.B) {
-			b.ResetTimer()
+			runtime.GC()
+			runtime.ReadMemStats(&endMem)
 
-			for i := 0; i < b.N; i++ {
-				rt2 = new(Table2[any])
-				runtime.GC()
-				runtime.ReadMemStats(&startMem)
-
-				for j, route := range routes {
-					if j >= nroutes {
-						break
-					}
-					rt2.Insert(route.CIDR, struct{}{})
-				}
-
-				runtime.GC()
-				runtime.ReadMemStats(&endMem)
-
-				if npfx := rt2.numPrefixes(); npfx != nroutes {
-					b.Fatalf("expect %v prefixes, got %v", nroutes, npfx)
-				}
-
-				b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
-				b.ReportMetric(float64(rt2.numNodes()), "Nodes")
-				b.ReportMetric(0, "ns/op") // silence
+			if npfx := rt2.numPrefixes(); npfx != len(routes) {
+				b.Fatalf("expect %v prefixes, got %v", len(routes), npfx)
 			}
-		})
-	}
+
+			b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
+			b.ReportMetric(float64(rt2.numNodes()), "Nodes")
+			b.ReportMetric(0, "ns/op") // silence
+		}
+	})
 }
-*/

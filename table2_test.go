@@ -363,6 +363,365 @@ func TestInsert2(t *testing.T) {
 	})
 }
 
+func TestDelete2(t *testing.T) {
+	t.Parallel()
+
+	t.Run("prefix_in_root", func(t *testing.T) {
+		// Add/remove prefix from root table.
+		rtbl := &Table2[int]{}
+		checkSize2(t, rtbl, 2)
+
+		rtbl.Insert(mpp("10.0.0.0/8"), 1)
+		checkRoutes2(t, rtbl, []tableTest{
+			{"10.0.0.1", 1},
+			{"255.255.255.255", -1},
+		})
+		checkSize2(t, rtbl, 2)
+
+		rtbl.Delete(mpp("10.0.0.0/8"))
+		checkRoutes2(t, rtbl, []tableTest{
+			{"10.0.0.1", -1},
+			{"255.255.255.255", -1},
+		})
+		checkSize2(t, rtbl, 2)
+	})
+
+	t.Run("prefix_in_leaf", func(t *testing.T) {
+		// Create, then delete a single leaf table.
+		rtbl := &Table2[int]{}
+		checkSize2(t, rtbl, 2)
+
+		rtbl.Insert(mpp("192.168.0.1/32"), 1)
+		checkRoutes2(t, rtbl, []tableTest{
+			{"192.168.0.1", 1},
+			{"255.255.255.255", -1},
+		})
+
+		rtbl.Delete(mpp("192.168.0.1/32"))
+		checkRoutes2(t, rtbl, []tableTest{
+			{"192.168.0.1", -1},
+			{"255.255.255.255", -1},
+		})
+		checkSize2(t, rtbl, 2)
+	})
+
+	t.Run("intermediate_no_routes", func(t *testing.T) {
+		// Create an intermediate with 2 children, then delete one leaf.
+		rtbl := &Table2[int]{}
+
+		rtbl.Insert(mpp("192.168.0.1/32"), 1)
+		rtbl.Insert(mpp("192.180.0.1/32"), 2)
+
+		checkRoutes2(t, rtbl, []tableTest{
+			{"192.168.0.1", 1},
+			{"192.180.0.1", 2},
+			{"192.40.0.1", -1},
+		})
+		checkSize2(t, rtbl, 5)
+
+		rtbl.Delete(mpp("192.180.0.1/32"))
+
+		checkRoutes2(t, rtbl, []tableTest{
+			{"192.168.0.1", 1},
+			{"192.180.0.1", -1},
+			{"192.40.0.1", -1},
+		})
+		checkSize2(t, rtbl, 3)
+	})
+
+	t.Run("intermediate_with_route", func(t *testing.T) {
+		// Same, but the intermediate carries a route as well.
+		rtbl := &Table2[int]{}
+		rtbl.Insert(mpp("192.168.0.1/32"), 1)
+		rtbl.Insert(mpp("192.180.0.1/32"), 2)
+		rtbl.Insert(mpp("192.0.0.0/10"), 3)
+
+		checkRoutes2(t, rtbl, []tableTest{
+			{"192.168.0.1", 1},
+			{"192.180.0.1", 2},
+			{"192.40.0.1", 3},
+			{"192.255.0.1", -1},
+		})
+		checkSize2(t, rtbl, 5)
+
+		rtbl.Delete(mpp("192.180.0.1/32"))
+
+		checkRoutes2(t, rtbl, []tableTest{
+			{"192.168.0.1", 1},
+			{"192.180.0.1", -1},
+			{"192.40.0.1", 3},
+			{"192.255.0.1", -1},
+		})
+		checkSize2(t, rtbl, 4) // 2 roots, 1 intermediate, 1 leaf
+	})
+
+	t.Run("intermediate_many_leaves", func(t *testing.T) {
+		// Intermediate with 3 leaves, then delete one leaf.
+		rtbl := &Table2[int]{}
+		rtbl.Insert(mpp("192.168.0.1/32"), 1)
+		rtbl.Insert(mpp("192.180.0.1/32"), 2)
+		rtbl.Insert(mpp("192.200.0.1/32"), 3)
+
+		checkRoutes2(t, rtbl, []tableTest{
+			{"192.168.0.1", 1},
+			{"192.180.0.1", 2},
+			{"192.200.0.1", 3},
+			{"192.255.0.1", -1},
+		})
+		checkSize2(t, rtbl, 6)
+
+		rtbl.Delete(mpp("192.180.0.1/32"))
+
+		checkRoutes2(t, rtbl, []tableTest{
+			{"192.168.0.1", 1},
+			{"192.180.0.1", -1},
+			{"192.200.0.1", 3},
+			{"192.255.0.1", -1},
+		})
+		checkSize2(t, rtbl, 5)
+	})
+
+	t.Run("nosuchprefix_missing_child", func(t *testing.T) {
+		// Delete non-existent prefix, missing strideTable path.
+		rtbl := &Table2[int]{}
+		rtbl.Insert(mpp("192.168.0.1/32"), 1)
+
+		checkRoutes2(t, rtbl, []tableTest{
+			{"192.168.0.1", 1},
+			{"192.255.0.1", -1},
+		})
+		checkSize2(t, rtbl, 3)
+
+		rtbl.Delete(mpp("200.0.0.0/32")) // lookup miss in root
+
+		checkRoutes2(t, rtbl, []tableTest{
+			{"192.168.0.1", 1},
+			{"192.255.0.1", -1},
+		})
+		checkSize2(t, rtbl, 3)
+	})
+
+	t.Run("nosuchprefix_not_in_leaf", func(t *testing.T) {
+		// Delete non-existent prefix, strideTable path exists but
+		// leaf doesn't contain route.
+		rtbl := &Table2[int]{}
+		rtbl.Insert(mpp("192.168.0.1/32"), 1)
+
+		checkRoutes2(t, rtbl, []tableTest{
+			{"192.168.0.1", 1},
+			{"192.255.0.1", -1},
+		})
+		checkSize2(t, rtbl, 3)
+
+		rtbl.Delete(mpp("192.168.0.5/32")) // right leaf, no route
+
+		checkRoutes2(t, rtbl, []tableTest{
+			{"192.168.0.1", 1},
+			{"192.255.0.1", -1},
+		})
+		checkSize2(t, rtbl, 3)
+	})
+
+	t.Run("intermediate_with_deleted_route", func(t *testing.T) {
+		// Intermediate table loses its last route and becomes
+		// compactable.
+		rtbl := &Table2[int]{}
+		rtbl.Insert(mpp("192.168.0.1/32"), 1)
+		rtbl.Insert(mpp("192.168.0.0/22"), 2)
+
+		checkRoutes2(t, rtbl, []tableTest{
+			{"192.168.0.1", 1},
+			{"192.168.0.2", 2},
+			{"192.255.0.1", -1},
+		})
+		checkSize2(t, rtbl, 4)
+
+		rtbl.Delete(mpp("192.168.0.0/22"))
+
+		checkRoutes2(t, rtbl, []tableTest{
+			{"192.168.0.1", 1},
+			{"192.168.0.2", -1},
+			{"192.255.0.1", -1},
+		})
+		checkSize2(t, rtbl, 3)
+	})
+
+	t.Run("default_route", func(t *testing.T) {
+		// Default routes have a special case in the code.
+		rtbl := &Table2[int]{}
+
+		rtbl.Insert(mpp("0.0.0.0/0"), 1)
+		rtbl.Insert(mpp("::/0"), 1)
+
+		rtbl.Delete(mpp("0.0.0.0/0"))
+
+		checkRoutes2(t, rtbl, []tableTest{
+			{"1.2.3.4", -1},
+			{"::1", 1},
+		})
+		checkSize2(t, rtbl, 2)
+	})
+}
+
+func TestDeleteCompare2(t *testing.T) {
+	// Create large route tables repeatedly, delete half of their
+	// prefixes, and compare Table's behavior to a naive and slow but
+	// correct implementation.
+	t.Parallel()
+
+	const (
+		numPrefixes  = 10_000 // total prefixes to insert (test deletes 50% of them)
+		numPerFamily = numPrefixes / 2
+		deleteCut    = numPerFamily / 2
+		numProbes    = 10_000 // random addr lookups to do
+	)
+
+	// We have to do this little dance instead of just using allPrefixes,
+	// because we want pfxs and toDelete to be non-overlapping sets.
+	all4, all6 := randomPrefixes4(numPerFamily), randomPrefixes6(numPerFamily)
+
+	pfxs := append([]slowRTEntry[int](nil), all4[:deleteCut]...)
+	pfxs = append(pfxs, all6[:deleteCut]...)
+
+	toDelete := append([]slowRTEntry[int](nil), all4[deleteCut:]...)
+	toDelete = append(toDelete, all6[deleteCut:]...)
+
+	slow := slowRT[int]{pfxs}
+	fast := Table2[int]{}
+
+	for _, pfx := range pfxs {
+		fast.Insert(pfx.pfx, pfx.val)
+	}
+
+	for _, pfx := range toDelete {
+		fast.Insert(pfx.pfx, pfx.val)
+	}
+	for _, pfx := range toDelete {
+		fast.Delete(pfx.pfx)
+	}
+
+	seenVals4 := map[int]bool{}
+	seenVals6 := map[int]bool{}
+
+	for i := 0; i < numProbes; i++ {
+		a := randomAddr()
+
+		slowVal, slowOK := slow.lookup(a)
+		fastVal, fastOK := fast.Lookup(a)
+
+		if !getsEqual(slowVal, slowOK, fastVal, fastOK) {
+			t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", a, fastVal, fastOK, slowVal, slowOK)
+		}
+
+		if a.Is6() {
+			seenVals6[fastVal] = true
+		} else {
+			seenVals4[fastVal] = true
+		}
+	}
+	// Empirically, 10k probes into 5k v4 prefixes and 5k v6 prefixes results in
+	// ~1k distinct values for v4 and ~300 for v6. distinct routes. This sanity
+	// check that we didn't just return a single route for everything should be
+	// very generous indeed.
+	if cnt := len(seenVals4); cnt < 10 {
+		t.Fatalf("saw %d distinct v4 route results, statistically expected ~1000", cnt)
+	}
+	if cnt := len(seenVals6); cnt < 10 {
+		t.Fatalf("saw %d distinct v6 route results, statistically expected ~300", cnt)
+	}
+}
+
+func TestDeleteShuffled2(t *testing.T) {
+	// The order in which you delete prefixes from a route table
+	// should not matter, as long as you're deleting the same set of
+	// routes.
+	t.Parallel()
+
+	const (
+		numPrefixes  = 10_000 // prefixes to insert (test deletes 50% of them)
+		numPerFamily = numPrefixes / 2
+		deleteCut    = numPerFamily / 2
+		numProbes    = 10_000 // random addr lookups to do
+	)
+
+	// We have to do this little dance instead of just using allPrefixes,
+	// because we want pfxs and toDelete to be non-overlapping sets.
+	all4, all6 := randomPrefixes4(numPerFamily), randomPrefixes6(numPerFamily)
+
+	pfxs := append([]slowRTEntry[int](nil), all4[:deleteCut]...)
+	pfxs = append(pfxs, all6[:deleteCut]...)
+
+	toDelete := append([]slowRTEntry[int](nil), all4[deleteCut:]...)
+	toDelete = append(toDelete, all6[deleteCut:]...)
+
+	rt1 := Table2[int]{}
+	for _, pfx := range pfxs {
+		rt1.Insert(pfx.pfx, pfx.val)
+	}
+	for _, pfx := range toDelete {
+		rt1.Insert(pfx.pfx, pfx.val)
+	}
+	for _, pfx := range toDelete {
+		rt1.Delete(pfx.pfx)
+	}
+
+	for i := 0; i < 10; i++ {
+		pfxs2 := append([]slowRTEntry[int](nil), pfxs...)
+		toDelete2 := append([]slowRTEntry[int](nil), toDelete...)
+		rand.Shuffle(len(toDelete2), func(i, j int) { toDelete2[i], toDelete2[j] = toDelete2[j], toDelete2[i] })
+		rt2 := Table2[int]{}
+		for _, pfx := range pfxs2 {
+			rt2.Insert(pfx.pfx, pfx.val)
+		}
+		for _, pfx := range toDelete2 {
+			rt2.Insert(pfx.pfx, pfx.val)
+		}
+		for _, pfx := range toDelete2 {
+			rt2.Delete(pfx.pfx)
+		}
+
+		// Diffing a deep tree of tables gives cmp.Diff a nervous breakdown, so
+		// test for equivalence statistically with random probes instead.
+		for i := 0; i < numProbes; i++ {
+			a := randomAddr()
+			val1, ok1 := rt1.Lookup(a)
+			val2, ok2 := rt2.Lookup(a)
+			if !getsEqual(val1, ok1, val2, ok2) {
+				t.Errorf("get(%q) = (%v, %v), want (%v, %v)", a, val2, ok2, val1, ok1)
+			}
+		}
+	}
+}
+
+func TestDeleteIsReverseOfInsert2(t *testing.T) {
+	t.Parallel()
+	// Insert N prefixes, then delete those same prefixes in reverse
+	// order. Each deletion should exactly undo the internal structure
+	// changes that each insert did.
+	const N = 100
+
+	var tab Table2[int]
+	prefixes := randomPrefixes(N)
+
+	defer func() {
+		if t.Failed() {
+			fmt.Printf("the prefixes that fail the test: %v\n", prefixes)
+		}
+	}()
+
+	want := tab.dumpString()
+	for _, p := range prefixes {
+		tab.Insert(p.pfx, p.val)
+	}
+
+	for i := len(prefixes) - 1; i >= 0; i-- {
+		tab.Delete(prefixes[i].pfx)
+	}
+	if got := tab.dumpString(); got != want {
+		t.Fatalf("after delete, mismatch:\n\n got: %s\n\nwant: %s", got, want)
+	}
+}
+
 func TestGet2(t *testing.T) {
 	t.Parallel()
 
@@ -481,7 +840,6 @@ func TestUpdateCompare2(t *testing.T) {
 			t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", pfx.pfx, fastVal, fastOK, slowVal, slowOK)
 		}
 	}
-
 }
 
 func TestUpdate2(t *testing.T) {
@@ -579,6 +937,161 @@ func TestLookupCompare2(t *testing.T) {
 		}
 
 		if a.Is6() {
+			seenVals6[fastVal] = true
+		} else {
+			seenVals4[fastVal] = true
+		}
+	}
+
+	// Empirically, 10k probes into 5k v4 prefixes and 5k v6 prefixes results in
+	// ~1k distinct values for v4 and ~300 for v6. distinct routes. This sanity
+	// check that we didn't just return a single route for everything should be
+	// very generous indeed.
+	if cnt := len(seenVals4); cnt < 10 {
+		t.Fatalf("saw %d distinct v4 route results, statistically expected ~1000", cnt)
+	}
+	if cnt := len(seenVals6); cnt < 10 {
+		t.Fatalf("saw %d distinct v6 route results, statistically expected ~300", cnt)
+	}
+}
+
+func TestLookupPrefix2(t *testing.T) {
+	t.Parallel()
+
+	rt := new(Table2[int])
+
+	t.Run("empty table", func(t *testing.T) {
+		_, ok := rt.LookupPrefix(randomPrefix4())
+
+		if ok {
+			t.Errorf("empty table: ok=%v, expected: %v", ok, false)
+		}
+	})
+
+	tests := []struct {
+		name string
+		pfx  netip.Prefix
+		val  int
+	}{
+		{
+			name: "default route v4",
+			pfx:  mpp("0.0.0.0/0"),
+			val:  0,
+		},
+		{
+			name: "default route v6",
+			pfx:  mpp("::/0"),
+			val:  0,
+		},
+		{
+			name: "set v4",
+			pfx:  mpp("1.2.3.4/32"),
+			val:  1234,
+		},
+		{
+			name: "set v6",
+			pfx:  mpp("2001:db8::/32"),
+			val:  2001,
+		},
+	}
+
+	rt = new(Table2[int])
+
+	for _, tt := range tests {
+		rt.Insert(tt.pfx, tt.val)
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := rt.LookupPrefix(tt.pfx)
+
+			if !ok {
+				t.Errorf("%s: ok=%v, expected: %v", tt.name, ok, true)
+			}
+
+			if got != tt.val {
+				t.Errorf("%s: val=%v, expected: %v", tt.name, got, tt.val)
+			}
+		})
+	}
+}
+
+func TestLookupPrefixCompare2(t *testing.T) {
+	// Create large route tables repeatedly, and compare Table's
+	// behavior to a naive and slow but correct implementation.
+	t.Parallel()
+	pfxs := randomPrefixes(10_000)
+
+	slow := slowRT[int]{pfxs}
+	fast := Table2[int]{}
+
+	for _, pfx := range pfxs {
+		fast.Insert(pfx.pfx, pfx.val)
+	}
+
+	seenVals4 := map[int]bool{}
+	seenVals6 := map[int]bool{}
+
+	for i := 0; i < 10_000; i++ {
+		pfx := randomPrefix()
+
+		slowVal, slowOK := slow.lookupPfx(pfx)
+		fastVal, fastOK := fast.LookupPrefix(pfx)
+
+		if !getsEqual(slowVal, slowOK, fastVal, fastOK) {
+			t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", pfx, fastVal, fastOK, slowVal, slowOK)
+		}
+
+		if pfx.Addr().Is6() {
+			seenVals6[fastVal] = true
+		} else {
+			seenVals4[fastVal] = true
+		}
+	}
+
+	// Empirically, 10k probes into 5k v4 prefixes and 5k v6 prefixes results in
+	// ~1k distinct values for v4 and ~300 for v6. distinct routes. This sanity
+	// check that we didn't just return a single route for everything should be
+	// very generous indeed.
+	if cnt := len(seenVals4); cnt < 10 {
+		t.Fatalf("saw %d distinct v4 route results, statistically expected ~1000", cnt)
+	}
+	if cnt := len(seenVals6); cnt < 10 {
+		t.Fatalf("saw %d distinct v6 route results, statistically expected ~300", cnt)
+	}
+}
+
+func TestLookupPrefixLPMCompare2(t *testing.T) {
+	// Create large route tables repeatedly, and compare Table's
+	// behavior to a naive and slow but correct implementation.
+	t.Parallel()
+	pfxs := randomPrefixes(10_000)
+
+	slow := slowRT[int]{pfxs}
+	fast := Table2[int]{}
+
+	for _, pfx := range pfxs {
+		fast.Insert(pfx.pfx, pfx.val)
+	}
+
+	seenVals4 := map[int]bool{}
+	seenVals6 := map[int]bool{}
+
+	for i := 0; i < 10_000; i++ {
+		pfx := randomPrefix()
+
+		slowLPM, slowVal, slowOK := slow.lookupPfxLPM(pfx)
+		fastLPM, fastVal, fastOK := fast.LookupPrefixLPM(pfx)
+
+		if !getsEqual(slowVal, slowOK, fastVal, fastOK) {
+			t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", pfx, fastVal, fastOK, slowVal, slowOK)
+		}
+
+		if !getsEqual(slowLPM, slowOK, fastLPM, fastOK) {
+			t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", pfx, fastLPM, fastOK, slowLPM, slowOK)
+		}
+
+		if pfx.Addr().Is6() {
 			seenVals6[fastVal] = true
 		} else {
 			seenVals4[fastVal] = true
@@ -738,8 +1251,7 @@ func BenchmarkTableLookup2(b *testing.B) {
 		}
 
 		// same routes
-		//for _, nroutes := range []int{100, 1_000, 10_000, 100_000, 1_000_000} {
-		for _, nroutes := range []int{10_000, 100_000, 1_000_000} {
+		for _, nroutes := range []int{10, 100, 1_000, 10_000, 100_000, 1_000_000} {
 			runtime.GC()
 
 			var rt1 Table[int]
@@ -753,19 +1265,95 @@ func BenchmarkTableLookup2(b *testing.B) {
 			probe := rng(1)[0]
 
 			b.ResetTimer()
-			b.Run(fmt.Sprintf("orig: %s/In_%6d/%s", fam, nroutes, "IP"), func(b *testing.B) {
-				for i := 0; i < b.N; i++ {
+			b.Run(fmt.Sprintf("orig/IP:  %s/In_%6d", fam, nroutes), func(b *testing.B) {
+				for range b.N {
 					writeSink, _ = rt1.Lookup(probe.pfx.Addr())
 				}
-				b.ReportMetric(float64(rt1.numNodes()), "Nodes")
 			})
 
 			b.ResetTimer()
-			b.Run(fmt.Sprintf("comp: %s/In_%6d/%s", fam, nroutes, "IP"), func(b *testing.B) {
-				for i := 0; i < b.N; i++ {
+			b.Run(fmt.Sprintf("comp/IP:  %s/In_%6d", fam, nroutes), func(b *testing.B) {
+				for range b.N {
 					writeSink, _ = rt2.Lookup(probe.pfx.Addr())
 				}
-				b.ReportMetric(float64(rt2.numNodes()), "Nodes")
+			})
+
+		}
+	}
+}
+
+func BenchmarkTableLookupPrefix2(b *testing.B) {
+	for _, fam := range []string{"ipv4", "ipv6"} {
+		rng := randomPrefixes4
+		if fam == "ipv6" {
+			rng = randomPrefixes6
+		}
+
+		// same routes
+		for _, nroutes := range []int{10, 100, 1_000, 10_000, 100_000, 1_000_000} {
+			runtime.GC()
+
+			var rt1 Table[int]
+			var rt2 Table2[int]
+			for _, route := range rng(nroutes) {
+				rt1.Insert(route.pfx, route.val)
+				rt2.Insert(route.pfx, route.val)
+			}
+
+			// same probe
+			probe := rng(1)[0]
+
+			b.ResetTimer()
+			b.Run(fmt.Sprintf("orig/Pfx: %s/In_%6d", fam, nroutes), func(b *testing.B) {
+				for range b.N {
+					writeSink, _ = rt1.LookupPrefix(probe.pfx)
+				}
+			})
+
+			b.ResetTimer()
+			b.Run(fmt.Sprintf("comp/Pfx: %s/In_%6d", fam, nroutes), func(b *testing.B) {
+				for range b.N {
+					writeSink, _ = rt2.LookupPrefix(probe.pfx)
+				}
+			})
+
+		}
+	}
+}
+
+func BenchmarkTableLookupPrefixLPM2(b *testing.B) {
+	for _, fam := range []string{"ipv4", "ipv6"} {
+		rng := randomPrefixes4
+		if fam == "ipv6" {
+			rng = randomPrefixes6
+		}
+
+		// same routes
+		for _, nroutes := range []int{10, 100, 1_000, 10_000, 100_000, 1_000_000} {
+			runtime.GC()
+
+			var rt1 Table[int]
+			var rt2 Table2[int]
+			for _, route := range rng(nroutes) {
+				rt1.Insert(route.pfx, route.val)
+				rt2.Insert(route.pfx, route.val)
+			}
+
+			// same probe
+			probe := rng(1)[0]
+
+			b.ResetTimer()
+			b.Run(fmt.Sprintf("orig/LPM: %s/In_%6d", fam, nroutes), func(b *testing.B) {
+				for range b.N {
+					_, writeSink, _ = rt1.LookupPrefixLPM(probe.pfx)
+				}
+			})
+
+			b.ResetTimer()
+			b.Run(fmt.Sprintf("comp/LPM: %s/In_%6d", fam, nroutes), func(b *testing.B) {
+				for range b.N {
+					_, writeSink, _ = rt2.LookupPrefixLPM(probe.pfx)
+				}
 			})
 
 		}
@@ -863,6 +1451,48 @@ func BenchmarkTableInsert2(b *testing.B) {
 				for i := 0; i < b.N; i++ {
 					rt2.Insert(probe.pfx, struct{}{})
 				}
+			})
+		}
+	}
+}
+
+func BenchmarkTableDelete2Match(b *testing.B) {
+	for _, fam := range []string{"ipv4", "ipv6"} {
+		rng := randomPrefixes4
+		if fam == "ipv6" {
+			rng = randomPrefixes6
+		}
+
+		for _, nroutes := range benchRouteCount {
+			var rt1 Table[int]
+			var rt2 Table2[int]
+
+			routes := rng(nroutes)
+
+			for _, route := range routes {
+				rt1.Insert(route.pfx, route.val)
+				rt2.Insert(route.pfx, route.val)
+			}
+
+			nodes1 := rt1.numNodes()
+			nodes2 := rt2.numNodes()
+
+			probe := routes[rand.Intn(nroutes)]
+
+			b.ResetTimer()
+			b.Run(fmt.Sprintf("orig/%s/From_%d", fam, nroutes), func(b *testing.B) {
+				for range b.N {
+					rt1.Delete(probe.pfx)
+				}
+				b.ReportMetric(float64(rt1.numNodes()-nodes1), "delta_Nodes")
+			})
+
+			b.ResetTimer()
+			b.Run(fmt.Sprintf("comp/%s/From_%d", fam, nroutes), func(b *testing.B) {
+				for range b.N {
+					rt2.Delete(probe.pfx)
+				}
+				b.ReportMetric(float64(rt2.numNodes()-nodes2), "delta_Nodes")
 			})
 		}
 	}
