@@ -45,7 +45,7 @@ func (t *Table2[V]) DumpList4() []DumpListNode[V] {
 	if t.rootV4 == nil {
 		return nil
 	}
-	return t.rootV4.dumpListRec(0, nil, true)
+	return t.rootV4.dumpListRec(0, true)
 }
 
 // DumpList6 dumps ipv4 tree into list of roots and their subnets.
@@ -55,11 +55,11 @@ func (t *Table2[V]) DumpList6() []DumpListNode[V] {
 	if t.rootV6 == nil {
 		return nil
 	}
-	return t.rootV6.dumpListRec(0, nil, false)
+	return t.rootV6.dumpListRec(0, false)
 }
 
-func (n *node2[V]) dumpListRec(parentIdx uint, path []byte, is4 bool) []DumpListNode[V] {
-	directKids := n.getKidsRec(parentIdx, path, is4)
+func (n *node2[V]) dumpListRec(parentIdx uint, is4 bool) []DumpListNode[V] {
+	directKids := n.getKidsRec(parentIdx, is4)
 	slices.SortFunc(directKids, sortKidsByPrefix2[V])
 
 	nodes := make([]DumpListNode[V], 0, len(directKids))
@@ -67,7 +67,7 @@ func (n *node2[V]) dumpListRec(parentIdx uint, path []byte, is4 bool) []DumpList
 		nodes = append(nodes, DumpListNode[V]{
 			CIDR:    kid.cidr,
 			Value:   kid.val,
-			Subnets: kid.n.dumpListRec(kid.idx, kid.path, is4),
+			Subnets: kid.n.dumpListRec(kid.idx, is4),
 		})
 	}
 

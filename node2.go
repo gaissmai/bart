@@ -57,10 +57,6 @@ func newNode2[V any](path []byte) *node2[V] {
 	return n
 }
 
-func (p *pathT) asSlice() (octets []byte) {
-	return p.octets[:p.length]
-}
-
 func (n *node2[V]) pathAsSlice() (octets []byte) {
 	return n.path.octets[:n.path.length]
 }
@@ -561,7 +557,7 @@ func (n *node2[V]) walkRec(path []byte, is4 bool, cb func(netip.Prefix, V) error
 	// for all prefixes in this node do ...
 	for _, idx := range n.allStrideIndexes() {
 		val, _ := n.getValByIndex(idx)
-		pfx := cidrFromPath(path, idx, is4)
+		pfx := n.cidrFromPath(idx, is4)
 
 		// make the callback for this prefix
 		if err := cb(pfx, val); err != nil {
@@ -593,7 +589,7 @@ func (n *node2[V]) subnets(path []byte, parentIdx uint, is4 bool) (result []neti
 		for i := idx; i >= parentIdx; i >>= 1 {
 			if i == parentIdx { // match
 				// get CIDR back for idx
-				pfx := cidrFromPath(path, idx, is4)
+				pfx := n.cidrFromPath(idx, is4)
 
 				result = append(result, pfx)
 				break

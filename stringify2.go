@@ -17,9 +17,8 @@ import (
 // but see below.
 type kidT2[V any] struct {
 	// for traversing
-	n    *node2[V]
-	path []byte
-	idx  uint
+	n   *node2[V]
+	idx uint
 	// for printing
 	cidr netip.Prefix
 	val  V
@@ -93,16 +92,16 @@ func (t *Table2[V]) fprint(w io.Writer, is4 bool) error {
 	if _, err := fmt.Fprint(w, "▼\n"); err != nil {
 		return err
 	}
-	if err := rootNode.fprintRec(w, 0, nil, is4, ""); err != nil {
+	if err := rootNode.fprintRec(w, 0, is4, ""); err != nil {
 		return err
 	}
 	return nil
 }
 
 // fprintRec, the output is a hierarchical CIDR tree starting with parentIdx and byte path.
-func (n *node2[V]) fprintRec(w io.Writer, parentIdx uint, path []byte, is4 bool, pad string) error {
+func (n *node2[V]) fprintRec(w io.Writer, parentIdx uint, is4 bool, pad string) error {
 	// get direct childs for this parentIdx ...
-	directKids := n.getKidsRec(parentIdx, path, is4)
+	directKids := n.getKidsRec(parentIdx, is4)
 
 	// sort them by netip.Prefix, not by baseIndex
 	slices.SortFunc(directKids, sortKidsByPrefix2[V])
@@ -127,7 +126,7 @@ func (n *node2[V]) fprintRec(w io.Writer, parentIdx uint, path []byte, is4 bool,
 		// rec-descent with this prefix as parentIdx.
 		// hierarchical nested tree view, two rec-descent functions
 		// work together to spoil the reader.
-		if err := kid.n.fprintRec(w, kid.idx, kid.path, is4, pad+spacer); err != nil {
+		if err := kid.n.fprintRec(w, kid.idx, is4, pad+spacer); err != nil {
 			return err
 		}
 	}
@@ -141,7 +140,7 @@ func (n *node2[V]) fprintRec(w io.Writer, parentIdx uint, path []byte, is4 bool,
 //
 // See the  artlookup.pdf paper in the doc folder,
 // the baseIndex function is the key.
-func (n *node2[V]) getKidsRec(parentIdx uint, path []byte, is4 bool) []kidT2[V] {
+func (n *node2[V]) getKidsRec(parentIdx uint, is4 bool) []kidT2[V] {
 	directKids := []kidT2[V]{}
 
 	// the node may have prefixes
@@ -154,9 +153,8 @@ func (n *node2[V]) getKidsRec(parentIdx uint, path []byte, is4 bool) []kidT2[V] 
 		// check if lpmIdx for this idx' parent is equal to parentIdx
 		if lpmIdx, _, _ := n.lpmByIndex(idx >> 1); lpmIdx == parentIdx {
 			val, _ := n.getValByIndex(idx)
-			path := slices.Clone(path)
-			cidr := cidrFromPath(path, idx, is4)
-			directKids = append(directKids, kidT2[V]{n, path, idx, cidr, val})
+			cidr := n.cidrFromPath(idx, is4)
+			directKids = append(directKids, kidT2[V]{n, idx, cidr, val})
 		}
 	}
 
@@ -164,29 +162,27 @@ func (n *node2[V]) getKidsRec(parentIdx uint, path []byte, is4 bool) []kidT2[V] 
 	for _, octet := range n.allChildAddrs() {
 		// do a longest-prefix-match
 		if lpmIdx, _, _ := n.lpmByOctet(byte(octet)); lpmIdx == parentIdx {
-			// child is directKid, the path is needed to get back the prefixes
-			path := append(slices.Clone(path), byte(octet))
+			// child is directKid
 
 			// get next child node
 			c := n.getChild(byte(octet))
 
 			// traverse, rec-descent call with next child node
-			directKids = append(directKids, c.getKidsRec(0, path, is4)...)
+			directKids = append(directKids, c.getKidsRec(0, is4)...)
 		}
 	}
 
 	return directKids
 }
 
-/*
 // cidrFromPath, make prefix from byte path, next octet and pfxLen.
-func cidrFromPath(path []byte, idx uint, is4 bool) (pfx netip.Prefix) {
+func (n *node2[V]) cidrFromPath(idx uint, is4 bool) (pfx netip.Prefix) {
 	octet, pfxLen := baseIndexToPrefix(idx)
 
 	// append last (partially) masked byte to path and
 	// calc bits with pathLen and pfxLen
-	octets := append(slices.Clone(path), octet)
-	bits := len(path)*strideLen + pfxLen
+	octets := append(n.pathAsSlice(), octet)
+	bits := n.pathLen()*strideLen + pfxLen
 
 	// make ip addr from octets
 	var ip netip.Addr
@@ -204,7 +200,6 @@ func cidrFromPath(path []byte, idx uint, is4 bool) (pfx netip.Prefix) {
 	pfx, _ = ip.Prefix(bits)
 	return
 }
-*/
 
 // sortKidsByPrefix, all prefixes are already normalized (Masked).
 func sortKidsByPrefix2[V any](a, b kidT2[V]) int {
