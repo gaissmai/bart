@@ -43,13 +43,8 @@ func (t *Table2[V]) rootNodeByVersion(is4 bool) *node2[V] {
 func (t *Table2[V]) Insert(pfx netip.Prefix, val V) {
 	t.init()
 
-	// always normalize the prefix
-	pfx = pfx.Masked()
-
 	// some needed values, see below
-	bits := pfx.Bits()
-	ip := pfx.Addr()
-	is4 := ip.Is4()
+	pfx, ip, bits, is4 := pfxToValues(pfx)
 
 	// get the root node of the routing table
 	n := t.rootNodeByVersion(is4)
@@ -145,12 +140,8 @@ func (t *Table2[V]) Insert(pfx netip.Prefix, val V) {
 
 // Delete removes pfx from the tree, pfx does not have to be present.
 func (t *Table2[V]) Delete(pfx netip.Prefix) {
-	// always normalize the prefix
-	pfx = pfx.Masked()
-
-	bits := pfx.Bits()
-	ip := pfx.Addr()
-	is4 := ip.Is4()
+	// some needed values, see below
+	pfx, ip, bits, is4 := pfxToValues(pfx)
 
 	n := t.rootNodeByVersion(is4)
 	if n == nil {
@@ -271,12 +262,8 @@ func (t *Table2[V]) Delete(pfx netip.Prefix) {
 func (t *Table2[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 	t.init()
 
-	// always normalize the prefix
-	pfx = pfx.Masked()
-
-	bits := pfx.Bits()
-	ip := pfx.Addr()
-	is4 := ip.Is4()
+	// some needed values, see below
+	pfx, ip, bits, is4 := pfxToValues(pfx)
 
 	n := t.rootNodeByVersion(is4)
 
@@ -357,12 +344,8 @@ func (t *Table2[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 // Get returns the associated payload for prefix and true, or false if
 // prefix is not set in the routing table.
 func (t *Table2[V]) Get(pfx netip.Prefix) (val V, ok bool) {
-	// always normalize the prefix
-	pfx = pfx.Masked()
-
-	bits := pfx.Bits()
-	ip := pfx.Addr()
-	is4 := ip.Is4()
+	// some needed values, see below
+	pfx, ip, bits, is4 := pfxToValues(pfx)
 
 	n := t.rootNodeByVersion(is4)
 	if n == nil {
@@ -516,12 +499,8 @@ func (t *Table2[V]) LookupPrefixLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, 
 }
 
 func (t *Table2[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V, ok bool) {
-	// always normalize the prefix
-	pfx = pfx.Masked()
-
-	bits := pfx.Bits()
-	ip := pfx.Addr()
-	is4 := ip.Is4()
+	// some needed values, see below
+	pfx, ip, bits, is4 := pfxToValues(pfx)
 
 	n := t.rootNodeByVersion(is4)
 	if n == nil {
@@ -612,27 +591,21 @@ func (t *Table2[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val 
 
 // Subnets, return all prefixes covered by pfx in natural CIDR sort order.
 func (t *Table2[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
-	// always normalize the prefix
-	pfx = pfx.Masked()
-
 	// some needed values, see below
-	bits := pfx.Bits()
-	ip := pfx.Addr()
-	is4 := ip.Is4()
+	pfx, ip, bits, is4 := pfxToValues(pfx)
 
 	n := t.rootNodeByVersion(is4)
 	if n == nil {
 		return nil
 	}
 
-	// pfx is default route
-	if bits == 0 {
+	octets := make([]byte, 0, 16)
+	octets = ipToOctets(octets, ip, is4)
 
-		// return *all* routes for this IP version, sic!
-		_ = n.allRec(func(pfx netip.Prefix, _ V) bool {
-			result = append(result, pfx)
-			return true
-		})
+	// see comment in Insert()
+	lastOctetIdx := (bits - 1) / strideLen
+	lastOctet := octets[lastOctetIdx]
+	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
 		// walk order is wierd, needed sort after walk
 		slices.SortFunc(result, cmpPrefix)
@@ -859,11 +832,21 @@ func (t *Table2[V]) All6(yield func(pfx netip.Prefix, val V) bool) {
 }
 
 // ipToOctets, be careful, do not allocate!
-func ipToOctets(octets []byte, ip netip.Addr, is4 bool) []byte {
+// intended use: SA4009: argument octets is overwritten before first use
+func ipToOctets(octets []byte, ip netip.Addr, is4 bool) []byte { //nolint:staticcheck
 	a16 := ip.As16()
-	octets = a16[:]
+	octets = a16[:] //nolint:staticcheck
 	if is4 {
 		octets = octets[12:]
 	}
 	return octets
+}
+
+// pfxToValues, a helper function.
+func pfxToValues(pfx netip.Prefix) (masked netip.Prefix, ip netip.Addr, bits int, is4 bool) {
+	masked = pfx.Masked() // normalized
+	bits = pfx.Bits()
+	ip = pfx.Addr()
+	is4 = ip.Is4()
+	return
 }
