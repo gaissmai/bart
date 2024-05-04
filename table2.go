@@ -44,7 +44,7 @@ func (t *Table2[V]) Insert(pfx netip.Prefix, val V) {
 	t.init()
 
 	// some needed values, see below
-	pfx, ip, bits, is4 := pfxToValues(pfx)
+	_, ip, bits, is4 := pfxToValues(pfx)
 
 	// get the root node of the routing table
 	n := t.rootNodeByVersion(is4)
@@ -141,7 +141,7 @@ func (t *Table2[V]) Insert(pfx netip.Prefix, val V) {
 // Delete removes pfx from the tree, pfx does not have to be present.
 func (t *Table2[V]) Delete(pfx netip.Prefix) {
 	// some needed values, see below
-	pfx, ip, bits, is4 := pfxToValues(pfx)
+	_, ip, bits, is4 := pfxToValues(pfx)
 
 	n := t.rootNodeByVersion(is4)
 	if n == nil {
@@ -263,7 +263,7 @@ func (t *Table2[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 	t.init()
 
 	// some needed values, see below
-	pfx, ip, bits, is4 := pfxToValues(pfx)
+	_, ip, bits, is4 := pfxToValues(pfx)
 
 	n := t.rootNodeByVersion(is4)
 
@@ -345,7 +345,7 @@ func (t *Table2[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 // prefix is not set in the routing table.
 func (t *Table2[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 	// some needed values, see below
-	pfx, ip, bits, is4 := pfxToValues(pfx)
+	_, ip, bits, is4 := pfxToValues(pfx)
 
 	n := t.rootNodeByVersion(is4)
 	if n == nil {
@@ -500,7 +500,7 @@ func (t *Table2[V]) LookupPrefixLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, 
 
 func (t *Table2[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V, ok bool) {
 	// some needed values, see below
-	pfx, ip, bits, is4 := pfxToValues(pfx)
+	_, ip, bits, is4 := pfxToValues(pfx)
 
 	n := t.rootNodeByVersion(is4)
 	if n == nil {
@@ -592,7 +592,7 @@ func (t *Table2[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val 
 // Subnets, return all prefixes covered by pfx in natural CIDR sort order.
 func (t *Table2[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 	// some needed values, see below
-	pfx, ip, bits, is4 := pfxToValues(pfx)
+	_, ip, bits, is4 := pfxToValues(pfx)
 
 	n := t.rootNodeByVersion(is4)
 	if n == nil {
