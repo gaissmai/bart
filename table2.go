@@ -54,11 +54,9 @@ func (t *Table2[V]) Insert(pfx netip.Prefix, val V) {
 	// get the root node of the routing table
 	n := t.rootNodeByVersion(is4)
 
-	a16 := ip.As16()
-	octets := a16[:]
-	if is4 {
-		octets = octets[12:]
-	}
+	// do not allocate
+	octets := make([]byte, 0, 16)
+	octets = ipToOctets(octets, ip, is4)
 
 	// 10.0.0.0/8    -> 0
 	// 10.12.0.0/15  -> 1
@@ -166,12 +164,9 @@ func (t *Table2[V]) Delete(pfx netip.Prefix) {
 		octet byte
 	}{}
 
-	// does not allocate
-	a16 := ip.As16()
-	octets := a16[:]
-	if is4 {
-		octets = octets[12:]
-	}
+	// do not allocate
+	octets := make([]byte, 0, 16)
+	octets = ipToOctets(octets, ip, is4)
 
 	// see comment in Insert()
 	lastOctetIdx := (bits - 1) / strideLen
@@ -285,12 +280,9 @@ func (t *Table2[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 
 	n := t.rootNodeByVersion(is4)
 
-	// does not allocate
-	a16 := ip.As16()
-	octets := a16[:]
-	if is4 {
-		octets = octets[12:]
-	}
+	// do not allocate
+	octets := make([]byte, 0, 16)
+	octets = ipToOctets(octets, ip, is4)
 
 	// see comment in Insert()
 	lastOctetIdx := (bits - 1) / strideLen
@@ -377,12 +369,9 @@ func (t *Table2[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 		return
 	}
 
-	// does not allocate
-	a16 := ip.As16()
-	octets := a16[:]
-	if is4 {
-		octets = octets[12:]
-	}
+	// do not allocate
+	octets := make([]byte, 0, 16)
+	octets = ipToOctets(octets, ip, is4)
 
 	// see comment in Insert()
 	lastOctetIdx := (bits - 1) / strideLen
@@ -429,15 +418,11 @@ func (t *Table2[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 		return
 	}
 
-	// does not allocate
-	a16 := ip.As16()
-	octets := a16[:]
-	lastOctetIdx := 15
+	// do not allocate
+	octets := make([]byte, 16)
+	octets = ipToOctets(octets, ip, is4)
 
-	if is4 {
-		octets = octets[12:]
-		lastOctetIdx = 3
-	}
+	lastOctetIdx := len(octets) - 1
 
 	// stack of the traversed nodes for fast backtracking, if needed
 	stack := [maxTreeDepth]struct {
@@ -550,12 +535,9 @@ func (t *Table2[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val 
 		bits  int
 	}{}
 
-	// does not allocate
-	a16 := ip.As16()
-	octets := a16[:]
-	if is4 {
-		octets = octets[12:]
-	}
+	// do not allocate
+	octets := make([]byte, 0, 16)
+	octets = ipToOctets(octets, ip, is4)
 
 	// see comment in Insert()
 	lastOctetIdx := (bits - 1) / strideLen
@@ -628,11 +610,8 @@ func (t *Table2[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val 
 	}
 }
 
-// TODO path compressed algo
 // Subnets, return all prefixes covered by pfx in natural CIDR sort order.
 func (t *Table2[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
-	var result []netip.Prefix
-
 	// always normalize the prefix
 	pfx = pfx.Masked()
 
@@ -717,11 +696,8 @@ func (t *Table2[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 		return result
 	}
 
-	a16 := ip.As16()
-	octets := a16[:]
-	if is4 {
-		octets = octets[12:]
-	}
+	octets := make([]byte, 0, 16)
+	octets = ipToOctets(octets, ip, is4)
 
 	for depth, octet := range octets {
 		// max bits in baseIndex functions is strideLen
@@ -784,12 +760,9 @@ func (t *Table2[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 		return false
 	}
 
-	// does not allocate
-	a16 := ip.As16()
-	octets := a16[:]
-	if is4 {
-		octets = octets[12:]
-	}
+	// do not allocate
+	octets := make([]byte, 0, 16)
+	octets = ipToOctets(octets, ip, is4)
 
 	for _, octet := range octets {
 
@@ -845,7 +818,6 @@ func (t *Table2[V]) Union(o *Table2[V]) {
 	t.rootV6.unionRec(o.rootV6)
 }
 
-// TODO path compressed algo
 // Clone returns a copy of the routing table.
 // The payloads V are copied using assignment, so this is a shallow clone.
 func (t *Table2[V]) Clone() *Table2[V] {
@@ -884,4 +856,14 @@ func (t *Table2[V]) All4(yield func(pfx netip.Prefix, val V) bool) {
 func (t *Table2[V]) All6(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
 	t.rootV6.allRec(yield)
+}
+
+// ipToOctets, be careful, do not allocate!
+func ipToOctets(octets []byte, ip netip.Addr, is4 bool) []byte {
+	a16 := ip.As16()
+	octets = a16[:]
+	if is4 {
+		octets = octets[12:]
+	}
+	return octets
 }

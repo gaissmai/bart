@@ -1239,6 +1239,38 @@ func TestAll2(t *testing.T) {
 	})
 }
 
+func TestTableClone2(t *testing.T) {
+	t.Parallel()
+
+	tbl := new(Table2[int])
+	clone := tbl.Clone()
+	if tbl.String() != clone.String() {
+		t.Errorf("empty Clone: got:\n%swant:\n%s", clone.String(), tbl.String())
+	}
+
+	tbl.Insert(mpp("10.0.0.1/32"), 1)
+	tbl.Insert(mpp("::1/128"), 1)
+	t.Log(tbl.dumpString())
+
+	clone = tbl.Clone()
+	t.Log(clone.dumpString())
+
+	if tbl.String() != clone.String() {
+		t.Errorf("Clone: got:\n%swant:\n%s", clone.String(), tbl.String())
+	}
+
+	// overwrite value
+	tbl.Insert(mpp("::1/128"), 2)
+	if tbl.String() == clone.String() {
+		t.Errorf("overwrite, clone must be different: clone:\n%sorig:\n%s", clone.String(), tbl.String())
+	}
+
+	tbl.Delete(mpp("10.0.0.1/32"))
+	if tbl.String() == clone.String() {
+		t.Errorf("delete, clone must be different: clone:\n%sorig:\n%s", clone.String(), tbl.String())
+	}
+}
+
 // ############################################################################
 
 // checkOverlaps2 verifies that the overlaps lookups in tt return the

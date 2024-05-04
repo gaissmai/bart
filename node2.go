@@ -561,7 +561,8 @@ func (n *node2[V]) unionRec(o *node2[V]) {
 }
 
 func (n *node2[V]) cloneRec() *node2[V] {
-	c := newNode2[V](nil, false)
+	c := newNode2[V](n.pathAsSlice(), n.is4)
+
 	if n.isEmpty() {
 		return c
 	}
