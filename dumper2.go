@@ -71,39 +71,39 @@ func (t *Table2[V]) dump(w io.Writer) error {
 	if _, err := fmt.Fprint(w, "IPv4:\n"); err != nil {
 		return err
 	}
-	t.rootV4.dumpRec(w, 0, true)
+	t.rootV4.dumpRec(w, 0)
 
 	if _, err := fmt.Fprint(w, "IPv6:\n"); err != nil {
 		return err
 	}
-	t.rootV6.dumpRec(w, 0, false)
+	t.rootV6.dumpRec(w, 0)
 
 	return nil
 }
 
 func (t *Table2[V]) dump4(w io.Writer) error {
 	t.init()
-	t.rootV4.dumpRec(w, 0, true)
+	t.rootV4.dumpRec(w, 0)
 	return nil
 }
 
 func (t *Table2[V]) dump6(w io.Writer) error {
 	t.init()
-	t.rootV6.dumpRec(w, 0, false)
+	t.rootV6.dumpRec(w, 0)
 	return nil
 }
 
 // dumpRec, rec-descent the trie.
-func (n *node2[V]) dumpRec(w io.Writer, depth int, is4 bool) {
-	n.dump(w, depth, is4)
+func (n *node2[V]) dumpRec(w io.Writer, depth int) {
+	n.dump(w, depth)
 
 	for _, child := range n.children {
-		child.dumpRec(w, depth+1, is4)
+		child.dumpRec(w, depth+1)
 	}
 }
 
 // dump the node to w.
-func (n *node2[V]) dump(w io.Writer, depth int, is4 bool) {
+func (n *node2[V]) dump(w io.Writer, depth int) {
 	must := func(_ int, err error) {
 		if err != nil {
 			panic(err)
@@ -115,7 +115,7 @@ func (n *node2[V]) dump(w io.Writer, depth int, is4 bool) {
 
 	// node type with depth and octet path and bits.
 	must(fmt.Fprintf(w, "\n%s[%s] path: [%v] bits: +%d depth: %d\n",
-		indent, n.hasType(), ancestors(n.pathAsSlice(), is4), bits, depth))
+		indent, n.hasType(), n.pathFmt(), bits, depth))
 
 	if len(n.prefixes) != 0 {
 		indices := n.allStrideIndexes()
@@ -127,7 +127,7 @@ func (n *node2[V]) dump(w io.Writer, depth int, is4 bool) {
 
 		for _, idx := range indices {
 			octet, bits := baseIndexToPrefix(idx)
-			must(fmt.Fprintf(w, "%s/%d ", octetFmt(octet, is4), bits))
+			must(fmt.Fprintf(w, "%s/%d ", octetFmt(octet, n.is4), bits))
 		}
 		must(fmt.Fprintln(w))
 
@@ -146,7 +146,7 @@ func (n *node2[V]) dump(w io.Writer, depth int, is4 bool) {
 
 		for i := range n.children {
 			octet := byte(n.childrenBitset.Select(uint(i)))
-			must(fmt.Fprintf(w, "%s ", octetFmt(octet, is4)))
+			must(fmt.Fprintf(w, "%s ", octetFmt(octet, n.is4)))
 		}
 		must(fmt.Fprintln(w))
 	}

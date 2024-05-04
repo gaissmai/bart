@@ -92,16 +92,16 @@ func (t *Table2[V]) fprint(w io.Writer, is4 bool) error {
 	if _, err := fmt.Fprint(w, "▼\n"); err != nil {
 		return err
 	}
-	if err := rootNode.fprintRec(w, 0, is4, ""); err != nil {
+	if err := rootNode.fprintRec(w, 0, ""); err != nil {
 		return err
 	}
 	return nil
 }
 
 // fprintRec, the output is a hierarchical CIDR tree starting with parentIdx and byte path.
-func (n *node2[V]) fprintRec(w io.Writer, parentIdx uint, is4 bool, pad string) error {
+func (n *node2[V]) fprintRec(w io.Writer, parentIdx uint, pad string) error {
 	// get direct childs for this parentIdx ...
-	directKids := n.getKidsRec(parentIdx, is4)
+	directKids := n.getKidsRec(parentIdx)
 
 	// sort them by netip.Prefix, not by baseIndex
 	slices.SortFunc(directKids, sortKidsByPrefix2[V])
@@ -126,7 +126,7 @@ func (n *node2[V]) fprintRec(w io.Writer, parentIdx uint, is4 bool, pad string) 
 		// rec-descent with this prefix as parentIdx.
 		// hierarchical nested tree view, two rec-descent functions
 		// work together to spoil the reader.
-		if err := kid.n.fprintRec(w, kid.idx, is4, pad+spacer); err != nil {
+		if err := kid.n.fprintRec(w, kid.idx, pad+spacer); err != nil {
 			return err
 		}
 	}
@@ -140,7 +140,7 @@ func (n *node2[V]) fprintRec(w io.Writer, parentIdx uint, is4 bool, pad string) 
 //
 // See the  artlookup.pdf paper in the doc folder,
 // the baseIndex function is the key.
-func (n *node2[V]) getKidsRec(parentIdx uint, is4 bool) []kidT2[V] {
+func (n *node2[V]) getKidsRec(parentIdx uint) []kidT2[V] {
 	directKids := []kidT2[V]{}
 
 	// the node may have prefixes
@@ -153,7 +153,7 @@ func (n *node2[V]) getKidsRec(parentIdx uint, is4 bool) []kidT2[V] {
 		// check if lpmIdx for this idx' parent is equal to parentIdx
 		if lpmIdx, _, _ := n.lpmByIndex(idx >> 1); lpmIdx == parentIdx {
 			val, _ := n.getValByIndex(idx)
-			cidr := n.cidrFromIndex(idx, is4)
+			cidr := n.cidrFromIndex(idx)
 			directKids = append(directKids, kidT2[V]{n, idx, cidr, val})
 		}
 	}
@@ -168,7 +168,7 @@ func (n *node2[V]) getKidsRec(parentIdx uint, is4 bool) []kidT2[V] {
 			c := n.getChild(byte(octet))
 
 			// traverse, rec-descent call with next child node
-			directKids = append(directKids, c.getKidsRec(0, is4)...)
+			directKids = append(directKids, c.getKidsRec(0)...)
 		}
 	}
 

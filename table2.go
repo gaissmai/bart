@@ -25,8 +25,8 @@ type Table2[V any] struct {
 // init BitSets once, so no constructor is needed
 func (t *Table2[V]) init() {
 	t.initOnce.Do(func() {
-		t.rootV4 = newNode2[V](nil)
-		t.rootV6 = newNode2[V](nil)
+		t.rootV4 = newNode2[V](nil, true)
+		t.rootV6 = newNode2[V](nil, false)
 	})
 }
 
@@ -99,7 +99,7 @@ func (t *Table2[V]) Insert(pfx netip.Prefix, val V) {
 		// just insert other node as new leaf
 		if c == nil {
 			// make new node
-			o := newNode2[V](path)
+			o := newNode2[V](path, n.is4)
 			o.insertPrefix(lastOctet, lastOctetBits, val)
 
 			n.insertChild(cursor, o)
@@ -116,7 +116,7 @@ func (t *Table2[V]) Insert(pfx netip.Prefix, val V) {
 		}
 
 		// make new node
-		o := newNode2[V](path)
+		o := newNode2[V](path, n.is4)
 		o.insertPrefix(lastOctet, lastOctetBits, val)
 
 		// other is prefix for child node
@@ -133,7 +133,7 @@ func (t *Table2[V]) Insert(pfx netip.Prefix, val V) {
 		commonPathIdx := c.commonPathIdx(idx, o)
 
 		// make intermediate node with path until divergence
-		imed := newNode2[V](c.pathAsSlice()[:commonPathIdx+1])
+		imed := newNode2[V](c.pathAsSlice()[:commonPathIdx+1], n.is4)
 
 		// insert old and new child into intermediate node
 		imed.insertChild(c.pathAsSlice()[commonPathIdx+1], c)
@@ -317,7 +317,7 @@ func (t *Table2[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 		// just insert other node as new leaf
 		if c == nil {
 			// make new node, already set path and insert prefix
-			o := newNode2[V](path)
+			o := newNode2[V](path, n.is4)
 			n.insertChild(cursor, o)
 
 			return o.updatePrefix(lastOctet, lastOctetBits, cb)
@@ -332,7 +332,7 @@ func (t *Table2[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 			continue
 		}
 
-		o := newNode2[V](path)
+		o := newNode2[V](path, n.is4)
 
 		// other is prefix for child node
 		if o.pathIsPrefixOrEqual(c.pathAsSlice()) {
@@ -350,7 +350,7 @@ func (t *Table2[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 		commonPathIdx := c.commonPathIdx(idx, o)
 
 		// make intermediate node with path until divergence
-		imed := newNode2[V](c.pathAsSlice()[:commonPathIdx+1])
+		imed := newNode2[V](c.pathAsSlice()[:commonPathIdx+1], n.is4)
 
 		// insert old and new child into intermediate node
 		imed.insertChild(c.pathAsSlice()[commonPathIdx+1], c)
@@ -650,7 +650,7 @@ func (t *Table2[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 	if bits == 0 {
 
 		// return *all* routes for this IP version, sic!
-		_ = n.allRec(is4, func(pfx netip.Prefix, _ V) bool {
+		_ = n.allRec(func(pfx netip.Prefix, _ V) bool {
 			result = append(result, pfx)
 			return true
 		})
@@ -871,17 +871,17 @@ func (t *Table2[V]) Clone() *Table2[V] {
 func (t *Table2[V]) All(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
 	// respect premature end of allRec()
-	_ = t.rootV4.allRec(true, yield) && t.rootV6.allRec(false, yield)
+	_ = t.rootV4.allRec(yield) && t.rootV6.allRec(yield)
 }
 
 // All4, like [Table.All] but only for the v4 routing table.
 func (t *Table2[V]) All4(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
-	t.rootV4.allRec(true, yield)
+	t.rootV4.allRec(yield)
 }
 
 // All6, like [Table.All] but only for the v6 routing table.
 func (t *Table2[V]) All6(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
-	t.rootV6.allRec(false, yield)
+	t.rootV6.allRec(yield)
 }

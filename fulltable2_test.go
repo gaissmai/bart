@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-func BenchmarkFull2MatchV4(b *testing.B) {
+func BenchmarkFullLookup2MatchV4(b *testing.B) {
 	var rt1 Table[int]
 	var rt2 Table2[int]
 
@@ -51,7 +51,7 @@ func BenchmarkFull2MatchV4(b *testing.B) {
 	})
 }
 
-func BenchmarkFull2MatchV6(b *testing.B) {
+func BenchmarkFullLookup2MatchV6(b *testing.B) {
 	var rt1 Table[int]
 	var rt2 Table2[int]
 
@@ -92,7 +92,7 @@ func BenchmarkFull2MatchV6(b *testing.B) {
 	})
 }
 
-func BenchmarkFull2MissV4(b *testing.B) {
+func BenchmarkFullLookup2MissV4(b *testing.B) {
 	var rt1 Table[int]
 	var rt2 Table2[int]
 
@@ -129,7 +129,7 @@ func BenchmarkFull2MissV4(b *testing.B) {
 	})
 }
 
-func BenchmarkFull2MissV6(b *testing.B) {
+func BenchmarkFullLookup2MissV6(b *testing.B) {
 	var rt1 Table[int]
 	var rt2 Table2[int]
 

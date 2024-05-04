@@ -59,7 +59,7 @@ func (t *Table2[V]) DumpList6() []DumpListNode[V] {
 }
 
 func (n *node2[V]) dumpListRec(parentIdx uint, is4 bool) []DumpListNode[V] {
-	directKids := n.getKidsRec(parentIdx, is4)
+	directKids := n.getKidsRec(parentIdx)
 	slices.SortFunc(directKids, sortKidsByPrefix2[V])
 
 	nodes := make([]DumpListNode[V], 0, len(directKids))

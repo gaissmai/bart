@@ -5,8 +5,11 @@ package bart
 
 import (
 	"bytes"
+	"fmt"
 	"net/netip"
 	"slices"
+	"strconv"
+	"strings"
 
 	"github.com/bits-and-blooms/bitset"
 )
@@ -26,15 +29,19 @@ import (
 // The lookup is then slower by a factor of about 2, but this is
 // the intended trade-off to prevent memory consumption from exploding.
 type node2[V any] struct {
-	// for path compression
-	path pathT
-
+	// BitSets for popcount compression
 	prefixesBitset *bitset.BitSet
 	childrenBitset *bitset.BitSet
 
 	// popcount compressed slices
 	prefixes []V
 	children []*node2[V]
+
+	// for path compression
+	path pathT
+
+	// IP version of this node
+	is4 bool
 }
 
 // pathT, for path compression.
@@ -45,7 +52,7 @@ type pathT struct {
 }
 
 // newNode2, BitSets and path have to be initialized.
-func newNode2[V any](path []byte) *node2[V] {
+func newNode2[V any](path []byte, is4 bool) *node2[V] {
 	n := &node2[V]{
 		prefixesBitset: bitset.New(0), // init BitSet
 		childrenBitset: bitset.New(0), // init BitSet
@@ -54,6 +61,7 @@ func newNode2[V any](path []byte) *node2[V] {
 	copy(n.path.octets[:], path)
 	n.path.length = uint8(len(path))
 
+	n.is4 = is4
 	return n
 }
 
@@ -80,6 +88,29 @@ func (n *node2[V]) commonPathIdx(start int, o *node2[V]) int {
 		idx = i
 	}
 	return idx
+}
+
+// pathFmt, stride path, different formats for IPv4 and IPv6, dotted decimal or hex.
+func (n *node2[V]) pathFmt() string {
+	buf := new(strings.Builder)
+
+	if n.is4 {
+		for i, b := range n.pathAsSlice() {
+			if i != 0 {
+				buf.WriteString(".")
+			}
+			buf.WriteString(strconv.Itoa(int(b)))
+		}
+		return buf.String()
+	}
+
+	for i, b := range n.pathAsSlice() {
+		if i != 0 && i%2 == 0 {
+			buf.WriteString(":")
+		}
+		buf.WriteString(fmt.Sprintf("%02x", b))
+	}
+	return buf.String()
 }
 
 // isEmpty returns true if node has neither prefixes nor children.
@@ -530,7 +561,7 @@ func (n *node2[V]) unionRec(o *node2[V]) {
 }
 
 func (n *node2[V]) cloneRec() *node2[V] {
-	c := newNode2[V](nil)
+	c := newNode2[V](nil, false)
 	if n.isEmpty() {
 		return c
 	}
@@ -553,11 +584,11 @@ func (n *node2[V]) cloneRec() *node2[V] {
 // the yield function is called for each route entry with prefix and value.
 // If the yield function returns false the recursion ends prematurely and the
 // false value is propagated.
-func (n *node2[V]) allRec(is4 bool, yield func(netip.Prefix, V) bool) bool {
+func (n *node2[V]) allRec(yield func(netip.Prefix, V) bool) bool {
 	// for all prefixes in this node do ...
 	for _, idx := range n.allStrideIndexes() {
 		val, _ := n.getValByIndex(idx)
-		pfx := n.cidrFromIndex(idx, is4)
+		pfx := n.cidrFromIndex(idx)
 
 		// make the callback for this prefix
 		if !yield(pfx, val) {
@@ -571,7 +602,7 @@ func (n *node2[V]) allRec(is4 bool, yield func(netip.Prefix, V) bool) bool {
 		octet := byte(addr)
 		child := n.getChild(octet)
 
-		if !child.allRec(is4, yield) {
+		if !child.allRec(yield) {
 			// premature end of recursion
 			return false
 		}
@@ -588,7 +619,7 @@ func (n *node2[V]) subnets(path []byte, parentIdx uint, is4 bool) (result []neti
 		for i := idx; i >= parentIdx; i >>= 1 {
 			if i == parentIdx { // match
 				// get CIDR back for idx
-				pfx := n.cidrFromIndex(idx, is4)
+				pfx := n.cidrFromIndex(idx)
 
 				result = append(result, pfx)
 				break
@@ -608,7 +639,7 @@ func (n *node2[V]) subnets(path []byte, parentIdx uint, is4 bool) (result []neti
 				c := n.getChild(octet)
 
 				// all cidrs under this child are covered by pfx
-				_ = c.allRec(is4, func(pfx netip.Prefix, _ V) bool {
+				_ = c.allRec(func(pfx netip.Prefix, _ V) bool {
 					result = append(result, pfx)
 					return true
 				})
@@ -630,7 +661,7 @@ func cmpPrefix(a, b netip.Prefix) int {
 */
 
 // cidrFromIndex, make prefix from baseIndex.
-func (n *node2[V]) cidrFromIndex(idx uint, is4 bool) (pfx netip.Prefix) {
+func (n *node2[V]) cidrFromIndex(idx uint) (pfx netip.Prefix) {
 	octet, pfxLen := baseIndexToPrefix(idx)
 
 	// append last (partially) masked byte to path and
@@ -640,7 +671,7 @@ func (n *node2[V]) cidrFromIndex(idx uint, is4 bool) (pfx netip.Prefix) {
 
 	// make ip addr from octets
 	var ip netip.Addr
-	if is4 {
+	if n.is4 {
 		b4 := [4]byte{}
 		copy(b4[:], octets)
 		ip = netip.AddrFrom4(b4)
