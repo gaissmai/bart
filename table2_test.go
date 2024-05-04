@@ -1157,6 +1157,88 @@ func TestInsertShuffled2(t *testing.T) {
 	}
 }
 
+// After go version 1.22 we can use range iterators
+func TestAll2(t *testing.T) {
+	pfxs := randomPrefixes(10_000)
+	seen := make(map[netip.Prefix]int, 10_000)
+
+	t.Run("All", func(t *testing.T) {
+		rtbl := new(Table[int])
+		for _, item := range pfxs {
+			rtbl.Insert(item.pfx, item.val)
+			seen[item.pfx] = item.val
+		}
+
+		// check if pfx/val is as expected
+		rtbl.All(func(pfx netip.Prefix, val int) bool {
+			if seen[pfx] != val {
+				t.Errorf("%v got value: %v, expected: %v", pfx, val, seen[pfx])
+			}
+			delete(seen, pfx)
+			return true
+		})
+
+		// check if all entries visited
+		if len(seen) != 0 {
+			t.Fatalf("traverse error, not all entries visited")
+		}
+	})
+
+	// make an interation and update the values in the callback
+	t.Run("All and Update", func(t *testing.T) {
+		rtbl := new(Table[int])
+		for _, item := range pfxs {
+			rtbl.Insert(item.pfx, item.val)
+			seen[item.pfx] = item.val + 1
+		}
+
+		// update callback, add 1 to val
+		updateValue := func(val int, ok bool) int {
+			return val + 1
+		}
+
+		yield := func(pfx netip.Prefix, val int) bool {
+			rtbl.Update(pfx, updateValue)
+			return true
+		}
+
+		// iterate and update the values
+		rtbl.All(yield)
+
+		// test if all values got updated, yield now as closure
+		rtbl.All(func(pfx netip.Prefix, val int) bool {
+			if seen[pfx] != val {
+				t.Errorf("%v got value: %v, expected: %v", pfx, val, seen[pfx])
+			}
+			return true
+		})
+	})
+
+	t.Run("All with premature exit", func(t *testing.T) {
+		rtbl := new(Table[int])
+		for _, item := range pfxs {
+			rtbl.Insert(item.pfx, item.val)
+		}
+
+		// check if callback stops prematurely
+		countV6 := 0
+		rtbl.All(func(pfx netip.Prefix, val int) bool {
+			// max 1000 IPv6 prefixes
+			if !pfx.Addr().Is4() {
+				countV6++
+			}
+
+			// premature STOP condition
+			return countV6 < 1000
+		})
+
+		// check if iteration stopped with error
+		if countV6 > 1000 {
+			t.Fatalf("expected premature stop with error")
+		}
+	})
+}
+
 // ############################################################################
 
 // checkOverlaps2 verifies that the overlaps lookups in tt return the

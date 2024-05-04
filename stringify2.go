@@ -153,7 +153,7 @@ func (n *node2[V]) getKidsRec(parentIdx uint, is4 bool) []kidT2[V] {
 		// check if lpmIdx for this idx' parent is equal to parentIdx
 		if lpmIdx, _, _ := n.lpmByIndex(idx >> 1); lpmIdx == parentIdx {
 			val, _ := n.getValByIndex(idx)
-			cidr := n.cidrFromPath(idx, is4)
+			cidr := n.cidrFromIndex(idx, is4)
 			directKids = append(directKids, kidT2[V]{n, idx, cidr, val})
 		}
 	}
@@ -173,32 +173,6 @@ func (n *node2[V]) getKidsRec(parentIdx uint, is4 bool) []kidT2[V] {
 	}
 
 	return directKids
-}
-
-// cidrFromPath, make prefix from byte path, next octet and pfxLen.
-func (n *node2[V]) cidrFromPath(idx uint, is4 bool) (pfx netip.Prefix) {
-	octet, pfxLen := baseIndexToPrefix(idx)
-
-	// append last (partially) masked byte to path and
-	// calc bits with pathLen and pfxLen
-	octets := append(n.pathAsSlice(), octet)
-	bits := n.pathLen()*strideLen + pfxLen
-
-	// make ip addr from octets
-	var ip netip.Addr
-	if is4 {
-		b4 := [4]byte{}
-		copy(b4[:], octets)
-		ip = netip.AddrFrom4(b4)
-	} else {
-		b16 := [16]byte{}
-		copy(b16[:], octets)
-		ip = netip.AddrFrom16(b16)
-	}
-
-	// make a normalized prefix from ip/bits
-	pfx, _ = ip.Prefix(bits)
-	return
 }
 
 // sortKidsByPrefix, all prefixes are already normalized (Masked).
