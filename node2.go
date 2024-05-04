@@ -90,8 +90,8 @@ func (n *node2[V]) commonPathIdx(start int, o *node2[V]) int {
 	return idx
 }
 
-// pathFmt, stride path, different formats for IPv4 and IPv6, dotted decimal or hex.
-func (n *node2[V]) pathFmt() string {
+// pathAsString, stride path, different formats for IPv4 and IPv6, dotted decimal or hex.
+func (n *node2[V]) pathAsString() string {
 	buf := new(strings.Builder)
 
 	if n.is4 {
