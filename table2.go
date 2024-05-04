@@ -607,38 +607,58 @@ func (t *Table2[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 	lastOctet := octets[lastOctetIdx]
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
-		// walk order is wierd, needed sort after walk
-		slices.SortFunc(result, cmpPrefix)
+	// search prefixes and child below this index
+	parentIndex := prefixToBaseIndex(lastOctet, lastOctetBits)
 
-		return result
-	}
+	// path of pfx to get all subnets
+	path := octets[:lastOctetIdx]
 
-	// heap allocation does not matter here
-	octets := ip.AsSlice()
+	idx := 0
+	cursor := octets[idx]
 
-	for depth, octet := range octets {
-		// last significant octet reached
-		if bits <= strideLen {
-			result := n.subnets(octets[:depth], prefixToBaseIndex(octet, bits), is4)
+	// find the trie node
+	for {
+		// last non-masked octet reached
+		if idx == lastOctetIdx {
+			result := n.subnetsRec(parentIndex)
 
 			slices.SortFunc(result, cmpPrefix)
 			return result
 		}
 
-		// descend down to next trie level
-		child := n.getChild(octet)
-
-		// stop condition, found no matching stride node
-		if child == nil {
+		// descend down to next level
+		c := n.getChild(cursor)
+		if c == nil {
 			return nil
 		}
 
-		// next round
-		n = child
-		bits -= strideLen
-	}
+		// child is prefix for pfx
+		if c.pathIsPrefixOrEqual(path) {
+			// go down, path compression, idx may jump
+			idx = c.pathLen()
+			cursor = octets[idx]
+			n = c
+			continue
+		}
 
-	return result
+		// this path is not in trie, make new search node with this pfx
+		o := newNode2[V](path, n.is4)
+
+		// other is prefix for child node
+		if o.pathIsPrefixOrEqual(c.pathAsSlice()) {
+			// insert child into search node
+			idx = o.pathLen()
+			octet := c.pathAsSlice()[idx]
+			o.insertChild(octet, c)
+
+			result := o.subnetsRec(parentIndex)
+
+			slices.SortFunc(result, cmpPrefix)
+			return result
+		}
+
+		return nil
+	}
 }
 
 // TODO path compressed algo

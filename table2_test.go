@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net/netip"
+	"reflect"
 	"runtime"
 	"testing"
 )
@@ -1268,6 +1269,108 @@ func TestTableClone2(t *testing.T) {
 	tbl.Delete(mpp("10.0.0.1/32"))
 	if tbl.String() == clone.String() {
 		t.Errorf("delete, clone must be different: clone:\n%sorig:\n%s", clone.String(), tbl.String())
+	}
+}
+
+func TestSubnetsEdgeCases2(t *testing.T) {
+	t.Parallel()
+
+	t.Run("empty", func(t *testing.T) {
+		rtbl := &Table2[int]{}
+
+		defaultRoute4 := mpp("0.0.0.0/0")
+		defaultRoute6 := mpp("::/0")
+
+		got := rtbl.Subnets(defaultRoute4)
+		if got != nil {
+			t.Fatalf("empty: got:\n%v\nwant:\n%v", got, nil)
+		}
+
+		got = rtbl.Subnets(defaultRoute6)
+		if got != nil {
+			t.Fatalf("empty: got:\n%v\nwant:\n%v", got, nil)
+		}
+	})
+
+	t.Run("default route", func(t *testing.T) {
+		rtbl := &Table2[int]{}
+
+		defaultRoute4 := mpp("0.0.0.0/0")
+		defaultRoute6 := mpp("::/0")
+
+		rtbl.Insert(defaultRoute4, 0)
+		rtbl.Insert(defaultRoute6, 0)
+
+		got := rtbl.Subnets(defaultRoute4)
+		want := []netip.Prefix{defaultRoute4}
+
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("default routev4: got:\n%v\nwant:\n%v", got, want)
+		}
+
+		got = rtbl.Subnets(defaultRoute6)
+		want = []netip.Prefix{defaultRoute6}
+
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("default routev6: got:\n%v\nwant:\n%v", got, want)
+		}
+	})
+
+	t.Run("same leaf", func(t *testing.T) {
+		rtbl := &Table2[int]{}
+
+		pfx1 := mpp("10.0.0.1/32")
+		pfxs := mpp("10.0.0.0/25")
+
+		rtbl.Insert(pfx1, 0)
+
+		got := rtbl.Subnets(pfxs)
+		want := []netip.Prefix{pfx1}
+
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("same leaf: got:\n%v\nwant:\n%v", got, want)
+		}
+	})
+
+	t.Run("intermediate", func(t *testing.T) {
+		rtbl := &Table2[int]{}
+
+		pfx1 := mpp("10.0.0.1/32")
+		pfxs := mpp("10.0.0.0/16")
+
+		rtbl.Insert(pfx1, 1)
+
+		got := rtbl.Subnets(pfxs)
+		want := []netip.Prefix{pfx1}
+
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("intermediate: got:\n%v\nwant:\n%v", got, want)
+		}
+	})
+}
+
+func TestSubnetsCompare2(t *testing.T) {
+	t.Parallel()
+
+	pfxs := randomPrefixes(10_000)
+
+	slow := slowRT[int]{pfxs}
+	fast := Table2[int]{}
+
+	for _, pfx := range pfxs {
+		fast.Insert(pfx.pfx, pfx.val)
+	}
+
+	for i := 0; i < 10_000; i++ {
+		pfx := randomPrefix()
+
+		slowPfxs := slow.subnets(pfx)
+		fastPfxs := fast.Subnets(pfx)
+
+		if !reflect.DeepEqual(slowPfxs, fastPfxs) {
+			t.Fatalf("Subnets(%q), got: %v\nwant: %v", pfx, fastPfxs, slowPfxs)
+		}
+
 	}
 }
 

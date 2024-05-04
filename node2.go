@@ -612,16 +612,14 @@ func (n *node2[V]) allRec(yield func(netip.Prefix, V) bool) bool {
 	return true
 }
 
-// subnets returns all CIDRs covered by parent pfx.
-func (n *node2[V]) subnets(path []byte, parentIdx uint, is4 bool) (result []netip.Prefix) {
+// subnetsRec returns all CIDRs covered by parent pfx.
+func (n *node2[V]) subnetsRec(parentIdx uint) (result []netip.Prefix) {
 	// for all routes in this node do ...
 	for _, idx := range n.allStrideIndexes() {
 		// is this route covered by pfx?
 		for i := idx; i >= parentIdx; i >>= 1 {
 			if i == parentIdx { // match
-				// get CIDR back for idx
 				pfx := n.cidrFromIndex(idx)
-
 				result = append(result, pfx)
 				break
 			}
@@ -635,12 +633,10 @@ func (n *node2[V]) subnets(path []byte, parentIdx uint, is4 bool) (result []neti
 
 		// is this child covered by pfx?
 		for i := idx; i >= parentIdx; i >>= 1 {
-			if i == parentIdx { // match
-				// get child for octet
+			if i == parentIdx {
+				// all CIDRs under this child are covered by pfx
 				c := n.getChild(octet)
-
-				// all cidrs under this child are covered by pfx
-				_ = c.allRec(func(pfx netip.Prefix, _ V) bool {
+				c.allRec(func(pfx netip.Prefix, _ V) bool {
 					result = append(result, pfx)
 					return true
 				})
