@@ -44,7 +44,7 @@ func (t *Table2[V]) Insert(pfx netip.Prefix, val V) {
 	t.init()
 
 	// some needed values, see below
-	_, ip, bits, is4 := pfxToValues(pfx)
+	ip, bits, is4 := pfxToValues(pfx)
 
 	// get the root node of the routing table
 	n := t.rootNodeByVersion(is4)
@@ -141,7 +141,7 @@ func (t *Table2[V]) Insert(pfx netip.Prefix, val V) {
 // Delete removes pfx from the tree, pfx does not have to be present.
 func (t *Table2[V]) Delete(pfx netip.Prefix) {
 	// some needed values, see below
-	_, ip, bits, is4 := pfxToValues(pfx)
+	ip, bits, is4 := pfxToValues(pfx)
 
 	n := t.rootNodeByVersion(is4)
 	if n == nil {
@@ -263,7 +263,7 @@ func (t *Table2[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 	t.init()
 
 	// some needed values, see below
-	_, ip, bits, is4 := pfxToValues(pfx)
+	ip, bits, is4 := pfxToValues(pfx)
 
 	n := t.rootNodeByVersion(is4)
 
@@ -345,7 +345,7 @@ func (t *Table2[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 // prefix is not set in the routing table.
 func (t *Table2[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 	// some needed values, see below
-	_, ip, bits, is4 := pfxToValues(pfx)
+	ip, bits, is4 := pfxToValues(pfx)
 
 	n := t.rootNodeByVersion(is4)
 	if n == nil {
@@ -500,7 +500,7 @@ func (t *Table2[V]) LookupPrefixLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, 
 
 func (t *Table2[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V, ok bool) {
 	// some needed values, see below
-	_, ip, bits, is4 := pfxToValues(pfx)
+	ip, bits, is4 := pfxToValues(pfx)
 
 	n := t.rootNodeByVersion(is4)
 	if n == nil {
@@ -592,7 +592,7 @@ func (t *Table2[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val 
 // Subnets, return all prefixes covered by pfx in natural CIDR sort order.
 func (t *Table2[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 	// some needed values, see below
-	_, ip, bits, is4 := pfxToValues(pfx)
+	ip, bits, is4 := pfxToValues(pfx)
 
 	n := t.rootNodeByVersion(is4)
 	if n == nil {
@@ -669,7 +669,7 @@ func (t *Table2[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 	var result []netip.Prefix
 
 	// some needed values, see below
-	_, ip, bits, is4 := pfxToValues(pfx)
+	ip, bits, is4 := pfxToValues(pfx)
 
 	n := t.rootNodeByVersion(is4)
 	if n == nil {
@@ -722,16 +722,10 @@ func (t *Table2[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 	return result
 }
 
-// TODO path compressed algo
 // OverlapsPrefix reports whether any IP in pfx matches a route in the table.
 func (t *Table2[V]) OverlapsPrefix(pfx netip.Prefix) bool {
-	// always normalize the prefix
-	pfx = pfx.Masked()
-
 	// some needed values, see below
-	bits := pfx.Bits()
-	ip := pfx.Addr()
-	is4 := ip.Is4()
+	ip, bits, is4 := pfxToValues(pfx)
 
 	// get the root node of the routing table
 	n := t.rootNodeByVersion(is4)
@@ -739,41 +733,65 @@ func (t *Table2[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 		return false
 	}
 
-	// do not allocate
 	octets := make([]byte, 0, 16)
 	octets = ipToOctets(octets, ip, is4)
 
-	for _, octet := range octets {
+	// see comment in Insert()
+	lastOctetIdx := (bits - 1) / strideLen
+	lastOctet := octets[lastOctetIdx]
+	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
-		// last significant octet reached
-		if bits <= strideLen {
-			return n.overlapsPrefix(octet, bits)
+	// path of pfx for overlaps
+	path := octets[:lastOctetIdx]
+
+	idx := 0
+	cursor := octets[idx]
+
+	for {
+		if idx == lastOctetIdx {
+			return n.overlapsPrefix(lastOctet, lastOctetBits)
 		}
 
 		// still in the middle of prefix chunks
-		// test if any route overlaps prefix´ octet chunk so far
-
-		// but skip intermediate nodes, no routes to test?
-		if len(n.prefixes) != 0 {
-			if _, _, ok := n.lpmByOctet(octet); ok {
-				return true
-			}
+		// test if any route overlaps prefix´
+		if _, _, ok := n.lpmByOctet(cursor); ok {
+			return true
 		}
 
-		// no overlap so far, go down to next child
-		child := n.getChild(octet)
-
-		// no more children to explore, there can't be an overlap
-		if child == nil {
+		// no overlap so far, go down to next c
+		c := n.getChild(cursor)
+		if c == nil {
 			return false
 		}
 
-		// next round
-		bits -= strideLen
-		n = child
-	}
+		// is child is prefix in search path?
+		if c.pathIsPrefixOrEqual(idx, path) {
+			// go down, path compression, idx may jump
+			idx = c.pathLen()
+			cursor = octets[idx]
+			n = c
+			continue
+		}
 
-	return false
+		// dummy generic value for insertPrefix
+		var zeroV V
+
+		// make temp search node with this pfx
+		search := newNode2[V](path, n.is4)
+		search.insertPrefix(lastOctet, lastOctetBits, zeroV)
+
+		// if search is prefix for child node?
+		if search.pathIsPrefixOrEqual(idx, c.pathAsSlice()) {
+			idx = search.pathLen()
+			octet := c.pathAsSlice()[idx]
+
+			// pfx overlaps this child octet?
+			_, _, ok := search.lpmByOctet(octet)
+			return ok
+		}
+
+		return false
+	}
 }
 
 // TODO path compressed algo
@@ -835,24 +853,4 @@ func (t *Table2[V]) All4(yield func(pfx netip.Prefix, val V) bool) {
 func (t *Table2[V]) All6(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
 	t.rootV6.allRec(yield)
-}
-
-// ipToOctets, be careful, do not allocate!
-// intended use: SA4009: argument octets is overwritten before first use
-func ipToOctets(octets []byte, ip netip.Addr, is4 bool) []byte { //nolint:staticcheck
-	a16 := ip.As16()
-	octets = a16[:] //nolint:staticcheck
-	if is4 {
-		octets = octets[12:]
-	}
-	return octets
-}
-
-// pfxToValues, a helper function.
-func pfxToValues(pfx netip.Prefix) (masked netip.Prefix, ip netip.Addr, bits int, is4 bool) {
-	masked = pfx.Masked() // normalized
-	bits = pfx.Bits()
-	ip = pfx.Addr()
-	is4 = ip.Is4()
-	return
 }

@@ -1151,78 +1151,6 @@ func TestUpdateCompare(t *testing.T) {
 	}
 }
 
-func TestUpdateCompare(t *testing.T) {
-	// use update as insert and compare with slow implementation
-	t.Parallel()
-	pfxs := randomPrefixes(10_000)
-	slow := slowRT[int]{pfxs}
-	fast := Table[int]{}
-
-	t.Run("update as insert", func(t *testing.T) {
-		for _, pfx := range pfxs {
-			// contrived insert
-			fast.Update(pfx.pfx, func(_ int, _ bool) int {
-				return pfx.val
-			})
-		}
-
-		seenVals4 := map[int]bool{}
-		seenVals6 := map[int]bool{}
-
-		for i := 0; i < 10_000; i++ {
-			a := randomAddr()
-
-			slowVal, slowOK := slow.lookup(a)
-			fastVal, fastOK := fast.Lookup(a)
-
-			if !getsEqual(slowVal, slowOK, fastVal, fastOK) {
-				t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", a, fastVal, fastOK, slowVal, slowOK)
-			}
-
-			if a.Is6() {
-				seenVals6[fastVal] = true
-			} else {
-				seenVals4[fastVal] = true
-			}
-		}
-
-		// Empirically, 10k probes into 5k v4 prefixes and 5k v6 prefixes results in
-		// ~1k distinct values for v4 and ~300 for v6. distinct routes. This sanity
-		// check that we didn't just return a single route for everything should be
-		// very generous indeed.
-		if cnt := len(seenVals4); cnt < 10 {
-			t.Fatalf("saw %d distinct v4 route results, statistically expected ~1000", cnt)
-		}
-		if cnt := len(seenVals6); cnt < 10 {
-			t.Fatalf("saw %d distinct v6 route results, statistically expected ~300", cnt)
-		}
-	})
-
-	t.Run("update", func(t *testing.T) {
-		// update half of the prefixes
-
-		cb := func(val int, ok bool) int {
-			return val + 42
-		}
-
-		for _, pfx := range pfxs[len(pfxs)/2:] {
-			slow.update(pfx.pfx, cb)
-			fast.Update(pfx.pfx, cb)
-		}
-
-		for i := 0; i < 10_000; i++ {
-			a := randomAddr()
-
-			slowVal, slowOK := slow.lookup(a)
-			fastVal, fastOK := fast.Lookup(a)
-
-			if !getsEqual(slowVal, slowOK, fastVal, fastOK) {
-				t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", a, fastVal, fastOK, slowVal, slowOK)
-			}
-		}
-	})
-}
-
 func TestUpdate(t *testing.T) {
 	t.Parallel()
 
@@ -1570,7 +1498,7 @@ func TestSubnetsCompare(t *testing.T) {
 	}
 }
 
-func TestSupernetsCompare(t *testing.T) {
+func TestSupernets(t *testing.T) {
 	t.Parallel()
 
 	pfxs := randomPrefixes(10_000)
@@ -2064,7 +1992,7 @@ func TestSize(t *testing.T) {
 
 // ############ benchmarks ################################
 
-var benchRouteCount = []int{1, 10, 100, 1000, 10_000, 100_000, 1_000_000}
+var benchRouteCount = []int{10, 100, 1000, 10_000, 100_000}
 
 func BenchmarkTableInsert(b *testing.B) {
 	for _, fam := range []string{"ipv4", "ipv6"} {

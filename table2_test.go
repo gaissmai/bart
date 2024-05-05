@@ -1501,6 +1501,83 @@ func TestSupernetsCompare2(t *testing.T) {
 	}
 }
 
+func TestOverlapsPrefixEdgeCases2(t *testing.T) {
+	t.Parallel()
+
+	tbl := &Table2[int]{}
+
+	// empty table
+	checkOverlaps2(t, tbl, []tableOverlapsTest{
+		{"0.0.0.0/0", false},
+		{"::/0", false},
+	})
+
+	// default route
+	tbl.Insert(mpp("10.0.0.0/8"), 0)
+	tbl.Insert(mpp("2001:db8::/32"), 0)
+	checkOverlaps2(t, tbl, []tableOverlapsTest{
+		{"0.0.0.0/0", true},
+		{"::/0", true},
+	})
+
+	// default route
+	tbl = &Table2[int]{}
+	tbl.Insert(mpp("0.0.0.0/0"), 0)
+	tbl.Insert(mpp("::/0"), 0)
+	checkOverlaps2(t, tbl, []tableOverlapsTest{
+		{"10.0.0.0/8", true},
+		{"2001:db8::/32", true},
+	})
+
+	// single IP
+	tbl = &Table2[int]{}
+	tbl.Insert(mpp("10.0.0.0/7"), 0)
+	tbl.Insert(mpp("2001::/16"), 0)
+	checkOverlaps2(t, tbl, []tableOverlapsTest{
+		{"10.1.2.3/32", true},
+		{"2001:db8:affe::cafe/128", true},
+	})
+
+	// single IPv
+	tbl = &Table2[int]{}
+	tbl.Insert(mpp("10.1.2.3/32"), 0)
+	tbl.Insert(mpp("2001:db8:affe::cafe/128"), 0)
+	checkOverlaps2(t, tbl, []tableOverlapsTest{
+		{"10.0.0.0/7", true},
+		{"2001::/16", true},
+	})
+
+	// same IPv
+	tbl = &Table2[int]{}
+	tbl.Insert(mpp("10.1.2.3/32"), 0)
+	tbl.Insert(mpp("2001:db8:affe::cafe/128"), 0)
+	checkOverlaps2(t, tbl, []tableOverlapsTest{
+		{"10.1.2.3/32", true},
+		{"2001:db8:affe::cafe/128", true},
+	})
+}
+
+func TestOverlapsPrefixCompare2(t *testing.T) {
+	t.Parallel()
+	pfxs := randomPrefixes(100_000)
+
+	slow := slowRT[int]{pfxs}
+	fast := Table2[int]{}
+
+	for _, pfx := range pfxs {
+		fast.Insert(pfx.pfx, pfx.val)
+	}
+
+	tests := randomPrefixes(10_000)
+	for _, tt := range tests {
+		gotSlow := slow.overlapsPrefix(tt.pfx)
+		gotFast := fast.OverlapsPrefix(tt.pfx)
+		if gotSlow != gotFast {
+			t.Fatalf("overlapsPrefix(%q) = %v, want %v", tt.pfx, gotFast, gotSlow)
+		}
+	}
+}
+
 // ############################################################################
 
 // checkOverlaps2 verifies that the overlaps lookups in tt return the
