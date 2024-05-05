@@ -663,76 +663,60 @@ func (t *Table2[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 	}
 }
 
-// TODO path compressed algo
 // Supernets, return all matching routes for pfx,
 // in natural CIDR sort order.
 func (t *Table2[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 	var result []netip.Prefix
 
-	// always normalize the prefix
-	pfx = pfx.Masked()
-
 	// some needed values, see below
-	bits := pfx.Bits()
-	ip := pfx.Addr()
-	is4 := ip.Is4()
+	_, ip, bits, is4 := pfxToValues(pfx)
 
 	n := t.rootNodeByVersion(is4)
 	if n == nil {
 		return nil
 	}
 
-	// pfx is default route
-	if bits == 0 {
-		// test if default route is in table
-		if _, ok := n.getValByPrefix(0, 0); ok {
-			result = append(result, pfx)
-		}
-		return result
-	}
-
 	octets := make([]byte, 0, 16)
 	octets = ipToOctets(octets, ip, is4)
 
-	for depth, octet := range octets {
-		// max bits in baseIndex functions is strideLen
-		pfxLen := strideLen
+	// see comment in Insert()
+	lastOctetIdx := (bits - 1) / strideLen
+	lastOctet := octets[lastOctetIdx]
+	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
-		// last significant octet reached
-		if bits <= strideLen {
-			pfxLen = bits
-		}
+	// path of pfx to get all supernets
+	path := octets[:lastOctetIdx]
 
-		// make an all-prefix-match at this level
-		superIndexes := n.apmByPrefix(octet, pfxLen)
+	idx := 0
+	cursor := octets[idx]
 
-		// get back the matching prefix from baseIdx
-		for _, baseIdx := range superIndexes {
-			// calc supernet mask
-			mask := baseIndexToPrefixMask(baseIdx, depth)
-
-			// calculate the pfx from ip and mask
-			superPfx, _ := ip.Prefix(mask)
-
-			result = append(result, superPfx)
-		}
-
-		// last significant octet reached
-		if bits <= strideLen {
+	for {
+		// stop condition, last octet
+		if idx == lastOctetIdx {
+			// make an all-prefix-match at last level
+			result = append(result, n.apmByPrefix(lastOctet, lastOctetBits)...)
 			break
 		}
+
+		// make an all-prefix-match at intermediate level for cursor and strideLen
+		result = append(result, n.apmByPrefix(cursor, strideLen)...)
 
 		// descend down to next trie level
-		child := n.getChild(octet)
-
-		// stop condition, no more childs
-		if child == nil {
+		c := n.getChild(cursor)
+		if c == nil {
 			break
 		}
 
-		// next round
-		n = child
-		bits -= strideLen
+		// is child is prefix in search path?
+		if c.pathIsPrefixOrEqual(path) {
+			// go down, path compression, idx may jump
+			idx = c.pathLen()
+			cursor = octets[idx]
+			n = c
+			continue
+		}
+
+		break
 	}
 
 	return result

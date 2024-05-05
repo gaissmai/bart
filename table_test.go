@@ -1570,7 +1570,7 @@ func TestSubnetsCompare(t *testing.T) {
 	}
 }
 
-func TestSupernets(t *testing.T) {
+func TestSupernetsCompare(t *testing.T) {
 	t.Parallel()
 
 	pfxs := randomPrefixes(10_000)

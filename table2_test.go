@@ -1377,6 +1377,130 @@ func TestSubnetsCompare2(t *testing.T) {
 	}
 }
 
+func TestSupernetsEdgeCases2(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		pfxs []netip.Prefix // input prefixes
+		spfx netip.Prefix   // supernet search prefix
+		want []netip.Prefix
+	}{
+		{
+			name: "empty V4",
+			pfxs: nil,
+			spfx: mpp("0.0.0.0/0"),
+			want: nil,
+		},
+		{
+			name: "empty V6",
+			pfxs: nil,
+			spfx: mpp("::/0"),
+			want: nil,
+		},
+		{
+			name: "default V4",
+			pfxs: []netip.Prefix{mpp("0.0.0.0/0")},
+			spfx: mpp("0.0.0.0/0"),
+			want: []netip.Prefix{mpp("0.0.0.0/0")},
+		},
+		{
+			name: "default V6",
+			pfxs: []netip.Prefix{mpp("::/0")},
+			spfx: mpp("::/0"),
+			want: []netip.Prefix{mpp("::/0")},
+		},
+		{
+			name: "self V4",
+			pfxs: []netip.Prefix{mpp("192.168.128.0/19")},
+			spfx: mpp("192.168.128.0/19"),
+			want: []netip.Prefix{mpp("192.168.128.0/19")},
+		},
+		{
+			name: "self V6",
+			pfxs: []netip.Prefix{mpp("2001:db8::dead:beef/128")},
+			spfx: mpp("2001:db8::dead:beef/128"),
+			want: []netip.Prefix{mpp("2001:db8::dead:beef/128")},
+		},
+		{
+			name: "same leaf V4",
+			pfxs: []netip.Prefix{mpp("10.0.0.0/29")},
+			spfx: mpp("10.0.0.1/32"),
+			want: []netip.Prefix{mpp("10.0.0.0/29")},
+		},
+		{
+			name: "same leaf V6",
+			pfxs: []netip.Prefix{mpp("::0/121")},
+			spfx: mpp("::1/128"),
+			want: []netip.Prefix{mpp("::0/121")},
+		},
+		{
+			name: "intermediate V4",
+			pfxs: []netip.Prefix{mpp("10.10.0.0/16"), mpp("10.0.0.0/13"), mpp("10.0.0.1/32"), mpp("10.0.1.1/32")},
+			spfx: mpp("10.0.0.0/16"),
+			want: []netip.Prefix{mpp("10.0.0.0/13")},
+		},
+		{
+			name: "intermediate V6",
+			pfxs: []netip.Prefix{mpp("2001:db8::0/32"), mpp("2001:db8:dead:beaf::/64")},
+			spfx: mpp("2001:db8::/64"),
+			want: []netip.Prefix{mpp("2001:db8::0/32")},
+		},
+		{
+			name: "nope V4",
+			pfxs: []netip.Prefix{mpp("10.0.0.0/16"), mpp("10.4.0.0/14")},
+			spfx: mpp("10.1.0.0/16"),
+			want: nil,
+		},
+		{
+			name: "nope V6",
+			pfxs: []netip.Prefix{mpp("2001:db0::/32"), mpp("2001:db4::/30")},
+			spfx: mpp("2001:db1::/32"),
+			want: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rtbl := new(Table2[string])
+
+			for _, pfx := range tt.pfxs {
+				rtbl.Insert(pfx, tt.name)
+			}
+
+			got := rtbl.Supernets(tt.spfx)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Fatalf("%s: got:\n%v\nwant:\n%v", tt.name, got, tt.want)
+			}
+
+		})
+	}
+}
+
+func TestSupernetsCompare2(t *testing.T) {
+	t.Parallel()
+
+	pfxs := randomPrefixes(10_000)
+
+	slow := slowRT[int]{pfxs}
+	fast := Table2[int]{}
+
+	for _, pfx := range pfxs {
+		fast.Insert(pfx.pfx, pfx.val)
+	}
+
+	for i := 0; i < 10_000; i++ {
+		pfx := randomPrefix()
+
+		slowPfxs := slow.supernets(pfx)
+		fastPfxs := fast.Supernets(pfx)
+
+		if !reflect.DeepEqual(slowPfxs, fastPfxs) {
+			t.Fatalf("Supernets(%q), got: %v\nwant: %v", pfx, fastPfxs, slowPfxs)
+		}
+	}
+}
+
 // ############################################################################
 
 // checkOverlaps2 verifies that the overlaps lookups in tt return the

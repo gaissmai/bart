@@ -253,17 +253,19 @@ func (n *node2[V]) getValByPrefix(octet byte, bits int) (val V, ok bool) {
 }
 
 // apmByPrefix does an all prefix match in the 8-bit (stride) routing table
-// at this depth and returns all matching baseIdx's.
-func (n *node2[V]) apmByPrefix(octet byte, bits int) (result []uint) {
+// at this depth and returns all matching CIDRs.
+func (n *node2[V]) apmByPrefix(octet byte, bits int) []netip.Prefix {
 	// skip intermediate nodes
 	if len(n.prefixes) == 0 {
-		return
+		return nil
 	}
+
+	var super []uint
 
 	idx := prefixToBaseIndex(octet, bits)
 	for {
 		if n.prefixesBitset.Test(idx) {
-			result = append(result, idx)
+			super = append(super, idx)
 		}
 
 		if idx == 0 {
@@ -275,8 +277,14 @@ func (n *node2[V]) apmByPrefix(octet byte, bits int) (result []uint) {
 		idx >>= 1
 	}
 
-	// sort in ascending order
-	slices.Sort(result)
+	// sort indices in ascending order
+	slices.Sort(super)
+
+	var result []netip.Prefix
+	for _, baseIdx := range super {
+		result = append(result, n.cidrFromIndex(baseIdx))
+	}
+
 	return result
 }
 
