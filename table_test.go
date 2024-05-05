@@ -1386,87 +1386,201 @@ func TestSupernets(t *testing.T) {
 func TestSubnetsEdgeCases(t *testing.T) {
 	t.Parallel()
 
-	t.Run("empty", func(t *testing.T) {
-		rtbl := &Table[int]{}
+	tests := []struct {
+		name string
+		pfxs []netip.Prefix // input prefixes
+		spfx netip.Prefix   // subnet search prefix
+		want []netip.Prefix
+	}{
+		{
+			name: "empty V4",
+			pfxs: nil,
+			spfx: mpp("0.0.0.0/0"),
+			want: nil,
+		},
+		{
+			name: "empty V6",
+			pfxs: nil,
+			spfx: mpp("::/0"),
+			want: nil,
+		},
+		{
+			name: "default V4",
+			pfxs: []netip.Prefix{mpp("0.0.0.0/0")},
+			spfx: mpp("0.0.0.0/0"),
+			want: []netip.Prefix{mpp("0.0.0.0/0")},
+		},
+		{
+			name: "default V6",
+			pfxs: []netip.Prefix{mpp("::/0")},
+			spfx: mpp("::/0"),
+			want: []netip.Prefix{mpp("::/0")},
+		},
+		{
+			name: "self V4",
+			pfxs: []netip.Prefix{mpp("192.168.128.0/19")},
+			spfx: mpp("192.168.128.0/19"),
+			want: []netip.Prefix{mpp("192.168.128.0/19")},
+		},
+		{
+			name: "self V6",
+			pfxs: []netip.Prefix{mpp("2001:db8::dead:beef/128")},
+			spfx: mpp("2001:db8::dead:beef/128"),
+			want: []netip.Prefix{mpp("2001:db8::dead:beef/128")},
+		},
+		{
+			name: "same leaf V4",
+			pfxs: []netip.Prefix{mpp("10.0.0.1/32")},
+			spfx: mpp("10.0.0.0/29"),
+			want: []netip.Prefix{mpp("10.0.0.1/32")},
+		},
+		{
+			name: "same leaf V6",
+			pfxs: []netip.Prefix{mpp("::1/128")},
+			spfx: mpp("::0/120"),
+			want: []netip.Prefix{mpp("::1/128")},
+		},
+		{
+			name: "intermediate V4",
+			pfxs: []netip.Prefix{mpp("10.0.0.1/32"), mpp("10.0.1.1/32")},
+			spfx: mpp("10.0.0.0/16"),
+			want: []netip.Prefix{mpp("10.0.0.1/32"), mpp("10.0.1.1/32")},
+		},
+		{
+			name: "intermediate V6",
+			pfxs: []netip.Prefix{mpp("2001:db8::1/128"), mpp("2001:db8:dead:beaf::/64")},
+			spfx: mpp("2001:db8::/32"),
+			want: []netip.Prefix{mpp("2001:db8::1/128"), mpp("2001:db8:dead:beaf::/64")},
+		},
+		{
+			name: "nope V4",
+			pfxs: []netip.Prefix{mpp("10.0.0.0/16"), mpp("10.4.0.0/14")},
+			spfx: mpp("10.1.0.0/16"),
+			want: nil,
+		},
+		{
+			name: "nope V6",
+			pfxs: []netip.Prefix{mpp("2001:db0::/32"), mpp("2001:db4::/30")},
+			spfx: mpp("2001:db1::/32"),
+			want: nil,
+		},
+	}
 
-		defaultRoute4 := mpp("0.0.0.0/0")
-		defaultRoute6 := mpp("::/0")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rtbl := new(Table[any])
 
-		got := rtbl.Subnets(defaultRoute4)
-		if got != nil {
-			t.Fatalf("empty: got:\n%v\nwant:\n%v", got, nil)
-		}
+			for _, pfx := range tt.pfxs {
+				rtbl.Insert(pfx, nil)
+			}
 
-		got = rtbl.Subnets(defaultRoute6)
-		if got != nil {
-			t.Fatalf("empty: got:\n%v\nwant:\n%v", got, nil)
-		}
-	})
+			got := rtbl.Subnets(tt.spfx)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Fatalf("%s: got:\n%v\nwant:\n%v", tt.name, got, tt.want)
+			}
 
-	t.Run("default route", func(t *testing.T) {
-		rtbl := &Table[int]{}
-
-		defaultRoute4 := mpp("0.0.0.0/0")
-		defaultRoute6 := mpp("::/0")
-
-		rtbl.Insert(defaultRoute4, 0)
-		rtbl.Insert(defaultRoute6, 0)
-
-		got := rtbl.Subnets(defaultRoute4)
-		want := []netip.Prefix{defaultRoute4}
-		if !reflect.DeepEqual(got, want) {
-			t.Fatalf("default routev4: got:\n%v\nwant:\n%v", got, want)
-		}
-
-		got = rtbl.Subnets(defaultRoute6)
-		want = []netip.Prefix{defaultRoute6}
-		if !reflect.DeepEqual(got, want) {
-			t.Fatalf("default routev6: got:\n%v\nwant:\n%v", got, want)
-		}
-	})
+		})
+	}
 }
 
 func TestSupernetsEdgeCases(t *testing.T) {
 	t.Parallel()
 
-	t.Run("empty", func(t *testing.T) {
-		rtbl := &Table[int]{}
+	tests := []struct {
+		name string
+		pfxs []netip.Prefix // input prefixes
+		spfx netip.Prefix   // supernet search prefix
+		want []netip.Prefix
+	}{
+		{
+			name: "empty V4",
+			pfxs: nil,
+			spfx: mpp("0.0.0.0/0"),
+			want: nil,
+		},
+		{
+			name: "empty V6",
+			pfxs: nil,
+			spfx: mpp("::/0"),
+			want: nil,
+		},
+		{
+			name: "default V4",
+			pfxs: []netip.Prefix{mpp("0.0.0.0/0")},
+			spfx: mpp("0.0.0.0/0"),
+			want: []netip.Prefix{mpp("0.0.0.0/0")},
+		},
+		{
+			name: "default V6",
+			pfxs: []netip.Prefix{mpp("::/0")},
+			spfx: mpp("::/0"),
+			want: []netip.Prefix{mpp("::/0")},
+		},
+		{
+			name: "self V4",
+			pfxs: []netip.Prefix{mpp("192.168.128.0/19")},
+			spfx: mpp("192.168.128.0/19"),
+			want: []netip.Prefix{mpp("192.168.128.0/19")},
+		},
+		{
+			name: "self V6",
+			pfxs: []netip.Prefix{mpp("2001:db8::dead:beef/128")},
+			spfx: mpp("2001:db8::dead:beef/128"),
+			want: []netip.Prefix{mpp("2001:db8::dead:beef/128")},
+		},
+		{
+			name: "same leaf V4",
+			pfxs: []netip.Prefix{mpp("10.0.0.0/29")},
+			spfx: mpp("10.0.0.1/32"),
+			want: []netip.Prefix{mpp("10.0.0.0/29")},
+		},
+		{
+			name: "same leaf V6",
+			pfxs: []netip.Prefix{mpp("::0/121")},
+			spfx: mpp("::1/128"),
+			want: []netip.Prefix{mpp("::0/121")},
+		},
+		{
+			name: "intermediate V4",
+			pfxs: []netip.Prefix{mpp("10.10.0.0/16"), mpp("10.0.0.0/13"), mpp("10.0.0.1/32"), mpp("10.0.1.1/32")},
+			spfx: mpp("10.0.0.0/16"),
+			want: []netip.Prefix{mpp("10.0.0.0/13")},
+		},
+		{
+			name: "intermediate V6",
+			pfxs: []netip.Prefix{mpp("2001:db8::0/32"), mpp("2001:db8:dead:beaf::/64")},
+			spfx: mpp("2001:db8::/64"),
+			want: []netip.Prefix{mpp("2001:db8::0/32")},
+		},
+		{
+			name: "nope V4",
+			pfxs: []netip.Prefix{mpp("10.0.0.0/16"), mpp("10.4.0.0/14")},
+			spfx: mpp("10.1.0.0/16"),
+			want: nil,
+		},
+		{
+			name: "nope V6",
+			pfxs: []netip.Prefix{mpp("2001:db0::/32"), mpp("2001:db4::/30")},
+			spfx: mpp("2001:db1::/32"),
+			want: nil,
+		},
+	}
 
-		defaultRoute4 := mpp("0.0.0.0/0")
-		defaultRoute6 := mpp("::/0")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rtbl := new(Table[string])
 
-		got := rtbl.Supernets(defaultRoute4)
-		if got != nil {
-			t.Fatalf("empty: got:\n%v\nwant:\n%v", got, nil)
-		}
+			for _, pfx := range tt.pfxs {
+				rtbl.Insert(pfx, tt.name)
+			}
 
-		got = rtbl.Supernets(defaultRoute6)
-		if got != nil {
-			t.Fatalf("empty: got:\n%v\nwant:\n%v", got, nil)
-		}
-	})
+			got := rtbl.Supernets(tt.spfx)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Fatalf("%s: got:\n%v\nwant:\n%v", tt.name, got, tt.want)
+			}
 
-	t.Run("default route", func(t *testing.T) {
-		rtbl := &Table[int]{}
-
-		defaultRoute4 := mpp("0.0.0.0/0")
-		defaultRoute6 := mpp("::/0")
-
-		rtbl.Insert(defaultRoute4, 0)
-		rtbl.Insert(defaultRoute6, 0)
-
-		got := rtbl.Supernets(defaultRoute4)
-		want := []netip.Prefix{defaultRoute4}
-		if !reflect.DeepEqual(got, want) {
-			t.Fatalf("default routev4: got:\n%v\nwant:\n%v", got, want)
-		}
-
-		got = rtbl.Supernets(defaultRoute6)
-		want = []netip.Prefix{defaultRoute6}
-		if !reflect.DeepEqual(got, want) {
-			t.Fatalf("default routev6: got:\n%v\nwant:\n%v", got, want)
-		}
-	})
+		})
+	}
 }
 
 func TestTableClone(t *testing.T) {
