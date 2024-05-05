@@ -107,22 +107,30 @@ func (n *node[V]) dump(w io.Writer, path []byte, is4 bool) {
 		must(fmt.Fprintf(w, "%sindexs(#%d): %v\n", indent, len(n.prefixes), indices))
 
 		// print the prefixes for this node
-		must(fmt.Fprintf(w, "%sprefxs(#%d): ", indent, len(n.prefixes)))
+		must(fmt.Fprintf(w, "%sprefxs(#%d):", indent, len(n.prefixes)))
 
 		for _, idx := range indices {
 			octet, bits := baseIndexToPrefix(idx)
-			must(fmt.Fprintf(w, "%s/%d ", octetFmt(octet, is4), bits))
+			must(fmt.Fprintf(w, " %s/%d", octetFmt(octet, is4), bits))
+		}
+		must(fmt.Fprintln(w))
+
+		// print the values for this node
+		must(fmt.Fprintf(w, "%svalues(#%d):", indent, len(n.prefixes)))
+
+		for _, val := range n.prefixes {
+			must(fmt.Fprintf(w, " %v", val))
 		}
 		must(fmt.Fprintln(w))
 	}
 
 	if len(n.children) != 0 {
 		// print the childs for this node
-		must(fmt.Fprintf(w, "%schilds(#%d): ", indent, len(n.children)))
+		must(fmt.Fprintf(w, "%schilds(#%d):", indent, len(n.children)))
 
 		for i := range n.children {
 			octet := byte(n.childrenBitset.Select(uint(i)))
-			must(fmt.Fprintf(w, "%s ", octetFmt(octet, is4)))
+			must(fmt.Fprintf(w, " %s", octetFmt(octet, is4)))
 		}
 		must(fmt.Fprintln(w))
 	}
