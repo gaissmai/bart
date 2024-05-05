@@ -607,18 +607,17 @@ func (t *Table2[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 	lastOctet := octets[lastOctetIdx]
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
-	// search prefixes and child below this index
-	parentIndex := prefixToBaseIndex(lastOctet, lastOctetBits)
-
 	// path of pfx to get all subnets
 	path := octets[:lastOctetIdx]
 
 	idx := 0
 	cursor := octets[idx]
 
+	// search prefixes and child below this stride index
+	parentIndex := prefixToBaseIndex(lastOctet, lastOctetBits)
+
 	// find the trie node
 	for {
-		// last non-masked octet reached
 		if idx == lastOctetIdx {
 			result := n.subnetsRec(parentIndex)
 
@@ -632,7 +631,7 @@ func (t *Table2[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 			return nil
 		}
 
-		// child is prefix for pfx
+		// is child is prefix in search path?
 		if c.pathIsPrefixOrEqual(path) {
 			// go down, path compression, idx may jump
 			idx = c.pathLen()
@@ -641,19 +640,22 @@ func (t *Table2[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 			continue
 		}
 
-		// this path is not in trie, make new search node with this pfx
-		o := newNode2[V](path, n.is4)
+		// this search path is not in the trie,
+		// make temp new search node with this pfx
+		search := newNode2[V](path, n.is4)
 
-		// other is prefix for child node
-		if o.pathIsPrefixOrEqual(c.pathAsSlice()) {
-			// insert child into search node
-			idx = o.pathLen()
+		// if search is prefix for child node?
+		if search.pathIsPrefixOrEqual(c.pathAsSlice()) {
+			// insert child into temp search node
+			idx = search.pathLen()
 			octet := c.pathAsSlice()[idx]
-			o.insertChild(octet, c)
+			search.insertChild(octet, c)
 
-			result := o.subnetsRec(parentIndex)
+			// subnet search, starting at this tmp search node
+			result := search.subnetsRec(parentIndex)
 
 			slices.SortFunc(result, cmpPrefix)
+
 			return result
 		}
 
