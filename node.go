@@ -188,31 +188,44 @@ func (n *node[V]) getValByPrefix(octet byte, bits int) (val V, ok bool) {
 	return n.getValByIndex(prefixToBaseIndex(octet, bits))
 }
 
+// apmByOctet is an adapter for apmByPrefix.
+func (n *node[V]) apmByOctet(octet byte, depth int, ip netip.Addr) (result []netip.Prefix) {
+	return n.apmByPrefix(octet, strideLen, depth, ip)
+}
+
 // apmByPrefix does an all prefix match in the 8-bit (stride) routing table
-// at this depth and returns all matching baseIdx's.
-func (n *node[V]) apmByPrefix(octet byte, bits int) (result []uint) {
+// at this depth and returns all matching CIDRs.
+func (n *node[V]) apmByPrefix(octet byte, bits int, depth int, ip netip.Addr) (result []netip.Prefix) {
 	// skip intermediate nodes
 	if len(n.prefixes) == 0 {
 		return
 	}
 
-	idx := prefixToBaseIndex(octet, bits)
+	var superIdxs []uint
+	baseIdx := prefixToBaseIndex(octet, bits)
 	for {
-		if n.prefixesBitset.Test(idx) {
-			result = append(result, idx)
+		if n.prefixesBitset.Test(baseIdx) {
+			superIdxs = append(superIdxs, baseIdx)
 		}
 
-		if idx == 0 {
+		if baseIdx == 0 {
 			break
 		}
 
 		// cache friendly backtracking to the next less specific route.
 		// thanks to the complete binary tree it's just a shift operation.
-		idx >>= 1
+		baseIdx >>= 1
 	}
 
-	// sort in ascending order
-	slices.Sort(result)
+	// sort baseIndexes in ascending order
+	slices.Sort(superIdxs)
+
+	// make CIDRs
+	for _, baseIdx := range superIdxs {
+		superPfx, _ := ip.Prefix(baseIndexToPrefixMask(baseIdx, depth))
+		result = append(result, superPfx)
+	}
+
 	return result
 }
 
