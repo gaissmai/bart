@@ -16,7 +16,7 @@ type jsonTestNode struct {
 
 func newJsonTestNode(cidr string, value any) jsonTestNode {
 	return jsonTestNode{
-		cidr:  netip.MustParsePrefix(cidr),
+		cidr:  mpp(cidr),
 		value: value,
 	}
 }

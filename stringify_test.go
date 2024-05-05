@@ -21,9 +21,8 @@ func TestStringPanic(t *testing.T) {
 		}
 	}()
 
-	p := netip.MustParsePrefix
 	tbl := new(Table[any])
-	tbl.Insert(p("1.2.3.4/32"), nil)
+	tbl.Insert(mpp("1.2.3.4/32"), nil)
 	tbl.Fprint(nil)
 }
 
@@ -38,11 +37,10 @@ func TestStringEmpty(t *testing.T) {
 
 func TestStringDefaultRouteV4(t *testing.T) {
 	t.Parallel()
-	p := netip.MustParsePrefix
 	tbl := new(Table[any])
 	checkString(t, tbl, stringTest{
 		cidrs: []netip.Prefix{
-			p("0.0.0.0/0"),
+			mpp("0.0.0.0/0"),
 		},
 		want: `▼
 └─ 0.0.0.0/0 (<nil>)
@@ -52,11 +50,10 @@ func TestStringDefaultRouteV4(t *testing.T) {
 
 func TestStringDefaultRouteV6(t *testing.T) {
 	t.Parallel()
-	p := netip.MustParsePrefix
 	tbl := new(Table[any])
 	checkString(t, tbl, stringTest{
 		cidrs: []netip.Prefix{
-			p("::/0"),
+			mpp("::/0"),
 		},
 		want: `▼
 └─ ::/0 (<nil>)
@@ -66,19 +63,18 @@ func TestStringDefaultRouteV6(t *testing.T) {
 
 func TestStringSampleV4(t *testing.T) {
 	t.Parallel()
-	p := netip.MustParsePrefix
 	tbl := new(Table[any])
 	checkString(t, tbl, stringTest{
 		cidrs: []netip.Prefix{
-			p("172.16.0.0/12"),
-			p("10.0.0.0/24"),
-			p("192.168.0.0/16"),
-			p("10.0.0.0/8"),
-			p("10.0.1.0/24"),
-			p("169.254.0.0/16"),
-			p("127.0.0.0/8"),
-			p("127.0.0.1/32"),
-			p("192.168.1.0/24"),
+			mpp("172.16.0.0/12"),
+			mpp("10.0.0.0/24"),
+			mpp("192.168.0.0/16"),
+			mpp("10.0.0.0/8"),
+			mpp("10.0.1.0/24"),
+			mpp("169.254.0.0/16"),
+			mpp("127.0.0.0/8"),
+			mpp("127.0.0.1/32"),
+			mpp("192.168.1.0/24"),
 		},
 		want: `▼
 ├─ 10.0.0.0/8 (<nil>)
@@ -96,14 +92,13 @@ func TestStringSampleV4(t *testing.T) {
 
 func TestStringSampleV6(t *testing.T) {
 	t.Parallel()
-	p := netip.MustParsePrefix
 	tbl := new(Table[any])
 	checkString(t, tbl, stringTest{
 		cidrs: []netip.Prefix{
-			p("fe80::/10"),
-			p("::1/128"),
-			p("2000::/3"),
-			p("2001:db8::/32"),
+			mpp("fe80::/10"),
+			mpp("::1/128"),
+			mpp("2000::/3"),
+			mpp("2001:db8::/32"),
 		},
 		want: `▼
 ├─ ::1/128 (<nil>)
@@ -116,24 +111,23 @@ func TestStringSampleV6(t *testing.T) {
 
 func TestStringSample(t *testing.T) {
 	t.Parallel()
-	p := netip.MustParsePrefix
 	tbl := new(Table[any])
 	checkString(t, tbl, stringTest{
 		cidrs: []netip.Prefix{
-			p("fe80::/10"),
-			p("172.16.0.0/12"),
-			p("10.0.0.0/24"),
-			p("::1/128"),
-			p("192.168.0.0/16"),
-			p("10.0.0.0/8"),
-			p("::/0"),
-			p("10.0.1.0/24"),
-			p("169.254.0.0/16"),
-			p("2000::/3"),
-			p("2001:db8::/32"),
-			p("127.0.0.0/8"),
-			p("127.0.0.1/32"),
-			p("192.168.1.0/24"),
+			mpp("fe80::/10"),
+			mpp("172.16.0.0/12"),
+			mpp("10.0.0.0/24"),
+			mpp("::1/128"),
+			mpp("192.168.0.0/16"),
+			mpp("10.0.0.0/8"),
+			mpp("::/0"),
+			mpp("10.0.1.0/24"),
+			mpp("169.254.0.0/16"),
+			mpp("2000::/3"),
+			mpp("2001:db8::/32"),
+			mpp("127.0.0.0/8"),
+			mpp("127.0.0.1/32"),
+			mpp("192.168.1.0/24"),
 		},
 		want: `▼
 ├─ 10.0.0.0/8 (<nil>)
