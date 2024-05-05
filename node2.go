@@ -73,8 +73,8 @@ func (n *node2[V]) pathLen() int {
 	return int(n.path.length)
 }
 
-func (n *node2[V]) pathIsPrefixOrEqual(buf []byte) bool {
-	return bytes.HasPrefix(buf, n.pathAsSlice())
+func (n *node2[V]) pathIsPrefixOrEqual(start int, buf []byte) bool {
+	return bytes.HasPrefix(buf[start:], n.pathAsSlice()[start:])
 }
 
 // commonPathIdx, return idx until path differ.

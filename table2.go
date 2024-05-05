@@ -100,7 +100,7 @@ func (t *Table2[V]) Insert(pfx netip.Prefix, val V) {
 		}
 
 		// child is prefix for other node
-		if c.pathIsPrefixOrEqual(path) {
+		if c.pathIsPrefixOrEqual(idx, path) {
 			// go down, path compression -> idx may jump
 			idx = c.pathLen()
 			cursor = octets[idx]
@@ -113,7 +113,7 @@ func (t *Table2[V]) Insert(pfx netip.Prefix, val V) {
 		o.insertPrefix(lastOctet, lastOctetBits, val)
 
 		// other is prefix for child node
-		if o.pathIsPrefixOrEqual(c.pathAsSlice()) {
+		if o.pathIsPrefixOrEqual(idx, c.pathAsSlice()) {
 			// splice other between n and child: n -> other -> child
 			// path compression -> idx jump
 			idx = o.pathLen()
@@ -202,7 +202,7 @@ func (t *Table2[V]) Delete(pfx netip.Prefix) {
 		}
 
 		// no match, stopp
-		if !c.pathIsPrefixOrEqual(path) {
+		if !c.pathIsPrefixOrEqual(idx, path) {
 			return
 		}
 
@@ -303,7 +303,7 @@ func (t *Table2[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 		}
 
 		// child is prefix or equal to other node
-		if c.pathIsPrefixOrEqual(path) {
+		if c.pathIsPrefixOrEqual(idx, path) {
 			// go down, path compression, idx may jump
 			idx = c.pathLen()
 			cursor = octets[idx]
@@ -314,7 +314,7 @@ func (t *Table2[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 		o := newNode2[V](path, n.is4)
 
 		// other is prefix for child node
-		if o.pathIsPrefixOrEqual(c.pathAsSlice()) {
+		if o.pathIsPrefixOrEqual(idx, c.pathAsSlice()) {
 			// splice other between n and child: n -> other -> child
 			// path compression, idx may jump
 			idx = o.pathLen()
@@ -381,7 +381,7 @@ func (t *Table2[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 		}
 
 		// child is prefix for other node
-		if c.pathIsPrefixOrEqual(path) {
+		if c.pathIsPrefixOrEqual(idx, path) {
 			// go down, path compression, idx may jump
 			idx = c.pathLen()
 			cursor = octets[idx]
@@ -440,7 +440,7 @@ func (t *Table2[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 		}
 
 		// c is no prefix for octets
-		if !c.pathIsPrefixOrEqual(octets) {
+		if !c.pathIsPrefixOrEqual(idx, octets) {
 			break
 		}
 
@@ -559,7 +559,7 @@ func (t *Table2[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val 
 		}
 
 		// no match, stopp
-		if !c.pathIsPrefixOrEqual(path) {
+		if !c.pathIsPrefixOrEqual(idx, path) {
 			break
 		}
 
@@ -632,7 +632,7 @@ func (t *Table2[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 		}
 
 		// is child is prefix in search path?
-		if c.pathIsPrefixOrEqual(path) {
+		if c.pathIsPrefixOrEqual(idx, path) {
 			// go down, path compression, idx may jump
 			idx = c.pathLen()
 			cursor = octets[idx]
@@ -645,7 +645,7 @@ func (t *Table2[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 		search := newNode2[V](path, n.is4)
 
 		// if search is prefix for child node?
-		if search.pathIsPrefixOrEqual(c.pathAsSlice()) {
+		if search.pathIsPrefixOrEqual(idx, c.pathAsSlice()) {
 			// insert child into temp search node
 			idx = search.pathLen()
 			octet := c.pathAsSlice()[idx]
@@ -708,7 +708,7 @@ func (t *Table2[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 		}
 
 		// is child is prefix in search path?
-		if c.pathIsPrefixOrEqual(path) {
+		if c.pathIsPrefixOrEqual(idx, path) {
 			// go down, path compression, idx may jump
 			idx = c.pathLen()
 			cursor = octets[idx]
