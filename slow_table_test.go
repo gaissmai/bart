@@ -33,6 +33,32 @@ func (s *slowRT[V]) insert(pfx netip.Prefix, val V) {
 	s.entries = append(s.entries, slowRTEntry[V]{pfx, val})
 }
 
+func (s *slowRT[V]) get(pfx netip.Prefix) (val V, ok bool) {
+	pfx = pfx.Masked()
+	for _, ent := range s.entries {
+		if ent.pfx == pfx {
+			return ent.val, true
+		}
+	}
+	return val, false
+}
+
+func (s *slowRT[V]) update(pfx netip.Prefix, cb func(V, bool) V) (val V) {
+	pfx = pfx.Masked()
+	for i, ent := range s.entries {
+		if ent.pfx == pfx {
+			// update val
+			s.entries[i].val = cb(ent.val, true)
+			return
+		}
+	}
+	// new val
+	val = cb(val, false)
+
+	s.entries = append(s.entries, slowRTEntry[V]{pfx, val})
+	return val
+}
+
 func (s *slowRT[T]) union(o *slowRT[T]) {
 	for _, op := range o.entries {
 		var match bool

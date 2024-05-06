@@ -729,15 +729,6 @@ func TestInsertShuffled(t *testing.T) {
 	t.Parallel()
 
 	pfxs := randomPrefixes(1000)
-	/* uncomment for failure debugging
-	var pfxs2 []slowRTEntry[int]
-	defer func() {
-		if t.Failed() {
-			t.Logf("pre-shuffle: %#v", pfxs)
-			t.Logf("post-shuffle: %#v", pfxs2)
-		}
-	}()
-	*/
 
 	for i := 0; i < 10; i++ {
 		pfxs2 := append([]slowRTEntry[int](nil), pfxs...)
@@ -791,21 +782,6 @@ func TestDeleteCompare(t *testing.T) {
 
 	toDelete := append([]slowRTEntry[int](nil), all4[deleteCut:]...)
 	toDelete = append(toDelete, all6[deleteCut:]...)
-
-	/* uncomment for failure debugging
-	defer func() {
-		if t.Failed() {
-			for _, pfx := range pfxs {
-				fmt.Printf("%q, ", pfx.pfx)
-			}
-			fmt.Println("")
-			for _, pfx := range toDelete {
-				fmt.Printf("%q, ", pfx.pfx)
-			}
-			fmt.Println("")
-		}
-	}()
-	*/
 
 	slow := slowRT[int]{pfxs}
 	fast := Table[int]{}
@@ -946,6 +922,15 @@ func TestDeleteIsReverseOfInsert(t *testing.T) {
 func TestGet(t *testing.T) {
 	t.Parallel()
 
+	rt := new(Table[int])
+	t.Run("empty table", func(t *testing.T) {
+		_, ok := rt.Get(randomPrefix4())
+
+		if ok {
+			t.Errorf("empty table: ok=%v, expected: %v", ok, false)
+		}
+	})
+
 	tests := []struct {
 		name string
 		pfx  netip.Prefix
@@ -973,23 +958,7 @@ func TestGet(t *testing.T) {
 		},
 	}
 
-	rt := new(Table[int])
-
-	t.Run("empty table", func(t *testing.T) {
-		_, ok := rt.Get(randomPrefix4())
-
-		if ok {
-			t.Errorf("empty table: ok=%v, expected: %v", ok, false)
-		}
-	})
-
-	t.Run("empty table", func(t *testing.T) {
-		_, ok := rt.Get(randomPrefix6())
-
-		if ok {
-			t.Errorf("empty table: ok=%v, expected: %v", ok, false)
-		}
-	})
+	rt = new(Table[int])
 
 	for _, tt := range tests {
 		rt.Insert(tt.pfx, tt.val)
@@ -1008,15 +977,65 @@ func TestGet(t *testing.T) {
 			}
 		})
 	}
+}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			rt.Delete(tt.pfx)
+func TestGetCompare(t *testing.T) {
+	t.Parallel()
 
-			if _, ok := rt.Get(tt.pfx); ok {
-				t.Errorf("%s: ok=%v, expected: %v", tt.name, ok, false)
-			}
-		})
+	pfxs := randomPrefixes(10_000)
+	slow := slowRT[int]{pfxs}
+	fast := Table[int]{}
+
+	for _, pfx := range pfxs {
+		fast.Insert(pfx.pfx, pfx.val)
+	}
+
+	for _, pfx := range pfxs {
+		slowVal, slowOK := slow.get(pfx.pfx)
+		fastVal, fastOK := fast.Get(pfx.pfx)
+
+		if !getsEqual(slowVal, slowOK, fastVal, fastOK) {
+			t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", pfx.pfx, fastVal, fastOK, slowVal, slowOK)
+		}
+	}
+}
+
+func TestUpdateCompare(t *testing.T) {
+	t.Parallel()
+
+	pfxs := randomPrefixes(10_000)
+	slow := slowRT[int]{pfxs}
+	fast := Table[int]{}
+
+	// Update as insert
+	for _, pfx := range pfxs {
+		fast.Update(pfx.pfx, func(int, bool) int { return pfx.val })
+	}
+
+	for _, pfx := range pfxs {
+		slowVal, slowOK := slow.get(pfx.pfx)
+		fastVal, fastOK := fast.Get(pfx.pfx)
+
+		if !getsEqual(slowVal, slowOK, fastVal, fastOK) {
+			t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", pfx.pfx, fastVal, fastOK, slowVal, slowOK)
+		}
+	}
+
+	cb := func(val int, _ bool) int { return val + 1 }
+
+	// Update as update
+	for _, pfx := range pfxs[:len(pfxs)/2] {
+		slow.update(pfx.pfx, cb)
+		fast.Update(pfx.pfx, cb)
+	}
+
+	for _, pfx := range pfxs {
+		slowVal, slowOK := slow.get(pfx.pfx)
+		fastVal, fastOK := fast.Get(pfx.pfx)
+
+		if !getsEqual(slowVal, slowOK, fastVal, fastOK) {
+			t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", pfx.pfx, fastVal, fastOK, slowVal, slowOK)
+		}
 	}
 }
 
@@ -1055,8 +1074,9 @@ func TestUpdate(t *testing.T) {
 		return 0
 	}
 
+	// update as insert
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(fmt.Sprintf("insert: %s", tt.name), func(t *testing.T) {
 			val := rt.Update(tt.pfx, cb)
 			got, ok := rt.Get(tt.pfx)
 
@@ -1070,8 +1090,9 @@ func TestUpdate(t *testing.T) {
 		})
 	}
 
+	// update as update
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(fmt.Sprintf("update: %s", tt.name), func(t *testing.T) {
 			val := rt.Update(tt.pfx, cb)
 			got, ok := rt.Get(tt.pfx)
 
@@ -1113,14 +1134,12 @@ func TestOverlapsCompare(t *testing.T) {
 		gotFast := fast.Overlaps(&fastInter)
 
 		if gotSlow != gotFast {
-			t.Fatalf("Overlaps(...) = %v, want %v\nTable1:\n%s\nTable2:\n%v",
+			t.Fatalf("Overlaps(...) = %v, want %v\nTable1:\n%s\nTable:\n%v",
 				gotFast, gotSlow, fast.String(), fastInter.String())
 		}
 
 		seen[gotFast]++
 	}
-
-	t.Log(seen)
 }
 
 func TestOverlapsPrefixCompare(t *testing.T) {
@@ -1478,7 +1497,6 @@ func TestSubnetsEdgeCases(t *testing.T) {
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Fatalf("%s: got:\n%v\nwant:\n%v", tt.name, got, tt.want)
 			}
-
 		})
 	}
 }
@@ -1578,7 +1596,6 @@ func TestSupernetsEdgeCases(t *testing.T) {
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Fatalf("%s: got:\n%v\nwant:\n%v", tt.name, got, tt.want)
 			}
-
 		})
 	}
 }
