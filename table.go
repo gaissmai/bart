@@ -14,6 +14,17 @@ import (
 //
 // The Table is safe for concurrent readers but not for
 // concurrent readers and/or writers.
+//
+// ATTENTION:
+// The standard library net/netip doesn't enforce normalized
+// prefixes, where the non-prefix bits are all zero.
+//
+// Since the conversion of a prefix into the normalized form
+// is quite time-consuming relative to the other functions
+// of the library, all prefixes must already be provided in
+// normalized form as input parameters.
+//
+// If this is not the case, the behavior is undefined.
 type Table[V any] struct {
 	rootV4 *node[V]
 	rootV6 *node[V]
@@ -40,6 +51,8 @@ func (t *Table[V]) rootNodeByVersion(is4 bool) *node[V] {
 
 // Insert adds pfx to the tree, with value val.
 // If pfx is already present in the tree, its value is set to val.
+//
+// The prefix must already be normalized!
 func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	t.init()
 
@@ -93,6 +106,8 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 // The callback function is called with (value, ok) and returns a new value..
 //
 // If the pfx does not already exist, it is set with the new value.
+//
+// The prefix must already be normalized!
 func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 	t.init()
 
@@ -130,6 +145,8 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 
 // Get returns the associated payload for prefix and true, or false if
 // prefix is not set in the routing table.
+//
+// The prefix must already be normalized!
 func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 	// some values derived from pfx
 	ip, bits, is4 := pfxToValues(pfx)
@@ -161,6 +178,8 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 }
 
 // Delete removes pfx from the tree, pfx does not have to be present.
+//
+// The prefix must already be normalized!
 func (t *Table[V]) Delete(pfx netip.Prefix) {
 	// some values derived from pfx
 	ip, bits, is4 := pfxToValues(pfx)
@@ -191,12 +210,6 @@ func (t *Table[V]) Delete(pfx netip.Prefix) {
 		stack[i] = n
 
 		if i == lastOctetIdx {
-			// try to delete prefix in trie node
-			if !n.deletePrefix(lastOctet, lastOctetBits) {
-				// nothing deleted
-				return
-			}
-			// maybe purge needed
 			break
 		}
 
@@ -206,6 +219,11 @@ func (t *Table[V]) Delete(pfx netip.Prefix) {
 			return
 		}
 		n = c
+	}
+
+	// try to delete prefix in trie node
+	if !n.deletePrefix(lastOctet, lastOctetBits) {
+		return // nothing deleted
 	}
 
 	// purge dangling nodes after successful deletion
@@ -275,6 +293,8 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 
 // LookupPrefix does a route lookup (longest prefix match) for pfx and
 // returns the associated value and true, or false if no route matched.
+//
+// The prefix must already be normalized!
 func (t *Table[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
 	_, _, val, ok = t.lpmByPrefix(pfx)
 	return
@@ -282,6 +302,8 @@ func (t *Table[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
 
 // LookupPrefixLPM is similar to [Table.LookupPrefix],
 // but it returns the lpm prefix in addition to value,ok.
+//
+// The prefix must already be normalized!
 //
 // This method is about 20-30% slower than LookupPrefix and should only
 // be used if the matching lpm entry is also required for other reasons.
@@ -368,6 +390,8 @@ func (t *Table[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V
 }
 
 // Subnets, return all prefixes covered by pfx in natural CIDR sort order.
+//
+// The prefix must already be normalized!
 func (t *Table[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 	// some needed values, see below
 	ip, bits, is4 := pfxToValues(pfx)
@@ -407,6 +431,8 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 
 // Supernets, return all matching routes for pfx,
 // in natural CIDR sort order.
+//
+// The prefix must already be normalized!
 func (t *Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 	var result []netip.Prefix
 
@@ -448,6 +474,8 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 }
 
 // OverlapsPrefix reports whether any IP in pfx matches a route in the table.
+//
+// The prefix must be normalized!
 func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 	// some needed values, see below
 	ip, bits, is4 := pfxToValues(pfx)
@@ -555,13 +583,10 @@ func ipToOctets(octets []byte, ip netip.Addr, is4 bool) []byte {
 	return octets
 }
 
-// pfxToValues, a helper function.
+// pfxToValues, the pfx must already be normalized!
 func pfxToValues(pfx netip.Prefix) (ip netip.Addr, bits int, is4 bool) {
-	// always normalize the prefix
-	masked := pfx.Masked()
-
-	bits = masked.Bits()
-	ip = masked.Addr()
+	bits = pfx.Bits()
+	ip = pfx.Addr()
 	is4 = ip.Is4()
 	return
 }

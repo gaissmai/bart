@@ -9,7 +9,7 @@
 
 ## ATTENTION: API change!!!
 
-API change, Walk() got a signature change and renamed to All(), ready for range-over-func iterations.
+All prefixes as input parameters must be normalized!
 
 ## Overview
 
@@ -36,7 +36,7 @@ The child array at each stride level is also popcount compressed.
 
 ## API
 
-The API has changed since v0.4.2 and 0.5.3.
+The API has changed since v0.4.2, 0.5.3. and v0.6.3
 
 ```golang
   import "github.com/gaissmai/bart"
@@ -89,23 +89,15 @@ Please see the extensive [benchmarks](https://github.com/gaissmai/iprbench) comp
 Just a teaser, LPM lookups against the full Internet routing table with random probes:
 
 ```
+goos: linux
+goarch: amd64
+pkg: github.com/gaissmai/bart
 cpu: Intel(R) Core(TM) i5-8250U CPU @ 1.60GHz
 
-BenchmarkFullMatchV4/Lookup                  28140715        41.95 ns/op
-BenchmarkFullMatchV4/LookupPrefix            24648212        48.73 ns/op
-BenchmarkFullMatchV4/LookupPrefixLPM         21412228        56.06 ns/op
-
-BenchmarkFullMatchV6/Lookup                  29225397        41.06 ns/op
-BenchmarkFullMatchV6/LookupPrefix            24992281        48.01 ns/op
-BenchmarkFullMatchV6/LookupPrefixLPM         21743133        55.25 ns/op
-
-BenchmarkFullMissV4/Lookup                   15246050        78.84 ns/op
-BenchmarkFullMissV4/LookupPrefix             13382380        89.76 ns/op
-BenchmarkFullMissV4/LookupPrefixLPM          12887918        93.09 ns/op
-
-BenchmarkFullMissV6/Lookup                   69248640        17.31 ns/op
-BenchmarkFullMissV6/LookupPrefix             51542642        23.29 ns/op
-BenchmarkFullMissV6/LookupPrefixLPM          48444040        24.79 ns/op
+BenchmarkFullMatchV4/Lookup                     24484828            49.03 ns/op
+BenchmarkFullMatchV6/Lookup                     17098262            70.15 ns/op
+BenchmarkFullMissV4/Lookup                      24480925            49.15 ns/op
+BenchmarkFullMissV6/Lookup                      54955310            21.79 ns/op
 ```
 
 ## CONTRIBUTION
