@@ -343,7 +343,7 @@ func BenchmarkFullTableClone(b *testing.B) {
 	}
 }
 
-func BenchmarkFullTableWalk(b *testing.B) {
+func BenchmarkFullTableAll(b *testing.B) {
 	var rt bart.Table[int]
 
 	for i, route := range routes {
