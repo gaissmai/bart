@@ -50,6 +50,14 @@ The API has changed since v0.4.2, 0.5.3. and v0.6.3
     The Table is safe for concurrent readers but not for concurrent readers
     and/or writers.
 
+    ATTENTION: The standard library net/netip doesn't enforce normalized
+    prefixes, where the non-prefix bits are all zero.
+
+    Since the conversion of a prefix into the normalized form is quite
+    time-consuming relative to the other functions of the library, all prefixes
+    must already be provided in normalized form as input parameters.
+
+    If this is not the case, the behavior is undefined.
   
   func (t *Table[V]) Insert(pfx netip.Prefix, val V)
   func (t *Table[V]) Delete(pfx netip.Prefix)
