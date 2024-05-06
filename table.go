@@ -156,7 +156,6 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 			return
 		}
 		n = c
-		continue
 	}
 	return n.getValByPrefix(lastOctet, lastOctetBits)
 }
@@ -181,10 +180,9 @@ func (t *Table[V]) Delete(pfx netip.Prefix) {
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
 	// record path to deleted node
-	// purge dangling nodes after deletion
 	stack := [maxTreeDepth]*node[V]{}
 
-	// run variables, needed after for loop
+	// run variable as stackPointer, see below
 	var i int
 
 	// find the trie node
@@ -193,26 +191,24 @@ func (t *Table[V]) Delete(pfx netip.Prefix) {
 		stack[i] = n
 
 		if i == lastOctetIdx {
+			// try to delete prefix in trie node
 			if !n.deletePrefix(lastOctet, lastOctetBits) {
-				// prefix not in tree, nothing deleted
+				// nothing deleted
 				return
 			}
-
-			// escape, but purge dangling path if needed, see below
+			// maybe purge needed
 			break
 		}
 
 		// descend down to next level
-		if c := n.getChild(octets[i]); c != nil {
-			n = c
-			continue
+		c := n.getChild(octets[i])
+		if c == nil {
+			return
 		}
-
-		// no child found, nothing to delete
-		return
+		n = c
 	}
 
-	// purge dangling paths
+	// purge dangling nodes after successful deletion
 	for i > 0 {
 		if n.isEmpty() {
 			// purge empty node from parents children
@@ -252,12 +248,11 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 		stack[i] = n
 
 		// go down in tight loop to leaf node
-		if c := n.getChild(octets[i]); c != nil {
-			n = c
-			continue
+		c := n.getChild(octets[i])
+		if c == nil {
+			break
 		}
-
-		break
+		n = c
 	}
 
 	// start backtracking at leaf node in tight loop
@@ -341,13 +336,12 @@ func (t *Table[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V
 		}
 
 		// go down in tight loop to leaf node
-		if c := n.getChild(octets[depth]); c != nil {
-			n = c
-			continue
+		c := n.getChild(octets[depth])
+		if c == nil {
+			pfxLen = strideLen
+			break
 		}
-
-		pfxLen = strideLen
-		break
+		n = c
 	}
 
 	// start backtracking with last node and octet
@@ -407,7 +401,6 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 		}
 
 		n = c
-		continue
 	}
 	return nil
 }
@@ -449,7 +442,6 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 			break
 		}
 		n = c
-		continue
 	}
 
 	return result

@@ -895,7 +895,7 @@ func TestDeleteIsReverseOfInsert(t *testing.T) {
 	// Insert N prefixes, then delete those same prefixes in reverse
 	// order. Each deletion should exactly undo the internal structure
 	// changes that each insert did.
-	const N = 100
+	const N = 10_000
 
 	var tab Table[int]
 	prefixes := randomPrefixes(N)
