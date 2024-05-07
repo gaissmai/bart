@@ -1576,6 +1576,293 @@ func TestOverlapsPrefixCompare2(t *testing.T) {
 	}
 }
 
+func TestUnionRegression2(t *testing.T) {
+	t.Run("reg 1", func(t *testing.T) {
+		aTbl := &Table2[string]{}
+		bTbl := &Table2[string]{}
+
+		aTbl.Insert(mpp("219.0.0.0/9"), "219.0.0.0/9")
+		bTbl.Insert(mpp("219.126.65.199/32"), "219.126.65.199/32")
+
+		aTbl.Union(bTbl)
+		want := `▼
+└─ 219.0.0.0/9 (219.0.0.0/9)
+   └─ 219.126.65.199/32 (219.126.65.199/32)
+`
+		got := aTbl.String()
+		if got != want {
+			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
+		}
+	})
+
+	t.Run("reg 2", func(t *testing.T) {
+		aTbl := &Table2[string]{}
+		bTbl := &Table2[string]{}
+
+		aTbl.Insert(mpp("219.0.0.0/8"), "219.0.0.0/8")
+		aTbl.Insert(mpp("219.126.0.0/15"), "219.126.0.0/15")
+
+		bTbl.Insert(mpp("219.126.3.4/32"), "219.126.3.4/32")
+
+		aTbl.Union(bTbl)
+		want := `▼
+└─ 219.0.0.0/8 (219.0.0.0/8)
+   └─ 219.126.0.0/15 (219.126.0.0/15)
+      └─ 219.126.3.4/32 (219.126.3.4/32)
+`
+		got := aTbl.String()
+		if got != want {
+			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
+		}
+	})
+
+	t.Run("reg 3", func(t *testing.T) {
+		aTbl := &Table2[string]{}
+		bTbl := &Table2[string]{}
+
+		aTbl.Insert(mpp("219.0.0.0/8"), "219.0.0.0/8")
+		aTbl.Insert(mpp("219.126.3.4/32"), "219.126.3.4/32")
+
+		bTbl.Insert(mpp("219.126.0.0/15"), "219.126.0.0/15")
+
+		aTbl.Union(bTbl)
+		want := `▼
+└─ 219.0.0.0/8 (219.0.0.0/8)
+   └─ 219.126.0.0/15 (219.126.0.0/15)
+      └─ 219.126.3.4/32 (219.126.3.4/32)
+`
+		got := aTbl.String()
+		if got != want {
+			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
+		}
+	})
+}
+
+func TestUnionEdgeCases2(t *testing.T) {
+	t.Parallel()
+
+	t.Run("empty", func(t *testing.T) {
+		aTbl := &Table2[int]{}
+		bTbl := &Table2[int]{}
+
+		// union empty tables
+		aTbl.Union(bTbl)
+
+		want := ""
+		got := aTbl.String()
+		if got != want {
+			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
+		}
+	})
+
+	t.Run("other empty", func(t *testing.T) {
+		aTbl := &Table2[int]{}
+		bTbl := &Table2[int]{}
+
+		// one empty table, b
+		aTbl.Insert(mpp("0.0.0.0/0"), 0)
+
+		aTbl.Union(bTbl)
+		want := `▼
+└─ 0.0.0.0/0 (0)
+`
+		got := aTbl.String()
+		if got != want {
+			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
+		}
+	})
+
+	t.Run("other empty", func(t *testing.T) {
+		aTbl := &Table2[int]{}
+		bTbl := &Table2[int]{}
+
+		// one empty table, a
+		bTbl.Insert(mpp("0.0.0.0/0"), 0)
+
+		aTbl.Union(bTbl)
+		want := `▼
+└─ 0.0.0.0/0 (0)
+`
+		got := aTbl.String()
+		if got != want {
+			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
+		}
+	})
+
+	t.Run("duplicate prefix", func(t *testing.T) {
+		aTbl := &Table2[string]{}
+		bTbl := &Table2[string]{}
+
+		// one empty table
+		aTbl.Insert(mpp("::/0"), "orig value")
+		bTbl.Insert(mpp("::/0"), "overwrite")
+
+		aTbl.Union(bTbl)
+		want := `▼
+└─ ::/0 (overwrite)
+`
+		got := aTbl.String()
+		if got != want {
+			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
+		}
+	})
+
+	t.Run("different IP versions", func(t *testing.T) {
+		aTbl := &Table2[int]{}
+		bTbl := &Table2[int]{}
+
+		// one empty table
+		aTbl.Insert(mpp("0.0.0.0/0"), 1)
+		bTbl.Insert(mpp("::/0"), 2)
+
+		aTbl.Union(bTbl)
+		want := `▼
+└─ 0.0.0.0/0 (1)
+▼
+└─ ::/0 (2)
+`
+		got := aTbl.String()
+		if got != want {
+			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
+		}
+	})
+
+	t.Run("same children", func(t *testing.T) {
+		aTbl := &Table2[int]{}
+		bTbl := &Table2[int]{}
+
+		aTbl.Insert(mpp("127.0.0.1/32"), 1)
+		aTbl.Insert(mpp("::1/128"), 1)
+
+		bTbl.Insert(mpp("127.0.0.2/32"), 2)
+		bTbl.Insert(mpp("::2/128"), 2)
+
+		aTbl.Union(bTbl)
+		want := `▼
+├─ 127.0.0.1/32 (1)
+└─ 127.0.0.2/32 (2)
+▼
+├─ ::1/128 (1)
+└─ ::2/128 (2)
+`
+		got := aTbl.String()
+		if got != want {
+			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
+		}
+	})
+}
+
+// TestUnionMemoryAliasing tests that the Union method does not alias memory
+// between the two tables.
+func TestUnionMemoryAliasing2(t *testing.T) {
+	newTable := func(pfx ...string) *Table2[struct{}] {
+		var t Table2[struct{}]
+		for _, s := range pfx {
+			t.Insert(mpp(s), struct{}{})
+		}
+		return &t
+	}
+	// First create two tables with disjoint prefixes.
+	stable := newTable("0.0.0.0/24")
+	temp := newTable("100.69.1.0/24")
+
+	// Verify that the tables are disjoint.
+	if stable.Overlaps(temp) {
+		t.Error("stable should not overlap temp")
+	}
+
+	// Now union them.
+	temp.Union(stable)
+
+	// Add a new prefix to temp.
+	temp.Insert(mpp("0.0.1.0/24"), struct{}{})
+
+	// Ensure that stable is unchanged.
+	_, ok := stable.Lookup(mpa("0.0.1.1"))
+	if ok {
+		t.Error("stable should not contain 0.0.1.1")
+	}
+	if stable.OverlapsPrefix(mpp("0.0.1.1/32")) {
+		t.Error("stable should not overlap 0.0.1.1/32")
+	}
+}
+
+func TestUnionCompare2(t *testing.T) {
+	t.Parallel()
+
+	const numEntries = 1
+
+	var pfxsA []slowRTEntry[int]
+	var pfxsB []slowRTEntry[int]
+
+	var slowA slowRT[int]
+	var fastA Table2[int]
+
+	var slowAC slowRT[int]
+	var fastAC Table2[int]
+
+	var slowB slowRT[int]
+	var fastB Table2[int]
+
+	var slowBC slowRT[int]
+	var fastBC Table2[int]
+
+	defer func() {
+		if t.Failed() {
+			t.Logf("slowAC:\n%s", slowAC.dumpString())
+			t.Logf("slowBC:\n%s", slowBC.dumpString())
+			t.Logf("fastAC:\n%s", fastAC.String())
+			t.Logf("fastBC:\n%s", fastBC.String())
+
+			t.Logf("slowA:\n%s", slowA.dumpString())
+			t.Logf("fastA:\n%s", fastA.String())
+		}
+	}()
+
+	for i := 0; i < 1_000; i++ {
+		pfxsA = randomPrefixes4(numEntries)
+
+		slowA = slowRT[int]{pfxsA}
+		slowAC = slowRT[int]{pfxsA}
+		fastA = Table2[int]{}
+		fastAC = Table2[int]{}
+		for _, pfx := range pfxsA {
+			fastA.Insert(pfx.pfx, pfx.val)
+			fastAC.Insert(pfx.pfx, pfx.val)
+		}
+
+		pfxsB = randomPrefixes4(numEntries)
+
+		slowB = slowRT[int]{pfxsB}
+		slowBC = slowRT[int]{pfxsB}
+		fastB = Table2[int]{}
+		fastBC = Table2[int]{}
+		for _, pfx := range pfxsB {
+			fastB.Insert(pfx.pfx, pfx.val)
+			fastBC.Insert(pfx.pfx, pfx.val)
+		}
+
+		slowA.union(&slowB)
+		fastA.Union(&fastB)
+
+		// dump as slow table for comparison
+		fastAsSlowTable := fastA.dumpAsPrefixTable()
+
+		// sort for comparison
+		slowA.sort()
+		fastAsSlowTable.sort()
+
+		for i := range slowA.entries {
+			slowI := slowA.entries[i]
+			fastI := fastAsSlowTable.entries[i]
+
+			if slowI != fastI {
+				t.Fatalf("Union(...): items[%d] differ slow(%v) != fast(%v)", i, slowI, fastI)
+			}
+		}
+	}
+}
+
 // ############################################################################
 
 // checkOverlaps2 verifies that the overlaps lookups in tt return the
@@ -1593,22 +1880,21 @@ func checkOverlaps2(t *testing.T, tbl *Table2[int], tests []tableOverlapsTest) {
 // dumpAsPrefixTable, just a helper to compare with slowPrefixTable
 func (t *Table2[V]) dumpAsPrefixTable() slowRT[V] {
 	pfxs := []slowRTEntry[V]{}
-	pfxs = dumpListRec(pfxs, t.DumpList4())
-	pfxs = dumpListRec(pfxs, t.DumpList6())
+
+	pfxs = dumpListRec2(pfxs, t.DumpList4())
+	pfxs = dumpListRec2(pfxs, t.DumpList6())
 
 	ret := slowRT[V]{pfxs}
 	return ret
 }
 
-/*
-func dumpListRec[V any](pfxs []slowRTEntry[V], dumpList []DumpListNode[V]) []slowRTEntry[V] {
+func dumpListRec2[V any](pfxs []slowRTEntry[V], dumpList []DumpListNode[V]) []slowRTEntry[V] {
 	for _, node := range dumpList {
 		pfxs = append(pfxs, slowRTEntry[V]{pfx: node.CIDR, val: node.Value})
 		pfxs = append(pfxs, dumpListRec[V](nil, node.Subnets)...)
 	}
 	return pfxs
 }
-*/
 
 // #########################################################
 

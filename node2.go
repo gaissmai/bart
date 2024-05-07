@@ -77,6 +77,10 @@ func (n *node2[V]) pathIsPrefixOrEqual(start int, buf []byte) bool {
 	return bytes.HasPrefix(buf[start:], n.pathAsSlice()[start:])
 }
 
+func (n *node2[V]) pathIsEqual(start int, buf []byte) bool {
+	return bytes.Equal(buf[start:], n.pathAsSlice()[start:])
+}
+
 // commonPathIdx, return idx until path differ.
 // Start is the idx we know already they are in common.
 func (n *node2[V]) commonPathIdx(start int, o *node2[V]) int {
@@ -533,38 +537,73 @@ func (n *node2[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 
 // unionRec combines two nodes, changing the receiver node.
 // If there are duplicate entries, the value is taken from the other node.
+//
+// The algorithm is similar as for Insert()
 func (n *node2[V]) unionRec(o *node2[V]) {
-	var oIdx uint
-	var oOk bool
 	// for all prefixes in other node do ...
-	for {
-		if oIdx, oOk = o.prefixesBitset.NextSet(oIdx); !oOk {
-			break
-		}
-		oVal, _ := o.getValByIndex(oIdx)
+	for _, idx := range o.allStrideIndexes() {
 		// insert/overwrite prefix/value from oNode to nNode
-		n.insertIdx(oIdx, oVal)
-		oIdx++
+		val, _ := o.getValByIndex(idx)
+		n.insertIdx(idx, val)
 	}
 
-	var oOctet uint
 	// for all children in other node do ...
-	for {
-		if oOctet, oOk = o.childrenBitset.NextSet(oOctet); !oOk {
-			break
-		}
-		oNode := o.getChild(byte(oOctet))
+	for _, addr := range o.allChildAddrs() {
+		octet := byte(addr)
 
-		// get nNode with same octet
-		nNode := n.getChild(byte(oOctet))
-		if nNode == nil {
-			// union child from oNode into nNode
-			n.insertChild(byte(oOctet), oNode.cloneRec())
-		} else {
-			// both nodes have child with octet, call union rec-descent
-			nNode.unionRec(oNode)
+		// get the child at this octet from o
+		oo := o.getChild(octet)
+
+		// clone the child, no memory aliasing
+		oo = oo.cloneRec()
+
+		// get the child at same octet from n
+		nn := n.getChild(octet)
+
+		// slot not occupied, just insert other child
+		if nn == nil {
+			n.insertChild(octet, oo)
+			continue
 		}
-		oOctet++
+
+		// n.pathLen or o.pathLen, anyway, choose one
+		startIdx := o.pathLen()
+
+		// path is equal, rec-descent with childs
+		if nn.pathIsEqual(startIdx, oo.pathAsSlice()) {
+			nn.unionRec(oo)
+			continue
+		}
+
+		// child is prefix for other node
+		if nn.pathIsPrefixOrEqual(startIdx, oo.pathAsSlice()) {
+			slot := oo.pathAsSlice()[nn.pathLen()]
+
+			if c := nn.getChild(slot); c == nil {
+				nn.insertChild(slot, oo)
+				continue
+			}
+
+			panic("unreachable")
+		}
+
+		// other is prefix for child node
+		if oo.pathIsPrefixOrEqual(startIdx, nn.pathAsSlice()) {
+			slot := nn.pathAsSlice()[oo.pathLen()]
+
+			if c := oo.getChild(slot); c == nil {
+				// insert nn under oo
+				oo.insertChild(slot, nn)
+
+				// relink oo where nn was
+				n.insertChild(octet, oo)
+				continue
+			}
+
+			panic("unreachable")
+		}
+
+		panic("unreachable")
 	}
 }
 
