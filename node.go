@@ -475,37 +475,27 @@ func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 // unionRec combines two nodes, changing the receiver node.
 // If there are duplicate entries, the value is taken from the other node.
 func (n *node[V]) unionRec(o *node[V]) {
-	var oIdx uint
-	var oOk bool
 	// for all prefixes in other node do ...
-	for {
-		if oIdx, oOk = o.prefixesBitset.NextSet(oIdx); !oOk {
-			break
-		}
-		oVal, _ := o.getValByIndex(oIdx)
+	for _, oIdx := range o.allStrideIndexes() {
 		// insert/overwrite prefix/value from oNode to nNode
+		oVal, _ := o.getValByIndex(oIdx)
 		n.insertIdx(oIdx, oVal)
-		oIdx++
 	}
 
-	var oOctet uint
 	// for all children in other node do ...
-	for {
-		if oOctet, oOk = o.childrenBitset.NextSet(oOctet); !oOk {
-			break
-		}
+	for _, oOctet := range o.allChildAddrs() {
 		oNode := o.getChild(byte(oOctet))
 
 		// get nNode with same octet
 		nNode := n.getChild(byte(oOctet))
+
 		if nNode == nil {
-			// union child from oNode into nNode
+			// union cloned child from oNode into nNode
 			n.insertChild(byte(oOctet), oNode.cloneRec())
 		} else {
 			// both nodes have child with octet, call union rec-descent
 			nNode.unionRec(oNode)
 		}
-		oOctet++
 	}
 }
 
