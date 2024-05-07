@@ -1,0 +1,75 @@
+// Copyright (c) 2024 Karl Gaissmaier
+// SPDX-License-Identifier: MIT
+
+package bart
+
+import (
+	"encoding/json"
+	"slices"
+)
+
+/*
+// DumpListNode contains CIDR, value and list of subnets (tree childrens).
+type DumpListNode[V any] struct {
+	CIDR    netip.Prefix      `json:"cidr"`
+	Value   V                 `json:"value"`
+	Subnets []DumpListNode[V] `json:"subnets,omitempty"`
+}
+*/
+
+// MarshalJSON dumps table into two sorted lists: for ipv4 and ipv6.
+// Every root and subnet are array, not map, because the order matters.
+func (t *Table2[V]) MarshalJSON() ([]byte, error) {
+	t.init()
+
+	result := struct {
+		Ipv4 []DumpListNode[V] `json:"ipv4,omitempty"`
+		Ipv6 []DumpListNode[V] `json:"ipv6,omitempty"`
+	}{
+		Ipv4: t.DumpList4(),
+		Ipv6: t.DumpList6(),
+	}
+
+	buf, err := json.Marshal(result)
+	if err != nil {
+		return nil, err
+	}
+
+	return buf, nil
+}
+
+// DumpList4 dumps ipv4 tree into list of roots and their subnets.
+// It can be used to analyze tree or build custom json representation.
+func (t *Table2[V]) DumpList4() []DumpListNode[V] {
+	t.init()
+	if t.rootV4 == nil {
+		return nil
+	}
+	return t.rootV4.dumpListRec(0, nil, true)
+}
+
+// DumpList6 dumps ipv4 tree into list of roots and their subnets.
+// It can be used to analyze tree or build custom json representation.
+func (t *Table2[V]) DumpList6() []DumpListNode[V] {
+	t.init()
+	if t.rootV6 == nil {
+		return nil
+	}
+	return t.rootV6.dumpListRec(0, nil, false)
+}
+
+func (n *node2[V]) dumpListRec(parentIdx uint, path []byte, is4 bool) []DumpListNode[V] {
+	directKids := n.getKidsRec(parentIdx, path, is4)
+	slices.SortFunc(directKids, sortKidsByPrefix2[V])
+
+	nodes := make([]DumpListNode[V], 0, len(directKids))
+	for _, kid := range directKids {
+		nodes = append(nodes, DumpListNode[V]{
+			CIDR:    kid.cidr,
+			Value:   kid.val,
+			Subnets: kid.n.dumpListRec(kid.idx, kid.path, is4),
+		})
+	}
+
+	return nodes
+}
