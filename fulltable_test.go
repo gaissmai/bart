@@ -1,21 +1,19 @@
 // Copyright (c) 2024 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
-package bart_test
+package bart
 
 import (
 	"bufio"
 	"compress/gzip"
-	crand "crypto/rand"
 	"fmt"
 	"log"
 	"math/rand"
 	"net/netip"
 	"os"
+	"runtime"
 	"strings"
 	"testing"
-
-	"github.com/gaissmai/bart"
 )
 
 // full internet prefix list, gzipped
@@ -43,12 +41,16 @@ func init() {
 }
 
 var (
-	intSink int
-	okSink  bool
+	intSink  int
+	okSink   bool
+	boolSink bool
+
+	pfxSliceSink []netip.Prefix
+	cloneSink    *Table[int]
 )
 
 func BenchmarkFullMatchV4(b *testing.B) {
-	var rt bart.Table[int]
+	var rt Table[int]
 
 	for i, route := range routes {
 		rt.Insert(route.CIDR, i)
@@ -87,18 +89,10 @@ func BenchmarkFullMatchV4(b *testing.B) {
 			_, intSink, okSink = rt.LookupPrefixLPM(ipAsPfx)
 		}
 	})
-
-	pfx := randomPrefix4()
-	b.Run("OverlapsPfx", func(b *testing.B) {
-		b.ResetTimer()
-		for k := 0; k < b.N; k++ {
-			okSink = rt.OverlapsPrefix(pfx)
-		}
-	})
 }
 
 func BenchmarkFullMatchV6(b *testing.B) {
-	var rt bart.Table[int]
+	var rt Table[int]
 
 	for i, route := range routes {
 		rt.Insert(route.CIDR, i)
@@ -137,18 +131,10 @@ func BenchmarkFullMatchV6(b *testing.B) {
 			_, intSink, okSink = rt.LookupPrefixLPM(ipAsPfx)
 		}
 	})
-
-	pfx := randomPrefix6()
-	b.Run("OverlapsPfx", func(b *testing.B) {
-		b.ResetTimer()
-		for k := 0; k < b.N; k++ {
-			okSink = rt.OverlapsPrefix(pfx)
-		}
-	})
 }
 
 func BenchmarkFullMissV4(b *testing.B) {
-	var rt bart.Table[int]
+	var rt Table[int]
 
 	for i, route := range routes {
 		rt.Insert(route.CIDR, i)
@@ -190,7 +176,7 @@ func BenchmarkFullMissV4(b *testing.B) {
 }
 
 func BenchmarkFullMissV6(b *testing.B) {
-	var rt bart.Table[int]
+	var rt Table[int]
 
 	for i, route := range routes {
 		rt.Insert(route.CIDR, i)
@@ -231,17 +217,15 @@ func BenchmarkFullMissV6(b *testing.B) {
 	})
 }
 
-var boolSink bool
-
 func BenchmarkFullTableOverlapsV4(b *testing.B) {
-	var rt bart.Table[int]
+	var rt Table[int]
 
 	for i, route := range routes4 {
 		rt.Insert(route.CIDR, i)
 	}
 
 	for i := 1; i <= 1024; i *= 2 {
-		inter := new(bart.Table[int])
+		inter := new(Table[int])
 		for j := 0; j <= i; j++ {
 			pfx := randomPrefix4()
 			inter.Insert(pfx, j)
@@ -257,14 +241,14 @@ func BenchmarkFullTableOverlapsV4(b *testing.B) {
 }
 
 func BenchmarkFullTableOverlapsV6(b *testing.B) {
-	var rt bart.Table[int]
+	var rt Table[int]
 
 	for i, route := range routes6 {
 		rt.Insert(route.CIDR, i)
 	}
 
 	for i := 1; i <= 1024; i *= 2 {
-		inter := new(bart.Table[int])
+		inter := new(Table[int])
 		for j := 0; j <= i; j++ {
 			pfx := randomPrefix6()
 			inter.Insert(pfx, j)
@@ -280,14 +264,14 @@ func BenchmarkFullTableOverlapsV6(b *testing.B) {
 }
 
 func BenchmarkFullTableOverlaps(b *testing.B) {
-	var rt bart.Table[int]
+	var rt Table[int]
 
 	for i, route := range routes {
 		rt.Insert(route.CIDR, i)
 	}
 
 	for i := 1; i <= 1024; i *= 2 {
-		inter := new(bart.Table[int])
+		inter := new(Table[int])
 		for j := 0; j <= i; j++ {
 			pfx := randomPrefix()
 			inter.Insert(pfx, j)
@@ -302,10 +286,8 @@ func BenchmarkFullTableOverlaps(b *testing.B) {
 	}
 }
 
-var cloneSink *bart.Table[int]
-
 func BenchmarkFullTableCloneV4(b *testing.B) {
-	var rt bart.Table[int]
+	var rt Table[int]
 
 	for i, route := range routes4 {
 		rt.Insert(route.CIDR, i)
@@ -318,7 +300,7 @@ func BenchmarkFullTableCloneV4(b *testing.B) {
 }
 
 func BenchmarkFullTableCloneV6(b *testing.B) {
-	var rt bart.Table[int]
+	var rt Table[int]
 
 	for i, route := range routes6 {
 		rt.Insert(route.CIDR, i)
@@ -331,7 +313,7 @@ func BenchmarkFullTableCloneV6(b *testing.B) {
 }
 
 func BenchmarkFullTableClone(b *testing.B) {
-	var rt bart.Table[int]
+	var rt Table[int]
 
 	for i, route := range routes {
 		rt.Insert(route.CIDR, i)
@@ -344,7 +326,7 @@ func BenchmarkFullTableClone(b *testing.B) {
 }
 
 func BenchmarkFullTableAll(b *testing.B) {
-	var rt bart.Table[int]
+	var rt Table[int]
 
 	for i, route := range routes {
 		rt.Insert(route.CIDR, i)
@@ -358,10 +340,8 @@ func BenchmarkFullTableAll(b *testing.B) {
 	}
 }
 
-var pfxSliceSink []netip.Prefix
-
 func BenchmarkFullTableSubnetsV4(b *testing.B) {
-	var rt bart.Table[int]
+	var rt Table[int]
 
 	for i, route := range routes4 {
 		rt.Insert(route.CIDR, i)
@@ -374,7 +354,7 @@ func BenchmarkFullTableSubnetsV4(b *testing.B) {
 }
 
 func BenchmarkFullTableSubnetsV6(b *testing.B) {
-	var rt bart.Table[int]
+	var rt Table[int]
 
 	for i, route := range routes6 {
 		rt.Insert(route.CIDR, i)
@@ -387,7 +367,7 @@ func BenchmarkFullTableSubnetsV6(b *testing.B) {
 }
 
 func BenchmarkFullTableSupernetsV4(b *testing.B) {
-	var rt bart.Table[int]
+	var rt Table[int]
 
 	for i, route := range routes4 {
 		rt.Insert(route.CIDR, i)
@@ -400,7 +380,7 @@ func BenchmarkFullTableSupernetsV4(b *testing.B) {
 }
 
 func BenchmarkFullTableSupernetsV6(b *testing.B) {
-	var rt bart.Table[int]
+	var rt Table[int]
 
 	for i, route := range routes6 {
 		rt.Insert(route.CIDR, i)
@@ -410,6 +390,72 @@ func BenchmarkFullTableSupernetsV6(b *testing.B) {
 	for k := 0; k < b.N; k++ {
 		pfxSliceSink = rt.Supernets(randRoute6.CIDR)
 	}
+}
+
+func BenchmarkFullTableSizeV4(b *testing.B) {
+	var startMem, endMem runtime.MemStats
+
+	rt := new(Table[struct{}])
+	runtime.GC()
+	runtime.ReadMemStats(&startMem)
+
+	b.Run(fmt.Sprintf("routes:%d", len(routes4)), func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			for _, route := range routes4 {
+				rt.Insert(route.CIDR, struct{}{})
+			}
+		}
+
+		runtime.GC()
+		runtime.ReadMemStats(&endMem)
+
+		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "bytes")
+		b.ReportMetric(0, "ns/op")
+	})
+}
+
+func BenchmarkFullTableSizeV6(b *testing.B) {
+	var startMem, endMem runtime.MemStats
+
+	rt := new(Table[struct{}])
+	runtime.GC()
+	runtime.ReadMemStats(&startMem)
+
+	b.Run(fmt.Sprintf("routes:%d", len(routes6)), func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			for _, route := range routes6 {
+				rt.Insert(route.CIDR, struct{}{})
+			}
+		}
+
+		runtime.GC()
+		runtime.ReadMemStats(&endMem)
+
+		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "bytes")
+		b.ReportMetric(0, "ns/op")
+	})
+}
+
+func BenchmarkFullTableSize(b *testing.B) {
+	var startMem, endMem runtime.MemStats
+
+	rt := new(Table[struct{}])
+	runtime.GC()
+	runtime.ReadMemStats(&startMem)
+
+	b.Run(fmt.Sprintf("routes:%d", len(routes)), func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			for _, route := range routes {
+				rt.Insert(route.CIDR, struct{}{})
+			}
+		}
+
+		runtime.GC()
+		runtime.ReadMemStats(&endMem)
+
+		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "bytes")
+		b.ReportMetric(0, "ns/op")
+	})
 }
 
 func fillRouteTables() {
@@ -429,6 +475,8 @@ func fillRouteTables() {
 		line = strings.TrimSpace(line)
 
 		cidr := netip.MustParsePrefix(line)
+		cidr = cidr.Masked()
+
 		routes = append(routes, route{cidr, cidr})
 
 		if cidr.Addr().Is4() {
@@ -492,63 +540,4 @@ func gimmeRandomPrefix6(n int) (pfxs []netip.Prefix) {
 		}
 	}
 	return
-}
-
-// randomPrefixes returns n randomly generated prefixes and
-// associated values, distributed equally between IPv4 and IPv6.
-//
-//nolint:unused
-func randomPrefix() netip.Prefix {
-	if rand.Intn(2) == 1 {
-		return randomPrefix4()
-	} else {
-		return randomPrefix6()
-	}
-}
-
-//nolint:unused
-func randomPrefix4() netip.Prefix {
-	bits := rand.Intn(33)
-	pfx, err := randomIP4().Prefix(bits)
-	if err != nil {
-		panic(err)
-	}
-	return pfx
-}
-
-//nolint:unused
-func randomPrefix6() netip.Prefix {
-	bits := rand.Intn(129)
-	pfx, err := randomIP6().Prefix(bits)
-	if err != nil {
-		panic(err)
-	}
-	return pfx
-}
-
-//nolint:unused
-func randomIP() netip.Addr {
-	if rand.Intn(2) == 1 {
-		return randomIP4()
-	} else {
-		return randomIP6()
-	}
-}
-
-//nolint:unused
-func randomIP4() netip.Addr {
-	var b [4]byte
-	if _, err := crand.Read(b[:]); err != nil {
-		panic(err)
-	}
-	return netip.AddrFrom4(b)
-}
-
-//nolint:unused
-func randomIP6() netip.Addr {
-	var b [16]byte
-	if _, err := crand.Read(b[:]); err != nil {
-		panic(err)
-	}
-	return netip.AddrFrom16(b)
 }

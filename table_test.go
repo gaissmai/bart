@@ -1971,8 +1971,6 @@ func BenchmarkTableLookup(b *testing.B) {
 	}
 }
 
-var boolSink bool
-
 func BenchmarkTableOverlapsPrefix(b *testing.B) {
 	for _, fam := range []string{"ipv4", "ipv6"} {
 		rng := randomPrefixes4
