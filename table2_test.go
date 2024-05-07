@@ -1347,7 +1347,6 @@ func TestSubnetsEdgeCases2(t *testing.T) {
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Fatalf("%s: got:\n%v\nwant:\n%v", tt.name, got, tt.want)
 			}
-
 		})
 	}
 }
@@ -1472,7 +1471,6 @@ func TestSupernetsEdgeCases2(t *testing.T) {
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Fatalf("%s: got:\n%v\nwant:\n%v", tt.name, got, tt.want)
 			}
-
 		})
 	}
 }
@@ -1787,7 +1785,7 @@ func BenchmarkTableLookupPrefixLPM2(b *testing.B) {
 	}
 }
 
-func BenchmarkSize2(b *testing.B) {
+func BenchmarkSize2Random(b *testing.B) {
 	for _, fam := range []string{"ipv4", "ipv6"} {
 		rng := randomPrefixes4
 		if fam == "ipv6" {
@@ -1796,14 +1794,14 @@ func BenchmarkSize2(b *testing.B) {
 
 		var startMem, endMem runtime.MemStats
 		for _, nroutes := range []int{10, 100, 1_000, 10_000, 100_000, 1_000_000} {
-			rt1 := new(Table[any])
-			rt2 := new(Table2[any])
+			rt1 := new(Table[struct{}])
+			rt2 := new(Table2[struct{}])
 
 			b.Run(fmt.Sprintf("orig:%7d/%s", nroutes, fam), func(b *testing.B) {
 				b.ResetTimer()
 
 				for range b.N {
-					rt1 = new(Table[any])
+					rt1 = new(Table[struct{}])
 					runtime.GC()
 					runtime.ReadMemStats(&startMem)
 
@@ -1826,7 +1824,7 @@ func BenchmarkSize2(b *testing.B) {
 				b.ResetTimer()
 
 				for range b.N {
-					rt2 = new(Table2[any])
+					rt2 = new(Table2[struct{}])
 					runtime.GC()
 					runtime.ReadMemStats(&startMem)
 
