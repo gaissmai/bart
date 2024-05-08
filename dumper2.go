@@ -22,22 +22,6 @@ func (t *Table2[V]) dumpString() string {
 	return w.String()
 }
 
-func (t *Table2[V]) dumpString4() string {
-	w := new(strings.Builder)
-	if err := t.dump4(w); err != nil {
-		panic(err)
-	}
-	return w.String()
-}
-
-func (t *Table2[V]) dumpString6() string {
-	w := new(strings.Builder)
-	if err := t.dump6(w); err != nil {
-		panic(err)
-	}
-	return w.String()
-}
-
 // dump the table structure and all the nodes to w.
 //
 //	Output:
@@ -110,18 +94,6 @@ func (t *Table2[V]) dump(w io.Writer) error {
 	}
 	t.rootV6.dumpRec(w, 0)
 
-	return nil
-}
-
-func (t *Table2[V]) dump4(w io.Writer) error {
-	t.init()
-	t.rootV4.dumpRec(w, 0)
-	return nil
-}
-
-func (t *Table2[V]) dump6(w io.Writer) error {
-	t.init()
-	t.rootV6.dumpRec(w, 0)
 	return nil
 }
 

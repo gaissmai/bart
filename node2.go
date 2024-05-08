@@ -5,11 +5,13 @@ package bart
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net/netip"
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/bits-and-blooms/bitset"
 )
@@ -73,12 +75,12 @@ func (n *node2[V]) pathLen() int {
 	return int(n.path.length)
 }
 
-func (n *node2[V]) pathIsPrefixOrEqual(start int, buf []byte) bool {
-	return bytes.HasPrefix(buf[start:], n.pathAsSlice()[start:])
-}
-
 func (n *node2[V]) pathIsEqual(start int, buf []byte) bool {
 	return bytes.Equal(buf[start:], n.pathAsSlice()[start:])
+}
+
+func (n *node2[V]) pathIsPrefixOrEqual(start int, buf []byte) bool {
+	return bytes.HasPrefix(buf[start:], n.pathAsSlice()[start:])
 }
 
 // commonPathIdx, return idx until path differ.
@@ -535,78 +537,6 @@ func (n *node2[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 	return false
 }
 
-// unionRec combines two nodes, changing the receiver node.
-// If there are duplicate entries, the value is taken from the other node.
-//
-// The algorithm is similar as for Insert()
-func (n *node2[V]) unionRec(o *node2[V]) {
-	// for all prefixes in other node do ...
-	for _, idx := range o.allStrideIndexes() {
-		// insert/overwrite prefix/value from oNode to nNode
-		val, _ := o.getValByIndex(idx)
-		n.insertIdx(idx, val)
-	}
-
-	// for all children in other node do ...
-	for _, addr := range o.allChildAddrs() {
-		octet := byte(addr)
-
-		// get the child at this octet from o
-		oo := o.getChild(octet)
-
-		// clone the child, no memory aliasing
-		oo = oo.cloneRec()
-
-		// get the child at same octet from n
-		nn := n.getChild(octet)
-
-		// slot not occupied, just insert other child
-		if nn == nil {
-			n.insertChild(octet, oo)
-			continue
-		}
-
-		// n.pathLen or o.pathLen, anyway, choose one
-		startIdx := o.pathLen()
-
-		// path is equal, rec-descent with childs
-		if nn.pathIsEqual(startIdx, oo.pathAsSlice()) {
-			nn.unionRec(oo)
-			continue
-		}
-
-		// child is prefix for other node
-		if nn.pathIsPrefixOrEqual(startIdx, oo.pathAsSlice()) {
-			slot := oo.pathAsSlice()[nn.pathLen()]
-
-			if c := nn.getChild(slot); c == nil {
-				nn.insertChild(slot, oo)
-				continue
-			}
-
-			panic("unreachable")
-		}
-
-		// other is prefix for child node
-		if oo.pathIsPrefixOrEqual(startIdx, nn.pathAsSlice()) {
-			slot := nn.pathAsSlice()[oo.pathLen()]
-
-			if c := oo.getChild(slot); c == nil {
-				// insert nn under oo
-				oo.insertChild(slot, nn)
-
-				// relink oo where nn was
-				n.insertChild(octet, oo)
-				continue
-			}
-
-			panic("unreachable")
-		}
-
-		panic("unreachable")
-	}
-}
-
 func (n *node2[V]) cloneRec() *node2[V] {
 	c := newNode2[V](n.pathAsSlice(), n.is4)
 
@@ -728,4 +658,88 @@ func (n *node2[V]) cidrFromIndex(idx uint) (pfx netip.Prefix) {
 	// make a normalized prefix from ip/bits
 	pfx, _ = ip.Prefix(bits)
 	return
+}
+
+// topSupernetsRec runs recursive the trie, starting at node.
+// The yield function is called for each top level route entry.
+// If the yield function returns false the recursion ends prematurely and the
+// false value is propagated.
+func (n *node2[V]) topSupernetsRec(yield func(pfx netip.Prefix) bool) bool {
+	// allotTbl, filled with prefix entries
+	var allotTbl [maxNodePrefixes]bool
+
+	// DEFAULT ROUTE, very fast exit, masks all prefixes and children
+	if n.prefixesBitset.Test(1) {
+		return yield(n.cidrFromIndex(1))
+	}
+
+	// for all prefixes do
+	for _, idx := range n.allStrideIndexes() {
+		// not yet masked by supernet
+		if !allotTbl[idx] {
+			if !yield(n.cidrFromIndex(idx)) {
+				return false
+			}
+			// this is a top level supernet, mask allot slots
+			allot(&allotTbl, idx)
+		}
+	}
+
+	// for all children do
+	for _, addr := range n.allChildAddrs() {
+		// host route already set with supernet prefix?
+		if allotTbl[addr+firstHostIndex] {
+			continue
+		}
+
+		// child not masked by supernet, rec-descent
+		c := n.getChild(byte(addr))
+		if !c.topSupernetsRec(yield) {
+			return false
+		}
+	}
+	return true
+}
+
+func allot(allotTbl *[maxNodePrefixes]bool, idx uint) {
+	// allotRec is faster for idx >= some x
+	if idx >= 4 {
+		allotRec(allotTbl, idx)
+		return
+	}
+
+	// iteration is faster for small idx
+	allotTbl[idx] = true
+	for i := idx; i < firstHostIndex; i++ {
+		if !allotTbl[i] {
+			continue
+		}
+		allotTbl[i*2] = true
+		allotTbl[i*2+1] = true
+	}
+}
+
+func allotRec(allotTbl *[maxNodePrefixes]bool, idx uint) {
+	allotTbl[idx] = true
+	if idx >= firstHostIndex {
+		return
+	}
+	allotRec(allotTbl, idx*2)
+	allotRec(allotTbl, idx*2+1)
+}
+
+func (n *node2[V]) iterTopSupernetsRec(ctx context.Context, wg *sync.WaitGroup, pfxChan chan<- netip.Prefix) {
+	defer wg.Done()
+	defer close(pfxChan)
+
+	yield := func(pfx netip.Prefix) bool {
+		select {
+		case <-ctx.Done():
+			return false
+		case pfxChan <- pfx:
+			return true
+		}
+	}
+
+	n.topSupernetsRec(yield)
 }

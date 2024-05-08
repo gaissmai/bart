@@ -4,16 +4,25 @@
 package bart
 
 import (
+	"context"
 	"net/netip"
 	"slices"
 	"sync"
 )
 
-// Table is an IPv4 and IPv6 routing table with payload V.
+// Table2 is an IPv4 and IPv6 routing table with payload V.
 // The zero value is ready to use.
 //
-// The Table is safe for concurrent readers but not for
+// The Table2 is safe for concurrent readers but not for
 // concurrent readers and/or writers.
+//
+// The Table2 is an evolution of Table, but now with path compression.
+// Path compression introduces a lot of complexity!
+//
+// "A complex system that works is invariably found to have evolved from
+// a simple system that worked. A complex system designed from scratch
+// never works and cannot be patched up to make it work.
+// You have to start over with a working simple system." (John Gall)
 type Table2[V any] struct {
 	rootV4 *node2[V]
 	rootV6 *node2[V]
@@ -42,6 +51,9 @@ func (t *Table2[V]) rootNodeByVersion(is4 bool) *node2[V] {
 // If pfx is already present in the tree, its value is set to val.
 func (t *Table2[V]) Insert(pfx netip.Prefix, val V) {
 	t.init()
+	if !pfx.IsValid() {
+		return
+	}
 
 	// some needed values, see below
 	ip, bits, is4 := pfxToValues(pfx)
@@ -140,6 +152,9 @@ func (t *Table2[V]) Insert(pfx netip.Prefix, val V) {
 
 // Delete removes pfx from the tree, pfx does not have to be present.
 func (t *Table2[V]) Delete(pfx netip.Prefix) {
+	if !pfx.IsValid() {
+		return
+	}
 	// some needed values, see below
 	ip, bits, is4 := pfxToValues(pfx)
 
@@ -261,6 +276,10 @@ func (t *Table2[V]) Delete(pfx netip.Prefix) {
 // If the pfx does not already exist, it is set with the new value.
 func (t *Table2[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 	t.init()
+	if !pfx.IsValid() {
+		var zero V
+		return zero
+	}
 
 	// some needed values, see below
 	ip, bits, is4 := pfxToValues(pfx)
@@ -344,6 +363,9 @@ func (t *Table2[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 // Get returns the associated payload for prefix and true, or false if
 // prefix is not set in the routing table.
 func (t *Table2[V]) Get(pfx netip.Prefix) (val V, ok bool) {
+	if !pfx.IsValid() {
+		return
+	}
 	// some needed values, see below
 	ip, bits, is4 := pfxToValues(pfx)
 
@@ -395,6 +417,9 @@ func (t *Table2[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 // Lookup does a route lookup (longest prefix match) for IP and
 // returns the associated value and true, or false if no route matched.
 func (t *Table2[V]) Lookup(ip netip.Addr) (val V, ok bool) {
+	if !ip.IsValid() {
+		return
+	}
 	is4 := ip.Is4()
 	n := t.rootNodeByVersion(is4)
 	if n == nil {
@@ -472,6 +497,9 @@ func (t *Table2[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 // LookupPrefix does a route lookup (longest prefix match) for pfx and
 // returns the associated value and true, or false if no route matched.
 func (t *Table2[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
+	if !pfx.IsValid() {
+		return
+	}
 	_, _, val, ok = t.lpmByPrefix(pfx)
 	return
 }
@@ -485,6 +513,9 @@ func (t *Table2[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
 // If LookupPrefixLPM is to be used for IP addresses,
 // they must be converted to /32 or /128 prefixes.
 func (t *Table2[V]) LookupPrefixLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) {
+	if !pfx.IsValid() {
+		return
+	}
 	depth, baseIdx, val, ok := t.lpmByPrefix(pfx)
 
 	if ok {
@@ -591,6 +622,9 @@ func (t *Table2[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val 
 
 // Subnets, return all prefixes covered by pfx in natural CIDR sort order.
 func (t *Table2[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
+	if !pfx.IsValid() {
+		return nil
+	}
 	// some needed values, see below
 	ip, bits, is4 := pfxToValues(pfx)
 
@@ -666,6 +700,9 @@ func (t *Table2[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 // Supernets, return all matching routes for pfx,
 // in natural CIDR sort order.
 func (t *Table2[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
+	if !pfx.IsValid() {
+		return nil
+	}
 	var result []netip.Prefix
 
 	// some needed values, see below
@@ -724,6 +761,9 @@ func (t *Table2[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 
 // OverlapsPrefix reports whether any IP in pfx matches a route in the table.
 func (t *Table2[V]) OverlapsPrefix(pfx netip.Prefix) bool {
+	if !pfx.IsValid() {
+		return false
+	}
 	// some needed values, see below
 	ip, bits, is4 := pfxToValues(pfx)
 
@@ -794,25 +834,178 @@ func (t *Table2[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 	}
 }
 
-// TODO path compressed algo
 // Overlaps reports whether any IP in the table matches a route in the
 // other table.
+func (t *Table2[V]) Overlaps1(o *Table2[V]) bool {
+	t.init()
+	o.init()
+
+	// stop recursion on first overlap, so negate the result of OverlapsPrefix
+	cb := func(pfx netip.Prefix, _ V) bool {
+		return !t.OverlapsPrefix(pfx)
+	}
+
+	// shortcut, return on first overlap
+	return !(o.rootV4.allRec(cb) && o.rootV6.allRec(cb))
+}
+
 func (t *Table2[V]) Overlaps(o *Table2[V]) bool {
 	t.init()
 	o.init()
 
-	return t.rootV4.overlapsRec(o.rootV4) || t.rootV6.overlapsRec(o.rootV6)
+	// stop recursion on first overlap, so negate the result of OverlapsPrefix
+	cb := func(pfx netip.Prefix) bool {
+		return !t.OverlapsPrefix(pfx)
+	}
+
+	// shortcut, return on first overlap
+	return !(o.rootV4.topSupernetsRec(cb) && o.rootV6.topSupernetsRec(cb))
 }
 
-// TODO path compressed algo
+func (t *Table2[V]) Overlaps4(o *Table2[V]) bool {
+	t.init()
+	o.init()
+
+	tPfxsV4 := make([]netip.Prefix, 0, 10)
+	oPfxsV4 := make([]netip.Prefix, 0, 10)
+	tPfxsV6 := make([]netip.Prefix, 0, 10)
+	oPfxsV6 := make([]netip.Prefix, 0, 10)
+
+	tPfxsChanV4 := make(chan netip.Prefix)
+	oPfxsChanV4 := make(chan netip.Prefix)
+	tPfxsChanV6 := make(chan netip.Prefix)
+	oPfxsChanV6 := make(chan netip.Prefix)
+
+	var wg sync.WaitGroup
+	wg.Add(4)
+	ctx, cancel := context.WithCancel(context.Background())
+
+	go t.rootV4.iterTopSupernetsRec(ctx, &wg, tPfxsChanV4)
+	go o.rootV4.iterTopSupernetsRec(ctx, &wg, oPfxsChanV4)
+	go t.rootV6.iterTopSupernetsRec(ctx, &wg, tPfxsChanV6)
+	go o.rootV6.iterTopSupernetsRec(ctx, &wg, oPfxsChanV6)
+
+	overlaps := false
+	openChannels := 4
+
+OuterLoop:
+	for {
+		if openChannels == 0 {
+			cancel()
+			break OuterLoop
+		}
+
+		select {
+		case <-ctx.Done():
+			break OuterLoop
+
+		case pfx, ok := <-tPfxsChanV4:
+			if !ok {
+				tPfxsChanV4 = nil
+				openChannels--
+				continue
+			}
+
+			for _, oPfx := range oPfxsV4 {
+				if pfx.Overlaps(oPfx) {
+					overlaps = true
+					cancel()
+					break OuterLoop
+				}
+			}
+			tPfxsV4 = append(tPfxsV4, pfx)
+
+		case pfx, ok := <-oPfxsChanV4:
+			if !ok {
+				oPfxsChanV4 = nil
+				openChannels--
+				continue
+			}
+
+			for _, tPfx := range tPfxsV4 {
+				if pfx.Overlaps(tPfx) {
+					overlaps = true
+					cancel()
+					break OuterLoop
+				}
+			}
+			oPfxsV4 = append(oPfxsV4, pfx)
+
+		case pfx, ok := <-tPfxsChanV6:
+			if !ok {
+				tPfxsChanV6 = nil
+				openChannels--
+				continue
+			}
+
+			for _, oPfx := range oPfxsV6 {
+				if pfx.Overlaps(oPfx) {
+					overlaps = true
+					cancel()
+					break OuterLoop
+				}
+			}
+			tPfxsV6 = append(tPfxsV6, pfx)
+
+		case pfx, ok := <-oPfxsChanV6:
+			if !ok {
+				oPfxsChanV6 = nil
+				openChannels--
+				continue
+			}
+
+			for _, tPfx := range tPfxsV6 {
+				if pfx.Overlaps(tPfx) {
+					overlaps = true
+					cancel()
+					break OuterLoop
+				}
+			}
+			oPfxsV6 = append(oPfxsV6, pfx)
+		}
+	}
+	wg.Wait()
+	return overlaps
+}
+
+func (t *Table2[V]) Overlaps5(o *Table2[V]) bool {
+	t.init()
+	o.init()
+
+	cb1 := func(pfx1 netip.Prefix) bool {
+		cb2 := func(pfx2 netip.Prefix) bool {
+			return !pfx1.Overlaps(pfx2)
+		}
+		return o.rootV4.topSupernetsRec(cb2)
+	}
+
+	if !t.rootV4.topSupernetsRec(cb1) {
+		return true
+	}
+
+	// and now v6
+
+	cb1 = func(pfx1 netip.Prefix) bool {
+		cb2 := func(pfx2 netip.Prefix) bool {
+			return !pfx1.Overlaps(pfx2)
+		}
+		return o.rootV6.topSupernetsRec(cb2)
+	}
+	return !t.rootV6.topSupernetsRec(cb1)
+}
+
 // Union combines two tables, changing the receiver table.
 // If there are duplicate entries, the value is taken from the other table.
 func (t *Table2[V]) Union(o *Table2[V]) {
 	t.init()
 	o.init()
 
-	t.rootV4.unionRec(o.rootV4)
-	t.rootV6.unionRec(o.rootV6)
+	// unionRec is too complex for path compressed nodes
+	// just walk over all nodes in o and insert pfx/val into t.
+	o.All(func(pfx netip.Prefix, val V) bool {
+		t.Insert(pfx, val)
+		return true
+	})
 }
 
 // Clone returns a copy of the routing table.
@@ -853,4 +1046,30 @@ func (t *Table2[V]) All4(yield func(pfx netip.Prefix, val V) bool) {
 func (t *Table2[V]) All6(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
 	t.rootV6.allRec(yield)
+}
+
+func (t *Table2[V]) numNodes() int {
+	t.init()
+	return t.numNodesRec(t.rootV4) + t.numNodesRec(t.rootV6)
+}
+
+func (t *Table2[V]) numNodesRec(n *node2[V]) int {
+	ret := 1 // this node
+	for _, c := range n.children {
+		ret += t.numNodesRec(c)
+	}
+	return ret
+}
+
+func (t *Table2[V]) numPrefixes() int {
+	t.init()
+	return t.numPrefixesRec(t.rootV4) + t.numPrefixesRec(t.rootV6)
+}
+
+func (t *Table2[V]) numPrefixesRec(n *node2[V]) int {
+	ret := len(n.prefixes)
+	for _, c := range n.children {
+		ret += t.numPrefixesRec(c)
+	}
+	return ret
 }

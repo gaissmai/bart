@@ -1226,7 +1226,6 @@ func TestOverlapsCompare(t *testing.T) {
 	// of random pairs overlapping. Cool example of the birthday paradox!
 	const numEntries = 6
 
-	seen := map[bool]int{}
 	for i := 0; i < 10000; i++ {
 		pfxs := randomPrefixes(numEntries)
 		fast := Table[int]{}
@@ -1250,8 +1249,6 @@ func TestOverlapsCompare(t *testing.T) {
 			t.Fatalf("Overlaps(...) = %v, want %v\nTable1:\n%s\nTable:\n%v",
 				gotFast, gotGold, fast.String(), fastInter.String())
 		}
-
-		seen[gotFast]++
 	}
 }
 

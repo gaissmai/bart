@@ -6,11 +6,9 @@ package bart
 import (
 	"cmp"
 	crand "crypto/rand"
-	"fmt"
 	"math/rand"
 	"net/netip"
 	"slices"
-	"strings"
 )
 
 // goldTable is a simple and slow route table, implemented as a slice of prefixes
@@ -157,14 +155,6 @@ func (ta *goldTable[V]) overlaps(tb *goldTable[V]) bool {
 		}
 	}
 	return false
-}
-
-func (s *slowRT[T]) dumpString() string {
-	buf := strings.Builder{}
-	for _, e := range s.entries {
-		buf.WriteString(fmt.Sprintf("%s %v\n", e.pfx, e.val))
-	}
-	return buf.String()
 }
 
 // sort, inplace by netip.Prefix, all prefixes are in normalized form

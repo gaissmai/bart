@@ -1576,180 +1576,23 @@ func TestOverlapsPrefixCompare2(t *testing.T) {
 	}
 }
 
-func TestUnionRegression2(t *testing.T) {
-	t.Run("reg 1", func(t *testing.T) {
-		aTbl := &Table2[string]{}
-		bTbl := &Table2[string]{}
-
-		aTbl.Insert(mpp("219.0.0.0/9"), "219.0.0.0/9")
-		bTbl.Insert(mpp("219.126.65.199/32"), "219.126.65.199/32")
-
-		aTbl.Union(bTbl)
-		want := `▼
-└─ 219.0.0.0/9 (219.0.0.0/9)
-   └─ 219.126.65.199/32 (219.126.65.199/32)
-`
-		got := aTbl.String()
-		if got != want {
-			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
-		}
-	})
-
-	t.Run("reg 2", func(t *testing.T) {
-		aTbl := &Table2[string]{}
-		bTbl := &Table2[string]{}
-
-		aTbl.Insert(mpp("219.0.0.0/8"), "219.0.0.0/8")
-		aTbl.Insert(mpp("219.126.0.0/15"), "219.126.0.0/15")
-
-		bTbl.Insert(mpp("219.126.3.4/32"), "219.126.3.4/32")
-
-		aTbl.Union(bTbl)
-		want := `▼
-└─ 219.0.0.0/8 (219.0.0.0/8)
-   └─ 219.126.0.0/15 (219.126.0.0/15)
-      └─ 219.126.3.4/32 (219.126.3.4/32)
-`
-		got := aTbl.String()
-		if got != want {
-			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
-		}
-	})
-
-	t.Run("reg 3", func(t *testing.T) {
-		aTbl := &Table2[string]{}
-		bTbl := &Table2[string]{}
-
-		aTbl.Insert(mpp("219.0.0.0/8"), "219.0.0.0/8")
-		aTbl.Insert(mpp("219.126.3.4/32"), "219.126.3.4/32")
-
-		bTbl.Insert(mpp("219.126.0.0/15"), "219.126.0.0/15")
-
-		aTbl.Union(bTbl)
-		want := `▼
-└─ 219.0.0.0/8 (219.0.0.0/8)
-   └─ 219.126.0.0/15 (219.126.0.0/15)
-      └─ 219.126.3.4/32 (219.126.3.4/32)
-`
-		got := aTbl.String()
-		if got != want {
-			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
-		}
-	})
-}
-
-func TestUnionEdgeCases2(t *testing.T) {
+func TestUnionCompare2(t *testing.T) {
 	t.Parallel()
 
-	t.Run("empty", func(t *testing.T) {
-		aTbl := &Table2[int]{}
-		bTbl := &Table2[int]{}
+	// test random prefixes
+	for n := 1; n <= 1_000; n += 10 {
 
-		// union empty tables
-		aTbl.Union(bTbl)
-
-		want := ""
-		got := aTbl.String()
-		if got != want {
-			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
+		pfxsA := make([]netip.Prefix, 0, n)
+		for _, r := range randomPrefixes(n) {
+			pfxsA = append(pfxsA, r.pfx)
 		}
-	})
 
-	t.Run("other empty", func(t *testing.T) {
-		aTbl := &Table2[int]{}
-		bTbl := &Table2[int]{}
-
-		// one empty table, b
-		aTbl.Insert(mpp("0.0.0.0/0"), 0)
-
-		aTbl.Union(bTbl)
-		want := `▼
-└─ 0.0.0.0/0 (0)
-`
-		got := aTbl.String()
-		if got != want {
-			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
+		pfxsB := make([]netip.Prefix, 0, n)
+		for _, r := range randomPrefixes(n) {
+			pfxsB = append(pfxsB, r.pfx)
 		}
-	})
-
-	t.Run("other empty", func(t *testing.T) {
-		aTbl := &Table2[int]{}
-		bTbl := &Table2[int]{}
-
-		// one empty table, a
-		bTbl.Insert(mpp("0.0.0.0/0"), 0)
-
-		aTbl.Union(bTbl)
-		want := `▼
-└─ 0.0.0.0/0 (0)
-`
-		got := aTbl.String()
-		if got != want {
-			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
-		}
-	})
-
-	t.Run("duplicate prefix", func(t *testing.T) {
-		aTbl := &Table2[string]{}
-		bTbl := &Table2[string]{}
-
-		// one empty table
-		aTbl.Insert(mpp("::/0"), "orig value")
-		bTbl.Insert(mpp("::/0"), "overwrite")
-
-		aTbl.Union(bTbl)
-		want := `▼
-└─ ::/0 (overwrite)
-`
-		got := aTbl.String()
-		if got != want {
-			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
-		}
-	})
-
-	t.Run("different IP versions", func(t *testing.T) {
-		aTbl := &Table2[int]{}
-		bTbl := &Table2[int]{}
-
-		// one empty table
-		aTbl.Insert(mpp("0.0.0.0/0"), 1)
-		bTbl.Insert(mpp("::/0"), 2)
-
-		aTbl.Union(bTbl)
-		want := `▼
-└─ 0.0.0.0/0 (1)
-▼
-└─ ::/0 (2)
-`
-		got := aTbl.String()
-		if got != want {
-			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
-		}
-	})
-
-	t.Run("same children", func(t *testing.T) {
-		aTbl := &Table2[int]{}
-		bTbl := &Table2[int]{}
-
-		aTbl.Insert(mpp("127.0.0.1/32"), 1)
-		aTbl.Insert(mpp("::1/128"), 1)
-
-		bTbl.Insert(mpp("127.0.0.2/32"), 2)
-		bTbl.Insert(mpp("::2/128"), 2)
-
-		aTbl.Union(bTbl)
-		want := `▼
-├─ 127.0.0.1/32 (1)
-└─ 127.0.0.2/32 (2)
-▼
-├─ ::1/128 (1)
-└─ ::2/128 (2)
-`
-		got := aTbl.String()
-		if got != want {
-			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
-		}
-	})
+		checkUnion2(t, pfxsA, pfxsB)
+	}
 }
 
 // TestUnionMemoryAliasing tests that the Union method does not alias memory
@@ -1787,165 +1630,36 @@ func TestUnionMemoryAliasing2(t *testing.T) {
 	}
 }
 
-func TestUnionCompare2(t *testing.T) {
+func TestOverlapsCompare2(t *testing.T) {
 	t.Parallel()
 
-	const numEntries = 1
+	// Empirically, between 5 and 6 routes per table results in ~50%
+	// of random pairs overlapping. Cool example of the birthday paradox!
+	const numEntries = 6
 
-	var pfxsA []slowRTEntry[int]
-	var pfxsB []slowRTEntry[int]
-
-	var slowA slowRT[int]
-	var fastA Table2[int]
-
-	var slowAC slowRT[int]
-	var fastAC Table2[int]
-
-	var slowB slowRT[int]
-	var fastB Table2[int]
-
-	var slowBC slowRT[int]
-	var fastBC Table2[int]
-
-	defer func() {
-		if t.Failed() {
-			t.Logf("slowAC:\n%s", slowAC.dumpString())
-			t.Logf("slowBC:\n%s", slowBC.dumpString())
-			t.Logf("fastAC:\n%s", fastAC.String())
-			t.Logf("fastBC:\n%s", fastBC.String())
-
-			t.Logf("slowA:\n%s", slowA.dumpString())
-			t.Logf("fastA:\n%s", fastA.String())
-		}
-	}()
-
-	for i := 0; i < 1_000; i++ {
-		pfxsA = randomPrefixes4(numEntries)
-
-		slowA = slowRT[int]{pfxsA}
-		slowAC = slowRT[int]{pfxsA}
-		fastA = Table2[int]{}
-		fastAC = Table2[int]{}
-		for _, pfx := range pfxsA {
-			fastA.Insert(pfx.pfx, pfx.val)
-			fastAC.Insert(pfx.pfx, pfx.val)
+	for i := 0; i < 10_000; i++ {
+		pfxs := randomPrefixes(numEntries)
+		slow := slowRT[int]{pfxs}
+		fast := Table2[int]{}
+		for _, pfx := range pfxs {
+			fast.Insert(pfx.pfx, pfx.val)
 		}
 
-		pfxsB = randomPrefixes4(numEntries)
-
-		slowB = slowRT[int]{pfxsB}
-		slowBC = slowRT[int]{pfxsB}
-		fastB = Table2[int]{}
-		fastBC = Table2[int]{}
-		for _, pfx := range pfxsB {
-			fastB.Insert(pfx.pfx, pfx.val)
-			fastBC.Insert(pfx.pfx, pfx.val)
+		inter := randomPrefixes(numEntries)
+		slowInter := slowRT[int]{inter}
+		fastInter := Table2[int]{}
+		for _, pfx := range inter {
+			fastInter.Insert(pfx.pfx, pfx.val)
 		}
 
-		slowA.union(&slowB)
-		fastA.Union(&fastB)
+		gotSlow := slow.overlaps(&slowInter)
+		gotFast := fast.Overlaps(&fastInter)
 
-		// dump as slow table for comparison
-		fastAsSlowTable := fastA.dumpAsPrefixTable()
-
-		// sort for comparison
-		slowA.sort()
-		fastAsSlowTable.sort()
-
-		for i := range slowA.entries {
-			slowI := slowA.entries[i]
-			fastI := fastAsSlowTable.entries[i]
-
-			if slowI != fastI {
-				t.Fatalf("Union(...): items[%d] differ slow(%v) != fast(%v)", i, slowI, fastI)
-			}
+		if gotSlow != gotFast {
+			t.Fatalf("Overlaps(...) = %v, want %v\nTable1:\n%s\nTable:\n%v",
+				gotFast, gotSlow, fast.String(), fastInter.String())
 		}
 	}
-}
-
-// ############################################################################
-
-// checkOverlaps2 verifies that the overlaps lookups in tt return the
-// expected results on tbl.
-func checkOverlaps2(t *testing.T, tbl *Table2[int], tests []tableOverlapsTest) {
-	for _, tt := range tests {
-		got := tbl.OverlapsPrefix(mpp(tt.prefix))
-		if got != tt.want {
-			t.Log(tbl.String())
-			t.Errorf("OverlapsPrefix(%v) = %v, want %v", mpp(tt.prefix), got, tt.want)
-		}
-	}
-}
-
-// dumpAsPrefixTable, just a helper to compare with slowPrefixTable
-func (t *Table2[V]) dumpAsPrefixTable() slowRT[V] {
-	pfxs := []slowRTEntry[V]{}
-
-	pfxs = dumpListRec2(pfxs, t.DumpList4())
-	pfxs = dumpListRec2(pfxs, t.DumpList6())
-
-	ret := slowRT[V]{pfxs}
-	return ret
-}
-
-func dumpListRec2[V any](pfxs []slowRTEntry[V], dumpList []DumpListNode[V]) []slowRTEntry[V] {
-	for _, node := range dumpList {
-		pfxs = append(pfxs, slowRTEntry[V]{pfx: node.CIDR, val: node.Value})
-		pfxs = append(pfxs, dumpListRec[V](nil, node.Subnets)...)
-	}
-	return pfxs
-}
-
-// #########################################################
-
-// checkRoutes verifies that the route lookups in tt return the
-// expected results on tbl.
-func checkRoutes2(t *testing.T, tbl *Table2[int], tt []tableTest) {
-	t.Helper()
-	for _, tc := range tt {
-		v, ok := tbl.Lookup(mpa(tc.addr))
-
-		if !ok && tc.want != -1 {
-			t.Errorf("Lookup %q got (%v, %v), want (%v, true)", tc.addr, v, ok, tc.want)
-		}
-		if ok && v != tc.want {
-			t.Errorf("Lookup %q got (%v, %v), want (%v, true)", tc.addr, v, ok, tc.want)
-		}
-	}
-}
-
-func checkSize2(t *testing.T, tbl *Table2[int], want int) {
-	tbl.init()
-	t.Helper()
-	if got := tbl.numNodes(); got != want {
-		t.Errorf("wrong table size, got %d strides want %d", got, want)
-	}
-}
-
-func (t *Table2[V]) numNodes() int {
-	t.init()
-	return t.numNodesRec(t.rootV4) + t.numNodesRec(t.rootV6)
-}
-
-func (t *Table2[V]) numNodesRec(n *node2[V]) int {
-	ret := 1 // this node
-	for _, c := range n.children {
-		ret += t.numNodesRec(c)
-	}
-	return ret
-}
-
-func (t *Table2[V]) numPrefixes() int {
-	t.init()
-	return t.numPrefixesRec(t.rootV4) + t.numPrefixesRec(t.rootV6)
-}
-
-func (t *Table2[V]) numPrefixesRec(n *node2[V]) int {
-	ret := len(n.prefixes)
-	for _, c := range n.children {
-		ret += t.numPrefixesRec(c)
-	}
-	return ret
 }
 
 func BenchmarkTableLookup2(b *testing.B) {
@@ -2241,5 +1955,164 @@ func BenchmarkTableDelete2Match(b *testing.B) {
 				b.ReportMetric(float64(rt2.numNodes()-nodes2), "delta_Nodes")
 			})
 		}
+	}
+}
+
+func BenchmarkTableUnion2(b *testing.B) {
+	for _, fam := range []string{"ipv4", "ipv6"} {
+		rng := randomPrefixes4
+		if fam == "ipv6" {
+			rng = randomPrefixes6
+		}
+
+		for _, nroutes := range benchRouteCount {
+			rt1 := new(Table[struct{}])
+			rt2 := new(Table2[struct{}])
+			for _, route := range rng(nroutes) {
+				rt1.Insert(route.pfx, struct{}{})
+				rt2.Insert(route.pfx, struct{}{})
+			}
+
+			rt3 := new(Table[struct{}])
+			rt4 := new(Table2[struct{}])
+			for _, route := range rng(nroutes) {
+				rt3.Insert(route.pfx, struct{}{})
+				rt4.Insert(route.pfx, struct{}{})
+			}
+
+			b.ResetTimer()
+			b.Run(fmt.Sprintf("orig/%s/Union_%d", fam, nroutes), func(b *testing.B) {
+				for range b.N {
+					rt1.Union(rt3)
+				}
+			})
+
+			b.ResetTimer()
+			b.Run(fmt.Sprintf("comp/%s/Union_%d", fam, nroutes), func(b *testing.B) {
+				for range b.N {
+					rt2.Union(rt4)
+				}
+			})
+		}
+	}
+}
+
+func BenchmarkTableOverlaps2(b *testing.B) {
+	for _, fam := range []string{"ipv4", "ipv6"} {
+		rng := randomPrefixes4
+		if fam == "ipv6" {
+			rng = randomPrefixes6
+		}
+
+		for _, nroutes := range benchRouteCount {
+			var fast Table2[int]
+			slow := slowRT[int]{rng(nroutes)}
+			for _, route := range slow.entries {
+				fast.Insert(route.pfx, route.val)
+			}
+
+			const (
+				intersectSize = 100
+				numIntersects = 1_000
+			)
+
+			fastIntersects := make([]*Table2[int], numIntersects)
+			slowIntersects := make([]slowRT[int], numIntersects)
+
+			for i := 0; i < numIntersects; i++ {
+				fastInter := &Table2[int]{}
+				slowInter := slowRT[int]{rng(intersectSize)}
+
+				for _, route := range slowInter.entries {
+					fastInter.Insert(route.pfx, route.val)
+				}
+				fastIntersects[i] = fastInter
+				slowIntersects[i] = slowInter
+			}
+
+			b.ResetTimer()
+			b.Run(fmt.Sprintf("fast/%s/%d_with_%d", fam, nroutes, intersectSize), func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					boolSink = fast.Overlaps(fastIntersects[i%numIntersects])
+				}
+			})
+
+			b.ResetTimer()
+			b.Run(fmt.Sprintf("slow/%s/%d_with_%d", fam, nroutes, intersectSize), func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					boolSink = (&slow).overlaps(&slowIntersects[i%numIntersects])
+				}
+			})
+		}
+	}
+}
+
+// ############################################################################
+//  test helpers
+// ############################################################################
+
+// checkOverlaps2 verifies that the overlaps lookups in tt return the
+// expected results on tbl.
+func checkOverlaps2(t *testing.T, tbl *Table2[int], tests []tableOverlapsTest) {
+	for _, tt := range tests {
+		got := tbl.OverlapsPrefix(mpp(tt.prefix))
+		if got != tt.want {
+			t.Log(tbl.String())
+			t.Errorf("OverlapsPrefix(%v) = %v, want %v", mpp(tt.prefix), got, tt.want)
+		}
+	}
+}
+
+// checkRoutes verifies that the route lookups in tt return the
+// expected results on tbl.
+func checkRoutes2(t *testing.T, tbl *Table2[int], tt []tableTest) {
+	t.Helper()
+	for _, tc := range tt {
+		v, ok := tbl.Lookup(mpa(tc.addr))
+
+		if !ok && tc.want != -1 {
+			t.Errorf("Lookup %q got (%v, %v), want (%v, true)", tc.addr, v, ok, tc.want)
+		}
+		if ok && v != tc.want {
+			t.Errorf("Lookup %q got (%v, %v), want (%v, true)", tc.addr, v, ok, tc.want)
+		}
+	}
+}
+
+// checkUnion2 verifies that the unified table matches the expected result.
+func checkUnion2(t *testing.T, pfxsA, pfxsB []netip.Prefix) {
+	t.Helper()
+
+	golden := &Table2[string]{}
+
+	a := &Table2[string]{}
+	b := &Table2[string]{}
+
+	for _, pfx := range pfxsA {
+		a.Insert(pfx, "A: "+pfx.String())
+		golden.Insert(pfx, "A: "+pfx.String())
+	}
+
+	for _, pfx := range pfxsB {
+		b.Insert(pfx, "B: "+pfx.String())
+		golden.Insert(pfx, "B: "+pfx.String())
+	}
+
+	a.Union(b)
+
+	want := golden.String()
+	got := a.String()
+
+	if got != want {
+		t.Errorf("want:\n%s", want)
+		t.Errorf("got:\n%s", got)
+	}
+}
+
+func checkSize2(t *testing.T, tbl *Table2[int], want int) {
+	tbl.init()
+	t.Helper()
+	if got := tbl.numNodes(); got != want {
+		t.Errorf("wrong table size, got %d strides want %d", got, want)
 	}
 }

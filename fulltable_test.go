@@ -489,8 +489,8 @@ func sliceRoutes(n int) []route {
 		panic("n too big")
 	}
 
-	clone := make([]route, 0, n)
-	clone = append(clone, routes...)
+	clone := make([]route, n)
+	copy(clone, routes)
 
 	rand.Shuffle(len(clone), func(i, j int) {
 		clone[i], clone[j] = clone[j], clone[i]
