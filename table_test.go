@@ -31,6 +31,113 @@ var mpp = func(s string) netip.Prefix {
 	return pfx
 }
 
+func TestValid(t *testing.T) {
+	t.Parallel()
+
+	var tbl = new(Table[any])
+	var zero netip.Prefix
+	var testname string
+
+	testname = "Insert"
+	t.Run(testname, func(t *testing.T) {
+		defer func(testname string) {
+			if r := recover(); r != nil {
+				t.Fatalf("%s panics on invalid prefix input", testname)
+			}
+		}(testname)
+
+		tbl.Insert(zero, nil)
+	})
+
+	testname = "Delete"
+	t.Run(testname, func(t *testing.T) {
+		defer func(testname string) {
+			if r := recover(); r != nil {
+				t.Fatalf("%s panics on invalid prefix input", testname)
+			}
+		}(testname)
+
+		tbl.Delete(zero)
+	})
+
+	testname = "Update"
+	t.Run(testname, func(t *testing.T) {
+		defer func(testname string) {
+			if r := recover(); r != nil {
+				t.Fatalf("%s panics on invalid prefix input", testname)
+			}
+		}(testname)
+
+		tbl.Update(zero, func(v any, _ bool) any { return v })
+	})
+
+	testname = "Get"
+	t.Run(testname, func(t *testing.T) {
+		defer func(testname string) {
+			if r := recover(); r != nil {
+				t.Fatalf("%s panics on invalid prefix input", testname)
+			}
+		}(testname)
+
+		tbl.Get(zero)
+	})
+
+	testname = "LookupPrefix"
+	t.Run(testname, func(t *testing.T) {
+		defer func(testname string) {
+			if r := recover(); r != nil {
+				t.Fatalf("%s panics on invalid prefix input", testname)
+			}
+		}(testname)
+
+		tbl.LookupPrefix(zero)
+	})
+
+	testname = "LookupPrefixLPM"
+	t.Run(testname, func(t *testing.T) {
+		defer func(testname string) {
+			if r := recover(); r != nil {
+				t.Fatalf("%s panics on invalid prefix input", testname)
+			}
+		}(testname)
+
+		tbl.LookupPrefixLPM(zero)
+	})
+
+	testname = "Subnets"
+	t.Run(testname, func(t *testing.T) {
+		defer func(testname string) {
+			if r := recover(); r != nil {
+				t.Fatalf("%s panics on invalid prefix input", testname)
+			}
+		}(testname)
+
+		tbl.Subnets(zero)
+	})
+
+	testname = "Supernets"
+	t.Run(testname, func(t *testing.T) {
+		defer func(testname string) {
+			if r := recover(); r != nil {
+				t.Fatalf("%s panics on invalid prefix input", testname)
+			}
+		}(testname)
+
+		tbl.Supernets(zero)
+	})
+
+	testname = "OverlapsPrefix"
+	t.Run(testname, func(t *testing.T) {
+		defer func(testname string) {
+			if r := recover(); r != nil {
+				t.Fatalf("%s panics on invalid prefix input", testname)
+			}
+		}(testname)
+
+		tbl.OverlapsPrefix(zero)
+	})
+}
+
 func TestRegression(t *testing.T) {
 	t.Parallel()
 	// original comment by tailscale for ART,
