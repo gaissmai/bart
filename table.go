@@ -55,6 +55,9 @@ func (t *Table[V]) rootNodeByVersion(is4 bool) *node[V] {
 // The prefix must already be normalized!
 func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	t.init()
+	if !pfx.IsValid() {
+		return
+	}
 
 	// some values derived from pfx
 	ip, bits, is4 := pfxToValues(pfx)
@@ -110,6 +113,10 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 // The prefix must already be normalized!
 func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 	t.init()
+	if !pfx.IsValid() {
+		var zero V
+		return zero
+	}
 
 	// some values derived from pfx
 	ip, bits, is4 := pfxToValues(pfx)
@@ -148,6 +155,9 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 //
 // The prefix must already be normalized!
 func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
+	if !pfx.IsValid() {
+		return
+	}
 	// some values derived from pfx
 	ip, bits, is4 := pfxToValues(pfx)
 
@@ -181,6 +191,9 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 //
 // The prefix must already be normalized!
 func (t *Table[V]) Delete(pfx netip.Prefix) {
+	if !pfx.IsValid() {
+		return
+	}
 	// some values derived from pfx
 	ip, bits, is4 := pfxToValues(pfx)
 
@@ -243,6 +256,10 @@ func (t *Table[V]) Delete(pfx netip.Prefix) {
 // Lookup does a route lookup (longest prefix match) for IP and
 // returns the associated value and true, or false if no route matched.
 func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
+	if !ip.IsValid() {
+		return
+	}
+
 	is4 := ip.Is4()
 
 	n := t.rootNodeByVersion(is4)
@@ -296,6 +313,9 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 //
 // The prefix must already be normalized!
 func (t *Table[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
+	if !pfx.IsValid() {
+		return
+	}
 	_, _, val, ok = t.lpmByPrefix(pfx)
 	return
 }
@@ -311,6 +331,9 @@ func (t *Table[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
 // If LookupPrefixLPM is to be used for IP addresses,
 // they must be converted to /32 or /128 prefixes.
 func (t *Table[V]) LookupPrefixLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) {
+	if !pfx.IsValid() {
+		return
+	}
 	depth, baseIdx, val, ok := t.lpmByPrefix(pfx)
 
 	if ok {
@@ -393,6 +416,9 @@ func (t *Table[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V
 //
 // The prefix must already be normalized!
 func (t *Table[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
+	if !pfx.IsValid() {
+		return nil
+	}
 	// some needed values, see below
 	ip, bits, is4 := pfxToValues(pfx)
 
@@ -434,6 +460,9 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 //
 // The prefix must already be normalized!
 func (t *Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
+	if !pfx.IsValid() {
+		return nil
+	}
 	var result []netip.Prefix
 
 	// some needed values, see below
@@ -477,6 +506,9 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 //
 // The prefix must be normalized!
 func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
+	if !pfx.IsValid() {
+		return false
+	}
 	// some needed values, see below
 	ip, bits, is4 := pfxToValues(pfx)
 
