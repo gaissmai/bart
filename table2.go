@@ -4,7 +4,6 @@
 package bart
 
 import (
-	"context"
 	"net/netip"
 	"slices"
 	"sync"
@@ -653,7 +652,7 @@ func (t *Table2[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 	// find the trie node
 	for {
 		if idx == lastOctetIdx {
-			result := n.subnetsRec(parentIndex)
+			result := n.subnetsRec2(parentIndex)
 
 			slices.SortFunc(result, cmpPrefix)
 			return result
@@ -686,7 +685,7 @@ func (t *Table2[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 			search.insertChild(octet, c)
 
 			// subnet search, starting at this tmp search node
-			result := search.subnetsRec(parentIndex)
+			result := search.subnetsRec2(parentIndex)
 
 			slices.SortFunc(result, cmpPrefix)
 
@@ -836,162 +835,22 @@ func (t *Table2[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 
 // Overlaps reports whether any IP in the table matches a route in the
 // other table.
-func (t *Table2[V]) Overlaps1(o *Table2[V]) bool {
-	t.init()
-	o.init()
-
-	// stop recursion on first overlap, so negate the result of OverlapsPrefix
-	cb := func(pfx netip.Prefix, _ V) bool {
-		return !t.OverlapsPrefix(pfx)
-	}
-
-	// shortcut, return on first overlap
-	return !(o.rootV4.allRec(cb) && o.rootV6.allRec(cb))
-}
-
+// The algorithm works most efficiently when table t is the larger of the two tables
 func (t *Table2[V]) Overlaps(o *Table2[V]) bool {
 	t.init()
 	o.init()
 
-	// stop recursion on first overlap, so negate the result of OverlapsPrefix
-	cb := func(pfx netip.Prefix) bool {
+	// negates the result of OverlapsPrefix, stop recursion on first overlap
+	yield := func(pfx netip.Prefix) bool {
 		return !t.OverlapsPrefix(pfx)
 	}
 
-	// shortcut, return on first overlap
-	return !(o.rootV4.topSupernetsRec(cb) && o.rootV6.topSupernetsRec(cb))
-}
-
-func (t *Table2[V]) Overlaps4(o *Table2[V]) bool {
-	t.init()
-	o.init()
-
-	tPfxsV4 := make([]netip.Prefix, 0, 10)
-	oPfxsV4 := make([]netip.Prefix, 0, 10)
-	tPfxsV6 := make([]netip.Prefix, 0, 10)
-	oPfxsV6 := make([]netip.Prefix, 0, 10)
-
-	tPfxsChanV4 := make(chan netip.Prefix)
-	oPfxsChanV4 := make(chan netip.Prefix)
-	tPfxsChanV6 := make(chan netip.Prefix)
-	oPfxsChanV6 := make(chan netip.Prefix)
-
-	var wg sync.WaitGroup
-	wg.Add(4)
-	ctx, cancel := context.WithCancel(context.Background())
-
-	go t.rootV4.iterTopSupernetsRec(ctx, &wg, tPfxsChanV4)
-	go o.rootV4.iterTopSupernetsRec(ctx, &wg, oPfxsChanV4)
-	go t.rootV6.iterTopSupernetsRec(ctx, &wg, tPfxsChanV6)
-	go o.rootV6.iterTopSupernetsRec(ctx, &wg, oPfxsChanV6)
-
-	overlaps := false
-	openChannels := 4
-
-OuterLoop:
-	for {
-		if openChannels == 0 {
-			cancel()
-			break OuterLoop
-		}
-
-		select {
-		case <-ctx.Done():
-			break OuterLoop
-
-		case pfx, ok := <-tPfxsChanV4:
-			if !ok {
-				tPfxsChanV4 = nil
-				openChannels--
-				continue
-			}
-
-			for _, oPfx := range oPfxsV4 {
-				if pfx.Overlaps(oPfx) {
-					overlaps = true
-					cancel()
-					break OuterLoop
-				}
-			}
-			tPfxsV4 = append(tPfxsV4, pfx)
-
-		case pfx, ok := <-oPfxsChanV4:
-			if !ok {
-				oPfxsChanV4 = nil
-				openChannels--
-				continue
-			}
-
-			for _, tPfx := range tPfxsV4 {
-				if pfx.Overlaps(tPfx) {
-					overlaps = true
-					cancel()
-					break OuterLoop
-				}
-			}
-			oPfxsV4 = append(oPfxsV4, pfx)
-
-		case pfx, ok := <-tPfxsChanV6:
-			if !ok {
-				tPfxsChanV6 = nil
-				openChannels--
-				continue
-			}
-
-			for _, oPfx := range oPfxsV6 {
-				if pfx.Overlaps(oPfx) {
-					overlaps = true
-					cancel()
-					break OuterLoop
-				}
-			}
-			tPfxsV6 = append(tPfxsV6, pfx)
-
-		case pfx, ok := <-oPfxsChanV6:
-			if !ok {
-				oPfxsChanV6 = nil
-				openChannels--
-				continue
-			}
-
-			for _, tPfx := range tPfxsV6 {
-				if pfx.Overlaps(tPfx) {
-					overlaps = true
-					cancel()
-					break OuterLoop
-				}
-			}
-			oPfxsV6 = append(oPfxsV6, pfx)
-		}
-	}
-	wg.Wait()
-	return overlaps
-}
-
-func (t *Table2[V]) Overlaps5(o *Table2[V]) bool {
-	t.init()
-	o.init()
-
-	cb1 := func(pfx1 netip.Prefix) bool {
-		cb2 := func(pfx2 netip.Prefix) bool {
-			return !pfx1.Overlaps(pfx2)
-		}
-		return o.rootV4.topSupernetsRec(cb2)
-	}
-
-	if !t.rootV4.topSupernetsRec(cb1) {
+	// return on first overlap, re-negate the result
+	if !o.rootV4.toplevelSupernetsRec(yield) {
 		return true
 	}
 
-	// and now v6
-
-	cb1 = func(pfx1 netip.Prefix) bool {
-		cb2 := func(pfx2 netip.Prefix) bool {
-			return !pfx1.Overlaps(pfx2)
-		}
-		return o.rootV6.topSupernetsRec(cb2)
-	}
-	return !t.rootV6.topSupernetsRec(cb1)
+	return !o.rootV6.toplevelSupernetsRec(yield)
 }
 
 // Union combines two tables, changing the receiver table.
@@ -1033,43 +892,17 @@ func (t *Table2[V]) Clone() *Table2[V] {
 func (t *Table2[V]) All(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
 	// respect premature end of allRec()
-	_ = t.rootV4.allRec(yield) && t.rootV6.allRec(yield)
+	_ = t.rootV4.allRec2(yield) && t.rootV6.allRec2(yield)
 }
 
 // All4, like [Table.All] but only for the v4 routing table.
 func (t *Table2[V]) All4(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
-	t.rootV4.allRec(yield)
+	t.rootV4.allRec2(yield)
 }
 
 // All6, like [Table.All] but only for the v6 routing table.
 func (t *Table2[V]) All6(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
-	t.rootV6.allRec(yield)
-}
-
-func (t *Table2[V]) numNodes() int {
-	t.init()
-	return t.numNodesRec(t.rootV4) + t.numNodesRec(t.rootV6)
-}
-
-func (t *Table2[V]) numNodesRec(n *node2[V]) int {
-	ret := 1 // this node
-	for _, c := range n.children {
-		ret += t.numNodesRec(c)
-	}
-	return ret
-}
-
-func (t *Table2[V]) numPrefixes() int {
-	t.init()
-	return t.numPrefixesRec(t.rootV4) + t.numPrefixesRec(t.rootV6)
-}
-
-func (t *Table2[V]) numPrefixesRec(n *node2[V]) int {
-	ret := len(n.prefixes)
-	for _, c := range n.children {
-		ret += t.numPrefixesRec(c)
-	}
-	return ret
+	t.rootV6.allRec2(yield)
 }

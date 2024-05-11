@@ -692,7 +692,7 @@ func TestDeleteIsReverseOfInsert2(t *testing.T) {
 		}
 	}()
 
-	want := tab.dumpString()
+	want := tab.dumpString2()
 	for _, p := range prefixes {
 		tab.Insert(p.pfx, p.val)
 	}
@@ -700,7 +700,7 @@ func TestDeleteIsReverseOfInsert2(t *testing.T) {
 	for i := len(prefixes) - 1; i >= 0; i-- {
 		tab.Delete(prefixes[i].pfx)
 	}
-	if got := tab.dumpString(); got != want {
+	if got := tab.dumpString2(); got != want {
 		t.Fatalf("after delete, mismatch:\n\n got: %s\n\nwant: %s", got, want)
 	}
 }
@@ -1686,7 +1686,7 @@ func BenchmarkTableLookup2(b *testing.B) {
 			b.ResetTimer()
 			b.Run(fmt.Sprintf("orig/IP:  %s/In_%7d", fam, nroutes), func(b *testing.B) {
 				for range b.N {
-					writeSink, _ = rt1.Lookup(probe.pfx.Addr())
+					intSink, _ = rt1.Lookup(probe.pfx.Addr())
 				}
 				b.ReportMetric(float64(rt1.numNodes()), "Nodes")
 			})
@@ -1694,7 +1694,7 @@ func BenchmarkTableLookup2(b *testing.B) {
 			b.ResetTimer()
 			b.Run(fmt.Sprintf("comp/IP:  %s/In_%7d", fam, nroutes), func(b *testing.B) {
 				for range b.N {
-					writeSink, _ = rt2.Lookup(probe.pfx.Addr())
+					intSink, _ = rt2.Lookup(probe.pfx.Addr())
 				}
 				b.ReportMetric(float64(rt2.numNodes()), "Nodes")
 			})
@@ -1727,7 +1727,7 @@ func BenchmarkTableLookupPrefix2(b *testing.B) {
 			b.ResetTimer()
 			b.Run(fmt.Sprintf("orig/Pfx: %s/In_%7d", fam, nroutes), func(b *testing.B) {
 				for range b.N {
-					writeSink, _ = rt1.LookupPrefix(probe.pfx)
+					intSink, _ = rt1.LookupPrefix(probe.pfx)
 				}
 				b.ReportMetric(float64(rt1.numNodes()), "Nodes")
 			})
@@ -1735,7 +1735,7 @@ func BenchmarkTableLookupPrefix2(b *testing.B) {
 			b.ResetTimer()
 			b.Run(fmt.Sprintf("comp/Pfx: %s/In_%7d", fam, nroutes), func(b *testing.B) {
 				for range b.N {
-					writeSink, _ = rt2.LookupPrefix(probe.pfx)
+					intSink, _ = rt2.LookupPrefix(probe.pfx)
 				}
 				b.ReportMetric(float64(rt2.numNodes()), "Nodes")
 			})
@@ -1768,7 +1768,7 @@ func BenchmarkTableLookupPrefixLPM2(b *testing.B) {
 			b.ResetTimer()
 			b.Run(fmt.Sprintf("orig/LPM: %s/In_%7d", fam, nroutes), func(b *testing.B) {
 				for range b.N {
-					_, writeSink, _ = rt1.LookupPrefixLPM(probe.pfx)
+					_, intSink, _ = rt1.LookupPrefixLPM(probe.pfx)
 				}
 				b.ReportMetric(float64(rt1.numNodes()), "Nodes")
 			})
@@ -1776,7 +1776,7 @@ func BenchmarkTableLookupPrefixLPM2(b *testing.B) {
 			b.ResetTimer()
 			b.Run(fmt.Sprintf("comp/LPM: %s/In_%7d", fam, nroutes), func(b *testing.B) {
 				for range b.N {
-					_, writeSink, _ = rt2.LookupPrefixLPM(probe.pfx)
+					_, intSink, _ = rt2.LookupPrefixLPM(probe.pfx)
 				}
 				b.ReportMetric(float64(rt2.numNodes()), "Nodes")
 			})
@@ -2005,10 +2005,11 @@ func BenchmarkTableOverlaps2(b *testing.B) {
 		}
 
 		for _, nroutes := range benchRouteCount {
-			var fast Table2[int]
-			slow := slowRT[int]{rng(nroutes)}
-			for _, route := range slow.entries {
-				fast.Insert(route.pfx, route.val)
+			var tbl1 Table[int]
+			var tbl2 Table2[int]
+			for _, route := range rng(nroutes) {
+				tbl1.Insert(route.pfx, route.val)
+				tbl2.Insert(route.pfx, route.val)
 			}
 
 			const (
@@ -2016,33 +2017,35 @@ func BenchmarkTableOverlaps2(b *testing.B) {
 				numIntersects = 1_000
 			)
 
-			fastIntersects := make([]*Table2[int], numIntersects)
-			slowIntersects := make([]slowRT[int], numIntersects)
+			tbl1Intersects := make([]*Table[int], numIntersects)
+			tbl2Intersects := make([]*Table2[int], numIntersects)
 
 			for i := 0; i < numIntersects; i++ {
-				fastInter := &Table2[int]{}
-				slowInter := slowRT[int]{rng(intersectSize)}
+				tbl1Inter := &Table[int]{}
+				tbl2Inter := &Table2[int]{}
 
-				for _, route := range slowInter.entries {
-					fastInter.Insert(route.pfx, route.val)
+				for _, route := range rng(intersectSize) {
+					tbl1Inter.Insert(route.pfx, route.val)
+					tbl2Inter.Insert(route.pfx, route.val)
 				}
-				fastIntersects[i] = fastInter
-				slowIntersects[i] = slowInter
+				tbl1Intersects[i] = tbl1Inter
+				tbl2Intersects[i] = tbl2Inter
 			}
 
 			b.ResetTimer()
-			b.Run(fmt.Sprintf("fast/%s/%d_with_%d", fam, nroutes, intersectSize), func(b *testing.B) {
+			b.Run(fmt.Sprintf("orig/%s/%d_with_%d", fam, nroutes, intersectSize), func(b *testing.B) {
 				for i := 0; i < b.N; i++ {
-					boolSink = fast.Overlaps(fastIntersects[i%numIntersects])
+					boolSink = tbl1.Overlaps(tbl1Intersects[i%numIntersects])
 				}
 			})
 
 			b.ResetTimer()
-			b.Run(fmt.Sprintf("slow/%s/%d_with_%d", fam, nroutes, intersectSize), func(b *testing.B) {
+			b.Run(fmt.Sprintf("comp/%s/%d_with_%d", fam, nroutes, intersectSize), func(b *testing.B) {
 				for i := 0; i < b.N; i++ {
-					boolSink = (&slow).overlaps(&slowIntersects[i%numIntersects])
+					boolSink = tbl2.Overlaps(tbl2Intersects[i%numIntersects])
 				}
 			})
+
 		}
 	}
 }
@@ -2115,4 +2118,30 @@ func checkSize2(t *testing.T, tbl *Table2[int], want int) {
 	if got := tbl.numNodes(); got != want {
 		t.Errorf("wrong table size, got %d strides want %d", got, want)
 	}
+}
+
+func (t *Table2[V]) numNodes() int {
+	t.init()
+	return t.numNodesRec(t.rootV4) + t.numNodesRec(t.rootV6)
+}
+
+func (t *Table2[V]) numNodesRec(n *node2[V]) int {
+	ret := 1 // this node
+	for _, c := range n.children {
+		ret += t.numNodesRec(c)
+	}
+	return ret
+}
+
+func (t *Table2[V]) numPrefixes() int {
+	t.init()
+	return t.numPrefixesRec(t.rootV4) + t.numPrefixesRec(t.rootV6)
+}
+
+func (t *Table2[V]) numPrefixesRec(n *node2[V]) int {
+	ret := len(n.prefixes)
+	for _, c := range n.children {
+		ret += t.numPrefixesRec(c)
+	}
+	return ret
 }

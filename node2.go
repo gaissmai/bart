@@ -5,13 +5,8 @@ package bart
 
 import (
 	"bytes"
-	"context"
-	"fmt"
 	"net/netip"
 	"slices"
-	"strconv"
-	"strings"
-	"sync"
 
 	"github.com/bits-and-blooms/bitset"
 )
@@ -75,16 +70,12 @@ func (n *node2[V]) pathLen() int {
 	return int(n.path.length)
 }
 
-func (n *node2[V]) pathIsEqual(start int, buf []byte) bool {
-	return bytes.Equal(buf[start:], n.pathAsSlice()[start:])
-}
-
 func (n *node2[V]) pathIsPrefixOrEqual(start int, buf []byte) bool {
 	return bytes.HasPrefix(buf[start:], n.pathAsSlice()[start:])
 }
 
-// commonPathIdx, return idx until path differ.
-// Start is the idx we know already they are in common.
+// commonPathIdx, return idx for last in common byte.
+// Start is the idx we know already they are in common (time optimization).
 func (n *node2[V]) commonPathIdx(start int, o *node2[V]) int {
 	idx := start
 	for i := start; i < min(n.pathLen(), o.pathLen()); i++ {
@@ -94,29 +85,6 @@ func (n *node2[V]) commonPathIdx(start int, o *node2[V]) int {
 		idx = i
 	}
 	return idx
-}
-
-// pathAsString, stride path, different formats for IPv4 and IPv6, dotted decimal or hex.
-func (n *node2[V]) pathAsString() string {
-	buf := new(strings.Builder)
-
-	if n.is4 {
-		for i, b := range n.pathAsSlice() {
-			if i != 0 {
-				buf.WriteString(".")
-			}
-			buf.WriteString(strconv.Itoa(int(b)))
-		}
-		return buf.String()
-	}
-
-	for i, b := range n.pathAsSlice() {
-		if i != 0 && i%2 == 0 {
-			buf.WriteString(":")
-		}
-		buf.WriteString(fmt.Sprintf("%02x", b))
-	}
-	return buf.String()
 }
 
 // isEmpty returns true if node has neither prefixes nor children.
@@ -357,129 +325,6 @@ func (n *node2[V]) allChildAddrs() []uint {
 
 // #################### nodes #############################################
 
-// overlapsRec returns true if any IP in the nodes n or o overlaps.
-// First test the routes, then the children and if no match rec-descent
-// for child nodes with same octet.
-func (n *node2[V]) overlapsRec(o *node2[V]) bool {
-	// dynamically allot the host routes from prefixes
-	nAllotIndex := [maxNodePrefixes]bool{}
-	oAllotIndex := [maxNodePrefixes]bool{}
-
-	// 1. test if any routes overlaps?
-
-	nOk := len(n.prefixes) > 0
-	oOk := len(o.prefixes) > 0
-	var nIdx, oIdx uint
-	// zig-zag, for all routes in both nodes ...
-	for {
-		if nOk {
-			// range over bitset, node n
-			if nIdx, nOk = n.prefixesBitset.NextSet(nIdx); nOk {
-				// get range of host routes for this prefix
-				lowerBound, upperBound := lowerUpperBound(nIdx)
-
-				// insert host routes (octet/8) for this prefix,
-				// some sort of allotment
-				for i := lowerBound; i <= upperBound; i++ {
-					// zig-zag, fast return
-					if oAllotIndex[i] {
-						return true
-					}
-					nAllotIndex[i] = true
-				}
-				nIdx++
-			}
-		}
-
-		if oOk {
-			// range over bitset, node o
-			if oIdx, oOk = o.prefixesBitset.NextSet(oIdx); oOk {
-				// get range of host routes for this prefix
-				lowerBound, upperBound := lowerUpperBound(oIdx)
-
-				// insert host routes (octet/8) for this prefix,
-				// some sort of allotment
-				for i := lowerBound; i <= upperBound; i++ {
-					// zig-zag, fast return
-					if nAllotIndex[i] {
-						return true
-					}
-					oAllotIndex[i] = true
-				}
-				oIdx++
-			}
-		}
-		if !nOk && !oOk {
-			break
-		}
-	}
-
-	// full run, zig-zag didn't already match
-	if len(n.prefixes) > 0 && len(o.prefixes) > 0 {
-		for i := firstHostIndex; i <= lastHostIndex; i++ {
-			if nAllotIndex[i] && oAllotIndex[i] {
-				return true
-			}
-		}
-	}
-
-	// 2. test if routes overlaps any child
-
-	nOctets := [maxNodeChildren]bool{}
-	oOctets := [maxNodeChildren]bool{}
-
-	nOk = len(n.children) > 0
-	oOk = len(o.children) > 0
-	var nOctet, oOctet uint
-	// zig-zag, for all octets in both nodes ...
-	for {
-		// range over bitset, node n
-		if nOk {
-			if nOctet, nOk = n.childrenBitset.NextSet(nOctet); nOk {
-				if oAllotIndex[nOctet+firstHostIndex] {
-					return true
-				}
-				nOctets[nOctet] = true
-				nOctet++
-			}
-		}
-
-		// range over bitset, node o
-		if oOk {
-			if oOctet, oOk = o.childrenBitset.NextSet(oOctet); oOk {
-				if nAllotIndex[oOctet+firstHostIndex] {
-					return true
-				}
-				oOctets[oOctet] = true
-				oOctet++
-			}
-		}
-
-		if !nOk && !oOk {
-			break
-		}
-	}
-
-	// 3. rec-descent call for childs with same octet
-
-	if len(n.children) > 0 && len(o.children) > 0 {
-		for i := 0; i < len(nOctets); i++ {
-			if nOctets[i] && oOctets[i] {
-				// get next child node for this octet
-				nc := n.getChild(byte(i))
-				oc := o.getChild(byte(i))
-
-				// rec-descent
-				if nc.overlapsRec(oc) {
-					return true
-				}
-			}
-		}
-	}
-
-	return false
-}
-
 // overlapsPrefix returns true if node overlaps with prefix.
 func (n *node2[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 	// ##################################################
@@ -499,7 +344,7 @@ func (n *node2[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 
 	// increment to 'next' routeIdx for start in bitset search
 	// since pfxIdx already testet by lpm in other direction
-	routeIdx := pfxIdx << 1
+	routeIdx := pfxIdx * 2
 	var ok bool
 	for {
 		if routeIdx, ok = n.prefixesBitset.NextSet(routeIdx); !ok {
@@ -537,6 +382,7 @@ func (n *node2[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 	return false
 }
 
+// cloneRec, clones the node recursive.
 func (n *node2[V]) cloneRec() *node2[V] {
 	c := newNode2[V](n.pathAsSlice(), n.is4)
 
@@ -558,11 +404,11 @@ func (n *node2[V]) cloneRec() *node2[V] {
 	return c
 }
 
-// allRec runs recursive the trie, starting at node and
+// allRec2 runs recursive the trie, starting at node and
 // the yield function is called for each route entry with prefix and value.
 // If the yield function returns false the recursion ends prematurely and the
 // false value is propagated.
-func (n *node2[V]) allRec(yield func(netip.Prefix, V) bool) bool {
+func (n *node2[V]) allRec2(yield func(netip.Prefix, V) bool) bool {
 	// for all prefixes in this node do ...
 	for _, idx := range n.allStrideIndexes() {
 		val, _ := n.getValByIndex(idx)
@@ -580,7 +426,7 @@ func (n *node2[V]) allRec(yield func(netip.Prefix, V) bool) bool {
 		octet := byte(addr)
 		child := n.getChild(octet)
 
-		if !child.allRec(yield) {
+		if !child.allRec2(yield) {
 			// premature end of recursion
 			return false
 		}
@@ -589,8 +435,8 @@ func (n *node2[V]) allRec(yield func(netip.Prefix, V) bool) bool {
 	return true
 }
 
-// subnetsRec returns all CIDRs covered by parent pfx.
-func (n *node2[V]) subnetsRec(parentIdx uint) (result []netip.Prefix) {
+// subnetsRec2 returns all CIDRs covered by parent pfx.
+func (n *node2[V]) subnetsRec2(parentIdx uint) (result []netip.Prefix) {
 	// for all routes in this node do ...
 	for _, idx := range n.allStrideIndexes() {
 		// is this route covered by pfx?
@@ -613,7 +459,7 @@ func (n *node2[V]) subnetsRec(parentIdx uint) (result []netip.Prefix) {
 			if i == parentIdx {
 				// all CIDRs under this child are covered by pfx
 				c := n.getChild(octet)
-				c.allRec(func(pfx netip.Prefix, _ V) bool {
+				c.allRec2(func(pfx netip.Prefix, _ V) bool {
 					result = append(result, pfx)
 					return true
 				})
@@ -623,16 +469,6 @@ func (n *node2[V]) subnetsRec(parentIdx uint) (result []netip.Prefix) {
 
 	return result
 }
-
-/*
-// cmpPrefix, all cidrs are normalized
-func cmpPrefix(a, b netip.Prefix) int {
-	if cmp := a.Addr().Compare(b.Addr()); cmp != 0 {
-		return cmp
-	}
-	return cmp.Compare(a.Bits(), b.Bits())
-}
-*/
 
 // cidrFromIndex, make prefix from baseIndex.
 func (n *node2[V]) cidrFromIndex(idx uint) (pfx netip.Prefix) {
@@ -660,11 +496,43 @@ func (n *node2[V]) cidrFromIndex(idx uint) (pfx netip.Prefix) {
 	return
 }
 
-// topSupernetsRec runs recursive the trie, starting at node.
-// The yield function is called for each top level route entry.
+// toplevelSupernetsRec runs recursive the trie, starting at node.
+// A top level supernet prefix is defined as having no other prefix as supernet.
+// All other prefixes in the trie overlaps with exactly one toplevel supernet.
+//
+// The yield function is called for each top level supernet.
 // If the yield function returns false the recursion ends prematurely and the
 // false value is propagated.
-func (n *node2[V]) topSupernetsRec(yield func(pfx netip.Prefix) bool) bool {
+//
+//	example:
+//
+//	  ▼
+//	  ├─ 6.238.0.0/15
+//	  ├─ 8.0.0.0/7
+//	  ├─ 25.12.76.64/29
+//	  ├─ 52.154.212.32/28
+//	  ├─ 115.14.128.0/17
+//	  └─ 128.0.0.0/1
+//	     ├─ 129.222.24.0/25
+//	     ├─ 130.101.156.0/24
+//	     ├─ 150.200.0.0/13
+//	     ├─ 153.203.41.64/27
+//	     ├─ 186.22.98.220/31
+//	     ├─ 200.0.0.0/5
+//	     │  └─ 205.39.238.0/23
+//	     ├─ 212.84.85.0/24
+//	     └─ 252.0.0.0/6
+//	        └─ 252.196.0.0/18
+//
+//	toplevel supernets:
+//
+//	  6.238.0.0/15
+//	  8.0.0.0/7
+//	  25.12.76.64/29
+//	  52.154.212.32/28
+//	  115.14.128.0/17
+//	  128.0.0.0/1
+func (n *node2[V]) toplevelSupernetsRec(yield func(pfx netip.Prefix) bool) bool {
 	// allotTbl, filled with prefix entries
 	var allotTbl [maxNodePrefixes]bool
 
@@ -694,52 +562,9 @@ func (n *node2[V]) topSupernetsRec(yield func(pfx netip.Prefix) bool) bool {
 
 		// child not masked by supernet, rec-descent
 		c := n.getChild(byte(addr))
-		if !c.topSupernetsRec(yield) {
+		if !c.toplevelSupernetsRec(yield) {
 			return false
 		}
 	}
 	return true
-}
-
-func allot(allotTbl *[maxNodePrefixes]bool, idx uint) {
-	// allotRec is faster for idx >= some x
-	if idx >= 4 {
-		allotRec(allotTbl, idx)
-		return
-	}
-
-	// iteration is faster for small idx
-	allotTbl[idx] = true
-	for i := idx; i < firstHostIndex; i++ {
-		if !allotTbl[i] {
-			continue
-		}
-		allotTbl[i*2] = true
-		allotTbl[i*2+1] = true
-	}
-}
-
-func allotRec(allotTbl *[maxNodePrefixes]bool, idx uint) {
-	allotTbl[idx] = true
-	if idx >= firstHostIndex {
-		return
-	}
-	allotRec(allotTbl, idx*2)
-	allotRec(allotTbl, idx*2+1)
-}
-
-func (n *node2[V]) iterTopSupernetsRec(ctx context.Context, wg *sync.WaitGroup, pfxChan chan<- netip.Prefix) {
-	defer wg.Done()
-	defer close(pfxChan)
-
-	yield := func(pfx netip.Prefix) bool {
-		select {
-		case <-ctx.Done():
-			return false
-		case pfxChan <- pfx:
-			return true
-		}
-	}
-
-	n.topSupernetsRec(yield)
 }

@@ -6,6 +6,7 @@ package bart
 import (
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 )
 
@@ -13,8 +14,8 @@ import (
 // Useful during development or debugging and testing.
 // ###################################################
 
-// dumpString is just a wrapper for dump.
-func (t *Table2[V]) dumpString() string {
+// dumpString2 is just a wrapper for dump.
+func (t *Table2[V]) dumpString2() string {
 	w := new(strings.Builder)
 	if err := t.dump(w); err != nil {
 		panic(err)
@@ -87,27 +88,27 @@ func (t *Table2[V]) dump(w io.Writer) error {
 	if _, err := fmt.Fprint(w, "IPv4:\n"); err != nil {
 		return err
 	}
-	t.rootV4.dumpRec(w, 0)
+	t.rootV4.dumpRec2(w, 0)
 
 	if _, err := fmt.Fprint(w, "IPv6:\n"); err != nil {
 		return err
 	}
-	t.rootV6.dumpRec(w, 0)
+	t.rootV6.dumpRec2(w, 0)
 
 	return nil
 }
 
-// dumpRec, rec-descent the trie.
-func (n *node2[V]) dumpRec(w io.Writer, depth int) {
-	n.dump(w, depth)
+// dumpRec2, rec-descent the trie.
+func (n *node2[V]) dumpRec2(w io.Writer, depth int) {
+	n.dump2(w, depth)
 
 	for _, child := range n.children {
-		child.dumpRec(w, depth+1)
+		child.dumpRec2(w, depth+1)
 	}
 }
 
-// dump the node to w.
-func (n *node2[V]) dump(w io.Writer, depth int) {
+// dump2 the node to w.
+func (n *node2[V]) dump2(w io.Writer, depth int) {
 	must := func(_ int, err error) {
 		if err != nil {
 			panic(err)
@@ -119,7 +120,7 @@ func (n *node2[V]) dump(w io.Writer, depth int) {
 
 	// node type with depth and octet path and bits.
 	must(fmt.Fprintf(w, "\n%s[%s] path: [%s] bits: +%d depth: %d\n",
-		indent, n.hasType(), n.pathAsString(), bits, depth))
+		indent, n.hasType2(), n.pathAsString(), bits, depth))
 
 	if len(n.prefixes) != 0 {
 		indices := n.allStrideIndexes()
@@ -156,8 +157,31 @@ func (n *node2[V]) dump(w io.Writer, depth int) {
 	}
 }
 
-// hasType returns the nodeType.
-func (n *node2[V]) hasType() nodeType {
+// pathAsString, stride path, different formats for IPv4 and IPv6, dotted decimal or hex.
+func (n *node2[V]) pathAsString() string {
+	buf := new(strings.Builder)
+
+	if n.is4 {
+		for i, b := range n.pathAsSlice() {
+			if i != 0 {
+				buf.WriteString(".")
+			}
+			buf.WriteString(strconv.Itoa(int(b)))
+		}
+		return buf.String()
+	}
+
+	for i, b := range n.pathAsSlice() {
+		if i != 0 && i%2 == 0 {
+			buf.WriteString(":")
+		}
+		buf.WriteString(fmt.Sprintf("%02x", b))
+	}
+	return buf.String()
+}
+
+// hasType2 returns the nodeType.
+func (n *node2[V]) hasType2() nodeType {
 	lenPefixes := len(n.prefixes)
 	lenChilds := len(n.children)
 
