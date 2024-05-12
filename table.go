@@ -29,6 +29,10 @@ type Table[V any] struct {
 	rootV4 *node[V]
 	rootV6 *node[V]
 
+	// number of prefixes in trie
+	sizeV4 int
+	sizeV6 int
+
 	// BitSets have to be initialized.
 	initOnce sync.Once
 }
@@ -102,7 +106,10 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	}
 
 	// insert prefix into node
-	n.insertPrefix(lastOctet, lastOctetBits, val)
+	wasPresent := n.insertPrefix(lastOctet, lastOctetBits, val)
+	if !wasPresent {
+		t.incDecSize(+1, is4)
+	}
 }
 
 // Update or set the value at pfx with a callback function.
@@ -147,7 +154,11 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 	}
 
 	// update/insert prefix into node
-	return n.updatePrefix(lastOctet, lastOctetBits, cb)
+	val, wasPresent := n.updatePrefix(lastOctet, lastOctetBits, cb)
+	if !wasPresent {
+		t.incDecSize(+1, is4)
+	}
+	return val
 }
 
 // Get returns the associated payload for prefix and true, or false if
@@ -235,9 +246,13 @@ func (t *Table[V]) Delete(pfx netip.Prefix) {
 	}
 
 	// try to delete prefix in trie node
-	if !n.deletePrefix(lastOctet, lastOctetBits) {
-		return // nothing deleted
+	if wasPresent := n.deletePrefix(lastOctet, lastOctetBits); !wasPresent {
+		// nothing deleted
+		return
 	}
+
+	// prefix deleted, decrement the size
+	t.incDecSize(-1, is4)
 
 	// purge dangling nodes after successful deletion
 	for i > 0 {
@@ -599,6 +614,32 @@ func (t *Table[V]) All4(yield func(pfx netip.Prefix, val V) bool) {
 func (t *Table[V]) All6(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
 	t.rootV6.allRec(nil, false, yield)
+}
+
+// Size returns the sum of the IPv4 and IPv6 refixes.
+func (t *Table[V]) Size() int {
+	t.init()
+	return t.sizeV4 + t.sizeV6
+}
+
+// Size4 returns the number of IPv4 refixes.
+func (t *Table[V]) Size4() int {
+	t.init()
+	return t.sizeV4
+}
+
+// Size6 returns the number of IPv6 refixes.
+func (t *Table[V]) Size6() int {
+	t.init()
+	return t.sizeV6
+}
+
+func (t *Table[V]) incDecSize(val int, is4 bool) {
+	if is4 {
+		t.sizeV4 = t.sizeV4 + val
+	} else {
+		t.sizeV6 = t.sizeV6 + val
+	}
 }
 
 // ipToOctets, be careful, do not allocate!
