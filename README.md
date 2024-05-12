@@ -77,14 +77,18 @@ The API has changed since v0.4.2, 0.5.3. and v0.6.3
   func (t *Table[V]) Overlaps(o *Table[V]) bool
   func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool
   
-  func (t *Table[V]) String() string
-  func (t *Table[V]) Fprint(w io.Writer) error
-  func (t *Table[V]) MarshalText() ([]byte, error)
-  func (t *Table[V]) MarshalJSON() ([]byte, error)
+  func (t *Table[V]) Size() int
+  func (t *Table[V]) Size4() int
+  func (t *Table[V]) Size6() int
 
   func (t *Table[V]) All(yield func(pfx netip.Prefix, val V) bool) bool
   func (t *Table[V]) All4(yield func(pfx netip.Prefix, val V) bool) bool
   func (t *Table[V]) All6(yield func(pfx netip.Prefix, val V) bool) bool
+
+  func (t *Table[V]) String() string
+  func (t *Table[V]) Fprint(w io.Writer) error
+  func (t *Table[V]) MarshalText() ([]byte, error)
+  func (t *Table[V]) MarshalJSON() ([]byte, error)
 
   func (t *Table[V]) DumpList4() []DumpListNode[V]
   func (t *Table[V]) DumpList6() []DumpListNode[V]
