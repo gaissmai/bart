@@ -450,12 +450,10 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 	lastOctet := octets[lastOctetIdx]
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
-	parentIdx := prefixToBaseIndex(lastOctet, lastOctetBits)
-
 	// find the trie node
 	for i, octet := range octets {
 		if i == lastOctetIdx {
-			result := n.subnets(octets[:i], parentIdx, is4)
+			result := n.subnets(octets[:i], lastOctet, lastOctetBits, is4)
 			slices.SortFunc(result, cmpPrefix)
 			return result
 		}

@@ -553,42 +553,65 @@ func (n *node[V]) allRec(path []byte, is4 bool, yield func(netip.Prefix, V) bool
 }
 
 // subnets returns all CIDRs covered by parent pfx.
-func (n *node[V]) subnets(path []byte, parentIdx uint, is4 bool) (result []netip.Prefix) {
-	// for all routes in this node do ...
-	for _, idx := range n.allStrideIndexes() {
-		// is this route covered by pfx?
-		for i := idx; i >= parentIdx; i >>= 1 {
-			if i == parentIdx { // match
-				// get CIDR back for idx
-				pfx := cidrFromPath(path, idx, is4)
+func (n *node[V]) subnets(path []byte, pfxOctet byte, pfxLen int, is4 bool) (result []netip.Prefix) {
+	parentIdx := prefixToBaseIndex(pfxOctet, pfxLen)
 
-				result = append(result, pfx)
-				break
-			}
+	// collect all routes covered by this pfx
+	// see also algorithm in overlapsPrefix
+
+	// lower/upper boundary for octet/pfxLen host routes
+	pfxLowerBound := uint(pfxOctet) + firstHostIndex
+	pfxUpperBound := lastHostIndexOfPrefix(pfxOctet, pfxLen)
+
+	// start in bitset search at parentIdx
+	idx := parentIdx
+	var ok bool
+	for {
+		if idx, ok = n.prefixesBitset.NextSet(idx); !ok {
+			// no more prefixes in this node
+			break
 		}
+
+		routeLowerBound, routeUpperBound := lowerUpperBound(idx)
+		if routeLowerBound >= pfxLowerBound && routeUpperBound <= pfxUpperBound {
+			// get CIDR back for this idx
+			pfx := cidrFromPath(path, idx, is4)
+			result = append(result, pfx)
+		}
+
+		// next prefix idx
+		idx++
 	}
 
-	// for all children in this node do ...
-	for _, addr := range n.allChildAddrs() {
-		octet := byte(addr)
-		idx := octetToBaseIndex(octet)
+	// collect all children covered by this pfx
+	// see also algorithm in overlapsPrefix
 
-		// is this child covered by pfx?
-		for i := idx; i >= parentIdx; i >>= 1 {
-			if i == parentIdx { // match
-				// get child for octet
-				c := n.getChild(octet)
-
-				// append octet to path
-				path := append(slices.Clone(path), octet)
-
-				// all cidrs under this child are covered by pfx
-				c.allRec(path, is4, func(pfx netip.Prefix, _ V) bool {
-					result = append(result, pfx)
-					return true
-				})
-			}
+	// set start octet in bitset search with prefix octet
+	childOctet := uint(pfxOctet)
+	for {
+		if childOctet, ok = n.childrenBitset.NextSet(childOctet); !ok {
+			// no more children
+			break
 		}
+
+		childIdx := childOctet + firstHostIndex
+
+		if childIdx >= pfxLowerBound && childIdx <= pfxUpperBound {
+			// pfx covers child
+			c := n.getChild(byte(childOctet))
+
+			// append octet to path
+			path := append(slices.Clone(path), byte(childOctet))
+
+			// all cidrs under this child are covered by pfx
+			c.allRec(path, is4, func(pfx netip.Prefix, _ V) bool {
+				result = append(result, pfx)
+				return true
+			})
+		}
+
+		// next round
+		childOctet++
 	}
 
 	return result
