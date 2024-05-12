@@ -103,21 +103,22 @@ func (n *node2[V]) prefixRank(baseIdx uint) int {
 
 // insertPrefix adds the route octet/prefixLen, with value val.
 // Just an adapter for insertIdx.
-func (n *node2[V]) insertPrefix(octet byte, prefixLen int, val V) {
-	n.insertIdx(prefixToBaseIndex(octet, prefixLen), val)
+func (n *node2[V]) insertPrefix(octet byte, prefixLen int, val V) (wasPresent bool) {
+	return n.insertIdx(prefixToBaseIndex(octet, prefixLen), val)
 }
 
 // insertIdx adds the route for baseIdx, with value val.
-func (n *node2[V]) insertIdx(baseIdx uint, val V) {
+func (n *node2[V]) insertIdx(baseIdx uint, val V) (wasPresent bool) {
 	// prefix exists, overwrite val
 	if n.prefixesBitset.Test(baseIdx) {
 		n.prefixes[n.prefixRank(baseIdx)] = val
-		return
+		return true
 	}
 
 	// new, insert into bitset and slice
 	n.prefixesBitset.Set(baseIdx)
 	n.prefixes = slices.Insert(n.prefixes, n.prefixRank(baseIdx), val)
+	return false
 }
 
 // deletePrefix removes the route octet/prefixLen. Reports whether the
@@ -143,26 +144,25 @@ func (n *node2[V]) deletePrefix(octet byte, prefixLen int) (wasPresent bool) {
 }
 
 // updatePrefix, update or set the value at prefix via callback.
-func (n *node2[V]) updatePrefix(octet byte, prefixLen int, cb func(V, bool) V) (val V) {
+func (n *node2[V]) updatePrefix(octet byte, prefixLen int, cb func(V, bool) V) (val V, wasPresent bool) {
 	// calculate idx once
 	baseIdx := prefixToBaseIndex(octet, prefixLen)
 
-	var ok bool
 	var rnk int
 
 	// if prefix is set, get current value
-	if ok = n.prefixesBitset.Test(baseIdx); ok {
+	if wasPresent = n.prefixesBitset.Test(baseIdx); wasPresent {
 		rnk = n.prefixRank(baseIdx)
 		val = n.prefixes[rnk]
 	}
 
 	// callback function to get updated or new value
-	val = cb(val, ok)
+	val = cb(val, wasPresent)
 
 	// prefix is already set, update and return value
-	if ok {
+	if wasPresent {
 		n.prefixes[rnk] = val
-		return val
+		return
 	}
 
 	// new prefix, insert into bitset ...
@@ -174,7 +174,7 @@ func (n *node2[V]) updatePrefix(octet byte, prefixLen int, cb func(V, bool) V) (
 	// ... and insert value into slice
 	n.prefixes = slices.Insert(n.prefixes, rnk, val)
 
-	return val
+	return
 }
 
 // lpmByIndex does a route lookup for idx in the 8-bit (stride) routing table
@@ -339,8 +339,7 @@ func (n *node2[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 	// 2. test if prefix overlaps any route in this node
 
 	// lower/upper boundary for octet/pfxLen host routes
-	pfxLowerBound := uint(octet) + firstHostIndex
-	pfxUpperBound := lastHostIndexOfPrefix(octet, pfxLen)
+	pfxLowerBound, pfxUpperBound := lowerUpperBound(pfxIdx)
 
 	// increment to 'next' routeIdx for start in bitset search
 	// since pfxIdx already testet by lpm in other direction

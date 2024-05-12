@@ -26,6 +26,10 @@ type Table2[V any] struct {
 	rootV4 *node2[V]
 	rootV6 *node2[V]
 
+	// number of prefixes in trie
+	sizeV4 int
+	sizeV6 int
+
 	// BitSets have to be initialized.
 	initOnce sync.Once
 }
@@ -93,7 +97,10 @@ func (t *Table2[V]) Insert(pfx netip.Prefix, val V) {
 		// last octet reached
 		if idx == lastOctetIdx {
 			// insert prefix into node
-			n.insertPrefix(lastOctet, lastOctetBits, val)
+			wasPresent := n.insertPrefix(lastOctet, lastOctetBits, val)
+			if !wasPresent {
+				t.incDecSize(+1, is4)
+			}
 			return
 		}
 
@@ -105,6 +112,7 @@ func (t *Table2[V]) Insert(pfx netip.Prefix, val V) {
 			// make new node
 			o := newNode2[V](path, n.is4)
 			o.insertPrefix(lastOctet, lastOctetBits, val)
+			t.incDecSize(+1, is4)
 
 			n.insertChild(cursor, o)
 			return
@@ -122,6 +130,7 @@ func (t *Table2[V]) Insert(pfx netip.Prefix, val V) {
 		// make new node
 		o := newNode2[V](path, n.is4)
 		o.insertPrefix(lastOctet, lastOctetBits, val)
+		t.incDecSize(+1, is4)
 
 		// other is prefix for child node
 		if o.pathIsPrefixOrEqual(idx, c.pathAsSlice()) {
@@ -198,12 +207,13 @@ func (t *Table2[V]) Delete(pfx netip.Prefix) {
 		// last significant octet reached
 		if idx == lastOctetIdx {
 			// found a child on proper depth ...
-			if !n.deletePrefix(lastOctet, lastOctetBits) {
-				// ... but prefix not in tree, nothing deleted
+			if wasPresent := n.deletePrefix(lastOctet, lastOctetBits); !wasPresent {
+				// prefix not in tree
 				return
 			}
 
 			// escape, but purge dangling path if needed, see below
+			t.incDecSize(-1, is4)
 			break
 		}
 
@@ -305,7 +315,11 @@ func (t *Table2[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 		// last octet reached
 		if idx == lastOctetIdx {
 			// update/insert prefix into node
-			return n.updatePrefix(lastOctet, lastOctetBits, cb)
+			val, wasPresent := n.updatePrefix(lastOctet, lastOctetBits, cb)
+			if !wasPresent {
+				t.incDecSize(+1, is4)
+			}
+			return val
 		}
 
 		// descend down the trie
@@ -317,7 +331,11 @@ func (t *Table2[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 			o := newNode2[V](path, n.is4)
 			n.insertChild(cursor, o)
 
-			return o.updatePrefix(lastOctet, lastOctetBits, cb)
+			val, wasPresent := o.updatePrefix(lastOctet, lastOctetBits, cb)
+			if !wasPresent {
+				t.incDecSize(+1, is4)
+			}
+			return val
 		}
 
 		// child is prefix or equal to other node
@@ -340,7 +358,11 @@ func (t *Table2[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 			o.insertChild(c.pathAsSlice()[idx], c)
 			n.insertChild(cursor, o)
 
-			return o.updatePrefix(lastOctet, lastOctetBits, cb)
+			val, wasPresent := o.updatePrefix(lastOctet, lastOctetBits, cb)
+			if !wasPresent {
+				t.incDecSize(+1, is4)
+			}
+			return val
 		}
 
 		// The paths are different from a certain index.
@@ -355,7 +377,12 @@ func (t *Table2[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 
 		// splice intermediate: n -> imed -> (child, other)
 		n.insertChild(cursor, imed)
-		return o.updatePrefix(lastOctet, lastOctetBits, cb)
+
+		val, wasPresent := o.updatePrefix(lastOctet, lastOctetBits, cb)
+		if !wasPresent {
+			t.incDecSize(+1, is4)
+		}
+		return val
 	}
 }
 
@@ -835,7 +862,6 @@ func (t *Table2[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 
 // Overlaps reports whether any IP in the table matches a route in the
 // other table.
-// The algorithm works most efficiently when table t is the larger of the two tables
 func (t *Table2[V]) Overlaps(o *Table2[V]) bool {
 	t.init()
 	o.init()
@@ -845,9 +871,19 @@ func (t *Table2[V]) Overlaps(o *Table2[V]) bool {
 		return !t.OverlapsPrefix(pfx)
 	}
 
+	// The algorithm works most efficiently when table t is the larger of the two tables
+	if t.sizeV4 < o.sizeV4 {
+		t, o = o, t
+	}
+
 	// return on first overlap, re-negate the result
 	if !o.rootV4.toplevelSupernetsRec(yield) {
 		return true
+	}
+
+	// The algorithm works most efficiently when table t is the larger of the two tables
+	if t.sizeV6 < o.sizeV6 {
+		t, o = o, t
 	}
 
 	return !o.rootV6.toplevelSupernetsRec(yield)
@@ -905,4 +941,30 @@ func (t *Table2[V]) All4(yield func(pfx netip.Prefix, val V) bool) {
 func (t *Table2[V]) All6(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
 	t.rootV6.allRec2(yield)
+}
+
+// Size returns the sum of the IPv4 and IPv6 refixes.
+func (t *Table2[V]) Size() int {
+	t.init()
+	return t.sizeV4 + t.sizeV6
+}
+
+// Size4 returns the number of IPv4 refixes.
+func (t *Table2[V]) Size4() int {
+	t.init()
+	return t.sizeV4
+}
+
+// Size6 returns the number of IPv6 refixes.
+func (t *Table2[V]) Size6() int {
+	t.init()
+	return t.sizeV6
+}
+
+func (t *Table2[V]) incDecSize(val int, is4 bool) {
+	if is4 {
+		t.sizeV4 = t.sizeV4 + val
+	} else {
+		t.sizeV6 = t.sizeV6 + val
+	}
 }

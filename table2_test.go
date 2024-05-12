@@ -1662,6 +1662,42 @@ func TestOverlapsCompare2(t *testing.T) {
 	}
 }
 
+func TestSize2(t *testing.T) {
+	rtbl := new(Table2[any])
+	pfxs := randomPrefixes(10_000)
+
+	for _, pfx := range pfxs {
+		switch rand.Intn(3) {
+		case 0:
+			rtbl.Insert(pfx.pfx, nil)
+		case 1:
+			rtbl.Delete(pfx.pfx)
+		case 2:
+			rtbl.Update(pfx.pfx, func(any, bool) any { return nil })
+		}
+	}
+
+	var size4 int
+	var size6 int
+
+	rtbl.All4(func(netip.Prefix, any) bool {
+		size4++
+		return true
+	})
+
+	rtbl.All6(func(netip.Prefix, any) bool {
+		size6++
+		return true
+	})
+
+	if size4 != rtbl.Size4() {
+		t.Errorf("Size4: want: %d, got: %d", size4, rtbl.Size4())
+	}
+	if size6 != rtbl.Size6() {
+		t.Errorf("Size6: want: %d, got: %d", size6, rtbl.Size6())
+	}
+}
+
 func BenchmarkTableLookup2(b *testing.B) {
 	for _, fam := range []string{"ipv4", "ipv6"} {
 		rng := randomPrefixes4
