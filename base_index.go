@@ -28,47 +28,6 @@ const (
 	lastHostIndex = 0b1_1111_1111 // 511
 )
 
-// allot, bart is a balanced-art, bart has no allotment table for each stride table.
-// bart uses popcount slice compression with no fixed-size allotment arrays.
-// For some algorithms that would be either too complex or too slow without
-// an allotment table we build it on the fly.
-//
-// It's a mix of iteration and rec-descent to make it fast.
-// Keep it fast, input validation must be done on calling site.
-//
-//nolint:unused
-func allot(allotTbl *[maxNodePrefixes]bool, idx uint) {
-	// microbenchmarking, recursion is faster than iteration for idx >= 4
-	if idx >= 4 {
-		allotRec(allotTbl, idx)
-		return
-	}
-
-	// microbenchmarking, iteration is faster than recursion for idx <= 4
-	allotTbl[idx] = true
-	for idx < firstHostIndex {
-		if allotTbl[idx] {
-			// trick, the allotTbl itself is the stack
-			allotTbl[idx<<1] = true
-			allotTbl[idx<<1+1] = true
-		}
-		idx++
-	}
-}
-
-// allotRec, recursive part of allot.
-// Keep it fast, input validation must be done on calling site.
-func allotRec(allotTbl *[maxNodePrefixes]bool, idx uint) {
-	allotTbl[idx] = true
-	// idx has reached last stage
-	if idx >= firstHostIndex {
-		return
-	}
-
-	allotRec(allotTbl, idx<<1)
-	allotRec(allotTbl, idx<<1+1)
-}
-
 // prefixToBaseIndex, maps a prefix table as a 'complete binary tree'.
 // This is the so-called baseIndex a.k.a heapFunc:
 func prefixToBaseIndex(octet byte, prefixLen int) uint {

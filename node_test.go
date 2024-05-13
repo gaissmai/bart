@@ -12,7 +12,6 @@ package bart
 import (
 	"fmt"
 	"math/rand"
-	"reflect"
 	"testing"
 )
 
@@ -153,19 +152,6 @@ func TestNodeOverlaps(t *testing.T) {
 	t.Log(seenResult)
 	if len(seenResult) != 2 { // saw both intersections and non-intersections
 		t.Fatalf("didn't see both intersections and non-intersections\nIntersects: %d\nNon-intersects: %d", seenResult[true], seenResult[false])
-	}
-}
-
-func TestNodeAllot(t *testing.T) {
-	t.Parallel()
-	for idx := 1; idx < 512; idx++ {
-		at1 := [maxNodePrefixes]bool{}
-		at2 := [maxNodePrefixes]bool{}
-		allot(&at1, uint(idx))
-		allotRec(&at2, uint(idx))
-		if !reflect.DeepEqual(at1, at2) {
-			t.Errorf("allot(%d) differs with allotRec(%d)", idx, idx)
-		}
 	}
 }
 
@@ -353,27 +339,6 @@ func BenchmarkNodeChildRank(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				node.childRank(byte(baseIdx))
-			}
-		})
-	}
-}
-
-func BenchmarkNodeAllot(b *testing.B) {
-	for _, idx := range []uint{1, 2, 3, 4, 5, 6, 7, 8, 32, 64, 128, 256} {
-
-		b.Run(fmt.Sprintf("allot(%d)", idx), func(b *testing.B) {
-			allotTbl := [maxNodePrefixes]bool{}
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				allot(&allotTbl, idx)
-			}
-		})
-
-		b.Run(fmt.Sprintf("allotRec(%d)", idx), func(b *testing.B) {
-			allotTbl := [maxNodePrefixes]bool{}
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				allotRec(&allotTbl, idx)
 			}
 		})
 	}
