@@ -673,14 +673,10 @@ func (t *Table2[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 	idx := 0
 	cursor := octets[idx]
 
-	// search prefixes and child below this stride index
-	parentIndex := prefixToBaseIndex(lastOctet, lastOctetBits)
-
 	// find the trie node
 	for {
 		if idx == lastOctetIdx {
-			result := n.subnetsRec2(parentIndex)
-
+			result := n.subnets(lastOctet, lastOctetBits)
 			slices.SortFunc(result, cmpPrefix)
 			return result
 		}
@@ -712,10 +708,8 @@ func (t *Table2[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 			search.insertChild(octet, c)
 
 			// subnet search, starting at this tmp search node
-			result := search.subnetsRec2(parentIndex)
-
+			result := search.subnets(lastOctet, lastOctetBits)
 			slices.SortFunc(result, cmpPrefix)
-
 			return result
 		}
 
@@ -866,27 +860,7 @@ func (t *Table2[V]) Overlaps(o *Table2[V]) bool {
 	t.init()
 	o.init()
 
-	// negates the result of OverlapsPrefix, stop recursion on first overlap
-	yield := func(pfx netip.Prefix) bool {
-		return !t.OverlapsPrefix(pfx)
-	}
-
-	// The algorithm works most efficiently when table t is the larger of the two tables
-	if t.sizeV4 < o.sizeV4 {
-		t, o = o, t
-	}
-
-	// return on first overlap, re-negate the result
-	if !o.rootV4.toplevelSupernetsRec(yield) {
-		return true
-	}
-
-	// The algorithm works most efficiently when table t is the larger of the two tables
-	if t.sizeV6 < o.sizeV6 {
-		t, o = o, t
-	}
-
-	return !o.rootV6.toplevelSupernetsRec(yield)
+	return t.rootV4.overlapsRec(o.rootV4) || t.rootV6.overlapsRec(o.rootV6)
 }
 
 // Union combines two tables, changing the receiver table.
@@ -928,19 +902,19 @@ func (t *Table2[V]) Clone() *Table2[V] {
 func (t *Table2[V]) All(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
 	// respect premature end of allRec()
-	_ = t.rootV4.allRec2(yield) && t.rootV6.allRec2(yield)
+	_ = t.rootV4.allRec(yield) && t.rootV6.allRec(yield)
 }
 
 // All4, like [Table.All] but only for the v4 routing table.
 func (t *Table2[V]) All4(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
-	t.rootV4.allRec2(yield)
+	t.rootV4.allRec(yield)
 }
 
 // All6, like [Table.All] but only for the v6 routing table.
 func (t *Table2[V]) All6(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
-	t.rootV6.allRec2(yield)
+	t.rootV6.allRec(yield)
 }
 
 // Size returns the sum of the IPv4 and IPv6 refixes.

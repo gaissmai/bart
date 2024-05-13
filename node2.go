@@ -70,6 +70,10 @@ func (n *node2[V]) pathLen() int {
 	return int(n.path.length)
 }
 
+func (n *node2[V]) pathIsEqual(start int, buf []byte) bool {
+	return bytes.Equal(buf[start:], n.pathAsSlice()[start:])
+}
+
 func (n *node2[V]) pathIsPrefixOrEqual(start int, buf []byte) bool {
 	return bytes.HasPrefix(buf[start:], n.pathAsSlice()[start:])
 }
@@ -403,11 +407,11 @@ func (n *node2[V]) cloneRec() *node2[V] {
 	return c
 }
 
-// allRec2 runs recursive the trie, starting at node and
+// allRec runs recursive the trie, starting at node and
 // the yield function is called for each route entry with prefix and value.
 // If the yield function returns false the recursion ends prematurely and the
 // false value is propagated.
-func (n *node2[V]) allRec2(yield func(netip.Prefix, V) bool) bool {
+func (n *node2[V]) allRec(yield func(netip.Prefix, V) bool) bool {
 	// for all prefixes in this node do ...
 	for _, idx := range n.allStrideIndexes() {
 		val, _ := n.getValByIndex(idx)
@@ -425,7 +429,7 @@ func (n *node2[V]) allRec2(yield func(netip.Prefix, V) bool) bool {
 		octet := byte(addr)
 		child := n.getChild(octet)
 
-		if !child.allRec2(yield) {
+		if !child.allRec(yield) {
 			// premature end of recursion
 			return false
 		}
@@ -434,36 +438,62 @@ func (n *node2[V]) allRec2(yield func(netip.Prefix, V) bool) bool {
 	return true
 }
 
-// subnetsRec2 returns all CIDRs covered by parent pfx.
-func (n *node2[V]) subnetsRec2(parentIdx uint) (result []netip.Prefix) {
-	// for all routes in this node do ...
-	for _, idx := range n.allStrideIndexes() {
-		// is this route covered by pfx?
-		for i := idx; i >= parentIdx; i >>= 1 {
-			if i == parentIdx { // match
-				pfx := n.cidrFromIndex(idx)
-				result = append(result, pfx)
-				break
-			}
+// subnets returns all CIDRs covered by parent pfx.
+func (n *node2[V]) subnets(pfxOctet byte, pfxLen int) (result []netip.Prefix) {
+	parentIdx := prefixToBaseIndex(pfxOctet, pfxLen)
+
+	// collect all routes covered by this pfx
+	// see also algorithm in overlapsPrefix
+
+	// lower/upper boundary for octet/pfxLen host routes
+	pfxLowerBound, pfxUpperBound := lowerUpperBound(parentIdx)
+
+	// start in bitset search at parentIdx
+	idx := parentIdx
+	var ok bool
+	for {
+		if idx, ok = n.prefixesBitset.NextSet(idx); !ok {
+			// no more prefixes in this node
+			break
 		}
+
+		routeLowerBound, routeUpperBound := lowerUpperBound(idx)
+		if routeLowerBound >= pfxLowerBound && routeUpperBound <= pfxUpperBound {
+			// get CIDR back for this idx
+			pfx := n.cidrFromIndex(idx)
+			result = append(result, pfx)
+		}
+
+		// next prefix idx
+		idx++
 	}
 
-	// for all children in this node do ...
-	for _, addr := range n.allChildAddrs() {
-		octet := byte(addr)
-		idx := octetToBaseIndex(octet)
+	// collect all children covered by this pfx
+	// see also algorithm in overlapsPrefix
 
-		// is this child covered by pfx?
-		for i := idx; i >= parentIdx; i >>= 1 {
-			if i == parentIdx {
-				// all CIDRs under this child are covered by pfx
-				c := n.getChild(octet)
-				c.allRec2(func(pfx netip.Prefix, _ V) bool {
-					result = append(result, pfx)
-					return true
-				})
-			}
+	// set start octet in bitset search with prefix octet
+	childOctet := uint(pfxOctet)
+	for {
+		if childOctet, ok = n.childrenBitset.NextSet(childOctet); !ok {
+			// no more children
+			break
 		}
+
+		childIdx := childOctet + firstHostIndex
+
+		if childIdx >= pfxLowerBound && childIdx <= pfxUpperBound {
+			// pfx covers child
+			c := n.getChild(byte(childOctet))
+
+			// all cidrs under this child are covered by pfx
+			c.allRec(func(pfx netip.Prefix, _ V) bool {
+				result = append(result, pfx)
+				return true
+			})
+		}
+
+		// next round
+		childOctet++
 	}
 
 	return result
@@ -495,75 +525,150 @@ func (n *node2[V]) cidrFromIndex(idx uint) (pfx netip.Prefix) {
 	return
 }
 
-// toplevelSupernetsRec runs recursive the trie, starting at node.
-// A top level supernet prefix is defined as having no other prefix as supernet.
-// All other prefixes in the trie overlaps with exactly one toplevel supernet.
-//
-// The yield function is called for each top level supernet.
-// If the yield function returns false the recursion ends prematurely and the
-// false value is propagated.
-//
-//	example:
-//
-//	  ▼
-//	  ├─ 6.238.0.0/15
-//	  ├─ 8.0.0.0/7
-//	  ├─ 25.12.76.64/29
-//	  ├─ 52.154.212.32/28
-//	  ├─ 115.14.128.0/17
-//	  └─ 128.0.0.0/1
-//	     ├─ 129.222.24.0/25
-//	     ├─ 130.101.156.0/24
-//	     ├─ 150.200.0.0/13
-//	     ├─ 153.203.41.64/27
-//	     ├─ 186.22.98.220/31
-//	     ├─ 200.0.0.0/5
-//	     │  └─ 205.39.238.0/23
-//	     ├─ 212.84.85.0/24
-//	     └─ 252.0.0.0/6
-//	        └─ 252.196.0.0/18
-//
-//	toplevel supernets:
-//
-//	  6.238.0.0/15
-//	  8.0.0.0/7
-//	  25.12.76.64/29
-//	  52.154.212.32/28
-//	  115.14.128.0/17
-//	  128.0.0.0/1
-func (n *node2[V]) toplevelSupernetsRec(yield func(pfx netip.Prefix) bool) bool {
-	// allotTbl, filled with prefix entries
-	var allotTbl [maxNodePrefixes]bool
+// overlapsRec returns true if any IP in the nodes n or o overlaps.
+// First test the routes, then the children and if no match rec-descent
+// for child nodes with same octet.
+func (n *node2[V]) overlapsRec(o *node2[V]) bool {
+	// dynamically allot the host routes from prefixes
+	nAllotIndex := [maxNodePrefixes]bool{}
+	oAllotIndex := [maxNodePrefixes]bool{}
 
-	// DEFAULT ROUTE, very fast exit, masks all prefixes and children
-	if n.prefixesBitset.Test(1) {
-		return yield(n.cidrFromIndex(1))
-	}
+	// 1. test if any routes overlaps?
 
-	// for all prefixes do
-	for _, idx := range n.allStrideIndexes() {
-		// not yet masked by supernet
-		if !allotTbl[idx] {
-			if !yield(n.cidrFromIndex(idx)) {
-				return false
+	nOk := len(n.prefixes) > 0
+	oOk := len(o.prefixes) > 0
+	var nIdx, oIdx uint
+	// zig-zag, for all routes in both nodes ...
+	for {
+		if nOk {
+			// range over bitset, node n
+			if nIdx, nOk = n.prefixesBitset.NextSet(nIdx); nOk {
+				// get range of host routes for this prefix
+				lowerBound, upperBound := lowerUpperBound(nIdx)
+
+				// insert host routes (octet/8) for this prefix,
+				// some sort of allotment
+				for i := lowerBound; i <= upperBound; i++ {
+					// zig-zag, fast return
+					if oAllotIndex[i] {
+						return true
+					}
+					nAllotIndex[i] = true
+				}
+				nIdx++
 			}
-			// this is a top level supernet, mask allot slots
-			allot(&allotTbl, idx)
+		}
+
+		if oOk {
+			// range over bitset, node o
+			if oIdx, oOk = o.prefixesBitset.NextSet(oIdx); oOk {
+				// get range of host routes for this prefix
+				lowerBound, upperBound := lowerUpperBound(oIdx)
+
+				// insert host routes (octet/8) for this prefix,
+				// some sort of allotment
+				for i := lowerBound; i <= upperBound; i++ {
+					// zig-zag, fast return
+					if nAllotIndex[i] {
+						return true
+					}
+					oAllotIndex[i] = true
+				}
+				oIdx++
+			}
+		}
+		if !nOk && !oOk {
+			break
 		}
 	}
 
-	// for all children do
-	for _, addr := range n.allChildAddrs() {
-		// host route already set with supernet prefix?
-		if allotTbl[addr+firstHostIndex] {
-			continue
-		}
-
-		// child not masked by supernet, rec-descent
-		c := n.getChild(byte(addr))
-		if !c.toplevelSupernetsRec(yield) {
-			return false
+	// full run, zig-zag didn't already match
+	if len(n.prefixes) > 0 && len(o.prefixes) > 0 {
+		for i := firstHostIndex; i <= lastHostIndex; i++ {
+			if nAllotIndex[i] && oAllotIndex[i] {
+				return true
+			}
 		}
 	}
-	return true
+
+	// 2. test if routes overlaps any child
+
+	nOctets := [maxNodeChildren]bool{}
+	oOctets := [maxNodeChildren]bool{}
+
+	nOk = len(n.children) > 0
+	oOk = len(o.children) > 0
+	var nOctet, oOctet uint
+	// zig-zag, for all octets in both nodes ...
+	for {
+		// range over bitset, node n
+		if nOk {
+			if nOctet, nOk = n.childrenBitset.NextSet(nOctet); nOk {
+				if oAllotIndex[nOctet+firstHostIndex] {
+					return true
+				}
+				nOctets[nOctet] = true
+				nOctet++
+			}
+		}
+
+		// range over bitset, node o
+		if oOk {
+			if oOctet, oOk = o.childrenBitset.NextSet(oOctet); oOk {
+				if nAllotIndex[oOctet+firstHostIndex] {
+					return true
+				}
+				oOctets[oOctet] = true
+				oOctet++
+			}
+		}
+
+		if !nOk && !oOk {
+			break
+		}
+	}
+
+	// 3. rec-descent call, for childs with same octet
+
+	if len(n.children) > 0 && len(o.children) > 0 {
+		for i := 0; i < len(nOctets); i++ {
+			if nOctets[i] && oOctets[i] {
+				// get next child node for this octet
+				nc := n.getChild(byte(i))
+				oc := o.getChild(byte(i))
+
+				// rec-descent, the nodes can have different path
+				if nc.overlapsHelper(oc) {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
+}
+
+// overlapsHelper, check for different paths
+func (n *node2[V]) overlapsHelper(o *node2[V]) bool {
+	switch {
+	case n.pathIsEqual(0, o.pathAsSlice()):
+		// n and o in same trie level and path, rec-descent call
+		return n.overlapsRec(o)
+
+	case n.pathIsPrefixOrEqual(0, o.pathAsSlice()):
+		// next octet in o has an lpm match in n?
+		nextOctet := o.pathAsSlice()[n.pathLen()]
+		if _, _, ok := n.lpmByOctet(nextOctet); ok {
+			return true
+		}
+
+	case o.pathIsPrefixOrEqual(0, n.pathAsSlice()):
+		// next octet in n has an lpm match in o?
+		nextOctet := n.pathAsSlice()[o.pathLen()]
+		if _, _, ok := o.lpmByOctet(nextOctet); ok {
+			return true
+		}
+	}
+
+	return false
 }
