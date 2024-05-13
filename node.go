@@ -429,13 +429,12 @@ func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 	// #################################################
 	// 2. test if prefix overlaps any route in this node
 
-	// lower/upper boundary for octet/pfxLen host routes
-	pfxLowerBound := uint(octet) + firstHostIndex
-	pfxUpperBound := lastHostIndexOfPrefix(octet, pfxLen)
+	// lower/upper boundary for host routes
+	pfxLowerBound, pfxUpperBound := lowerUpperBound(pfxIdx)
 
 	// increment to 'next' routeIdx for start in bitset search
 	// since pfxIdx already testet by lpm in other direction
-	routeIdx := pfxIdx << 1
+	routeIdx := pfxIdx * 2
 	var ok bool
 	for {
 		if routeIdx, ok = n.prefixesBitset.NextSet(routeIdx); !ok {
@@ -500,6 +499,7 @@ func (n *node[V]) unionRec(o *node[V]) {
 	}
 }
 
+// cloneRec, clones the node recursive.
 func (n *node[V]) cloneRec() *node[V] {
 	c := newNode[V]()
 	if n.isEmpty() {
@@ -560,8 +560,7 @@ func (n *node[V]) subnets(path []byte, pfxOctet byte, pfxLen int, is4 bool) (res
 	// see also algorithm in overlapsPrefix
 
 	// lower/upper boundary for octet/pfxLen host routes
-	pfxLowerBound := uint(pfxOctet) + firstHostIndex
-	pfxUpperBound := lastHostIndexOfPrefix(pfxOctet, pfxLen)
+	pfxLowerBound, pfxUpperBound := lowerUpperBound(parentIdx)
 
 	// start in bitset search at parentIdx
 	idx := parentIdx
