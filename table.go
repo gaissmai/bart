@@ -616,19 +616,16 @@ func (t *Table[V]) All6(yield func(pfx netip.Prefix, val V) bool) {
 
 // Size returns the sum of the IPv4 and IPv6 prefixes.
 func (t *Table[V]) Size() int {
-	t.init()
 	return t.sizeV4 + t.sizeV6
 }
 
 // Size4 returns the number of IPv4 prefixes.
 func (t *Table[V]) Size4() int {
-	t.init()
 	return t.sizeV4
 }
 
 // Size6 returns the number of IPv6 prefixes.
 func (t *Table[V]) Size6() int {
-	t.init()
 	return t.sizeV6
 }
 

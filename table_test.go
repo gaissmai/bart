@@ -227,6 +227,8 @@ func TestRegression(t *testing.T) {
 }
 
 func TestInsert(t *testing.T) {
+	t.Parallel()
+
 	tbl := &Table[int]{}
 
 	// Create a new leaf strideTable, with compressed path
@@ -1387,6 +1389,8 @@ func TestUnionEdgeCases(t *testing.T) {
 // TestUnionMemoryAliasing tests that the Union method does not alias memory
 // between the two tables.
 func TestUnionMemoryAliasing(t *testing.T) {
+	t.Parallel()
+
 	newTable := func(pfx ...string) *Table[struct{}] {
 		var t Table[struct{}]
 		for _, s := range pfx {
@@ -1794,6 +1798,8 @@ func TestOverlapsPrefixEdgeCases(t *testing.T) {
 
 // After go version 1.22 we can use range iterators
 func TestAll(t *testing.T) {
+	t.Parallel()
+
 	pfxs := randomPrefixes(10_000)
 	seen := make(map[netip.Prefix]int, 10_000)
 
@@ -1875,38 +1881,53 @@ func TestAll(t *testing.T) {
 }
 
 func TestSize(t *testing.T) {
-	rtbl := new(Table[any])
-	pfxs := randomPrefixes(10_000)
+	t.Parallel()
 
-	for _, pfx := range pfxs {
-		switch rand.Intn(3) {
-		case 0:
-			rtbl.Insert(pfx.pfx, nil)
-		case 1:
-			rtbl.Delete(pfx.pfx)
-		case 2:
-			rtbl.Update(pfx.pfx, func(any, bool) any { return nil })
-		}
+	rtbl := new(Table[any])
+	if rtbl.Size() != 0 {
+		t.Errorf("empty Table: want: 0, got: %d", rtbl.Size())
 	}
 
-	var size4 int
-	var size6 int
+	pfxs1 := randomPrefixes(10_000)
+	pfxs2 := randomPrefixes(10_000)
+
+	for _, pfx := range pfxs1 {
+		rtbl.Insert(pfx.pfx, nil)
+	}
+
+	for _, pfx := range pfxs2 {
+		rtbl.Update(pfx.pfx, func(any, bool) any { return nil })
+	}
+
+	pfxs1 = append(pfxs1, pfxs2...)
+
+	for _, pfx := range pfxs1[:1_000] {
+		rtbl.Update(pfx.pfx, func(any, bool) any { return nil })
+	}
+
+	for _, pfx := range randomPrefixes(20_000) {
+		rtbl.Delete(pfx.pfx)
+	}
+
+	var golden4 int
+	var golden6 int
 
 	rtbl.All4(func(netip.Prefix, any) bool {
-		size4++
+		golden4++
 		return true
 	})
 
 	rtbl.All6(func(netip.Prefix, any) bool {
-		size6++
+		golden6++
 		return true
 	})
 
-	if size4 != rtbl.Size4() {
-		t.Errorf("Size4: want: %d, got: %d", size4, rtbl.Size4())
+	if golden4 != rtbl.Size4() {
+		t.Errorf("Size4: want: %d, got: %d", golden4, rtbl.Size4())
 	}
-	if size6 != rtbl.Size6() {
-		t.Errorf("Size6: want: %d, got: %d", size6, rtbl.Size6())
+
+	if golden6 != rtbl.Size6() {
+		t.Errorf("Size6: want: %d, got: %d", golden6, rtbl.Size6())
 	}
 }
 
