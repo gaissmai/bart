@@ -28,6 +28,47 @@ const (
 	lastHostIndex = 0b1_1111_1111 // 511
 )
 
+// allot, bart is a balanced-art, bart has no allotment table for each stride table.
+// bart uses popcount slice compression with no fixed-size allotment arrays.
+// For some algorithms that would be either too complex or too slow without
+// an allotment table we build it on the fly.
+//
+// It's a mix of iteration and rec-descent to make it fast.
+// Keep it fast, input validation must be done on calling site.
+//
+//nolint:unused
+func allot(allotTbl *[maxNodePrefixes]bool, idx uint) {
+	// microbenchmarking, recursion is faster than iteration for idx >= 4
+	if idx >= 4 {
+		allotRec(allotTbl, idx)
+		return
+	}
+
+	// microbenchmarking, iteration is faster than recursion for idx <= 4
+	allotTbl[idx] = true
+	for idx < firstHostIndex {
+		if allotTbl[idx] {
+			// trick, the allotTbl itself is the stack
+			allotTbl[idx<<1] = true
+			allotTbl[idx<<1+1] = true
+		}
+		idx++
+	}
+}
+
+// allotRec, recursive part of allot.
+// Keep it fast, input validation must be done on calling site.
+func allotRec(allotTbl *[maxNodePrefixes]bool, idx uint) {
+	allotTbl[idx] = true
+	// idx has reached last stage
+	if idx >= firstHostIndex {
+		return
+	}
+
+	allotRec(allotTbl, idx<<1)
+	allotRec(allotTbl, idx<<1+1)
+}
+
 // prefixToBaseIndex, maps a prefix table as a 'complete binary tree'.
 // This is the so-called baseIndex a.k.a heapFunc:
 func prefixToBaseIndex(octet byte, prefixLen int) uint {
@@ -40,15 +81,15 @@ func octetToBaseIndex(octet byte) uint {
 	return uint(octet) + firstHostIndex // just: octet + 256
 }
 
-// lastHostIndexOfPrefix returns the bitset index of the last octet in octet/len.
-func lastHostIndexOfPrefix(octet byte, bits int) uint {
-	return octetToBaseIndex(octet | hostMasks[bits])
-}
-
 // lowerUpperBound, get range of host routes for this prefix
+//
+//	prefix: 32/6
+//	idx:    72
+//	lower:  256 + 32 = 288
+//	upper:  256 + (32 | 0b0000_0011) = 291
 func lowerUpperBound(idx uint) (uint, uint) {
 	octet, bits := baseIndexToPrefix(idx)
-	return octetToBaseIndex(octet), lastHostIndexOfPrefix(octet, bits)
+	return octetToBaseIndex(octet), octetToBaseIndex(octet | hostMasks[bits])
 }
 
 // baseIndexToPrefixMask, calc the bits from baseIndex and octect depth
