@@ -352,27 +352,27 @@ func TestDelete2(t *testing.T) {
 	t.Run("prefix_in_root", func(t *testing.T) {
 		// Add/remove prefix from root table.
 		rtbl := &Table2[int]{}
-		checkSize2(t, rtbl, 2)
+		checkNodes2(t, rtbl, 2)
 
 		rtbl.Insert(mpp("10.0.0.0/8"), 1)
 		checkRoutes2(t, rtbl, []tableTest{
 			{"10.0.0.1", 1},
 			{"255.255.255.255", -1},
 		})
-		checkSize2(t, rtbl, 2)
+		checkNodes2(t, rtbl, 2)
 
 		rtbl.Delete(mpp("10.0.0.0/8"))
 		checkRoutes2(t, rtbl, []tableTest{
 			{"10.0.0.1", -1},
 			{"255.255.255.255", -1},
 		})
-		checkSize2(t, rtbl, 2)
+		checkNodes2(t, rtbl, 2)
 	})
 
 	t.Run("prefix_in_leaf", func(t *testing.T) {
 		// Create, then delete a single leaf table.
 		rtbl := &Table2[int]{}
-		checkSize2(t, rtbl, 2)
+		checkNodes2(t, rtbl, 2)
 
 		rtbl.Insert(mpp("192.168.0.1/32"), 1)
 		checkRoutes2(t, rtbl, []tableTest{
@@ -385,7 +385,7 @@ func TestDelete2(t *testing.T) {
 			{"192.168.0.1", -1},
 			{"255.255.255.255", -1},
 		})
-		checkSize2(t, rtbl, 2)
+		checkNodes2(t, rtbl, 2)
 	})
 
 	t.Run("intermediate_no_routes", func(t *testing.T) {
@@ -400,7 +400,7 @@ func TestDelete2(t *testing.T) {
 			{"192.180.0.1", 2},
 			{"192.40.0.1", -1},
 		})
-		checkSize2(t, rtbl, 5)
+		checkNodes2(t, rtbl, 5)
 
 		rtbl.Delete(mpp("192.180.0.1/32"))
 
@@ -409,7 +409,7 @@ func TestDelete2(t *testing.T) {
 			{"192.180.0.1", -1},
 			{"192.40.0.1", -1},
 		})
-		checkSize2(t, rtbl, 3)
+		checkNodes2(t, rtbl, 3)
 	})
 
 	t.Run("intermediate_with_route", func(t *testing.T) {
@@ -425,7 +425,7 @@ func TestDelete2(t *testing.T) {
 			{"192.40.0.1", 3},
 			{"192.255.0.1", -1},
 		})
-		checkSize2(t, rtbl, 5)
+		checkNodes2(t, rtbl, 5)
 
 		rtbl.Delete(mpp("192.180.0.1/32"))
 
@@ -435,7 +435,7 @@ func TestDelete2(t *testing.T) {
 			{"192.40.0.1", 3},
 			{"192.255.0.1", -1},
 		})
-		checkSize2(t, rtbl, 4) // 2 roots, 1 intermediate, 1 leaf
+		checkNodes2(t, rtbl, 4) // 2 roots, 1 intermediate, 1 leaf
 	})
 
 	t.Run("intermediate_many_leaves", func(t *testing.T) {
@@ -451,7 +451,7 @@ func TestDelete2(t *testing.T) {
 			{"192.200.0.1", 3},
 			{"192.255.0.1", -1},
 		})
-		checkSize2(t, rtbl, 6)
+		checkNodes2(t, rtbl, 6)
 
 		rtbl.Delete(mpp("192.180.0.1/32"))
 
@@ -461,7 +461,7 @@ func TestDelete2(t *testing.T) {
 			{"192.200.0.1", 3},
 			{"192.255.0.1", -1},
 		})
-		checkSize2(t, rtbl, 5)
+		checkNodes2(t, rtbl, 5)
 	})
 
 	t.Run("nosuchprefix_missing_child", func(t *testing.T) {
@@ -473,7 +473,7 @@ func TestDelete2(t *testing.T) {
 			{"192.168.0.1", 1},
 			{"192.255.0.1", -1},
 		})
-		checkSize2(t, rtbl, 3)
+		checkNodes2(t, rtbl, 3)
 
 		rtbl.Delete(mpp("200.0.0.0/32")) // lookup miss in root
 
@@ -481,7 +481,7 @@ func TestDelete2(t *testing.T) {
 			{"192.168.0.1", 1},
 			{"192.255.0.1", -1},
 		})
-		checkSize2(t, rtbl, 3)
+		checkNodes2(t, rtbl, 3)
 	})
 
 	t.Run("nosuchprefix_not_in_leaf", func(t *testing.T) {
@@ -494,7 +494,7 @@ func TestDelete2(t *testing.T) {
 			{"192.168.0.1", 1},
 			{"192.255.0.1", -1},
 		})
-		checkSize2(t, rtbl, 3)
+		checkNodes2(t, rtbl, 3)
 
 		rtbl.Delete(mpp("192.168.0.5/32")) // right leaf, no route
 
@@ -502,7 +502,7 @@ func TestDelete2(t *testing.T) {
 			{"192.168.0.1", 1},
 			{"192.255.0.1", -1},
 		})
-		checkSize2(t, rtbl, 3)
+		checkNodes2(t, rtbl, 3)
 	})
 
 	t.Run("intermediate_with_deleted_route", func(t *testing.T) {
@@ -517,7 +517,7 @@ func TestDelete2(t *testing.T) {
 			{"192.168.0.2", 2},
 			{"192.255.0.1", -1},
 		})
-		checkSize2(t, rtbl, 4)
+		checkNodes2(t, rtbl, 4)
 
 		rtbl.Delete(mpp("192.168.0.0/22"))
 
@@ -526,7 +526,7 @@ func TestDelete2(t *testing.T) {
 			{"192.168.0.2", -1},
 			{"192.255.0.1", -1},
 		})
-		checkSize2(t, rtbl, 3)
+		checkNodes2(t, rtbl, 3)
 	})
 
 	t.Run("default_route", func(t *testing.T) {
@@ -542,7 +542,7 @@ func TestDelete2(t *testing.T) {
 			{"1.2.3.4", -1},
 			{"::1", 1},
 		})
-		checkSize2(t, rtbl, 2)
+		checkNodes2(t, rtbl, 2)
 	})
 }
 
@@ -1576,6 +1576,120 @@ func TestOverlapsPrefixCompare2(t *testing.T) {
 	}
 }
 
+func TestUnionEdgeCases2(t *testing.T) {
+	t.Parallel()
+
+	t.Run("empty", func(t *testing.T) {
+		aTbl := &Table2[int]{}
+		bTbl := &Table2[int]{}
+
+		// union empty tables
+		aTbl.Union(bTbl)
+
+		want := ""
+		got := aTbl.String()
+		if got != want {
+			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
+		}
+	})
+
+	t.Run("other empty", func(t *testing.T) {
+		aTbl := &Table2[int]{}
+		bTbl := &Table2[int]{}
+
+		// one empty table, b
+		aTbl.Insert(mpp("0.0.0.0/0"), 0)
+
+		aTbl.Union(bTbl)
+		want := `▼
+└─ 0.0.0.0/0 (0)
+`
+		got := aTbl.String()
+		if got != want {
+			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
+		}
+	})
+
+	t.Run("other empty", func(t *testing.T) {
+		aTbl := &Table2[int]{}
+		bTbl := &Table2[int]{}
+
+		// one empty table, a
+		bTbl.Insert(mpp("0.0.0.0/0"), 0)
+
+		aTbl.Union(bTbl)
+		want := `▼
+└─ 0.0.0.0/0 (0)
+`
+		got := aTbl.String()
+		if got != want {
+			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
+		}
+	})
+
+	t.Run("duplicate prefix", func(t *testing.T) {
+		aTbl := &Table2[string]{}
+		bTbl := &Table2[string]{}
+
+		// one empty table
+		aTbl.Insert(mpp("::/0"), "orig value")
+		bTbl.Insert(mpp("::/0"), "overwrite")
+
+		aTbl.Union(bTbl)
+		want := `▼
+└─ ::/0 (overwrite)
+`
+		got := aTbl.String()
+		if got != want {
+			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
+		}
+	})
+
+	t.Run("different IP versions", func(t *testing.T) {
+		aTbl := &Table2[int]{}
+		bTbl := &Table2[int]{}
+
+		// one empty table
+		aTbl.Insert(mpp("0.0.0.0/0"), 1)
+		bTbl.Insert(mpp("::/0"), 2)
+
+		aTbl.Union(bTbl)
+		want := `▼
+└─ 0.0.0.0/0 (1)
+▼
+└─ ::/0 (2)
+`
+		got := aTbl.String()
+		if got != want {
+			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
+		}
+	})
+
+	t.Run("same children", func(t *testing.T) {
+		aTbl := &Table2[int]{}
+		bTbl := &Table2[int]{}
+
+		aTbl.Insert(mpp("127.0.0.1/32"), 1)
+		aTbl.Insert(mpp("::1/128"), 1)
+
+		bTbl.Insert(mpp("127.0.0.2/32"), 2)
+		bTbl.Insert(mpp("::2/128"), 2)
+
+		aTbl.Union(bTbl)
+		want := `▼
+├─ 127.0.0.1/32 (1)
+└─ 127.0.0.2/32 (2)
+▼
+├─ ::1/128 (1)
+└─ ::2/128 (2)
+`
+		got := aTbl.String()
+		if got != want {
+			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
+		}
+	})
+}
+
 func TestUnionCompare2(t *testing.T) {
 	t.Parallel()
 
@@ -2146,9 +2260,14 @@ func checkUnion2(t *testing.T, pfxsA, pfxsB []netip.Prefix) {
 		t.Errorf("want:\n%s", want)
 		t.Errorf("got:\n%s", got)
 	}
+
+	// check the size
+	if golden.Size() != a.Size() {
+		t.Errorf("sizes differ, got: %d, want: %d", a.Size(), golden.Size())
+	}
 }
 
-func checkSize2(t *testing.T, tbl *Table2[int], want int) {
+func checkNodes2(t *testing.T, tbl *Table2[int], want int) {
 	tbl.init()
 	t.Helper()
 	if got := tbl.numNodes(); got != want {

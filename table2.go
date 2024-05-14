@@ -26,10 +26,6 @@ type Table2[V any] struct {
 	rootV4 *node2[V]
 	rootV6 *node2[V]
 
-	// number of prefixes in trie
-	sizeV4 int
-	sizeV6 int
-
 	// BitSets have to be initialized.
 	initOnce sync.Once
 }
@@ -97,10 +93,7 @@ func (t *Table2[V]) Insert(pfx netip.Prefix, val V) {
 		// last octet reached
 		if idx == lastOctetIdx {
 			// insert prefix into node
-			wasPresent := n.insertPrefix(lastOctet, lastOctetBits, val)
-			if !wasPresent {
-				t.incDecSize(+1, is4)
-			}
+			n.insertPrefix(lastOctet, lastOctetBits, val)
 			return
 		}
 
@@ -112,7 +105,6 @@ func (t *Table2[V]) Insert(pfx netip.Prefix, val V) {
 			// make new node
 			o := newNode2[V](path, n.is4)
 			o.insertPrefix(lastOctet, lastOctetBits, val)
-			t.incDecSize(+1, is4)
 
 			n.insertChild(cursor, o)
 			return
@@ -130,7 +122,6 @@ func (t *Table2[V]) Insert(pfx netip.Prefix, val V) {
 		// make new node
 		o := newNode2[V](path, n.is4)
 		o.insertPrefix(lastOctet, lastOctetBits, val)
-		t.incDecSize(+1, is4)
 
 		// other is prefix for child node
 		if o.pathIsPrefixOrEqual(idx, c.pathAsSlice()) {
@@ -213,7 +204,6 @@ func (t *Table2[V]) Delete(pfx netip.Prefix) {
 			}
 
 			// escape, but purge dangling path if needed, see below
-			t.incDecSize(-1, is4)
 			break
 		}
 
@@ -315,11 +305,7 @@ func (t *Table2[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 		// last octet reached
 		if idx == lastOctetIdx {
 			// update/insert prefix into node
-			val, wasPresent := n.updatePrefix(lastOctet, lastOctetBits, cb)
-			if !wasPresent {
-				t.incDecSize(+1, is4)
-			}
-			return val
+			return n.updatePrefix(lastOctet, lastOctetBits, cb)
 		}
 
 		// descend down the trie
@@ -330,12 +316,7 @@ func (t *Table2[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 			// make new node, already set path and insert prefix
 			o := newNode2[V](path, n.is4)
 			n.insertChild(cursor, o)
-
-			val, wasPresent := o.updatePrefix(lastOctet, lastOctetBits, cb)
-			if !wasPresent {
-				t.incDecSize(+1, is4)
-			}
-			return val
+			return o.updatePrefix(lastOctet, lastOctetBits, cb)
 		}
 
 		// child is prefix or equal to other node
@@ -357,12 +338,7 @@ func (t *Table2[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 
 			o.insertChild(c.pathAsSlice()[idx], c)
 			n.insertChild(cursor, o)
-
-			val, wasPresent := o.updatePrefix(lastOctet, lastOctetBits, cb)
-			if !wasPresent {
-				t.incDecSize(+1, is4)
-			}
-			return val
+			return o.updatePrefix(lastOctet, lastOctetBits, cb)
 		}
 
 		// The paths are different from a certain index.
@@ -377,12 +353,7 @@ func (t *Table2[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 
 		// splice intermediate: n -> imed -> (child, other)
 		n.insertChild(cursor, imed)
-
-		val, wasPresent := o.updatePrefix(lastOctet, lastOctetBits, cb)
-		if !wasPresent {
-			t.incDecSize(+1, is4)
-		}
-		return val
+		return o.updatePrefix(lastOctet, lastOctetBits, cb)
 	}
 }
 
@@ -917,25 +888,26 @@ func (t *Table2[V]) All6(yield func(pfx netip.Prefix, val V) bool) {
 	t.rootV6.allRec(yield)
 }
 
-// Size returns the sum of the IPv4 and IPv6 refixes.
+// Size, calculates the IPv4 and IPv6 prefixes and returns the sum.
+// You could also calculate it using All(), but this would be slower
+// in any case and therefore qualifies Size() as an independent method.
 func (t *Table2[V]) Size() int {
-	return t.sizeV4 + t.sizeV6
+	t.init()
+	return t.rootV4.numPrefixesRec() + t.rootV6.numPrefixesRec()
 }
 
-// Size4 returns the number of IPv4 refixes.
+// Size4 calculates the number of IPv4 prefixes.
+// You could also calculate it using All4(), but this would be slower
+// in any case and therefore qualifies Size4() as an independent method.
 func (t *Table2[V]) Size4() int {
-	return t.sizeV4
+	t.init()
+	return t.rootV4.numPrefixesRec()
 }
 
-// Size6 returns the number of IPv6 refixes.
+// Size6 calculates the number of IPv6 prefixes.
+// You could also calculate it using All6(), but this would be slower
+// in any case and therefore qualifies Size6() as an independent method.
 func (t *Table2[V]) Size6() int {
-	return t.sizeV6
-}
-
-func (t *Table2[V]) incDecSize(val int, is4 bool) {
-	if is4 {
-		t.sizeV4 = t.sizeV4 + val
-	} else {
-		t.sizeV6 = t.sizeV6 + val
-	}
+	t.init()
+	return t.rootV6.numPrefixesRec()
 }
