@@ -610,7 +610,7 @@ func (t *Table[V]) Size() int {
 
 // Size4 calculates the number of IPv4 prefixes.
 // You could also calculate it using All4(), but this would be slower
-// in any case and therefore qualifies Size() as an independent method.
+// in any case and therefore qualifies Size4() as an independent method.
 func (t *Table[V]) Size4() int {
 	t.init()
 	return t.rootV4.numPrefixesRec()
@@ -618,7 +618,7 @@ func (t *Table[V]) Size4() int {
 
 // Size6 calculates the number of IPv6 prefixes.
 // You could also calculate it using All6(), but this would be slower
-// in any case and therefore qualifies Size() as an independent method.
+// in any case and therefore qualifies Size6() as an independent method.
 func (t *Table[V]) Size6() int {
 	t.init()
 	return t.rootV6.numPrefixesRec()
