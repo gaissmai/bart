@@ -65,23 +65,22 @@ func (n *node[V]) prefixRank(baseIdx uint) int {
 
 // insertPrefix adds the route octet/prefixLen, with value val.
 // Just an adapter for insertIdx.
-func (n *node[V]) insertPrefix(octet byte, prefixLen int, val V) (wasPresent bool) {
-	return n.insertIdx(prefixToBaseIndex(octet, prefixLen), val)
+func (n *node[V]) insertPrefix(octet byte, prefixLen int, val V) {
+	n.insertIdx(prefixToBaseIndex(octet, prefixLen), val)
 }
 
 // insertIdx adds the route for baseIdx, with value val.
 // incSize reports if the sie counter must incremented.
-func (n *node[V]) insertIdx(baseIdx uint, val V) (wasPresent bool) {
+func (n *node[V]) insertIdx(baseIdx uint, val V) {
 	// prefix exists, overwrite val
 	if n.prefixesBitset.Test(baseIdx) {
 		n.prefixes[n.prefixRank(baseIdx)] = val
-		return true
+		return
 	}
 
 	// new, insert into bitset and slice
 	n.prefixesBitset.Set(baseIdx)
 	n.prefixes = slices.Insert(n.prefixes, n.prefixRank(baseIdx), val)
-	return false
 }
 
 // deletePrefix removes the route octet/prefixLen. Reports whether the
@@ -107,23 +106,24 @@ func (n *node[V]) deletePrefix(octet byte, prefixLen int) (wasPresent bool) {
 }
 
 // updatePrefix, update or set the value at prefix via callback.
-func (n *node[V]) updatePrefix(octet byte, prefixLen int, cb func(V, bool) V) (val V, wasPresent bool) {
+func (n *node[V]) updatePrefix(octet byte, prefixLen int, cb func(V, bool) V) (val V) {
 	// calculate idx once
 	baseIdx := prefixToBaseIndex(octet, prefixLen)
 
+	var ok bool
 	var rnk int
 
 	// if prefix is set, get current value
-	if wasPresent = n.prefixesBitset.Test(baseIdx); wasPresent {
+	if ok = n.prefixesBitset.Test(baseIdx); ok {
 		rnk = n.prefixRank(baseIdx)
 		val = n.prefixes[rnk]
 	}
 
 	// callback function to get updated or new value
-	val = cb(val, wasPresent)
+	val = cb(val, ok)
 
 	// prefix is already set, update and return value
-	if wasPresent {
+	if ok {
 		n.prefixes[rnk] = val
 		return
 	}
@@ -622,4 +622,13 @@ func cmpPrefix(a, b netip.Prefix) int {
 		return cmp
 	}
 	return cmp.Compare(a.Bits(), b.Bits())
+}
+
+// numPrefixesRec, calculate the number of prefixes under node n.
+func (n *node[V]) numPrefixesRec() int {
+	size := len(n.prefixes)
+	for _, c := range n.children {
+		size += c.numPrefixesRec()
+	}
+	return size
 }

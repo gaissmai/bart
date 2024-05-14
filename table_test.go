@@ -1460,6 +1460,11 @@ func TestUnionCompare(t *testing.T) {
 				t.Fatalf("Union(...): items[%d] differ slow(%v) != fast(%v)", i, slowI, fastI)
 			}
 		}
+
+		// check the size
+		if fast.Size() != len(slow.entries) {
+			t.Errorf("sizes differ, got: %d, want: %d", fast.Size(), len(slow.entries))
+		}
 	}
 }
 
@@ -1711,7 +1716,7 @@ func TestSupernetsEdgeCases(t *testing.T) {
 	}
 }
 
-func TestTableClone(t *testing.T) {
+func TestTableCloneEdgeCases(t *testing.T) {
 	t.Parallel()
 
 	tbl := new(Table[int])
@@ -1736,6 +1741,24 @@ func TestTableClone(t *testing.T) {
 	tbl.Delete(mpp("10.0.0.1/32"))
 	if tbl.String() == clone.String() {
 		t.Errorf("delete, clone must be different: clone:\n%sorig:\n%s", clone.String(), tbl.String())
+	}
+}
+
+func TestTableClone(t *testing.T) {
+	t.Parallel()
+
+	pfxs := randomPrefixes4(10_000)
+
+	golden := new(Table[int])
+	tbl := new(Table[int])
+	for _, pfx := range pfxs {
+		golden.Insert(pfx.pfx, pfx.val)
+		tbl.Insert(pfx.pfx, pfx.val)
+	}
+	clone := tbl.Clone()
+
+	if !reflect.DeepEqual(tbl, clone) {
+		t.Errorf("foo")
 	}
 }
 
