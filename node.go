@@ -303,14 +303,15 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 
 	// 1. test if any routes overlaps?
 
-	nOk := len(n.prefixes) > 0
-	oOk := len(o.prefixes) > 0
+	nPfxExists := len(n.prefixes) > 0
+	oPfxExists := len(o.prefixes) > 0
 	var nIdx, oIdx uint
+
 	// zig-zag, for all routes in both nodes ...
 	for {
-		if nOk {
+		if nPfxExists {
 			// range over bitset, node n
-			if nIdx, nOk = n.prefixesBitset.NextSet(nIdx); nOk {
+			if nIdx, nPfxExists = n.prefixesBitset.NextSet(nIdx); nPfxExists {
 				// get range of host routes for this prefix
 				lowerBound, upperBound := lowerUpperBound(nIdx)
 
@@ -327,9 +328,9 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 			}
 		}
 
-		if oOk {
+		if oPfxExists {
 			// range over bitset, node o
-			if oIdx, oOk = o.prefixesBitset.NextSet(oIdx); oOk {
+			if oIdx, oPfxExists = o.prefixesBitset.NextSet(oIdx); oPfxExists {
 				// get range of host routes for this prefix
 				lowerBound, upperBound := lowerUpperBound(oIdx)
 
@@ -345,7 +346,7 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 				oIdx++
 			}
 		}
-		if !nOk && !oOk {
+		if !nPfxExists && !oPfxExists {
 			break
 		}
 	}
@@ -364,14 +365,15 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 	nOctets := [maxNodeChildren]bool{}
 	oOctets := [maxNodeChildren]bool{}
 
-	nOk = len(n.children) > 0
-	oOk = len(o.children) > 0
+	ncExists := len(n.children) > 0
+	ocExists := len(o.children) > 0
 	var nOctet, oOctet uint
+
 	// zig-zag, for all octets in both nodes ...
 	for {
 		// range over bitset, node n
-		if nOk {
-			if nOctet, nOk = n.childrenBitset.NextSet(nOctet); nOk {
+		if ncExists {
+			if nOctet, ncExists = n.childrenBitset.NextSet(nOctet); ncExists {
 				if oAllotIndex[nOctet+firstHostIndex] {
 					return true
 				}
@@ -381,8 +383,8 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 		}
 
 		// range over bitset, node o
-		if oOk {
-			if oOctet, oOk = o.childrenBitset.NextSet(oOctet); oOk {
+		if ocExists {
+			if oOctet, ocExists = o.childrenBitset.NextSet(oOctet); ocExists {
 				if nAllotIndex[oOctet+firstHostIndex] {
 					return true
 				}
@@ -391,7 +393,7 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 			}
 		}
 
-		if !nOk && !oOk {
+		if !ncExists && !ocExists {
 			break
 		}
 	}
@@ -454,19 +456,19 @@ func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 	// 3. test if prefix overlaps any child in this node
 
 	// set start octet in bitset search with prefix octet
-	childOctet := uint(octet)
+	cOctet := uint(octet)
 	for {
-		if childOctet, ok = n.childrenBitset.NextSet(childOctet); !ok {
+		if cOctet, ok = n.childrenBitset.NextSet(cOctet); !ok {
 			break
 		}
 
-		childIdx := childOctet + firstHostIndex
-		if childIdx >= pfxLowerBound && childIdx <= pfxUpperBound {
+		cIdx := cOctet + firstHostIndex
+		if cIdx >= pfxLowerBound && cIdx <= pfxUpperBound {
 			return true
 		}
 
 		// next round
-		childOctet++
+		cOctet++
 	}
 
 	return false
@@ -484,17 +486,20 @@ func (n *node[V]) unionRec(o *node[V]) {
 
 	// for all children in other node do ...
 	for _, oOctet := range o.allChildAddrs() {
-		oNode := o.getChild(byte(oOctet))
+		octet := byte(oOctet)
 
-		// get nNode with same octet
-		nNode := n.getChild(byte(oOctet))
+		// get other child for this octet
+		oc := o.getChild(octet)
 
-		if nNode == nil {
-			// union cloned child from oNode into nNode
-			n.insertChild(byte(oOctet), oNode.cloneRec())
+		// get n child with same octet
+		nc := n.getChild(octet)
+
+		if nc == nil {
+			// insert cloned child from oNode into nNode
+			n.insertChild(octet, oc.cloneRec())
 		} else {
 			// both nodes have child with octet, call union rec-descent
-			nNode.unionRec(oNode)
+			nc.unionRec(oc)
 		}
 	}
 }
@@ -586,21 +591,21 @@ func (n *node[V]) subnets(path []byte, pfxOctet byte, pfxLen int, is4 bool) (res
 	// see also algorithm in overlapsPrefix
 
 	// set start octet in bitset search with prefix octet
-	childOctet := uint(pfxOctet)
+	cOctet := uint(pfxOctet)
 	for {
-		if childOctet, ok = n.childrenBitset.NextSet(childOctet); !ok {
+		if cOctet, ok = n.childrenBitset.NextSet(cOctet); !ok {
 			// no more children
 			break
 		}
 
-		childIdx := childOctet + firstHostIndex
+		cIdx := cOctet + firstHostIndex
 
-		if childIdx >= pfxLowerBound && childIdx <= pfxUpperBound {
+		if cIdx >= pfxLowerBound && cIdx <= pfxUpperBound {
 			// pfx covers child
-			c := n.getChild(byte(childOctet))
+			c := n.getChild(byte(cOctet))
 
 			// append octet to path
-			path := append(slices.Clone(path), byte(childOctet))
+			path := append(slices.Clone(path), byte(cOctet))
 
 			// all cidrs under this child are covered by pfx
 			c.allRec(path, is4, func(pfx netip.Prefix, _ V) bool {
@@ -610,7 +615,7 @@ func (n *node[V]) subnets(path []byte, pfxOctet byte, pfxLen int, is4 bool) (res
 		}
 
 		// next round
-		childOctet++
+		cOctet++
 	}
 
 	return result
