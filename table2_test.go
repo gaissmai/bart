@@ -32,7 +32,7 @@ func TestRegression2(t *testing.T) {
 
 	t.Run("prefixes_aligned_on_stride_boundary", func(t *testing.T) {
 		fast := &Table2[int]{}
-		slow := slowRT[int]{}
+		slow := goldTable[int]{}
 
 		fast.Insert(mpp("226.205.197.0/24"), 1)
 		slow.insert(mpp("226.205.197.0/24"), 1)
@@ -563,13 +563,13 @@ func TestDeleteCompare2(t *testing.T) {
 	// because we want pfxs and toDelete to be non-overlapping sets.
 	all4, all6 := randomPrefixes4(numPerFamily), randomPrefixes6(numPerFamily)
 
-	pfxs := append([]slowRTEntry[int](nil), all4[:deleteCut]...)
+	pfxs := append([]goldTableItem[int](nil), all4[:deleteCut]...)
 	pfxs = append(pfxs, all6[:deleteCut]...)
 
-	toDelete := append([]slowRTEntry[int](nil), all4[deleteCut:]...)
+	toDelete := append([]goldTableItem[int](nil), all4[deleteCut:]...)
 	toDelete = append(toDelete, all6[deleteCut:]...)
 
-	slow := slowRT[int]{pfxs}
+	slow := goldTable[int](pfxs)
 	fast := Table2[int]{}
 
 	for _, pfx := range pfxs {
@@ -631,10 +631,10 @@ func TestDeleteShuffled2(t *testing.T) {
 	// because we want pfxs and toDelete to be non-overlapping sets.
 	all4, all6 := randomPrefixes4(numPerFamily), randomPrefixes6(numPerFamily)
 
-	pfxs := append([]slowRTEntry[int](nil), all4[:deleteCut]...)
+	pfxs := append([]goldTableItem[int](nil), all4[:deleteCut]...)
 	pfxs = append(pfxs, all6[:deleteCut]...)
 
-	toDelete := append([]slowRTEntry[int](nil), all4[deleteCut:]...)
+	toDelete := append([]goldTableItem[int](nil), all4[deleteCut:]...)
 	toDelete = append(toDelete, all6[deleteCut:]...)
 
 	rt1 := Table2[int]{}
@@ -649,8 +649,8 @@ func TestDeleteShuffled2(t *testing.T) {
 	}
 
 	for i := 0; i < 10; i++ {
-		pfxs2 := append([]slowRTEntry[int](nil), pfxs...)
-		toDelete2 := append([]slowRTEntry[int](nil), toDelete...)
+		pfxs2 := append([]goldTableItem[int](nil), pfxs...)
+		toDelete2 := append([]goldTableItem[int](nil), toDelete...)
 		rand.Shuffle(len(toDelete2), func(i, j int) { toDelete2[i], toDelete2[j] = toDelete2[j], toDelete2[i] })
 		rt2 := Table2[int]{}
 		for _, pfx := range pfxs2 {
@@ -769,7 +769,7 @@ func TestGetCompare2(t *testing.T) {
 	t.Parallel()
 
 	pfxs := randomPrefixes(10_000)
-	slow := slowRT[int]{pfxs}
+	slow := goldTable[int](pfxs)
 	fast := Table2[int]{}
 
 	for _, pfx := range pfxs {
@@ -790,7 +790,7 @@ func TestUpdateCompare2(t *testing.T) {
 	t.Parallel()
 
 	pfxs := randomPrefixes(10_000)
-	slow := slowRT[int]{pfxs}
+	slow := goldTable[int](pfxs)
 	fast := Table2[int]{}
 
 	// Update as insert
@@ -899,7 +899,7 @@ func TestLookupCompare2(t *testing.T) {
 	t.Parallel()
 	pfxs := randomPrefixes(10_000)
 
-	slow := slowRT[int]{pfxs}
+	slow := goldTable[int](pfxs)
 	fast := Table2[int]{}
 
 	for _, pfx := range pfxs {
@@ -1005,7 +1005,7 @@ func TestLookupPrefixCompare2(t *testing.T) {
 	t.Parallel()
 	pfxs := randomPrefixes(10_000)
 
-	slow := slowRT[int]{pfxs}
+	slow := goldTable[int](pfxs)
 	fast := Table2[int]{}
 
 	for _, pfx := range pfxs {
@@ -1050,7 +1050,7 @@ func TestLookupPrefixLPMCompare2(t *testing.T) {
 	t.Parallel()
 	pfxs := randomPrefixes(10_000)
 
-	slow := slowRT[int]{pfxs}
+	slow := goldTable[int](pfxs)
 	fast := Table2[int]{}
 
 	for _, pfx := range pfxs {
@@ -1111,7 +1111,7 @@ func TestInsertShuffled2(t *testing.T) {
 	*/
 
 	for i := 0; i < 10; i++ {
-		pfxs2 := append([]slowRTEntry[int](nil), pfxs...)
+		pfxs2 := append([]goldTableItem[int](nil), pfxs...)
 		rand.Shuffle(len(pfxs2), func(i, j int) { pfxs2[i], pfxs2[j] = pfxs2[j], pfxs2[i] })
 
 		addrs := make([]netip.Addr, 0, 10_000)
@@ -1356,7 +1356,7 @@ func TestSubnetsCompare2(t *testing.T) {
 
 	pfxs := randomPrefixes(10_000)
 
-	slow := slowRT[int]{pfxs}
+	slow := goldTable[int](pfxs)
 	fast := Table2[int]{}
 
 	for _, pfx := range pfxs {
@@ -1480,7 +1480,7 @@ func TestSupernetsCompare2(t *testing.T) {
 
 	pfxs := randomPrefixes(10_000)
 
-	slow := slowRT[int]{pfxs}
+	slow := goldTable[int](pfxs)
 	fast := Table2[int]{}
 
 	for _, pfx := range pfxs {
@@ -1559,7 +1559,7 @@ func TestOverlapsPrefixCompare2(t *testing.T) {
 	t.Parallel()
 	pfxs := randomPrefixes(100_000)
 
-	slow := slowRT[int]{pfxs}
+	slow := goldTable[int](pfxs)
 	fast := Table2[int]{}
 
 	for _, pfx := range pfxs {
@@ -1753,14 +1753,14 @@ func TestOverlapsCompare2(t *testing.T) {
 
 	for i := 0; i < 10_000; i++ {
 		pfxs := randomPrefixes(numEntries)
-		slow := slowRT[int]{pfxs}
+		slow := goldTable[int](pfxs)
 		fast := Table2[int]{}
 		for _, pfx := range pfxs {
 			fast.Insert(pfx.pfx, pfx.val)
 		}
 
 		inter := randomPrefixes(numEntries)
-		slowInter := slowRT[int]{inter}
+		slowInter := goldTable[int](inter)
 		fastInter := Table2[int]{}
 		for _, pfx := range inter {
 			fastInter.Insert(pfx.pfx, pfx.val)
@@ -1838,7 +1838,7 @@ func BenchmarkTableLookup2(b *testing.B) {
 				for range b.N {
 					intSink, _ = rt1.Lookup(probe.pfx.Addr())
 				}
-				b.ReportMetric(float64(rt1.numNodes()), "Nodes")
+				b.ReportMetric(float64(rt1.nodes()), "Nodes")
 			})
 
 			b.ResetTimer()
@@ -1846,7 +1846,7 @@ func BenchmarkTableLookup2(b *testing.B) {
 				for range b.N {
 					intSink, _ = rt2.Lookup(probe.pfx.Addr())
 				}
-				b.ReportMetric(float64(rt2.numNodes()), "Nodes")
+				b.ReportMetric(float64(rt2.nodes()), "Nodes")
 			})
 
 		}
@@ -1879,7 +1879,7 @@ func BenchmarkTableLookupPrefix2(b *testing.B) {
 				for range b.N {
 					intSink, _ = rt1.LookupPrefix(probe.pfx)
 				}
-				b.ReportMetric(float64(rt1.numNodes()), "Nodes")
+				b.ReportMetric(float64(rt1.nodes()), "Nodes")
 			})
 
 			b.ResetTimer()
@@ -1887,7 +1887,7 @@ func BenchmarkTableLookupPrefix2(b *testing.B) {
 				for range b.N {
 					intSink, _ = rt2.LookupPrefix(probe.pfx)
 				}
-				b.ReportMetric(float64(rt2.numNodes()), "Nodes")
+				b.ReportMetric(float64(rt2.nodes()), "Nodes")
 			})
 
 		}
@@ -1920,7 +1920,7 @@ func BenchmarkTableLookupPrefixLPM2(b *testing.B) {
 				for range b.N {
 					_, intSink, _ = rt1.LookupPrefixLPM(probe.pfx)
 				}
-				b.ReportMetric(float64(rt1.numNodes()), "Nodes")
+				b.ReportMetric(float64(rt1.nodes()), "Nodes")
 			})
 
 			b.ResetTimer()
@@ -1928,7 +1928,7 @@ func BenchmarkTableLookupPrefixLPM2(b *testing.B) {
 				for range b.N {
 					_, intSink, _ = rt2.LookupPrefixLPM(probe.pfx)
 				}
-				b.ReportMetric(float64(rt2.numNodes()), "Nodes")
+				b.ReportMetric(float64(rt2.nodes()), "Nodes")
 			})
 
 		}
@@ -1961,12 +1961,12 @@ func BenchmarkSize2Random(b *testing.B) {
 
 					runtime.GC()
 					runtime.ReadMemStats(&endMem)
-					if npfx := rt1.numPrefixes(); npfx != nroutes {
+					if npfx := rt1.Size(); npfx != nroutes {
 						b.Fatalf("expect %v prefixes, got %v", nroutes, npfx)
 					}
 
 					b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
-					b.ReportMetric(float64(rt1.numNodes()), "Nodes")
+					b.ReportMetric(float64(rt1.nodes()), "Nodes")
 					b.ReportMetric(0, "ns/op") // silence
 				}
 			})
@@ -1984,12 +1984,12 @@ func BenchmarkSize2Random(b *testing.B) {
 
 					runtime.GC()
 					runtime.ReadMemStats(&endMem)
-					if npfx := rt2.numPrefixes(); npfx != nroutes {
+					if npfx := rt2.Size(); npfx != nroutes {
 						b.Fatalf("expect %v prefixes, got %v", nroutes, npfx)
 					}
 
 					b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
-					b.ReportMetric(float64(rt2.numNodes()), "Nodes")
+					b.ReportMetric(float64(rt2.nodes()), "Nodes")
 					b.ReportMetric(0, "ns/op") // silence
 				}
 			})
@@ -2084,8 +2084,8 @@ func BenchmarkTableDelete2Match(b *testing.B) {
 				rt2.Insert(route.pfx, route.val)
 			}
 
-			nodes1 := rt1.numNodes()
-			nodes2 := rt2.numNodes()
+			nodes1 := rt1.nodes()
+			nodes2 := rt2.nodes()
 
 			probe := routes[rand.Intn(nroutes)]
 
@@ -2094,7 +2094,7 @@ func BenchmarkTableDelete2Match(b *testing.B) {
 				for range b.N {
 					rt1.Delete(probe.pfx)
 				}
-				b.ReportMetric(float64(rt1.numNodes()-nodes1), "delta_Nodes")
+				b.ReportMetric(float64(rt1.nodes()-nodes1), "delta_Nodes")
 			})
 
 			b.ResetTimer()
@@ -2102,7 +2102,7 @@ func BenchmarkTableDelete2Match(b *testing.B) {
 				for range b.N {
 					rt2.Delete(probe.pfx)
 				}
-				b.ReportMetric(float64(rt2.numNodes()-nodes2), "delta_Nodes")
+				b.ReportMetric(float64(rt2.nodes()-nodes2), "delta_Nodes")
 			})
 		}
 	}
@@ -2270,33 +2270,7 @@ func checkUnion2(t *testing.T, pfxsA, pfxsB []netip.Prefix) {
 func checkNodes2(t *testing.T, tbl *Table2[int], want int) {
 	tbl.init()
 	t.Helper()
-	if got := tbl.numNodes(); got != want {
+	if got := tbl.nodes(); got != want {
 		t.Errorf("wrong table size, got %d strides want %d", got, want)
 	}
-}
-
-func (t *Table2[V]) numNodes() int {
-	t.init()
-	return t.numNodesRec(t.rootV4) + t.numNodesRec(t.rootV6)
-}
-
-func (t *Table2[V]) numNodesRec(n *node2[V]) int {
-	ret := 1 // this node
-	for _, c := range n.children {
-		ret += t.numNodesRec(c)
-	}
-	return ret
-}
-
-func (t *Table2[V]) numPrefixes() int {
-	t.init()
-	return t.numPrefixesRec(t.rootV4) + t.numPrefixesRec(t.rootV6)
-}
-
-func (t *Table2[V]) numPrefixesRec(n *node2[V]) int {
-	ret := len(n.prefixes)
-	for _, c := range n.children {
-		ret += t.numPrefixesRec(c)
-	}
-	return ret
 }

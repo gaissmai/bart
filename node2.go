@@ -62,18 +62,22 @@ func newNode2[V any](path []byte, is4 bool) *node2[V] {
 	return n
 }
 
+// pathAsSlice with proper length.
 func (n *node2[V]) pathAsSlice() (octets []byte) {
 	return n.path.octets[:n.path.length]
 }
 
+// pathLen
 func (n *node2[V]) pathLen() int {
 	return int(n.path.length)
 }
 
+// pathIsEqual with other byte slice.
 func (n *node2[V]) pathIsEqual(start int, buf []byte) bool {
 	return bytes.Equal(buf[start:], n.pathAsSlice()[start:])
 }
 
+// pathIsPrefixOrEqual with other byte slice.
 func (n *node2[V]) pathIsPrefixOrEqual(start int, buf []byte) bool {
 	return bytes.HasPrefix(buf[start:], n.pathAsSlice()[start:])
 }
@@ -282,7 +286,7 @@ func (n *node2[V]) childRank(octet byte) int {
 	return int(n.childrenBitset.Rank(uint(octet))) - 1
 }
 
-// insertChild, insert the child
+// insertChild, insert the child into node.
 func (n *node2[V]) insertChild(octet byte, child *node2[V]) {
 	// child exists, overwrite it
 	if n.childrenBitset.Test(uint(octet)) {
@@ -295,7 +299,8 @@ func (n *node2[V]) insertChild(octet byte, child *node2[V]) {
 	n.children = slices.Insert(n.children, n.childRank(octet), child)
 }
 
-// deleteChild, delete the child at octet. It is valid to delete a non-existent child.
+// deleteChild, delete the child at octet from node.
+// It is valid to delete a non-existent child.
 func (n *node2[V]) deleteChild(octet byte) {
 	if !n.childrenBitset.Test(uint(octet)) {
 		return
@@ -499,7 +504,7 @@ func (n *node2[V]) subnets(pfxOctet byte, pfxLen int) (result []netip.Prefix) {
 	return result
 }
 
-// cidrFromIndex, make prefix from baseIndex.
+// cidrFromIndex, make prefix from baseIndex with path and IP version.
 func (n *node2[V]) cidrFromIndex(idx uint) (pfx netip.Prefix) {
 	octet, pfxLen := baseIndexToPrefix(idx)
 
@@ -520,7 +525,7 @@ func (n *node2[V]) cidrFromIndex(idx uint) (pfx netip.Prefix) {
 		ip = netip.AddrFrom16(b16)
 	}
 
-	// make a normalized prefix from ip/bits
+	// normalize prefix!
 	pfx, _ = ip.Prefix(bits)
 	return
 }
@@ -535,14 +540,15 @@ func (n *node2[V]) overlapsRec(o *node2[V]) bool {
 
 	// 1. test if any routes overlaps?
 
-	nOk := len(n.prefixes) > 0
-	oOk := len(o.prefixes) > 0
+	nPfxExists := len(n.prefixes) > 0
+	oPfxExists := len(o.prefixes) > 0
 	var nIdx, oIdx uint
+
 	// zig-zag, for all routes in both nodes ...
 	for {
-		if nOk {
+		if nPfxExists {
 			// range over bitset, node n
-			if nIdx, nOk = n.prefixesBitset.NextSet(nIdx); nOk {
+			if nIdx, nPfxExists = n.prefixesBitset.NextSet(nIdx); nPfxExists {
 				// get range of host routes for this prefix
 				lowerBound, upperBound := lowerUpperBound(nIdx)
 
@@ -559,9 +565,9 @@ func (n *node2[V]) overlapsRec(o *node2[V]) bool {
 			}
 		}
 
-		if oOk {
+		if oPfxExists {
 			// range over bitset, node o
-			if oIdx, oOk = o.prefixesBitset.NextSet(oIdx); oOk {
+			if oIdx, oPfxExists = o.prefixesBitset.NextSet(oIdx); oPfxExists {
 				// get range of host routes for this prefix
 				lowerBound, upperBound := lowerUpperBound(oIdx)
 
@@ -577,7 +583,7 @@ func (n *node2[V]) overlapsRec(o *node2[V]) bool {
 				oIdx++
 			}
 		}
-		if !nOk && !oOk {
+		if !nPfxExists && !oPfxExists {
 			break
 		}
 	}
@@ -596,14 +602,15 @@ func (n *node2[V]) overlapsRec(o *node2[V]) bool {
 	nOctets := [maxNodeChildren]bool{}
 	oOctets := [maxNodeChildren]bool{}
 
-	nOk = len(n.children) > 0
-	oOk = len(o.children) > 0
+	ncExists := len(n.children) > 0
+	ocExists := len(o.children) > 0
 	var nOctet, oOctet uint
+
 	// zig-zag, for all octets in both nodes ...
 	for {
 		// range over bitset, node n
-		if nOk {
-			if nOctet, nOk = n.childrenBitset.NextSet(nOctet); nOk {
+		if ncExists {
+			if nOctet, ncExists = n.childrenBitset.NextSet(nOctet); ncExists {
 				if oAllotIndex[nOctet+firstHostIndex] {
 					return true
 				}
@@ -613,8 +620,8 @@ func (n *node2[V]) overlapsRec(o *node2[V]) bool {
 		}
 
 		// range over bitset, node o
-		if oOk {
-			if oOctet, oOk = o.childrenBitset.NextSet(oOctet); oOk {
+		if ocExists {
+			if oOctet, ocExists = o.childrenBitset.NextSet(oOctet); ocExists {
 				if nAllotIndex[oOctet+firstHostIndex] {
 					return true
 				}
@@ -623,7 +630,7 @@ func (n *node2[V]) overlapsRec(o *node2[V]) bool {
 			}
 		}
 
-		if !nOk && !oOk {
+		if !ncExists && !ocExists {
 			break
 		}
 	}
@@ -637,7 +644,8 @@ func (n *node2[V]) overlapsRec(o *node2[V]) bool {
 				nc := n.getChild(byte(i))
 				oc := o.getChild(byte(i))
 
-				// rec-descent, the nodes can have different path
+				// the nodes can have different path, side step,
+				// more complex algorithm due to path compression.
 				if nc.overlapsHelper(oc) {
 					return true
 				}
@@ -648,7 +656,8 @@ func (n *node2[V]) overlapsRec(o *node2[V]) bool {
 	return false
 }
 
-// overlapsHelper, check for different paths
+// overlapsHelper, check for different paths,
+// more complex algorithm due to path compression.
 func (n *node2[V]) overlapsHelper(o *node2[V]) bool {
 	switch {
 	case n.pathIsEqual(0, o.pathAsSlice()):
@@ -678,6 +687,15 @@ func (n *node2[V]) numPrefixesRec() int {
 	size := len(n.prefixes)
 	for _, c := range n.children {
 		size += c.numPrefixesRec()
+	}
+	return size
+}
+
+// numNodesRec, calculate the number of nodes under n.
+func (n *node2[V]) numNodesRec() int {
+	size := 1 // this node
+	for _, c := range n.children {
+		size += c.numNodesRec()
 	}
 	return size
 }

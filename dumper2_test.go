@@ -19,7 +19,7 @@ func TestDumperPanic2(t *testing.T) {
 
 	tbl := new(Table2[any])
 	tbl.Insert(mpp("1.2.3.4/32"), nil)
-	_ = tbl.dump(nil)
+	tbl.dump(nil)
 }
 
 func TestDumperEmpty2(t *testing.T) {
@@ -27,12 +27,10 @@ func TestDumperEmpty2(t *testing.T) {
 	tbl := new(Table2[any])
 	checkDump2(t, tbl, dumpTest{
 		cidrs: []netip.Prefix{},
-		want: `IPv4:
-
-[ROOT] path: [] bits: +0 depth: 0
-IPv6:
-
-[ROOT] path: [] bits: +0 depth: 0
+		want: `### IPv4:
+[NULL] path: [] bits: +0 depth: 0
+### IPv6:
+[NULL] path: [] bits: +0 depth: 0
 `,
 	})
 }
@@ -44,15 +42,13 @@ func TestDumpDefaultV4Route2(t *testing.T) {
 		cidrs: []netip.Prefix{
 			mpp("0.0.0.0/0"),
 		},
-		want: `IPv4:
-
+		want: `### IPv4:
 [LEAF] path: [] bits: +0 depth: 0
 indexs(#1): [1]
 prefxs(#1): 0/0
 values(#1): <nil>
-IPv6:
-
-[ROOT] path: [] bits: +0 depth: 0
+### IPv6:
+[NULL] path: [] bits: +0 depth: 0
 `,
 	})
 }
@@ -64,11 +60,9 @@ func TestDumpDefaultV6Route2(t *testing.T) {
 		cidrs: []netip.Prefix{
 			mpp("::/0"),
 		},
-		want: `IPv4:
-
-[ROOT] path: [] bits: +0 depth: 0
-IPv6:
-
+		want: `### IPv4:
+[NULL] path: [] bits: +0 depth: 0
+### IPv6:
 [LEAF] path: [] bits: +0 depth: 0
 indexs(#1): [1]
 prefxs(#1): 0x00/0
@@ -92,8 +86,7 @@ func TestDumpV4Sample2(t *testing.T) {
 			mpp("127.0.0.1/32"),
 			mpp("192.168.1.0/24"),
 		},
-		want: `IPv4:
-
+		want: `### IPv4:
 [FULL] path: [] bits: +0 depth: 0
 indexs(#2): [266 383]
 prefxs(#2): 10/8 127/8
@@ -130,9 +123,8 @@ childs(#5): 10 127 169 172 192
 ..indexs(#1): [257]
 ..prefxs(#1): 1/8
 ..values(#1): <nil>
-IPv6:
-
-[ROOT] path: [] bits: +0 depth: 0
+### IPv6:
+[NULL] path: [] bits: +0 depth: 0
 `,
 	})
 }
@@ -146,11 +138,9 @@ func TestDumpV6Sample2(t *testing.T) {
 			mpp("2000::/3"),
 			mpp("2001:db8::/32"),
 		},
-		want: `IPv4:
-
-[ROOT] path: [] bits: +0 depth: 0
-IPv6:
-
+		want: `### IPv4:
+[NULL] path: [] bits: +0 depth: 0
+### IPv6:
 [FULL] path: [] bits: +0 depth: 0
 indexs(#1): [9]
 prefxs(#1): 0x20/3
@@ -189,8 +179,7 @@ func TestDumpSample2(t *testing.T) {
 			mpp("127.0.0.1/32"),
 			mpp("192.168.1.0/24"),
 		},
-		want: `IPv4:
-
+		want: `### IPv4:
 [FULL] path: [] bits: +0 depth: 0
 indexs(#2): [266 383]
 prefxs(#2): 10/8 127/8
@@ -227,8 +216,7 @@ childs(#5): 10 127 169 172 192
 ..indexs(#1): [257]
 ..prefxs(#1): 1/8
 ..values(#1): <nil>
-IPv6:
-
+### IPv6:
 [FULL] path: [] bits: +0 depth: 0
 indexs(#2): [1 9]
 prefxs(#2): 0x00/0 0x20/3
@@ -254,9 +242,7 @@ func checkDump2(t *testing.T, tbl *Table2[any], tt dumpTest) {
 		tbl.Insert(cidr, nil)
 	}
 	w := new(strings.Builder)
-	if err := tbl.dump(w); err != nil {
-		t.Errorf("Dump() unexpected err: %v", err)
-	}
+	tbl.dump(w)
 	got := w.String()
 	if tt.want != got {
 		t.Errorf("Dump got:\n%swant:\n%s", got, tt.want)

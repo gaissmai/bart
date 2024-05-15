@@ -48,6 +48,8 @@ func (t *Table2[V]) rootNodeByVersion(is4 bool) *node2[V] {
 
 // Insert adds pfx to the tree, with value val.
 // If pfx is already present in the tree, its value is set to val.
+//
+// The prefix must already be normalized!
 func (t *Table2[V]) Insert(pfx netip.Prefix, val V) {
 	t.init()
 	if !pfx.IsValid() {
@@ -150,6 +152,8 @@ func (t *Table2[V]) Insert(pfx netip.Prefix, val V) {
 }
 
 // Delete removes pfx from the tree, pfx does not have to be present.
+//
+// The prefix must already be normalized!
 func (t *Table2[V]) Delete(pfx netip.Prefix) {
 	if !pfx.IsValid() {
 		return
@@ -273,6 +277,8 @@ func (t *Table2[V]) Delete(pfx netip.Prefix) {
 // The callback function is called with (value, ok) and returns a new value..
 //
 // If the pfx does not already exist, it is set with the new value.
+//
+// The prefix must already be normalized!
 func (t *Table2[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 	t.init()
 	if !pfx.IsValid() {
@@ -359,6 +365,8 @@ func (t *Table2[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 
 // Get returns the associated payload for prefix and true, or false if
 // prefix is not set in the routing table.
+//
+// The prefix must already be normalized!
 func (t *Table2[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 	if !pfx.IsValid() {
 		return
@@ -493,6 +501,8 @@ func (t *Table2[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 
 // LookupPrefix does a route lookup (longest prefix match) for pfx and
 // returns the associated value and true, or false if no route matched.
+//
+// The prefix must already be normalized!
 func (t *Table2[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
 	if !pfx.IsValid() {
 		return
@@ -509,6 +519,8 @@ func (t *Table2[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
 //
 // If LookupPrefixLPM is to be used for IP addresses,
 // they must be converted to /32 or /128 prefixes.
+//
+// The prefix must already be normalized!
 func (t *Table2[V]) LookupPrefixLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) {
 	if !pfx.IsValid() {
 		return
@@ -618,6 +630,8 @@ func (t *Table2[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val 
 }
 
 // Subnets, return all prefixes covered by pfx in natural CIDR sort order.
+//
+// The prefix must already be normalized!
 func (t *Table2[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 	if !pfx.IsValid() {
 		return nil
@@ -690,6 +704,8 @@ func (t *Table2[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 
 // Supernets, return all matching routes for pfx,
 // in natural CIDR sort order.
+//
+// The prefix must already be normalized!
 func (t *Table2[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 	if !pfx.IsValid() {
 		return nil
@@ -751,6 +767,8 @@ func (t *Table2[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 }
 
 // OverlapsPrefix reports whether any IP in pfx matches a route in the table.
+//
+// The prefix must already be normalized!
 func (t *Table2[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 	if !pfx.IsValid() {
 		return false
@@ -910,4 +928,10 @@ func (t *Table2[V]) Size4() int {
 func (t *Table2[V]) Size6() int {
 	t.init()
 	return t.rootV6.numPrefixesRec()
+}
+
+// nodes, calculates the IPv4 and IPv6 nodes and returns the sum.
+func (t *Table2[V]) nodes() int {
+	t.init()
+	return t.rootV4.numNodesRec() + t.rootV6.numNodesRec()
 }

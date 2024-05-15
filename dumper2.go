@@ -17,9 +17,7 @@ import (
 // dumpString2 is just a wrapper for dump.
 func (t *Table2[V]) dumpString2() string {
 	w := new(strings.Builder)
-	if err := t.dump(w); err != nil {
-		panic(err)
-	}
+	t.dump(w)
 	return w.String()
 }
 
@@ -82,20 +80,14 @@ func (t *Table2[V]) dumpString2() string {
 // .indexs(#1): [6]
 // .prefxs(#1): 0x80/2
 // .values(#1): <nil>
-func (t *Table2[V]) dump(w io.Writer) error {
+func (t *Table2[V]) dump(w io.Writer) {
 	t.init()
 
-	if _, err := fmt.Fprint(w, "IPv4:\n"); err != nil {
-		return err
-	}
+	fmt.Fprint(w, "### IPv4:")
 	t.rootV4.dumpRec2(w, 0)
 
-	if _, err := fmt.Fprint(w, "IPv6:\n"); err != nil {
-		return err
-	}
+	fmt.Fprint(w, "### IPv6:")
 	t.rootV6.dumpRec2(w, 0)
-
-	return nil
 }
 
 // dumpRec2, rec-descent the trie.

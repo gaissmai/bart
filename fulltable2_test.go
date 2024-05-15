@@ -39,7 +39,7 @@ func BenchmarkFullLookup2MatchV4(b *testing.B) {
 		for k := 0; k < b.N; k++ {
 			_, okSink = rt1.Lookup(ip)
 		}
-		b.ReportMetric(float64(rt1.numNodes()), "Nodes")
+		b.ReportMetric(float64(rt1.nodes()), "Nodes")
 	})
 
 	b.Run("comp", func(b *testing.B) {
@@ -47,7 +47,7 @@ func BenchmarkFullLookup2MatchV4(b *testing.B) {
 		for k := 0; k < b.N; k++ {
 			_, okSink = rt2.Lookup(ip)
 		}
-		b.ReportMetric(float64(rt2.numNodes()), "Nodes")
+		b.ReportMetric(float64(rt2.nodes()), "Nodes")
 	})
 }
 
@@ -80,7 +80,7 @@ func BenchmarkFullLookup2MatchV6(b *testing.B) {
 		for k := 0; k < b.N; k++ {
 			_, okSink = rt1.Lookup(ip)
 		}
-		b.ReportMetric(float64(rt1.numNodes()), "Nodes")
+		b.ReportMetric(float64(rt1.nodes()), "Nodes")
 	})
 
 	b.Run("comp", func(b *testing.B) {
@@ -88,7 +88,7 @@ func BenchmarkFullLookup2MatchV6(b *testing.B) {
 		for k := 0; k < b.N; k++ {
 			intSink, okSink = rt2.Lookup(ip)
 		}
-		b.ReportMetric(float64(rt2.numNodes()), "Nodes")
+		b.ReportMetric(float64(rt2.nodes()), "Nodes")
 	})
 }
 
@@ -117,7 +117,7 @@ func BenchmarkFullLookup2MissV4(b *testing.B) {
 		for k := 0; k < b.N; k++ {
 			_, okSink = rt1.Lookup(ip)
 		}
-		b.ReportMetric(float64(rt1.numNodes()), "Nodes")
+		b.ReportMetric(float64(rt1.nodes()), "Nodes")
 	})
 
 	b.Run("comp", func(b *testing.B) {
@@ -125,7 +125,7 @@ func BenchmarkFullLookup2MissV4(b *testing.B) {
 		for k := 0; k < b.N; k++ {
 			_, okSink = rt2.Lookup(ip)
 		}
-		b.ReportMetric(float64(rt2.numNodes()), "Nodes")
+		b.ReportMetric(float64(rt2.nodes()), "Nodes")
 	})
 }
 
@@ -154,7 +154,7 @@ func BenchmarkFullLookup2MissV6(b *testing.B) {
 		for k := 0; k < b.N; k++ {
 			_, okSink = rt1.Lookup(ip)
 		}
-		b.ReportMetric(float64(rt1.numNodes()), "Nodes")
+		b.ReportMetric(float64(rt1.nodes()), "Nodes")
 	})
 
 	b.Run("comp", func(b *testing.B) {
@@ -162,7 +162,7 @@ func BenchmarkFullLookup2MissV6(b *testing.B) {
 		for k := 0; k < b.N; k++ {
 			_, okSink = rt2.Lookup(ip)
 		}
-		b.ReportMetric(float64(rt2.numNodes()), "Nodes")
+		b.ReportMetric(float64(rt2.nodes()), "Nodes")
 	})
 }
 
@@ -191,12 +191,12 @@ func BenchmarkFull2Size2(b *testing.B) {
 				runtime.GC()
 				runtime.ReadMemStats(&endMem)
 
-				if npfx := rt1.numPrefixes(); npfx != nroutes {
+				if npfx := rt1.Size(); npfx != nroutes {
 					b.Fatalf("expect %v prefixes, got %v", nroutes, npfx)
 				}
 
 				b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
-				b.ReportMetric(float64(rt1.numNodes()), "Nodes")
+				b.ReportMetric(float64(rt1.nodes()), "Nodes")
 				b.ReportMetric(0, "ns/op") // silence
 			}
 		})
@@ -219,12 +219,12 @@ func BenchmarkFull2Size2(b *testing.B) {
 				runtime.GC()
 				runtime.ReadMemStats(&endMem)
 
-				if npfx := rt2.numPrefixes(); npfx != nroutes {
+				if npfx := rt2.Size(); npfx != nroutes {
 					b.Fatalf("expect %v prefixes, got %v", nroutes, npfx)
 				}
 
 				b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
-				b.ReportMetric(float64(rt2.numNodes()), "Nodes")
+				b.ReportMetric(float64(rt2.nodes()), "Nodes")
 				b.ReportMetric(0, "ns/op") // silence
 			}
 		})
