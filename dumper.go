@@ -19,16 +19,14 @@ const (
 	intermediateNode                 // only children
 )
 
-// ###################################################
-// Useful during development or debugging and testing.
-// ###################################################
+// ##################################################
+//  useful during development, debugging and testing
+// ##################################################
 
 // dumpString is just a wrapper for dump.
 func (t *Table[V]) dumpString() string {
 	w := new(strings.Builder)
-	if err := t.dump(w); err != nil {
-		panic(err)
-	}
+	t.dump(w)
 	return w.String()
 }
 
@@ -59,20 +57,14 @@ func (t *Table[V]) dumpString() string {
 //		...prefxs(#1): 1/8
 //
 // ...
-func (t *Table[V]) dump(w io.Writer) error {
+func (t *Table[V]) dump(w io.Writer) {
 	t.init()
 
-	if _, err := fmt.Fprint(w, "IPv4:\n"); err != nil {
-		return err
-	}
+	fmt.Fprint(w, "### IPv4:")
 	t.rootV4.dumpRec(w, nil, true)
 
-	if _, err := fmt.Fprint(w, "IPv6:\n"); err != nil {
-		return err
-	}
+	fmt.Fprint(w, "### IPv6:")
 	t.rootV6.dumpRec(w, nil, false)
-
-	return nil
 }
 
 // dumpRec, rec-descent the trie.
@@ -87,52 +79,46 @@ func (n *node[V]) dumpRec(w io.Writer, path []byte, is4 bool) {
 
 // dump the node to w.
 func (n *node[V]) dump(w io.Writer, path []byte, is4 bool) {
-	must := func(_ int, err error) {
-		if err != nil {
-			panic(err)
-		}
-	}
-
 	depth := len(path)
 	bits := depth * strideLen
 	indent := strings.Repeat(".", depth)
 
 	// node type with depth and octet path and bits.
-	must(fmt.Fprintf(w, "\n%s[%s] depth:  %d path: [%v] / %d\n",
-		indent, n.hasType(), depth, ancestors(path, is4), bits))
+	fmt.Fprintf(w, "\n%s[%s] depth:  %d path: [%v] / %d\n",
+		indent, n.hasType(), depth, ancestors(path, is4), bits)
 
 	if len(n.prefixes) != 0 {
 		indices := n.allStrideIndexes()
 		// print the baseIndices for this node.
-		must(fmt.Fprintf(w, "%sindexs(#%d): %v\n", indent, len(n.prefixes), indices))
+		fmt.Fprintf(w, "%sindexs(#%d): %v\n", indent, len(n.prefixes), indices)
 
 		// print the prefixes for this node
-		must(fmt.Fprintf(w, "%sprefxs(#%d):", indent, len(n.prefixes)))
+		fmt.Fprintf(w, "%sprefxs(#%d):", indent, len(n.prefixes))
 
 		for _, idx := range indices {
 			octet, bits := baseIndexToPrefix(idx)
-			must(fmt.Fprintf(w, " %s/%d", octetFmt(octet, is4), bits))
+			fmt.Fprintf(w, " %s/%d", octetFmt(octet, is4), bits)
 		}
-		must(fmt.Fprintln(w))
+		fmt.Fprintln(w)
 
 		// print the values for this node
-		must(fmt.Fprintf(w, "%svalues(#%d):", indent, len(n.prefixes)))
+		fmt.Fprintf(w, "%svalues(#%d):", indent, len(n.prefixes))
 
 		for _, val := range n.prefixes {
-			must(fmt.Fprintf(w, " %v", val))
+			fmt.Fprintf(w, " %v", val)
 		}
-		must(fmt.Fprintln(w))
+		fmt.Fprintln(w)
 	}
 
 	if len(n.children) != 0 {
 		// print the childs for this node
-		must(fmt.Fprintf(w, "%schilds(#%d):", indent, len(n.children)))
+		fmt.Fprintf(w, "%schilds(#%d):", indent, len(n.children))
 
 		for i := range n.children {
 			octet := byte(n.childrenBitset.Select(uint(i)))
-			must(fmt.Fprintf(w, " %s", octetFmt(octet, is4)))
+			fmt.Fprintf(w, " %s", octetFmt(octet, is4))
 		}
-		must(fmt.Fprintln(w))
+		fmt.Fprintln(w)
 	}
 }
 
@@ -171,7 +157,7 @@ func ancestors(path []byte, is4 bool) string {
 func (nt nodeType) String() string {
 	switch nt {
 	case nullNode:
-		return "ROOT"
+		return "NULL"
 	case fullNode:
 		return "FULL"
 	case leafNode:
