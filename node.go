@@ -621,14 +621,6 @@ func (n *node[V]) subnets(path []byte, pfxOctet byte, pfxLen int, is4 bool) (res
 	return result
 }
 
-// cmpPrefix, all cidrs are normalized
-func cmpPrefix(a, b netip.Prefix) int {
-	if cmp := a.Addr().Compare(b.Addr()); cmp != 0 {
-		return cmp
-	}
-	return cmp.Compare(a.Bits(), b.Bits())
-}
-
 // numPrefixesRec, calculate the number of prefixes under n.
 func (n *node[V]) numPrefixesRec() int {
 	size := len(n.prefixes) // this node
@@ -645,4 +637,12 @@ func (n *node[V]) numNodesRec() int {
 		size += c.numNodesRec()
 	}
 	return size
+}
+
+// cmpPrefix, all cidrs are normalized
+func cmpPrefix(a, b netip.Prefix) int {
+	if cmp := a.Addr().Compare(b.Addr()); cmp != 0 {
+		return cmp
+	}
+	return cmp.Compare(a.Bits(), b.Bits())
 }

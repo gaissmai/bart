@@ -11,31 +11,29 @@ import (
 	"slices"
 )
 
-// slowRT is a simple and slow route table, implemented as a slice of prefixes
-// as a correctness reference for bart.Table.
-type slowRT[V any] struct {
-	entries []slowRTEntry[V]
-}
+// goldTable is a simple and slow route table, implemented as a slice of prefixes
+// and values as a golden reference for bart.Table.
+type goldTable[V any] []goldTableItem[V]
 
-type slowRTEntry[V any] struct {
+type goldTableItem[V any] struct {
 	pfx netip.Prefix
 	val V
 }
 
-func (s *slowRT[V]) insert(pfx netip.Prefix, val V) {
+func (t *goldTable[V]) insert(pfx netip.Prefix, val V) {
 	pfx = pfx.Masked()
-	for i, ent := range s.entries {
+	for i, ent := range *t {
 		if ent.pfx == pfx {
-			s.entries[i].val = val
+			(*t)[i].val = val
 			return
 		}
 	}
-	s.entries = append(s.entries, slowRTEntry[V]{pfx, val})
+	*t = append(*t, goldTableItem[V]{pfx, val})
 }
 
-func (s *slowRT[V]) get(pfx netip.Prefix) (val V, ok bool) {
+func (t *goldTable[V]) get(pfx netip.Prefix) (val V, ok bool) {
 	pfx = pfx.Masked()
-	for _, ent := range s.entries {
+	for _, ent := range *t {
 		if ent.pfx == pfx {
 			return ent.val, true
 		}
@@ -43,42 +41,42 @@ func (s *slowRT[V]) get(pfx netip.Prefix) (val V, ok bool) {
 	return val, false
 }
 
-func (s *slowRT[V]) update(pfx netip.Prefix, cb func(V, bool) V) (val V) {
+func (t *goldTable[V]) update(pfx netip.Prefix, cb func(V, bool) V) (val V) {
 	pfx = pfx.Masked()
-	for i, ent := range s.entries {
+	for i, ent := range *t {
 		if ent.pfx == pfx {
 			// update val
-			s.entries[i].val = cb(ent.val, true)
+			(*t)[i].val = cb(ent.val, true)
 			return
 		}
 	}
 	// new val
 	val = cb(val, false)
 
-	s.entries = append(s.entries, slowRTEntry[V]{pfx, val})
+	*t = append(*t, goldTableItem[V]{pfx, val})
 	return val
 }
 
-func (s *slowRT[T]) union(o *slowRT[T]) {
-	for _, op := range o.entries {
+func (ta *goldTable[V]) union(tb *goldTable[V]) {
+	for _, bItem := range *tb {
 		var match bool
-		for i, sp := range s.entries {
-			if sp.pfx == op.pfx {
-				s.entries[i] = op
+		for i, aItem := range *ta {
+			if aItem.pfx == bItem.pfx {
+				(*ta)[i] = bItem
 				match = true
 				break
 			}
 		}
 		if !match {
-			s.entries = append(s.entries, op)
+			*ta = append(*ta, bItem)
 		}
 	}
 }
 
-func (s *slowRT[V]) lookup(addr netip.Addr) (val V, ok bool) {
+func (t *goldTable[V]) lookup(addr netip.Addr) (val V, ok bool) {
 	bestLen := -1
 
-	for _, item := range s.entries {
+	for _, item := range *t {
 		if item.pfx.Contains(addr) && item.pfx.Bits() > bestLen {
 			val = item.val
 			ok = true
@@ -88,10 +86,10 @@ func (s *slowRT[V]) lookup(addr netip.Addr) (val V, ok bool) {
 	return
 }
 
-func (s *slowRT[V]) lookupPfx(pfx netip.Prefix) (val V, ok bool) {
+func (t *goldTable[V]) lookupPfx(pfx netip.Prefix) (val V, ok bool) {
 	bestLen := -1
 
-	for _, item := range s.entries {
+	for _, item := range *t {
 		if item.pfx.Overlaps(pfx) && item.pfx.Bits() <= pfx.Bits() && item.pfx.Bits() > bestLen {
 			val = item.val
 			ok = true
@@ -101,10 +99,10 @@ func (s *slowRT[V]) lookupPfx(pfx netip.Prefix) (val V, ok bool) {
 	return
 }
 
-func (s *slowRT[V]) lookupPfxLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) {
+func (t *goldTable[V]) lookupPfxLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) {
 	bestLen := -1
 
-	for _, item := range s.entries {
+	for _, item := range *t {
 		if item.pfx.Overlaps(pfx) && item.pfx.Bits() <= pfx.Bits() && item.pfx.Bits() > bestLen {
 			val = item.val
 			lpm = item.pfx
@@ -115,10 +113,10 @@ func (s *slowRT[V]) lookupPfxLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, ok 
 	return
 }
 
-func (s *slowRT[V]) subnets(pfx netip.Prefix) []netip.Prefix {
+func (t *goldTable[V]) subnets(pfx netip.Prefix) []netip.Prefix {
 	var result []netip.Prefix
 
-	for _, item := range s.entries {
+	for _, item := range *t {
 		if pfx.Overlaps(item.pfx) && pfx.Bits() <= item.pfx.Bits() {
 			result = append(result, item.pfx)
 		}
@@ -127,10 +125,10 @@ func (s *slowRT[V]) subnets(pfx netip.Prefix) []netip.Prefix {
 	return result
 }
 
-func (s *slowRT[V]) supernets(pfx netip.Prefix) []netip.Prefix {
+func (t *goldTable[V]) supernets(pfx netip.Prefix) []netip.Prefix {
 	var result []netip.Prefix
 
-	for _, item := range s.entries {
+	for _, item := range *t {
 		if item.pfx.Overlaps(pfx) && item.pfx.Bits() <= pfx.Bits() {
 			result = append(result, item.pfx)
 		}
@@ -139,8 +137,8 @@ func (s *slowRT[V]) supernets(pfx netip.Prefix) []netip.Prefix {
 	return result
 }
 
-func (s *slowRT[T]) overlapsPrefix(pfx netip.Prefix) bool {
-	for _, p := range s.entries {
+func (t *goldTable[V]) overlapsPrefix(pfx netip.Prefix) bool {
+	for _, p := range *t {
 		if p.pfx.Overlaps(pfx) {
 			return true
 		}
@@ -148,10 +146,10 @@ func (s *slowRT[T]) overlapsPrefix(pfx netip.Prefix) bool {
 	return false
 }
 
-func (s *slowRT[T]) overlaps(o *slowRT[T]) bool {
-	for _, tp := range s.entries {
-		for _, op := range o.entries {
-			if tp.pfx.Overlaps(op.pfx) {
+func (ta *goldTable[V]) overlaps(tb *goldTable[V]) bool {
+	for _, aItem := range *ta {
+		for _, bItem := range *tb {
+			if aItem.pfx.Overlaps(bItem.pfx) {
 				return true
 			}
 		}
@@ -160,8 +158,8 @@ func (s *slowRT[T]) overlaps(o *slowRT[T]) bool {
 }
 
 // sort, inplace by netip.Prefix, all prefixes are in normalized form
-func (s *slowRT[T]) sort() {
-	slices.SortFunc(s.entries, func(a, b slowRTEntry[T]) int {
+func (t *goldTable[V]) sort() {
+	slices.SortFunc(*t, func(a, b goldTableItem[V]) int {
 		if cmp := a.pfx.Addr().Compare(b.pfx.Addr()); cmp != 0 {
 			return cmp
 		}
@@ -171,7 +169,7 @@ func (s *slowRT[T]) sort() {
 
 // randomPrefixes returns n randomly generated prefixes and associated values,
 // distributed equally between IPv4 and IPv6.
-func randomPrefixes(n int) []slowRTEntry[int] {
+func randomPrefixes(n int) []goldTableItem[int] {
 	pfxs := randomPrefixes4(n / 2)
 	pfxs = append(pfxs, randomPrefixes6(n-len(pfxs))...)
 	return pfxs
@@ -179,7 +177,7 @@ func randomPrefixes(n int) []slowRTEntry[int] {
 
 // randomPrefixes4 returns n randomly generated IPv4 prefixes and associated values.
 // skip default route
-func randomPrefixes4(n int) []slowRTEntry[int] {
+func randomPrefixes4(n int) []goldTableItem[int] {
 	pfxs := map[netip.Prefix]bool{}
 
 	for len(pfxs) < n {
@@ -192,9 +190,9 @@ func randomPrefixes4(n int) []slowRTEntry[int] {
 		pfxs[pfx] = true
 	}
 
-	ret := make([]slowRTEntry[int], 0, len(pfxs))
+	ret := make([]goldTableItem[int], 0, len(pfxs))
 	for pfx := range pfxs {
-		ret = append(ret, slowRTEntry[int]{pfx, rand.Int()})
+		ret = append(ret, goldTableItem[int]{pfx, rand.Int()})
 	}
 
 	return ret
@@ -202,7 +200,7 @@ func randomPrefixes4(n int) []slowRTEntry[int] {
 
 // randomPrefixes6 returns n randomly generated IPv4 prefixes and associated values.
 // skip default route
-func randomPrefixes6(n int) []slowRTEntry[int] {
+func randomPrefixes6(n int) []goldTableItem[int] {
 	pfxs := map[netip.Prefix]bool{}
 
 	for len(pfxs) < n {
@@ -215,9 +213,9 @@ func randomPrefixes6(n int) []slowRTEntry[int] {
 		pfxs[pfx] = true
 	}
 
-	ret := make([]slowRTEntry[int], 0, len(pfxs))
+	ret := make([]goldTableItem[int], 0, len(pfxs))
 	for pfx := range pfxs {
-		ret = append(ret, slowRTEntry[int]{pfx, rand.Int()})
+		ret = append(ret, goldTableItem[int]{pfx, rand.Int()})
 	}
 
 	return ret
