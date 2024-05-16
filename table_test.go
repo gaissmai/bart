@@ -31,7 +31,9 @@ var mpp = func(s string) netip.Prefix {
 	return pfx
 }
 
-func TestValid(t *testing.T) {
+// ############ tests ################################
+
+func TestValidPrefix(t *testing.T) {
 	t.Parallel()
 
 	tbl := new(Table[any])
@@ -152,17 +154,17 @@ func TestRegression(t *testing.T) {
 
 	t.Run("prefixes_aligned_on_stride_boundary", func(t *testing.T) {
 		fast := &Table[int]{}
-		slow := slowRT[int]{}
+		gold := goldTable[int]{}
 
 		fast.Insert(mpp("226.205.197.0/24"), 1)
-		slow.insert(mpp("226.205.197.0/24"), 1)
+		gold.insert(mpp("226.205.197.0/24"), 1)
 
 		fast.Insert(mpp("226.205.0.0/16"), 2)
-		slow.insert(mpp("226.205.0.0/16"), 2)
+		gold.insert(mpp("226.205.0.0/16"), 2)
 
 		probe := mpa("226.205.121.152")
 		got, gotOK := fast.Lookup(probe)
-		want, wantOK := slow.lookup(probe)
+		want, wantOK := gold.lookup(probe)
 		if !getsEqual(got, gotOK, want, wantOK) {
 			t.Fatalf("got (%v, %v), want (%v, %v)", got, gotOK, want, wantOK)
 		}
@@ -698,7 +700,7 @@ func TestLookupCompare(t *testing.T) {
 	t.Parallel()
 	pfxs := randomPrefixes(10_000)
 
-	slow := slowRT[int]{pfxs}
+	gold := goldTable[int](pfxs)
 	fast := Table[int]{}
 
 	for _, pfx := range pfxs {
@@ -711,11 +713,11 @@ func TestLookupCompare(t *testing.T) {
 	for i := 0; i < 10_000; i++ {
 		a := randomAddr()
 
-		slowVal, slowOK := slow.lookup(a)
+		goldVal, goldOK := gold.lookup(a)
 		fastVal, fastOK := fast.Lookup(a)
 
-		if !getsEqual(slowVal, slowOK, fastVal, fastOK) {
-			t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", a, fastVal, fastOK, slowVal, slowOK)
+		if !getsEqual(goldVal, goldOK, fastVal, fastOK) {
+			t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", a, fastVal, fastOK, goldVal, goldOK)
 		}
 
 		if a.Is6() {
@@ -743,8 +745,8 @@ func TestLookupPrefixCompare(t *testing.T) {
 	t.Parallel()
 	pfxs := randomPrefixes(10_000)
 
-	slow := slowRT[int]{pfxs}
 	fast := Table[int]{}
+	gold := goldTable[int](pfxs)
 
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx, pfx.val)
@@ -756,11 +758,11 @@ func TestLookupPrefixCompare(t *testing.T) {
 	for i := 0; i < 10_000; i++ {
 		pfx := randomPrefix()
 
-		slowVal, slowOK := slow.lookupPfx(pfx)
+		goldVal, goldOK := gold.lookupPfx(pfx)
 		fastVal, fastOK := fast.LookupPrefix(pfx)
 
-		if !getsEqual(slowVal, slowOK, fastVal, fastOK) {
-			t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", pfx, fastVal, fastOK, slowVal, slowOK)
+		if !getsEqual(goldVal, goldOK, fastVal, fastOK) {
+			t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", pfx, fastVal, fastOK, goldVal, goldOK)
 		}
 
 		if pfx.Addr().Is6() {
@@ -788,8 +790,8 @@ func TestLookupPrefixLPMCompare(t *testing.T) {
 	t.Parallel()
 	pfxs := randomPrefixes(10_000)
 
-	slow := slowRT[int]{pfxs}
 	fast := Table[int]{}
+	gold := goldTable[int](pfxs)
 
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx, pfx.val)
@@ -801,15 +803,15 @@ func TestLookupPrefixLPMCompare(t *testing.T) {
 	for i := 0; i < 10_000; i++ {
 		pfx := randomPrefix()
 
-		slowLPM, slowVal, slowOK := slow.lookupPfxLPM(pfx)
+		goldLPM, goldVal, goldOK := gold.lookupPfxLPM(pfx)
 		fastLPM, fastVal, fastOK := fast.LookupPrefixLPM(pfx)
 
-		if !getsEqual(slowVal, slowOK, fastVal, fastOK) {
-			t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", pfx, fastVal, fastOK, slowVal, slowOK)
+		if !getsEqual(goldVal, goldOK, fastVal, fastOK) {
+			t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", pfx, fastVal, fastOK, goldVal, goldOK)
 		}
 
-		if !getsEqual(slowLPM, slowOK, fastLPM, fastOK) {
-			t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", pfx, fastLPM, fastOK, slowLPM, slowOK)
+		if !getsEqual(goldLPM, goldOK, fastLPM, fastOK) {
+			t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", pfx, fastLPM, fastOK, goldLPM, goldOK)
 		}
 
 		if pfx.Addr().Is6() {
@@ -840,7 +842,7 @@ func TestInsertShuffled(t *testing.T) {
 	pfxs := randomPrefixes(1000)
 
 	for i := 0; i < 10; i++ {
-		pfxs2 := append([]slowRTEntry[int](nil), pfxs...)
+		pfxs2 := append([]goldTableItem[int](nil), pfxs...)
 		rand.Shuffle(len(pfxs2), func(i, j int) { pfxs2[i], pfxs2[j] = pfxs2[j], pfxs2[i] })
 
 		addrs := make([]netip.Addr, 0, 10_000)
@@ -886,14 +888,14 @@ func TestDeleteCompare(t *testing.T) {
 	// because we want pfxs and toDelete to be non-overlapping sets.
 	all4, all6 := randomPrefixes4(numPerFamily), randomPrefixes6(numPerFamily)
 
-	pfxs := append([]slowRTEntry[int](nil), all4[:deleteCut]...)
+	pfxs := append([]goldTableItem[int](nil), all4[:deleteCut]...)
 	pfxs = append(pfxs, all6[:deleteCut]...)
 
-	toDelete := append([]slowRTEntry[int](nil), all4[deleteCut:]...)
+	toDelete := append([]goldTableItem[int](nil), all4[deleteCut:]...)
 	toDelete = append(toDelete, all6[deleteCut:]...)
 
-	slow := slowRT[int]{pfxs}
 	fast := Table[int]{}
+	gold := goldTable[int](pfxs)
 
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx, pfx.val)
@@ -912,11 +914,11 @@ func TestDeleteCompare(t *testing.T) {
 	for i := 0; i < numProbes; i++ {
 		a := randomAddr()
 
-		slowVal, slowOK := slow.lookup(a)
+		goldVal, goldOK := gold.lookup(a)
 		fastVal, fastOK := fast.Lookup(a)
 
-		if !getsEqual(slowVal, slowOK, fastVal, fastOK) {
-			t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", a, fastVal, fastOK, slowVal, slowOK)
+		if !getsEqual(goldVal, goldOK, fastVal, fastOK) {
+			t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", a, fastVal, fastOK, goldVal, goldOK)
 		}
 
 		if a.Is6() {
@@ -954,10 +956,10 @@ func TestDeleteShuffled(t *testing.T) {
 	// because we want pfxs and toDelete to be non-overlapping sets.
 	all4, all6 := randomPrefixes4(numPerFamily), randomPrefixes6(numPerFamily)
 
-	pfxs := append([]slowRTEntry[int](nil), all4[:deleteCut]...)
+	pfxs := append([]goldTableItem[int](nil), all4[:deleteCut]...)
 	pfxs = append(pfxs, all6[:deleteCut]...)
 
-	toDelete := append([]slowRTEntry[int](nil), all4[deleteCut:]...)
+	toDelete := append([]goldTableItem[int](nil), all4[deleteCut:]...)
 	toDelete = append(toDelete, all6[deleteCut:]...)
 
 	rt1 := Table[int]{}
@@ -972,8 +974,8 @@ func TestDeleteShuffled(t *testing.T) {
 	}
 
 	for i := 0; i < 10; i++ {
-		pfxs2 := append([]slowRTEntry[int](nil), pfxs...)
-		toDelete2 := append([]slowRTEntry[int](nil), toDelete...)
+		pfxs2 := append([]goldTableItem[int](nil), pfxs...)
+		toDelete2 := append([]goldTableItem[int](nil), toDelete...)
 		rand.Shuffle(len(toDelete2), func(i, j int) { toDelete2[i], toDelete2[j] = toDelete2[j], toDelete2[i] })
 		rt2 := Table[int]{}
 		for _, pfx := range pfxs2 {
@@ -1092,19 +1094,19 @@ func TestGetCompare(t *testing.T) {
 	t.Parallel()
 
 	pfxs := randomPrefixes(10_000)
-	slow := slowRT[int]{pfxs}
 	fast := Table[int]{}
+	gold := goldTable[int](pfxs)
 
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx, pfx.val)
 	}
 
 	for _, pfx := range pfxs {
-		slowVal, slowOK := slow.get(pfx.pfx)
+		goldVal, goldOK := gold.get(pfx.pfx)
 		fastVal, fastOK := fast.Get(pfx.pfx)
 
-		if !getsEqual(slowVal, slowOK, fastVal, fastOK) {
-			t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", pfx.pfx, fastVal, fastOK, slowVal, slowOK)
+		if !getsEqual(goldVal, goldOK, fastVal, fastOK) {
+			t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", pfx.pfx, fastVal, fastOK, goldVal, goldOK)
 		}
 	}
 }
@@ -1113,8 +1115,8 @@ func TestUpdateCompare(t *testing.T) {
 	t.Parallel()
 
 	pfxs := randomPrefixes(10_000)
-	slow := slowRT[int]{pfxs}
 	fast := Table[int]{}
+	gold := goldTable[int](pfxs)
 
 	// Update as insert
 	for _, pfx := range pfxs {
@@ -1122,11 +1124,11 @@ func TestUpdateCompare(t *testing.T) {
 	}
 
 	for _, pfx := range pfxs {
-		slowVal, slowOK := slow.get(pfx.pfx)
+		goldVal, goldOK := gold.get(pfx.pfx)
 		fastVal, fastOK := fast.Get(pfx.pfx)
 
-		if !getsEqual(slowVal, slowOK, fastVal, fastOK) {
-			t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", pfx.pfx, fastVal, fastOK, slowVal, slowOK)
+		if !getsEqual(goldVal, goldOK, fastVal, fastOK) {
+			t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", pfx.pfx, fastVal, fastOK, goldVal, goldOK)
 		}
 	}
 
@@ -1134,16 +1136,16 @@ func TestUpdateCompare(t *testing.T) {
 
 	// Update as update
 	for _, pfx := range pfxs[:len(pfxs)/2] {
-		slow.update(pfx.pfx, cb)
+		gold.update(pfx.pfx, cb)
 		fast.Update(pfx.pfx, cb)
 	}
 
 	for _, pfx := range pfxs {
-		slowVal, slowOK := slow.get(pfx.pfx)
+		goldVal, goldOK := gold.get(pfx.pfx)
 		fastVal, fastOK := fast.Get(pfx.pfx)
 
-		if !getsEqual(slowVal, slowOK, fastVal, fastOK) {
-			t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", pfx.pfx, fastVal, fastOK, slowVal, slowOK)
+		if !getsEqual(goldVal, goldOK, fastVal, fastOK) {
+			t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", pfx.pfx, fastVal, fastOK, goldVal, goldOK)
 		}
 	}
 }
@@ -1226,25 +1228,26 @@ func TestOverlapsCompare(t *testing.T) {
 	seen := map[bool]int{}
 	for i := 0; i < 10000; i++ {
 		pfxs := randomPrefixes(numEntries)
-		slow := slowRT[int]{pfxs}
 		fast := Table[int]{}
+		gold := goldTable[int](pfxs)
+
 		for _, pfx := range pfxs {
 			fast.Insert(pfx.pfx, pfx.val)
 		}
 
 		inter := randomPrefixes(numEntries)
-		slowInter := slowRT[int]{inter}
+		goldInter := goldTable[int](inter)
 		fastInter := Table[int]{}
 		for _, pfx := range inter {
 			fastInter.Insert(pfx.pfx, pfx.val)
 		}
 
-		gotSlow := slow.overlaps(&slowInter)
+		gotGold := gold.overlaps(&goldInter)
 		gotFast := fast.Overlaps(&fastInter)
 
-		if gotSlow != gotFast {
+		if gotGold != gotFast {
 			t.Fatalf("Overlaps(...) = %v, want %v\nTable1:\n%s\nTable:\n%v",
-				gotFast, gotSlow, fast.String(), fastInter.String())
+				gotFast, gotGold, fast.String(), fastInter.String())
 		}
 
 		seen[gotFast]++
@@ -1255,8 +1258,8 @@ func TestOverlapsPrefixCompare(t *testing.T) {
 	t.Parallel()
 	pfxs := randomPrefixes(100_000)
 
-	slow := slowRT[int]{pfxs}
 	fast := Table[int]{}
+	gold := goldTable[int](pfxs)
 
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx, pfx.val)
@@ -1264,10 +1267,10 @@ func TestOverlapsPrefixCompare(t *testing.T) {
 
 	tests := randomPrefixes(10_000)
 	for _, tt := range tests {
-		gotSlow := slow.overlapsPrefix(tt.pfx)
+		gotGold := gold.overlapsPrefix(tt.pfx)
 		gotFast := fast.OverlapsPrefix(tt.pfx)
-		if gotSlow != gotFast {
-			t.Fatalf("overlapsPrefix(%q) = %v, want %v", tt.pfx, gotFast, gotSlow)
+		if gotGold != gotFast {
+			t.Fatalf("overlapsPrefix(%q) = %v, want %v", tt.pfx, gotFast, gotGold)
 		}
 	}
 }
@@ -1430,40 +1433,41 @@ func TestUnionCompare(t *testing.T) {
 
 	for i := 0; i < 100; i++ {
 		pfxs := randomPrefixes(numEntries)
-		slow := slowRT[int]{pfxs}
 		fast := Table[int]{}
+		gold := goldTable[int](pfxs)
+
 		for _, pfx := range pfxs {
 			fast.Insert(pfx.pfx, pfx.val)
 		}
 
 		pfxs2 := randomPrefixes(numEntries)
-		slow2 := slowRT[int]{pfxs2}
+		gold2 := goldTable[int](pfxs2)
 		fast2 := Table[int]{}
 		for _, pfx := range pfxs2 {
 			fast2.Insert(pfx.pfx, pfx.val)
 		}
 
-		slow.union(&slow2)
+		gold.union(&gold2)
 		fast.Union(&fast2)
 
 		// dump as slow table for comparison
-		fastAsSlowTable := fast.dumpAsPrefixTable()
+		fastAsGoldenTbl := fast.dumpAsGoldTable()
 
 		// sort for comparison
-		slow.sort()
-		fastAsSlowTable.sort()
+		gold.sort()
+		fastAsGoldenTbl.sort()
 
-		for i := range slow.entries {
-			slowI := slow.entries[i]
-			fastI := fastAsSlowTable.entries[i]
-			if slowI != fastI {
-				t.Fatalf("Union(...): items[%d] differ slow(%v) != fast(%v)", i, slowI, fastI)
+		for i := range gold {
+			goldItem := gold[i]
+			fastItem := fastAsGoldenTbl[i]
+			if goldItem != fastItem {
+				t.Fatalf("Union(...): items[%d] differ slow(%v) != fast(%v)", i, goldItem, fastItem)
 			}
 		}
 
 		// check the size
-		if fast.Size() != len(slow.entries) {
-			t.Errorf("sizes differ, got: %d, want: %d", fast.Size(), len(slow.entries))
+		if fast.Size() != len(gold) {
+			t.Errorf("sizes differ, got: %d, want: %d", fast.Size(), len(gold))
 		}
 	}
 }
@@ -1473,8 +1477,8 @@ func TestSubnetsCompare(t *testing.T) {
 
 	pfxs := randomPrefixes(10_000)
 
-	slow := slowRT[int]{pfxs}
 	fast := Table[int]{}
+	gold := goldTable[int](pfxs)
 
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx, pfx.val)
@@ -1483,11 +1487,11 @@ func TestSubnetsCompare(t *testing.T) {
 	for i := 0; i < 10_000; i++ {
 		pfx := randomPrefix()
 
-		slowPfxs := slow.subnets(pfx)
+		goldPfxs := gold.subnets(pfx)
 		fastPfxs := fast.Subnets(pfx)
 
-		if !reflect.DeepEqual(slowPfxs, fastPfxs) {
-			t.Fatalf("Subnets(%q), got: %v\nwant: %v", pfx, fastPfxs, slowPfxs)
+		if !reflect.DeepEqual(goldPfxs, fastPfxs) {
+			t.Fatalf("Subnets(%q), got: %v\nwant: %v", pfx, fastPfxs, goldPfxs)
 		}
 
 	}
@@ -1498,8 +1502,8 @@ func TestSupernets(t *testing.T) {
 
 	pfxs := randomPrefixes(10_000)
 
-	slow := slowRT[int]{pfxs}
 	fast := Table[int]{}
+	gold := goldTable[int](pfxs)
 
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx, pfx.val)
@@ -1508,11 +1512,11 @@ func TestSupernets(t *testing.T) {
 	for i := 0; i < 10_000; i++ {
 		pfx := randomPrefix()
 
-		slowPfxs := slow.supernets(pfx)
+		goldPfxs := gold.supernets(pfx)
 		fastPfxs := fast.Supernets(pfx)
 
-		if !reflect.DeepEqual(slowPfxs, fastPfxs) {
-			t.Fatalf("Supernets(%q), got: %v\nwant: %v", pfx, fastPfxs, slowPfxs)
+		if !reflect.DeepEqual(goldPfxs, fastPfxs) {
+			t.Fatalf("Supernets(%q), got: %v\nwant: %v", pfx, fastPfxs, goldPfxs)
 		}
 
 	}
@@ -1716,7 +1720,7 @@ func TestSupernetsEdgeCases(t *testing.T) {
 	}
 }
 
-func TestTableCloneEdgeCases(t *testing.T) {
+func TestCloneEdgeCases(t *testing.T) {
 	t.Parallel()
 
 	tbl := new(Table[int])
@@ -1744,7 +1748,7 @@ func TestTableCloneEdgeCases(t *testing.T) {
 	}
 }
 
-func TestTableClone(t *testing.T) {
+func TestClone(t *testing.T) {
 	t.Parallel()
 
 	pfxs := randomPrefixes4(10_000)
@@ -1903,6 +1907,61 @@ func TestAll(t *testing.T) {
 	})
 }
 
+// rangefunc iterators, only test it with 1.22 and newer
+/*
+func TestRange(t *testing.T) {
+	pfxs := randomPrefixes(10_000)
+	seen := make(map[netip.Prefix]int, 10_000)
+
+	t.Run("All", func(t *testing.T) {
+		rtbl := new(Table[int])
+		for _, item := range pfxs {
+			rtbl.Insert(item.pfx, item.val)
+			seen[item.pfx] = item.val
+		}
+
+		// check if pfx/val is as expected
+		for pfx, val := range rtbl.All {
+			if seen[pfx] != val {
+				t.Errorf("%v got value: %v, expected: %v", pfx, val, seen[pfx])
+			}
+			delete(seen, pfx)
+		}
+
+		// check if all entries visited
+		if len(seen) != 0 {
+			t.Fatalf("traverse error, not all entries visited")
+		}
+	})
+
+	t.Run("All with premature exit", func(t *testing.T) {
+		rtbl := new(Table[int])
+		for _, item := range pfxs {
+			rtbl.Insert(item.pfx, item.val)
+		}
+
+		// check if callback stops prematurely
+		countV6 := 0
+		for pfx, _ := range rtbl.All {
+			// max 1000 IPv6 prefixes
+			if !pfx.Addr().Is4() {
+				countV6++
+			}
+
+			// premature STOP condition
+			if countV6 >= 1000 {
+				break
+			}
+		}
+
+		// check if iteration stopped with error
+		if countV6 > 1000 {
+			t.Fatalf("expected premature stop with error")
+		}
+	})
+}
+*/
+
 func TestSize(t *testing.T) {
 	t.Parallel()
 
@@ -1954,79 +2013,9 @@ func TestSize(t *testing.T) {
 	}
 }
 
-// ############################################################################
-
-type tableOverlapsTest struct {
-	prefix string
-	want   bool
-}
-
-// checkOverlaps verifies that the overlaps lookups in tt return the
-// expected results on tbl.
-func checkOverlaps(t *testing.T, tbl *Table[int], tests []tableOverlapsTest) {
-	for _, tt := range tests {
-		got := tbl.OverlapsPrefix(mpp(tt.prefix))
-		if got != tt.want {
-			t.Log(tbl.String())
-			t.Errorf("OverlapsPrefix(%v) = %v, want %v", mpp(tt.prefix), got, tt.want)
-		}
-	}
-}
-
-type tableTest struct {
-	// addr is an IP address string to look up in a route table.
-	addr string
-	// want is the expected >=0 value associated with the route, or -1
-	// if we expect a lookup miss.
-	want int
-}
-
-// checkRoutes verifies that the route lookups in tt return the
-// expected results on tbl.
-func checkRoutes(t *testing.T, tbl *Table[int], tt []tableTest) {
-	t.Helper()
-	for _, tc := range tt {
-		v, ok := tbl.Lookup(mpa(tc.addr))
-
-		if !ok && tc.want != -1 {
-			t.Errorf("Lookup %q got (%v, %v), want (%v, false)", tc.addr, v, ok, tc.want)
-		}
-		if ok && v != tc.want {
-			t.Errorf("Lookup %q got (%v, %v), want (%v, true)", tc.addr, v, ok, tc.want)
-		}
-	}
-}
+// ############ benchmarks ################################
 
 var benchRouteCount = []int{10, 100, 1000, 10_000, 100_000}
-
-func checkSize(t *testing.T, tbl *Table[int], want int) {
-	tbl.init()
-	t.Helper()
-	if got := tbl.nodes(); got != want {
-		t.Errorf("wrong table size, got %d strides want %d", got, want)
-	}
-}
-
-// dumpAsPrefixTable, just a helper to compare with slowPrefixTable
-func (t *Table[V]) dumpAsPrefixTable() slowRT[V] {
-	t.init()
-	pfxs := []slowRTEntry[V]{}
-	pfxs = dumpListRec(pfxs, t.DumpList4())
-	pfxs = dumpListRec(pfxs, t.DumpList6())
-
-	ret := slowRT[V]{pfxs}
-	return ret
-}
-
-func dumpListRec[V any](pfxs []slowRTEntry[V], dumpList []DumpListNode[V]) []slowRTEntry[V] {
-	for _, node := range dumpList {
-		pfxs = append(pfxs, slowRTEntry[V]{pfx: node.CIDR, val: node.Value})
-		pfxs = append(pfxs, dumpListRec[V](nil, node.Subnets)...)
-	}
-	return pfxs
-}
-
-// #########################################################
 
 func BenchmarkTableInsert(b *testing.B) {
 	for _, fam := range []string{"ipv4", "ipv6"} {
@@ -2236,4 +2225,68 @@ func BenchmarkSize(b *testing.B) {
 			})
 		}
 	}
+}
+
+// ##################### helpers ############################
+
+type tableOverlapsTest struct {
+	prefix string
+	want   bool
+}
+
+// checkOverlaps verifies that the overlaps lookups in tt return the
+// expected results on tbl.
+func checkOverlaps(t *testing.T, tbl *Table[int], tests []tableOverlapsTest) {
+	for _, tt := range tests {
+		got := tbl.OverlapsPrefix(mpp(tt.prefix))
+		if got != tt.want {
+			t.Log(tbl.String())
+			t.Errorf("OverlapsPrefix(%v) = %v, want %v", mpp(tt.prefix), got, tt.want)
+		}
+	}
+}
+
+type tableTest struct {
+	// addr is an IP address string to look up in a route table.
+	addr string
+	// want is the expected >=0 value associated with the route, or -1
+	// if we expect a lookup miss.
+	want int
+}
+
+// checkRoutes verifies that the route lookups in tt return the
+// expected results on tbl.
+func checkRoutes(t *testing.T, tbl *Table[int], tt []tableTest) {
+	t.Helper()
+	for _, tc := range tt {
+		v, ok := tbl.Lookup(mpa(tc.addr))
+
+		if !ok && tc.want != -1 {
+			t.Errorf("Lookup %q got (%v, %v), want (%v, false)", tc.addr, v, ok, tc.want)
+		}
+		if ok && v != tc.want {
+			t.Errorf("Lookup %q got (%v, %v), want (%v, true)", tc.addr, v, ok, tc.want)
+		}
+	}
+}
+
+func checkSize(t *testing.T, tbl *Table[int], want int) {
+	tbl.init()
+	t.Helper()
+	if got := tbl.nodes(); got != want {
+		t.Errorf("wrong table size, got %d strides want %d", got, want)
+	}
+}
+
+// dumpAsGoldTable, just a helper to compare with golden table.
+func (t *Table[V]) dumpAsGoldTable() goldTable[V] {
+	t.init()
+	var tbl goldTable[V]
+
+	t.All(func(pfx netip.Prefix, val V) bool {
+		tbl = append(tbl, goldTableItem[V]{pfx: pfx, val: val})
+		return true
+	})
+
+	return tbl
 }
