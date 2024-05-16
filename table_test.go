@@ -34,7 +34,7 @@ var mpp = func(s string) netip.Prefix {
 func TestValid(t *testing.T) {
 	t.Parallel()
 
-	var tbl = new(Table[any])
+	tbl := new(Table[any])
 	var zero netip.Prefix
 	var testname string
 
@@ -2002,25 +2002,9 @@ var benchRouteCount = []int{10, 100, 1000, 10_000, 100_000}
 func checkSize(t *testing.T, tbl *Table[int], want int) {
 	tbl.init()
 	t.Helper()
-	if got := tbl.numNodes(); got != want {
+	if got := tbl.nodes(); got != want {
 		t.Errorf("wrong table size, got %d strides want %d", got, want)
 	}
-}
-
-func (t *Table[V]) numNodes() int {
-	t.init()
-	return t.numNodesRec(t.rootV4) + t.numNodesRec(t.rootV6)
-}
-
-func (t *Table[V]) numNodesRec(n *node[V]) int {
-	ret := 1
-	if len(n.children) == 0 {
-		return ret
-	}
-	for _, c := range n.children {
-		ret += t.numNodesRec(c)
-	}
-	return ret
 }
 
 // dumpAsPrefixTable, just a helper to compare with slowPrefixTable

@@ -624,6 +624,12 @@ func (t *Table[V]) Size6() int {
 	return t.rootV6.numPrefixesRec()
 }
 
+// nodes, calculates the IPv4 and IPv6 nodes and returns the sum.
+func (t *Table[V]) nodes() int {
+	t.init()
+	return t.rootV4.numNodesRec() + t.rootV6.numNodesRec()
+}
+
 // ipToOctets, be careful, do not allocate!
 //
 // intended use: SA4009: argument octets is overwritten before first use

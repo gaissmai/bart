@@ -629,11 +629,20 @@ func cmpPrefix(a, b netip.Prefix) int {
 	return cmp.Compare(a.Bits(), b.Bits())
 }
 
-// numPrefixesRec, calculate the number of prefixes under node n.
+// numPrefixesRec, calculate the number of prefixes under n.
 func (n *node[V]) numPrefixesRec() int {
-	size := len(n.prefixes)
+	size := len(n.prefixes) // this node
 	for _, c := range n.children {
 		size += c.numPrefixesRec()
+	}
+	return size
+}
+
+// numNodesRec, calculate the number of nodes under n.
+func (n *node[V]) numNodesRec() int {
+	size := 1 // this node
+	for _, c := range n.children {
+		size += c.numNodesRec()
 	}
 	return size
 }
