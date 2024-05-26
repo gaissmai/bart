@@ -49,6 +49,17 @@ var (
 	cloneSink    *Table[int]
 )
 
+func BenchmarkFullTableInsert(b *testing.B) {
+	var rt Table[struct{}]
+
+	b.ResetTimer()
+	for k := 0; k < b.N; k++ {
+		for _, route := range routes6 {
+			rt.Insert(route.CIDR, struct{}{})
+		}
+	}
+}
+
 func BenchmarkFullMatchV4(b *testing.B) {
 	var rt Table[int]
 

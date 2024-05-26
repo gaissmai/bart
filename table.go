@@ -55,6 +55,13 @@ type Table[V any] struct {
 
 // init BitSets once, so no constructor is needed
 func (t *Table[V]) init() {
+	// upfront nil test, faster than the atomic load in sync.Once.Do
+	// this makes bulk inserts 5% faster and the table is not safe
+	// for concurrent writers anyway
+	if t.rootV6 != nil {
+		return
+	}
+
 	t.initOnce.Do(func() {
 		t.rootV4 = newNode[V]()
 		t.rootV6 = newNode[V]()
@@ -75,6 +82,7 @@ func (t *Table[V]) rootNodeByVersion(is4 bool) *node[V] {
 // The prefix must already be normalized!
 func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	t.init()
+
 	if !pfx.IsValid() {
 		return
 	}

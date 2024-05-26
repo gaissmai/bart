@@ -1761,8 +1761,8 @@ func TestClone(t *testing.T) {
 	}
 	clone := tbl.Clone()
 
-	if !reflect.DeepEqual(tbl, clone) {
-		t.Errorf("foo")
+	if !reflect.DeepEqual(golden, clone) {
+		t.Errorf("cloned table isn't equal")
 	}
 }
 
