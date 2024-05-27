@@ -94,8 +94,8 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	n := t.rootNodeByVersion(is4)
 
 	// do not allocate
-	octets := make([]byte, 0, 16)
-	octets = ipToOctets(octets, ip, is4)
+	octets := make([]byte, 16)
+	ipToOctets(&octets, ip)
 
 	// 10.0.0.0/8    -> 0
 	// 10.12.0.0/15  -> 1
@@ -152,8 +152,8 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 	n := t.rootNodeByVersion(is4)
 
 	// do not allocate
-	octets := make([]byte, 0, 16)
-	octets = ipToOctets(octets, ip, is4)
+	octets := make([]byte, 16)
+	ipToOctets(&octets, ip)
 
 	// see comment in Insert()
 	lastOctetIdx := (bits - 1) / strideLen
@@ -195,8 +195,8 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 	}
 
 	// do not allocate
-	octets := make([]byte, 0, 16)
-	octets = ipToOctets(octets, ip, is4)
+	octets := make([]byte, 16)
+	ipToOctets(&octets, ip)
 
 	// see comment in Insert()
 	lastOctetIdx := (bits - 1) / strideLen
@@ -231,8 +231,8 @@ func (t *Table[V]) Delete(pfx netip.Prefix) {
 	}
 
 	// do not allocate
-	octets := make([]byte, 0, 16)
-	octets = ipToOctets(octets, ip, is4)
+	octets := make([]byte, 16)
+	ipToOctets(&octets, ip)
 
 	// see comment in Insert()
 	lastOctetIdx := (bits - 1) / strideLen
@@ -297,8 +297,8 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	}
 
 	// do not allocate
-	octets := make([]byte, 0, 16)
-	octets = ipToOctets(octets, ip, is4)
+	octets := make([]byte, 16)
+	ipToOctets(&octets, ip)
 
 	// stack of the traversed nodes for fast backtracking, if needed
 	stack := [maxTreeDepth]*node[V]{}
@@ -389,8 +389,8 @@ func (t *Table[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V
 	stack := [maxTreeDepth]*node[V]{}
 
 	// do not allocate
-	octets := make([]byte, 0, 16)
-	octets = ipToOctets(octets, ip, is4)
+	octets := make([]byte, 16)
+	ipToOctets(&octets, ip)
 
 	// see comment in Insert()
 	lastOctetIdx := (bits - 1) / strideLen
@@ -456,8 +456,8 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 		return nil
 	}
 
-	octets := make([]byte, 0, 16)
-	octets = ipToOctets(octets, ip, is4)
+	octets := make([]byte, 16)
+	ipToOctets(&octets, ip)
 
 	// see comment in Insert()
 	lastOctetIdx := (bits - 1) / strideLen
@@ -500,8 +500,8 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 		return nil
 	}
 
-	octets := make([]byte, 0, 16)
-	octets = ipToOctets(octets, ip, is4)
+	octets := make([]byte, 16)
+	ipToOctets(&octets, ip)
 
 	// see comment in Insert()
 	lastOctetIdx := (bits - 1) / strideLen
@@ -545,8 +545,8 @@ func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 		return false
 	}
 
-	octets := make([]byte, 0, 16)
-	octets = ipToOctets(octets, ip, is4)
+	octets := make([]byte, 16)
+	ipToOctets(&octets, ip)
 
 	// see comment in Insert()
 	lastOctetIdx := (bits - 1) / strideLen
@@ -659,17 +659,13 @@ func (t *Table[V]) nodes() int {
 }
 
 // ipToOctets, be careful, do not allocate!
-//
-// intended use: SA4009: argument octets is overwritten before first use
-//
-//nolint:staticcheck
-func ipToOctets(octets []byte, ip netip.Addr, is4 bool) []byte {
+func ipToOctets(octets *[]byte, ip netip.Addr) {
 	a16 := ip.As16()
-	octets = a16[:]
-	if is4 {
-		octets = octets[12:]
+	copy(*octets, a16[:])
+
+	if ip.Is4() {
+		*octets = (*octets)[12:]
 	}
-	return octets
 }
 
 // pfxToValues, the pfx must already be normalized!
