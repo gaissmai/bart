@@ -15,6 +15,7 @@ import (
 	"net/netip"
 	"reflect"
 	"runtime"
+	"slices"
 	"testing"
 )
 
@@ -1907,6 +1908,37 @@ func TestAll(t *testing.T) {
 	})
 }
 
+// After go version 1.22 we can use range iterators
+func TestAllSorted(t *testing.T) {
+	t.Parallel()
+
+	n := 10_000
+
+	pfxs := randomPrefixes(n)
+
+	t.Run("All versus slices.SortFunc", func(t *testing.T) {
+		expect := make([]netip.Prefix, 0, n)
+		got := make([]netip.Prefix, 0, n)
+
+		rtbl := new(Table[int])
+		for _, item := range pfxs {
+			rtbl.Insert(item.pfx, item.val)
+			expect = append(expect, item.pfx)
+		}
+
+		slices.SortFunc(expect, cmpPrefix)
+
+		rtbl.All(func(pfx netip.Prefix, _ int) bool {
+			got = append(got, pfx)
+			return true
+		})
+
+		if !reflect.DeepEqual(got, expect) {
+			t.Fatalf("All differs with slices.SortFunc")
+		}
+	})
+}
+
 func TestSize(t *testing.T) {
 	t.Parallel()
 
@@ -2170,6 +2202,27 @@ func BenchmarkSize(b *testing.B) {
 			})
 		}
 	}
+}
+
+func BenchmarkAll(b *testing.B) {
+	n := 100_000
+	buf := make([]netip.Prefix, 0, n)
+
+	rtbl := new(Table[int])
+	for _, item := range randomPrefixes(n) {
+		rtbl.Insert(item.pfx, item.val)
+	}
+
+	b.Run("All", func(b *testing.B) {
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			buf = buf[:0]
+			rtbl.All(func(pfx netip.Prefix, _ int) bool {
+				buf = append(buf, pfx)
+				return true
+			})
+		}
+	})
 }
 
 // ##################### helpers ############################

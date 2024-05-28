@@ -653,29 +653,28 @@ func (t *Table[V]) Clone() *Table[V] {
 }
 
 // All may be used in a for/range loop to iterate
-// through all the prefixes.
+// through all the prefixes in CIDR sort order.
 //
 // Prefixes must not be inserted or deleted during iteration, otherwise
 // the behavior is undefined. However, value updates are permitted.
 //
-// The iteration order is not specified and is not part of the
-// public interface, you must not rely on it.
+// If the yield function returns false the iteration ends prematurely.
 func (t *Table[V]) All(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
 	// respect premature end of allRec()
-	_ = t.rootV4.allRec(nil, true, yield) && t.rootV6.allRec(nil, false, yield)
+	_ = t.rootV4.allRecSorted(nil, true, yield) && t.rootV6.allRecSorted(nil, false, yield)
 }
 
 // All4, like [Table.All] but only for the v4 routing table.
 func (t *Table[V]) All4(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
-	t.rootV4.allRec(nil, true, yield)
+	t.rootV4.allRecSorted(nil, true, yield)
 }
 
 // All6, like [Table.All] but only for the v6 routing table.
 func (t *Table[V]) All6(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
-	t.rootV6.allRec(nil, false, yield)
+	t.rootV6.allRecSorted(nil, false, yield)
 }
 
 // Size, calculates the IPv4 and IPv6 prefixes and returns the sum.
