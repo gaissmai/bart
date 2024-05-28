@@ -5,7 +5,6 @@ package bart
 
 import (
 	"bytes"
-	"cmp"
 	"fmt"
 	"io"
 	"net/netip"
@@ -13,13 +12,15 @@ import (
 	"strings"
 )
 
-// container for the direct kids, needed for hierarchical tree print,
-// but see below.
-type kidT[V any] struct {
+// kid, a node has no path information about its predecessors,
+// we collect this during the recursive descent.
+// The path is needed to get the CIDR back.
+type kid[V any] struct {
 	// for traversing
 	n    *node[V]
 	path []byte
 	idx  uint
+
 	// for printing
 	cidr netip.Prefix
 	val  V
@@ -105,7 +106,7 @@ func (n *node[V]) fprintRec(w io.Writer, parentIdx uint, path []byte, is4 bool, 
 	directKids := n.getKidsRec(parentIdx, path, is4)
 
 	// sort them by netip.Prefix, not by baseIndex
-	slices.SortFunc(directKids, sortKidsByPrefix[V])
+	slices.SortFunc(directKids, cmpKidByPrefix[V])
 
 	// symbols used in tree
 	glyphe := "├─ "
@@ -141,8 +142,8 @@ func (n *node[V]) fprintRec(w io.Writer, parentIdx uint, path []byte, is4 bool, 
 //
 // See the  artlookup.pdf paper in the doc folder,
 // the baseIndex function is the key.
-func (n *node[V]) getKidsRec(parentIdx uint, path []byte, is4 bool) []kidT[V] {
-	directKids := []kidT[V]{}
+func (n *node[V]) getKidsRec(parentIdx uint, path []byte, is4 bool) []kid[V] {
+	directKids := []kid[V]{}
 
 	// the node may have prefixes
 	for _, idx := range n.allStrideIndexes() {
@@ -156,7 +157,7 @@ func (n *node[V]) getKidsRec(parentIdx uint, path []byte, is4 bool) []kidT[V] {
 			val, _ := n.getValByIndex(idx)
 			path := slices.Clone(path)
 			cidr := cidrFromPath(path, idx, is4)
-			directKids = append(directKids, kidT[V]{n, path, idx, cidr, val})
+			directKids = append(directKids, kid[V]{n, path, idx, cidr, val})
 		}
 	}
 
@@ -204,10 +205,7 @@ func cidrFromPath(path []byte, idx uint, is4 bool) (pfx netip.Prefix) {
 	return
 }
 
-// sortKidsByPrefix, all prefixes are already normalized (Masked).
-func sortKidsByPrefix[V any](a, b kidT[V]) int {
-	if cmp := a.cidr.Addr().Compare(b.cidr.Addr()); cmp != 0 {
-		return cmp
-	}
-	return cmp.Compare(a.cidr.Bits(), b.cidr.Bits())
+// cmpKidByPrefix, all prefixes are already normalized (Masked).
+func cmpKidByPrefix[V any](a, b kid[V]) int {
+	return cmpPrefix(a.cidr, b.cidr)
 }
