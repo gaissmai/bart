@@ -7,10 +7,6 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Stand With Ukraine](https://raw.githubusercontent.com/vshymanskyy/StandWithUkraine/main/badges/StandWithUkraine.svg)](https://stand-with-ukraine.pp.ua)
 
-## ATTENTION: API change!!!
-
-All prefixes as input parameters must be normalized!
-
 ## Overview
 
 `package bart` provides a Balanced-Routing-Table (BART).

@@ -232,9 +232,14 @@ func (n *node[V]) apmByPrefix(octet byte, bits int, depth int, ip netip.Addr) (r
 
 // allStrideIndexes returns all baseIndexes set in this stride node in ascending order.
 func (n *node[V]) allStrideIndexes() []uint {
-	all := make([]uint, 0, maxNodePrefixes)
-	_, all = n.prefixesBitset.NextSetMany(0, all)
-	return all
+	c := len(n.prefixes)
+	if c == 0 {
+		return nil
+	}
+
+	buf := make([]uint, 0, c)
+	_, buf = n.prefixesBitset.NextSetMany(0, buf)
+	return buf
 }
 
 // ################## children ################################
@@ -286,9 +291,14 @@ func (n *node[V]) getChild(octet byte) *node[V] {
 
 // allChildAddrs returns the octets of all child nodes in ascending order.
 func (n *node[V]) allChildAddrs() []uint {
-	all := make([]uint, maxNodeChildren)
-	_, all = n.childrenBitset.NextSetMany(0, all)
-	return all
+	c := len(n.children)
+	if c == 0 {
+		return nil
+	}
+
+	buf := make([]uint, 0, c)
+	_, buf = n.childrenBitset.NextSetMany(0, buf)
+	return buf
 }
 
 // #################### nodes #############################################
@@ -313,11 +323,11 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 			// range over bitset, node n
 			if nIdx, nPfxExists = n.prefixesBitset.NextSet(nIdx); nPfxExists {
 				// get range of host routes for this prefix
-				lowerBound, upperBound := lowerUpperBound(nIdx)
+				lower, upper := hostRoutesByIndex(nIdx)
 
 				// insert host routes (octet/8) for this prefix,
 				// some sort of allotment
-				for i := lowerBound; i <= upperBound; i++ {
+				for i := lower; i <= upper; i++ {
 					// zig-zag, fast return
 					if oAllotIndex[i] {
 						return true
@@ -332,11 +342,11 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 			// range over bitset, node o
 			if oIdx, oPfxExists = o.prefixesBitset.NextSet(oIdx); oPfxExists {
 				// get range of host routes for this prefix
-				lowerBound, upperBound := lowerUpperBound(oIdx)
+				lower, upper := hostRoutesByIndex(oIdx)
 
 				// insert host routes (octet/8) for this prefix,
 				// some sort of allotment
-				for i := lowerBound; i <= upperBound; i++ {
+				for i := lower; i <= upper; i++ {
 					// zig-zag, fast return
 					if nAllotIndex[i] {
 						return true
@@ -432,7 +442,7 @@ func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 	// 2. test if prefix overlaps any route in this node
 
 	// lower/upper boundary for host routes
-	pfxLowerBound, pfxUpperBound := lowerUpperBound(pfxIdx)
+	pfxLower, pfxUpper := hostRoutesByIndex(pfxIdx)
 
 	// increment to 'next' routeIdx for start in bitset search
 	// since pfxIdx already testet by lpm in other direction
@@ -443,8 +453,8 @@ func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 			break
 		}
 
-		routeLowerBound, routeUpperBound := lowerUpperBound(routeIdx)
-		if routeLowerBound >= pfxLowerBound && routeUpperBound <= pfxUpperBound {
+		routeLower, routeUpper := hostRoutesByIndex(routeIdx)
+		if routeLower >= pfxLower && routeUpper <= pfxUpper {
 			return true
 		}
 
@@ -463,7 +473,7 @@ func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 		}
 
 		cIdx := cOctet + firstHostIndex
-		if cIdx >= pfxLowerBound && cIdx <= pfxUpperBound {
+		if cIdx >= pfxLower && cIdx <= pfxUpper {
 			return true
 		}
 
@@ -529,6 +539,8 @@ func (n *node[V]) cloneRec() *node[V] {
 // the yield function is called for each route entry with prefix and value.
 // If the yield function returns false the recursion ends prematurely and the
 // false value is propagated.
+//
+// The iteration order is not defined, just the simplest and fastest recursive implementation.
 func (n *node[V]) allRec(path []byte, is4 bool, yield func(netip.Prefix, V) bool) bool {
 	// for all prefixes in this node do ...
 	for _, idx := range n.allStrideIndexes() {
@@ -565,7 +577,7 @@ func (n *node[V]) subnets(path []byte, pfxOctet byte, pfxLen int, is4 bool) (res
 	// see also algorithm in overlapsPrefix
 
 	// lower/upper boundary for octet/pfxLen host routes
-	pfxLowerBound, pfxUpperBound := lowerUpperBound(parentIdx)
+	pfxLower, pfxUpper := hostRoutesByIndex(parentIdx)
 
 	// start in bitset search at parentIdx
 	idx := parentIdx
@@ -576,8 +588,8 @@ func (n *node[V]) subnets(path []byte, pfxOctet byte, pfxLen int, is4 bool) (res
 			break
 		}
 
-		routeLowerBound, routeUpperBound := lowerUpperBound(idx)
-		if routeLowerBound >= pfxLowerBound && routeUpperBound <= pfxUpperBound {
+		routeLower, routeUpper := hostRoutesByIndex(idx)
+		if routeLower >= pfxLower && routeUpper <= pfxUpper {
 			// get CIDR back for this idx
 			pfx := cidrFromPath(path, idx, is4)
 			result = append(result, pfx)
@@ -600,7 +612,7 @@ func (n *node[V]) subnets(path []byte, pfxOctet byte, pfxLen int, is4 bool) (res
 
 		cIdx := cOctet + firstHostIndex
 
-		if cIdx >= pfxLowerBound && cIdx <= pfxUpperBound {
+		if cIdx >= pfxLower && cIdx <= pfxUpper {
 			// pfx covers child
 			c := n.getChild(byte(cOctet))
 
@@ -621,6 +633,146 @@ func (n *node[V]) subnets(path []byte, pfxOctet byte, pfxLen int, is4 bool) (res
 	return result
 }
 
+// allRecSorted runs recursive the trie, starting at node and
+// the yield function is called for each route entry with prefix and value.
+// If the yield function returns false the recursion ends prematurely and the
+// false value is propagated.
+//
+// The iteration is in prefix sort order, it's a very complex implemenation compared with allRec.
+func (n *node[V]) allRecSorted(path []byte, is4 bool, yield func(netip.Prefix, V) bool) bool {
+	// get slice of all child addrs in this node, sorted by addr
+	allChildren := n.allChildAddrs()
+	childCursor := 0
+
+	// get slice of all indexes, sorted by idx
+	allIndices := n.allStrideIndexes()
+
+	// sort indexes by prefix
+	slices.SortFunc(allIndices, func(a, b uint) int {
+		return cmp.Compare(prefixSortRankByIndex(a), prefixSortRankByIndex(b))
+	})
+
+	// range over all indexes in this node in prefix sort order
+	for i, idx := range allIndices {
+		// get the host routes for this index
+		lower, upper := hostRoutesByIndex(idx)
+
+		// adjust host routes for this idx in case the host routes
+		// of the following idx overlaps
+		if i+1 < len(allIndices) {
+			lower, upper = adjustHostRoutes(idx, allIndices[i+1])
+		}
+
+		// handle childs before the host routes of idx
+		for j, addr := range allChildren {
+			octet := byte(addr)
+			if octetToBaseIndex(octet) >= lower {
+				// lower border of host routes
+				childCursor = j
+				break
+			}
+			c := n.getChild(octet)
+			path := append(slices.Clone(path), octet)
+
+			// premature end?
+			if !c.allRecSorted(path, is4, yield) {
+				return false
+			}
+
+			childCursor = j + 1
+		}
+
+		// some childs handled? shrink the slice
+		allChildren = allChildren[childCursor:]
+		childCursor = 0
+
+		// now handle prefix for idx
+		pfx := cidrFromPath(path, idx, is4)
+		val, _ := n.getValByIndex(idx)
+
+		// premature end?
+		if !yield(pfx, val) {
+			return false
+		}
+
+		// handle the children in host routes for this prefix
+		for j, addr := range allChildren {
+			octet := byte(addr)
+			if octetToBaseIndex(octet) > upper {
+				// out of host routes
+				childCursor = j
+				break
+			}
+
+			c := n.getChild(octet)
+			path := append(slices.Clone(path), octet)
+
+			// premature end?
+			if !c.allRecSorted(path, is4, yield) {
+				return false
+			}
+
+			childCursor = j + 1
+		}
+
+		// some childs handled? shrink the slice
+		allChildren = allChildren[childCursor:]
+		childCursor = 0
+	}
+
+	// handle all the rest of the children
+	for _, addr := range allChildren {
+		octet := byte(addr)
+		c := n.getChild(octet)
+		path := append(slices.Clone(path), octet)
+
+		// premature end?
+		if !c.allRecSorted(path, is4, yield) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// adjustHostRoutes, helper function to adjust the lower, upper bounds of the
+// host routes in case the host routes of the next idx overlaps
+func adjustHostRoutes(idx, next uint) (lower, upper uint) {
+	lower, upper = hostRoutesByIndex(idx)
+
+	// get the lower host route border of the next idx
+	nextLower, _ := hostRoutesByIndex(next)
+
+	// is there an overlap?
+	switch {
+	case nextLower == lower:
+		upper = 0
+
+		// [------------] idx
+		// [-----]        next
+		// make host routes for this idx invalid
+		//
+		// ][             idx
+		// [-----]^^^^^^] next
+		//
+		//  these ^^^^^^ children are handled before next prefix
+		//
+		// sorry, I know, it's completely confusing
+
+	case nextLower <= upper:
+		upper = nextLower - 1
+
+		// [------------] idx
+		//       [------] next
+		//
+		// shrink host routes for this idx
+		// [----][------] idx, next
+		//      ^
+	}
+
+	return lower, upper
+}
+
 // numPrefixesRec, calculate the number of prefixes under n.
 func (n *node[V]) numPrefixesRec() int {
 	size := len(n.prefixes) // this node
@@ -639,7 +791,8 @@ func (n *node[V]) numNodesRec() int {
 	return size
 }
 
-// cmpPrefix, all cidrs are normalized
+// cmpPrefix, compare func for prefix sort,
+// all cidrs are already normalized
 func cmpPrefix(a, b netip.Prefix) int {
 	if cmp := a.Addr().Compare(b.Addr()); cmp != 0 {
 		return cmp

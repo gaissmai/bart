@@ -336,21 +336,6 @@ func BenchmarkFullTableClone(b *testing.B) {
 	}
 }
 
-func BenchmarkFullTableAll(b *testing.B) {
-	var rt Table[int]
-
-	for i, route := range routes {
-		rt.Insert(route.CIDR, i)
-	}
-
-	b.ResetTimer()
-	for k := 0; k < b.N; k++ {
-		rt.All(func(pfx netip.Prefix, val int) bool {
-			return true
-		})
-	}
-}
-
 func BenchmarkFullTableSubnetsV4(b *testing.B) {
 	var rt Table[int]
 
