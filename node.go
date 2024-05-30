@@ -555,10 +555,10 @@ func (n *node[V]) allRec(path []byte, is4 bool, yield func(netip.Prefix, V) bool
 	}
 
 	// for all children in this node do ...
-	for _, addr := range n.allChildAddrs() {
+	for i, addr := range n.allChildAddrs() {
 		octet := byte(addr)
 		path := append(slices.Clone(path), octet)
-		child := n.getChild(octet)
+		child := n.children[i]
 
 		if !child.allRec(path, is4, yield) {
 			// premature end of recursion
@@ -640,8 +640,7 @@ func (n *node[V]) subnets(path []byte, pfxOctet byte, pfxLen int, is4 bool) (res
 //
 // The iteration is in prefix sort order, it's a very complex implemenation compared with allRec.
 func (n *node[V]) allRecSorted(path []byte, is4 bool, yield func(netip.Prefix, V) bool) bool {
-	// get slice of all child addrs in this node, sorted by addr
-	allChildren := n.allChildAddrs()
+	childAddrs := n.allChildAddrs()
 	childCursor := 0
 
 	// get slice of all indexes, sorted by idx
@@ -664,14 +663,16 @@ func (n *node[V]) allRecSorted(path []byte, is4 bool, yield func(netip.Prefix, V
 		}
 
 		// handle childs before the host routes of idx
-		for j, addr := range allChildren {
+		for j := childCursor; j < len(childAddrs); j++ {
+			addr := childAddrs[j]
 			octet := byte(addr)
+
 			if octetToBaseIndex(octet) >= lower {
 				// lower border of host routes
-				childCursor = j
 				break
 			}
-			c := n.getChild(octet)
+
+			c := n.children[j]
 			path := append(slices.Clone(path), octet)
 
 			// premature end?
@@ -679,12 +680,8 @@ func (n *node[V]) allRecSorted(path []byte, is4 bool, yield func(netip.Prefix, V
 				return false
 			}
 
-			childCursor = j + 1
+			childCursor++
 		}
-
-		// some childs handled? shrink the slice
-		allChildren = allChildren[childCursor:]
-		childCursor = 0
 
 		// now handle prefix for idx
 		pfx := cidrFromPath(path, idx, is4)
@@ -696,34 +693,31 @@ func (n *node[V]) allRecSorted(path []byte, is4 bool, yield func(netip.Prefix, V
 		}
 
 		// handle the children in host routes for this prefix
-		for j, addr := range allChildren {
+		for j := childCursor; j < len(childAddrs); j++ {
+			addr := childAddrs[j]
 			octet := byte(addr)
 			if octetToBaseIndex(octet) > upper {
 				// out of host routes
-				childCursor = j
 				break
 			}
 
-			c := n.getChild(octet)
+			c := n.children[j]
 			path := append(slices.Clone(path), octet)
 
 			// premature end?
 			if !c.allRecSorted(path, is4, yield) {
 				return false
 			}
-
-			childCursor = j + 1
+			childCursor++
 		}
-
-		// some childs handled? shrink the slice
-		allChildren = allChildren[childCursor:]
-		childCursor = 0
 	}
 
 	// handle all the rest of the children
-	for _, addr := range allChildren {
+	for j := childCursor; j < len(childAddrs); j++ {
+		addr := childAddrs[j]
 		octet := byte(addr)
-		c := n.getChild(octet)
+
+		c := n.children[j]
 		path := append(slices.Clone(path), octet)
 
 		// premature end?
