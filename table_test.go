@@ -2170,7 +2170,7 @@ func BenchmarkTableOverlaps(b *testing.B) {
 	}
 }
 
-func BenchmarkSize(b *testing.B) {
+func BenchmarkMemory(b *testing.B) {
 	for _, fam := range []string{"ipv4", "ipv6"} {
 		rng := randomPrefixes4
 		if fam == "ipv6" {
@@ -2181,7 +2181,7 @@ func BenchmarkSize(b *testing.B) {
 		for _, nroutes := range benchRouteCount {
 			rt := new(Table[any])
 
-			b.Run(fmt.Sprintf("%d/%s", nroutes, fam), func(b *testing.B) {
+			b.Run(fmt.Sprintf("%s/random/%d", fam, nroutes), func(b *testing.B) {
 				b.ResetTimer()
 
 				for i := 0; i < b.N; i++ {
@@ -2197,6 +2197,7 @@ func BenchmarkSize(b *testing.B) {
 					runtime.ReadMemStats(&endMem)
 
 					b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
+					b.ReportMetric(float64(nroutes)/float64(rt.nodes()), "Prefix/Node")
 					b.ReportMetric(0, "ns/op") // silence
 				}
 			})
