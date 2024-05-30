@@ -162,14 +162,15 @@ func (n *node[V]) getKidsRec(parentIdx uint, path []byte, is4 bool) []kid[V] {
 	}
 
 	// the node may have childs, the rec-descent monster starts
-	for _, octet := range n.allChildAddrs() {
+	for i, addr := range n.allChildAddrs() {
+		octet := byte(addr)
 		// do a longest-prefix-match
-		if lpmIdx, _, _ := n.lpmByOctet(byte(octet)); lpmIdx == parentIdx {
+		if lpmIdx, _, _ := n.lpmByOctet(octet); lpmIdx == parentIdx {
 			// child is directKid, the path is needed to get back the prefixes
-			path := append(slices.Clone(path), byte(octet))
+			path := append(slices.Clone(path), octet)
 
 			// get next child node
-			c := n.getChild(byte(octet))
+			c := n.children[i]
 
 			// traverse, rec-descent call with next child node
 			directKids = append(directKids, c.getKidsRec(0, path, is4)...)
