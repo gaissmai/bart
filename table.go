@@ -377,8 +377,6 @@ func (t *Table[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
 // LookupPrefixLPM is similar to [Table.LookupPrefix],
 // but it returns the lpm prefix in addition to value,ok.
 //
-// The prefix must already be normalized!
-//
 // This method is about 20-30% slower than LookupPrefix and should only
 // be used if the matching lpm entry is also required for other reasons.
 //
