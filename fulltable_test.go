@@ -12,6 +12,7 @@ import (
 	"net/netip"
 	"os"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -336,66 +337,58 @@ func BenchmarkFullTableClone(b *testing.B) {
 	}
 }
 
-func BenchmarkFullTableSubnetsV4(b *testing.B) {
+func BenchmarkFullTableSubnets(b *testing.B) {
 	var rt Table[int]
 
-	for i, route := range routes4 {
+	for i, route := range routes {
 		rt.Insert(route.CIDR, i)
 	}
 
-	b.ResetTimer()
-	for k := 0; k < b.N; k++ {
-		pfxSliceSink = rt.Subnets(randRoute4.CIDR)
-	}
+	b.Run("V4", func(b *testing.B) {
+		b.ResetTimer()
+		for k := 0; k < b.N; k++ {
+			pfxSliceSink = rt.Subnets(randRoute4.CIDR)
+		}
+	})
+
+	b.Run("V6", func(b *testing.B) {
+		b.ResetTimer()
+		for k := 0; k < b.N; k++ {
+			pfxSliceSink = rt.Subnets(randRoute6.CIDR)
+		}
+	})
 }
 
-func BenchmarkFullTableSubnetsV6(b *testing.B) {
+func BenchmarkFullTableSupernets(b *testing.B) {
 	var rt Table[int]
 
-	for i, route := range routes6 {
+	for i, route := range routes {
 		rt.Insert(route.CIDR, i)
 	}
 
-	b.ResetTimer()
-	for k := 0; k < b.N; k++ {
-		pfxSliceSink = rt.Subnets(randRoute6.CIDR)
-	}
+	b.Run("V4", func(b *testing.B) {
+		b.ResetTimer()
+		for k := 0; k < b.N; k++ {
+			pfxSliceSink = rt.Supernets(randRoute4.CIDR)
+		}
+	})
+
+	b.Run("V6", func(b *testing.B) {
+		b.ResetTimer()
+		for k := 0; k < b.N; k++ {
+			pfxSliceSink = rt.Supernets(randRoute6.CIDR)
+		}
+	})
 }
 
-func BenchmarkFullTableSupernetsV4(b *testing.B) {
-	var rt Table[int]
-
-	for i, route := range routes4 {
-		rt.Insert(route.CIDR, i)
-	}
-
-	b.ResetTimer()
-	for k := 0; k < b.N; k++ {
-		pfxSliceSink = rt.Supernets(randRoute4.CIDR)
-	}
-}
-
-func BenchmarkFullTableSupernetsV6(b *testing.B) {
-	var rt Table[int]
-
-	for i, route := range routes6 {
-		rt.Insert(route.CIDR, i)
-	}
-
-	b.ResetTimer()
-	for k := 0; k < b.N; k++ {
-		pfxSliceSink = rt.Supernets(randRoute6.CIDR)
-	}
-}
-
-func BenchmarkFullTableSizeV4(b *testing.B) {
+func BenchmarkFullTableMemoryV4(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 
 	rt := new(Table[struct{}])
 	runtime.GC()
 	runtime.ReadMemStats(&startMem)
 
-	b.Run(fmt.Sprintf("routes:%d", len(routes4)), func(b *testing.B) {
+	b.Run(strconv.Itoa(len(routes4)), func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			for _, route := range routes4 {
 				rt.Insert(route.CIDR, struct{}{})
@@ -405,19 +398,20 @@ func BenchmarkFullTableSizeV4(b *testing.B) {
 		runtime.GC()
 		runtime.ReadMemStats(&endMem)
 
-		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "bytes")
+		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
+		b.ReportMetric(float64(rt.Size())/float64(rt.nodes()), "Prefix/Node")
 		b.ReportMetric(0, "ns/op")
 	})
 }
 
-func BenchmarkFullTableSizeV6(b *testing.B) {
+func BenchmarkFullTableMemoryV6(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 
 	rt := new(Table[struct{}])
 	runtime.GC()
 	runtime.ReadMemStats(&startMem)
 
-	b.Run(fmt.Sprintf("routes:%d", len(routes6)), func(b *testing.B) {
+	b.Run(strconv.Itoa(len(routes6)), func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			for _, route := range routes6 {
 				rt.Insert(route.CIDR, struct{}{})
@@ -427,19 +421,20 @@ func BenchmarkFullTableSizeV6(b *testing.B) {
 		runtime.GC()
 		runtime.ReadMemStats(&endMem)
 
-		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "bytes")
+		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
+		b.ReportMetric(float64(rt.Size())/float64(rt.nodes()), "Prefix/Node")
 		b.ReportMetric(0, "ns/op")
 	})
 }
 
-func BenchmarkFullTableSize(b *testing.B) {
+func BenchmarkFullTableMemory(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 
 	rt := new(Table[struct{}])
 	runtime.GC()
 	runtime.ReadMemStats(&startMem)
 
-	b.Run(fmt.Sprintf("routes:%d", len(routes)), func(b *testing.B) {
+	b.Run(strconv.Itoa(len(routes)), func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			for _, route := range routes {
 				rt.Insert(route.CIDR, struct{}{})
@@ -449,7 +444,8 @@ func BenchmarkFullTableSize(b *testing.B) {
 		runtime.GC()
 		runtime.ReadMemStats(&endMem)
 
-		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "bytes")
+		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
+		b.ReportMetric(float64(rt.Size())/float64(rt.nodes()), "Prefix/Node")
 		b.ReportMetric(0, "ns/op")
 	})
 }
