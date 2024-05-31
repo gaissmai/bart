@@ -41,10 +41,11 @@ import (
 //
 // Since the conversion of a prefix into the normalized form
 // is quite time-consuming relative to the other functions
-// of the library, all prefixes must already be provided in
+// of the library, all prefixes must be provided in
 // normalized form as input parameters.
-//
 // If this is not the case, the behavior is undefined.
+//
+// All returned prefixes are also always in normalized form.
 type Table[V any] struct {
 	rootV4 *node[V]
 	rootV6 *node[V]
@@ -559,7 +560,7 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 		}
 
 		// make an all-prefix-match at intermediate level for octet
-		result = append(result, n.apmByOctet(octet, i, ip)...)
+		result = append(result, n.apmByPrefix(octet, strideLen, i, ip)...)
 
 		// descend down to next trie level
 		c := n.getChild(octet)

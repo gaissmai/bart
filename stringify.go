@@ -86,15 +86,15 @@ func (t *Table[V]) Fprint(w io.Writer) error {
 
 // fprint is the version dependent adapter to fprintRec.
 func (t *Table[V]) fprint(w io.Writer, is4 bool) error {
-	rootNode := t.rootNodeByVersion(is4)
-	if rootNode.isEmpty() {
+	n := t.rootNodeByVersion(is4)
+	if n.isEmpty() {
 		return nil
 	}
 
 	if _, err := fmt.Fprint(w, "▼\n"); err != nil {
 		return err
 	}
-	if err := rootNode.fprintRec(w, 0, nil, is4, ""); err != nil {
+	if err := n.fprintRec(w, 0, nil, is4, ""); err != nil {
 		return err
 	}
 	return nil
@@ -153,7 +153,9 @@ func (n *node[V]) getKidsRec(parentIdx uint, path []byte, is4 bool) []kid[V] {
 		}
 
 		// check if lpmIdx for this idx' parent is equal to parentIdx
-		if lpmIdx, _, _ := n.lpmByIndex(idx >> 1); lpmIdx == parentIdx {
+		lpmIdx, _, _ := n.lpmByIndex(idx >> 1)
+		if lpmIdx == parentIdx {
+			// idx is directKid
 			val, _ := n.getValByIndex(idx)
 			path := slices.Clone(path)
 			cidr := cidrFromPath(path, idx, is4)
@@ -165,7 +167,8 @@ func (n *node[V]) getKidsRec(parentIdx uint, path []byte, is4 bool) []kid[V] {
 	for i, addr := range n.allChildAddrs() {
 		octet := byte(addr)
 		// do a longest-prefix-match
-		if lpmIdx, _, _ := n.lpmByOctet(octet); lpmIdx == parentIdx {
+		lpmIdx, _, _ := n.lpmByOctet(octet)
+		if lpmIdx == parentIdx {
 			// child is directKid, the path is needed to get back the prefixes
 			path := append(slices.Clone(path), octet)
 
