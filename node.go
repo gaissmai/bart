@@ -189,24 +189,21 @@ func (n *node[V]) getValByPrefix(octet byte, bits int) (val V, ok bool) {
 	return n.getValByIndex(prefixToBaseIndex(octet, bits))
 }
 
-// apmByOctet is an adapter for apmByPrefix.
-func (n *node[V]) apmByOctet(octet byte, depth int, ip netip.Addr) (result []netip.Prefix) {
-	return n.apmByPrefix(octet, strideLen, depth, ip)
-}
-
 // apmByPrefix does an all prefix match in the 8-bit (stride) routing table
 // at this depth and returns all matching CIDRs.
-func (n *node[V]) apmByPrefix(octet byte, bits int, depth int, ip netip.Addr) (result []netip.Prefix) {
+func (n *node[V]) apmByPrefix(octet byte, bits int, depth int, ip netip.Addr) []netip.Prefix {
 	// skip intermediate nodes
 	if len(n.prefixes) == 0 {
-		return
+		return nil
 	}
 
-	var superIdxs []uint
+	result := make([]netip.Prefix, 0, len(n.prefixes))
+	parents := make([]uint, 0, len(n.prefixes))
+
 	baseIdx := prefixToBaseIndex(octet, bits)
 	for {
 		if n.prefixesBitset.Test(baseIdx) {
-			superIdxs = append(superIdxs, baseIdx)
+			parents = append(parents, baseIdx)
 		}
 
 		if baseIdx == 0 {
@@ -218,13 +215,16 @@ func (n *node[V]) apmByPrefix(octet byte, bits int, depth int, ip netip.Addr) (r
 		baseIdx >>= 1
 	}
 
-	// sort baseIndexes in ascending order
-	slices.Sort(superIdxs)
+	// re-sort indexes by prefix in place
+	slices.SortFunc(parents, func(a, b uint) int {
+		return cmp.Compare(prefixSortRankByIndex(a), prefixSortRankByIndex(b))
+	})
 
-	// make CIDRs
-	for _, baseIdx := range superIdxs {
-		superCIDR, _ := ip.Prefix(baseIndexToPrefixMask(baseIdx, depth))
-		result = append(result, superCIDR)
+	// make CIDRs from indexes
+	for _, idx := range parents {
+		bits := baseIndexToPrefixMask(idx, depth)
+		cidr, _ := ip.Prefix(bits)
+		result = append(result, cidr)
 	}
 
 	return result
