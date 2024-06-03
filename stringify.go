@@ -153,10 +153,10 @@ func (n *node[V]) getKidsRec(parentIdx uint, path []byte, is4 bool) []kid[V] {
 		}
 
 		// check if lpmIdx for this idx' parent is equal to parentIdx
-		lpmIdx, _, _ := n.lpmByIndex(idx >> 1)
+		lpmIdx, _, _ := n.lpm(idx >> 1)
 		if lpmIdx == parentIdx {
 			// idx is directKid
-			val, _ := n.getValByIndex(idx)
+			val, _ := n.getValue(idx)
 			path := slices.Clone(path)
 			cidr := cidrFromPath(path, idx, is4)
 			directKids = append(directKids, kid[V]{n, path, idx, cidr, val})
@@ -167,7 +167,7 @@ func (n *node[V]) getKidsRec(parentIdx uint, path []byte, is4 bool) []kid[V] {
 	for i, addr := range n.allChildAddrs() {
 		octet := byte(addr)
 		// do a longest-prefix-match
-		lpmIdx, _, _ := n.lpmByOctet(octet)
+		lpmIdx, _, _ := n.lpm(octetToBaseIndex(octet))
 		if lpmIdx == parentIdx {
 			// child is directKid, the path is needed to get back the prefixes
 			path := append(slices.Clone(path), octet)

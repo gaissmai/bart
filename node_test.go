@@ -52,13 +52,13 @@ func TestPrefixInsert(t *testing.T) {
 	fast := newNode[int]()
 
 	for _, pfx := range pfxs {
-		fast.insertPrefix(pfx.octet, pfx.bits, pfx.val)
+		fast.insertPrefix(prefixToBaseIndex(pfx.octet, pfx.bits), pfx.val)
 	}
 
 	for i := 0; i < 256; i++ {
 		octet := byte(i)
 		goldVal, goldOK := gold.lpm(octet)
-		_, fastVal, fastOK := fast.lpmByOctet(octet)
+		_, fastVal, fastOK := fast.lpm(octetToBaseIndex(octet))
 		if !getsEqual(fastVal, fastOK, goldVal, goldOK) {
 			t.Fatalf("get(%d) = (%v, %v), want (%v, %v)", octet, fastVal, fastOK, goldVal, goldOK)
 		}
@@ -73,7 +73,7 @@ func TestPrefixDelete(t *testing.T) {
 	fast := newNode[int]()
 
 	for _, pfx := range pfxs {
-		fast.insertPrefix(pfx.octet, pfx.bits, pfx.val)
+		fast.insertPrefix(prefixToBaseIndex(pfx.octet, pfx.bits), pfx.val)
 	}
 
 	toDelete := pfxs[:50]
@@ -90,7 +90,7 @@ func TestPrefixDelete(t *testing.T) {
 	for i := 0; i < 256; i++ {
 		octet := byte(i)
 		goldVal, goldOK := gold.lpm(octet)
-		_, fastVal, fastOK := fast.lpmByOctet(octet)
+		_, fastVal, fastOK := fast.lpm(octetToBaseIndex(octet))
 		if !getsEqual(fastVal, fastOK, goldVal, goldOK) {
 			t.Fatalf("get(%d) = (%v, %v), want (%v, %v)", octet, fastVal, fastOK, goldVal, goldOK)
 		}
@@ -105,7 +105,7 @@ func TestPrefixOverlaps(t *testing.T) {
 	fast := newNode[int]()
 
 	for _, pfx := range pfxs {
-		fast.insertPrefix(pfx.octet, pfx.bits, pfx.val)
+		fast.insertPrefix(prefixToBaseIndex(pfx.octet, pfx.bits), pfx.val)
 	}
 
 	for _, tt := range allStridePfxs() {
@@ -134,7 +134,7 @@ func TestNodeOverlaps(t *testing.T) {
 		fast := newNode[int]()
 
 		for _, pfx := range pfxs {
-			fast.insertPrefix(pfx.octet, pfx.bits, pfx.val)
+			fast.insertPrefix(prefixToBaseIndex(pfx.octet, pfx.bits), pfx.val)
 		}
 
 		inter := all[numEntries : 2*numEntries]
@@ -142,7 +142,7 @@ func TestNodeOverlaps(t *testing.T) {
 		fastInter := newNode[int]()
 
 		for _, pfx := range inter {
-			fastInter.insertPrefix(pfx.octet, pfx.bits, pfx.val)
+			fastInter.insertPrefix(prefixToBaseIndex(pfx.octet, pfx.bits), pfx.val)
 		}
 
 		gotGold := gold.strideOverlaps(&goldInter)
@@ -173,7 +173,7 @@ func BenchmarkNodePrefixInsert(b *testing.B) {
 			if i >= nroutes {
 				break
 			}
-			node.insertPrefix(route.octet, route.bits, 0)
+			node.insertPrefix(prefixToBaseIndex(route.octet, route.bits), 0)
 		}
 
 		b.Run(fmt.Sprintf("Into %d", nroutes), func(b *testing.B) {
@@ -181,7 +181,7 @@ func BenchmarkNodePrefixInsert(b *testing.B) {
 
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				node.insertPrefix(route.octet, route.bits, 0)
+				node.insertPrefix(prefixToBaseIndex(route.octet, route.bits), 0)
 			}
 		})
 	}
@@ -197,7 +197,7 @@ func BenchmarkNodePrefixUpdate(b *testing.B) {
 			if i >= nroutes {
 				break
 			}
-			node.insertPrefix(route.octet, route.bits, 0)
+			node.insertPrefix(prefixToBaseIndex(route.octet, route.bits), 0)
 		}
 
 		b.Run(fmt.Sprintf("In %d", nroutes), func(b *testing.B) {
@@ -221,7 +221,7 @@ func BenchmarkNodePrefixDelete(b *testing.B) {
 			if i >= nroutes {
 				break
 			}
-			node.insertPrefix(route.octet, route.bits, 0)
+			node.insertPrefix(prefixToBaseIndex(route.octet, route.bits), 0)
 		}
 
 		b.Run(fmt.Sprintf("From %d", nroutes), func(b *testing.B) {
@@ -247,7 +247,7 @@ func BenchmarkNodePrefixLPM(b *testing.B) {
 			if i >= nroutes {
 				break
 			}
-			node.insertPrefix(route.octet, route.bits, 0)
+			node.insertPrefix(prefixToBaseIndex(route.octet, route.bits), 0)
 		}
 
 		b.Run(fmt.Sprintf("IN %d", nroutes), func(b *testing.B) {
@@ -255,7 +255,7 @@ func BenchmarkNodePrefixLPM(b *testing.B) {
 
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				_, writeSink, _ = node.lpmByPrefix(route.octet, route.bits)
+				_, writeSink, _ = node.lpm(prefixToBaseIndex(route.octet, route.bits))
 			}
 		})
 	}
@@ -271,7 +271,7 @@ func BenchmarkNodePrefixRank(b *testing.B) {
 			if i >= nroutes {
 				break
 			}
-			node.insertPrefix(route.octet, route.bits, 0)
+			node.insertPrefix(prefixToBaseIndex(route.octet, route.bits), 0)
 		}
 
 		b.Run(fmt.Sprintf("IN %d", nroutes), func(b *testing.B) {

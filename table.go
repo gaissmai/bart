@@ -96,7 +96,11 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	// get the root node of the routing table
 	n := t.rootNodeByVersion(is4)
 
-	// do not allocate
+	// Do not allocate!
+	// As16() is inlined, the prefered AsSlice() is too complex for inlining.
+	// starting with go1.23 we can use AsSlice(),
+	// see https://github.com/golang/go/issues/56136
+
 	a16 := ip.As16()
 	octets := a16[:]
 	if is4 {
@@ -135,8 +139,8 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 		n = c
 	}
 
-	// insert prefix into node
-	n.insertPrefix(lastOctet, lastOctetBits, val)
+	// insert prefix/val into node
+	n.insertPrefix(prefixToBaseIndex(lastOctet, lastOctetBits), val)
 }
 
 // Update or set the value at pfx with a callback function.
@@ -229,7 +233,7 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 		}
 		n = c
 	}
-	return n.getValByPrefix(lastOctet, lastOctetBits)
+	return n.getValue(prefixToBaseIndex(lastOctet, lastOctetBits))
 }
 
 // Delete removes pfx from the tree, pfx does not have to be present.
@@ -354,7 +358,7 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 		// longest prefix match
 		// micro benchmarking: skip if node has no prefixes
 		if len(n.prefixes) != 0 {
-			if _, val, ok := n.lpmByIndex(octetToBaseIndex(octet)); ok {
+			if _, val, ok := n.lpm(octetToBaseIndex(octet)); ok {
 				return val, true
 			}
 		}
@@ -367,10 +371,7 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 //
 // The prefix must be in normalized form!
 func (t *Table[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
-	if !pfx.IsValid() {
-		return
-	}
-	_, _, val, ok = t.lpmByPrefix(pfx)
+	_, _, val, ok = t.lpmPrefix(pfx)
 	return
 }
 
@@ -385,10 +386,7 @@ func (t *Table[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
 //
 // The prefix must be in normalized form!
 func (t *Table[V]) LookupPrefixLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) {
-	if !pfx.IsValid() {
-		return
-	}
-	depth, baseIdx, val, ok := t.lpmByPrefix(pfx)
+	depth, baseIdx, val, ok := t.lpmPrefix(pfx)
 
 	if ok {
 		// calculate the mask from baseIdx and depth
@@ -401,7 +399,11 @@ func (t *Table[V]) LookupPrefixLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, o
 	return lpm, val, ok
 }
 
-func (t *Table[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V, ok bool) {
+func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V, ok bool) {
+	if !pfx.IsValid() {
+		return
+	}
+
 	// values derived from pfx
 	ip := pfx.Addr()
 	is4 := ip.Is4()
@@ -411,9 +413,6 @@ func (t *Table[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V
 	if n == nil {
 		return
 	}
-
-	// record path to leaf node
-	stack := [maxTreeDepth]*node[V]{}
 
 	// do not allocate
 	a16 := ip.As16()
@@ -428,6 +427,9 @@ func (t *Table[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V
 
 	var i int
 	var octet byte
+
+	// record path to leaf node
+	stack := [maxTreeDepth]*node[V]{}
 
 	// find the node
 	for i, octet = range octets[:lastOctetIdx+1] {
@@ -456,8 +458,10 @@ func (t *Table[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V
 		// longest prefix match
 		// micro benchmarking: skip if node has no prefixes
 		if len(n.prefixes) != 0 {
-			if baseIdx, val, ok := n.lpmByPrefix(octet, pfxLen); ok {
-				return j, baseIdx, val, true
+
+			if baseIdx, val, ok = n.lpm(prefixToBaseIndex(octet, pfxLen)); ok {
+				depth = j
+				return
 			}
 		}
 
@@ -550,12 +554,12 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 	for i, octet := range octets {
 		if i == lastOctetIdx {
 			// make an all-prefix-match at last level
-			result = append(result, n.apmByPrefix(lastOctet, lastOctetBits, i, ip)...)
+			result = append(result, n.apm(lastOctet, lastOctetBits, i, ip)...)
 			break
 		}
 
 		// make an all-prefix-match at intermediate level for octet
-		result = append(result, n.apmByPrefix(octet, strideLen, i, ip)...)
+		result = append(result, n.apm(octet, strideLen, i, ip)...)
 
 		// descend down to next trie level
 		c := n.getChild(octet)
@@ -601,7 +605,7 @@ func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 
 	for _, octet := range octets[:lastOctetIdx] {
 		// test if any route overlaps prefix´ so far
-		if _, _, ok := n.lpmByOctet(octet); ok {
+		if _, _, ok := n.lpm(octetToBaseIndex(octet)); ok {
 			return true
 		}
 
