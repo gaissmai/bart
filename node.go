@@ -63,15 +63,9 @@ func (n *node[V]) prefixRank(baseIdx uint) int {
 	return int(n.prefixesBitset.Rank(baseIdx)) - 1
 }
 
-// insertPrefix adds the route octet/prefixLen, with value val.
-// Just an adapter for insertIdx.
-func (n *node[V]) insertPrefix(octet byte, prefixLen int, val V) {
-	n.insertIdx(prefixToBaseIndex(octet, prefixLen), val)
-}
-
-// insertIdx adds the route for baseIdx, with value val.
+// insertPrefix adds the route for baseIdx, with value val.
 // incSize reports if the sie counter must incremented.
-func (n *node[V]) insertIdx(baseIdx uint, val V) {
+func (n *node[V]) insertPrefix(baseIdx uint, val V) {
 	// prefix exists, overwrite val
 	if n.prefixesBitset.Test(baseIdx) {
 		n.prefixes[n.prefixRank(baseIdx)] = val
@@ -140,13 +134,13 @@ func (n *node[V]) updatePrefix(octet byte, prefixLen int, cb func(V, bool) V) (v
 	return
 }
 
-// lpmByIndex does a route lookup for idx in the 8-bit (stride) routing table
+// lpm does a route lookup for idx in the 8-bit (stride) routing table
 // at this depth and returns (baseIdx, value, true) if a matching
 // longest prefix exists, or ok=false otherwise.
 //
 // backtracking is fast, it's just a bitset test and, if found, one popcount.
 // max steps in backtracking is the stride length.
-func (n *node[V]) lpmByIndex(idx uint) (baseIdx uint, val V, ok bool) {
+func (n *node[V]) lpm(idx uint) (baseIdx uint, val V, ok bool) {
 	for baseIdx = idx; baseIdx > 0; baseIdx >>= 1 {
 		if n.prefixesBitset.Test(baseIdx) {
 			// longest prefix match
@@ -158,32 +152,17 @@ func (n *node[V]) lpmByIndex(idx uint) (baseIdx uint, val V, ok bool) {
 	return 0, val, false
 }
 
-// lpmByOctet is an adapter to lpmByIndex.
-func (n *node[V]) lpmByOctet(octet byte) (baseIdx uint, val V, ok bool) {
-	return n.lpmByIndex(octetToBaseIndex(octet))
-}
-
-// lpmByPrefix is an adapter to lpmByIndex.
-func (n *node[V]) lpmByPrefix(octet byte, bits int) (baseIdx uint, val V, ok bool) {
-	return n.lpmByIndex(prefixToBaseIndex(octet, bits))
-}
-
-// getValByIndex for baseIdx.
-func (n *node[V]) getValByIndex(baseIdx uint) (val V, ok bool) {
+// getValue for baseIdx.
+func (n *node[V]) getValue(baseIdx uint) (val V, ok bool) {
 	if n.prefixesBitset.Test(baseIdx) {
 		return n.prefixes[n.prefixRank(baseIdx)], true
 	}
 	return
 }
 
-// getValByPrefix, adapter for getValByIndex.
-func (n *node[V]) getValByPrefix(octet byte, bits int) (val V, ok bool) {
-	return n.getValByIndex(prefixToBaseIndex(octet, bits))
-}
-
-// apmByPrefix does an all prefix match in the 8-bit (stride) routing table
+// apm does an all prefix match in the 8-bit (stride) routing table
 // at this depth and returns all matching CIDRs.
-func (n *node[V]) apmByPrefix(octet byte, bits int, depth int, ip netip.Addr) []netip.Prefix {
+func (n *node[V]) apm(octet byte, bits int, depth int, ip netip.Addr) []netip.Prefix {
 	// skip intermediate nodes
 	if len(n.prefixes) == 0 {
 		return nil
@@ -426,7 +405,7 @@ func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 	// 1. test if any route in this node overlaps prefix?
 
 	pfxIdx := prefixToBaseIndex(octet, pfxLen)
-	if _, _, ok := n.lpmByIndex(pfxIdx); ok {
+	if _, _, ok := n.lpm(pfxIdx); ok {
 		return true
 	}
 
@@ -536,8 +515,8 @@ func (n *node[V]) unionRec(o *node[V]) {
 	// for all prefixes in other node do ...
 	for _, oIdx := range o.allStrideIndexes() {
 		// insert/overwrite prefix/value from oNode to nNode
-		oVal, _ := o.getValByIndex(oIdx)
-		n.insertIdx(oIdx, oVal)
+		oVal, _ := o.getValue(oIdx)
+		n.insertPrefix(oIdx, oVal)
 	}
 
 	// for all children in other node do ...
@@ -591,7 +570,7 @@ func (n *node[V]) cloneRec() *node[V] {
 func (n *node[V]) allRec(path []byte, is4 bool, yield func(netip.Prefix, V) bool) bool {
 	// for all prefixes in this node do ...
 	for _, idx := range n.allStrideIndexes() {
-		val, _ := n.getValByIndex(idx)
+		val, _ := n.getValue(idx)
 		pfx := cidrFromPath(path, idx, is4)
 
 		// make the callback for this prefix
@@ -686,7 +665,7 @@ func (n *node[V]) allRecSorted(path []byte, is4 bool, yield func(netip.Prefix, V
 		// FOOTNOTE: B, C, F
 		// now handle prefix for idx
 		pfx := cidrFromPath(path, idx, is4)
-		val, _ := n.getValByIndex(idx)
+		val, _ := n.getValue(idx)
 
 		// premature end?
 		if !yield(pfx, val) {
