@@ -331,36 +331,35 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 
 	// run variable, used after for loop
 	var i int
+	var octet byte
 
 	// find leaf node
-	for i = range octets {
+	for i, octet = range octets {
 		// push current node on stack for fast backtracking
 		stack[i] = n
 
 		// go down in tight loop to leaf node
-		c := n.getChild(octets[i])
+		c := n.getChild(octet)
 		if c == nil {
 			break
 		}
 		n = c
 	}
 
-	// start backtracking at leaf node in tight loop
-	for {
-		// longest prefix match, make inlining possible
-		if _, val, ok := n.lpmByIndex(octetToBaseIndex(octets[i])); ok {
-			return val, true
-		}
+	// start backtracking, unwind the stack
+	for j := i; j >= 0; j-- {
+		n = stack[j]
+		octet = octets[j]
 
-		// if stack is exhausted?
-		if i == 0 {
-			return
+		// longest prefix match
+		// micro benchmarking: skip if node has no prefixes
+		if len(n.prefixes) != 0 {
+			if _, val, ok := n.lpmByIndex(octetToBaseIndex(octet)); ok {
+				return val, true
+			}
 		}
-
-		// unwind the stack
-		i--
-		n = stack[i]
 	}
+	return
 }
 
 // LookupPrefix does a route lookup (longest prefix match) for pfx and
@@ -427,49 +426,45 @@ func (t *Table[V]) lpmByPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V
 	lastOctetIdx := (bits - 1) / strideLen
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
-	var pfxLen int
+	var i int
+	var octet byte
 
-	// find the trie node
-	for depth = range octets {
+	// find the node
+	for i, octet = range octets[:lastOctetIdx+1] {
 		// push current node on stack
-		stack[depth] = n
+		stack[i] = n
 
-		// only the lastOctet has a different prefix len (prefix route)
-		if depth == lastOctetIdx {
-			pfxLen = lastOctetBits
-			break
-		}
-
-		// go down in tight loop to leaf node
-		c := n.getChild(octets[depth])
+		// go down in tight loop
+		c := n.getChild(octet)
 		if c == nil {
-			pfxLen = strideLen
 			break
 		}
 		n = c
 	}
 
-	// start backtracking with last node and octet
-	for {
-		pfxIdx := prefixToBaseIndex(octets[depth], pfxLen)
+	// only the lastOctet may have a different prefix len
+	pfxLen := strideLen
+	if i == lastOctetIdx {
+		pfxLen = lastOctetBits
+	}
+
+	// start backtracking, unwind the stack
+	for j := i; j >= 0; j-- {
+		n = stack[j]
+		octet = octets[j]
 
 		// longest prefix match
-		if baseIdx, val, ok := n.lpmByIndex(pfxIdx); ok {
-			return depth, baseIdx, val, true
+		// micro benchmarking: skip if node has no prefixes
+		if len(n.prefixes) != 0 {
+			if baseIdx, val, ok := n.lpmByPrefix(octet, pfxLen); ok {
+				return j, baseIdx, val, true
+			}
 		}
 
-		// if stack is exhausted?
-		if depth == 0 {
-			return
-		}
-
-		// for all upper levels
+		// for all upper levels, just host routes
 		pfxLen = strideLen
-
-		// unwind the stack
-		depth--
-		n = stack[depth]
 	}
+	return
 }
 
 // Subnets, return all prefixes covered by pfx in natural CIDR sort order.
