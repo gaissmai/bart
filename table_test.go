@@ -227,6 +227,22 @@ func TestRegression(t *testing.T) {
 			t.Fatalf("tables unexpectedly do not overlap")
 		}
 	})
+
+	t.Run("LookupPrefix, default route", func(t *testing.T) {
+		t1 := Table[int]{}
+		dg4 := mpp("0.0.0.0/0")
+		dg6 := mpp("::/0")
+
+		_, ok := t1.LookupPrefix(dg4)
+		if ok {
+			t.Fatalf("LookupPrefix(%s) should be false", dg4)
+		}
+
+		_, ok = t1.LookupPrefix(dg6)
+		if ok {
+			t.Fatalf("LookupPrefix(%s) should be false", dg6)
+		}
+	})
 }
 
 func TestInsert(t *testing.T) {
