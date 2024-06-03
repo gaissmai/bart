@@ -145,21 +145,13 @@ func (n *node[V]) updatePrefix(octet byte, prefixLen int, cb func(V, bool) V) (v
 // longest prefix exists, or ok=false otherwise.
 //
 // backtracking is fast, it's just a bitset test and, if found, one popcount.
+// max steps in backtracking is the stride length.
 func (n *node[V]) lpmByIndex(idx uint) (baseIdx uint, val V, ok bool) {
-	// max steps in backtracking is the stride length.
-	for {
-		if n.prefixesBitset.Test(idx) {
+	for baseIdx = idx; baseIdx > 0; baseIdx >>= 1 {
+		if n.prefixesBitset.Test(baseIdx) {
 			// longest prefix match
-			return idx, n.prefixes[n.prefixRank(idx)], true
+			return baseIdx, n.prefixes[n.prefixRank(baseIdx)], true
 		}
-
-		if idx == 0 {
-			break
-		}
-
-		// cache friendly backtracking to the next less specific route.
-		// thanks to the complete binary tree it's just a shift operation.
-		idx >>= 1
 	}
 
 	// not found (on this level)
@@ -200,22 +192,13 @@ func (n *node[V]) apmByPrefix(octet byte, bits int, depth int, ip netip.Addr) []
 	result := make([]netip.Prefix, 0, len(n.prefixes))
 	parents := make([]uint, 0, len(n.prefixes))
 
-	baseIdx := prefixToBaseIndex(octet, bits)
-	for {
-		if n.prefixesBitset.Test(baseIdx) {
-			parents = append(parents, baseIdx)
+	for idx := prefixToBaseIndex(octet, bits); idx > 0; idx >>= 1 {
+		if n.prefixesBitset.Test(idx) {
+			parents = append(parents, idx)
 		}
-
-		if baseIdx == 0 {
-			break
-		}
-
-		// cache friendly backtracking to the next less specific route.
-		// thanks to the complete binary tree it's just a shift operation.
-		baseIdx >>= 1
 	}
 
-	// re-sort indexes by prefix in place
+	// sort indexes by prefix in place
 	slices.SortFunc(parents, func(a, b uint) int {
 		return cmp.Compare(prefixSortRankByIndex(a), prefixSortRankByIndex(b))
 	})
@@ -640,7 +623,6 @@ func (n *node[V]) allRec(path []byte, is4 bool, yield func(netip.Prefix, V) bool
 //
 // The iteration is in prefix sort order, it's a very complex implemenation compared with allRec.
 func (n *node[V]) allRecSorted(path []byte, is4 bool, yield func(netip.Prefix, V) bool) bool {
-
 	// get slice of all child octets, sorted by addr
 	childAddrs := n.allChildAddrs()
 	childCursor := 0
