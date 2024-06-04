@@ -43,6 +43,7 @@ func TestValidPrefix(t *testing.T) {
 
 	testname = "Insert"
 	t.Run(testname, func(t *testing.T) {
+		t.Parallel()
 		defer func(testname string) {
 			if r := recover(); r != nil {
 				t.Fatalf("%s panics on invalid prefix input", testname)
@@ -54,6 +55,7 @@ func TestValidPrefix(t *testing.T) {
 
 	testname = "Delete"
 	t.Run(testname, func(t *testing.T) {
+		t.Parallel()
 		defer func(testname string) {
 			if r := recover(); r != nil {
 				t.Fatalf("%s panics on invalid prefix input", testname)
@@ -65,6 +67,7 @@ func TestValidPrefix(t *testing.T) {
 
 	testname = "Update"
 	t.Run(testname, func(t *testing.T) {
+		t.Parallel()
 		defer func(testname string) {
 			if r := recover(); r != nil {
 				t.Fatalf("%s panics on invalid prefix input", testname)
@@ -76,6 +79,7 @@ func TestValidPrefix(t *testing.T) {
 
 	testname = "Get"
 	t.Run(testname, func(t *testing.T) {
+		t.Parallel()
 		defer func(testname string) {
 			if r := recover(); r != nil {
 				t.Fatalf("%s panics on invalid prefix input", testname)
@@ -87,6 +91,7 @@ func TestValidPrefix(t *testing.T) {
 
 	testname = "LookupPrefix"
 	t.Run(testname, func(t *testing.T) {
+		t.Parallel()
 		defer func(testname string) {
 			if r := recover(); r != nil {
 				t.Fatalf("%s panics on invalid prefix input", testname)
@@ -98,6 +103,7 @@ func TestValidPrefix(t *testing.T) {
 
 	testname = "LookupPrefixLPM"
 	t.Run(testname, func(t *testing.T) {
+		t.Parallel()
 		defer func(testname string) {
 			if r := recover(); r != nil {
 				t.Fatalf("%s panics on invalid prefix input", testname)
@@ -109,6 +115,7 @@ func TestValidPrefix(t *testing.T) {
 
 	testname = "Subnets"
 	t.Run(testname, func(t *testing.T) {
+		t.Parallel()
 		defer func(testname string) {
 			if r := recover(); r != nil {
 				t.Fatalf("%s panics on invalid prefix input", testname)
@@ -120,6 +127,7 @@ func TestValidPrefix(t *testing.T) {
 
 	testname = "Supernets"
 	t.Run(testname, func(t *testing.T) {
+		t.Parallel()
 		defer func(testname string) {
 			if r := recover(); r != nil {
 				t.Fatalf("%s panics on invalid prefix input", testname)
@@ -131,6 +139,7 @@ func TestValidPrefix(t *testing.T) {
 
 	testname = "OverlapsPrefix"
 	t.Run(testname, func(t *testing.T) {
+		t.Parallel()
 		defer func(testname string) {
 			if r := recover(); r != nil {
 				t.Fatalf("%s panics on invalid prefix input", testname)
@@ -154,6 +163,7 @@ func TestRegression(t *testing.T) {
 	// ... but the BART implementation is different and has other edge cases.
 
 	t.Run("prefixes_aligned_on_stride_boundary", func(t *testing.T) {
+		t.Parallel()
 		fast := &Table[int]{}
 		gold := goldTable[int]{}
 
@@ -172,6 +182,7 @@ func TestRegression(t *testing.T) {
 	})
 
 	t.Run("parent_prefix_inserted_in_different_orders", func(t *testing.T) {
+		t.Parallel()
 		t1, t2 := &Table[int]{}, &Table[int]{}
 
 		t1.Insert(mpp("136.20.0.0/16"), 1)
@@ -189,6 +200,7 @@ func TestRegression(t *testing.T) {
 	})
 
 	t.Run("overlaps_divergent_children_with_parent_route_entry", func(t *testing.T) {
+		t.Parallel()
 		t1, t2 := Table[int]{}, Table[int]{}
 
 		t1.Insert(mpp("128.0.0.0/2"), 1)
@@ -209,6 +221,7 @@ func TestRegression(t *testing.T) {
 	})
 
 	t.Run("overlaps_parent_child_comparison_with_route_in_parent", func(t *testing.T) {
+		t.Parallel()
 		t1, t2 := Table[int]{}, Table[int]{}
 
 		t1.Insert(mpp("226.0.0.0/8"), 1)
@@ -229,6 +242,7 @@ func TestRegression(t *testing.T) {
 	})
 
 	t.Run("LookupPrefix, default route", func(t *testing.T) {
+		t.Parallel()
 		t1 := Table[int]{}
 		dg4 := mpp("0.0.0.0/0")
 		dg6 := mpp("::/0")
@@ -531,6 +545,7 @@ func TestDelete(t *testing.T) {
 	t.Parallel()
 
 	t.Run("prefix_in_root", func(t *testing.T) {
+		t.Parallel()
 		// Add/remove prefix from root table.
 		rtbl := &Table[int]{}
 		checkSize(t, rtbl, 2)
@@ -550,6 +565,7 @@ func TestDelete(t *testing.T) {
 	})
 
 	t.Run("prefix_in_leaf", func(t *testing.T) {
+		t.Parallel()
 		// Create, then delete a single leaf table.
 		rtbl := &Table[int]{}
 		checkSize(t, rtbl, 2)
@@ -568,6 +584,7 @@ func TestDelete(t *testing.T) {
 	})
 
 	t.Run("intermediate_no_routes", func(t *testing.T) {
+		t.Parallel()
 		// Create an intermediate with 2 children, then delete one leaf.
 		tbl := &Table[int]{}
 		checkSize(t, tbl, 2)
@@ -589,6 +606,7 @@ func TestDelete(t *testing.T) {
 	})
 
 	t.Run("intermediate_with_route", func(t *testing.T) {
+		t.Parallel()
 		// Same, but the intermediate carries a route as well.
 		rtbl := &Table[int]{}
 		checkSize(t, rtbl, 2)
@@ -613,6 +631,7 @@ func TestDelete(t *testing.T) {
 	})
 
 	t.Run("intermediate_many_leaves", func(t *testing.T) {
+		t.Parallel()
 		// Intermediate with 3 leaves, then delete one leaf.
 		rtbl := &Table[int]{}
 		checkSize(t, rtbl, 2)
@@ -637,6 +656,7 @@ func TestDelete(t *testing.T) {
 	})
 
 	t.Run("nosuchprefix_missing_child", func(t *testing.T) {
+		t.Parallel()
 		// Delete non-existent prefix, missing strideTable path.
 		rtbl := &Table[int]{}
 		checkSize(t, rtbl, 2)
@@ -655,6 +675,7 @@ func TestDelete(t *testing.T) {
 	})
 
 	t.Run("nosuchprefix_not_in_leaf", func(t *testing.T) {
+		t.Parallel()
 		// Delete non-existent prefix, strideTable path exists but
 		// leaf doesn't contain route.
 		rtbl := &Table[int]{}
@@ -674,6 +695,7 @@ func TestDelete(t *testing.T) {
 	})
 
 	t.Run("intermediate_with_deleted_route", func(t *testing.T) {
+		t.Parallel()
 		// Intermediate table loses its last route and becomes
 		// compactable.
 		rtbl := &Table[int]{}
@@ -696,6 +718,7 @@ func TestDelete(t *testing.T) {
 	})
 
 	t.Run("default_route", func(t *testing.T) {
+		t.Parallel()
 		// Default routes have a special case in the code.
 		rtbl := &Table[int]{}
 
@@ -1052,6 +1075,7 @@ func TestGet(t *testing.T) {
 
 	rt := new(Table[int])
 	t.Run("empty table", func(t *testing.T) {
+		t.Parallel()
 		_, ok := rt.Get(randomPrefix4())
 
 		if ok {
@@ -1094,6 +1118,7 @@ func TestGet(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got, ok := rt.Get(tt.pfx)
 
 			if !ok {
@@ -1296,6 +1321,7 @@ func TestUnionEdgeCases(t *testing.T) {
 	t.Parallel()
 
 	t.Run("empty", func(t *testing.T) {
+		t.Parallel()
 		aTbl := &Table[int]{}
 		bTbl := &Table[int]{}
 
@@ -1310,6 +1336,7 @@ func TestUnionEdgeCases(t *testing.T) {
 	})
 
 	t.Run("other empty", func(t *testing.T) {
+		t.Parallel()
 		aTbl := &Table[int]{}
 		bTbl := &Table[int]{}
 
@@ -1327,6 +1354,7 @@ func TestUnionEdgeCases(t *testing.T) {
 	})
 
 	t.Run("other empty", func(t *testing.T) {
+		t.Parallel()
 		aTbl := &Table[int]{}
 		bTbl := &Table[int]{}
 
@@ -1344,6 +1372,7 @@ func TestUnionEdgeCases(t *testing.T) {
 	})
 
 	t.Run("duplicate prefix", func(t *testing.T) {
+		t.Parallel()
 		aTbl := &Table[string]{}
 		bTbl := &Table[string]{}
 
@@ -1362,6 +1391,7 @@ func TestUnionEdgeCases(t *testing.T) {
 	})
 
 	t.Run("different IP versions", func(t *testing.T) {
+		t.Parallel()
 		aTbl := &Table[int]{}
 		bTbl := &Table[int]{}
 
@@ -1382,6 +1412,7 @@ func TestUnionEdgeCases(t *testing.T) {
 	})
 
 	t.Run("same children", func(t *testing.T) {
+		t.Parallel()
 		aTbl := &Table[int]{}
 		bTbl := &Table[int]{}
 
@@ -1624,6 +1655,7 @@ func TestSubnetsEdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			rtbl := new(Table[any])
 
 			for _, pfx := range tt.pfxs {
@@ -1723,6 +1755,7 @@ func TestSupernetsEdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			rtbl := new(Table[string])
 
 			for _, pfx := range tt.pfxs {
@@ -1848,6 +1881,7 @@ func TestAll(t *testing.T) {
 	seen := make(map[netip.Prefix]int, 10_000)
 
 	t.Run("All", func(t *testing.T) {
+		t.Parallel()
 		rtbl := new(Table[int])
 		for _, item := range pfxs {
 			rtbl.Insert(item.pfx, item.val)
@@ -1869,8 +1903,9 @@ func TestAll(t *testing.T) {
 		}
 	})
 
-	// make an interation and update the values in the callback
+	// make an iteration and update the values in the callback
 	t.Run("All and Update", func(t *testing.T) {
+		t.Parallel()
 		rtbl := new(Table[int])
 		for _, item := range pfxs {
 			rtbl.Insert(item.pfx, item.val)
@@ -1900,6 +1935,7 @@ func TestAll(t *testing.T) {
 	})
 
 	t.Run("All with premature exit", func(t *testing.T) {
+		t.Parallel()
 		rtbl := new(Table[int])
 		for _, item := range pfxs {
 			rtbl.Insert(item.pfx, item.val)
@@ -1933,6 +1969,7 @@ func TestAllSorted(t *testing.T) {
 	pfxs := randomPrefixes(n)
 
 	t.Run("All versus slices.SortFunc", func(t *testing.T) {
+		t.Parallel()
 		expect := make([]netip.Prefix, 0, n)
 		got := make([]netip.Prefix, 0, n)
 
