@@ -351,9 +351,9 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	}
 
 	// start backtracking, unwind the stack
-	for j := i; j >= 0; j-- {
-		n = stack[j]
-		octet = octets[j]
+	for depth := i; depth >= 0; depth-- {
+		n = stack[depth]
+		octet = octets[depth]
 
 		// longest prefix match
 		// micro benchmarking: skip if node has no prefixes
@@ -372,7 +372,7 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 // The prefix must be in normalized form!
 func (t *Table[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
 	_, _, val, ok = t.lpmPrefix(pfx)
-	return
+	return val, ok
 }
 
 // LookupPrefixLPM is similar to [Table.LookupPrefix],
@@ -444,29 +444,29 @@ func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V, 
 		n = c
 	}
 
-	// only the lastOctet may have a different prefix len
-	pfxLen := strideLen
-	if i == lastOctetIdx {
-		pfxLen = lastOctetBits
-	}
-
 	// start backtracking, unwind the stack
-	for j := i; j >= 0; j-- {
-		n = stack[j]
-		octet = octets[j]
+	for depth = i; depth >= 0; depth-- {
+		n = stack[depth]
+		octet = octets[depth]
 
 		// longest prefix match
 		// micro benchmarking: skip if node has no prefixes
 		if len(n.prefixes) != 0 {
 
-			if baseIdx, val, ok = n.lpm(prefixToBaseIndex(octet, pfxLen)); ok {
-				depth = j
-				return
+			// only the lastOctet may have a different prefix len
+			// all others are just host routes
+			idx := uint(0)
+			if depth == lastOctetIdx {
+				idx = prefixToBaseIndex(octet, lastOctetBits)
+			} else {
+				idx = octetToBaseIndex(octet)
+			}
+
+			baseIdx, val, ok = n.lpm(idx)
+			if ok {
+				return depth, baseIdx, val, ok
 			}
 		}
-
-		// for all upper levels, just host routes
-		pfxLen = strideLen
 	}
 	return
 }
