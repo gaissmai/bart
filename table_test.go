@@ -21,20 +21,11 @@ import (
 
 var mpa = netip.MustParseAddr
 
-var mpp = func(s string) netip.Prefix {
-	pfx := netip.MustParsePrefix(s)
-
-	// pfx string must be normalized
-	if pfx.Addr() != pfx.Masked().Addr() {
-		panic(fmt.Sprintf("%s is not normalized", s))
-	}
-
-	return pfx
-}
+var mpp = netip.MustParsePrefix
 
 // ############ tests ################################
 
-func TestValidPrefix(t *testing.T) {
+func TestInvalidPrefix(t *testing.T) {
 	t.Parallel()
 
 	tbl := new(Table[any])
@@ -757,7 +748,7 @@ func TestLookupCompare(t *testing.T) {
 		fastVal, fastOK := fast.Lookup(a)
 
 		if !getsEqual(goldVal, goldOK, fastVal, fastOK) {
-			t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", a, fastVal, fastOK, goldVal, goldOK)
+			t.Fatalf("Lookup(%q) = (%v, %v), want (%v, %v)", a, fastVal, fastOK, goldVal, goldOK)
 		}
 
 		if a.Is6() {
@@ -802,7 +793,7 @@ func TestLookupPrefixCompare(t *testing.T) {
 		fastVal, fastOK := fast.LookupPrefix(pfx)
 
 		if !getsEqual(goldVal, goldOK, fastVal, fastOK) {
-			t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", pfx, fastVal, fastOK, goldVal, goldOK)
+			t.Fatalf("LookupPrefix(%q) = (%v, %v), want (%v, %v)", pfx, fastVal, fastOK, goldVal, goldOK)
 		}
 
 		if pfx.Addr().Is6() {
@@ -847,11 +838,11 @@ func TestLookupPrefixLPMCompare(t *testing.T) {
 		fastLPM, fastVal, fastOK := fast.LookupPrefixLPM(pfx)
 
 		if !getsEqual(goldVal, goldOK, fastVal, fastOK) {
-			t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", pfx, fastVal, fastOK, goldVal, goldOK)
+			t.Fatalf("LookupPrefixLPM(%q) = (%v, %v), want (%v, %v)", pfx, fastVal, fastOK, goldVal, goldOK)
 		}
 
 		if !getsEqual(goldLPM, goldOK, fastLPM, fastOK) {
-			t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", pfx, fastLPM, fastOK, goldLPM, goldOK)
+			t.Fatalf("LookupPrefixLPM(%q) = (%v, %v), want (%v, %v)", pfx, fastLPM, fastOK, goldLPM, goldOK)
 		}
 
 		if pfx.Addr().Is6() {
@@ -905,7 +896,7 @@ func TestInsertShuffled(t *testing.T) {
 			val2, ok2 := rt2.Lookup(a)
 
 			if !getsEqual(val1, ok1, val2, ok2) {
-				t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", a, val2, ok2, val1, ok1)
+				t.Fatalf("Lookup(%q) = (%v, %v), want (%v, %v)", a, val2, ok2, val1, ok1)
 			}
 		}
 	}
@@ -958,7 +949,7 @@ func TestDeleteCompare(t *testing.T) {
 		fastVal, fastOK := fast.Lookup(a)
 
 		if !getsEqual(goldVal, goldOK, fastVal, fastOK) {
-			t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", a, fastVal, fastOK, goldVal, goldOK)
+			t.Fatalf("Lookup(%q) = (%v, %v), want (%v, %v)", a, fastVal, fastOK, goldVal, goldOK)
 		}
 
 		if a.Is6() {
@@ -1035,7 +1026,7 @@ func TestDeleteShuffled(t *testing.T) {
 			val1, ok1 := rt1.Lookup(a)
 			val2, ok2 := rt2.Lookup(a)
 			if !getsEqual(val1, ok1, val2, ok2) {
-				t.Errorf("get(%q) = (%v, %v), want (%v, %v)", a, val2, ok2, val1, ok1)
+				t.Errorf("Lookup(%q) = (%v, %v), want (%v, %v)", a, val2, ok2, val1, ok1)
 			}
 		}
 	}
@@ -1076,10 +1067,11 @@ func TestGet(t *testing.T) {
 	rt := new(Table[int])
 	t.Run("empty table", func(t *testing.T) {
 		t.Parallel()
-		_, ok := rt.Get(randomPrefix4())
+		pfx := randomPrefix()
+		_, ok := rt.Get(pfx)
 
 		if ok {
-			t.Errorf("empty table: ok=%v, expected: %v", ok, false)
+			t.Errorf("empty table: Get(%v), ok=%v, expected: %v", pfx, ok, false)
 		}
 	})
 
@@ -1148,7 +1140,7 @@ func TestGetCompare(t *testing.T) {
 		fastVal, fastOK := fast.Get(pfx.pfx)
 
 		if !getsEqual(goldVal, goldOK, fastVal, fastOK) {
-			t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", pfx.pfx, fastVal, fastOK, goldVal, goldOK)
+			t.Fatalf("Get(%q) = (%v, %v), want (%v, %v)", pfx.pfx, fastVal, fastOK, goldVal, goldOK)
 		}
 	}
 }
@@ -1170,7 +1162,7 @@ func TestUpdateCompare(t *testing.T) {
 		fastVal, fastOK := fast.Get(pfx.pfx)
 
 		if !getsEqual(goldVal, goldOK, fastVal, fastOK) {
-			t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", pfx.pfx, fastVal, fastOK, goldVal, goldOK)
+			t.Fatalf("Get(%q) = (%v, %v), want (%v, %v)", pfx.pfx, fastVal, fastOK, goldVal, goldOK)
 		}
 	}
 
@@ -1187,7 +1179,7 @@ func TestUpdateCompare(t *testing.T) {
 		fastVal, fastOK := fast.Get(pfx.pfx)
 
 		if !getsEqual(goldVal, goldOK, fastVal, fastOK) {
-			t.Fatalf("get(%q) = (%v, %v), want (%v, %v)", pfx.pfx, fastVal, fastOK, goldVal, goldOK)
+			t.Fatalf("Get(%q) = (%v, %v), want (%v, %v)", pfx.pfx, fastVal, fastOK, goldVal, goldOK)
 		}
 	}
 }
@@ -2138,7 +2130,7 @@ func BenchmarkTableLookup(b *testing.B) {
 			probe := rng(1)[0]
 
 			b.ResetTimer()
-			b.Run(fmt.Sprintf("%s/In_%6d/%s", fam, nroutes, "IP"), func(b *testing.B) {
+			b.Run(fmt.Sprintf("%s/In_%6d/%s", fam, nroutes, "Lookup"), func(b *testing.B) {
 				for i := 0; i < b.N; i++ {
 					writeSink, _ = rt.Lookup(probe.pfx.Addr())
 				}

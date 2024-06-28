@@ -19,6 +19,10 @@ var hostMasks = []uint8{
 	0b0000_0000, // bits == 8
 }
 
+func netMask(mask int) uint8 {
+	return ^hostMasks[uint8(mask)]
+}
+
 const (
 
 	// baseIndex of the first host route: prefixToBaseIndex(0,8)
