@@ -382,11 +382,11 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 	// 3. rec-descent call for childs with same octet
 
 	if len(n.children) > 0 && len(o.children) > 0 {
-		for i := 0; i < len(nOctets); i++ {
-			if nOctets[i] && oOctets[i] {
+		for octet := 0; octet < maxNodeChildren; octet++ {
+			if nOctets[octet] && oOctets[octet] {
 				// get next child node for this octet
-				nc := n.getChild(byte(i))
-				oc := o.getChild(byte(i))
+				nc := n.getChild(byte(octet))
+				oc := o.getChild(byte(octet))
 
 				// rec-descent
 				if nc.overlapsRec(oc) {
