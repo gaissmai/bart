@@ -34,18 +34,6 @@ import (
 //
 // The Table is safe for concurrent readers but not for
 // concurrent readers and/or writers.
-//
-// ATTENTION:
-// The standard library net/netip doesn't enforce normalized
-// prefixes, where the non-prefix bits are all zero.
-//
-// Since the conversion of a prefix into the normalized form
-// is quite time-consuming relative to the other functions
-// of the library, all prefixes must be provided in
-// normalized form as input parameters.
-// If this is not the case, the behavior is undefined.
-//
-// All returned prefixes are also always in normalized form.
 type Table[V any] struct {
 	rootV4 *node[V]
 	rootV6 *node[V]
@@ -79,8 +67,6 @@ func (t *Table[V]) rootNodeByVersion(is4 bool) *node[V] {
 
 // Insert adds pfx to the tree, with value val.
 // If pfx is already present in the tree, its value is set to val.
-//
-// The prefix must be in normalized form!
 func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	t.init()
 
@@ -125,6 +111,9 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	// 10.12.10.9/32 -> 8
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
+	// mask the prefix, this is faster than netip.Prefix.Masked()
+	lastOctet = lastOctet & netMask(lastOctetBits)
+
 	// find the proper trie node to insert prefix
 	for _, octet := range octets[:lastOctetIdx] {
 		// descend down to next trie level
@@ -147,8 +136,6 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 // The callback function is called with (value, ok) and returns a new value..
 //
 // If the pfx does not already exist, it is set with the new value.
-//
-// The prefix must be in normalized form!
 func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 	t.init()
 	if !pfx.IsValid() {
@@ -175,6 +162,9 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 	lastOctet := octets[lastOctetIdx]
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
+	// mask the prefix
+	lastOctet = lastOctet & netMask(lastOctetBits)
+
 	// find the proper trie node to update prefix
 	for _, octet := range octets[:lastOctetIdx] {
 		// descend down to next trie level
@@ -195,8 +185,6 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 
 // Get returns the associated payload for prefix and true, or false if
 // prefix is not set in the routing table.
-//
-// The prefix must be in normalized form!
 func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 	if !pfx.IsValid() {
 		return
@@ -224,6 +212,9 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 	lastOctet := octets[lastOctetIdx]
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
+	// mask the prefix
+	lastOctet = lastOctet & netMask(lastOctetBits)
+
 	// find the proper trie node
 	for _, octet := range octets[:lastOctetIdx] {
 		c := n.getChild(octet)
@@ -237,8 +228,6 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 }
 
 // Delete removes pfx from the tree, pfx does not have to be present.
-//
-// The prefix must be in normalized form!
 func (t *Table[V]) Delete(pfx netip.Prefix) {
 	if !pfx.IsValid() {
 		return
@@ -265,6 +254,10 @@ func (t *Table[V]) Delete(pfx netip.Prefix) {
 	lastOctetIdx := (bits - 1) / strideLen
 	lastOctet := octets[lastOctetIdx]
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
+
+	// mask the prefix
+	lastOctet = lastOctet & netMask(lastOctetBits)
+	octets[lastOctetIdx] = lastOctet
 
 	// record path to deleted node
 	stack := [maxTreeDepth]*node[V]{}
@@ -366,10 +359,74 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	return
 }
 
+// LookupLPM is similar to [Table.Lookup],
+// but it returns the lpm prefix in addition to value,ok.
+//
+// This method is about 20-30% slower than Lookup and should only
+// be used if the matching lpm entry is also required for other reasons.
+func (t *Table[V]) LookupLPM(ip netip.Addr) (lpm netip.Prefix, val V, ok bool) {
+	if !ip.IsValid() {
+		return
+	}
+
+	is4 := ip.Is4()
+
+	n := t.rootNodeByVersion(is4)
+	if n == nil {
+		return
+	}
+
+	// do not allocate
+	a16 := ip.As16()
+	octets := a16[:]
+	if is4 {
+		octets = octets[12:]
+	}
+
+	// stack of the traversed nodes for fast backtracking, if needed
+	stack := [maxTreeDepth]*node[V]{}
+
+	// run variable, used after for loop
+	var i int
+	var octet byte
+
+	// find leaf node
+	for i, octet = range octets {
+		// push current node on stack for fast backtracking
+		stack[i] = n
+
+		// go down in tight loop to leaf node
+		c := n.getChild(octet)
+		if c == nil {
+			break
+		}
+		n = c
+	}
+
+	// start backtracking, unwind the stack
+	for depth := i; depth >= 0; depth-- {
+		n = stack[depth]
+		octet = octets[depth]
+
+		// longest prefix match
+		// micro benchmarking: skip if node has no prefixes
+		if len(n.prefixes) != 0 {
+			if baseIdx, val, ok := n.lpm(octetToBaseIndex(octet)); ok {
+
+				// calculate the mask from baseIdx and depth
+				mask := baseIndexToPrefixMask(baseIdx, depth)
+
+				// calculate the lpm from ip and mask
+				lpm, _ = ip.Prefix(mask)
+				return lpm, val, true
+			}
+		}
+	}
+	return
+}
+
 // LookupPrefix does a route lookup (longest prefix match) for pfx and
 // returns the associated value and true, or false if no route matched.
-//
-// The prefix must be in normalized form!
 func (t *Table[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
 	_, _, val, ok = t.lpmPrefix(pfx)
 	return val, ok
@@ -383,8 +440,6 @@ func (t *Table[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
 //
 // If LookupPrefixLPM is to be used for IP addresses,
 // they must be converted to /32 or /128 prefixes.
-//
-// The prefix must be in normalized form!
 func (t *Table[V]) LookupPrefixLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) {
 	depth, baseIdx, val, ok := t.lpmPrefix(pfx)
 
@@ -423,7 +478,12 @@ func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V, 
 
 	// see comment in Insert()
 	lastOctetIdx := (bits - 1) / strideLen
+	lastOctet := octets[lastOctetIdx]
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
+
+	// mask the prefix
+	lastOctet = lastOctet & netMask(lastOctetBits)
+	octets[lastOctetIdx] = lastOctet
 
 	var i int
 	var octet byte
@@ -472,8 +532,6 @@ func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V, 
 }
 
 // Subnets, return all prefixes covered by pfx in natural CIDR sort order.
-//
-// The prefix must be in normalized form!
 func (t *Table[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 	if !pfx.IsValid() {
 		return nil
@@ -501,6 +559,10 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 	lastOctet := octets[lastOctetIdx]
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
+	// mask the prefix
+	lastOctet = lastOctet & netMask(lastOctetBits)
+	octets[lastOctetIdx] = lastOctet
+
 	// find the trie node
 	for i, octet := range octets {
 		if i == lastOctetIdx {
@@ -521,8 +583,6 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 
 // Supernets, return all matching routes for pfx,
 // in natural CIDR sort order.
-//
-// The prefix must be in normalized form!
 func (t *Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 	if !pfx.IsValid() {
 		return nil
@@ -551,6 +611,10 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 	lastOctet := octets[lastOctetIdx]
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
+	// mask the prefix
+	lastOctet = lastOctet & netMask(lastOctetBits)
+	octets[lastOctetIdx] = lastOctet
+
 	for i, octet := range octets {
 		if i == lastOctetIdx {
 			// make an all-prefix-match at last level
@@ -573,8 +637,6 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 }
 
 // OverlapsPrefix reports whether any IP in pfx matches a route in the table.
-//
-// The prefix must be in normalized form!
 func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 	if !pfx.IsValid() {
 		return false
@@ -603,6 +665,9 @@ func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 	lastOctet := octets[lastOctetIdx]
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
+	// mask the prefix
+	lastOctet = lastOctet & netMask(lastOctetBits)
+
 	for _, octet := range octets[:lastOctetIdx] {
 		// test if any route overlaps prefix´ so far
 		if _, _, ok := n.lpm(octetToBaseIndex(octet)); ok {
@@ -616,6 +681,7 @@ func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 		}
 		n = c
 	}
+
 	return n.overlapsPrefix(lastOctet, lastOctetBits)
 }
 

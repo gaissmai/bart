@@ -88,6 +88,13 @@ func BenchmarkFullMatchV4(b *testing.B) {
 		}
 	})
 
+	b.Run("LookupLPM", func(b *testing.B) {
+		b.ResetTimer()
+		for k := 0; k < b.N; k++ {
+			_, intSink, okSink = rt.LookupLPM(ip)
+		}
+	})
+
 	b.Run("LookupPrefix", func(b *testing.B) {
 		b.ResetTimer()
 		for k := 0; k < b.N; k++ {
@@ -127,6 +134,13 @@ func BenchmarkFullMatchV6(b *testing.B) {
 		b.ResetTimer()
 		for k := 0; k < b.N; k++ {
 			intSink, okSink = rt.Lookup(ip)
+		}
+	})
+
+	b.Run("LookupLPM", func(b *testing.B) {
+		b.ResetTimer()
+		for k := 0; k < b.N; k++ {
+			_, intSink, okSink = rt.LookupLPM(ip)
 		}
 	})
 
@@ -172,6 +186,13 @@ func BenchmarkFullMissV4(b *testing.B) {
 		}
 	})
 
+	b.Run("LookupLPM", func(b *testing.B) {
+		b.ResetTimer()
+		for k := 0; k < b.N; k++ {
+			_, intSink, okSink = rt.LookupLPM(ip)
+		}
+	})
+
 	b.Run("LookupPrefix", func(b *testing.B) {
 		b.ResetTimer()
 		for k := 0; k < b.N; k++ {
@@ -211,6 +232,13 @@ func BenchmarkFullMissV6(b *testing.B) {
 		b.ResetTimer()
 		for k := 0; k < b.N; k++ {
 			intSink, okSink = rt.Lookup(ip)
+		}
+	})
+
+	b.Run("LookupLPM", func(b *testing.B) {
+		b.ResetTimer()
+		for k := 0; k < b.N; k++ {
+			_, intSink, okSink = rt.LookupLPM(ip)
 		}
 	})
 

@@ -46,16 +46,6 @@ The API has changed since v0.4.2, 0.5.3. and v0.6.3
     The Table is safe for concurrent readers but not for concurrent readers
     and/or writers.
 
-    ATTENTION: The standard library net/netip doesn't enforce normalized
-    prefixes, where the non-prefix bits are all zero.
-
-    Since the conversion of a prefix into the normalized form is quite
-    time-consuming relative to the other functions of the library, all prefixes
-    must be provided in normalized form as input parameters. If this is not the
-    case, the behavior is undefined.
-
-    All returned prefixes are also always in normalized form.
-  
   func (t *Table[V]) Insert(pfx netip.Prefix, val V)
   func (t *Table[V]) Delete(pfx netip.Prefix)
   func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool)
@@ -65,6 +55,8 @@ The API has changed since v0.4.2, 0.5.3. and v0.6.3
   func (t *Table[V]) Clone() *Table[V]
   
   func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool)
+  func (t *Table[V]) LookupLPM(ip netip.Addr) (lpm netip.Prefix, val V, ok bool)
+
   func (t *Table[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool)
   func (t *Table[V]) LookupPrefixLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool)
 

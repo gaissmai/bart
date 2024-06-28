@@ -86,6 +86,20 @@ func (t *goldTable[V]) lookup(addr netip.Addr) (val V, ok bool) {
 	return
 }
 
+func (t *goldTable[V]) lookupLPM(addr netip.Addr) (lpm netip.Prefix, val V, ok bool) {
+	bestLen := -1
+
+	for _, item := range *t {
+		if item.pfx.Contains(addr) && item.pfx.Bits() > bestLen {
+			val = item.val
+			lpm = item.pfx
+			ok = true
+			bestLen = item.pfx.Bits()
+		}
+	}
+	return
+}
+
 func (t *goldTable[V]) lookupPfx(pfx netip.Prefix) (val V, ok bool) {
 	bestLen := -1
 
