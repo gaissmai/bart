@@ -253,12 +253,12 @@ func (n *node[V]) getChild(octet byte) *node[V] {
 
 // allChildAddrs returns the octets of all child nodes in ascending order.
 func (n *node[V]) allChildAddrs() []uint {
-	c := len(n.children)
-	if c == 0 {
+	cLen := len(n.children)
+	if cLen == 0 {
 		return nil
 	}
 
-	buf := make([]uint, 0, c)
+	buf := make([]uint, 0, cLen)
 	_, buf = n.childrenBitset.NextSetMany(0, buf)
 	return buf
 }
@@ -293,12 +293,12 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 
 				// insert host routes (octet/8) for this prefix,
 				// some sort of allotment
-				for i := lower; i <= upper; i++ {
+				for hostRoute := lower; hostRoute <= upper; hostRoute++ {
 					// zig-zag, fast return on first match
-					if oAllotIndex[i] {
+					if oAllotIndex[hostRoute] {
 						return true
 					}
-					nAllotIndex[i] = true
+					nAllotIndex[hostRoute] = true
 				}
 				nIdx++
 			}
@@ -312,12 +312,12 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 
 				// insert host routes (octet/8) for this prefix,
 				// some sort of allotment
-				for i := lower; i <= upper; i++ {
+				for hostRoute := lower; hostRoute <= upper; hostRoute++ {
 					// zig-zag, fast return on first macth
-					if nAllotIndex[i] {
+					if nAllotIndex[hostRoute] {
 						return true
 					}
-					oAllotIndex[i] = true
+					oAllotIndex[hostRoute] = true
 				}
 				oIdx++
 			}
@@ -329,8 +329,8 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 
 	// full run, zig-zag didn't already match
 	if len(n.prefixes) > 0 && len(o.prefixes) > 0 {
-		for i := firstHostIndex; i <= lastHostIndex; i++ {
-			if nAllotIndex[i] && oAllotIndex[i] {
+		for hostRoute := firstHostIndex; hostRoute <= lastHostIndex; hostRoute++ {
+			if nAllotIndex[hostRoute] && oAllotIndex[hostRoute] {
 				return true
 			}
 		}
@@ -357,6 +357,7 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 				if oAllotIndex[nOctet+firstHostIndex] {
 					return true
 				}
+				// collect the octet for later use in step 3
 				nOctets[nOctet] = true
 				nOctet++
 			}
@@ -369,6 +370,7 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 				if nAllotIndex[oOctet+firstHostIndex] {
 					return true
 				}
+				// collect the octet for later use in step 3
 				oOctets[oOctet] = true
 				oOctet++
 			}
@@ -382,9 +384,10 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 	// 3. rec-descent call for childs with same octet
 
 	if len(n.children) > 0 && len(o.children) > 0 {
-		for octet := 0; octet < maxNodeChildren; octet++ {
+		for octet := 0; octet < len(nOctets) && octet < len(oOctets); octet++ {
+			// bounds check eliminated in for loop condition
 			if nOctets[octet] && oOctets[octet] {
-				// get next child node for this octet
+				// get child node for this octet
 				nc := n.getChild(byte(octet))
 				oc := o.getChild(byte(octet))
 
