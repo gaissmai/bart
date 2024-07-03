@@ -2207,6 +2207,12 @@ func BenchmarkTableOverlaps(b *testing.B) {
 				for i := 0; i < b.N; i++ {
 					boolSink = rt.Overlaps(intersects[i%numIntersects])
 				}
+
+				if boolSink {
+					b.ReportMetric(float64(1), "Overlaps")
+				} else {
+					b.ReportMetric(float64(0), "Overlaps")
+				}
 			})
 		}
 	}
