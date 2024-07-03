@@ -97,7 +97,7 @@ func TestPrefixDelete(t *testing.T) {
 	}
 }
 
-func TestPrefixOverlaps(t *testing.T) {
+func TestOverlapsPrefix(t *testing.T) {
 	t.Parallel()
 
 	pfxs := shuffleStridePfxs(allStridePfxs())[:100]
@@ -117,7 +117,7 @@ func TestPrefixOverlaps(t *testing.T) {
 	}
 }
 
-func TestNodeOverlaps(t *testing.T) {
+func TestOverlapsNode(t *testing.T) {
 	t.Parallel()
 
 	// Empirically, between 5 and 6 routes per table results in ~50%
