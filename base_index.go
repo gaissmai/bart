@@ -29,6 +29,7 @@ const (
 	firstHostIndex = 0b1_0000_0000 // 256
 
 	// baseIndex of the last host route: prefixToBaseIndex(255,8)
+	//nolint:unused
 	lastHostIndex = 0b1_1111_1111 // 511
 )
 
