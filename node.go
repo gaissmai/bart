@@ -251,16 +251,14 @@ func (n *node[V]) getChild(octet byte) *node[V] {
 	return n.children[n.childRank(octet)]
 }
 
-// allChildAddrs returns the octets of all child nodes in ascending order.
-func (n *node[V]) allChildAddrs() []uint {
-	cLen := len(n.children)
-	if cLen == 0 {
-		return nil
+// allChildAddrs fills the buffer with the octets of all child nodes in ascending order,
+// panics if the buffer isn't bib enough.
+func (n *node[V]) allChildAddrs(buffer []uint) {
+	if len(n.children) > len(buffer) {
+		panic("logic error, buffer isn't big enough")
 	}
 
-	buf := make([]uint, 0, cLen)
-	_, buf = n.childrenBitset.NextSetMany(0, buf)
-	return buf
+	n.childrenBitset.NextSetMany(0, buffer)
 }
 
 // #################### nodes #############################################
@@ -487,7 +485,10 @@ func (n *node[V]) subnets(path []byte, parentOctet byte, pfxLen int, is4 bool) (
 
 	// collect all children covered
 	// see also algorithm in overlapsPrefix
-	for i, cAddr := range n.allChildAddrs() {
+	childAddrs := make([]uint, len(n.children))
+	n.allChildAddrs(childAddrs)
+
+	for i, cAddr := range childAddrs {
 		cOctet := byte(cAddr)
 
 		// make host route for comparison with lower, upper
@@ -523,7 +524,10 @@ func (n *node[V]) unionRec(o *node[V]) {
 	}
 
 	// for all children in other node do ...
-	for i, oOctet := range o.allChildAddrs() {
+	childAddrs := make([]uint, len(o.children))
+	o.allChildAddrs(childAddrs)
+
+	for i, oOctet := range childAddrs {
 		octet := byte(oOctet)
 
 		// we know the slice index, faster as o.getChild(octet)
@@ -584,7 +588,10 @@ func (n *node[V]) allRec(path []byte, is4 bool, yield func(netip.Prefix, V) bool
 	}
 
 	// for all children in this node do ...
-	for i, addr := range n.allChildAddrs() {
+	childAddrs := make([]uint, len(n.children))
+	n.allChildAddrs(childAddrs)
+
+	for i, addr := range childAddrs {
 		octet := byte(addr)
 		path := append(slices.Clone(path), octet)
 		child := n.children[i]
@@ -606,7 +613,9 @@ func (n *node[V]) allRec(path []byte, is4 bool, yield func(netip.Prefix, V) bool
 // The iteration is in prefix sort order, it's a very complex implemenation compared with allRec.
 func (n *node[V]) allRecSorted(path []byte, is4 bool, yield func(netip.Prefix, V) bool) bool {
 	// get slice of all child octets, sorted by addr
-	childAddrs := n.allChildAddrs()
+	childAddrs := make([]uint, len(n.children))
+	n.allChildAddrs(childAddrs)
+
 	childCursor := 0
 
 	// get slice of all indexes, sorted by idx
