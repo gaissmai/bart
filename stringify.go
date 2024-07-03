@@ -164,7 +164,10 @@ func (n *node[V]) getKidsRec(parentIdx uint, path []byte, is4 bool) []kid[V] {
 	}
 
 	// the node may have childs, the rec-descent monster starts
-	for i, addr := range n.allChildAddrs() {
+	childAddrs := make([]uint, len(n.children))
+	n.allChildAddrs(childAddrs)
+
+	for i, addr := range childAddrs {
 		octet := byte(addr)
 		// do a longest-prefix-match
 		lpmIdx, _, _ := n.lpm(octetToBaseIndex(octet))
