@@ -294,6 +294,11 @@ func BenchmarkFullTableOverlaps(b *testing.B) {
 			for k := 0; k < b.N; k++ {
 				boolSink = rt.Overlaps(inter)
 			}
+			if boolSink {
+				b.ReportMetric(float64(1), "Overlaps")
+			} else {
+				b.ReportMetric(float64(0), "Overlaps")
+			}
 		})
 	}
 }

@@ -604,7 +604,7 @@ func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 
 	for _, octet := range octets[:lastOctetIdx] {
 		// test if any route overlaps prefix´ so far
-		if _, _, ok := n.lpm(octetToBaseIndex(octet)); ok {
+		if n.lpmTest(octetToBaseIndex(octet)) {
 			return true
 		}
 
@@ -625,7 +625,45 @@ func (t *Table[V]) Overlaps(o *Table[V]) bool {
 	t.init()
 	o.init()
 
-	return t.rootV4.overlapsRec(o.rootV4) || t.rootV6.overlapsRec(o.rootV6)
+	// t is empty
+	if t.rootV4.isEmpty() && t.rootV6.isEmpty() {
+		return false
+	}
+
+	// o is empty
+	if o.rootV4.isEmpty() && o.rootV6.isEmpty() {
+		return false
+	}
+
+	// at least one v4 is empty
+	if t.rootV4.isEmpty() || o.rootV4.isEmpty() {
+		return t.Overlaps6(o)
+	}
+
+	// at least one v6 is empty
+	if t.rootV6.isEmpty() || o.rootV6.isEmpty() {
+		return t.Overlaps4(o)
+	}
+
+	return t.Overlaps4(o) || t.Overlaps6(o)
+}
+
+// Overlaps4 reports whether any IPv4 in the table matches a route in the
+// other table.
+func (t *Table[V]) Overlaps4(o *Table[V]) bool {
+	t.init()
+	o.init()
+
+	return t.rootV4.overlapsRec(o.rootV4)
+}
+
+// Overlaps6 reports whether any IPv6 in the table matches a route in the
+// other table.
+func (t *Table[V]) Overlaps6(o *Table[V]) bool {
+	t.init()
+	o.init()
+
+	return t.rootV6.overlapsRec(o.rootV6)
 }
 
 // Union combines two tables, changing the receiver table.

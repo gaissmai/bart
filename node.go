@@ -152,6 +152,17 @@ func (n *node[V]) lpm(idx uint) (baseIdx uint, val V, ok bool) {
 	return 0, val, false
 }
 
+// lpmTest for internal use in overlap tests, just return true or false, no value needed.
+func (n *node[V]) lpmTest(idx uint) bool {
+	for baseIdx := idx; baseIdx > 0; baseIdx >>= 1 {
+		if n.prefixesBitset.Test(baseIdx) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // getValue for baseIdx.
 func (n *node[V]) getValue(baseIdx uint) (val V, ok bool) {
 	if n.prefixesBitset.Test(baseIdx) {
@@ -264,135 +275,97 @@ func (n *node[V]) allChildAddrs(buffer []uint) {
 // #################### nodes #############################################
 
 // overlapsRec returns true if any IP in the nodes n or o overlaps.
-// First test the routes, then the children and if no match rec-descent
-// for child nodes with same octet.
-//
-// It´s a complex implementation.
+// First test overlapping routes, then if routes overlaps children and
+// if no match so far, go rec-descent down for child nodes with same octet.
 func (n *node[V]) overlapsRec(o *node[V]) bool {
-	// collect the host routes from prefixes
-	nAllotIndex := [maxNodePrefixes]bool{}
-	oAllotIndex := [maxNodePrefixes]bool{}
+	// ##############################
+	// 1. test if any routes overlaps
+	// ##############################
 
-	// 1. test if any routes overlaps?
+	nPfxLen := len(n.prefixes)
+	oPfxLen := len(o.prefixes)
 
-	nPfxExists := len(n.prefixes) > 0
-	oPfxExists := len(o.prefixes) > 0
+	if oPfxLen > 0 && nPfxLen > 0 {
 
-	var nIdx, oIdx uint
-
-	// zig-zag, for all routes in both nodes ...
-	// faster than [n,o].allStrideIndexes(), fast return on first match.
-	for {
-		if nPfxExists {
-			// single step range over bitset, node n
-			if nIdx, nPfxExists = n.prefixesBitset.NextSet(nIdx); nPfxExists {
-				// get range of host routes for this prefix
-				lower, upper := hostRoutesByIndex(nIdx)
-
-				// insert host routes (octet/8) for this prefix,
-				// some sort of allotment
-				for hostRoute := lower; hostRoute <= upper; hostRoute++ {
-					// zig-zag, fast return on first match
-					if oAllotIndex[hostRoute] {
-						return true
-					}
-					nAllotIndex[hostRoute] = true
-				}
-				nIdx++
+		// range over all prefixes in node n
+		var nIdx uint
+		for nPfxExists := true; nPfxExists; nIdx++ {
+			nIdx, nPfxExists = n.prefixesBitset.NextSet(nIdx)
+			// does any route in o overlap this prefix from n
+			if nPfxExists && o.lpmTest(nIdx) {
+				return true
 			}
 		}
 
-		if oPfxExists {
-			// single step range over bitset, node o
-			if oIdx, oPfxExists = o.prefixesBitset.NextSet(oIdx); oPfxExists {
-				// get range of host routes for this prefix
-				lower, upper := hostRoutesByIndex(oIdx)
-
-				// insert host routes (octet/8) for this prefix,
-				// some sort of allotment
-				for hostRoute := lower; hostRoute <= upper; hostRoute++ {
-					// zig-zag, fast return on first macth
-					if nAllotIndex[hostRoute] {
-						return true
-					}
-					oAllotIndex[hostRoute] = true
-				}
-				oIdx++
-			}
-		}
-		if !nPfxExists && !oPfxExists {
-			break
-		}
-	}
-
-	// full run, zig-zag didn't already match
-	if len(n.prefixes) > 0 && len(o.prefixes) > 0 {
-		for hostRoute := firstHostIndex; hostRoute <= lastHostIndex; hostRoute++ {
-			if nAllotIndex[hostRoute] && oAllotIndex[hostRoute] {
+		// range over all prefixes in node o
+		var oIdx uint
+		for oPfxExists := true; oPfxExists; oIdx++ {
+			oIdx, oPfxExists = o.prefixesBitset.NextSet(oIdx)
+			// does any route in n overlap this prefix from o
+			if oPfxExists && n.lpmTest(oIdx) {
 				return true
 			}
 		}
 	}
 
+	// ####################################
 	// 2. test if routes overlaps any child
+	// ####################################
 
-	// collect the octets
-	nOctets := [maxNodeChildren]bool{}
-	oOctets := [maxNodeChildren]bool{}
+	nChildLen := len(n.children)
+	oChildLen := len(o.children)
 
-	ncExists := len(n.children) > 0
-	ocExists := len(o.children) > 0
-
-	var nOctet, oOctet uint
-
-	// zig-zag, for all octets in both nodes ...
-	// faster than [n,o].allChildAddr(), fast return on first match.
-	for {
-		// range over bitset, node n
-		if ncExists {
-			if nOctet, ncExists = n.childrenBitset.NextSet(nOctet); ncExists {
-				// zig-zag, fast return on first match
-				if oAllotIndex[nOctet+firstHostIndex] {
-					return true
-				}
-				// collect the octet for later use in step 3
-				nOctets[nOctet] = true
-				nOctet++
+	if oPfxLen > 0 && nChildLen > 0 {
+		var nAddr uint
+		for nAddrExists := true; nAddrExists; nAddr++ {
+			nAddr, nAddrExists = n.childrenBitset.NextSet(nAddr)
+			// does any route in o overlap this child from n
+			if nAddrExists && o.lpmTest(octetToBaseIndex(byte(nAddr))) {
+				return true
 			}
-		}
-
-		// range over bitset, node o
-		if ocExists {
-			if oOctet, ocExists = o.childrenBitset.NextSet(oOctet); ocExists {
-				// zig-zag, fast return on first match
-				if nAllotIndex[oOctet+firstHostIndex] {
-					return true
-				}
-				// collect the octet for later use in step 3
-				oOctets[oOctet] = true
-				oOctet++
-			}
-		}
-
-		if !ncExists && !ocExists {
-			break
 		}
 	}
 
+	if nPfxLen > 0 && oChildLen > 0 {
+		var oAddr uint
+		for oAddrExists := true; oAddrExists; oAddr++ {
+			oAddr, oAddrExists = o.childrenBitset.NextSet(oAddr)
+			// does any route in n overlap this child from o
+			if oAddrExists && n.lpmTest(octetToBaseIndex(byte(oAddr))) {
+				return true
+			}
+		}
+	}
+
+	// ##############################################
 	// 3. rec-descent call for childs with same octet
+	// ##############################################
 
-	if len(n.children) > 0 && len(o.children) > 0 {
-		for octet := 0; octet < len(nOctets) && octet < len(oOctets); octet++ {
-			// bounds check eliminated in for loop condition
-			if nOctets[octet] && oOctets[octet] {
-				// get child node for this octet
-				nc := n.getChild(byte(octet))
-				oc := o.getChild(byte(octet))
+	// stop condition, n or o have no childs
+	if nChildLen == 0 || oChildLen == 0 {
+		return false
+	}
 
-				// rec-descent
-				if nc.overlapsRec(oc) {
-					return true
-				}
+	// swap for better performance, range over shorter bitset
+	if nChildLen > oChildLen {
+		n, o = o, n
+	}
+
+	var nAddr uint
+	for nAddrExists := true; nAddrExists; nAddr++ {
+		nAddr, nAddrExists = n.childrenBitset.NextSet(nAddr)
+		if nAddrExists {
+			nOctet := byte(nAddr)
+
+			oChild := o.getChild(nOctet)
+			if oChild == nil {
+				continue
+			}
+			nChild := n.getChild(nOctet)
+
+			// rec-descent
+			if nChild.overlapsRec(oChild) {
+				return true
 			}
 		}
 	}
@@ -404,14 +377,16 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 	// ##################################################
 	// 1. test if any route in this node overlaps prefix?
+	// ##################################################
 
 	pfxIdx := prefixToBaseIndex(octet, pfxLen)
-	if _, _, ok := n.lpm(pfxIdx); ok {
+	if n.lpmTest(pfxIdx) {
 		return true
 	}
 
 	// #################################################
 	// 2. test if prefix overlaps any route in this node
+	// #################################################
 
 	// lower/upper boundary for host routes
 	pfxLower, pfxUpper := hostRoutesByIndex(pfxIdx)
@@ -436,6 +411,7 @@ func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 
 	// #################################################
 	// 3. test if prefix overlaps any child in this node
+	// #################################################
 
 	// set start octet in bitset search with prefix octet
 	cOctet := uint(octet)
