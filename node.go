@@ -64,7 +64,6 @@ func (n *node[V]) prefixRank(baseIdx uint) int {
 }
 
 // insertPrefix adds the route for baseIdx, with value val.
-// incSize reports if the sie counter must incremented.
 func (n *node[V]) insertPrefix(baseIdx uint, val V) {
 	// prefix exists, overwrite val
 	if n.prefixesBitset.Test(baseIdx) {
@@ -153,9 +152,9 @@ func (n *node[V]) lpm(idx uint) (baseIdx uint, val V, ok bool) {
 }
 
 // lpmTest for internal use in overlap tests, just return true or false, no value needed.
-func (n *node[V]) lpmTest(idx uint) bool {
-	for baseIdx := idx; baseIdx > 0; baseIdx >>= 1 {
-		if n.prefixesBitset.Test(baseIdx) {
+func (n *node[V]) lpmTest(baseIdx uint) bool {
+	for idx := baseIdx; idx > 0; idx >>= 1 {
+		if n.prefixesBitset.Test(idx) {
 			return true
 		}
 	}
@@ -274,8 +273,6 @@ func (n *node[V]) allChildAddrs(buffer []uint) []uint {
 // #################### nodes #############################################
 
 // overlapsRec returns true if any IP in the nodes n or o overlaps.
-// First test overlapping routes, then if routes overlaps children and
-// if no match so far, go rec-descent down for child nodes with same octet.
 func (n *node[V]) overlapsRec(o *node[V]) bool {
 	// ##############################
 	// 1. test if any routes overlaps
@@ -291,23 +288,32 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 			return true
 		}
 
-		// range over all prefixes in node n
-		var nIdx uint
-		for nPfxExists := true; nPfxExists; nIdx++ {
-			nIdx, nPfxExists = n.prefixesBitset.NextSet(nIdx)
-			// does any route in o overlap this prefix from n
-			if nPfxExists && o.lpmTest(nIdx) {
-				return true
-			}
-		}
+		var nIdx, oIdx uint
 
-		// range over all prefixes in node o
-		var oIdx uint
-		for oPfxExists := true; oPfxExists; oIdx++ {
-			oIdx, oPfxExists = o.prefixesBitset.NextSet(oIdx)
-			// does any route in n overlap this prefix from o
-			if oPfxExists && n.lpmTest(oIdx) {
-				return true
+		nOK := nPfxLen > 0
+		oOK := oPfxLen > 0
+
+		// range over n and o at the same time to help chance on its way
+		for nOK || oOK {
+
+			if nOK {
+				// does any route in o overlap this prefix from n
+				if nIdx, nOK = n.prefixesBitset.NextSet(nIdx); nOK {
+					if o.lpmTest(nIdx) {
+						return true
+					}
+				}
+				nIdx++
+			}
+
+			if oOK {
+				// does any route in n overlap this prefix from o
+				if oIdx, oOK = o.prefixesBitset.NextSet(oIdx); oOK {
+					if n.lpmTest(oIdx) {
+						return true
+					}
+				}
+				oIdx++
 			}
 		}
 	}
@@ -319,27 +325,32 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 	nChildLen := len(n.children)
 	oChildLen := len(o.children)
 
-	if oPfxLen > 0 && nChildLen > 0 {
-		var nAddr uint
-		// range over all child addrs in node n
-		for nAddrExists := true; nAddrExists; nAddr++ {
-			nAddr, nAddrExists = n.childrenBitset.NextSet(nAddr)
-			// does any route in o overlap this child from n
-			if nAddrExists && o.lpmTest(octetToBaseIndex(byte(nAddr))) {
-				return true
-			}
-		}
-	}
+	var nAddr, oAddr uint
 
-	if nPfxLen > 0 && oChildLen > 0 {
-		var oAddr uint
-		// range over all child addrs in node o
-		for oAddrExists := true; oAddrExists; oAddr++ {
-			oAddr, oAddrExists = o.childrenBitset.NextSet(oAddr)
-			// does any route in n overlap this child from o
-			if oAddrExists && n.lpmTest(octetToBaseIndex(byte(oAddr))) {
-				return true
+	nOK := nChildLen > 0 && oPfxLen > 0 // test the childs in n against the routes in o
+	oOK := oChildLen > 0 && nPfxLen > 0 // test the childs in o against the routes in n
+
+	// range over n and o at the same time to help chance on its way
+	for nOK || oOK {
+
+		if nOK {
+			// does any route in o overlap this child from n
+			if nAddr, nOK = n.childrenBitset.NextSet(nAddr); nOK {
+				if o.lpmTest(octetToBaseIndex(byte(nAddr))) {
+					return true
+				}
 			}
+			nAddr++
+		}
+
+		if oOK {
+			// does any route in n overlap this child from o
+			if oAddr, oOK = o.childrenBitset.NextSet(oAddr); oOK {
+				if n.lpmTest(octetToBaseIndex(byte(oAddr))) {
+					return true
+				}
+			}
+			oAddr++
 		}
 	}
 
@@ -352,7 +363,7 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 		return false
 	}
 
-	// there exists no child with identical octet in n and o
+	// stop condition, no child with identical octet in n and o
 	if n.childrenBitset.IntersectionCardinality(o.childrenBitset) == 0 {
 		return false
 	}
@@ -362,22 +373,21 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 		n, o = o, n
 	}
 
-	var nAddr uint
-	for nAddrExists := true; nAddrExists; nAddr++ {
-		nAddr, nAddrExists = n.childrenBitset.NextSet(nAddr)
-		if nAddrExists {
-			nOctet := byte(nAddr)
+	var addr uint
+	for ok := true; ok; addr++ {
+		if addr, ok = n.childrenBitset.NextSet(addr); !ok {
+			break
+		}
 
-			oChild := o.getChild(nOctet)
-			if oChild == nil {
-				continue
-			}
-			nChild := n.getChild(nOctet)
+		oChild := o.getChild(byte(addr))
+		if oChild == nil {
+			continue
+		}
+		nChild := n.getChild(byte(addr))
 
-			// rec-descent
-			if nChild.overlapsRec(oChild) {
-				return true
-			}
+		// rec-descent
+		if nChild.overlapsRec(oChild) {
+			return true
 		}
 	}
 
