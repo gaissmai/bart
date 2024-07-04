@@ -87,13 +87,14 @@ func (n *node[V]) dump(w io.Writer, path []byte, is4 bool) {
 	fmt.Fprintf(w, "\n%s[%s] depth:  %d path: [%v] / %d\n",
 		indent, n.hasType(), depth, ancestors(path, is4), bits)
 
-	if len(n.prefixes) != 0 {
-		indices := n.allStrideIndexes()
+	if nPfxLen := len(n.prefixes); nPfxLen != 0 {
+		indices := n.allStrideIndexes(make([]uint, nPfxLen))
+
 		// print the baseIndices for this node.
-		fmt.Fprintf(w, "%sindexs(#%d): %v\n", indent, len(n.prefixes), indices)
+		fmt.Fprintf(w, "%sindexs(#%d): %v\n", indent, nPfxLen, indices)
 
 		// print the prefixes for this node
-		fmt.Fprintf(w, "%sprefxs(#%d):", indent, len(n.prefixes))
+		fmt.Fprintf(w, "%sprefxs(#%d):", indent, nPfxLen)
 
 		for _, idx := range indices {
 			octet, bits := baseIndexToPrefix(idx)
@@ -102,7 +103,7 @@ func (n *node[V]) dump(w io.Writer, path []byte, is4 bool) {
 		fmt.Fprintln(w)
 
 		// print the values for this node
-		fmt.Fprintf(w, "%svalues(#%d):", indent, len(n.prefixes))
+		fmt.Fprintf(w, "%svalues(#%d):", indent, nPfxLen)
 
 		for _, val := range n.prefixes {
 			fmt.Fprintf(w, " %v", val)
@@ -110,9 +111,9 @@ func (n *node[V]) dump(w io.Writer, path []byte, is4 bool) {
 		fmt.Fprintln(w)
 	}
 
-	if len(n.children) != 0 {
+	if nChildLen := len(n.children); nChildLen != 0 {
 		// print the childs for this node
-		fmt.Fprintf(w, "%schilds(#%d):", indent, len(n.children))
+		fmt.Fprintf(w, "%schilds(#%d):", indent, nChildLen)
 
 		for i := range n.children {
 			octet := byte(n.childrenBitset.Select(uint(i)))
