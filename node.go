@@ -286,6 +286,11 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 
 	if oPfxLen > 0 && nPfxLen > 0 {
 
+		// some prefixes are identical
+		if n.prefixesBitset.IntersectionCardinality(o.prefixesBitset) > 0 {
+			return true
+		}
+
 		// range over all prefixes in node n
 		var nIdx uint
 		for nPfxExists := true; nPfxExists; nIdx++ {
@@ -316,6 +321,7 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 
 	if oPfxLen > 0 && nChildLen > 0 {
 		var nAddr uint
+		// range over all child addrs in node n
 		for nAddrExists := true; nAddrExists; nAddr++ {
 			nAddr, nAddrExists = n.childrenBitset.NextSet(nAddr)
 			// does any route in o overlap this child from n
@@ -327,6 +333,7 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 
 	if nPfxLen > 0 && oChildLen > 0 {
 		var oAddr uint
+		// range over all child addrs in node o
 		for oAddrExists := true; oAddrExists; oAddr++ {
 			oAddr, oAddrExists = o.childrenBitset.NextSet(oAddr)
 			// does any route in n overlap this child from o
@@ -345,7 +352,12 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 		return false
 	}
 
-	// swap for better performance, range over shorter bitset
+	// there exists no child with identical octet in n and o
+	if n.childrenBitset.IntersectionCardinality(o.childrenBitset) == 0 {
+		return false
+	}
+
+	// swap the nodes, range over shorter bitset
 	if nChildLen > oChildLen {
 		n, o = o, n
 	}
