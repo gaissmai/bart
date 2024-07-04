@@ -266,7 +266,7 @@ func (n *node[V]) getChild(octet byte) *node[V] {
 // panics if the buffer isn't big enough.
 func (n *node[V]) allChildAddrs(buffer []uint) {
 	if len(n.children) > len(buffer) {
-		panic("logic error, buffer isn't big enough")
+		panic("logic error, buffer is too small")
 	}
 
 	n.childrenBitset.NextSetMany(0, buffer)
