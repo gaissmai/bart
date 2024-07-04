@@ -146,7 +146,7 @@ func (n *node[V]) getKidsRec(parentIdx uint, path []byte, is4 bool) []kid[V] {
 	directKids := []kid[V]{}
 
 	// the node may have prefixes
-	for _, idx := range n.allStrideIndexes() {
+	for _, idx := range n.allStrideIndexes(make([]uint, len(n.prefixes))) {
 		// parent or self, handled alreday in an upper stack frame.
 		if idx <= parentIdx {
 			continue
@@ -164,10 +164,7 @@ func (n *node[V]) getKidsRec(parentIdx uint, path []byte, is4 bool) []kid[V] {
 	}
 
 	// the node may have childs, the rec-descent monster starts
-	childAddrs := make([]uint, len(n.children))
-	n.allChildAddrs(childAddrs)
-
-	for i, addr := range childAddrs {
+	for i, addr := range n.allChildAddrs(make([]uint, len(n.children))) {
 		octet := byte(addr)
 		// do a longest-prefix-match
 		lpmIdx, _, _ := n.lpm(octetToBaseIndex(octet))

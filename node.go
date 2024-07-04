@@ -204,15 +204,13 @@ func (n *node[V]) apm(octet byte, bits int, depth int, ip netip.Addr) []netip.Pr
 }
 
 // allStrideIndexes returns all baseIndexes set in this stride node in ascending order.
-func (n *node[V]) allStrideIndexes() []uint {
-	c := len(n.prefixes)
-	if c == 0 {
-		return nil
+func (n *node[V]) allStrideIndexes(buffer []uint) []uint {
+	if len(n.prefixes) > len(buffer) {
+		panic("logic error, buffer is too small")
 	}
 
-	buf := make([]uint, 0, c)
-	_, buf = n.prefixesBitset.NextSetMany(0, buf)
-	return buf
+	_, buffer = n.prefixesBitset.NextSetMany(0, buffer)
+	return buffer
 }
 
 // ################## children ################################
@@ -264,12 +262,13 @@ func (n *node[V]) getChild(octet byte) *node[V] {
 
 // allChildAddrs fills the buffer with the octets of all child nodes in ascending order,
 // panics if the buffer isn't big enough.
-func (n *node[V]) allChildAddrs(buffer []uint) {
+func (n *node[V]) allChildAddrs(buffer []uint) []uint {
 	if len(n.children) > len(buffer) {
 		panic("logic error, buffer is too small")
 	}
 
-	n.childrenBitset.NextSetMany(0, buffer)
+	_, buffer = n.childrenBitset.NextSetMany(0, buffer)
+	return buffer
 }
 
 // #################### nodes #############################################
@@ -461,10 +460,7 @@ func (n *node[V]) subnets(path []byte, parentOctet byte, pfxLen int, is4 bool) (
 
 	// collect all children covered
 	// see also algorithm in overlapsPrefix
-	childAddrs := make([]uint, len(n.children))
-	n.allChildAddrs(childAddrs)
-
-	for i, cAddr := range childAddrs {
+	for i, cAddr := range n.allChildAddrs(make([]uint, len(n.children))) {
 		cOctet := byte(cAddr)
 
 		// make host route for comparison with lower, upper
@@ -493,17 +489,14 @@ func (n *node[V]) subnets(path []byte, parentOctet byte, pfxLen int, is4 bool) (
 // If there are duplicate entries, the value is taken from the other node.
 func (n *node[V]) unionRec(o *node[V]) {
 	// for all prefixes in other node do ...
-	for _, oIdx := range o.allStrideIndexes() {
+	for _, oIdx := range o.allStrideIndexes(make([]uint, len(o.prefixes))) {
 		// insert/overwrite prefix/value from oNode to nNode
 		oVal, _ := o.getValue(oIdx)
 		n.insertPrefix(oIdx, oVal)
 	}
 
 	// for all children in other node do ...
-	childAddrs := make([]uint, len(o.children))
-	o.allChildAddrs(childAddrs)
-
-	for i, oOctet := range childAddrs {
+	for i, oOctet := range o.allChildAddrs(make([]uint, len(o.children))) {
 		octet := byte(oOctet)
 
 		// we know the slice index, faster as o.getChild(octet)
@@ -552,7 +545,7 @@ func (n *node[V]) cloneRec() *node[V] {
 // The iteration order is not defined, just the simplest and fastest recursive implementation.
 func (n *node[V]) allRec(path []byte, is4 bool, yield func(netip.Prefix, V) bool) bool {
 	// for all prefixes in this node do ...
-	for _, idx := range n.allStrideIndexes() {
+	for _, idx := range n.allStrideIndexes(make([]uint, len(n.prefixes))) {
 		val, _ := n.getValue(idx)
 		pfx := cidrFromPath(path, idx, is4)
 
@@ -564,10 +557,7 @@ func (n *node[V]) allRec(path []byte, is4 bool, yield func(netip.Prefix, V) bool
 	}
 
 	// for all children in this node do ...
-	childAddrs := make([]uint, len(n.children))
-	n.allChildAddrs(childAddrs)
-
-	for i, addr := range childAddrs {
+	for i, addr := range n.allChildAddrs(make([]uint, len(n.children))) {
 		octet := byte(addr)
 		path := append(slices.Clone(path), octet)
 		child := n.children[i]
@@ -589,13 +579,12 @@ func (n *node[V]) allRec(path []byte, is4 bool, yield func(netip.Prefix, V) bool
 // The iteration is in prefix sort order, it's a very complex implemenation compared with allRec.
 func (n *node[V]) allRecSorted(path []byte, is4 bool, yield func(netip.Prefix, V) bool) bool {
 	// get slice of all child octets, sorted by addr
-	childAddrs := make([]uint, len(n.children))
-	n.allChildAddrs(childAddrs)
+	childAddrs := n.allChildAddrs(make([]uint, len(n.children)))
 
 	childCursor := 0
 
 	// get slice of all indexes, sorted by idx
-	allIndices := n.allStrideIndexes()
+	allIndices := n.allStrideIndexes(make([]uint, len(n.prefixes)))
 
 	// re-sort indexes by prefix in place
 	slices.SortFunc(allIndices, func(a, b uint) int {
