@@ -64,21 +64,23 @@ func (n *node[V]) prefixRank(baseIdx uint) int {
 }
 
 // insertPrefix adds the route for baseIdx, with value val.
-func (n *node[V]) insertPrefix(baseIdx uint, val V) {
+// If the value already exists, overwrite it with val and return false.
+func (n *node[V]) insertPrefix(baseIdx uint, val V) (ok bool) {
 	// prefix exists, overwrite val
 	if n.prefixesBitset.Test(baseIdx) {
 		n.prefixes[n.prefixRank(baseIdx)] = val
-		return
+		return false
 	}
 
 	// new, insert into bitset and slice
 	n.prefixesBitset.Set(baseIdx)
 	n.prefixes = slices.Insert(n.prefixes, n.prefixRank(baseIdx), val)
+	return true
 }
 
-// deletePrefix removes the route octet/prefixLen. Reports whether the
-// prefix existed in the table prior to deletion.
-func (n *node[V]) deletePrefix(octet byte, prefixLen int) (wasPresent bool) {
+// deletePrefix removes the route octet/prefixLen.
+// Returns false if there was no prefix to delete.
+func (n *node[V]) deletePrefix(octet byte, prefixLen int) (ok bool) {
 	baseIdx := prefixToBaseIndex(octet, prefixLen)
 
 	// no route entry
@@ -98,26 +100,27 @@ func (n *node[V]) deletePrefix(octet byte, prefixLen int) (wasPresent bool) {
 	return true
 }
 
-// updatePrefix, update or set the value at prefix via callback.
-func (n *node[V]) updatePrefix(octet byte, prefixLen int, cb func(V, bool) V) (val V) {
+// updatePrefix, update or set the value at prefix via callback. The new value returned
+// and a bool wether the prefix was already present in the node.
+func (n *node[V]) updatePrefix(octet byte, prefixLen int, cb func(V, bool) V) (newVal V, wasPresent bool) {
 	// calculate idx once
 	baseIdx := prefixToBaseIndex(octet, prefixLen)
 
-	var ok bool
 	var rnk int
 
 	// if prefix is set, get current value
-	if ok = n.prefixesBitset.Test(baseIdx); ok {
+	var oldVal V
+	if wasPresent = n.prefixesBitset.Test(baseIdx); wasPresent {
 		rnk = n.prefixRank(baseIdx)
-		val = n.prefixes[rnk]
+		oldVal = n.prefixes[rnk]
 	}
 
 	// callback function to get updated or new value
-	val = cb(val, ok)
+	newVal = cb(oldVal, wasPresent)
 
 	// prefix is already set, update and return value
-	if ok {
-		n.prefixes[rnk] = val
+	if wasPresent {
+		n.prefixes[rnk] = newVal
 		return
 	}
 
@@ -128,7 +131,7 @@ func (n *node[V]) updatePrefix(octet byte, prefixLen int, cb func(V, bool) V) (v
 	rnk = n.prefixRank(baseIdx)
 
 	// ... and insert value into slice
-	n.prefixes = slices.Insert(n.prefixes, rnk, val)
+	n.prefixes = slices.Insert(n.prefixes, rnk, newVal)
 
 	return
 }
@@ -509,12 +512,15 @@ func (n *node[V]) subnets(path []byte, parentOctet byte, pfxLen int, is4 bool) (
 
 // unionRec combines two nodes, changing the receiver node.
 // If there are duplicate entries, the value is taken from the other node.
-func (n *node[V]) unionRec(o *node[V]) {
+// Count duplicate entries to adjust the t.size struct members.
+func (n *node[V]) unionRec(o *node[V]) (duplicates int) {
 	// for all prefixes in other node do ...
 	for _, oIdx := range o.allStrideIndexes(make([]uint, len(o.prefixes))) {
 		// insert/overwrite prefix/value from oNode to nNode
 		oVal, _ := o.getValue(oIdx)
-		n.insertPrefix(oIdx, oVal)
+		if !n.insertPrefix(oIdx, oVal) {
+			duplicates++
+		}
 	}
 
 	// for all children in other node do ...
@@ -533,9 +539,10 @@ func (n *node[V]) unionRec(o *node[V]) {
 			n.insertChild(octet, oc.cloneRec())
 		} else {
 			// both nodes have child with octet, call union rec-descent
-			nc.unionRec(oc)
+			duplicates += nc.unionRec(oc)
 		}
 	}
+	return duplicates
 }
 
 // cloneRec, clones the node recursive.
@@ -752,6 +759,8 @@ func adjustHostRoutes(idx, next uint) (lower, upper uint) {
 }
 
 // numPrefixesRec, calculate the number of prefixes under n.
+//
+//nolint:unused
 func (n *node[V]) numPrefixesRec() int {
 	size := len(n.prefixes) // this node
 	for _, c := range n.children {
