@@ -38,6 +38,9 @@ type Table[V any] struct {
 	rootV4 *node[V]
 	rootV6 *node[V]
 
+	size4 int
+	size6 int
+
 	// BitSets have to be initialized.
 	initOnce sync.Once
 }
@@ -129,14 +132,16 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	}
 
 	// insert prefix/val into node
-	n.insertPrefix(prefixToBaseIndex(lastOctet, lastOctetBits), val)
+	if n.insertPrefix(prefixToBaseIndex(lastOctet, lastOctetBits), val) {
+		t.sizeUpdate(is4, 1)
+	}
 }
 
 // Update or set the value at pfx with a callback function.
 // The callback function is called with (value, ok) and returns a new value..
 //
 // If the pfx does not already exist, it is set with the new value.
-func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
+func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V) {
 	t.init()
 	if !pfx.IsValid() {
 		var zero V
@@ -180,7 +185,13 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V {
 	}
 
 	// update/insert prefix into node
-	return n.updatePrefix(lastOctet, lastOctetBits, cb)
+	var wasPresent bool
+	newVal, wasPresent = n.updatePrefix(lastOctet, lastOctetBits, cb)
+	if !wasPresent {
+		t.sizeUpdate(is4, 1)
+	}
+
+	return newVal
 }
 
 // Get returns the associated payload for prefix and true, or false if
@@ -283,10 +294,11 @@ func (t *Table[V]) Delete(pfx netip.Prefix) {
 	}
 
 	// try to delete prefix in trie node
-	if wasPresent := n.deletePrefix(lastOctet, lastOctetBits); !wasPresent {
+	if !n.deletePrefix(lastOctet, lastOctetBits) {
 		// nothing deleted
 		return
 	}
+	t.sizeUpdate(is4, -1)
 
 	// purge dangling nodes after successful deletion
 	for i > 0 {
@@ -626,22 +638,22 @@ func (t *Table[V]) Overlaps(o *Table[V]) bool {
 	o.init()
 
 	// t is empty
-	if t.rootV4.isEmpty() && t.rootV6.isEmpty() {
+	if t.Size() == 0 {
 		return false
 	}
 
 	// o is empty
-	if o.rootV4.isEmpty() && o.rootV6.isEmpty() {
+	if o.Size() == 0 {
 		return false
 	}
 
 	// at least one v4 is empty
-	if t.rootV4.isEmpty() || o.rootV4.isEmpty() {
+	if t.size4 == 0 || o.size4 == 0 {
 		return t.Overlaps6(o)
 	}
 
 	// at least one v6 is empty
-	if t.rootV6.isEmpty() || o.rootV6.isEmpty() {
+	if t.size6 == 0 || o.size6 == 0 {
 		return t.Overlaps4(o)
 	}
 
@@ -672,8 +684,11 @@ func (t *Table[V]) Union(o *Table[V]) {
 	t.init()
 	o.init()
 
-	t.rootV4.unionRec(o.rootV4)
-	t.rootV6.unionRec(o.rootV6)
+	dup4 := t.rootV4.unionRec(o.rootV4)
+	dup6 := t.rootV6.unionRec(o.rootV6)
+
+	t.size4 += o.size4 - dup4
+	t.size6 += o.size6 - dup6
 }
 
 // Clone returns a copy of the routing table.
@@ -686,6 +701,9 @@ func (t *Table[V]) Clone() *Table[V] {
 
 	c.rootV4 = t.rootV4.cloneRec()
 	c.rootV6 = t.rootV6.cloneRec()
+
+	c.size4 = t.size4
+	c.size6 = t.size6
 
 	return c
 }
@@ -715,28 +733,28 @@ func (t *Table[V]) All6(yield func(pfx netip.Prefix, val V) bool) {
 	t.rootV6.allRecSorted(nil, false, yield)
 }
 
-// Size, calculates the IPv4 and IPv6 prefixes and returns the sum.
-// You could also calculate it using All(), but this would be slower
-// in any case and therefore qualifies Size() as an independent method.
+func (t *Table[V]) sizeUpdate(is4 bool, n int) {
+	switch is4 {
+	case true:
+		t.size4 += n
+	case false:
+		t.size6 += n
+	}
+}
+
+// Size returns the prefix count.
 func (t *Table[V]) Size() int {
-	t.init()
-	return t.rootV4.numPrefixesRec() + t.rootV6.numPrefixesRec()
+	return t.size4 + t.size6
 }
 
-// Size4 calculates the number of IPv4 prefixes.
-// You could also calculate it using All4(), but this would be slower
-// in any case and therefore qualifies Size4() as an independent method.
+// Size4 returns the IPv4 prefix count.
 func (t *Table[V]) Size4() int {
-	t.init()
-	return t.rootV4.numPrefixesRec()
+	return t.size4
 }
 
-// Size6 calculates the number of IPv6 prefixes.
-// You could also calculate it using All6(), but this would be slower
-// in any case and therefore qualifies Size6() as an independent method.
+// Size6 returns the IPv6 prefix count.
 func (t *Table[V]) Size6() int {
-	t.init()
-	return t.rootV6.numPrefixesRec()
+	return t.size6
 }
 
 // nodes, calculates the IPv4 and IPv6 nodes and returns the sum.
