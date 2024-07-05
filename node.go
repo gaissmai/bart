@@ -460,6 +460,8 @@ func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 func (n *node[V]) subnets(path []byte, parentOctet byte, pfxLen int, is4 bool) (result []netip.Prefix) {
 	// collect all routes covered by this pfx
 	// see also algorithm in overlapsPrefix
+
+	// can't use lpm, search prefix has no node
 	parentIdx := prefixToBaseIndex(parentOctet, pfxLen)
 	parentLower, parentUpper := hostRoutesByIndex(parentIdx)
 
@@ -472,6 +474,7 @@ func (n *node[V]) subnets(path []byte, parentOctet byte, pfxLen int, is4 bool) (
 			break
 		}
 
+		// can't use lpm, search prefix has no node
 		lower, upper := hostRoutesByIndex(idx)
 
 		// idx is covered by parentIdx?
@@ -484,8 +487,11 @@ func (n *node[V]) subnets(path []byte, parentOctet byte, pfxLen int, is4 bool) (
 	}
 
 	// collect all children covered
-	// see also algorithm in overlapsPrefix
-	for i, cAddr := range n.allChildAddrs(make([]uint, len(n.children))) {
+	var cAddr uint
+	for {
+		if cAddr, ok = n.childrenBitset.NextSet(cAddr); !ok {
+			break
+		}
 		cOctet := byte(cAddr)
 
 		// make host route for comparison with lower, upper
@@ -493,8 +499,7 @@ func (n *node[V]) subnets(path []byte, parentOctet byte, pfxLen int, is4 bool) (
 
 		// is child covered?
 		if cIdx >= parentLower && cIdx <= parentUpper {
-			// we know the slice index, faster as n.getChild(octet)
-			c := n.children[i]
+			c := n.getChild(cOctet)
 
 			// append octet to path
 			path := append(slices.Clone(path), cOctet)
@@ -505,9 +510,72 @@ func (n *node[V]) subnets(path []byte, parentOctet byte, pfxLen int, is4 bool) (
 				return true
 			})
 		}
+
+		cAddr++
 	}
 
 	return result
+}
+
+func (n *node[V]) eachSubnets(path []byte, parentOctet byte, pfxLen int, is4 bool, yield func(pfx netip.Prefix, val V) bool) {
+	// collect all routes covered by this pfx
+	// see also algorithm in overlapsPrefix
+
+	// can't use lpm, search prefix has no node
+	parentIdx := prefixToBaseIndex(parentOctet, pfxLen)
+	parentLower, parentUpper := hostRoutesByIndex(parentIdx)
+
+	// start bitset search at parentIdx
+	idx := parentIdx
+	var ok bool
+	for {
+		if idx, ok = n.prefixesBitset.NextSet(idx); !ok {
+			break
+		}
+
+		// can't use lpm, search prefix has no node
+		lower, upper := hostRoutesByIndex(idx)
+
+		// idx is covered by parentIdx?
+		if lower >= parentLower && upper <= parentUpper {
+			val, _ := n.getValue(idx)
+			cidr := cidrFromPath(path, idx, is4)
+
+			if !yield(cidr, val) {
+				// premature end of iteration
+				return
+			}
+
+		}
+
+		idx++
+	}
+
+	// collect all children covered
+	var cAddr uint
+	for {
+		if cAddr, ok = n.childrenBitset.NextSet(cAddr); !ok {
+			break
+		}
+		cOctet := byte(cAddr)
+
+		// make host route for comparison with lower, upper
+		cIdx := octetToBaseIndex(cOctet)
+
+		// is child covered?
+		if cIdx >= parentLower && cIdx <= parentUpper {
+			c := n.getChild(cOctet)
+
+			// append octet to path
+			path := append(slices.Clone(path), cOctet)
+
+			// all cidrs under this child are covered by pfx
+			c.allRec(path, is4, yield)
+		}
+
+		cAddr++
+	}
+
 }
 
 // unionRec combines two nodes, changing the receiver node.
@@ -759,8 +827,6 @@ func adjustHostRoutes(idx, next uint) (lower, upper uint) {
 }
 
 // numPrefixesRec, calculate the number of prefixes under n.
-//
-//nolint:unused
 func (n *node[V]) numPrefixesRec() int {
 	size := len(n.prefixes) // this node
 	for _, c := range n.children {

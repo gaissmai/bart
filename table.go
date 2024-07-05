@@ -527,6 +527,57 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 	return nil
 }
 
+// EachSubnet calls yield() for each prefix covered by pfx.
+// The sort order is undefined and you must not rely on it!
+//
+// If the yield function returns false, the iteration ends prematurely.
+func (t *Table[V]) EachSubnet(pfx netip.Prefix, yield func(pfx netip.Prefix, val V) bool) {
+	if !pfx.IsValid() {
+		return
+	}
+
+	// values derived from pfx
+	ip := pfx.Addr()
+	is4 := ip.Is4()
+	bits := pfx.Bits()
+
+	n := t.rootNodeByVersion(is4)
+	if n == nil {
+		return
+	}
+
+	// do not allocate
+	a16 := ip.As16()
+	octets := a16[:]
+	if is4 {
+		octets = octets[12:]
+	}
+
+	// see comment in Insert()
+	lastOctetIdx := (bits - 1) / strideLen
+	lastOctet := octets[lastOctetIdx]
+	lastOctetBits := bits - (lastOctetIdx * strideLen)
+
+	// mask the prefix
+	lastOctet = lastOctet & netMask(lastOctetBits)
+	octets[lastOctetIdx] = lastOctet
+
+	// find the trie node
+	for i, octet := range octets {
+		if i == lastOctetIdx {
+			n.eachSubnets(octets[:i], lastOctet, lastOctetBits, is4, yield)
+			return
+		}
+
+		c := n.getChild(octet)
+		if c == nil {
+			break
+		}
+
+		n = c
+	}
+}
+
 // Supernets, return all matching routes for pfx,
 // in natural CIDR sort order.
 func (t *Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
@@ -714,7 +765,7 @@ func (t *Table[V]) Clone() *Table[V] {
 // Prefixes must not be inserted or deleted during iteration, otherwise
 // the behavior is undefined. However, value updates are permitted.
 //
-// If the yield function returns false the iteration ends prematurely.
+// If the yield function returns false, the iteration ends prematurely.
 func (t *Table[V]) All(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
 	// respect premature end of allRec()
