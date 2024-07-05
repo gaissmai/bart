@@ -535,6 +535,13 @@ func TestInsert(t *testing.T) {
 func TestDelete(t *testing.T) {
 	t.Parallel()
 
+	t.Run("table_is_empty", func(t *testing.T) {
+		// must not panic
+		t.Parallel()
+		rtbl := &Table[int]{}
+		rtbl.Delete(randomPrefix())
+	})
+
 	t.Run("prefix_in_root", func(t *testing.T) {
 		t.Parallel()
 		// Add/remove prefix from root table.
@@ -1537,6 +1544,48 @@ func TestSubnetsCompare(t *testing.T) {
 	}
 }
 
+func TestEachSubnetsCompare(t *testing.T) {
+	t.Parallel()
+
+	pfxs := randomPrefixes(10_000)
+
+	fast := &Table[int]{}
+	gold := goldTable[int](pfxs)
+
+	for _, pfx := range pfxs {
+		fast.Insert(pfx.pfx, pfx.val)
+	}
+
+	for i := 0; i < 10_000; i++ {
+		pfx := randomPrefix()
+		goldPfxs := gold.subnets(pfx)
+
+		var fastPfxs []netip.Prefix
+		var values = map[netip.Prefix]int{}
+
+		fast.EachSubnet(pfx, func(p netip.Prefix, val int) bool {
+			fastPfxs = append(fastPfxs, p)
+			values[p] = val
+			return true
+		})
+
+		slices.SortFunc(fastPfxs, cmpPrefix)
+
+		if !reflect.DeepEqual(goldPfxs, fastPfxs) {
+			t.Fatalf("EachSubnets(%q), got: %v\nwant: %v", pfx, fastPfxs, goldPfxs)
+		}
+
+		for pfx, val := range values {
+			got, ok := fast.Get(pfx)
+
+			if !ok || got != val {
+				t.Fatalf("EachSubnets: Get(%q), got: %d,%v, want: %d,%v", pfx, got, ok, val, true)
+			}
+		}
+
+	}
+}
+
 func TestSupernets(t *testing.T) {
 	t.Parallel()
 
@@ -2030,6 +2079,17 @@ func TestSize(t *testing.T) {
 	if golden6 != rtbl.Size6() {
 		t.Errorf("Size6: want: %d, got: %d", golden6, rtbl.Size6())
 	}
+
+	size4Rec := rtbl.rootV4.numPrefixesRec()
+	if golden4 != size4Rec {
+		t.Errorf("size4Rec: want: %d, got: %d", golden4, size4Rec)
+	}
+
+	size6Rec := rtbl.rootV6.numPrefixesRec()
+	if golden6 != size6Rec {
+		t.Errorf("size6Rec: want: %d, got: %d", golden6, size6Rec)
+	}
+
 }
 
 // ############ benchmarks ################################

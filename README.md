@@ -61,6 +61,9 @@ The API has changed since v0.4.2, 0.5.3. and v0.6.3
   func (t *Table[V]) Subnets(pfx netip.Prefix) []netip.Prefix
   func (t *Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix
 
+  func (t *Table[V]) EachSubnet(pfx netip.Prefix, yield func(pfx netip.Prefix, val V) bool)
+  TODO: func (t *Table[V]) EachSupernet(pfx netip.Prefix, yield func(pfx netip.Prefix, val V) bool)
+
   func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool
 
   func (t *Table[V]) Overlaps(o *Table[V]) bool
