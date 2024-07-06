@@ -3,6 +3,8 @@
 
 package bart
 
+import "cmp"
+
 // Please read the ART paper ./doc/artlookup.pdf
 // to understand the baseIndex algorithm.
 
@@ -45,8 +47,8 @@ func octetToBaseIndex(octet byte) uint {
 	return uint(octet) + firstHostIndex // just: octet + 256
 }
 
-// baseIndexToPrefixMask, calc the bits from baseIndex and octect depth
-func baseIndexToPrefixMask(baseIdx uint, depth int) int {
+// baseIndexToPrefixLen, calc the bits from baseIndex and octect depth
+func baseIndexToPrefixLen(baseIdx uint, depth int) int {
 	_, pfxLen := baseIndexToPrefix(baseIdx)
 	return depth*strideLen + pfxLen
 }
@@ -85,10 +87,9 @@ func baseIndexToPrefix(baseIdx uint) (octet byte, pfxLen int) {
 	return item.octet, int(item.bits)
 }
 
-// prefixSortRankByIndex, get the prefix sort rank for baseIndex.
-// Use the pre computed lookup table.
-func prefixSortRankByIndex(baseIdx uint) int {
-	return int(baseIdxLookupTbl[baseIdx].rank)
+// cmpIndexRank, compare SortFunc to sort indexes in prefix sort order.
+func cmpIndexRank(a, b uint) int {
+	return cmp.Compare(baseIdxLookupTbl[a].rank, baseIdxLookupTbl[b].rank)
 }
 
 // baseIdxLookupTbl

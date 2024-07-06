@@ -88,7 +88,9 @@ func (n *node[V]) dump(w io.Writer, path []byte, is4 bool) {
 		indent, n.hasType(), depth, ancestors(path, is4), bits)
 
 	if nPfxLen := len(n.prefixes); nPfxLen != 0 {
-		indices := n.allStrideIndexes(make([]uint, nPfxLen))
+		// make backing arrays, no heap allocs
+		idxBackingArray := [maxNodePrefixes]uint{}
+		indices := n.allStrideIndexes(idxBackingArray[:])
 
 		// print the baseIndices for this node.
 		fmt.Fprintf(w, "%sindexs(#%d): %v\n", indent, nPfxLen, indices)

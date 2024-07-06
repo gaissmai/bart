@@ -85,7 +85,7 @@ func ExampleTable_All4() {
 	for _, item := range input {
 		rtbl.Insert(item.cidr, item.nextHop)
 	}
-	rtbl.All4(func(pfx netip.Prefix, val netip.Addr) bool {
+	rtbl.All4Sorted(func(pfx netip.Prefix, val netip.Addr) bool {
 		fmt.Printf("%v\t%v\n", pfx, val)
 		return true
 	})
@@ -100,4 +100,48 @@ func ExampleTable_All4() {
 	// 172.16.0.0/12	8.8.8.8
 	// 192.168.0.0/16	9.9.9.9
 	// 192.168.1.0/24	127.0.0.1
+}
+
+func ExampleTable_EachSubnet() {
+	rtbl := new(bart.Table[netip.Addr])
+	for _, item := range input {
+		rtbl.Insert(item.cidr, item.nextHop)
+	}
+
+	cidr := netip.MustParsePrefix("0.0.0.0/1")
+
+	rtbl.EachSubnet(cidr, func(pfx netip.Prefix, _ netip.Addr) bool {
+		fmt.Printf("%v\n", pfx)
+		return true
+	})
+
+	// Output:
+	// 10.0.0.0/8
+	// 127.0.0.0/8
+	// 10.0.0.0/24
+	// 10.0.1.0/24
+	// 127.0.0.1/32
+
+}
+
+func ExampleTable_EachSupernet() {
+	rtbl := new(bart.Table[netip.Addr])
+	for _, item := range input {
+		rtbl.Insert(item.cidr, item.nextHop)
+	}
+
+	cidr := netip.MustParsePrefix("2001:db8::/32")
+
+	counter := 0
+	rtbl.EachSupernet(cidr, func(pfx netip.Prefix, _ netip.Addr) bool {
+		fmt.Printf("%v\n", pfx)
+		counter++
+
+		// premature end of iteration?
+		return counter < 2
+	})
+
+	// Output:
+	// ::/0
+	// 2000::/3
 }
