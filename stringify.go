@@ -145,8 +145,9 @@ func (n *node[V]) fprintRec(w io.Writer, parentIdx uint, path []byte, is4 bool, 
 func (n *node[V]) getKidsRec(parentIdx uint, path []byte, is4 bool) []kid[V] {
 	directKids := []kid[V]{}
 
-	// the node may have prefixes
-	for _, idx := range n.allStrideIndexes(make([]uint, len(n.prefixes))) {
+	// make backing arrays, no heap allocs
+	idxBackingArray := [maxNodePrefixes]uint{}
+	for _, idx := range n.allStrideIndexes(idxBackingArray[:]) {
 		// parent or self, handled alreday in an upper stack frame.
 		if idx <= parentIdx {
 			continue
@@ -163,8 +164,11 @@ func (n *node[V]) getKidsRec(parentIdx uint, path []byte, is4 bool) []kid[V] {
 		}
 	}
 
+	// make backing arrays, no heap allocs
+	addrBackingArray := [maxNodeChildren]uint{}
+
 	// the node may have childs, the rec-descent monster starts
-	for i, addr := range n.allChildAddrs(make([]uint, len(n.children))) {
+	for i, addr := range n.allChildAddrs(addrBackingArray[:]) {
 		octet := byte(addr)
 		// do a longest-prefix-match
 		lpmIdx, _, _ := n.lpm(octetToBaseIndex(octet))

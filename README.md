@@ -32,7 +32,7 @@ The child array at each stride level is also popcount compressed.
 
 ## API
 
-The API has changed since v0.4.2, 0.5.3. and v0.6.3
+The API has changed since v0.4.2, 0.5.3, v0.6.3 and v0.10.1
 
 ```golang
   import "github.com/gaissmai/bart"
@@ -59,10 +59,10 @@ The API has changed since v0.4.2, 0.5.3. and v0.6.3
   func (t *Table[V]) LookupPrefixLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool)
 
   func (t *Table[V]) Subnets(pfx netip.Prefix) []netip.Prefix
-  func (t *Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix
-
   func (t *Table[V]) EachSubnet(pfx netip.Prefix, yield func(pfx netip.Prefix, val V) bool)
-  TODO: func (t *Table[V]) EachSupernet(pfx netip.Prefix, yield func(pfx netip.Prefix, val V) bool)
+
+  func (t *Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix
+  func (t *Table[V]) EachSupernet(pfx netip.Prefix, yield func(pfx netip.Prefix, val V) bool)
 
   func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool
 
@@ -77,6 +77,10 @@ The API has changed since v0.4.2, 0.5.3. and v0.6.3
   func (t *Table[V]) All(yield func(pfx netip.Prefix, val V) bool)
   func (t *Table[V]) All4(yield func(pfx netip.Prefix, val V) bool)
   func (t *Table[V]) All6(yield func(pfx netip.Prefix, val V) bool)
+
+  func (t *Table[V]) AllSorted(yield func(pfx netip.Prefix, val V) bool)
+  func (t *Table[V]) All4Sorted(yield func(pfx netip.Prefix, val V) bool)
+  func (t *Table[V]) All6Sorted(yield func(pfx netip.Prefix, val V) bool)
 
   func (t *Table[V]) String() string
   func (t *Table[V]) Fprint(w io.Writer) error

@@ -25,7 +25,6 @@ package bart
 
 import (
 	"net/netip"
-	"slices"
 	"sync"
 )
 
@@ -391,7 +390,7 @@ func (t *Table[V]) LookupPrefixLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, o
 
 	if ok {
 		// calculate the mask from baseIdx and depth
-		mask := baseIndexToPrefixMask(baseIdx, depth)
+		mask := baseIndexToPrefixLen(baseIdx, depth)
 
 		// calculate the lpm from ip and mask
 		lpm, _ = pfx.Addr().Prefix(mask)
@@ -477,11 +476,16 @@ func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V, 
 	return
 }
 
-// Subnets, return all prefixes covered by pfx in natural CIDR sort order.
+// Subnets, return all CIDRs covered by pfx.
+//
+// The sort order is undefined and you must not rely on it!
 func (t *Table[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 	if !pfx.IsValid() {
 		return nil
 	}
+
+	// mask the prefix
+	pfx = pfx.Masked()
 
 	// values derived from pfx
 	ip := pfx.Addr()
@@ -505,15 +509,10 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 	lastOctet := octets[lastOctetIdx]
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
-	// mask the prefix
-	lastOctet = lastOctet & netMask(lastOctetBits)
-	octets[lastOctetIdx] = lastOctet
-
 	// find the trie node
 	for i, octet := range octets {
 		if i == lastOctetIdx {
-			result := n.subnets(octets[:i], lastOctet, lastOctetBits, is4)
-			slices.SortFunc(result, cmpPrefix)
+			result := n.subnets(ip, i, lastOctet, lastOctetBits)
 			return result
 		}
 
@@ -527,14 +526,17 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 	return nil
 }
 
-// EachSubnet calls yield() for each prefix covered by pfx.
-// The sort order is undefined and you must not rely on it!
-//
+// EachSubnet calls yield() for each CIDR covered by pfx.
 // If the yield function returns false, the iteration ends prematurely.
+//
+// The sort order is undefined and you must not rely on it!
 func (t *Table[V]) EachSubnet(pfx netip.Prefix, yield func(pfx netip.Prefix, val V) bool) {
 	if !pfx.IsValid() {
 		return
 	}
+
+	// mask the prefix
+	pfx = pfx.Masked()
 
 	// values derived from pfx
 	ip := pfx.Addr()
@@ -558,14 +560,10 @@ func (t *Table[V]) EachSubnet(pfx netip.Prefix, yield func(pfx netip.Prefix, val
 	lastOctet := octets[lastOctetIdx]
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
-	// mask the prefix
-	lastOctet = lastOctet & netMask(lastOctetBits)
-	octets[lastOctetIdx] = lastOctet
-
 	// find the trie node
 	for i, octet := range octets {
 		if i == lastOctetIdx {
-			n.eachSubnets(octets[:i], lastOctet, lastOctetBits, is4, yield)
+			n.eachSubnets(ip, i, lastOctet, lastOctetBits, yield)
 			return
 		}
 
@@ -578,12 +576,15 @@ func (t *Table[V]) EachSubnet(pfx netip.Prefix, yield func(pfx netip.Prefix, val
 	}
 }
 
-// Supernets, return all matching routes for pfx,
-// in natural CIDR sort order.
+// Supernets, return all covering CIDRs for pfx in natural CIDR sort order.
 func (t *Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 	if !pfx.IsValid() {
 		return nil
 	}
+
+	// mask prefix
+	pfx = pfx.Masked()
+
 	var result []netip.Prefix
 
 	// values derived from pfx
@@ -608,19 +609,15 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 	lastOctet := octets[lastOctetIdx]
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
-	// mask the prefix
-	lastOctet = lastOctet & netMask(lastOctetBits)
-	octets[lastOctetIdx] = lastOctet
-
 	for i, octet := range octets {
 		if i == lastOctetIdx {
 			// make an all-prefix-match at last level
-			result = append(result, n.apm(lastOctet, lastOctetBits, i, ip)...)
+			result = append(result, n.supernets(ip, i, lastOctet, lastOctetBits)...)
 			break
 		}
 
 		// make an all-prefix-match at intermediate level for octet
-		result = append(result, n.apm(octet, strideLen, i, ip)...)
+		result = append(result, n.supernets(ip, i, octet, strideLen)...)
 
 		// descend down to next trie level
 		c := n.getChild(octet)
@@ -631,6 +628,59 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 	}
 
 	return result
+}
+
+// EachSupernet calls yield() for each CIDR covering pfx
+// in natural CIDR sort order.
+//
+// If the yield function returns false, the iteration ends prematurely.
+func (t *Table[V]) EachSupernet(pfx netip.Prefix, yield func(pfx netip.Prefix, val V) bool) {
+	if !pfx.IsValid() {
+		return
+	}
+
+	// values derived from pfx
+	ip := pfx.Addr()
+	is4 := ip.Is4()
+	bits := pfx.Bits()
+
+	n := t.rootNodeByVersion(is4)
+	if n == nil {
+		return
+	}
+
+	// do not allocate
+	a16 := ip.As16()
+	octets := a16[:]
+	if is4 {
+		octets = octets[12:]
+	}
+
+	// see comment in Insert()
+	lastOctetIdx := (bits - 1) / strideLen
+	lastOctet := octets[lastOctetIdx]
+	lastOctetBits := bits - (lastOctetIdx * strideLen)
+
+	for i, octet := range octets {
+		if i == lastOctetIdx {
+			// make an all-prefix-match at last level
+			n.eachSupernet(ip, i, lastOctet, lastOctetBits, yield)
+			return
+		}
+
+		// make an all-prefix-match at intermediate level for octet
+		if !n.eachSupernet(ip, i, octet, strideLen, yield) {
+			// premature end of iteration
+			return
+		}
+
+		// descend down to next trie level
+		c := n.getChild(octet)
+		if c == nil {
+			break
+		}
+		n = c
+	}
 }
 
 // OverlapsPrefix reports whether any IP in pfx matches a route in the table.
@@ -760,7 +810,8 @@ func (t *Table[V]) Clone() *Table[V] {
 }
 
 // All may be used in a for/range loop to iterate
-// through all the prefixes in natural CIDR sort order.
+// through all the prefixes.
+// The sort order is undefined and you must not rely on it!
 //
 // Prefixes must not be inserted or deleted during iteration, otherwise
 // the behavior is undefined. However, value updates are permitted.
@@ -769,19 +820,46 @@ func (t *Table[V]) Clone() *Table[V] {
 func (t *Table[V]) All(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
 	// respect premature end of allRec()
-	_ = t.rootV4.allRecSorted(nil, true, yield) && t.rootV6.allRecSorted(nil, false, yield)
+	_ = t.rootV4.allRec(netip.AddrFrom4([4]byte{}), 0, yield) &&
+		t.rootV6.allRec(netip.AddrFrom16([16]byte{}), 0, yield)
 }
 
 // All4, like [Table.All] but only for the v4 routing table.
 func (t *Table[V]) All4(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
-	t.rootV4.allRecSorted(nil, true, yield)
+	t.rootV4.allRec(netip.AddrFrom4([4]byte{}), 0, yield)
 }
 
 // All6, like [Table.All] but only for the v6 routing table.
 func (t *Table[V]) All6(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
-	t.rootV6.allRecSorted(nil, false, yield)
+	t.rootV6.allRec(netip.AddrFrom16([16]byte{}), 0, yield)
+}
+
+// AllSorted may be used in a for/range loop to iterate
+// through all the prefixes in natural CIDR sort order.
+//
+// Prefixes must not be inserted or deleted during iteration, otherwise
+// the behavior is undefined. However, value updates are permitted.
+//
+// If the yield function returns false, the iteration ends prematurely.
+func (t *Table[V]) AllSorted(yield func(pfx netip.Prefix, val V) bool) {
+	t.init()
+	// respect premature end of allRec()
+	_ = t.rootV4.allRecSorted(netip.AddrFrom4([4]byte{}), 0, yield) &&
+		t.rootV6.allRecSorted(netip.AddrFrom16([16]byte{}), 0, yield)
+}
+
+// All4Sorted, like [Table.AllSorted] but only for the v4 routing table.
+func (t *Table[V]) All4Sorted(yield func(pfx netip.Prefix, val V) bool) {
+	t.init()
+	t.rootV4.allRecSorted(netip.AddrFrom4([4]byte{}), 0, yield)
+}
+
+// All6Sorted, like [Table.AllSorted] but only for the v6 routing table.
+func (t *Table[V]) All6Sorted(yield func(pfx netip.Prefix, val V) bool) {
+	t.init()
+	t.rootV6.allRecSorted(netip.AddrFrom16([16]byte{}), 0, yield)
 }
 
 func (t *Table[V]) sizeUpdate(is4 bool, n int) {

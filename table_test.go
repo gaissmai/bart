@@ -1536,15 +1536,15 @@ func TestSubnetsCompare(t *testing.T) {
 
 		goldPfxs := gold.subnets(pfx)
 		fastPfxs := fast.Subnets(pfx)
+		slices.SortFunc(fastPfxs, cmpPrefix)
 
 		if !reflect.DeepEqual(goldPfxs, fastPfxs) {
-			t.Fatalf("Subnets(%q), got: %v\nwant: %v", pfx, fastPfxs, goldPfxs)
+			t.Fatalf("\nSubnets(%q):\ngot:  %v\nwant: %v", pfx, fastPfxs, goldPfxs)
 		}
-
 	}
 }
 
-func TestEachSubnetsCompare(t *testing.T) {
+func TestEachSubnetCompare(t *testing.T) {
 	t.Parallel()
 
 	pfxs := randomPrefixes(10_000)
@@ -1572,9 +1572,10 @@ func TestEachSubnetsCompare(t *testing.T) {
 		slices.SortFunc(fastPfxs, cmpPrefix)
 
 		if !reflect.DeepEqual(goldPfxs, fastPfxs) {
-			t.Fatalf("EachSubnets(%q), got: %v\nwant: %v", pfx, fastPfxs, goldPfxs)
+			t.Fatalf("\nEachSubnets(%q):\ngot:  %v\nwant: %v", pfx, fastPfxs, goldPfxs)
 		}
 
+		// also check the values handled by yield function
 		for pfx, val := range values {
 			got, ok := fast.Get(pfx)
 
@@ -1582,7 +1583,6 @@ func TestEachSubnetsCompare(t *testing.T) {
 				t.Fatalf("EachSubnets: Get(%q), got: %d,%v, want: %d,%v", pfx, got, ok, val, true)
 			}
 		}
-
 	}
 }
 
@@ -1605,7 +1605,38 @@ func TestSupernets(t *testing.T) {
 		fastPfxs := fast.Supernets(pfx)
 
 		if !reflect.DeepEqual(goldPfxs, fastPfxs) {
-			t.Fatalf("Supernets(%q), got: %v\nwant: %v", pfx, fastPfxs, goldPfxs)
+			t.Fatalf("\nSupernets(%q):\ngot:  %v\nwant: %v", pfx, fastPfxs, goldPfxs)
+		}
+
+	}
+}
+
+func TestEachSupernet(t *testing.T) {
+	t.Parallel()
+
+	pfxs := randomPrefixes(10_000)
+
+	fast := Table[int]{}
+	gold := goldTable[int](pfxs)
+
+	for _, pfx := range pfxs {
+		fast.Insert(pfx.pfx, pfx.val)
+	}
+
+	var fastPfxs []netip.Prefix
+	for i := 0; i < 10_000; i++ {
+		pfx := randomPrefix()
+
+		goldPfxs := gold.supernets(pfx)
+
+		fastPfxs = nil
+		fast.EachSupernet(pfx, func(p netip.Prefix, _ int) bool {
+			fastPfxs = append(fastPfxs, p)
+			return true
+		})
+
+		if !reflect.DeepEqual(goldPfxs, fastPfxs) {
+			t.Fatalf("\nEachSupernet(%q):\ngot:  %v\nwant: %v", pfx, fastPfxs, goldPfxs)
 		}
 
 	}
@@ -1929,7 +1960,7 @@ func TestAll(t *testing.T) {
 		}
 
 		// check if pfx/val is as expected
-		rtbl.All(func(pfx netip.Prefix, val int) bool {
+		rtbl.AllSorted(func(pfx netip.Prefix, val int) bool {
 			if seen[pfx] != val {
 				t.Errorf("%v got value: %v, expected: %v", pfx, val, seen[pfx])
 			}
@@ -1962,10 +1993,10 @@ func TestAll(t *testing.T) {
 		}
 
 		// iterate and update the values
-		rtbl.All(yield)
+		rtbl.AllSorted(yield)
 
 		// test if all values got updated, yield now as closure
-		rtbl.All(func(pfx netip.Prefix, val int) bool {
+		rtbl.AllSorted(func(pfx netip.Prefix, val int) bool {
 			if seen[pfx] != val {
 				t.Errorf("%v got value: %v, expected: %v", pfx, val, seen[pfx])
 			}
@@ -1981,7 +2012,7 @@ func TestAll(t *testing.T) {
 
 		// check if callback stops prematurely
 		countV6 := 0
-		rtbl.All(func(pfx netip.Prefix, val int) bool {
+		rtbl.AllSorted(func(pfx netip.Prefix, val int) bool {
 			// max 1000 IPv6 prefixes
 			if !pfx.Addr().Is4() {
 				countV6++
@@ -2019,7 +2050,7 @@ func TestAllSorted(t *testing.T) {
 
 		slices.SortFunc(expect, cmpPrefix)
 
-		rtbl.All(func(pfx netip.Prefix, _ int) bool {
+		rtbl.AllSorted(func(pfx netip.Prefix, _ int) bool {
 			got = append(got, pfx)
 			return true
 		})
@@ -2062,12 +2093,12 @@ func TestSize(t *testing.T) {
 	var golden4 int
 	var golden6 int
 
-	rtbl.All4(func(netip.Prefix, any) bool {
+	rtbl.All4Sorted(func(netip.Prefix, any) bool {
 		golden4++
 		return true
 	})
 
-	rtbl.All6(func(netip.Prefix, any) bool {
+	rtbl.All6Sorted(func(netip.Prefix, any) bool {
 		golden6++
 		return true
 	})
@@ -2320,7 +2351,7 @@ func BenchmarkAll(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			buf = buf[:0]
-			rtbl.All(func(pfx netip.Prefix, _ int) bool {
+			rtbl.AllSorted(func(pfx netip.Prefix, _ int) bool {
 				buf = append(buf, pfx)
 				return true
 			})
@@ -2384,7 +2415,7 @@ func (t *Table[V]) dumpAsGoldTable() goldTable[V] {
 	t.init()
 	var tbl goldTable[V]
 
-	t.All(func(pfx netip.Prefix, val V) bool {
+	t.AllSorted(func(pfx netip.Prefix, val V) bool {
 		tbl = append(tbl, goldTableItem[V]{pfx: pfx, val: val})
 		return true
 	})
