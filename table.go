@@ -639,6 +639,9 @@ func (t *Table[V]) EachSupernet(pfx netip.Prefix, yield func(pfx netip.Prefix, v
 		return
 	}
 
+	// mask prefix
+	pfx = pfx.Masked()
+
 	// values derived from pfx
 	ip := pfx.Addr()
 	is4 := ip.Is4()
