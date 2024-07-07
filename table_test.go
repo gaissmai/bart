@@ -1960,7 +1960,7 @@ func TestAll(t *testing.T) {
 		}
 
 		// check if pfx/val is as expected
-		rtbl.AllSorted(func(pfx netip.Prefix, val int) bool {
+		rtbl.All(func(pfx netip.Prefix, val int) bool {
 			if seen[pfx] != val {
 				t.Errorf("%v got value: %v, expected: %v", pfx, val, seen[pfx])
 			}
@@ -1993,10 +1993,10 @@ func TestAll(t *testing.T) {
 		}
 
 		// iterate and update the values
-		rtbl.AllSorted(yield)
+		rtbl.All(yield)
 
 		// test if all values got updated, yield now as closure
-		rtbl.AllSorted(func(pfx netip.Prefix, val int) bool {
+		rtbl.All(func(pfx netip.Prefix, val int) bool {
 			if seen[pfx] != val {
 				t.Errorf("%v got value: %v, expected: %v", pfx, val, seen[pfx])
 			}
@@ -2012,7 +2012,7 @@ func TestAll(t *testing.T) {
 
 		// check if callback stops prematurely
 		countV6 := 0
-		rtbl.AllSorted(func(pfx netip.Prefix, val int) bool {
+		rtbl.All(func(pfx netip.Prefix, val int) bool {
 			// max 1000 IPv6 prefixes
 			if !pfx.Addr().Is4() {
 				countV6++

@@ -404,9 +404,9 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 		}
 	}
 
-	// ########################################################
-	// 3. rec-descent call for childs with same octet in and o
-	// ########################################################
+	// ################################################################
+	// 3. rec-descent call for childs with same octet in nodes n and o
+	// ################################################################
 
 	// stop condition, n or o have no childs
 	if nChildLen == 0 || oChildLen == 0 {
@@ -741,7 +741,7 @@ func (n *node[V]) allRec(ip netip.Addr, depth int, yield func(netip.Prefix, V) b
 
 		octets[depth] = octet
 		ip, _ = netip.AddrFromSlice(octets)
-		pfx := netip.PrefixFrom(ip, bits).Masked()
+		pfx := netip.PrefixFrom(ip, bits)
 
 		val, _ := n.getValue(idx)
 
@@ -863,7 +863,7 @@ func (n *node[V]) allRecSorted(ip netip.Addr, depth int, yield func(netip.Prefix
 
 		octets[depth] = octet
 		ip, _ = netip.AddrFromSlice(octets)
-		pfx := netip.PrefixFrom(ip, bits).Masked()
+		pfx := netip.PrefixFrom(ip, bits)
 
 		// premature end?
 		if !yield(pfx, val) {
