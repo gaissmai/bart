@@ -343,7 +343,7 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 		nOK := nPfxLen > 0
 		oOK := oPfxLen > 0
 
-		// range over n and o at the same time to help chance on its way
+		// zip, range over n and o at the same time to help chance on its way
 		for nOK || oOK {
 
 			if nOK {
@@ -380,7 +380,7 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 	nOK := nChildLen > 0 && oPfxLen > 0 // test the childs in n against the routes in o
 	oOK := oChildLen > 0 && nPfxLen > 0 // test the childs in o against the routes in n
 
-	// range over n and o at the same time to help chance on its way
+	// zip, range over n and o at the same time to help chance on its way
 	for nOK || oOK {
 
 		if nOK {
@@ -404,9 +404,9 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 		}
 	}
 
-	// ##############################################
-	// 3. rec-descent call for childs with same octet
-	// ##############################################
+	// ########################################################
+	// 3. rec-descent call for childs with same octet in and o
+	// ########################################################
 
 	// stop condition, n or o have no childs
 	if nChildLen == 0 || oChildLen == 0 {
@@ -431,6 +431,7 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 
 		oChild := o.getChild(byte(addr))
 		if oChild == nil {
+			// no child in o with this octet
 			continue
 		}
 		nChild := n.getChild(byte(addr))

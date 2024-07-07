@@ -14,7 +14,7 @@ import (
 	"testing"
 )
 
-func TestRange(t *testing.T) {
+func TestRangeAll(t *testing.T) {
 	pfxs := randomPrefixes(10_000)
 	seen := make(map[netip.Prefix]int, 10_000)
 
