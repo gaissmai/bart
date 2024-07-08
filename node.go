@@ -18,6 +18,9 @@ const (
 	maxNodePrefixes = 1 << (strideLen + 1) // 512
 )
 
+// zero value, used manifold
+var zeroPath [16]byte
+
 // node is a level node in the multibit-trie.
 // A node has prefixes and children.
 //
@@ -245,7 +248,7 @@ func (n *node[V]) allChildAddrs(buffer []uint) []uint {
 
 // supernets does an all prefix match in the 8-bit (stride) routing table
 // at this depth and returns all matching CIDRs.
-func (n *node[V]) supernets(path []byte, octet byte, bits int, is4 bool) []netip.Prefix {
+func (n *node[V]) supernets(path [16]byte, depth int, is4 bool, octet byte, bits int) []netip.Prefix {
 	// skip intermediate nodes
 	if len(n.prefixes) == 0 {
 		return nil
@@ -270,7 +273,7 @@ func (n *node[V]) supernets(path []byte, octet byte, bits int, is4 bool) []netip
 	slices.SortFunc(allMatches, cmpIndexRank)
 
 	for _, idx := range allMatches {
-		cidr := cidrFromPath(path, idx, is4)
+		cidr, _ := cidrFromPath(path, depth, is4, idx)
 		result = append(result, cidr)
 	}
 
@@ -279,7 +282,7 @@ func (n *node[V]) supernets(path []byte, octet byte, bits int, is4 bool) []netip
 
 // eachSupernet does an all prefix match in the 8-bit (stride) routing table
 // at this depth and calls yield() for any matching CIDR.
-func (n *node[V]) eachSupernet(path []byte, octet byte, bits int, is4 bool, yield func(pfx netip.Prefix, val V) bool) bool {
+func (n *node[V]) eachSupernet(path [16]byte, depth int, is4 bool, octet byte, bits int, yield func(pfx netip.Prefix, val V) bool) bool {
 	// skip intermediate nodes
 	if len(n.prefixes) == 0 {
 		// no premature end of iteration
@@ -305,7 +308,7 @@ func (n *node[V]) eachSupernet(path []byte, octet byte, bits int, is4 bool, yiel
 	slices.SortFunc(allMatches, cmpIndexRank)
 
 	for _, idx := range allMatches {
-		cidr := cidrFromPath(path, idx, is4)
+		cidr, _ := cidrFromPath(path, depth, is4, idx)
 		val, _ := n.getValue(idx)
 
 		if !yield(cidr, val) {
@@ -499,7 +502,7 @@ func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 }
 
 // subnets returns all CIDRs covered by parent prefix.
-func (n *node[V]) subnets(path []byte, parentOctet byte, pfxLen int, is4 bool) (result []netip.Prefix) {
+func (n *node[V]) subnets(path [16]byte, depth int, is4 bool, parentOctet byte, pfxLen int) (result []netip.Prefix) {
 	// collect all routes covered by this pfx
 	// see also algorithm in overlapsPrefix
 
@@ -518,7 +521,7 @@ func (n *node[V]) subnets(path []byte, parentOctet byte, pfxLen int, is4 bool) (
 		// idx is covered by parentIdx?
 		lower, upper := hostRoutesByIndex(idx)
 		if lower >= parentLower && upper <= parentUpper {
-			cidr := cidrFromPath(path, idx, is4)
+			cidr, _ := cidrFromPath(path, depth, is4, idx)
 			result = append(result, cidr)
 		}
 
@@ -540,11 +543,11 @@ func (n *node[V]) subnets(path []byte, parentOctet byte, pfxLen int, is4 bool) (
 		if idx >= parentLower && idx <= parentUpper {
 			c := n.getChild(octet)
 
-			// append octet to path
-			path := append(slices.Clone(path), octet)
+			// add (set) this octet to path
+			path[depth] = octet
 
 			// all cidrs under this child are covered by pfx
-			c.allRec(path, is4, func(cidr netip.Prefix, _ V) bool {
+			c.allRec(path, depth+1, is4, func(cidr netip.Prefix, _ V) bool {
 				result = append(result, cidr)
 				return true
 			})
@@ -556,8 +559,7 @@ func (n *node[V]) subnets(path []byte, parentOctet byte, pfxLen int, is4 bool) (
 }
 
 // eachSubnet calls yield() for any covered CIDR by parent prefix.
-func (n *node[V]) eachSubnet(path []byte, parentOctet byte, pfxLen int, is4 bool, yield func(pfx netip.Prefix, val V) bool) bool {
-
+func (n *node[V]) eachSubnet(path [16]byte, depth int, is4 bool, parentOctet byte, pfxLen int, yield func(pfx netip.Prefix, val V) bool) bool {
 	// collect all routes covered by this pfx
 	// see also algorithm in overlapsPrefix
 
@@ -579,7 +581,7 @@ func (n *node[V]) eachSubnet(path []byte, parentOctet byte, pfxLen int, is4 bool
 		// idx is covered by parentIdx?
 		if lower >= parentLower && upper <= parentUpper {
 			val, _ := n.getValue(idx)
-			cidr := cidrFromPath(path, idx, is4)
+			cidr, _ := cidrFromPath(path, depth, is4, idx)
 
 			if !yield(cidr, val) {
 				// premature end of iteration
@@ -606,11 +608,11 @@ func (n *node[V]) eachSubnet(path []byte, parentOctet byte, pfxLen int, is4 bool
 		if idx >= parentLower && idx <= parentUpper {
 			c := n.getChild(octet)
 
-			// append octet to path
-			path := append(slices.Clone(path), octet)
+			// add (set) this octet to path
+			path[depth] = octet
 
 			// all cidrs under this child are covered by pfx
-			if !c.allRec(path, is4, yield) {
+			if !c.allRec(path, depth+1, is4, yield) {
 				// premature end of iteration
 				return false
 			}
@@ -690,7 +692,7 @@ func (n *node[V]) cloneRec() *node[V] {
 // false value is propagated.
 //
 // The iteration order is not defined, just the simplest and fastest recursive implementation.
-func (n *node[V]) allRec(path []byte, is4 bool, yield func(netip.Prefix, V) bool) bool {
+func (n *node[V]) allRec(path [16]byte, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
 	// for all prefixes in this node do ...
 	var idx uint
 	var ok bool
@@ -699,7 +701,7 @@ func (n *node[V]) allRec(path []byte, is4 bool, yield func(netip.Prefix, V) bool
 			break
 		}
 		val, _ := n.getValue(idx)
-		cidr := cidrFromPath(path, idx, is4)
+		cidr, _ := cidrFromPath(path, depth, is4, idx)
 
 		// make the callback for this prefix
 		if !yield(cidr, val) {
@@ -717,10 +719,10 @@ func (n *node[V]) allRec(path []byte, is4 bool, yield func(netip.Prefix, V) bool
 			break
 		}
 		octet := byte(addr)
-		path := append(slices.Clone(path), octet)
+		path[depth] = octet
 		child := n.getChild(octet)
 
-		if !child.allRec(path, is4, yield) {
+		if !child.allRec(path, depth+1, is4, yield) {
 			// premature end of recursion
 			return false
 		}
@@ -737,7 +739,7 @@ func (n *node[V]) allRec(path []byte, is4 bool, yield func(netip.Prefix, V) bool
 // false value is propagated.
 //
 // The iteration is in prefix sort order, it's a very complex implemenation compared with allRec.
-func (n *node[V]) allRecSorted(path []byte, is4 bool, yield func(netip.Prefix, V) bool) bool {
+func (n *node[V]) allRecSorted(path [16]byte, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
 	// make backing arrays, no heap allocs
 	addrBackingArray := [maxNodeChildren]uint{}
 	idxBackingArray := [maxNodePrefixes]uint{}
@@ -790,10 +792,12 @@ func (n *node[V]) allRecSorted(path []byte, is4 bool, yield func(netip.Prefix, V
 
 			// we know the slice index, faster as n.getChild(octet)
 			c := n.children[j]
-			path := append(slices.Clone(path), octet)
+
+			// add (set) this octet to path
+			path[depth] = octet
 
 			// premature end?
-			if !c.allRecSorted(path, is4, yield) {
+			if !c.allRecSorted(path, depth+1, is4, yield) {
 				return false
 			}
 
@@ -803,7 +807,7 @@ func (n *node[V]) allRecSorted(path []byte, is4 bool, yield func(netip.Prefix, V
 		// FOOTNOTE: B, C, F
 		// now handle prefix for idx
 		val, _ := n.getValue(idx)
-		cidr := cidrFromPath(path, idx, is4)
+		cidr, _ := cidrFromPath(path, depth, is4, idx)
 
 		// premature end?
 		if !yield(cidr, val) {
@@ -822,10 +826,12 @@ func (n *node[V]) allRecSorted(path []byte, is4 bool, yield func(netip.Prefix, V
 
 			// we know the slice index, faster as n.getChild(octet)
 			c := n.children[j]
-			path := append(slices.Clone(path), octet)
+
+			// add (set) this octet to path
+			path[depth] = octet
 
 			// premature end?
-			if !c.allRecSorted(path, is4, yield) {
+			if !c.allRecSorted(path, depth+1, is4, yield) {
 				return false
 			}
 
@@ -841,10 +847,12 @@ func (n *node[V]) allRecSorted(path []byte, is4 bool, yield func(netip.Prefix, V
 
 		// we know the slice index, faster as n.getChild(octet)
 		c := n.children[j]
-		path := append(slices.Clone(path), octet)
+
+		// add (set) this octet to path
+		path[depth] = octet
 
 		// premature end?
-		if !c.allRecSorted(path, is4, yield) {
+		if !c.allRecSorted(path, depth+1, is4, yield) {
 			return false
 		}
 	}

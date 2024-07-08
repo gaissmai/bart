@@ -495,11 +495,12 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 	}
 
 	// do not allocate
-	a16 := ip.As16()
-	octets := a16[:]
+	path := ip.As16()
+	octets := path[:]
 	if is4 {
 		octets = octets[12:]
 	}
+	copy(path[:], octets[:])
 
 	// see comment in Insert()
 	lastOctetIdx := (bits - 1) / strideLen
@@ -513,7 +514,7 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 	// find the trie node
 	for i, octet := range octets {
 		if i == lastOctetIdx {
-			return n.subnets(octets[:i], lastOctet, lastOctetBits, is4)
+			return n.subnets(path, i, is4, lastOctet, lastOctetBits)
 		}
 
 		c := n.getChild(octet)
@@ -546,11 +547,12 @@ func (t *Table[V]) EachSubnet(pfx netip.Prefix, yield func(pfx netip.Prefix, val
 	}
 
 	// do not allocate
-	a16 := ip.As16()
-	octets := a16[:]
+	path := ip.As16()
+	octets := path[:]
 	if is4 {
 		octets = octets[12:]
 	}
+	copy(path[:], octets[:])
 
 	// see comment in Insert()
 	lastOctetIdx := (bits - 1) / strideLen
@@ -564,7 +566,7 @@ func (t *Table[V]) EachSubnet(pfx netip.Prefix, yield func(pfx netip.Prefix, val
 	// find the trie node
 	for i, octet := range octets {
 		if i == lastOctetIdx {
-			_ = n.eachSubnet(octets[:i], lastOctet, lastOctetBits, is4, yield)
+			_ = n.eachSubnet(path, i, is4, lastOctet, lastOctetBits, yield)
 			return
 		}
 
@@ -596,11 +598,12 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 	}
 
 	// do not allocate
-	a16 := ip.As16()
-	octets := a16[:]
+	path := ip.As16()
+	octets := path[:]
 	if is4 {
 		octets = octets[12:]
 	}
+	copy(path[:], octets[:])
 
 	// see comment in Insert()
 	lastOctetIdx := (bits - 1) / strideLen
@@ -614,12 +617,12 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 	for i, octet := range octets {
 		if i == lastOctetIdx {
 			// make an all-prefix-match at last level
-			result = append(result, n.supernets(octets[:i], lastOctet, lastOctetBits, is4)...)
+			result = append(result, n.supernets(path, i, is4, lastOctet, lastOctetBits)...)
 			break
 		}
 
 		// make an all-prefix-match at intermediate level for octet
-		result = append(result, n.supernets(octets[:i], octet, strideLen, is4)...)
+		result = append(result, n.supernets(path, i, is4, octet, strideLen)...)
 
 		// descend down to next trie level
 		c := n.getChild(octet)
@@ -652,11 +655,12 @@ func (t *Table[V]) EachSupernet(pfx netip.Prefix, yield func(pfx netip.Prefix, v
 	}
 
 	// do not allocate
-	a16 := ip.As16()
-	octets := a16[:]
+	path := ip.As16()
+	octets := path[:]
 	if is4 {
 		octets = octets[12:]
 	}
+	copy(path[:], octets[:])
 
 	// see comment in Insert()
 	lastOctetIdx := (bits - 1) / strideLen
@@ -670,12 +674,12 @@ func (t *Table[V]) EachSupernet(pfx netip.Prefix, yield func(pfx netip.Prefix, v
 	for i, octet := range octets {
 		if i == lastOctetIdx {
 			// make an all-prefix-match at last level
-			_ = n.eachSupernet(octets[:i], lastOctet, lastOctetBits, is4, yield)
+			_ = n.eachSupernet(path, i, is4, lastOctet, lastOctetBits, yield)
 			return
 		}
 
 		// make an all-prefix-match at intermediate level for octet
-		if !n.eachSupernet(octets[:i], octet, strideLen, is4, yield) {
+		if !n.eachSupernet(path, i, is4, octet, strideLen, yield) {
 			// premature end of iteration
 			return
 		}
@@ -826,20 +830,20 @@ func (t *Table[V]) Clone() *Table[V] {
 func (t *Table[V]) All(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
 	// respect premature end of allRec()
-	_ = t.rootV4.allRec(nil, true, yield) &&
-		t.rootV6.allRec(nil, false, yield)
+	_ = t.rootV4.allRec(zeroPath, 0, true, yield) &&
+		t.rootV6.allRec(zeroPath, 0, false, yield)
 }
 
 // All4, like [Table.All] but only for the v4 routing table.
 func (t *Table[V]) All4(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
-	t.rootV4.allRec(nil, true, yield)
+	t.rootV4.allRec(zeroPath, 0, true, yield)
 }
 
 // All6, like [Table.All] but only for the v6 routing table.
 func (t *Table[V]) All6(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
-	t.rootV6.allRec(nil, false, yield)
+	t.rootV6.allRec(zeroPath, 0, false, yield)
 }
 
 // AllSorted may be used in a for/range loop to iterate
@@ -852,20 +856,20 @@ func (t *Table[V]) All6(yield func(pfx netip.Prefix, val V) bool) {
 func (t *Table[V]) AllSorted(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
 	// respect premature end of allRec()
-	_ = t.rootV4.allRecSorted(nil, true, yield) &&
-		t.rootV6.allRecSorted(nil, false, yield)
+	_ = t.rootV4.allRecSorted(zeroPath, 0, true, yield) &&
+		t.rootV6.allRecSorted(zeroPath, 0, false, yield)
 }
 
 // All4Sorted, like [Table.AllSorted] but only for the v4 routing table.
 func (t *Table[V]) All4Sorted(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
-	t.rootV4.allRecSorted(nil, true, yield)
+	t.rootV4.allRecSorted(zeroPath, 0, true, yield)
 }
 
 // All6Sorted, like [Table.AllSorted] but only for the v6 routing table.
 func (t *Table[V]) All6Sorted(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
-	t.rootV6.allRecSorted(nil, false, yield)
+	t.rootV6.allRecSorted(zeroPath, 0, false, yield)
 }
 
 func (t *Table[V]) sizeUpdate(is4 bool, n int) {

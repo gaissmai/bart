@@ -61,44 +61,50 @@ func (t *Table[V]) dump(w io.Writer) {
 	t.init()
 
 	fmt.Fprint(w, "### IPv4:")
-	t.rootV4.dumpRec(w, nil, true)
+	t.rootV4.dumpRec(w, zeroPath, 0, true)
 
 	fmt.Fprint(w, "### IPv6:")
-	t.rootV6.dumpRec(w, nil, false)
+	t.rootV6.dumpRec(w, zeroPath, 0, false)
 }
 
 // dumpRec, rec-descent the trie.
-func (n *node[V]) dumpRec(w io.Writer, path []byte, is4 bool) {
-	n.dump(w, path, is4)
+func (n *node[V]) dumpRec(w io.Writer, path [16]byte, depth int, is4 bool) {
+	n.dump(w, path, depth, is4)
 
-	for i, child := range n.children {
-		octet := n.childrenBitset.Select(uint(i))
-		child.dumpRec(w, append(path, byte(octet)), is4)
+	// make backing arrays, no heap allocs
+	addrBackingArray := [maxNodeChildren]uint{}
+
+	// the node may have childs, the rec-descent monster starts
+	for i, addr := range n.allChildAddrs(addrBackingArray[:]) {
+		octet := byte(addr)
+		child := n.children[i]
+		path[depth] = octet
+
+		child.dumpRec(w, path, depth+1, is4)
 	}
 }
 
 // dump the node to w.
-func (n *node[V]) dump(w io.Writer, path []byte, is4 bool) {
-	depth := len(path)
+func (n *node[V]) dump(w io.Writer, path [16]byte, depth int, is4 bool) {
 	bits := depth * strideLen
 	indent := strings.Repeat(".", depth)
 
 	// node type with depth and octet path and bits.
-	fmt.Fprintf(w, "\n%s[%s] depth:  %d path: [%v] / %d\n",
-		indent, n.hasType(), depth, ancestors(path, is4), bits)
+	fmt.Fprintf(w, "\n%s[%s] depth:  %d path: [%s] / %d\n",
+		indent, n.hasType(), depth, ipStridePath(path, depth, is4), bits)
 
 	if nPfxLen := len(n.prefixes); nPfxLen != 0 {
 		// make backing arrays, no heap allocs
 		idxBackingArray := [maxNodePrefixes]uint{}
-		indices := n.allStrideIndexes(idxBackingArray[:])
+		allIndices := n.allStrideIndexes(idxBackingArray[:])
 
 		// print the baseIndices for this node.
-		fmt.Fprintf(w, "%sindexs(#%d): %v\n", indent, nPfxLen, indices)
+		fmt.Fprintf(w, "%sindexs(#%d): %v\n", indent, nPfxLen, allIndices)
 
 		// print the prefixes for this node
 		fmt.Fprintf(w, "%sprefxs(#%d):", indent, nPfxLen)
 
-		for _, idx := range indices {
+		for _, idx := range allIndices {
 			octet, bits := baseIndexToPrefix(idx)
 			fmt.Fprintf(w, " %s/%d", octetFmt(octet, is4), bits)
 		}
@@ -113,12 +119,13 @@ func (n *node[V]) dump(w io.Writer, path []byte, is4 bool) {
 		fmt.Fprintln(w)
 	}
 
-	if nChildLen := len(n.children); nChildLen != 0 {
+	if childs := len(n.children); childs != 0 {
 		// print the childs for this node
-		fmt.Fprintf(w, "%schilds(#%d):", indent, nChildLen)
+		fmt.Fprintf(w, "%schilds(#%d):", indent, childs)
 
-		for i := range n.children {
-			octet := byte(n.childrenBitset.Select(uint(i)))
+		addrBackingArray := [maxNodeChildren]uint{}
+		for _, addr := range n.allChildAddrs(addrBackingArray[:]) {
+			octet := byte(addr)
 			fmt.Fprintf(w, " %s", octetFmt(octet, is4))
 		}
 		fmt.Fprintln(w)
@@ -133,12 +140,15 @@ func octetFmt(octet byte, is4 bool) string {
 	return fmt.Sprintf("0x%02x", octet)
 }
 
-// IP stride path, different formats for IPv4 and IPv6, dotted decimal or hex.
-func ancestors(path []byte, is4 bool) string {
+// ip stride path, different formats for IPv4 and IPv6, dotted decimal or hex.
+//
+//	127.0.0
+//	2001:0d
+func ipStridePath(path [16]byte, depth int, is4 bool) string {
 	buf := new(strings.Builder)
 
 	if is4 {
-		for i, b := range path {
+		for i, b := range path[:depth] {
 			if i != 0 {
 				buf.WriteString(".")
 			}
@@ -147,7 +157,7 @@ func ancestors(path []byte, is4 bool) string {
 		return buf.String()
 	}
 
-	for i, b := range path {
+	for i, b := range path[:depth] {
 		if i != 0 && i%2 == 0 {
 			buf.WriteString(":")
 		}
