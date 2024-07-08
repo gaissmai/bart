@@ -125,7 +125,7 @@ func (t *goldTable[V]) subnets(pfx netip.Prefix) []netip.Prefix {
 	return result
 }
 
-func (t *goldTable[V]) supernets(pfx netip.Prefix) []netip.Prefix {
+func (t *goldTable[V]) lookupPrefixReverse(pfx netip.Prefix) []netip.Prefix {
 	var result []netip.Prefix
 
 	for _, item := range *t {
@@ -133,7 +133,11 @@ func (t *goldTable[V]) supernets(pfx netip.Prefix) []netip.Prefix {
 			result = append(result, item.pfx)
 		}
 	}
-	slices.SortFunc(result, cmpPrefix)
+
+	// b,a reverse sort order!
+	slices.SortFunc(result, func(a, b netip.Prefix) int {
+		return cmpPrefix(b, a)
+	})
 	return result
 }
 

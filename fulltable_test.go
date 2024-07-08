@@ -336,54 +336,7 @@ func BenchmarkFullTableClone(b *testing.B) {
 	}
 }
 
-func BenchmarkFullTableSubnets(b *testing.B) {
-	var rt Table[int]
-	sink := make([]netip.Prefix, 0, 1_000_000)
-
-	for i, route := range routes {
-		rt.Insert(route.CIDR, i)
-	}
-
-	b.Run("sliceV4", func(b *testing.B) {
-		b.ResetTimer()
-		for k := 0; k < b.N; k++ {
-			sink = sink[:0]
-			sink = append(sink, rt.Subnets(randRoute4.CIDR)...)
-		}
-	})
-
-	b.Run("sliceV6", func(b *testing.B) {
-		b.ResetTimer()
-		for k := 0; k < b.N; k++ {
-			sink = sink[:0]
-			sink = append(sink, rt.Subnets(randRoute6.CIDR)...)
-		}
-	})
-
-	b.Run("iterV4", func(b *testing.B) {
-		b.ResetTimer()
-		for k := 0; k < b.N; k++ {
-			sink = sink[:0]
-			rt.EachSubnet(randRoute4.CIDR, func(pfx netip.Prefix, _ int) bool {
-				sink = append(sink, pfx)
-				return true
-			})
-		}
-	})
-
-	b.Run("iterV6", func(b *testing.B) {
-		b.ResetTimer()
-		for k := 0; k < b.N; k++ {
-			sink = sink[:0]
-			rt.EachSubnet(randRoute6.CIDR, func(pfx netip.Prefix, _ int) bool {
-				sink = append(sink, pfx)
-				return true
-			})
-		}
-	})
-}
-
-func BenchmarkFullTableSupernet(b *testing.B) {
+func BenchmarkFullTableEachLookupPrefix(b *testing.B) {
 	var rt Table[int]
 	sink := make([]netip.Prefix, 0, 9)
 
@@ -391,27 +344,11 @@ func BenchmarkFullTableSupernet(b *testing.B) {
 		rt.Insert(route.CIDR, i)
 	}
 
-	b.Run("sliceV4", func(b *testing.B) {
-		b.ResetTimer()
-		for k := 0; k < b.N; k++ {
-			sink = sink[:0]
-			sink = rt.Supernets(randRoute4.CIDR)
-		}
-	})
-
-	b.Run("sliceV6", func(b *testing.B) {
-		b.ResetTimer()
-		for k := 0; k < b.N; k++ {
-			sink = sink[:0]
-			sink = rt.Supernets(randRoute6.CIDR)
-		}
-	})
-
 	b.Run("iterV4", func(b *testing.B) {
 		b.ResetTimer()
 		for k := 0; k < b.N; k++ {
 			sink = sink[:0]
-			rt.EachSupernet(randRoute4.CIDR, func(pfx netip.Prefix, _ int) bool {
+			rt.EachLookupPrefix(randRoute4.CIDR, func(pfx netip.Prefix, _ int) bool {
 				sink = append(sink, pfx)
 				return true
 			})
@@ -422,7 +359,7 @@ func BenchmarkFullTableSupernet(b *testing.B) {
 		b.ResetTimer()
 		for k := 0; k < b.N; k++ {
 			sink = sink[:0]
-			rt.EachSupernet(randRoute6.CIDR, func(pfx netip.Prefix, _ int) bool {
+			rt.EachLookupPrefix(randRoute6.CIDR, func(pfx netip.Prefix, _ int) bool {
 				sink = append(sink, pfx)
 				return true
 			})

@@ -124,7 +124,7 @@ func ExampleTable_EachSubnet() {
 
 }
 
-func ExampleTable_EachSupernet() {
+func ExampleTable_EachLookupPrefix() {
 	rtbl := new(bart.Table[netip.Addr])
 	for _, item := range input {
 		rtbl.Insert(item.cidr, item.nextHop)
@@ -133,7 +133,7 @@ func ExampleTable_EachSupernet() {
 	cidr := netip.MustParsePrefix("2001:db8::/32")
 
 	counter := 0
-	rtbl.EachSupernet(cidr, func(pfx netip.Prefix, _ netip.Addr) bool {
+	rtbl.EachLookupPrefix(cidr, func(pfx netip.Prefix, _ netip.Addr) bool {
 		fmt.Printf("%v\n", pfx)
 		counter++
 
@@ -142,6 +142,6 @@ func ExampleTable_EachSupernet() {
 	})
 
 	// Output:
-	// ::/0
+	// 2001:db8::/32
 	// 2000::/3
 }

@@ -476,12 +476,14 @@ func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V, 
 	return
 }
 
-// Subnets, return all CIDRs covered by pfx.
+// EachLookupPrefix calls yield() for each CIDR covering pfx
+// in reverse CIDR sort order, from longest-prefix-match to
+// shortest-prefix-match.
 //
-// The sort order is undefined and you must not rely on it!
-func (t *Table[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
+// If the yield function returns false, the iteration ends prematurely.
+func (t *Table[V]) EachLookupPrefix(pfx netip.Prefix, yield func(pfx netip.Prefix, val V) bool) {
 	if !pfx.IsValid() {
-		return nil
+		return
 	}
 
 	// values derived from pfx
@@ -491,7 +493,7 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 
 	n := t.rootNodeByVersion(is4)
 	if n == nil {
-		return nil
+		return
 	}
 
 	// do not allocate
@@ -511,20 +513,50 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 	lastOctet = lastOctet & netMask(lastOctetBits)
 	octets[lastOctetIdx] = lastOctet
 
-	// find the trie node
-	for i, octet := range octets {
-		if i == lastOctetIdx {
-			return n.subnets(path, i, is4, lastOctet, lastOctetBits)
-		}
+	// stack of the traversed nodes for reverse ordering of supernets
+	stack := [maxTreeDepth]*node[V]{}
 
+	// run variable, used after for loop
+	var i int
+	var octet byte
+
+	// find last node
+	for i, octet = range octets[:lastOctetIdx+1] {
+		// push current node on stack
+		stack[i] = n
+
+		// go down in tight loop
 		c := n.getChild(octet)
 		if c == nil {
 			break
 		}
-
 		n = c
 	}
-	return nil
+
+	// start backtracking, unwind the stack
+	for depth := i; depth >= 0; depth-- {
+		n = stack[depth]
+
+		// microbenchmarking
+		if len(n.prefixes) == 0 {
+			continue
+		}
+
+		// only the lastOctet may have a different prefix len
+		if depth == lastOctetIdx {
+			if !n.eachLookupPrefix(path, depth, is4, lastOctet, lastOctetBits, yield) {
+				// early exit
+				return
+			}
+			continue
+		}
+
+		// all others are just host routes
+		if !n.eachLookupPrefix(path, depth, is4, octets[depth], strideLen, yield) {
+			// early exit
+			return
+		}
+	}
 }
 
 // EachSubnet calls yield() for each CIDR covered by pfx.
@@ -575,120 +607,6 @@ func (t *Table[V]) EachSubnet(pfx netip.Prefix, yield func(pfx netip.Prefix, val
 			break
 		}
 
-		n = c
-	}
-}
-
-// Supernets, return all covering CIDRs for pfx in natural CIDR sort order.
-func (t *Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
-	if !pfx.IsValid() {
-		return nil
-	}
-
-	var result []netip.Prefix
-
-	// values derived from pfx
-	ip := pfx.Addr()
-	is4 := ip.Is4()
-	bits := pfx.Bits()
-
-	n := t.rootNodeByVersion(is4)
-	if n == nil {
-		return nil
-	}
-
-	// do not allocate
-	path := ip.As16()
-	octets := path[:]
-	if is4 {
-		octets = octets[12:]
-	}
-	copy(path[:], octets[:])
-
-	// see comment in Insert()
-	lastOctetIdx := (bits - 1) / strideLen
-	lastOctet := octets[lastOctetIdx]
-	lastOctetBits := bits - (lastOctetIdx * strideLen)
-
-	// mask the prefix
-	lastOctet = lastOctet & netMask(lastOctetBits)
-	octets[lastOctetIdx] = lastOctet
-
-	for i, octet := range octets {
-		if i == lastOctetIdx {
-			// make an all-prefix-match at last level
-			result = append(result, n.supernets(path, i, is4, lastOctet, lastOctetBits)...)
-			break
-		}
-
-		// make an all-prefix-match at intermediate level for octet
-		result = append(result, n.supernets(path, i, is4, octet, strideLen)...)
-
-		// descend down to next trie level
-		c := n.getChild(octet)
-		if c == nil {
-			break
-		}
-		n = c
-	}
-
-	return result
-}
-
-// EachSupernet calls yield() for each CIDR covering pfx
-// in natural CIDR sort order.
-//
-// If the yield function returns false, the iteration ends prematurely.
-func (t *Table[V]) EachSupernet(pfx netip.Prefix, yield func(pfx netip.Prefix, val V) bool) {
-	if !pfx.IsValid() {
-		return
-	}
-
-	// values derived from pfx
-	ip := pfx.Addr()
-	is4 := ip.Is4()
-	bits := pfx.Bits()
-
-	n := t.rootNodeByVersion(is4)
-	if n == nil {
-		return
-	}
-
-	// do not allocate
-	path := ip.As16()
-	octets := path[:]
-	if is4 {
-		octets = octets[12:]
-	}
-	copy(path[:], octets[:])
-
-	// see comment in Insert()
-	lastOctetIdx := (bits - 1) / strideLen
-	lastOctet := octets[lastOctetIdx]
-	lastOctetBits := bits - (lastOctetIdx * strideLen)
-
-	// mask the prefix
-	lastOctet = lastOctet & netMask(lastOctetBits)
-	octets[lastOctetIdx] = lastOctet
-
-	for i, octet := range octets {
-		if i == lastOctetIdx {
-			// make an all-prefix-match at last level
-			_ = n.eachSupernet(path, i, is4, lastOctet, lastOctetBits, yield)
-			return
-		}
-
-		// make an all-prefix-match at intermediate level for octet
-		if !n.eachSupernet(path, i, is4, octet, strideLen, yield) {
-			// premature end of iteration
-			return
-		}
-
-		// descend down to next trie level
-		c := n.getChild(octet)
-		if c == nil {
-			break
-		}
 		n = c
 	}
 }
@@ -829,7 +747,7 @@ func (t *Table[V]) Clone() *Table[V] {
 // If the yield function returns false, the iteration ends prematurely.
 func (t *Table[V]) All(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
-	// respect premature end of allRec()
+	// respect early exit
 	_ = t.rootV4.allRec(zeroPath, 0, true, yield) &&
 		t.rootV6.allRec(zeroPath, 0, false, yield)
 }
@@ -855,7 +773,7 @@ func (t *Table[V]) All6(yield func(pfx netip.Prefix, val V) bool) {
 // If the yield function returns false, the iteration ends prematurely.
 func (t *Table[V]) AllSorted(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
-	// respect premature end of allRec()
+	// respect early exit
 	_ = t.rootV4.allRecSorted(zeroPath, 0, true, yield) &&
 		t.rootV6.allRecSorted(zeroPath, 0, false, yield)
 }
