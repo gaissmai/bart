@@ -32,7 +32,7 @@ The child array at each stride level is also popcount compressed.
 
 ## API
 
-The API has changed since v0.4.2, 0.5.3, v0.6.3 and v0.10.1
+The API changes in v0.4.2, 0.5.3, v0.6.3, v0.10.1, v0.11.0
 
 ```golang
   import "github.com/gaissmai/bart"
@@ -49,26 +49,24 @@ The API has changed since v0.4.2, 0.5.3, v0.6.3 and v0.10.1
   func (t *Table[V]) Insert(pfx netip.Prefix, val V)
   func (t *Table[V]) Delete(pfx netip.Prefix)
   func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool)
-  func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) V
+  func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V)
 
   func (t *Table[V]) Union(o *Table[V])
   func (t *Table[V]) Clone() *Table[V]
-  
+
   func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool)
+
   func (t *Table[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool)
   func (t *Table[V]) LookupPrefixLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool)
-
-  func (t *Table[V]) Subnets(pfx netip.Prefix) []netip.Prefix
-  func (t *Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix
+  func (t *Table[V]) EachLookupPrefix(pfx netip.Prefix, yield func(pfx netip.Prefix, val V) bool)
   func (t *Table[V]) EachSubnet(pfx netip.Prefix, yield func(pfx netip.Prefix, val V) bool)
-  func (t *Table[V]) EachSupernet(pfx netip.Prefix, yield func(pfx netip.Prefix, val V) bool)
 
   func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool
 
   func (t *Table[V]) Overlaps(o *Table[V]) bool
   func (t *Table[V]) Overlaps4(o *Table[V]) bool
   func (t *Table[V]) Overlaps6(o *Table[V]) bool
-  
+
   func (t *Table[V]) Size() int
   func (t *Table[V]) Size4() int
   func (t *Table[V]) Size6() int

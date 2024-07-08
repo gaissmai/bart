@@ -246,76 +246,21 @@ func (n *node[V]) allChildAddrs(buffer []uint) []uint {
 
 // #################### nodes #############################################
 
-// supernets does an all prefix match in the 8-bit (stride) routing table
-// at this depth and returns all matching CIDRs.
-func (n *node[V]) supernets(path [16]byte, depth int, is4 bool, octet byte, bits int) []netip.Prefix {
-	// skip intermediate nodes
-	if len(n.prefixes) == 0 {
-		return nil
-	}
-
-	// collect all matching indices, backtracking in CBT,
-	// not only the first lpm match.
-	allMatches := make([]uint, 0, strideLen+1)
-
-	for idx := prefixToBaseIndex(octet, bits); idx > 0; idx >>= 1 {
-		if n.prefixesBitset.Test(idx) {
-			allMatches = append(allMatches, idx)
-		}
-	}
-
-	if len(allMatches) == 0 {
-		return nil
-	}
-	result := make([]netip.Prefix, 0, len(allMatches))
-
-	// re-sort the index slice in natural CIDR sort order
-	slices.SortFunc(allMatches, cmpIndexRank)
-
-	for _, idx := range allMatches {
-		cidr, _ := cidrFromPath(path, depth, is4, idx)
-		result = append(result, cidr)
-	}
-
-	return result
-}
-
-// eachSupernet does an all prefix match in the 8-bit (stride) routing table
+// eachLookupPrefix does an all prefix match in the 8-bit (stride) routing table
 // at this depth and calls yield() for any matching CIDR.
-func (n *node[V]) eachSupernet(path [16]byte, depth int, is4 bool, octet byte, bits int, yield func(pfx netip.Prefix, val V) bool) bool {
-	// skip intermediate nodes
-	if len(n.prefixes) == 0 {
-		// no premature end of iteration
-		return true
-	}
-
-	// collect all matching indices, backtracking in CBT,
-	// not only the first lpm match.
-	allMatches := make([]uint, 0, strideLen+1)
-
+func (n *node[V]) eachLookupPrefix(path [16]byte, depth int, is4 bool, octet byte, bits int, yield func(pfx netip.Prefix, val V) bool) bool {
 	for idx := prefixToBaseIndex(octet, bits); idx > 0; idx >>= 1 {
 		if n.prefixesBitset.Test(idx) {
-			allMatches = append(allMatches, idx)
+			cidr, _ := cidrFromPath(path, depth, is4, idx)
+			val, _ := n.getValue(idx)
+
+			if !yield(cidr, val) {
+				// early exit
+				return false
+			}
 		}
 	}
 
-	if len(allMatches) == 0 {
-		// no premature end of iteration
-		return true
-	}
-
-	// re-sort the index slice to natural CIDR sort oreder
-	slices.SortFunc(allMatches, cmpIndexRank)
-
-	for _, idx := range allMatches {
-		cidr, _ := cidrFromPath(path, depth, is4, idx)
-		val, _ := n.getValue(idx)
-
-		if !yield(cidr, val) {
-			// premature end of iteration
-			return false
-		}
-	}
 	return true
 }
 
@@ -420,18 +365,16 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 		n, o = o, n
 	}
 
-	var addr uint
-	for ok := true; ok; addr++ {
-		if addr, ok = n.childrenBitset.NextSet(addr); !ok {
-			break
-		}
-
+	addrBackingArray := [maxNodeChildren]uint{}
+	for i, addr := range n.allChildAddrs(addrBackingArray[:]) {
 		oChild := o.getChild(byte(addr))
 		if oChild == nil {
 			// no child in o with this octet
 			continue
 		}
-		nChild := n.getChild(byte(addr))
+
+		// we have the slice index for n
+		nChild := n.children[i]
 
 		// rec-descent
 		if nChild.overlapsRec(oChild) {
@@ -483,79 +426,22 @@ func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 	// #################################################
 
 	// set start octet in bitset search with prefix octet
-	cOctet := uint(octet)
-	for {
-		if cOctet, ok = n.childrenBitset.NextSet(cOctet); !ok {
-			break
-		}
-
-		cIdx := cOctet + firstHostIndex
-		if cIdx >= pfxLower && cIdx <= pfxUpper {
-			return true
-		}
-
-		// next round
-		cOctet++
-	}
-
-	return false
-}
-
-// subnets returns all CIDRs covered by parent prefix.
-func (n *node[V]) subnets(path [16]byte, depth int, is4 bool, parentOctet byte, pfxLen int) (result []netip.Prefix) {
-	// collect all routes covered by this pfx
-	// see also algorithm in overlapsPrefix
-
-	parentIdx := prefixToBaseIndex(parentOctet, pfxLen)
-	parentLower, parentUpper := hostRoutesByIndex(parentIdx)
-
-	// start bitset search at parentIdx
-	idx := parentIdx
-	var ok bool
-	for {
-		if idx, ok = n.prefixesBitset.NextSet(idx); !ok {
-			// no more prefixes in this node
-			break
-		}
-
-		// idx is covered by parentIdx?
-		lower, upper := hostRoutesByIndex(idx)
-		if lower >= parentLower && upper <= parentUpper {
-			cidr, _ := cidrFromPath(path, depth, is4, idx)
-			result = append(result, cidr)
-		}
-
-		idx++
-	}
-
-	// collect all children covered
-	var addr uint
+	addr := uint(octet)
 	for {
 		if addr, ok = n.childrenBitset.NextSet(addr); !ok {
 			break
 		}
-		octet := byte(addr)
 
-		// make host route for comparison with lower, upper
-		idx := octetToBaseIndex(octet)
-
-		// is child covered?
-		if idx >= parentLower && idx <= parentUpper {
-			c := n.getChild(octet)
-
-			// add (set) this octet to path
-			path[depth] = octet
-
-			// all cidrs under this child are covered by pfx
-			c.allRec(path, depth+1, is4, func(cidr netip.Prefix, _ V) bool {
-				result = append(result, cidr)
-				return true
-			})
+		idx := addr + firstHostIndex
+		if idx >= pfxLower && idx <= pfxUpper {
+			return true
 		}
 
+		// next round
 		addr++
 	}
-	return
+
+	return false
 }
 
 // eachSubnet calls yield() for any covered CIDR by parent prefix.
@@ -584,7 +470,7 @@ func (n *node[V]) eachSubnet(path [16]byte, depth int, is4 bool, parentOctet byt
 			cidr, _ := cidrFromPath(path, depth, is4, idx)
 
 			if !yield(cidr, val) {
-				// premature end of iteration
+				// early exit
 				return false
 			}
 
@@ -613,7 +499,7 @@ func (n *node[V]) eachSubnet(path [16]byte, depth int, is4 bool, parentOctet byt
 
 			// all cidrs under this child are covered by pfx
 			if !c.allRec(path, depth+1, is4, yield) {
-				// premature end of iteration
+				// early exit
 				return false
 			}
 		}
@@ -694,40 +580,28 @@ func (n *node[V]) cloneRec() *node[V] {
 // The iteration order is not defined, just the simplest and fastest recursive implementation.
 func (n *node[V]) allRec(path [16]byte, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
 	// for all prefixes in this node do ...
-	var idx uint
-	var ok bool
-	for {
-		if idx, ok = n.prefixesBitset.NextSet(idx); !ok {
-			break
-		}
+	idxBackingArray := [maxNodePrefixes]uint{}
+	for _, idx := range n.allStrideIndexes(idxBackingArray[:]) {
 		val, _ := n.getValue(idx)
 		cidr, _ := cidrFromPath(path, depth, is4, idx)
 
 		// make the callback for this prefix
 		if !yield(cidr, val) {
-			// premature end of recursion
+			// early exit
 			return false
 		}
-
-		idx++
 	}
 
 	// for all children in this node do ...
-	var addr uint
-	for {
-		if addr, ok = n.childrenBitset.NextSet(addr); !ok {
-			break
-		}
-		octet := byte(addr)
-		path[depth] = octet
-		child := n.getChild(octet)
+	addrBackingArray := [maxNodeChildren]uint{}
+	for i, addr := range n.allChildAddrs(addrBackingArray[:]) {
+		child := n.children[i]
+		path[depth] = byte(addr)
 
 		if !child.allRec(path, depth+1, is4, yield) {
-			// premature end of recursion
+			// early exit
 			return false
 		}
-
-		addr++
 	}
 
 	return true
@@ -796,8 +670,8 @@ func (n *node[V]) allRecSorted(path [16]byte, depth int, is4 bool, yield func(ne
 			// add (set) this octet to path
 			path[depth] = octet
 
-			// premature end?
 			if !c.allRecSorted(path, depth+1, is4, yield) {
+				// early exit
 				return false
 			}
 
@@ -809,8 +683,8 @@ func (n *node[V]) allRecSorted(path [16]byte, depth int, is4 bool, yield func(ne
 		val, _ := n.getValue(idx)
 		cidr, _ := cidrFromPath(path, depth, is4, idx)
 
-		// premature end?
 		if !yield(cidr, val) {
+			// early exit
 			return false
 		}
 
@@ -830,8 +704,8 @@ func (n *node[V]) allRecSorted(path [16]byte, depth int, is4 bool, yield func(ne
 			// add (set) this octet to path
 			path[depth] = octet
 
-			// premature end?
 			if !c.allRecSorted(path, depth+1, is4, yield) {
+				// early exit
 				return false
 			}
 
@@ -851,8 +725,8 @@ func (n *node[V]) allRecSorted(path [16]byte, depth int, is4 bool, yield func(ne
 		// add (set) this octet to path
 		path[depth] = octet
 
-		// premature end?
 		if !c.allRecSorted(path, depth+1, is4, yield) {
+			// early exit
 			return false
 		}
 	}

@@ -286,6 +286,29 @@ func BenchmarkNodePrefixRank(b *testing.B) {
 	}
 }
 
+func BenchmarkNodePrefixNextSetMany(b *testing.B) {
+	routes := shuffleStridePfxs(allStridePfxs())
+
+	for _, nroutes := range prefixCount {
+		node := newNode[int]()
+
+		for i, route := range routes {
+			if i >= nroutes {
+				break
+			}
+			node.insertPrefix(prefixToBaseIndex(route.octet, route.bits), 0)
+		}
+
+		b.Run(fmt.Sprintf("IN %d", nroutes), func(b *testing.B) {
+			idxBackingArray := [maxNodePrefixes]uint{}
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				node.allStrideIndexes(idxBackingArray[:])
+			}
+		})
+	}
+}
+
 func BenchmarkNodeChildInsert(b *testing.B) {
 	for _, nchilds := range childCount {
 		node := newNode[int]()
@@ -342,6 +365,25 @@ func BenchmarkNodeChildRank(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				node.childRank(byte(baseIdx))
+			}
+		})
+	}
+}
+
+func BenchmarkNodeChildNextSetMany(b *testing.B) {
+	for _, nchilds := range childCount {
+		node := newNode[int]()
+
+		for i := 0; i < nchilds; i++ {
+			octet := byte(rand.Intn(maxNodeChildren))
+			node.insertChild(octet, nil)
+		}
+
+		b.Run(fmt.Sprintf("In %d", nchilds), func(b *testing.B) {
+			addrBackingArray := [maxNodeChildren]uint{}
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				node.allChildAddrs(addrBackingArray[:])
 			}
 		})
 	}

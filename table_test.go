@@ -104,30 +104,6 @@ func TestInvalidPrefix(t *testing.T) {
 		tbl.LookupPrefixLPM(zero)
 	})
 
-	testname = "Subnets"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid prefix input", testname)
-			}
-		}(testname)
-
-		tbl.Subnets(zero)
-	})
-
-	testname = "Supernets"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid prefix input", testname)
-			}
-		}(testname)
-
-		tbl.Supernets(zero)
-	})
-
 	testname = "OverlapsPrefix"
 	t.Run(testname, func(t *testing.T) {
 		t.Parallel()
@@ -1071,9 +1047,10 @@ func TestDeleteIsReverseOfInsert(t *testing.T) {
 func TestGet(t *testing.T) {
 	t.Parallel()
 
-	rt := new(Table[int])
 	t.Run("empty table", func(t *testing.T) {
 		t.Parallel()
+
+		rt := new(Table[int])
 		pfx := randomPrefix()
 		_, ok := rt.Get(pfx)
 
@@ -1109,15 +1086,13 @@ func TestGet(t *testing.T) {
 		},
 	}
 
-	rt = new(Table[int])
-
+	rt := new(Table[int])
 	for _, tt := range tests {
 		rt.Insert(tt.pfx, tt.val)
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			got, ok := rt.Get(tt.pfx)
 
 			if !ok {
@@ -1519,31 +1494,6 @@ func TestUnionCompare(t *testing.T) {
 	}
 }
 
-func TestSubnetsCompare(t *testing.T) {
-	t.Parallel()
-
-	pfxs := randomPrefixes(10_000)
-
-	fast := Table[int]{}
-	gold := goldTable[int](pfxs)
-
-	for _, pfx := range pfxs {
-		fast.Insert(pfx.pfx, pfx.val)
-	}
-
-	for i := 0; i < 10_000; i++ {
-		pfx := randomPrefix()
-
-		goldPfxs := gold.subnets(pfx)
-		fastPfxs := fast.Subnets(pfx)
-		slices.SortFunc(fastPfxs, cmpPrefix)
-
-		if !reflect.DeepEqual(goldPfxs, fastPfxs) {
-			t.Fatalf("\nSubnets(%q):\ngot:  %v\nwant: %v", pfx, fastPfxs, goldPfxs)
-		}
-	}
-}
-
 func TestEachSubnetCompare(t *testing.T) {
 	t.Parallel()
 
@@ -1586,32 +1536,7 @@ func TestEachSubnetCompare(t *testing.T) {
 	}
 }
 
-func TestSupernets(t *testing.T) {
-	t.Parallel()
-
-	pfxs := randomPrefixes(10_000)
-
-	fast := Table[int]{}
-	gold := goldTable[int](pfxs)
-
-	for _, pfx := range pfxs {
-		fast.Insert(pfx.pfx, pfx.val)
-	}
-
-	for i := 0; i < 10_000; i++ {
-		pfx := randomPrefix()
-
-		goldPfxs := gold.supernets(pfx)
-		fastPfxs := fast.Supernets(pfx)
-
-		if !reflect.DeepEqual(goldPfxs, fastPfxs) {
-			t.Fatalf("\nSupernets(%q):\ngot:  %v\nwant: %v", pfx, fastPfxs, goldPfxs)
-		}
-
-	}
-}
-
-func TestEachSupernet(t *testing.T) {
+func TestEachLookupPrefix(t *testing.T) {
 	t.Parallel()
 
 	pfxs := randomPrefixes(10_000)
@@ -1627,10 +1552,10 @@ func TestEachSupernet(t *testing.T) {
 	for i := 0; i < 10_000; i++ {
 		pfx := randomPrefix()
 
-		goldPfxs := gold.supernets(pfx)
+		goldPfxs := gold.lookupPrefixReverse(pfx)
 
 		fastPfxs = nil
-		fast.EachSupernet(pfx, func(p netip.Prefix, _ int) bool {
+		fast.EachLookupPrefix(pfx, func(p netip.Prefix, _ int) bool {
 			fastPfxs = append(fastPfxs, p)
 			return true
 		})
@@ -1639,206 +1564,6 @@ func TestEachSupernet(t *testing.T) {
 			t.Fatalf("\nEachSupernet(%q):\ngot:  %v\nwant: %v", pfx, fastPfxs, goldPfxs)
 		}
 
-	}
-}
-
-func TestSubnetsEdgeCases(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name string
-		pfxs []netip.Prefix // input prefixes
-		spfx netip.Prefix   // subnet search prefix
-		want []netip.Prefix
-	}{
-		{
-			name: "empty V4",
-			pfxs: nil,
-			spfx: mpp("0.0.0.0/0"),
-			want: nil,
-		},
-		{
-			name: "empty V6",
-			pfxs: nil,
-			spfx: mpp("::/0"),
-			want: nil,
-		},
-		{
-			name: "default V4",
-			pfxs: []netip.Prefix{mpp("0.0.0.0/0")},
-			spfx: mpp("0.0.0.0/0"),
-			want: []netip.Prefix{mpp("0.0.0.0/0")},
-		},
-		{
-			name: "default V6",
-			pfxs: []netip.Prefix{mpp("::/0")},
-			spfx: mpp("::/0"),
-			want: []netip.Prefix{mpp("::/0")},
-		},
-		{
-			name: "self V4",
-			pfxs: []netip.Prefix{mpp("192.168.128.0/19")},
-			spfx: mpp("192.168.128.0/19"),
-			want: []netip.Prefix{mpp("192.168.128.0/19")},
-		},
-		{
-			name: "self V6",
-			pfxs: []netip.Prefix{mpp("2001:db8::dead:beef/128")},
-			spfx: mpp("2001:db8::dead:beef/128"),
-			want: []netip.Prefix{mpp("2001:db8::dead:beef/128")},
-		},
-		{
-			name: "same leaf V4",
-			pfxs: []netip.Prefix{mpp("10.0.0.1/32")},
-			spfx: mpp("10.0.0.0/29"),
-			want: []netip.Prefix{mpp("10.0.0.1/32")},
-		},
-		{
-			name: "same leaf V6",
-			pfxs: []netip.Prefix{mpp("::1/128")},
-			spfx: mpp("::0/120"),
-			want: []netip.Prefix{mpp("::1/128")},
-		},
-		{
-			name: "intermediate V4",
-			pfxs: []netip.Prefix{mpp("10.0.0.1/32"), mpp("10.0.1.1/32")},
-			spfx: mpp("10.0.0.0/16"),
-			want: []netip.Prefix{mpp("10.0.0.1/32"), mpp("10.0.1.1/32")},
-		},
-		{
-			name: "intermediate V6",
-			pfxs: []netip.Prefix{mpp("2001:db8::1/128"), mpp("2001:db8:dead:beaf::/64")},
-			spfx: mpp("2001:db8::/32"),
-			want: []netip.Prefix{mpp("2001:db8::1/128"), mpp("2001:db8:dead:beaf::/64")},
-		},
-		{
-			name: "nope V4",
-			pfxs: []netip.Prefix{mpp("10.0.0.0/16"), mpp("10.4.0.0/14")},
-			spfx: mpp("10.1.0.0/16"),
-			want: nil,
-		},
-		{
-			name: "nope V6",
-			pfxs: []netip.Prefix{mpp("2001:db0::/32"), mpp("2001:db4::/30")},
-			spfx: mpp("2001:db1::/32"),
-			want: nil,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			rtbl := new(Table[any])
-
-			for _, pfx := range tt.pfxs {
-				rtbl.Insert(pfx, nil)
-			}
-
-			got := rtbl.Subnets(tt.spfx)
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Fatalf("%s: got:\n%v\nwant:\n%v", tt.name, got, tt.want)
-			}
-		})
-	}
-}
-
-func TestSupernetsEdgeCases(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name string
-		pfxs []netip.Prefix // input prefixes
-		spfx netip.Prefix   // supernet search prefix
-		want []netip.Prefix
-	}{
-		{
-			name: "empty V4",
-			pfxs: nil,
-			spfx: mpp("0.0.0.0/0"),
-			want: nil,
-		},
-		{
-			name: "empty V6",
-			pfxs: nil,
-			spfx: mpp("::/0"),
-			want: nil,
-		},
-		{
-			name: "default V4",
-			pfxs: []netip.Prefix{mpp("0.0.0.0/0")},
-			spfx: mpp("0.0.0.0/0"),
-			want: []netip.Prefix{mpp("0.0.0.0/0")},
-		},
-		{
-			name: "default V6",
-			pfxs: []netip.Prefix{mpp("::/0")},
-			spfx: mpp("::/0"),
-			want: []netip.Prefix{mpp("::/0")},
-		},
-		{
-			name: "self V4",
-			pfxs: []netip.Prefix{mpp("192.168.128.0/19")},
-			spfx: mpp("192.168.128.0/19"),
-			want: []netip.Prefix{mpp("192.168.128.0/19")},
-		},
-		{
-			name: "self V6",
-			pfxs: []netip.Prefix{mpp("2001:db8::dead:beef/128")},
-			spfx: mpp("2001:db8::dead:beef/128"),
-			want: []netip.Prefix{mpp("2001:db8::dead:beef/128")},
-		},
-		{
-			name: "same leaf V4",
-			pfxs: []netip.Prefix{mpp("10.0.0.0/29")},
-			spfx: mpp("10.0.0.1/32"),
-			want: []netip.Prefix{mpp("10.0.0.0/29")},
-		},
-		{
-			name: "same leaf V6",
-			pfxs: []netip.Prefix{mpp("::0/121")},
-			spfx: mpp("::1/128"),
-			want: []netip.Prefix{mpp("::0/121")},
-		},
-		{
-			name: "intermediate V4",
-			pfxs: []netip.Prefix{mpp("10.10.0.0/16"), mpp("10.0.0.0/13"), mpp("10.0.0.1/32"), mpp("10.0.1.1/32")},
-			spfx: mpp("10.0.0.0/16"),
-			want: []netip.Prefix{mpp("10.0.0.0/13")},
-		},
-		{
-			name: "intermediate V6",
-			pfxs: []netip.Prefix{mpp("2001:db8::0/32"), mpp("2001:db8:dead:beaf::/64")},
-			spfx: mpp("2001:db8::/64"),
-			want: []netip.Prefix{mpp("2001:db8::0/32")},
-		},
-		{
-			name: "nope V4",
-			pfxs: []netip.Prefix{mpp("10.0.0.0/16"), mpp("10.4.0.0/14")},
-			spfx: mpp("10.1.0.0/16"),
-			want: nil,
-		},
-		{
-			name: "nope V6",
-			pfxs: []netip.Prefix{mpp("2001:db0::/32"), mpp("2001:db4::/30")},
-			spfx: mpp("2001:db1::/32"),
-			want: nil,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			rtbl := new(Table[string])
-
-			for _, pfx := range tt.pfxs {
-				rtbl.Insert(pfx, tt.name)
-			}
-
-			got := rtbl.Supernets(tt.spfx)
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Fatalf("%s: got:\n%v\nwant:\n%v", tt.name, got, tt.want)
-			}
-		})
 	}
 }
 
@@ -1950,10 +1675,10 @@ func TestAll(t *testing.T) {
 	t.Parallel()
 
 	pfxs := randomPrefixes(10_000)
-	seen := make(map[netip.Prefix]int, 10_000)
 
 	t.Run("All", func(t *testing.T) {
 		rtbl := new(Table[int])
+		seen := make(map[netip.Prefix]int, 10_000)
 		for _, item := range pfxs {
 			rtbl.Insert(item.pfx, item.val)
 			seen[item.pfx] = item.val
@@ -1974,9 +1699,41 @@ func TestAll(t *testing.T) {
 		}
 	})
 
+	t.Run("All_4&6", func(t *testing.T) {
+		rtbl := new(Table[int])
+		seen := make(map[netip.Prefix]int, 10_000)
+		for _, item := range pfxs {
+			rtbl.Insert(item.pfx, item.val)
+			seen[item.pfx] = item.val
+		}
+
+		// check if pfx/val is as expected
+		rtbl.All4(func(pfx netip.Prefix, val int) bool {
+			if seen[pfx] != val {
+				t.Errorf("%v got value: %v, expected: %v", pfx, val, seen[pfx])
+			}
+			delete(seen, pfx)
+			return true
+		})
+
+		rtbl.All6(func(pfx netip.Prefix, val int) bool {
+			if seen[pfx] != val {
+				t.Errorf("%v got value: %v, expected: %v", pfx, val, seen[pfx])
+			}
+			delete(seen, pfx)
+			return true
+		})
+
+		// check if all entries visited
+		if len(seen) != 0 {
+			t.Fatalf("traverse error, not all entries visited")
+		}
+	})
+
 	// make an iteration and update the values in the callback
 	t.Run("All and Update", func(t *testing.T) {
 		rtbl := new(Table[int])
+		seen := make(map[netip.Prefix]int, 10_000)
 		for _, item := range pfxs {
 			rtbl.Insert(item.pfx, item.val)
 			seen[item.pfx] = item.val + 1
