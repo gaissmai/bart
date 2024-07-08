@@ -46,8 +46,7 @@ var (
 	okSink   bool
 	boolSink bool
 
-	pfxSliceSink []netip.Prefix
-	cloneSink    *Table[int]
+	cloneSink *Table[int]
 )
 
 func BenchmarkFullTableInsert(b *testing.B) {
@@ -339,7 +338,7 @@ func BenchmarkFullTableClone(b *testing.B) {
 
 func BenchmarkFullTableSubnets(b *testing.B) {
 	var rt Table[int]
-	sink := make([]netip.Prefix, 0, 10_000)
+	sink := make([]netip.Prefix, 0, 1_000_000)
 
 	for i, route := range routes {
 		rt.Insert(route.CIDR, i)
@@ -348,14 +347,16 @@ func BenchmarkFullTableSubnets(b *testing.B) {
 	b.Run("sliceV4", func(b *testing.B) {
 		b.ResetTimer()
 		for k := 0; k < b.N; k++ {
-			pfxSliceSink = rt.Subnets(randRoute4.CIDR)
+			sink = sink[:0]
+			sink = append(sink, rt.Subnets(randRoute4.CIDR)...)
 		}
 	})
 
 	b.Run("sliceV6", func(b *testing.B) {
 		b.ResetTimer()
 		for k := 0; k < b.N; k++ {
-			pfxSliceSink = rt.Subnets(randRoute6.CIDR)
+			sink = sink[:0]
+			sink = append(sink, rt.Subnets(randRoute6.CIDR)...)
 		}
 	})
 
@@ -427,7 +428,6 @@ func BenchmarkFullTableSupernet(b *testing.B) {
 			})
 		}
 	})
-
 }
 
 func BenchmarkFullTableMemoryV4(b *testing.B) {

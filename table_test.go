@@ -1561,7 +1561,7 @@ func TestEachSubnetCompare(t *testing.T) {
 		goldPfxs := gold.subnets(pfx)
 
 		var fastPfxs []netip.Prefix
-		var values = map[netip.Prefix]int{}
+		values := map[netip.Prefix]int{}
 
 		fast.EachSubnet(pfx, func(p netip.Prefix, val int) bool {
 			fastPfxs = append(fastPfxs, p)
@@ -2120,7 +2120,6 @@ func TestSize(t *testing.T) {
 	if golden6 != size6Rec {
 		t.Errorf("size6Rec: want: %d, got: %d", golden6, size6Rec)
 	}
-
 }
 
 // ############ benchmarks ################################
@@ -2340,7 +2339,6 @@ func BenchmarkMemory(b *testing.B) {
 
 func BenchmarkAll(b *testing.B) {
 	n := 100_000
-	buf := make([]netip.Prefix, 0, n)
 
 	rtbl := new(Table[int])
 	for _, item := range randomPrefixes(n) {
@@ -2350,9 +2348,16 @@ func BenchmarkAll(b *testing.B) {
 	b.Run("All", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			buf = buf[:0]
+			rtbl.All(func(pfx netip.Prefix, _ int) bool {
+				return true
+			})
+		}
+	})
+
+	b.Run("AllSorted", func(b *testing.B) {
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
 			rtbl.AllSorted(func(pfx netip.Prefix, _ int) bool {
-				buf = append(buf, pfx)
 				return true
 			})
 		}

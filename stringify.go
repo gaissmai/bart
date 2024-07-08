@@ -14,12 +14,13 @@ import (
 
 // kid, a node has no path information about its predecessors,
 // we collect this during the recursive descent.
-// The path is needed to get the CIDR back.
+// The path/depth/idx is needed to get the CIDR back.
 type kid[V any] struct {
 	// for traversing
-	n    *node[V]
-	path []byte
-	idx  uint
+	n     *node[V]
+	path  [16]byte
+	depth int
+	idx   uint
 
 	// for printing
 	cidr netip.Prefix
@@ -94,16 +95,16 @@ func (t *Table[V]) fprint(w io.Writer, is4 bool) error {
 	if _, err := fmt.Fprint(w, "▼\n"); err != nil {
 		return err
 	}
-	if err := n.fprintRec(w, 0, nil, is4, ""); err != nil {
+	if err := n.fprintRec(w, 0, zeroPath, 0, is4, ""); err != nil {
 		return err
 	}
 	return nil
 }
 
 // fprintRec, the output is a hierarchical CIDR tree starting with parentIdx and byte path.
-func (n *node[V]) fprintRec(w io.Writer, parentIdx uint, path []byte, is4 bool, pad string) error {
+func (n *node[V]) fprintRec(w io.Writer, parentIdx uint, path [16]byte, depth int, is4 bool, pad string) error {
 	// get direct childs for this parentIdx ...
-	directKids := n.getKidsRec(parentIdx, path, is4)
+	directKids := n.getKidsRec(parentIdx, path, depth, is4)
 
 	// sort them by netip.Prefix, not by baseIndex
 	slices.SortFunc(directKids, cmpKidByPrefix[V])
@@ -128,7 +129,7 @@ func (n *node[V]) fprintRec(w io.Writer, parentIdx uint, path []byte, is4 bool, 
 		// rec-descent with this prefix as parentIdx.
 		// hierarchical nested tree view, two rec-descent functions
 		// work together to spoil the reader.
-		if err := kid.n.fprintRec(w, kid.idx, kid.path, is4, pad+spacer); err != nil {
+		if err := kid.n.fprintRec(w, kid.idx, kid.path, kid.depth, is4, pad+spacer); err != nil {
 			return err
 		}
 	}
@@ -142,7 +143,7 @@ func (n *node[V]) fprintRec(w io.Writer, parentIdx uint, path []byte, is4 bool, 
 //
 // See the  artlookup.pdf paper in the doc folder,
 // the baseIndex function is the key.
-func (n *node[V]) getKidsRec(parentIdx uint, path []byte, is4 bool) []kid[V] {
+func (n *node[V]) getKidsRec(parentIdx uint, path [16]byte, depth int, is4 bool) []kid[V] {
 	directKids := []kid[V]{}
 
 	// make backing arrays, no heap allocs
@@ -158,59 +159,52 @@ func (n *node[V]) getKidsRec(parentIdx uint, path []byte, is4 bool) []kid[V] {
 		if lpmIdx == parentIdx {
 			// idx is directKid
 			val, _ := n.getValue(idx)
-			path := slices.Clone(path)
-			cidr := cidrFromPath(path, idx, is4)
-			directKids = append(directKids, kid[V]{n, path, idx, cidr, val})
+			cidr, _ := cidrFromPath(path, depth, is4, idx)
+
+			directKids = append(directKids, kid[V]{n, path, depth, idx, cidr, val})
 		}
 	}
 
-	// make backing arrays, no heap allocs
-	addrBackingArray := [maxNodeChildren]uint{}
-
 	// the node may have childs, the rec-descent monster starts
+	addrBackingArray := [maxNodeChildren]uint{}
 	for i, addr := range n.allChildAddrs(addrBackingArray[:]) {
 		octet := byte(addr)
 		// do a longest-prefix-match
 		lpmIdx, _, _ := n.lpm(octetToBaseIndex(octet))
 		if lpmIdx == parentIdx {
-			// child is directKid, the path is needed to get back the prefixes
-			path := append(slices.Clone(path), octet)
-
-			// get next child node
 			c := n.children[i]
+			path[depth] = octet
 
 			// traverse, rec-descent call with next child node
-			directKids = append(directKids, c.getKidsRec(0, path, is4)...)
+			directKids = append(directKids, c.getKidsRec(0, path, depth+1, is4)...)
 		}
 	}
 
 	return directKids
 }
 
-// cidrFromPath, make prefix from byte path, next octet and pfxLen.
-func cidrFromPath(path []byte, idx uint, is4 bool) (pfx netip.Prefix) {
+// cidrFromPath, get prefix back from byte path, depth, octet and pfxLen.
+func cidrFromPath(path [16]byte, depth int, is4 bool, idx uint) (netip.Prefix, error) {
 	octet, pfxLen := baseIndexToPrefix(idx)
 
-	// append last (partially) masked byte to path and
-	// calc bits with pathLen and pfxLen
-	octets := append(slices.Clone(path), octet)
-	bits := len(path)*strideLen + pfxLen
+	// set (partially) masked byte in path at depth
+	path[depth] = octet
 
 	// make ip addr from octets
 	var ip netip.Addr
 	if is4 {
 		b4 := [4]byte{}
-		copy(b4[:], octets)
+		copy(b4[:], path[:4])
 		ip = netip.AddrFrom4(b4)
 	} else {
-		b16 := [16]byte{}
-		copy(b16[:], octets)
-		ip = netip.AddrFrom16(b16)
+		ip = netip.AddrFrom16(path)
 	}
 
+	// calc bits with pathLen and pfxLen
+	bits := depth*strideLen + pfxLen
+
 	// make a normalized prefix from ip/bits
-	pfx, _ = ip.Prefix(bits)
-	return
+	return ip.Prefix(bits)
 }
 
 // cmpKidByPrefix, all prefixes are already normalized (Masked).
