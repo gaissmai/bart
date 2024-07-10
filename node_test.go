@@ -309,6 +309,37 @@ func BenchmarkNodePrefixNextSetMany(b *testing.B) {
 	}
 }
 
+func BenchmarkNodePrefixIntersectionCardinality(b *testing.B) {
+	routes1 := shuffleStridePfxs(allStridePfxs())
+	routes2 := shuffleStridePfxs(allStridePfxs())
+
+	for _, nroutes := range prefixCount {
+		node := newNode[int]()
+		other := newNode[int]()
+
+		for i, route := range routes1 {
+			if i >= nroutes {
+				break
+			}
+			node.insertPrefix(prefixToBaseIndex(route.octet, route.bits), 0)
+		}
+
+		for i, route := range routes2 {
+			if i >= nroutes {
+				break
+			}
+			other.insertPrefix(prefixToBaseIndex(route.octet, route.bits), 0)
+		}
+
+		b.Run(fmt.Sprintf("With %d", nroutes), func(b *testing.B) {
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				node.prefixesBitset.IntersectionCardinality(other.prefixesBitset)
+			}
+		})
+	}
+}
+
 func BenchmarkNodeChildInsert(b *testing.B) {
 	for _, nchilds := range childCount {
 		node := newNode[int]()
@@ -384,6 +415,28 @@ func BenchmarkNodeChildNextSetMany(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				node.allChildAddrs(addrBackingArray[:])
+			}
+		})
+	}
+}
+
+func BenchmarkNodeChildIntersectionCardinality(b *testing.B) {
+	for _, nchilds := range childCount {
+		node := newNode[int]()
+		other := newNode[int]()
+
+		for i := 0; i < nchilds; i++ {
+			octet := byte(rand.Intn(maxNodeChildren))
+			node.insertChild(octet, nil)
+
+			octet = byte(rand.Intn(maxNodeChildren))
+			other.insertChild(octet, nil)
+		}
+
+		b.Run(fmt.Sprintf("With %d", nchilds), func(b *testing.B) {
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				node.childrenBitset.IntersectionCardinality(other.childrenBitset)
 			}
 		})
 	}
