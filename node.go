@@ -157,10 +157,21 @@ func (n *node[V]) lpm(idx uint) (baseIdx uint, val V, ok bool) {
 	return 0, val, false
 }
 
-// lpmTest for internal use in overlap tests, just return true or false, no value needed.
+// lpmTest for faster lpm tests without value returns
 func (n *node[V]) lpmTest(baseIdx uint) bool {
 	for idx := baseIdx; idx > 0; idx >>= 1 {
 		if n.prefixesBitset.Test(idx) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// lpmTestFunc for lpm tests, not for nodes, just for bitsets
+func lpmTestFunc(b *bitset.BitSet, baseIdx uint) bool {
+	for idx := baseIdx; idx > 0; idx >>= 1 {
+		if b.Test(idx) {
 			return true
 		}
 	}
@@ -279,13 +290,14 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 	var nIdx, oIdx uint
 
 	// special case, a node has one prefix and no child
-	// overlapsPrefix is much faster than overlapsRec
+	// overlapsPrefix is faster than overlapsRec
 	if oPfxLen == 1 && oChildLen == 0 {
 		// get the single oIdx
 		oIdx, _ = o.prefixesBitset.NextSet(0)
 		return n.overlapsPrefix(baseIndexToPrefix(oIdx))
 	}
 
+	// special case, reversed
 	if nPfxLen == 1 && nChildLen == 0 {
 		// get the single nIdx
 		nIdx, _ = n.prefixesBitset.NextSet(0)
@@ -293,15 +305,15 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 	}
 
 	if nPfxLen > 0 && oPfxLen > 0 {
-		// some prefixes are identical
 		if n.prefixesBitset.IntersectionCardinality(o.prefixesBitset) > 0 {
+			// some prefixes are identical, trivial overlap
 			return true
 		}
 
 		nOK := nPfxLen > 0
 		oOK := oPfxLen > 0
 
-		// zip, range over n and o at the same time to help chance on its way
+		// zip, range over n and o together to help chance on its way
 		for nOK || oOK {
 
 			if nOK {
@@ -335,7 +347,7 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 	nOK := nChildLen > 0 && oPfxLen > 0 // test the childs in n against the routes in o
 	oOK := oChildLen > 0 && nPfxLen > 0 // test the childs in o against the routes in n
 
-	// zip, range over n and o at the same time to help chance on its way
+	// zip, range over n and o together to help chance on its way
 	for nOK || oOK {
 
 		if nOK {
@@ -374,18 +386,20 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 	}
 
 	// gimmicks, clone a bitset without allocations
-	backingArray := [9]uint64{}
-	copy(backingArray[:], n.childrenBitset.Bytes())
-	childsInCommon := bitset.From(backingArray[:])
+	// 4*64=256, maxNodeChildren
+	buf := [4]uint64{}
+	copy(buf[:], n.childrenBitset.Bytes())
+	nChildrenBitsetCloned := bitset.From(buf[:])
 
-	// intersect child bitsets from n and o in place in cloned bitset
-	childsInCommon.InPlaceIntersection(o.childrenBitset)
+	// intersect in place the child bitsets from n and o
+	nChildrenBitsetCloned.InPlaceIntersection(o.childrenBitset)
 
 	// gimmicks, don't allocate
-	addrBackingArray := [maxNodeChildren]uint{}
-	_, allChildsInCommon := childsInCommon.NextSetMany(0, addrBackingArray[:])
+	addrBuf := [maxNodeChildren]uint{}
+	_, allCommonChilds := nChildrenBitsetCloned.NextSetMany(0, addrBuf[:])
 
-	for _, addr := range allChildsInCommon {
+	// range over all child addrs, common in n and o
+	for _, addr := range allCommonChilds {
 		oChild := o.getChild(byte(addr))
 		nChild := n.getChild(byte(addr))
 
@@ -408,87 +422,56 @@ func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 	if n.lpmTest(pfxIdx) {
 		return true
 	}
+	pfxLowerHostRoute, pfxUpperHostRoute := hostRoutesByIndex(pfxIdx)
 
 	// #################################################
 	// 2. test if prefix overlaps any route in this node
 	// #################################################
 
-	// lower/upper boundary for host routes
-	pfxLower, pfxUpper := hostRoutesByIndex(pfxIdx)
+	idxBackingArray := [maxNodePrefixes]uint{}
 
-	// increment to 'next' idx for start in bitset search
-	// since pfxIdx already testet by lpm in other direction
-	idx := pfxIdx * 2
-	var ok bool
-	for {
-		if idx, ok = n.prefixesBitset.NextSet(idx); !ok {
-			break
-		}
-
-		idxHostLower, idxHostUpper := hostRoutesByIndex(idx)
-		if idxHostLower >= pfxLower && idxHostUpper <= pfxUpper {
+	// test if any idx is covered by prefix
+	for _, idx := range n.allStrideIndexes(idxBackingArray[:]) {
+		lower, upper := hostRoutesByIndex(idx)
+		if lower >= pfxLowerHostRoute && upper <= pfxUpperHostRoute {
 			return true
 		}
-
-		// next idxHostLower are also always > pfxUpper
-		if idxHostLower > idxHostUpper {
-			break
-		}
-
-		// next route
-		idx++
 	}
 
 	// #################################################
 	// 3. test if prefix overlaps any child in this node
 	// #################################################
 
-	// set start octet in bitset search with prefix octet
-	addr := uint(octet)
-	for {
-		if addr, ok = n.childrenBitset.NextSet(addr); !ok {
+	addrBackingArray := [maxNodeChildren]uint{}
+	for _, addr := range n.allChildAddrs(addrBackingArray[:]) {
+		idx := octetToBaseIndex(byte(addr))
+		if idx > pfxUpperHostRoute {
 			break
 		}
-
-		idx := addr + firstHostIndex
-		if idx >= pfxLower && idx <= pfxUpper {
-			return true
+		if idx < pfxLowerHostRoute {
+			continue
 		}
-
-		// next addrs are also always > pfxUpper
-		if idx > pfxUpper {
-			break
-		}
-
-		// next round
-		addr++
+		return true
 	}
 
 	return false
 }
 
 // eachSubnet calls yield() for any covered CIDR by parent prefix.
-func (n *node[V]) eachSubnet(path [16]byte, depth int, is4 bool, parentOctet byte, pfxLen int, yield func(pfx netip.Prefix, val V) bool) bool {
-	// collect all routes covered by this pfx
-	// see also algorithm in overlapsPrefix
+func (n *node[V]) eachSubnet(path [16]byte, depth int, is4 bool, octet byte, pfxLen int, yield func(pfx netip.Prefix, val V) bool) bool {
+	pfxIdx := prefixToBaseIndex(octet, pfxLen)
 
-	// can't use lpm, search prefix has no node
-	parentIdx := prefixToBaseIndex(parentOctet, pfxLen)
-	parentLower, parentUpper := hostRoutesByIndex(parentIdx)
+	// gimmicks, make a bitset without allocations, 8*64=512 = maxNodePrefixes
+	buf := [8]uint64{}
+	oPrefixBitset := bitset.From(buf[:])
+	oPrefixBitset.Set(pfxIdx)
 
-	// start bitset search at parentIdx
-	idx := parentIdx
-	var ok bool
-	for {
-		if idx, ok = n.prefixesBitset.NextSet(idx); !ok {
-			break
-		}
+	// backing array, no heap allocs
+	idxBackingArray := [maxNodePrefixes]uint{}
 
-		// can't use lpm, search prefix has no node
-		lower, upper := hostRoutesByIndex(idx)
-
-		// idx is covered by parentIdx?
-		if lower >= parentLower && upper <= parentUpper {
+	// yield all prefixes covered by prefix
+	for _, idx := range n.allStrideIndexes(idxBackingArray[:]) {
+		if lpmTestFunc(oPrefixBitset, idx) {
 			val, _ := n.getValue(idx)
 			cidr, _ := cidrFromPath(path, depth, is4, idx)
 
@@ -496,26 +479,19 @@ func (n *node[V]) eachSubnet(path [16]byte, depth int, is4 bool, parentOctet byt
 				// early exit
 				return false
 			}
-
 		}
-
-		idx++
 	}
 
-	// collect all children covered
-	var addr uint
-	for {
-		if addr, ok = n.childrenBitset.NextSet(addr); !ok {
-			break
-		}
+	// backing array, no heap allocs
+	addrBackingArray := [maxNodeChildren]uint{}
+
+	// descend down to all childs covered by prefix
+	for i, addr := range n.allChildAddrs(addrBackingArray[:]) {
 		octet := byte(addr)
 
-		// make host route for comparison with lower, upper
-		idx := octetToBaseIndex(octet)
-
-		// is child covered?
-		if idx >= parentLower && idx <= parentUpper {
-			c := n.getChild(octet)
+		// is child covered by prefix?
+		if lpmTestFunc(oPrefixBitset, octetToBaseIndex(octet)) {
+			c := n.children[i]
 
 			// add (set) this octet to path
 			path[depth] = octet
@@ -526,8 +502,6 @@ func (n *node[V]) eachSubnet(path [16]byte, depth int, is4 bool, parentOctet byt
 				return false
 			}
 		}
-
-		addr++
 	}
 
 	return true
@@ -602,8 +576,8 @@ func (n *node[V]) cloneRec() *node[V] {
 //
 // The iteration order is not defined, just the simplest and fastest recursive implementation.
 func (n *node[V]) allRec(path [16]byte, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
-	// for all prefixes in this node do ...
 	idxBackingArray := [maxNodePrefixes]uint{}
+	// for all prefixes in this node do ...
 	for _, idx := range n.allStrideIndexes(idxBackingArray[:]) {
 		val, _ := n.getValue(idx)
 		cidr, _ := cidrFromPath(path, depth, is4, idx)
@@ -615,8 +589,8 @@ func (n *node[V]) allRec(path [16]byte, depth int, is4 bool, yield func(netip.Pr
 		}
 	}
 
-	// for all children in this node do ...
 	addrBackingArray := [maxNodeChildren]uint{}
+	// for all children in this node do ...
 	for i, addr := range n.allChildAddrs(addrBackingArray[:]) {
 		child := n.children[i]
 		path[depth] = byte(addr)

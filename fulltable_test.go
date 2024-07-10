@@ -344,7 +344,7 @@ func BenchmarkFullTableEachLookupPrefix(b *testing.B) {
 		rt.Insert(route.CIDR, i)
 	}
 
-	b.Run("iterV4", func(b *testing.B) {
+	b.Run("V4", func(b *testing.B) {
 		b.ResetTimer()
 		for k := 0; k < b.N; k++ {
 			sink = sink[:0]
@@ -355,7 +355,7 @@ func BenchmarkFullTableEachLookupPrefix(b *testing.B) {
 		}
 	})
 
-	b.Run("iterV6", func(b *testing.B) {
+	b.Run("V6", func(b *testing.B) {
 		b.ResetTimer()
 		for k := 0; k < b.N; k++ {
 			sink = sink[:0]
