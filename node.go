@@ -273,14 +273,30 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 	nPfxLen := len(n.prefixes)
 	oPfxLen := len(o.prefixes)
 
-	if oPfxLen > 0 && nPfxLen > 0 {
+	nChildLen := len(n.children)
+	oChildLen := len(o.children)
 
+	var nIdx, oIdx uint
+
+	// special case, a node has one prefix and no child
+	// overlapsPrefix is much faster than overlapsRec
+	if oPfxLen == 1 && oChildLen == 0 {
+		// get the single oIdx
+		oIdx, _ = o.prefixesBitset.NextSet(0)
+		return n.overlapsPrefix(baseIndexToPrefix(oIdx))
+	}
+
+	if nPfxLen == 1 && nChildLen == 0 {
+		// get the single nIdx
+		nIdx, _ = n.prefixesBitset.NextSet(0)
+		return o.overlapsPrefix(baseIndexToPrefix(nIdx))
+	}
+
+	if nPfxLen > 0 && oPfxLen > 0 {
 		// some prefixes are identical
 		if n.prefixesBitset.IntersectionCardinality(o.prefixesBitset) > 0 {
 			return true
 		}
-
-		var nIdx, oIdx uint
 
 		nOK := nPfxLen > 0
 		oOK := oPfxLen > 0
@@ -294,8 +310,8 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 					if o.lpmTest(nIdx) {
 						return true
 					}
+					nIdx++
 				}
-				nIdx++
 			}
 
 			if oOK {
@@ -304,8 +320,8 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 					if n.lpmTest(oIdx) {
 						return true
 					}
+					oIdx++
 				}
-				oIdx++
 			}
 		}
 	}
@@ -313,9 +329,6 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 	// ####################################
 	// 2. test if routes overlaps any child
 	// ####################################
-
-	nChildLen := len(n.children)
-	oChildLen := len(o.children)
 
 	var nAddr, oAddr uint
 
@@ -331,8 +344,8 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 				if o.lpmTest(octetToBaseIndex(byte(nAddr))) {
 					return true
 				}
+				nAddr++
 			}
-			nAddr++
 		}
 
 		if oOK {
@@ -341,8 +354,8 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 				if n.lpmTest(octetToBaseIndex(byte(oAddr))) {
 					return true
 				}
+				oAddr++
 			}
-			oAddr++
 		}
 	}
 
@@ -360,21 +373,21 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 		return false
 	}
 
-	// swap the nodes, range over shorter bitset
-	if nChildLen > oChildLen {
-		n, o = o, n
-	}
+	// gimmicks, clone a bitset without allocations
+	backingArray := [9]uint64{}
+	copy(backingArray[:], n.childrenBitset.Bytes())
+	childsInCommon := bitset.From(backingArray[:])
 
+	// intersect child bitsets from n and o in place in cloned bitset
+	childsInCommon.InPlaceIntersection(o.childrenBitset)
+
+	// gimmicks, don't allocate
 	addrBackingArray := [maxNodeChildren]uint{}
-	for i, addr := range n.allChildAddrs(addrBackingArray[:]) {
-		oChild := o.getChild(byte(addr))
-		if oChild == nil {
-			// no child in o with this octet
-			continue
-		}
+	_, allChildsInCommon := childsInCommon.NextSetMany(0, addrBackingArray[:])
 
-		// we have the slice index for n
-		nChild := n.children[i]
+	for _, addr := range allChildsInCommon {
+		oChild := o.getChild(byte(addr))
+		nChild := n.getChild(byte(addr))
 
 		// rec-descent
 		if nChild.overlapsRec(oChild) {
@@ -403,22 +416,27 @@ func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 	// lower/upper boundary for host routes
 	pfxLower, pfxUpper := hostRoutesByIndex(pfxIdx)
 
-	// increment to 'next' routeIdx for start in bitset search
+	// increment to 'next' idx for start in bitset search
 	// since pfxIdx already testet by lpm in other direction
-	routeIdx := pfxIdx * 2
+	idx := pfxIdx * 2
 	var ok bool
 	for {
-		if routeIdx, ok = n.prefixesBitset.NextSet(routeIdx); !ok {
+		if idx, ok = n.prefixesBitset.NextSet(idx); !ok {
 			break
 		}
 
-		routeLower, routeUpper := hostRoutesByIndex(routeIdx)
-		if routeLower >= pfxLower && routeUpper <= pfxUpper {
+		idxHostLower, idxHostUpper := hostRoutesByIndex(idx)
+		if idxHostLower >= pfxLower && idxHostUpper <= pfxUpper {
 			return true
 		}
 
+		// next idxHostLower are also always > pfxUpper
+		if idxHostLower > idxHostUpper {
+			break
+		}
+
 		// next route
-		routeIdx++
+		idx++
 	}
 
 	// #################################################
@@ -435,6 +453,11 @@ func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 		idx := addr + firstHostIndex
 		if idx >= pfxLower && idx <= pfxUpper {
 			return true
+		}
+
+		// next addrs are also always > pfxUpper
+		if idx > pfxUpper {
+			break
 		}
 
 		// next round
