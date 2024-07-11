@@ -41,16 +41,24 @@ func prefixToBaseIndex(octet byte, prefixLen int) uint {
 	return uint(octet>>(strideLen-prefixLen)) + (1 << prefixLen)
 }
 
+// baseIndexToPrefixLen, calc the bits from baseIndex and octect depth
+func baseIndexToPrefixLen(baseIdx uint, depth int) int {
+	_, pfxLen := baseIndexToPrefix(baseIdx)
+	return depth*strideLen + pfxLen
+}
+
 // octetToBaseIndex, just prefixToBaseIndex(octet, 8), a.k.a host routes
 // but faster, use it for host routes in Lookup.
 func octetToBaseIndex(octet byte) uint {
 	return uint(octet) + firstHostIndex // just: octet + 256
 }
 
-// baseIndexToPrefixLen, calc the bits from baseIndex and octect depth
-func baseIndexToPrefixLen(baseIdx uint, depth int) int {
-	_, pfxLen := baseIndexToPrefix(baseIdx)
-	return depth*strideLen + pfxLen
+// hostRouteByAddr, get the host routes for child addrs.
+//
+//	addr:   72
+//	route:  72 + 256 = 328
+func hostRouteByAddr(addr uint) uint {
+	return octetToBaseIndex(byte(addr))
 }
 
 // hostRoutesByIndex, get range of host routes for this idx.

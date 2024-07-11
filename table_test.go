@@ -1519,8 +1519,6 @@ func TestEachSubnetCompare(t *testing.T) {
 			return true
 		})
 
-		slices.SortFunc(fastPfxs, cmpPrefix)
-
 		if !reflect.DeepEqual(goldPfxs, fastPfxs) {
 			t.Fatalf("\nEachSubnets(%q):\ngot:  %v\nwant: %v", pfx, fastPfxs, goldPfxs)
 		}
