@@ -407,47 +407,36 @@ func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 	// 1. test if any route in this node overlaps prefix?
 	// ##################################################
 
-	pfxIdx := prefixToBaseIndex(octet, pfxLen)
-	if n.lpmTest(pfxIdx) {
+	idx := prefixToBaseIndex(octet, pfxLen)
+	if n.lpmTest(idx) {
 		return true
 	}
-	pfxLowerHostRoute, pfxUpperHostRoute := hostRoutesByIndex(pfxIdx)
 
 	// #################################################
 	// 2. test if prefix overlaps any route in this node
 	// #################################################
 
-	idxBackingArray := [maxNodePrefixes]uint{}
+	// the allotLookupTbl[pfxIdx][:] contains the prefix routes
+	idxBuf := [8]uint64{}
+	copy(idxBuf[:], allotLookupTbl[idx][:])
+	idxRoutes := bitset.From(idxBuf[:])
 
-	// test if any idx is covered by prefix
-	for _, idx := range n.allStrideIndexes(idxBackingArray[:]) {
-		lower, upper := hostRoutesByIndex(idx)
-		if lower >= pfxLowerHostRoute && upper <= pfxUpperHostRoute {
-			return true
-		}
-		// can't break if lower > pfxUpperHostRoute
-		// indices are NOT sorted in indexRank order
+	// use bitsets intersection instead of range loops
+	if idxRoutes.IntersectionCardinality(n.prefixesBitset) != 0 {
+		return true
 	}
 
 	// #################################################
 	// 3. test if prefix overlaps any child in this node
 	// #################################################
 
-	addrBackingArray := [maxNodeChildren]uint{}
-	for _, addr := range n.allChildAddrs(addrBackingArray[:]) {
-		addrHostRoute := hostRouteByAddr(addr)
+	// trick, the allotLookupTbl[pfxIdx][4:] contains the host routes
+	hostBuf := [4]uint64{}
+	copy(hostBuf[:], allotLookupTbl[idx][4:])
+	hostRoutes := bitset.From(hostBuf[:])
 
-		// host addrs are sorted in indexRank order
-		if addrHostRoute > pfxUpperHostRoute {
-			break
-		}
-		if addrHostRoute < pfxLowerHostRoute {
-			continue
-		}
-		return true
-	}
-
-	return false
+	// use bitsets intersection instead of range loops
+	return hostRoutes.IntersectionCardinality(n.childrenBitset) != 0
 }
 
 // eachSubnet calls yield() for any covered CIDR by parent prefix in natural CIDR sort order..
