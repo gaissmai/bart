@@ -559,10 +559,9 @@ func (t *Table[V]) EachLookupPrefix(pfx netip.Prefix, yield func(pfx netip.Prefi
 	}
 }
 
-// EachSubnet calls yield() for each CIDR covered by pfx.
-// If the yield function returns false, the iteration ends prematurely.
+// EachSubnet iterates over all CIDRs covered by pfx in natural CIDR sort order.
 //
-// The sort order is undefined and you must not rely on it!
+// If the yield function returns false, the iteration ends prematurely.
 func (t *Table[V]) EachSubnet(pfx netip.Prefix, yield func(pfx netip.Prefix, val V) bool) {
 	if !pfx.IsValid() {
 		return

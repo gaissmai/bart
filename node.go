@@ -168,17 +168,6 @@ func (n *node[V]) lpmTest(baseIdx uint) bool {
 	return false
 }
 
-// lpmTestFunc for lpm tests, not for nodes, just for bitsets
-func lpmTestFunc(b *bitset.BitSet, baseIdx uint) bool {
-	for idx := baseIdx; idx > 0; idx >>= 1 {
-		if b.Test(idx) {
-			return true
-		}
-	}
-
-	return false
-}
-
 // getValue for baseIdx.
 func (n *node[V]) getValue(baseIdx uint) (val V, ok bool) {
 	if n.prefixesBitset.Test(baseIdx) {
@@ -436,6 +425,8 @@ func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 		if lower >= pfxLowerHostRoute && upper <= pfxUpperHostRoute {
 			return true
 		}
+		// can't break if lower > pfxUpperHostRoute
+		// indices are NOT sorted in indexRank order
 	}
 
 	// #################################################
@@ -444,11 +435,13 @@ func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 
 	addrBackingArray := [maxNodeChildren]uint{}
 	for _, addr := range n.allChildAddrs(addrBackingArray[:]) {
-		idx := octetToBaseIndex(byte(addr))
-		if idx > pfxUpperHostRoute {
+		addrHostRoute := hostRouteByAddr(addr)
+
+		// host addrs are sorted in indexRank order
+		if addrHostRoute > pfxUpperHostRoute {
 			break
 		}
-		if idx < pfxLowerHostRoute {
+		if addrHostRoute < pfxLowerHostRoute {
 			continue
 		}
 		return true
@@ -457,50 +450,111 @@ func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 	return false
 }
 
-// eachSubnet calls yield() for any covered CIDR by parent prefix.
+// eachSubnet calls yield() for any covered CIDR by parent prefix in natural CIDR sort order..
 func (n *node[V]) eachSubnet(path [16]byte, depth int, is4 bool, octet byte, pfxLen int, yield func(pfx netip.Prefix, val V) bool) bool {
 	pfxIdx := prefixToBaseIndex(octet, pfxLen)
+	pfxLowerHostRoute, pfxUpperHostRoute := hostRoutesByIndex(pfxIdx)
 
-	// gimmicks, make a bitset without allocations, 8*64=512 = maxNodePrefixes
-	buf := [8]uint64{}
-	oPrefixBitset := bitset.From(buf[:])
-	oPrefixBitset.Set(pfxIdx)
-
-	// backing array, no heap allocs
 	idxBackingArray := [maxNodePrefixes]uint{}
+	allCoveredIndices := idxBackingArray[:0]
 
-	// yield all prefixes covered by prefix
-	for _, idx := range n.allStrideIndexes(idxBackingArray[:]) {
-		if lpmTestFunc(oPrefixBitset, idx) {
-			val, _ := n.getValue(idx)
-			cidr, _ := cidrFromPath(path, depth, is4, idx)
-
-			if !yield(cidr, val) {
-				// early exit
-				return false
-			}
+	var idx uint
+	var ok bool
+	for {
+		if idx, ok = n.prefixesBitset.NextSet(idx); !ok {
+			break
 		}
+
+		// idx is covered by prefix
+		lower, upper := hostRoutesByIndex(idx)
+		if lower >= pfxLowerHostRoute && upper <= pfxUpperHostRoute {
+			allCoveredIndices = append(allCoveredIndices, idx)
+		}
+		idx++
 	}
 
-	// backing array, no heap allocs
-	addrBackingArray := [maxNodeChildren]uint{}
+	// sort indices in this node in CIDR sort order
+	slices.SortFunc(allCoveredIndices, cmpIndexRank)
 
-	// descend down to all childs covered by prefix
-	for i, addr := range n.allChildAddrs(addrBackingArray[:]) {
-		octet := byte(addr)
+	addrBackingArray := [maxNodePrefixes]uint{}
+	allCoveredAddrs := addrBackingArray[:0]
 
-		// is child covered by prefix?
-		if lpmTestFunc(oPrefixBitset, octetToBaseIndex(octet)) {
-			c := n.children[i]
+	var addr uint
+	for {
+		if addr, ok = n.childrenBitset.NextSet(addr); !ok {
+			break
+		}
+
+		// addr is covered by prefix?
+		addrHostRoute := hostRouteByAddr(addr)
+
+		// host addrs are sorted in indexRank order
+		if addrHostRoute > pfxUpperHostRoute {
+			break
+		}
+
+		if addrHostRoute >= pfxLowerHostRoute {
+			allCoveredAddrs = append(allCoveredAddrs, addr)
+		}
+
+		addr++
+	}
+
+	cursor := 0
+
+	// yield indices and childs in CIDR sort order
+	for _, idx := range allCoveredIndices {
+		idxLowerHostRoute, _ := hostRoutesByIndex(idx)
+
+		// yield all childs before idx
+		for j := cursor; j < len(allCoveredAddrs); j++ {
+			addr := allCoveredAddrs[j]
+			addrHostRoute := hostRouteByAddr(addr)
+
+			// yield prefix
+			if addrHostRoute >= idxLowerHostRoute {
+				break
+			}
+
+			// yield child
+
+			octet := byte(addr)
+			c := n.getChild(octet)
 
 			// add (set) this octet to path
 			path[depth] = octet
 
 			// all cidrs under this child are covered by pfx
-			if !c.allRec(path, depth+1, is4, yield) {
+			if !c.allRecSorted(path, depth+1, is4, yield) {
 				// early exit
 				return false
 			}
+			cursor++
+		}
+
+		// yield the prefix for this idx
+		val, _ := n.getValue(idx)
+		cidr, _ := cidrFromPath(path, depth, is4, idx)
+		if !yield(cidr, val) {
+			// early exit
+			return false
+		}
+	}
+
+	// yield the rest of childs, if any
+	for j := cursor; j < len(allCoveredAddrs); j++ {
+		addr := allCoveredAddrs[j]
+
+		octet := byte(addr)
+		c := n.getChild(octet)
+
+		// add (set) this octet to path
+		path[depth] = octet
+
+		// all cidrs under this child are covered by pfx
+		if !c.allRecSorted(path, depth+1, is4, yield) {
+			// early exit
+			return false
 		}
 	}
 
@@ -606,10 +660,10 @@ func (n *node[V]) allRec(path [16]byte, depth int, is4 bool, yield func(netip.Pr
 
 // allRecSorted runs recursive the trie, starting at node and
 // the yield function is called for each route entry with prefix and value.
+// The iteration is in prefix sort order.
+//
 // If the yield function returns false the recursion ends prematurely and the
 // false value is propagated.
-//
-// The iteration is in prefix sort order, it's a very complex implemenation compared with allRec.
 func (n *node[V]) allRecSorted(path [16]byte, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
 	// make backing arrays, no heap allocs
 	addrBackingArray := [maxNodeChildren]uint{}
@@ -617,7 +671,6 @@ func (n *node[V]) allRecSorted(path [16]byte, depth int, is4 bool, yield func(ne
 
 	// get slice of all child octets, sorted by addr
 	childAddrs := n.allChildAddrs(addrBackingArray[:])
-	childCursor := 0
 
 	// get slice of all indexes, sorted by idx
 	allIndices := n.allStrideIndexes(idxBackingArray[:])
@@ -625,103 +678,49 @@ func (n *node[V]) allRecSorted(path [16]byte, depth int, is4 bool, yield func(ne
 	// re-sort indexes by prefix in place
 	slices.SortFunc(allIndices, cmpIndexRank)
 
-	// example for entry with root node:
-	//
-	//  ▼
-	//  ├─ 0.0.0.1/32        <-- FOOTNOTE A: child  0     in first node
-	//  ├─ 10.0.0.0/7        <-- FOOTNOTE B: prefix 10/7  in first node
-	//  │  └─ 10.0.0.0/8     <-- FOOTNOTE C: prefix 10/8  in first node
-	//  │     └─ 10.0.0.1/32 <-- FOOTNOTE D: child  10    in first node
-	//  ├─ 127.0.0.0/8       <-- FOOTNOTE E: prefix 127/8 in first node
-	//  └─ 192.168.0.0/16    <-- FOOTNOTE F: child  192   in first node
+	childCursor := 0
 
-	// range over all indexes in this node, now in prefix sort order
-	// FOOTNOTE: B, C, E
-	for i, idx := range allIndices {
-		// get the host routes for this index
-		lower, upper := hostRoutesByIndex(idx)
+	// yield indices and childs in CIDR sort order
+	for _, idx := range allIndices {
+		idxLowerHostRoute, _ := hostRoutesByIndex(idx)
 
-		// adjust host routes for this idx in case the host routes
-		// of the following idx overlaps
-		// FOOTNOTE: B and C have overlaps in host routes
-		// FOOTNOTE: C, E don't overlap in host routes
-		// FOOTNOTE: E has no following prefix in this node
-		if i+1 < len(allIndices) {
-			lower, upper = adjustHostRoutes(idx, allIndices[i+1])
-		}
-
-		// handle childs before the host routes of idx
-		// FOOTNOTE: A
+		// yield all childs before idx
 		for j := childCursor; j < len(childAddrs); j++ {
 			addr := childAddrs[j]
-			octet := byte(addr)
+			addrHostRoute := hostRouteByAddr(addr)
 
-			if octetToBaseIndex(octet) >= lower {
-				// lower border of host routes
+			if addrHostRoute >= idxLowerHostRoute {
 				break
 			}
 
-			// we know the slice index, faster as n.getChild(octet)
+			// yield the child for this addr
 			c := n.children[j]
 
 			// add (set) this octet to path
-			path[depth] = octet
+			path[depth] = byte(addr)
 
+			// all cidrs under this child are covered by pfx
 			if !c.allRecSorted(path, depth+1, is4, yield) {
 				// early exit
 				return false
 			}
-
 			childCursor++
 		}
 
-		// FOOTNOTE: B, C, F
-		// now handle prefix for idx
+		// yield the prefix for this idx
 		val, _ := n.getValue(idx)
 		cidr, _ := cidrFromPath(path, depth, is4, idx)
-
 		if !yield(cidr, val) {
 			// early exit
 			return false
 		}
-
-		// handle the children in host routes for this prefix
-		// FOOTNOTE: D
-		for j := childCursor; j < len(childAddrs); j++ {
-			addr := childAddrs[j]
-			octet := byte(addr)
-			if octetToBaseIndex(octet) > upper {
-				// out of host routes
-				break
-			}
-
-			// we know the slice index, faster as n.getChild(octet)
-			c := n.children[j]
-
-			// add (set) this octet to path
-			path[depth] = octet
-
-			if !c.allRecSorted(path, depth+1, is4, yield) {
-				// early exit
-				return false
-			}
-
-			childCursor++
-		}
 	}
 
-	// FOOTNOTE: F
-	// handle all the rest of the children
+	// yield the rest of childs, if any
 	for j := childCursor; j < len(childAddrs); j++ {
 		addr := childAddrs[j]
-		octet := byte(addr)
-
-		// we know the slice index, faster as n.getChild(octet)
 		c := n.children[j]
-
-		// add (set) this octet to path
-		path[depth] = octet
-
+		path[depth] = byte(addr)
 		if !c.allRecSorted(path, depth+1, is4, yield) {
 			// early exit
 			return false
@@ -729,44 +728,6 @@ func (n *node[V]) allRecSorted(path [16]byte, depth int, is4 bool, yield func(ne
 	}
 
 	return true
-}
-
-// adjustHostRoutes, helper function to adjust the lower, upper bounds of the
-// host routes in case the host routes of the next idx overlaps
-func adjustHostRoutes(idx, next uint) (lower, upper uint) {
-	lower, upper = hostRoutesByIndex(idx)
-
-	// get the lower host route border of the next idx
-	nextLower, _ := hostRoutesByIndex(next)
-
-	// is there an overlap?
-	switch {
-	case nextLower == lower:
-		upper = 0
-
-		// [------------] idx
-		// [-----]        next
-		// make host routes for this idx invalid
-		//
-		// ][             idx
-		// [-----]^^^^^^] next
-		//
-		//  these ^^^^^^ children are handled before next prefix
-		//
-		// sorry, I know, it's completely confusing
-
-	case nextLower <= upper:
-		upper = nextLower - 1
-
-		// [------------] idx
-		//       [------] next
-		//
-		// shrink host routes for this idx
-		// [----][------] idx, next
-		//      ^
-	}
-
-	return lower, upper
 }
 
 // numPrefixesRec, calculate the number of prefixes under n.
