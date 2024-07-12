@@ -660,7 +660,7 @@ func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 }
 
 // Overlaps reports whether any IP in the table matches a route in the
-// other table.
+// other table or vice versa.
 func (t *Table[V]) Overlaps(o *Table[V]) bool {
 	t.init()
 	o.init()
@@ -689,7 +689,7 @@ func (t *Table[V]) Overlaps(o *Table[V]) bool {
 }
 
 // Overlaps4 reports whether any IPv4 in the table matches a route in the
-// other table.
+// other table or vice versa.
 func (t *Table[V]) Overlaps4(o *Table[V]) bool {
 	t.init()
 	o.init()
