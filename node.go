@@ -267,7 +267,7 @@ func (n *node[V]) eachLookupPrefix(path [16]byte, depth int, is4 bool, octet byt
 // overlapsRec returns true if any IP in the nodes n or o overlaps.
 func (n *node[V]) overlapsRec(o *node[V]) bool {
 	// ##############################
-	// 1. test if any routes overlaps
+	// 1. Test if any routes overlaps
 	// ##############################
 
 	nPfxLen := len(n.prefixes)
@@ -328,7 +328,7 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 	}
 
 	// ####################################
-	// 2. test if routes overlaps any child
+	// 2. Test if routes overlaps any child
 	// ####################################
 
 	var nAddr, oAddr uint
@@ -383,7 +383,7 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 	// intersect in place the child bitsets from n and o
 	nChildrenBitsetCloned.InPlaceIntersection(o.childrenBitset)
 
-	// gimmicks, don't allocate
+	// gimmick, don't allocate
 	addrBuf := [maxNodeChildren]uint{}
 	_, allCommonChilds := nChildrenBitsetCloned.NextSetMany(0, addrBuf[:])
 
@@ -403,22 +403,20 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 
 // overlapsPrefix returns true if node overlaps with prefix.
 func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
-	// ##################################################
-	// 1. test if any route in this node overlaps prefix?
-	// ##################################################
+	// 1. Test if any route in this node overlaps prefix?
 
 	idx := prefixToBaseIndex(octet, pfxLen)
 	if n.lpmTest(idx) {
 		return true
 	}
 
-	// #################################################
-	// 2. test if prefix overlaps any route in this node
-	// #################################################
+	// 2. Test if prefix overlaps any route in this node
 
-	// the allotLookupTbl[pfxIdx][:] contains the prefix routes
+	// the allotLookupTbl[pfxIdx][:] contains the prefix routes for idx
 	idxBuf := [8]uint64{}
 	copy(idxBuf[:], allotLookupTbl[idx][:])
+
+	// use pre-calculated bitset for idx
 	idxRoutes := bitset.From(idxBuf[:])
 
 	// use bitsets intersection instead of range loops
@@ -426,13 +424,13 @@ func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 		return true
 	}
 
-	// #################################################
-	// 3. test if prefix overlaps any child in this node
-	// #################################################
+	// 3. Test if prefix overlaps any child in this node
 
-	// trick, the allotLookupTbl[pfxIdx][4:] contains the host routes
+	// trick, the 2nd half of allotLookupTbl[pfxIdx][4:] contains the host routes
 	hostBuf := [4]uint64{}
 	copy(hostBuf[:], allotLookupTbl[idx][4:])
+
+	// use pre-calculated bitset for idx
 	hostRoutes := bitset.From(hostBuf[:])
 
 	// use bitsets intersection instead of range loops

@@ -2,8 +2,8 @@
 
 package bart
 
-// allotLookupTbl, precalculated lookup table.
-// Map baseIndex to bitset with precomputed complete binary tree.
+// allotLookupTbl, as precalculated bitsets,
+// map the baseIndex to bitset with precomputed complete binary tree.
 //
 //	  // 1 <= idx <= 511
 //		func allotRec(aTbl *bitset.BitSet, idx uint) {
@@ -14,6 +14,8 @@ package bart
 //			allotRec(aTbl, idx<<1)
 //			allotRec(aTbl, idx<<1+1)
 //		}
+//
+// Used for bitset intersections instead of range loops in overlaps tests.
 var allotLookupTbl = [512][8]uint64{
 	/* idx == 0   */ {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 	/* idx == 1   */ {0xfffffffffffffffe, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff},
