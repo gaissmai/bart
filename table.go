@@ -610,7 +610,7 @@ func (t *Table[V]) EachSubnet(pfx netip.Prefix, yield func(pfx netip.Prefix, val
 	}
 }
 
-// OverlapsPrefix reports whether any IP in pfx matches a route in the table.
+// OverlapsPrefix reports whether any IP in pfx matches a route in the table or vice versa.
 func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 	if !pfx.IsValid() {
 		return false
@@ -698,7 +698,7 @@ func (t *Table[V]) Overlaps4(o *Table[V]) bool {
 }
 
 // Overlaps6 reports whether any IPv6 in the table matches a route in the
-// other table.
+// other table or vice versa.
 func (t *Table[V]) Overlaps6(o *Table[V]) bool {
 	t.init()
 	o.init()
