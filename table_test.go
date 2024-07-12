@@ -522,27 +522,27 @@ func TestDelete(t *testing.T) {
 		t.Parallel()
 		// Add/remove prefix from root table.
 		rtbl := &Table[int]{}
-		checkSize(t, rtbl, 2)
+		checkNumNodes(t, rtbl, 2)
 
 		rtbl.Insert(mpp("10.0.0.0/8"), 1)
 		checkRoutes(t, rtbl, []tableTest{
 			{"10.0.0.1", 1},
 			{"255.255.255.255", -1},
 		})
-		checkSize(t, rtbl, 2)
+		checkNumNodes(t, rtbl, 2)
 		rtbl.Delete(mpp("10.0.0.0/8"))
 		checkRoutes(t, rtbl, []tableTest{
 			{"10.0.0.1", -1},
 			{"255.255.255.255", -1},
 		})
-		checkSize(t, rtbl, 2)
+		checkNumNodes(t, rtbl, 2)
 	})
 
 	t.Run("prefix_in_leaf", func(t *testing.T) {
 		t.Parallel()
 		// Create, then delete a single leaf table.
 		rtbl := &Table[int]{}
-		checkSize(t, rtbl, 2)
+		checkNumNodes(t, rtbl, 2)
 
 		rtbl.Insert(mpp("192.168.0.1/32"), 1)
 		checkRoutes(t, rtbl, []tableTest{
@@ -554,14 +554,14 @@ func TestDelete(t *testing.T) {
 			{"192.168.0.1", -1},
 			{"255.255.255.255", -1},
 		})
-		checkSize(t, rtbl, 2)
+		checkNumNodes(t, rtbl, 2)
 	})
 
 	t.Run("intermediate_no_routes", func(t *testing.T) {
 		t.Parallel()
 		// Create an intermediate with 2 children, then delete one leaf.
 		tbl := &Table[int]{}
-		checkSize(t, tbl, 2)
+		checkNumNodes(t, tbl, 2)
 		tbl.Insert(mpp("192.168.0.1/32"), 1)
 		tbl.Insert(mpp("192.180.0.1/32"), 2)
 		checkRoutes(t, tbl, []tableTest{
@@ -569,21 +569,21 @@ func TestDelete(t *testing.T) {
 			{"192.180.0.1", 2},
 			{"192.40.0.1", -1},
 		})
-		checkSize(t, tbl, 7) // 2 roots, 3 intermediate, 2 leaves
+		checkNumNodes(t, tbl, 7) // 2 roots, 3 intermediate, 2 leaves
 		tbl.Delete(mpp("192.180.0.1/32"))
 		checkRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.180.0.1", -1},
 			{"192.40.0.1", -1},
 		})
-		checkSize(t, tbl, 5) // 2 roots, 2 intermediates, 1 leaf
+		checkNumNodes(t, tbl, 5) // 2 roots, 2 intermediates, 1 leaf
 	})
 
 	t.Run("intermediate_with_route", func(t *testing.T) {
 		t.Parallel()
 		// Same, but the intermediate carries a route as well.
 		rtbl := &Table[int]{}
-		checkSize(t, rtbl, 2)
+		checkNumNodes(t, rtbl, 2)
 		rtbl.Insert(mpp("192.168.0.1/32"), 1)
 		rtbl.Insert(mpp("192.180.0.1/32"), 2)
 		rtbl.Insert(mpp("192.0.0.0/10"), 3)
@@ -593,7 +593,7 @@ func TestDelete(t *testing.T) {
 			{"192.40.0.1", 3},
 			{"192.255.0.1", -1},
 		})
-		checkSize(t, rtbl, 7) // 2 roots, 2 intermediates, 2 leaves
+		checkNumNodes(t, rtbl, 7) // 2 roots, 2 intermediates, 2 leaves
 		rtbl.Delete(mpp("192.180.0.1/32"))
 		checkRoutes(t, rtbl, []tableTest{
 			{"192.168.0.1", 1},
@@ -601,14 +601,14 @@ func TestDelete(t *testing.T) {
 			{"192.40.0.1", 3},
 			{"192.255.0.1", -1},
 		})
-		checkSize(t, rtbl, 5) // 2 roots, 1 full, 1 intermediate, 1 leaf
+		checkNumNodes(t, rtbl, 5) // 2 roots, 1 full, 1 intermediate, 1 leaf
 	})
 
 	t.Run("intermediate_many_leaves", func(t *testing.T) {
 		t.Parallel()
 		// Intermediate with 3 leaves, then delete one leaf.
 		rtbl := &Table[int]{}
-		checkSize(t, rtbl, 2)
+		checkNumNodes(t, rtbl, 2)
 		rtbl.Insert(mpp("192.168.0.1/32"), 1)
 		rtbl.Insert(mpp("192.180.0.1/32"), 2)
 		rtbl.Insert(mpp("192.200.0.1/32"), 3)
@@ -618,7 +618,7 @@ func TestDelete(t *testing.T) {
 			{"192.200.0.1", 3},
 			{"192.255.0.1", -1},
 		})
-		checkSize(t, rtbl, 9) // 2 roots, 4 intermediate, 3 leaves
+		checkNumNodes(t, rtbl, 9) // 2 roots, 4 intermediate, 3 leaves
 		rtbl.Delete(mpp("192.180.0.1/32"))
 		checkRoutes(t, rtbl, []tableTest{
 			{"192.168.0.1", 1},
@@ -626,26 +626,26 @@ func TestDelete(t *testing.T) {
 			{"192.200.0.1", 3},
 			{"192.255.0.1", -1},
 		})
-		checkSize(t, rtbl, 7) // 2 roots, 3 intermediate, 2 leaves
+		checkNumNodes(t, rtbl, 7) // 2 roots, 3 intermediate, 2 leaves
 	})
 
 	t.Run("nosuchprefix_missing_child", func(t *testing.T) {
 		t.Parallel()
 		// Delete non-existent prefix, missing strideTable path.
 		rtbl := &Table[int]{}
-		checkSize(t, rtbl, 2)
+		checkNumNodes(t, rtbl, 2)
 		rtbl.Insert(mpp("192.168.0.1/32"), 1)
 		checkRoutes(t, rtbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.255.0.1", -1},
 		})
-		checkSize(t, rtbl, 5)            // 2 roots, 2 intermediate, 1 leaf
+		checkNumNodes(t, rtbl, 5)        // 2 roots, 2 intermediate, 1 leaf
 		rtbl.Delete(mpp("200.0.0.0/32")) // lookup miss in root
 		checkRoutes(t, rtbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.255.0.1", -1},
 		})
-		checkSize(t, rtbl, 5) // 2 roots, 2 intermediate, 1 leaf
+		checkNumNodes(t, rtbl, 5) // 2 roots, 2 intermediate, 1 leaf
 	})
 
 	t.Run("nosuchprefix_not_in_leaf", func(t *testing.T) {
@@ -653,19 +653,19 @@ func TestDelete(t *testing.T) {
 		// Delete non-existent prefix, strideTable path exists but
 		// leaf doesn't contain route.
 		rtbl := &Table[int]{}
-		checkSize(t, rtbl, 2)
+		checkNumNodes(t, rtbl, 2)
 		rtbl.Insert(mpp("192.168.0.1/32"), 1)
 		checkRoutes(t, rtbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.255.0.1", -1},
 		})
-		checkSize(t, rtbl, 5)              // 2 roots, 2 intermediate, 1 leaf
+		checkNumNodes(t, rtbl, 5)          // 2 roots, 2 intermediate, 1 leaf
 		rtbl.Delete(mpp("192.168.0.5/32")) // right leaf, no route
 		checkRoutes(t, rtbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.255.0.1", -1},
 		})
-		checkSize(t, rtbl, 5) // 2 roots, 2 intermediate, 1 leaf
+		checkNumNodes(t, rtbl, 5) // 2 roots, 2 intermediate, 1 leaf
 	})
 
 	t.Run("intermediate_with_deleted_route", func(t *testing.T) {
@@ -673,7 +673,7 @@ func TestDelete(t *testing.T) {
 		// Intermediate table loses its last route and becomes
 		// compactable.
 		rtbl := &Table[int]{}
-		checkSize(t, rtbl, 2)
+		checkNumNodes(t, rtbl, 2)
 		rtbl.Insert(mpp("192.168.0.1/32"), 1)
 		rtbl.Insert(mpp("192.168.0.0/22"), 2)
 		checkRoutes(t, rtbl, []tableTest{
@@ -681,14 +681,14 @@ func TestDelete(t *testing.T) {
 			{"192.168.0.2", 2},
 			{"192.255.0.1", -1},
 		})
-		checkSize(t, rtbl, 5) // 2 roots, 1 intermediate, 1 full, 1 leaf
+		checkNumNodes(t, rtbl, 5) // 2 roots, 1 intermediate, 1 full, 1 leaf
 		rtbl.Delete(mpp("192.168.0.0/22"))
 		checkRoutes(t, rtbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.168.0.2", -1},
 			{"192.255.0.1", -1},
 		})
-		checkSize(t, rtbl, 5) // 2 roots, 2 intermediate, 1 leaf
+		checkNumNodes(t, rtbl, 5) // 2 roots, 2 intermediate, 1 leaf
 	})
 
 	t.Run("default_route", func(t *testing.T) {
@@ -704,7 +704,7 @@ func TestDelete(t *testing.T) {
 			{"1.2.3.4", -1},
 			{"::1", 1},
 		})
-		checkSize(t, rtbl, 2) // 2 roots
+		checkNumNodes(t, rtbl, 2) // 2 roots
 	})
 }
 
@@ -2162,7 +2162,7 @@ func checkRoutes(t *testing.T, tbl *Table[int], tt []tableTest) {
 	}
 }
 
-func checkSize(t *testing.T, tbl *Table[int], want int) {
+func checkNumNodes(t *testing.T, tbl *Table[int], want int) {
 	tbl.init()
 	t.Helper()
 	if got := tbl.nodes(); got != want {
