@@ -15,8 +15,8 @@ import (
 	"net/netip"
 )
 
-// LookupPrefixIter returns an iterator for each CIDR covering pfx
-// in reverse CIDR sort order, from longest-prefix-match to shortest-prefix-match.
+// LookupPrefixIter returns an iterator for each CIDR covering pfx.
+// The iteration is in reverse CIDR sort order, from longest-prefix-match to shortest-prefix-match.
 func (t *Table[V]) LookupPrefixIter(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
 
@@ -100,7 +100,8 @@ func (t *Table[V]) LookupPrefixIter(pfx netip.Prefix) iter.Seq2[netip.Prefix, V]
 
 }
 
-// SubnetIter returns an iterator over all CIDRs covered by pfx in natural CIDR sort order.
+// SubnetIter returns an iterator over all CIDRs covered by pfx.
+// The iteration is in natural CIDR sort order.
 func (t *Table[V]) SubnetIter(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
 
@@ -155,7 +156,7 @@ func (t *Table[V]) SubnetIter(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 }
 
 // AllIter returns an iterator over all prefxes.
-// The sort order is undefined and you must not rely on it!
+// The iteration order is undefined and you must not rely on it!
 //
 // Prefixes must not be inserted or deleted during iteration, otherwise
 // the behavior is undefined. However, value updates are permitted.
@@ -188,7 +189,7 @@ func (t *Table[V]) All6Iter() iter.Seq2[netip.Prefix, V] {
 }
 
 // AllSortedIter returns an iterator over all prefxes.
-// The sort order is Cin naturla CIDR sort oreder.
+// The iteration is in natural CIDR sort order.
 //
 // Prefixes must not be inserted or deleted during iteration, otherwise
 // the behavior is undefined. However, value updates are permitted.
