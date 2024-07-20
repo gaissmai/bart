@@ -411,16 +411,18 @@ func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 	}
 
 	// 2. Test if prefix overlaps any route in this node
+	// use bitsets intersection instead of range loops
 
-	// the allotLookupTbl[pfxIdx][:] contains the prefix routes for idx
-	var idxRoutes *bitset.BitSet
+	// buffer for bitset backing array, make sure we don't allocate
 	idxBuf := [8]uint64{}
+	idxRoutes := bitset.From(idxBuf[:])
 	if idx < 256 {
+		// overwrite the backing array of bitset with precalculated bitset
 		copy(idxBuf[:], allotLookupTbl[idx][:])
 		idxRoutes = bitset.From(idxBuf[:])
 	} else {
-		// just one bit set, fast calculation at runtime, save 16KB in lookup table
-		idxRoutes = bitset.From(idxBuf[:]).Set(idx)
+		// upper half in allot tbl, just 1 bit is set, fast calculation at runtime
+		idxRoutes.Set(idx)
 	}
 
 	// use bitsets intersection instead of range loops
@@ -429,16 +431,20 @@ func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 	}
 
 	// 3. Test if prefix overlaps any child in this node
+	// use bitsets intersection instead of range loops
 
 	// trick, the 2nd half columns of allotLookupTbl[pfxIdx][4:] contains the host routes
-	var hostRoutes *bitset.BitSet
+
+	// buffer for bitset backing array, make sure we don't allocate
 	hostBuf := [4]uint64{}
+	hostRoutes := bitset.From(hostBuf[:])
 	if idx < 256 {
+		// overwrite the backing array of bitset with precalculated bitset
 		copy(hostBuf[:], allotLookupTbl[idx][4:])
 		hostRoutes = bitset.From(hostBuf[:])
 	} else {
-		// just one bit set, fast calculation at runtime, save 16KB in lookup table
-		hostRoutes = bitset.From(hostBuf[:]).Set(idx - 256)
+		// upper half in allot tbl, just 1 bit is set, fast calculation at runtime
+		hostRoutes.Set(idx - 256)
 	}
 
 	// use bitsets intersection instead of range loops
