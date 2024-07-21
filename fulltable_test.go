@@ -336,37 +336,6 @@ func BenchmarkFullTableClone(b *testing.B) {
 	}
 }
 
-func BenchmarkFullTableEachLookupPrefix(b *testing.B) {
-	var rt Table[int]
-	sink := make([]netip.Prefix, 0, 9)
-
-	for i, route := range routes {
-		rt.Insert(route.CIDR, i)
-	}
-
-	b.Run("V4", func(b *testing.B) {
-		b.ResetTimer()
-		for k := 0; k < b.N; k++ {
-			sink = sink[:0]
-			rt.EachLookupPrefix(randRoute4.CIDR, func(pfx netip.Prefix, _ int) bool {
-				sink = append(sink, pfx)
-				return true
-			})
-		}
-	})
-
-	b.Run("V6", func(b *testing.B) {
-		b.ResetTimer()
-		for k := 0; k < b.N; k++ {
-			sink = sink[:0]
-			rt.EachLookupPrefix(randRoute6.CIDR, func(pfx netip.Prefix, _ int) bool {
-				sink = append(sink, pfx)
-				return true
-			})
-		}
-	})
-}
-
 func BenchmarkFullTableMemoryV4(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 
