@@ -1,23 +1,24 @@
-//go:build go1.23
-
-// rangefunc iterators for 1.23 and above
+// Copyright (c) 2024 Karl Gaissmaier
+// SPDX-License-Identifier: MIT
 
 // to edit it with vim-go and gotip do ...
 //
 //  $ export GOROOT=$(gotip env GOROOT)
 //  $ export PATH=${GOROOT}/bin:${PATH}
 //  $ vim filename.go
+//  :let g:go_gopls_executable = 'gotip gopls'
 
 package bart
 
 import (
-	"iter"
 	"net/netip"
 )
 
-// LookupPrefixIter returns an iterator for each CIDR covering pfx.
+// Supernets returns an iterator for each CIDR covering pfx.
 // The iteration is in reverse CIDR sort order, from longest-prefix-match to shortest-prefix-match.
-func (t *Table[V]) LookupPrefixIter(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
+//
+// See also [Table.LookupPrefixLPM]
+func (t *Table[V]) Supernets(pfx netip.Prefix) func(yield func(netip.Prefix, V) bool) {
 	return func(yield func(netip.Prefix, V) bool) {
 
 		// iterator setup
@@ -100,9 +101,9 @@ func (t *Table[V]) LookupPrefixIter(pfx netip.Prefix) iter.Seq2[netip.Prefix, V]
 
 }
 
-// SubnetIter returns an iterator over all CIDRs covered by pfx.
+// Subnets returns an iterator over all CIDRs covered by pfx.
 // The iteration is in natural CIDR sort order.
-func (t *Table[V]) SubnetIter(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
+func (t *Table[V]) Subnets(pfx netip.Prefix) func(yield func(netip.Prefix, V) bool) {
 	return func(yield func(netip.Prefix, V) bool) {
 
 		// iterator setup
@@ -152,71 +153,57 @@ func (t *Table[V]) SubnetIter(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 			n = c
 		}
 	}
-
 }
 
-// AllIter returns an iterator over all prefxes.
-// The iteration order is undefined and you must not rely on it!
+// All may be used in a for/range loop to iterate
+// through all the prefixes.
+// The sort order is undefined and you must not rely on it!
 //
 // Prefixes must not be inserted or deleted during iteration, otherwise
 // the behavior is undefined. However, value updates are permitted.
-func (t *Table[V]) AllIter() iter.Seq2[netip.Prefix, V] {
+//
+// If the yield function returns false, the iteration ends prematurely.
+func (t *Table[V]) All(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
-
-	return func(yield func(netip.Prefix, V) bool) {
-		// respect early exit
-		_ = t.rootV4.allRec(zeroPath, 0, true, yield) &&
-			t.rootV6.allRec(zeroPath, 0, false, yield)
-	}
-}
-
-// All4Iter, like [Table.AllIter] but only for the v4 routing table.
-func (t *Table[V]) All4Iter() iter.Seq2[netip.Prefix, V] {
-	t.init()
-
-	return func(yield func(netip.Prefix, V) bool) {
-		t.rootV4.allRec(zeroPath, 0, true, yield)
-	}
-}
-
-// All6Iter, like [Table.AllIter] but only for the v6 routing table.
-func (t *Table[V]) All6Iter() iter.Seq2[netip.Prefix, V] {
-	t.init()
-
-	return func(yield func(netip.Prefix, V) bool) {
+	// respect early exit
+	_ = t.rootV4.allRec(zeroPath, 0, true, yield) &&
 		t.rootV6.allRec(zeroPath, 0, false, yield)
-	}
 }
 
-// AllSortedIter returns an iterator over all prefxes.
-// The iteration is in natural CIDR sort order.
+// All4, like [Table.All] but only for the v4 routing table.
+func (t *Table[V]) All4(yield func(pfx netip.Prefix, val V) bool) {
+	t.init()
+	t.rootV4.allRec(zeroPath, 0, true, yield)
+}
+
+// All6, like [Table.All] but only for the v6 routing table.
+func (t *Table[V]) All6(yield func(pfx netip.Prefix, val V) bool) {
+	t.init()
+	t.rootV6.allRec(zeroPath, 0, false, yield)
+}
+
+// AllSorted may be used in a for/range loop to iterate
+// through all the prefixes in natural CIDR sort order.
 //
 // Prefixes must not be inserted or deleted during iteration, otherwise
 // the behavior is undefined. However, value updates are permitted.
-func (t *Table[V]) AllSortedIter() iter.Seq2[netip.Prefix, V] {
+//
+// If the yield function returns false, the iteration ends prematurely.
+func (t *Table[V]) AllSorted(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
-
-	return func(yield func(netip.Prefix, V) bool) {
-		// respect early exit
-		_ = t.rootV4.allRecSorted(zeroPath, 0, true, yield) &&
-			t.rootV6.allRecSorted(zeroPath, 0, false, yield)
-	}
-}
-
-// All4SortedIter, like [Table.AllSortedIter] but only for the v4 routing table.
-func (t *Table[V]) All4SortedIter() iter.Seq2[netip.Prefix, V] {
-	t.init()
-
-	return func(yield func(netip.Prefix, V) bool) {
-		t.rootV4.allRecSorted(zeroPath, 0, true, yield)
-	}
-}
-
-// All6SortedIter, like [Table.AllSortedIter] but only for the v6 routing table.
-func (t *Table[V]) All6SortedIter() iter.Seq2[netip.Prefix, V] {
-	t.init()
-
-	return func(yield func(netip.Prefix, V) bool) {
+	// respect early exit
+	_ = t.rootV4.allRecSorted(zeroPath, 0, true, yield) &&
 		t.rootV6.allRecSorted(zeroPath, 0, false, yield)
-	}
+}
+
+// All4Sorted, like [Table.AllSorted] but only for the v4 routing table.
+func (t *Table[V]) All4Sorted(yield func(pfx netip.Prefix, val V) bool) {
+	t.init()
+	t.rootV4.allRecSorted(zeroPath, 0, true, yield)
+}
+
+// All6Sorted, like [Table.AllSorted] but only for the v6 routing table.
+func (t *Table[V]) All6Sorted(yield func(pfx netip.Prefix, val V) bool) {
+	t.init()
+	t.rootV6.allRecSorted(zeroPath, 0, false, yield)
 }
