@@ -12,6 +12,8 @@ import (
 // shortest-prefix-match.
 //
 // If the yield function returns false, the iteration ends prematurely.
+//
+// Deprecated: EachLookupPrefix is deprecated. Use [Table.Supernets] instead.
 func (t *Table[V]) EachLookupPrefix(pfx netip.Prefix, yield func(pfx netip.Prefix, val V) bool) {
 	if !pfx.IsValid() {
 		return
@@ -93,6 +95,8 @@ func (t *Table[V]) EachLookupPrefix(pfx netip.Prefix, yield func(pfx netip.Prefi
 // EachSubnet iterates over all CIDRs covered by pfx in natural CIDR sort order.
 //
 // If the yield function returns false, the iteration ends prematurely.
+//
+// Deprecated: EachSubnet is deprecated. Use [Table.Subnets] instead.
 func (t *Table[V]) EachSubnet(pfx netip.Prefix, yield func(pfx netip.Prefix, val V) bool) {
 	if !pfx.IsValid() {
 		return
