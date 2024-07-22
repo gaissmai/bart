@@ -58,8 +58,9 @@ The API changes in v0.4.2, 0.5.3, v0.6.3, v0.10.1, v0.11.0
 
   func (t *Table[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool)
   func (t *Table[V]) LookupPrefixLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool)
-  func (t *Table[V]) EachLookupPrefix(pfx netip.Prefix, yield func(pfx netip.Prefix, val V) bool)
-  func (t *Table[V]) EachSubnet(pfx netip.Prefix, yield func(pfx netip.Prefix, val V) bool)
+
+  func (t *Table[V]) Subnets(pfx netip.Prefix) func(yield func(netip.Prefix, V) bool)
+  func (t *Table[V]) Supernets(pfx netip.Prefix) func(yield func(netip.Prefix, V) bool)
 
   func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool
 
