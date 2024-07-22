@@ -1,23 +1,14 @@
 // Copyright (c) 2024 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
-// to edit it with vim-go and gotip do ...
-//
-//  $ export GOROOT=$(gotip env GOROOT)
-//  $ export PATH=${GOROOT}/bin:${PATH}
-//  $ vim filename.go
-//  :let g:go_gopls_executable = 'gotip gopls'
-
 package bart
 
 import (
 	"net/netip"
 )
 
-// Supernets returns an iterator for each CIDR covering pfx.
+// Supernets returns an iterator over all CIDRs covering pfx.
 // The iteration is in reverse CIDR sort order, from longest-prefix-match to shortest-prefix-match.
-//
-// See also [Table.LookupPrefixLPM]
 func (t *Table[V]) Supernets(pfx netip.Prefix) func(yield func(netip.Prefix, V) bool) {
 	return func(yield func(netip.Prefix, V) bool) {
 
