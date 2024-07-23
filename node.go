@@ -259,8 +259,7 @@ func (n *node[V]) allChildAddrs(buffer []uint) []uint {
 func (n *node[V]) eachLookupPrefix(path [16]byte, depth int, is4 bool, octet byte, bits int, yield func(pfx netip.Prefix, val V) bool) bool {
 	// backtracking the CBT
 	for idx := prefixToBaseIndex(octet, bits); idx > 0; idx >>= 1 {
-		val, ok := n.getValueOK(idx)
-		if ok {
+		if val, ok := n.getValueOK(idx); ok {
 			cidr, _ := cidrFromPath(path, depth, is4, idx)
 
 			if !yield(cidr, val) {
