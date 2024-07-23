@@ -18,7 +18,7 @@ func ExampleTable_All4_rangeoverfunc() {
 		rtbl.Insert(item.cidr, item.nextHop)
 	}
 
-	for pfx, val := range rtbl.All4Sorted {
+	for pfx, val := range rtbl.All4Sorted() {
 		fmt.Printf("%v\t%v\n", pfx, val)
 	}
 

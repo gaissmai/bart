@@ -157,7 +157,7 @@ func TestAll(t *testing.T) {
 		}
 
 		// check if pfx/val is as expected
-		rtbl.All(func(pfx netip.Prefix, val int) bool {
+		rtbl.All()(func(pfx netip.Prefix, val int) bool {
 			if seen[pfx] != val {
 				t.Errorf("%v got value: %v, expected: %v", pfx, val, seen[pfx])
 			}
@@ -180,7 +180,7 @@ func TestAll(t *testing.T) {
 		}
 
 		// check if pfx/val is as expected
-		rtbl.All4(func(pfx netip.Prefix, val int) bool {
+		rtbl.All4()(func(pfx netip.Prefix, val int) bool {
 			if seen[pfx] != val {
 				t.Errorf("%v got value: %v, expected: %v", pfx, val, seen[pfx])
 			}
@@ -188,7 +188,7 @@ func TestAll(t *testing.T) {
 			return true
 		})
 
-		rtbl.All6(func(pfx netip.Prefix, val int) bool {
+		rtbl.All6()(func(pfx netip.Prefix, val int) bool {
 			if seen[pfx] != val {
 				t.Errorf("%v got value: %v, expected: %v", pfx, val, seen[pfx])
 			}
@@ -222,10 +222,10 @@ func TestAll(t *testing.T) {
 		}
 
 		// iterate and update the values
-		rtbl.All(yield)
+		rtbl.All()(yield)
 
 		// test if all values got updated, yield now as closure
-		rtbl.All(func(pfx netip.Prefix, val int) bool {
+		rtbl.All()(func(pfx netip.Prefix, val int) bool {
 			if seen[pfx] != val {
 				t.Errorf("%v got value: %v, expected: %v", pfx, val, seen[pfx])
 			}
@@ -241,7 +241,7 @@ func TestAll(t *testing.T) {
 
 		// check if callback stops prematurely
 		countV6 := 0
-		rtbl.All(func(pfx netip.Prefix, val int) bool {
+		rtbl.All()(func(pfx netip.Prefix, val int) bool {
 			// max 1000 IPv6 prefixes
 			if !pfx.Addr().Is4() {
 				countV6++
@@ -279,7 +279,7 @@ func TestAllSorted(t *testing.T) {
 
 		slices.SortFunc(expect, cmpPrefix)
 
-		rtbl.AllSorted(func(pfx netip.Prefix, _ int) bool {
+		rtbl.AllSorted()(func(pfx netip.Prefix, _ int) bool {
 			got = append(got, pfx)
 			return true
 		})
@@ -301,7 +301,7 @@ func BenchmarkAll(b *testing.B) {
 	b.Run("All", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			rtbl.All(func(pfx netip.Prefix, _ int) bool {
+			rtbl.All()(func(pfx netip.Prefix, _ int) bool {
 				return true
 			})
 		}
@@ -310,7 +310,7 @@ func BenchmarkAll(b *testing.B) {
 	b.Run("AllSorted", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			rtbl.AllSorted(func(pfx netip.Prefix, _ int) bool {
+			rtbl.AllSorted()(func(pfx netip.Prefix, _ int) bool {
 				return true
 			})
 		}

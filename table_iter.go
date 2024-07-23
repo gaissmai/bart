@@ -146,55 +146,52 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) func(yield func(netip.Prefix, V) bo
 	}
 }
 
-// All may be used in a for/range loop to iterate
-// through all the prefixes.
-// The sort order is undefined and you must not rely on it!
-//
-// Prefixes must not be inserted or deleted during iteration, otherwise
-// the behavior is undefined. However, value updates are permitted.
-//
-// If the yield function returns false, the iteration ends prematurely.
-func (t *Table[V]) All(yield func(pfx netip.Prefix, val V) bool) {
+// All returns an iterator over key-value pairs from Table. The iteration order
+// is not specified and is not guaranteed to be the same from one call to the
+// next.
+func (t *Table[V]) All() func(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
-	// respect early exit
-	_ = t.rootV4.allRec(zeroPath, 0, true, yield) &&
-		t.rootV6.allRec(zeroPath, 0, false, yield)
+	return func(yield func(netip.Prefix, V) bool) {
+		_ = t.rootV4.allRec(zeroPath, 0, true, yield) && t.rootV6.allRec(zeroPath, 0, false, yield)
+	}
 }
 
 // All4, like [Table.All] but only for the v4 routing table.
-func (t *Table[V]) All4(yield func(pfx netip.Prefix, val V) bool) {
+func (t *Table[V]) All4() func(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
-	t.rootV4.allRec(zeroPath, 0, true, yield)
+	return func(yield func(netip.Prefix, V) bool) {
+		_ = t.rootV4.allRec(zeroPath, 0, true, yield)
+	}
 }
 
 // All6, like [Table.All] but only for the v6 routing table.
-func (t *Table[V]) All6(yield func(pfx netip.Prefix, val V) bool) {
+func (t *Table[V]) All6() func(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
-	t.rootV6.allRec(zeroPath, 0, false, yield)
+	return func(yield func(netip.Prefix, V) bool) {
+		_ = t.rootV6.allRec(zeroPath, 0, false, yield)
+	}
 }
 
-// AllSorted may be used in a for/range loop to iterate
-// through all the prefixes in natural CIDR sort order.
-//
-// Prefixes must not be inserted or deleted during iteration, otherwise
-// the behavior is undefined. However, value updates are permitted.
-//
-// If the yield function returns false, the iteration ends prematurely.
-func (t *Table[V]) AllSorted(yield func(pfx netip.Prefix, val V) bool) {
+// AllSorted returns an iterator over key-value pairs from Table in natural CIDR sort order.
+func (t *Table[V]) AllSorted() func(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
-	// respect early exit
-	_ = t.rootV4.allRecSorted(zeroPath, 0, true, yield) &&
-		t.rootV6.allRecSorted(zeroPath, 0, false, yield)
+	return func(yield func(netip.Prefix, V) bool) {
+		_ = t.rootV4.allRecSorted(zeroPath, 0, true, yield) && t.rootV6.allRecSorted(zeroPath, 0, false, yield)
+	}
 }
 
 // All4Sorted, like [Table.AllSorted] but only for the v4 routing table.
-func (t *Table[V]) All4Sorted(yield func(pfx netip.Prefix, val V) bool) {
+func (t *Table[V]) All4Sorted() func(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
-	t.rootV4.allRecSorted(zeroPath, 0, true, yield)
+	return func(yield func(netip.Prefix, V) bool) {
+		_ = t.rootV4.allRecSorted(zeroPath, 0, true, yield)
+	}
 }
 
 // All6Sorted, like [Table.AllSorted] but only for the v6 routing table.
-func (t *Table[V]) All6Sorted(yield func(pfx netip.Prefix, val V) bool) {
+func (t *Table[V]) All6Sorted() func(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
-	t.rootV6.allRecSorted(zeroPath, 0, false, yield)
+	return func(yield func(netip.Prefix, V) bool) {
+		_ = t.rootV6.allRecSorted(zeroPath, 0, false, yield)
+	}
 }
