@@ -85,7 +85,7 @@ func ExampleTable_All4_callback() {
 	for _, item := range input {
 		rtbl.Insert(item.cidr, item.nextHop)
 	}
-	rtbl.All4Sorted(func(pfx netip.Prefix, val netip.Addr) bool {
+	rtbl.All4Sorted()(func(pfx netip.Prefix, val netip.Addr) bool {
 		fmt.Printf("%v\t%v\n", pfx, val)
 		return true
 	})

@@ -23,7 +23,7 @@ func TestAll4RangeOverFunc(t *testing.T) {
 		}
 
 		// rangefunc iterator
-		for pfx, val := range rtbl.All4 {
+		for pfx, val := range rtbl.All4() {
 			// check if pfx/val is as expected
 			if seen[pfx] != val {
 				t.Errorf("%v got value: %v, expected: %v", pfx, val, seen[pfx])
@@ -45,7 +45,7 @@ func TestAll4RangeOverFunc(t *testing.T) {
 
 		// check if callback stops prematurely
 		count := 0
-		for _, _ = range rtbl.All4 {
+		for _, _ = range rtbl.All4() {
 			count++
 			if count >= 1000 {
 				break
@@ -71,7 +71,7 @@ func TestAll6RangeOverFunc(t *testing.T) {
 		}
 
 		// rangefunc iterator
-		for pfx, val := range rtbl.All6 {
+		for pfx, val := range rtbl.All6() {
 			// check if pfx/val is as expected
 			if seen[pfx] != val {
 				t.Errorf("%v got value: %v, expected: %v", pfx, val, seen[pfx])
@@ -93,7 +93,7 @@ func TestAll6RangeOverFunc(t *testing.T) {
 
 		// check if callback stops prematurely
 		count := 0
-		for _, _ = range rtbl.All6 {
+		for _, _ = range rtbl.All6() {
 			count++
 			if count >= 1000 {
 				break
@@ -119,7 +119,7 @@ func TestAllRangeOverFunc(t *testing.T) {
 		}
 
 		// rangefunc iterator
-		for pfx, val := range rtbl.All {
+		for pfx, val := range rtbl.All() {
 			// check if pfx/val is as expected
 			if seen[pfx] != val {
 				t.Errorf("%v got value: %v, expected: %v", pfx, val, seen[pfx])
@@ -141,7 +141,7 @@ func TestAllRangeOverFunc(t *testing.T) {
 
 		// check if callback stops prematurely
 		count := 0
-		for _, _ = range rtbl.All {
+		for _, _ = range rtbl.All() {
 			count++
 			if count >= 1000 {
 				break
@@ -167,7 +167,7 @@ func TestAll4SortedIter(t *testing.T) {
 		}
 
 		// rangefunc iterator
-		for pfx, val := range rtbl.All4Sorted {
+		for pfx, val := range rtbl.All4Sorted() {
 			// check if pfx/val is as expected
 			if seen[pfx] != val {
 				t.Errorf("%v got value: %v, expected: %v", pfx, val, seen[pfx])
@@ -189,7 +189,7 @@ func TestAll4SortedIter(t *testing.T) {
 
 		// check if callback stops prematurely
 		count := 0
-		for _, _ = range rtbl.All4Sorted {
+		for _, _ = range rtbl.All4Sorted() {
 			count++
 			if count >= 1000 {
 				break
@@ -215,7 +215,7 @@ func TestAll6SortedRangeOverFunc(t *testing.T) {
 		}
 
 		// rangefunc iterator
-		for pfx, val := range rtbl.All6Sorted {
+		for pfx, val := range rtbl.All6Sorted() {
 			// check if pfx/val is as expected
 			if seen[pfx] != val {
 				t.Errorf("%v got value: %v, expected: %v", pfx, val, seen[pfx])
@@ -237,7 +237,7 @@ func TestAll6SortedRangeOverFunc(t *testing.T) {
 
 		// check if callback stops prematurely
 		count := 0
-		for _, _ = range rtbl.All6Sorted {
+		for _, _ = range rtbl.All6Sorted() {
 			count++
 			if count >= 1000 {
 				break
@@ -263,7 +263,7 @@ func TestAllSortedRangeOverFunc(t *testing.T) {
 		}
 
 		// rangefunc iterator
-		for pfx, val := range rtbl.AllSorted {
+		for pfx, val := range rtbl.AllSorted() {
 			// check if pfx/val is as expected
 			if seen[pfx] != val {
 				t.Errorf("%v got value: %v, expected: %v", pfx, val, seen[pfx])
@@ -285,7 +285,7 @@ func TestAllSortedRangeOverFunc(t *testing.T) {
 
 		// check if callback stops prematurely
 		count := 0
-		for _, _ = range rtbl.AllSorted {
+		for _, _ = range rtbl.AllSorted() {
 			count++
 			if count >= 1000 {
 				break
