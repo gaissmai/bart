@@ -158,7 +158,7 @@ func (n *node[V]) getKidsRec(parentIdx uint, path [16]byte, depth int, is4 bool)
 		lpmIdx, _, _ := n.lpm(idx >> 1)
 		if lpmIdx == parentIdx {
 			// idx is directKid
-			val, _ := n.getValue(idx)
+			val := n.getValue(idx)
 			cidr, _ := cidrFromPath(path, depth, is4, idx)
 
 			directKids = append(directKids, kid[V]{n, path, depth, idx, cidr, val})

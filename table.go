@@ -234,7 +234,7 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 		}
 		n = c
 	}
-	return n.getValue(prefixToBaseIndex(lastOctet, lastOctetBits))
+	return n.getValueOK(prefixToBaseIndex(lastOctet, lastOctetBits))
 }
 
 // Delete removes pfx from the tree, pfx does not have to be present.
