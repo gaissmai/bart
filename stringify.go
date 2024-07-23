@@ -18,6 +18,7 @@ import (
 type kid[V any] struct {
 	// for traversing
 	n     *node[V]
+	is4   bool
 	path  [16]byte
 	depth int
 	idx   uint
@@ -75,13 +76,16 @@ func (t *Table[V]) String() string {
 func (t *Table[V]) Fprint(w io.Writer) error {
 	t.init()
 
+	// v4
 	if err := t.fprint(w, true); err != nil {
 		return err
 	}
 
+	// v6
 	if err := t.fprint(w, false); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -95,16 +99,24 @@ func (t *Table[V]) fprint(w io.Writer, is4 bool) error {
 	if _, err := fmt.Fprint(w, "▼\n"); err != nil {
 		return err
 	}
-	if err := n.fprintRec(w, 0, zeroPath, 0, is4, ""); err != nil {
+
+	startKid := kid[V]{
+		n:    nil,
+		idx:  0,
+		path: zeroPath,
+		is4:  is4,
+	}
+
+	if err := n.fprintRec(w, startKid, ""); err != nil {
 		return err
 	}
 	return nil
 }
 
-// fprintRec, the output is a hierarchical CIDR tree starting with parentIdx and byte path.
-func (n *node[V]) fprintRec(w io.Writer, parentIdx uint, path [16]byte, depth int, is4 bool, pad string) error {
-	// get direct childs for this parentIdx ...
-	directKids := n.getKidsRec(parentIdx, path, depth, is4)
+// fprintRec, the output is a hierarchical CIDR tree starting with this kid.
+func (n *node[V]) fprintRec(w io.Writer, parent kid[V], pad string) error {
+	// get direct childs for this kid ...
+	directKids := n.getKidsRec(parent.idx, parent.path, parent.depth, parent.is4)
 
 	// sort them by netip.Prefix, not by baseIndex
 	slices.SortFunc(directKids, cmpKidByPrefix[V])
@@ -129,7 +141,7 @@ func (n *node[V]) fprintRec(w io.Writer, parentIdx uint, path [16]byte, depth in
 		// rec-descent with this prefix as parentIdx.
 		// hierarchical nested tree view, two rec-descent functions
 		// work together to spoil the reader.
-		if err := kid.n.fprintRec(w, kid.idx, kid.path, kid.depth, is4, pad+spacer); err != nil {
+		if err := kid.n.fprintRec(w, kid, pad+spacer); err != nil {
 			return err
 		}
 	}
@@ -156,12 +168,22 @@ func (n *node[V]) getKidsRec(parentIdx uint, path [16]byte, depth int, is4 bool)
 
 		// check if lpmIdx for this idx' parent is equal to parentIdx
 		lpmIdx, _, _ := n.lpm(idx >> 1)
+
+		// if idx is directKid?
 		if lpmIdx == parentIdx {
-			// idx is directKid
-			val := n.getValue(idx)
 			cidr, _ := cidrFromPath(path, depth, is4, idx)
 
-			directKids = append(directKids, kid[V]{n, path, depth, idx, cidr, val})
+			kid := kid[V]{
+				n:     n,
+				is4:   is4,
+				path:  path,
+				depth: depth,
+				idx:   idx,
+				cidr:  cidr,
+				val:   n.getValue(idx),
+			}
+
+			directKids = append(directKids, kid)
 		}
 	}
 
@@ -169,6 +191,7 @@ func (n *node[V]) getKidsRec(parentIdx uint, path [16]byte, depth int, is4 bool)
 	addrBackingArray := [maxNodeChildren]uint{}
 	for i, addr := range n.allChildAddrs(addrBackingArray[:]) {
 		octet := byte(addr)
+
 		// do a longest-prefix-match
 		lpmIdx, _, _ := n.lpm(octetToBaseIndex(octet))
 		if lpmIdx == parentIdx {
