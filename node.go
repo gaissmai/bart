@@ -146,10 +146,10 @@ func (n *node[V]) updatePrefix(octet byte, prefixLen int, cb func(V, bool) V) (n
 // backtracking is fast, it's just a bitset test and, if found, one popcount.
 // max steps in backtracking is the stride length.
 func (n *node[V]) lpm(idx uint) (baseIdx uint, val V, ok bool) {
-	// backtracking the CBT
+	// backtracking the CBT, make it as fast as possible
 	for baseIdx = idx; baseIdx > 0; baseIdx >>= 1 {
+		// practically it's getValueOK, but getValueOK is not inlined
 		if n.prefixesBitset.Test(baseIdx) {
-			// longest prefix match
 			return baseIdx, n.prefixes[n.prefixRank(baseIdx)], true
 		}
 	}
@@ -178,7 +178,8 @@ func (n *node[V]) getValueOK(baseIdx uint) (val V, ok bool) {
 	return
 }
 
-// getValue for baseIdx.
+// getValue for baseIdx, use it only after a successful bitset test.
+// n.prefixesBitset.Test(baseIdx) must be true
 func (n *node[V]) getValue(baseIdx uint) V {
 	return n.prefixes[n.prefixRank(baseIdx)]
 }
