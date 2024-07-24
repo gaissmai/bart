@@ -419,22 +419,15 @@ func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 	}
 
 	// 2. Test if prefix overlaps any route in this node
-	// use bitsets intersection instead of range loops
+	// use bitset intersection with alloted stride table instead of range loops
 
 	// buffer for bitset backing array, make sure we don't allocate
-	idxBuf := [8]uint64{}
-	idxRoutes := bitset.From(idxBuf[:])
-	if idx < 256 {
-		// overwrite the backing array of bitset with precalculated bitset
-		copy(idxBuf[:], allotLookupTbl[idx][:])
-		idxRoutes = bitset.From(idxBuf[:])
-	} else {
-		// upper half in allot tbl, just 1 bit is set, fast calculation at runtime
-		idxRoutes.Set(idx)
-	}
+	pfxBuf := [8]uint64{}
+	allotedPrefixRoutes(idx, pfxBuf[:])
+	prefixRoutesBitset := bitset.From(pfxBuf[:])
 
-	// use bitsets intersection instead of range loops
-	if idxRoutes.IntersectionCardinality(n.prefixesBitset) != 0 {
+	// use bitset intersection instead of range loops
+	if prefixRoutesBitset.IntersectionCardinality(n.prefixesBitset) != 0 {
 		return true
 	}
 
@@ -445,18 +438,11 @@ func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 
 	// buffer for bitset backing array, make sure we don't allocate
 	hostBuf := [4]uint64{}
-	hostRoutes := bitset.From(hostBuf[:])
-	if idx < 256 {
-		// overwrite the backing array of bitset with precalculated bitset
-		copy(hostBuf[:], allotLookupTbl[idx][4:])
-		hostRoutes = bitset.From(hostBuf[:])
-	} else {
-		// upper half in allot tbl, just 1 bit is set, fast calculation at runtime
-		hostRoutes.Set(idx - 256)
-	}
+	allotedHostRoutes(idx, hostBuf[:])
+	hostRoutesBitset := bitset.From(hostBuf[:])
 
 	// use bitsets intersection instead of range loops
-	return hostRoutes.IntersectionCardinality(n.childrenBitset) != 0
+	return hostRoutesBitset.IntersectionCardinality(n.childrenBitset) != 0
 }
 
 // eachSubnet calls yield() for any covered CIDR by parent prefix in natural CIDR sort order..

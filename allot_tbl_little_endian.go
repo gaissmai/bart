@@ -1,3 +1,6 @@
+// Copyright (c) 2024 Karl Gaissmaier
+// SPDX-License-Identifier: MIT
+
 //go:build !big_endian
 
 package bart
