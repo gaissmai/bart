@@ -1539,6 +1539,77 @@ func TestClone(t *testing.T) {
 	}
 }
 
+func TestCloneShallow(t *testing.T) {
+	t.Parallel()
+
+	tbl := new(Table[*int])
+	clone := tbl.Clone()
+	if tbl.String() != clone.String() {
+		t.Errorf("empty Clone: got:\n%swant:\n%s", clone.String(), tbl.String())
+	}
+
+	val := 1
+	pfx := mpp("10.0.0.1/32")
+	tbl.Insert(pfx, &val)
+
+	clone = tbl.Clone()
+	want, _ := tbl.Get(pfx)
+	got, _ := clone.Get(pfx)
+
+	if !(*got == *want && got == want) {
+		t.Errorf("shallow copy, values and pointers must be equal:\nvalues(%d, %d)\n(ptr(%v, %v)", *got, *want, got, want)
+	}
+
+	// update value, shallow copy of values, clone must be equal
+	val = 2
+	want, _ = tbl.Get(pfx)
+	got, _ = clone.Get(pfx)
+
+	if *got != *want {
+		t.Errorf("memory aliasing after shallow copy, values must be equal:\nvalues(%d, %d)", *got, *want)
+	}
+}
+
+// tests for deep copies with Cloner interface
+type MyInt int
+
+// implement the Cloner interface
+func (i *MyInt) Clone() *MyInt {
+	a := *i
+	return &a
+}
+
+func TestCloneDeep(t *testing.T) {
+	t.Parallel()
+
+	tbl := new(Table[*MyInt])
+	clone := tbl.Clone()
+	if tbl.String() != clone.String() {
+		t.Errorf("empty Clone: got:\n%swant:\n%s", clone.String(), tbl.String())
+	}
+
+	val := MyInt(1)
+	pfx := mpp("10.0.0.1/32")
+	tbl.Insert(pfx, &val)
+
+	clone = tbl.Clone()
+	want, _ := tbl.Get(pfx)
+	got, _ := clone.Get(pfx)
+
+	if *got != *want || got == want {
+		t.Errorf("deep copy, values must be equal, pointers must be different:\nvalues(%d, %d)\n(ptr(%v, %v)", *got, *want, got, want)
+	}
+
+	// update value, deep copy of values, cloned value must now be different
+	val = 2
+	want, _ = tbl.Get(pfx)
+	got, _ = clone.Get(pfx)
+
+	if *got == *want {
+		t.Errorf("memory aliasing after deep copy, values must be different:\nvalues(%d, %d)", *got, *want)
+	}
+}
+
 // test some edge cases
 func TestOverlapsPrefixEdgeCases(t *testing.T) {
 	t.Parallel()
@@ -1831,6 +1902,29 @@ func BenchmarkTableOverlaps(b *testing.B) {
 			b.Run(fmt.Sprintf("%s/%d_with_%d", fam, nroutes, intersectSize), func(b *testing.B) {
 				for i := 0; i < b.N; i++ {
 					boolSink = rt.Overlaps(intersects[i%numIntersects])
+				}
+			})
+		}
+	}
+}
+
+func BenchmarkTableClone(b *testing.B) {
+	for _, fam := range []string{"ipv4", "ipv6"} {
+		rng := randomPrefixes4
+		if fam == "ipv6" {
+			rng = randomPrefixes6
+		}
+
+		for _, nroutes := range benchRouteCount {
+			var rt Table[int]
+			for _, route := range rng(nroutes) {
+				rt.Insert(route.pfx, route.val)
+			}
+
+			b.ResetTimer()
+			b.Run(fmt.Sprintf("%s/%d", fam, nroutes), func(b *testing.B) {
+				for i := 0; i < b.N; i++ {
+					rt.Clone()
 				}
 			})
 		}
