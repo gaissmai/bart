@@ -113,11 +113,15 @@ Please open an issue for discussion before sending a pull request.
 
 ## CREDIT
 
+Standing on the shoulders of giants.
+
 Credits for many inspirations go to the clever guys at tailscale,
 to Daniel Lemire for the super-fast bitset package and
 to Donald E. Knuth for the **ART** routing algorithm and
 all the rest of his *Art* and for keeping important algorithms
 in the public domain!
+
+And last but not least to the Go team who do a wonderful job!
 
 ## LICENSE
 
