@@ -216,9 +216,9 @@ func cidrFromPath(path [16]byte, depth int, is4 bool, idx uint) (netip.Prefix, e
 	// make ip addr from octets
 	var ip netip.Addr
 	if is4 {
-		b4 := [4]byte{}
-		copy(b4[:], path[:4])
-		ip = netip.AddrFrom4(b4)
+		// convert slice to array pointer
+		a4 := (*[4]byte)(path[:4])
+		ip = netip.AddrFrom4(*a4)
 	} else {
 		ip = netip.AddrFrom16(path)
 	}
