@@ -7,7 +7,7 @@ package bart
 
 // allotLookupTbl, as precalculated bitsets,
 // see comment in little endian file
-var allotLookupTbl = [512][8]uint64{
+var allotLookupTbl = [256][8]uint64{
 	/* idx == 0   */ {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 	/* idx == 1   */ {0xfeffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff},
 	/* idx == 2   */ {0x340fff00ffff0000, 0xffffffff00000000, 0xffffffffffffffff, 0x0, 0xffffffffffffffff, 0xffffffffffffffff, 0x0, 0x0},

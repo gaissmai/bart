@@ -19,7 +19,7 @@ package bart
 //		}
 //
 // Used for bitset intersections instead of range loops in overlaps tests.
-var allotLookupTbl = [512][8]uint64{
+var allotLookupTbl = [256][8]uint64{
 	/* idx == 0   */ {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 	/* idx == 1   */ {0xfffffffffffffffe, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff},
 	/* idx == 2   */ {0xffff00ff0f34, 0xffffffff, 0xffffffffffffffff, 0x0, 0xffffffffffffffff, 0xffffffffffffffff, 0x0, 0x0},
