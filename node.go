@@ -603,12 +603,21 @@ func (n *node[V]) cloneRec() *node[V] {
 	}
 
 	c.prefixesBitset = n.prefixesBitset.Clone() // deep
-	c.prefixes = slices.Clone(n.prefixes)       // shallow values
+	c.prefixes = slices.Clone(n.prefixes)       // values, shallow copy
+
+	// deep copy if V implements Cloner[V]
+	for i, v := range c.prefixes {
+		if v, ok := any(v).(Cloner[V]); ok {
+			c.prefixes[i] = v.Clone()
+		} else {
+			break
+		}
+	}
 
 	c.childrenBitset = n.childrenBitset.Clone() // deep
-	c.children = slices.Clone(n.children)       // shallow
+	c.children = slices.Clone(n.children)       // children, shallow copy
 
-	// now clone the children deep
+	// deep copy of children
 	for i, child := range c.children {
 		c.children[i] = child.cloneRec()
 	}

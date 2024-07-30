@@ -44,6 +44,11 @@ type Table[V any] struct {
 	initOnce sync.Once
 }
 
+// Cloner, if implemented by payload of type V, the values are deeply copied during [Table.Clone] and [Table.Union].
+type Cloner[V any] interface {
+	Clone() V
+}
+
 // init BitSets once, so no constructor is needed
 func (t *Table[V]) init() {
 	// upfront nil test, faster than the atomic load in sync.Once.Do
@@ -573,7 +578,8 @@ func (t *Table[V]) Overlaps6(o *Table[V]) bool {
 }
 
 // Union combines two tables, changing the receiver table.
-// If there are duplicate entries, the value is taken from the other table.
+// If there are duplicate entries, the payload of type V is shallow copied from the other table.
+// If type V implements the Cloner interface, the values are cloned, see also [Table.Clone].
 func (t *Table[V]) Union(o *Table[V]) {
 	t.init()
 	o.init()
@@ -586,7 +592,7 @@ func (t *Table[V]) Union(o *Table[V]) {
 }
 
 // Clone returns a copy of the routing table.
-// The payloads V are copied using assignment, so this is a shallow clone.
+// The payload of type V is shallow copied, but if type V implements the Cloner interface, the values are cloned.
 func (t *Table[V]) Clone() *Table[V] {
 	t.init()
 
