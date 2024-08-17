@@ -312,7 +312,7 @@ func TestSupernets(t *testing.T) {
 	}
 
 	var fastPfxs []netip.Prefix
-	for i := 0; i < 10_000; i++ {
+	for range 10_000 {
 		pfx := randomPrefix()
 
 		goldPfxs := gold.lookupPrefixReverse(pfx)

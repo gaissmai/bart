@@ -53,7 +53,7 @@ func BenchmarkFullTableInsert(b *testing.B) {
 	var rt Table[struct{}]
 
 	b.ResetTimer()
-	for k := 0; k < b.N; k++ {
+	for range b.N {
 		for _, route := range routes6 {
 			rt.Insert(route.CIDR, struct{}{})
 		}
@@ -82,21 +82,21 @@ func BenchmarkFullMatchV4(b *testing.B) {
 
 	b.Run("Lookup", func(b *testing.B) {
 		b.ResetTimer()
-		for k := 0; k < b.N; k++ {
+		for range b.N {
 			intSink, okSink = rt.Lookup(ip)
 		}
 	})
 
 	b.Run("LookupPrefix", func(b *testing.B) {
 		b.ResetTimer()
-		for k := 0; k < b.N; k++ {
+		for range b.N {
 			intSink, okSink = rt.LookupPrefix(ipAsPfx)
 		}
 	})
 
 	b.Run("LookupPrefixLPM", func(b *testing.B) {
 		b.ResetTimer()
-		for k := 0; k < b.N; k++ {
+		for range b.N {
 			_, intSink, okSink = rt.LookupPrefixLPM(ipAsPfx)
 		}
 	})
@@ -124,21 +124,21 @@ func BenchmarkFullMatchV6(b *testing.B) {
 
 	b.Run("Lookup", func(b *testing.B) {
 		b.ResetTimer()
-		for k := 0; k < b.N; k++ {
+		for range b.N {
 			intSink, okSink = rt.Lookup(ip)
 		}
 	})
 
 	b.Run("LookupPrefix", func(b *testing.B) {
 		b.ResetTimer()
-		for k := 0; k < b.N; k++ {
+		for range b.N {
 			intSink, okSink = rt.LookupPrefix(ipAsPfx)
 		}
 	})
 
 	b.Run("LookupPrefixLPM", func(b *testing.B) {
 		b.ResetTimer()
-		for k := 0; k < b.N; k++ {
+		for range b.N {
 			_, intSink, okSink = rt.LookupPrefixLPM(ipAsPfx)
 		}
 	})
@@ -166,21 +166,21 @@ func BenchmarkFullMissV4(b *testing.B) {
 
 	b.Run("Lookup", func(b *testing.B) {
 		b.ResetTimer()
-		for k := 0; k < b.N; k++ {
+		for range b.N {
 			intSink, okSink = rt.Lookup(ip)
 		}
 	})
 
 	b.Run("LookupPrefix", func(b *testing.B) {
 		b.ResetTimer()
-		for k := 0; k < b.N; k++ {
+		for range b.N {
 			intSink, okSink = rt.LookupPrefix(ipAsPfx)
 		}
 	})
 
 	b.Run("LookupPrefixLPM", func(b *testing.B) {
 		b.ResetTimer()
-		for k := 0; k < b.N; k++ {
+		for range b.N {
 			_, intSink, okSink = rt.LookupPrefixLPM(ipAsPfx)
 		}
 	})
@@ -208,21 +208,21 @@ func BenchmarkFullMissV6(b *testing.B) {
 
 	b.Run("Lookup", func(b *testing.B) {
 		b.ResetTimer()
-		for k := 0; k < b.N; k++ {
+		for range b.N {
 			intSink, okSink = rt.Lookup(ip)
 		}
 	})
 
 	b.Run("LookupPrefix", func(b *testing.B) {
 		b.ResetTimer()
-		for k := 0; k < b.N; k++ {
+		for range b.N {
 			intSink, okSink = rt.LookupPrefix(ipAsPfx)
 		}
 	})
 
 	b.Run("LookupPrefixLPM", func(b *testing.B) {
 		b.ResetTimer()
-		for k := 0; k < b.N; k++ {
+		for range b.N {
 			_, intSink, okSink = rt.LookupPrefixLPM(ipAsPfx)
 		}
 	})
@@ -244,7 +244,7 @@ func BenchmarkFullTableOverlapsV4(b *testing.B) {
 
 		b.Run(fmt.Sprintf("With_%4d", i), func(b *testing.B) {
 			b.ResetTimer()
-			for k := 0; k < b.N; k++ {
+			for range b.N {
 				boolSink = rt.Overlaps(inter)
 			}
 		})
@@ -267,7 +267,7 @@ func BenchmarkFullTableOverlapsV6(b *testing.B) {
 
 		b.Run(fmt.Sprintf("With_%4d", i), func(b *testing.B) {
 			b.ResetTimer()
-			for k := 0; k < b.N; k++ {
+			for range b.N {
 				boolSink = rt.Overlaps(inter)
 			}
 		})
@@ -290,7 +290,7 @@ func BenchmarkFullTableOverlaps(b *testing.B) {
 
 		b.Run(fmt.Sprintf("With_%4d", i), func(b *testing.B) {
 			b.ResetTimer()
-			for k := 0; k < b.N; k++ {
+			for range b.N {
 				boolSink = rt.Overlaps(inter)
 			}
 		})
@@ -305,7 +305,7 @@ func BenchmarkFullTableCloneV4(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for k := 0; k < b.N; k++ {
+	for range b.N {
 		cloneSink = rt.Clone()
 	}
 }
@@ -318,7 +318,7 @@ func BenchmarkFullTableCloneV6(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for k := 0; k < b.N; k++ {
+	for range b.N {
 		cloneSink = rt.Clone()
 	}
 }
@@ -331,7 +331,7 @@ func BenchmarkFullTableClone(b *testing.B) {
 	}
 
 	b.ResetTimer()
-	for k := 0; k < b.N; k++ {
+	for range b.N {
 		cloneSink = rt.Clone()
 	}
 }
@@ -344,7 +344,7 @@ func BenchmarkFullTableMemoryV4(b *testing.B) {
 	runtime.ReadMemStats(&startMem)
 
 	b.Run(strconv.Itoa(len(routes4)), func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for range b.N {
 			for _, route := range routes4 {
 				rt.Insert(route.CIDR, struct{}{})
 			}
@@ -367,7 +367,7 @@ func BenchmarkFullTableMemoryV6(b *testing.B) {
 	runtime.ReadMemStats(&startMem)
 
 	b.Run(strconv.Itoa(len(routes6)), func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for range b.N {
 			for _, route := range routes6 {
 				rt.Insert(route.CIDR, struct{}{})
 			}
@@ -390,7 +390,7 @@ func BenchmarkFullTableMemory(b *testing.B) {
 	runtime.ReadMemStats(&startMem)
 
 	b.Run(strconv.Itoa(len(routes)), func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for range b.N {
 			for _, route := range routes {
 				rt.Insert(route.CIDR, struct{}{})
 			}
