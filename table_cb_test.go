@@ -22,7 +22,7 @@ func TestEachSubnetCompare(t *testing.T) {
 		fast.Insert(pfx.pfx, pfx.val)
 	}
 
-	for i := 0; i < 10_000; i++ {
+	for range 10_000 {
 		pfx := randomPrefix()
 		goldPfxs := gold.subnets(pfx)
 
@@ -63,7 +63,7 @@ func TestEachLookupPrefix(t *testing.T) {
 	}
 
 	var fastPfxs []netip.Prefix
-	for i := 0; i < 10_000; i++ {
+	for range 10_000 {
 		pfx := randomPrefix()
 
 		goldPfxs := gold.lookupPrefixReverse(pfx)
@@ -300,7 +300,7 @@ func BenchmarkAll(b *testing.B) {
 
 	b.Run("All", func(b *testing.B) {
 		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
+		for range b.N {
 			rtbl.All()(func(pfx netip.Prefix, _ int) bool {
 				return true
 			})
@@ -309,7 +309,7 @@ func BenchmarkAll(b *testing.B) {
 
 	b.Run("AllSorted", func(b *testing.B) {
 		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
+		for range b.N {
 			rtbl.AllSorted()(func(pfx netip.Prefix, _ int) bool {
 				return true
 			})
