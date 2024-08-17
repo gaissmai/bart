@@ -422,8 +422,7 @@ func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 	// use bitset intersection with alloted stride table instead of range loops
 
 	// buffer for bitset backing array, make sure we don't allocate
-	pfxBuf := [8]uint64{}
-	allotedPrefixRoutes(idx, pfxBuf[:])
+	pfxBuf := allotedPrefixRoutes(idx)
 	prefixRoutesBitset := bitset.From(pfxBuf[:])
 
 	// use bitset intersection instead of range loops
@@ -437,8 +436,7 @@ func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 	// trick, the 2nd half columns of allotLookupTbl[pfxIdx][4:] contains the host routes
 
 	// buffer for bitset backing array, make sure we don't allocate
-	hostBuf := [4]uint64{}
-	allotedHostRoutes(idx, hostBuf[:])
+	hostBuf := allotedHostRoutes(idx)
 	hostRoutesBitset := bitset.From(hostBuf[:])
 
 	// use bitsets intersection instead of range loops
