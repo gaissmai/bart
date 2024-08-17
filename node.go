@@ -186,10 +186,6 @@ func (n *node[V]) getValue(baseIdx uint) V {
 
 // allStrideIndexes returns all baseIndexes set in this stride node in ascending order.
 func (n *node[V]) allStrideIndexes(buffer []uint) []uint {
-	if len(n.prefixes) > len(buffer) {
-		panic("logic error, buffer is too small")
-	}
-
 	_, buffer = n.prefixesBitset.NextSetMany(0, buffer)
 	return buffer
 }
@@ -244,10 +240,6 @@ func (n *node[V]) getChild(octet byte) *node[V] {
 // allChildAddrs fills the buffer with the octets of all child nodes in ascending order,
 // panics if the buffer isn't big enough.
 func (n *node[V]) allChildAddrs(buffer []uint) []uint {
-	if len(n.children) > len(buffer) {
-		panic("logic error, buffer is too small")
-	}
-
 	_, buffer = n.childrenBitset.NextSetMany(0, buffer)
 	return buffer
 }
