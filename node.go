@@ -549,7 +549,7 @@ func (n *node[V]) eachSubnet(path [16]byte, depth int, is4 bool, octet byte, pfx
 // If there are duplicate entries, the value is taken from the other node.
 // Count duplicate entries to adjust the t.size struct members.
 func (n *node[V]) unionRec(o *node[V]) (duplicates int) {
-	// make backing arrays, no heap allocs
+	// make backing array, no heap allocs
 	idxBackingArray := [maxNodePrefixes]uint{}
 
 	// for all prefixes in other node do ...
@@ -560,7 +560,7 @@ func (n *node[V]) unionRec(o *node[V]) (duplicates int) {
 		}
 	}
 
-	// make backing arrays, no heap allocs
+	// make backing array, no heap allocs
 	addrBackingArray := [maxNodeChildren]uint{}
 
 	// for all children in other node do ...
