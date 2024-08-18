@@ -5,7 +5,7 @@ package bart
 
 import "github.com/bits-and-blooms/bitset"
 
-// allotedPrefixRoutes, overwrite the buffer with the precalculated words in allotment table.
+// allotedPrefixRoutes, returns the precalculated words as array from lookup table.
 func allotedPrefixRoutes(idx uint) (a8 [8]uint64) {
 	if idx < 256 {
 		// use precalculated bitset
@@ -16,7 +16,7 @@ func allotedPrefixRoutes(idx uint) (a8 [8]uint64) {
 	return a8
 }
 
-// allotedHostRoutes, overwrite the buffer with the precalculated words in allotment table.
+// allotedHostRoutes, returns the precalculated words as array from lookup table.
 func allotedHostRoutes(idx uint) (a4 [4]uint64) {
 	if idx < 256 {
 		// use precalculated bitset
