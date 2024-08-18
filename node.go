@@ -461,7 +461,7 @@ func (n *node[V]) eachSubnet(path [16]byte, depth int, is4 bool, octet byte, pfx
 	// sort indices in this node in CIDR sort order
 	slices.SortFunc(allCoveredIndices, cmpIndexRank)
 
-	addrBackingArray := [maxNodePrefixes]uint{}
+	addrBackingArray := [maxNodeChildren]uint{}
 	allCoveredAddrs := addrBackingArray[:0]
 
 	var addr uint
