@@ -5,8 +5,9 @@
 
 package bart
 
+// see comment in allot_tbl_little_endian.go
+
 // allotLookupTbl, as precalculated bitsets,
-// see comment in little endian file
 var allotLookupTbl = [256][8]uint64{
 	/* idx == 0   */ {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
 	/* idx == 1   */ {0xfeffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff},

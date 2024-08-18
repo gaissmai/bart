@@ -20,7 +20,7 @@ func TestInverseIndex(t *testing.T) {
 	for i := range maxNodeChildren {
 		for bits := 0; bits <= strideLen; bits++ {
 			octet := byte(i & (0xFF << (strideLen - bits)))
-			idx := prefixToBaseIndex(byte(octet), bits)
+			idx := prefixToBaseIndex(octet, bits)
 			octet2, len2 := baseIndexToPrefix(idx)
 			if octet2 != octet || len2 != bits {
 				t.Errorf("inverse(index(%d/%d)) != %d/%d", octet, bits, octet2, len2)
@@ -31,7 +31,7 @@ func TestInverseIndex(t *testing.T) {
 
 func TestFringeIndex(t *testing.T) {
 	t.Parallel()
-	for i := 0; i < maxNodeChildren; i++ {
+	for i := range maxNodeChildren {
 		got := octetToBaseIndex(byte(i))
 		want := prefixToBaseIndex(byte(i), 8)
 		if got != want {
@@ -55,7 +55,7 @@ func TestPrefixInsert(t *testing.T) {
 		fast.insertPrefix(prefixToBaseIndex(pfx.octet, pfx.bits), pfx.val)
 	}
 
-	for i := 0; i < 256; i++ {
+	for i := range 256 {
 		octet := byte(i)
 		goldVal, goldOK := gold.lpm(octet)
 		_, fastVal, fastOK := fast.lpm(octetToBaseIndex(octet))
@@ -87,7 +87,7 @@ func TestPrefixDelete(t *testing.T) {
 		t.Fatalf("goldenStride has %d entries after deletes, want 50", cnt)
 	}
 
-	for i := 0; i < 256; i++ {
+	for i := range 256 {
 		octet := byte(i)
 		goldVal, goldOK := gold.lpm(octet)
 		_, fastVal, fastOK := fast.lpm(octetToBaseIndex(octet))
@@ -109,7 +109,7 @@ func TestOverlapsPrefix(t *testing.T) {
 	}
 
 	for _, tt := range allStridePfxs() {
-		goldOK := gold.strideOverlapsPrefix(uint8(tt.octet), tt.bits)
+		goldOK := gold.strideOverlapsPrefix(tt.octet, tt.bits)
 		fastOK := fast.overlapsPrefix(tt.octet, tt.bits)
 		if goldOK != fastOK {
 			t.Fatalf("overlapsPrefix(%d, %d) = %v, want %v", tt.octet, tt.bits, fastOK, goldOK)
@@ -126,7 +126,7 @@ func TestOverlapsNode(t *testing.T) {
 	all := allStridePfxs()
 
 	seenResult := map[bool]int{}
-	for i := 0; i < 100_000; i++ {
+	for range 100_000 {
 		shuffleStridePfxs(all)
 		pfxs := all[:numEntries]
 

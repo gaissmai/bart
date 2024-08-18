@@ -50,7 +50,7 @@ func (t *goldStrideTbl[V]) strideOverlapsPrefix(octet uint8, prefixLen int) bool
 			minBits = e.bits
 		}
 		mask := ^hostMasks[minBits]
-		if octet&mask == uint8(e.octet)&mask {
+		if octet&mask == e.octet&mask {
 			return true
 		}
 	}

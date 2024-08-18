@@ -493,7 +493,7 @@ func (n *node[V]) eachSubnet(path [16]byte, depth int, is4 bool, octet byte, pfx
 
 		// yield all childs before idx
 		for j := cursor; j < len(allCoveredAddrs); j++ {
-			addr := allCoveredAddrs[j]
+			addr = allCoveredAddrs[j]
 			addrHostRoute := hostRouteByAddr(addr)
 
 			// yield prefix
@@ -503,7 +503,7 @@ func (n *node[V]) eachSubnet(path [16]byte, depth int, is4 bool, octet byte, pfx
 
 			// yield child
 
-			octet := byte(addr)
+			octet = byte(addr)
 			c := n.getChild(octet)
 
 			// add (set) this octet to path
@@ -527,9 +527,9 @@ func (n *node[V]) eachSubnet(path [16]byte, depth int, is4 bool, octet byte, pfx
 
 	// yield the rest of childs, if any
 	for j := cursor; j < len(allCoveredAddrs); j++ {
-		addr := allCoveredAddrs[j]
+		addr = allCoveredAddrs[j]
 
-		octet := byte(addr)
+		octet = byte(addr)
 		c := n.getChild(octet)
 
 		// add (set) this octet to path

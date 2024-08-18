@@ -35,7 +35,7 @@ func (t *Table[V]) EachLookupPrefix(pfx netip.Prefix, yield func(pfx netip.Prefi
 	if is4 {
 		octets = octets[12:]
 	}
-	copy(path[:], octets[:])
+	copy(path[:], octets)
 
 	// see comment in Insert()
 	lastOctetIdx := (bits - 1) / strideLen
@@ -43,7 +43,7 @@ func (t *Table[V]) EachLookupPrefix(pfx netip.Prefix, yield func(pfx netip.Prefi
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
 	// mask the prefix
-	lastOctet = lastOctet & netMask(lastOctetBits)
+	lastOctet &= netMask(lastOctetBits)
 	octets[lastOctetIdx] = lastOctet
 
 	// stack of the traversed nodes for reverse ordering of supernets
@@ -118,7 +118,7 @@ func (t *Table[V]) EachSubnet(pfx netip.Prefix, yield func(pfx netip.Prefix, val
 	if is4 {
 		octets = octets[12:]
 	}
-	copy(path[:], octets[:])
+	copy(path[:], octets)
 
 	// see comment in Insert()
 	lastOctetIdx := (bits - 1) / strideLen
@@ -126,7 +126,7 @@ func (t *Table[V]) EachSubnet(pfx netip.Prefix, yield func(pfx netip.Prefix, val
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
 	// mask the prefix
-	lastOctet = lastOctet & netMask(lastOctetBits)
+	lastOctet &= netMask(lastOctetBits)
 	octets[lastOctetIdx] = lastOctet
 
 	// find the trie node

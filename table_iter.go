@@ -11,7 +11,6 @@ import (
 // The iteration is in reverse CIDR sort order, from longest-prefix-match to shortest-prefix-match.
 func (t *Table[V]) Supernets(pfx netip.Prefix) func(yield func(netip.Prefix, V) bool) {
 	return func(yield func(netip.Prefix, V) bool) {
-
 		// iterator setup
 		if !pfx.IsValid() {
 			return
@@ -33,7 +32,7 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) func(yield func(netip.Prefix, V) 
 		if is4 {
 			octets = octets[12:]
 		}
-		copy(path[:], octets[:])
+		copy(path[:], octets)
 
 		// see comment in Insert()
 		lastOctetIdx := (bits - 1) / strideLen
@@ -41,7 +40,7 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) func(yield func(netip.Prefix, V) 
 		lastOctetBits := bits - (lastOctetIdx * strideLen)
 
 		// mask the prefix
-		lastOctet = lastOctet & netMask(lastOctetBits)
+		lastOctet &= netMask(lastOctetBits)
 		octets[lastOctetIdx] = lastOctet
 
 		// stack of the traversed nodes for reverse ordering of supernets
@@ -89,14 +88,12 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) func(yield func(netip.Prefix, V) 
 			}
 		}
 	}
-
 }
 
 // Subnets returns an iterator over all CIDRs covered by pfx.
 // The iteration is in natural CIDR sort order.
 func (t *Table[V]) Subnets(pfx netip.Prefix) func(yield func(netip.Prefix, V) bool) {
 	return func(yield func(netip.Prefix, V) bool) {
-
 		// iterator setup
 		if !pfx.IsValid() {
 			return
@@ -118,7 +115,7 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) func(yield func(netip.Prefix, V) bo
 		if is4 {
 			octets = octets[12:]
 		}
-		copy(path[:], octets[:])
+		copy(path[:], octets)
 
 		// see comment in Insert()
 		lastOctetIdx := (bits - 1) / strideLen
@@ -126,7 +123,7 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) func(yield func(netip.Prefix, V) bo
 		lastOctetBits := bits - (lastOctetIdx * strideLen)
 
 		// mask the prefix
-		lastOctet = lastOctet & netMask(lastOctetBits)
+		lastOctet &= netMask(lastOctetBits)
 		octets[lastOctetIdx] = lastOctet
 
 		// find the trie node

@@ -433,7 +433,7 @@ func fillRouteTables() {
 		}
 	}
 
-	if err := scanner.Err(); err != nil {
+	if err = scanner.Err(); err != nil {
 		log.Printf("reading from %v, %v", rgz, err)
 	}
 }
