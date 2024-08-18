@@ -158,7 +158,7 @@ func (n *node[V]) fprintRec(w io.Writer, parent kid[V], pad string) error {
 func (n *node[V]) getKidsRec(parentIdx uint, path [16]byte, depth int, is4 bool) []kid[V] {
 	directKids := []kid[V]{}
 
-	// make backing arrays, no heap allocs
+	// make backing array, no heap allocs
 	idxBackingArray := [maxNodePrefixes]uint{}
 	for _, idx := range n.allStrideIndexes(idxBackingArray[:]) {
 		// parent or self, handled alreday in an upper stack frame.

@@ -71,7 +71,7 @@ func (t *Table[V]) dump(w io.Writer) {
 func (n *node[V]) dumpRec(w io.Writer, path [16]byte, depth int, is4 bool) {
 	n.dump(w, path, depth, is4)
 
-	// make backing arrays, no heap allocs
+	// make backing array, no heap allocs
 	addrBackingArray := [maxNodeChildren]uint{}
 
 	// the node may have childs, the rec-descent monster starts
@@ -94,7 +94,7 @@ func (n *node[V]) dump(w io.Writer, path [16]byte, depth int, is4 bool) {
 		indent, n.hasType(), depth, ipStridePath(path, depth, is4), bits)
 
 	if nPfxLen := len(n.prefixes); nPfxLen != 0 {
-		// make backing arrays, no heap allocs
+		// make backing array, no heap allocs
 		idxBackingArray := [maxNodePrefixes]uint{}
 		allIndices := n.allStrideIndexes(idxBackingArray[:])
 
