@@ -186,7 +186,7 @@ func randomPrefixes4(n int) []goldTableItem[int] {
 
 	for len(pfxs) < n {
 		bits := rand.Intn(32)
-		bits += 1
+		bits++
 		pfx, err := randomAddr4().Prefix(bits)
 		if err != nil {
 			panic(err)
@@ -209,7 +209,7 @@ func randomPrefixes6(n int) []goldTableItem[int] {
 
 	for len(pfxs) < n {
 		bits := rand.Intn(128)
-		bits += 1
+		bits++
 		pfx, err := randomAddr6().Prefix(bits)
 		if err != nil {
 			panic(err)
@@ -258,9 +258,8 @@ func randomAddr6() netip.Addr {
 func randomPrefix() netip.Prefix {
 	if rand.Intn(2) == 1 {
 		return randomPrefix4()
-	} else {
-		return randomPrefix6()
 	}
+	return randomPrefix6()
 }
 
 func randomPrefix4() netip.Prefix {

@@ -121,7 +121,6 @@ func ExampleTable_EachSubnet_callback() {
 	// 10.0.1.0/24
 	// 127.0.0.0/8
 	// 127.0.0.1/32
-
 }
 
 func ExampleTable_EachLookupPrefix_callback() {

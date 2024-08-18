@@ -1026,7 +1026,7 @@ func TestDeleteIsReverseOfInsert(t *testing.T) {
 
 	defer func() {
 		if t.Failed() {
-			fmt.Printf("the prefixes that fail the test: %v\n", prefixes)
+			t.Logf("the prefixes that fail the test: %v\n", prefixes)
 		}
 	}()
 

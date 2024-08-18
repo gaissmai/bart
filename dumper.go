@@ -105,8 +105,8 @@ func (n *node[V]) dump(w io.Writer, path [16]byte, depth int, is4 bool) {
 		fmt.Fprintf(w, "%sprefxs(#%d):", indent, nPfxLen)
 
 		for _, idx := range allIndices {
-			octet, bits := baseIndexToPrefix(idx)
-			fmt.Fprintf(w, " %s/%d", octetFmt(octet, is4), bits)
+			octet, pfxLen := baseIndexToPrefix(idx)
+			fmt.Fprintf(w, " %s/%d", octetFmt(octet, is4), pfxLen)
 		}
 		fmt.Fprintln(w)
 

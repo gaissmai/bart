@@ -42,7 +42,7 @@ func ExampleTable_Subnets_rangeoverfunc() {
 
 	cidr := netip.MustParsePrefix("0.0.0.0/1")
 
-	for pfx, _ := range rtbl.Subnets(cidr) {
+	for pfx := range rtbl.Subnets(cidr) {
 		fmt.Printf("%v\n", pfx)
 	}
 
@@ -52,7 +52,6 @@ func ExampleTable_Subnets_rangeoverfunc() {
 	// 10.0.1.0/24
 	// 127.0.0.0/8
 	// 127.0.0.1/32
-
 }
 
 func ExampleTable_Supernets_rangeoverfunc() {
@@ -64,7 +63,7 @@ func ExampleTable_Supernets_rangeoverfunc() {
 	cidr := netip.MustParsePrefix("2001:db8::/32")
 
 	counter := 0
-	for pfx, _ := range rtbl.Supernets(cidr) {
+	for pfx := range rtbl.Supernets(cidr) {
 		fmt.Printf("%v\n", pfx)
 		counter++
 		if counter >= 2 {
