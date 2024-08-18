@@ -51,28 +51,28 @@ func (t *Table[V]) String() string {
 	return w.String()
 }
 
-// Fprint writes a hierarchical tree diagram of the ordered CIDRs to w.
-// If w is nil, Fprint panics.
+// Fprint writes a hierarchical tree diagram of the ordered CIDRs
+// with default formatted payload V to w. If w is nil, Fprint panics.
 //
 // The order from top to bottom is in ascending order of the prefix address
 // and the subtree structure is determined by the CIDRs coverage.
 //
 //	▼
-//	├─ 10.0.0.0/8 (9.9.9.9)
-//	│  ├─ 10.0.0.0/24 (8.8.8.8)
-//	│  └─ 10.0.1.0/24 (10.0.0.0)
-//	├─ 127.0.0.0/8 (127.0.0.1)
-//	│  └─ 127.0.0.1/32 (127.0.0.1)
-//	├─ 169.254.0.0/16 (10.0.0.0)
-//	├─ 172.16.0.0/12 (8.8.8.8)
-//	└─ 192.168.0.0/16 (9.9.9.9)
-//	   └─ 192.168.1.0/24 (127.0.0.1)
+//	├─ 10.0.0.0/8 (V)
+//	│  ├─ 10.0.0.0/24 (V)
+//	│  └─ 10.0.1.0/24 (V)
+//	├─ 127.0.0.0/8 (V)
+//	│  └─ 127.0.0.1/32 (V)
+//	├─ 169.254.0.0/16 (V)
+//	├─ 172.16.0.0/12 (V)
+//	└─ 192.168.0.0/16 (V)
+//	   └─ 192.168.1.0/24 (V)
 //	▼
-//	└─ ::/0 (2001:db8::1)
-//	   ├─ ::1/128 (::1%lo)
-//	   ├─ 2000::/3 (2001:db8::1)
-//	   │  └─ 2001:db8::/32 (2001:db8::1)
-//	   └─ fe80::/10 (::1%eth0)
+//	└─ ::/0 (V)
+//	   ├─ ::1/128 (V)
+//	   ├─ 2000::/3 (V)
+//	   │  └─ 2001:db8::/32 (V)
+//	   └─ fe80::/10 (V)
 func (t *Table[V]) Fprint(w io.Writer) error {
 	t.init()
 
