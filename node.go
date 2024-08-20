@@ -266,64 +266,31 @@ func (n *node[V]) eachLookupPrefix(path [16]byte, depth int, is4 bool, octet byt
 
 // overlapsRec returns true if any IP in the nodes n or o overlaps.
 func (n *node[V]) overlapsRec(o *node[V]) bool {
-	// ##############################
-	// 1. Test if any routes overlaps
-	// ##############################
-
 	nPfxLen := len(n.prefixes)
 	oPfxLen := len(o.prefixes)
 
 	nChildLen := len(n.children)
 	oChildLen := len(o.children)
 
-	var nIdx, oIdx uint
+	// ##############################
+	// 1. Test if any routes overlaps
+	// ##############################
 
-	// special case, a node has one prefix and no child
-	// overlapsPrefix is faster than overlapsRec
-	if oPfxLen == 1 && oChildLen == 0 {
-		// get the single oIdx
-		oIdx, _ = o.prefixesBitset.NextSet(0)
-		return n.overlapsPrefix(baseIndexToPrefix(oIdx))
-	}
-
-	// special case, reversed
-	if nPfxLen == 1 && nChildLen == 0 {
-		// get the single nIdx
-		nIdx, _ = n.prefixesBitset.NextSet(0)
+	switch {
+	case nPfxLen == 1 && nChildLen == 0:
+		// overlapsPrefix is faster than overlapsRec
+		nIdx, _ := n.prefixesBitset.NextSet(0)
 		return o.overlapsPrefix(baseIndexToPrefix(nIdx))
-	}
 
-	if nPfxLen > 0 && oPfxLen > 0 {
-		if n.prefixesBitset.IntersectionCardinality(o.prefixesBitset) > 0 {
-			// some prefixes are identical, trivial overlap
+	case oPfxLen == 1 && oChildLen == 0:
+		// symmetric reverse
+		oIdx, _ := o.prefixesBitset.NextSet(0)
+		return n.overlapsPrefix(baseIndexToPrefix(oIdx))
+
+	case nPfxLen > 0 && oPfxLen > 0:
+		// full cross check
+		if n.overlapsRoutes(o) {
 			return true
-		}
-
-		nOK := nPfxLen > 0
-		oOK := oPfxLen > 0
-
-		// zip, range over n and o together to help chance on its way
-		for nOK || oOK {
-
-			if nOK {
-				// does any route in o overlap this prefix from n
-				if nIdx, nOK = n.prefixesBitset.NextSet(nIdx); nOK {
-					if o.lpmTest(nIdx) {
-						return true
-					}
-					nIdx++
-				}
-			}
-
-			if oOK {
-				// does any route in n overlap this prefix from o
-				if oIdx, oOK = o.prefixesBitset.NextSet(oIdx); oOK {
-					if n.lpmTest(oIdx) {
-						return true
-					}
-					oIdx++
-				}
-			}
 		}
 	}
 
@@ -331,32 +298,16 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 	// 2. Test if routes overlaps any child
 	// ####################################
 
-	var nAddr, oAddr uint
-
-	nOK := nChildLen > 0 && oPfxLen > 0 // test the childs in n against the routes in o
-	oOK := oChildLen > 0 && nPfxLen > 0 // test the childs in o against the routes in n
-
-	// zip, range over n and o together to help chance on its way
-	for nOK || oOK {
-
-		if nOK {
-			// does any route in o overlap this child from n
-			if nAddr, nOK = n.childrenBitset.NextSet(nAddr); nOK {
-				if o.lpmTest(octetToBaseIndex(byte(nAddr))) {
-					return true
-				}
-				nAddr++
-			}
+	if nPfxLen > 0 && oChildLen > 0 {
+		if n.overlapsChildsIn(o) {
+			return true
 		}
+	}
 
-		if oOK {
-			// does any route in n overlap this child from o
-			if oAddr, oOK = o.childrenBitset.NextSet(oAddr); oOK {
-				if n.lpmTest(octetToBaseIndex(byte(oAddr))) {
-					return true
-				}
-				oAddr++
-			}
+	// symmetric reverse
+	if oPfxLen > 0 && nChildLen > 0 {
+		if o.overlapsChildsIn(n) {
+			return true
 		}
 	}
 
@@ -374,7 +325,105 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 		return false
 	}
 
-	// gimmicks, clone a bitset without allocations
+	return n.overlapsSameChilds(o)
+}
+
+// overlapsRoutes, test if n overlaps o prefixes and vice versa
+func (n *node[V]) overlapsRoutes(o *node[V]) bool {
+	// some prefixes are identical, trivial overlap
+	if n.prefixesBitset.IntersectionCardinality(o.prefixesBitset) > 0 {
+		return true
+	}
+
+	nOK := true
+	oOK := true
+
+	var nIdx, oIdx uint
+
+	// zip, range over n and o together to help chance on its way
+	for nOK || oOK {
+
+		if nOK {
+			// does any route in o overlap this prefix from n
+			if nIdx, nOK = n.prefixesBitset.NextSet(nIdx); nOK {
+				if o.lpmTest(nIdx) {
+					return true
+				}
+				nIdx++
+			}
+		}
+
+		if oOK {
+			// does any route in n overlap this prefix from o
+			if oIdx, oOK = o.prefixesBitset.NextSet(oIdx); oOK {
+				if n.lpmTest(oIdx) {
+					return true
+				}
+				oIdx++
+			}
+		}
+	}
+
+	return false
+}
+
+// overlapsChildsIn, test if prefixes in n overlaps child octets in o.
+func (n *node[V]) overlapsChildsIn(o *node[V]) bool {
+	pfxLen := len(n.prefixes)
+	childLen := len(o.children)
+
+	// heuristic, compare benchmarks
+	// when will re range over the children and when will we do bitset calc?
+	magicNumber := 15
+	doRange := childLen < magicNumber || pfxLen > magicNumber
+
+	// do range over, not so many childs and maybe to many prefixes
+	if doRange {
+		var oAddr uint
+		ok := true
+		for ok {
+			// does any route in o overlap this child from n
+			if oAddr, ok = o.childrenBitset.NextSet(oAddr); ok {
+				if n.lpmTest(octetToBaseIndex(byte(oAddr))) {
+					return true
+				}
+				oAddr++
+			}
+		}
+
+		return false
+	}
+
+	// do bitset intersection, alloted route table with child octets
+	// maybe to many childs ro range over or not so many prefixes to
+	// build the alloted routing table from them
+
+	// make allot table with prefixes as bitsets, bitsets are precalculated
+	// just union the bitsets to one bitset (allot table) for all prefixes
+	// in this node
+
+	// gimmick, don't allocate, can't use bitset.New()
+	prefixArray := [8]uint64{}
+	prefixRoutes := bitset.From(prefixArray[:])
+
+	idxBackingArray := [maxNodePrefixes]uint{}
+	for _, idx := range n.allStrideIndexes(idxBackingArray[:]) {
+		a8 := allotedPrefixRoutes(idx)
+		prefixRoutes.InPlaceUnion(bitset.From(a8[:]))
+	}
+
+	// shift children bitset by firstHostIndex
+	c8 := [8]uint64{}
+	copy(c8[4:], o.childrenBitset.Bytes()) // 4*64= 256
+	hostRoutes := bitset.From(c8[:])
+
+	return prefixRoutes.IntersectionCardinality(hostRoutes) > 0
+}
+
+// overlapsSameChilds, irec-descent with same child octet in n an o,
+// find same octets with bitset intersection.
+func (n *node[V]) overlapsSameChilds(o *node[V]) bool {
+	// gimmicks, clone a bitset without heap allocation
 	// 4*64=256, maxNodeChildren
 	buf := [4]uint64{}
 	copy(buf[:], n.childrenBitset.Bytes())
