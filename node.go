@@ -425,9 +425,9 @@ func (n *node[V]) overlapsChildsIn(o *node[V]) bool {
 func (n *node[V]) overlapsSameChilds(o *node[V]) bool {
 	// gimmicks, clone a bitset without heap allocation
 	// 4*64=256, maxNodeChildren
-	buf := [4]uint64{}
-	copy(buf[:], n.childrenBitset.Bytes())
-	nChildrenBitsetCloned := bitset.From(buf[:])
+	a4 := [4]uint64{}
+	copy(a4[:], n.childrenBitset.Bytes())
+	nChildrenBitsetCloned := bitset.From(a4[:])
 
 	// intersect in place the child bitsets from n and o
 	nChildrenBitsetCloned.InPlaceIntersection(o.childrenBitset)
@@ -474,14 +474,17 @@ func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 	// 3. Test if prefix overlaps any child in this node
 	// use bitsets intersection instead of range loops
 
-	// trick, the 2nd half columns of allotLookupTbl[pfxIdx][4:] contains the host routes
+	// shift children bitset by firstHostIndex
+	c8 := [8]uint64{}
+	copy(c8[4:], n.childrenBitset.Bytes()) // 4*64= 256
+	hostRoutes := bitset.From(c8[:])
 
 	// buffer for bitset backing array, make sure we don't allocate
-	hostBuf := allotedHostRoutes(idx)
-	hostRoutesBitset := bitset.From(hostBuf[:])
+	a8 := allotedPrefixRoutes(idx)
+	prefixRoutes := bitset.From(a8[:])
 
 	// use bitsets intersection instead of range loops
-	return hostRoutesBitset.IntersectionCardinality(n.childrenBitset) != 0
+	return prefixRoutes.IntersectionCardinality(hostRoutes) != 0
 }
 
 // eachSubnet calls yield() for any covered CIDR by parent prefix in natural CIDR sort order..
