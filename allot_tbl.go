@@ -17,15 +17,3 @@ func allotedPrefixRoutes(idx uint) (a8 [8]uint64) {
 	bitset.From(a8[:]).Set(idx)
 	return a8
 }
-
-// allotedHostRoutes, returns the precalculated words as array from lookup table.
-func allotedHostRoutes(idx uint) (a4 [4]uint64) {
-	if idx < firstHostIndex {
-		// use precalculated bitset
-		copy(a4[:], allotLookupTbl[idx][4:])
-		return a4
-	}
-	// upper half in allot tbl, just 1 bit is set, fast calculation at runtime
-	bitset.From(a4[:]).Set(idx - firstHostIndex)
-	return a4
-}
