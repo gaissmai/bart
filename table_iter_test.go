@@ -45,7 +45,7 @@ func TestAll4RangeOverFunc(t *testing.T) {
 
 		// check if callback stops prematurely
 		count := 0
-		for _, _ = range rtbl.All4() {
+		for range rtbl.All4() {
 			count++
 			if count >= 1000 {
 				break
@@ -93,7 +93,7 @@ func TestAll6RangeOverFunc(t *testing.T) {
 
 		// check if callback stops prematurely
 		count := 0
-		for _, _ = range rtbl.All6() {
+		for range rtbl.All6() {
 			count++
 			if count >= 1000 {
 				break
@@ -141,7 +141,7 @@ func TestAllRangeOverFunc(t *testing.T) {
 
 		// check if callback stops prematurely
 		count := 0
-		for _, _ = range rtbl.All() {
+		for range rtbl.All() {
 			count++
 			if count >= 1000 {
 				break
@@ -189,7 +189,7 @@ func TestAll4SortedIter(t *testing.T) {
 
 		// check if callback stops prematurely
 		count := 0
-		for _, _ = range rtbl.All4Sorted() {
+		for range rtbl.All4Sorted() {
 			count++
 			if count >= 1000 {
 				break
@@ -237,7 +237,7 @@ func TestAll6SortedRangeOverFunc(t *testing.T) {
 
 		// check if callback stops prematurely
 		count := 0
-		for _, _ = range rtbl.All6Sorted() {
+		for range rtbl.All6Sorted() {
 			count++
 			if count >= 1000 {
 				break
@@ -285,7 +285,7 @@ func TestAllSortedRangeOverFunc(t *testing.T) {
 
 		// check if callback stops prematurely
 		count := 0
-		for _, _ = range rtbl.AllSorted() {
+		for range rtbl.AllSorted() {
 			count++
 			if count >= 1000 {
 				break
@@ -318,7 +318,7 @@ func TestSupernets(t *testing.T) {
 		goldPfxs := gold.lookupPrefixReverse(pfx)
 
 		fastPfxs = nil
-		for p, _ := range fast.Supernets(pfx) {
+		for p := range fast.Supernets(pfx) {
 			fastPfxs = append(fastPfxs, p)
 		}
 
@@ -333,13 +333,13 @@ func TestSupernetsEdgeCase(t *testing.T) {
 
 	rtbl := new(Table[any])
 	pfx := mpp("::1/128")
-	for _, _ = range rtbl.Supernets(pfx) {
+	for range rtbl.Supernets(pfx) {
 		t.Errorf("empty table, must not range over")
 	}
 
 	val := "foo"
 	rtbl.Insert(pfx, val)
-	for _, _ = range rtbl.Supernets(netip.Prefix{}) {
+	for range rtbl.Supernets(netip.Prefix{}) {
 		t.Errorf("invalid prefix, must not range over")
 	}
 
@@ -352,7 +352,6 @@ func TestSupernetsEdgeCase(t *testing.T) {
 			t.Errorf("Supernets(%v), got: %v, want: %v", pfx, v.(string), val)
 		}
 	}
-
 }
 
 func TestSubnets(t *testing.T) {
@@ -360,13 +359,13 @@ func TestSubnets(t *testing.T) {
 
 	rtbl := new(Table[any])
 	pfx := mpp("::1/128")
-	for _, _ = range rtbl.Subnets(pfx) {
+	for range rtbl.Subnets(pfx) {
 		t.Errorf("empty table, must not range over")
 	}
 
 	val := "foo"
 	rtbl.Insert(pfx, val)
-	for _, _ = range rtbl.Subnets(netip.Prefix{}) {
+	for range rtbl.Subnets(netip.Prefix{}) {
 		t.Errorf("invalid prefix, must not range over")
 	}
 
@@ -379,5 +378,4 @@ func TestSubnets(t *testing.T) {
 			t.Errorf("Subnet(%v), got: %v, want: %v", pfx, v.(string), val)
 		}
 	}
-
 }

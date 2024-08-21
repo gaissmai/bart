@@ -212,11 +212,11 @@ func TestAll(t *testing.T) {
 		}
 
 		// update callback, add 1 to val
-		updateValue := func(val int, ok bool) int {
+		updateValue := func(val int, _ bool) int {
 			return val + 1
 		}
 
-		yield := func(pfx netip.Prefix, val int) bool {
+		yield := func(pfx netip.Prefix, _ int) bool {
 			rtbl.Update(pfx, updateValue)
 			return true
 		}
@@ -241,7 +241,7 @@ func TestAll(t *testing.T) {
 
 		// check if callback stops prematurely
 		countV6 := 0
-		rtbl.All()(func(pfx netip.Prefix, val int) bool {
+		rtbl.All()(func(pfx netip.Prefix, _ int) bool {
 			// max 1000 IPv6 prefixes
 			if !pfx.Addr().Is4() {
 				countV6++
@@ -301,7 +301,7 @@ func BenchmarkAll(b *testing.B) {
 	b.Run("All", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
-			rtbl.All()(func(pfx netip.Prefix, _ int) bool {
+			rtbl.All()(func(_ netip.Prefix, _ int) bool {
 				return true
 			})
 		}
@@ -310,7 +310,7 @@ func BenchmarkAll(b *testing.B) {
 	b.Run("AllSorted", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
-			rtbl.AllSorted()(func(pfx netip.Prefix, _ int) bool {
+			rtbl.AllSorted()(func(_ netip.Prefix, _ int) bool {
 				return true
 			})
 		}
