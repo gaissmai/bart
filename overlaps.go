@@ -47,12 +47,20 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 		return false
 	}
 
+	if oChildLen == 1 {
+		return n.overlapsOneChildIn(o)
+	}
+
+	if nChildLen == 1 {
+		return o.overlapsOneChildIn(n)
+	}
+
 	// stop condition, no child with identical octet in n and o
 	if n.childrenBitset.IntersectionCardinality(o.childrenBitset) == 0 {
 		return false
 	}
 
-	return n.overlapsSameChilds(o)
+	return n.overlapsSameChildsRec(o)
 }
 
 // overlapsRoutes, test if n overlaps o prefixes and vice versa
@@ -158,9 +166,9 @@ func (n *node[V]) overlapsChildsIn(o *node[V]) bool {
 	return prefixRoutes.IntersectionCardinality(hostRoutes) > 0
 }
 
-// overlapsSameChilds, irec-descent with same child octet in n an o,
+// overlapsSameChildsRec, irec-descent with same child octet in n an o,
 // find same octets with bitset intersection.
-func (n *node[V]) overlapsSameChilds(o *node[V]) bool {
+func (n *node[V]) overlapsSameChildsRec(o *node[V]) bool {
 	// gimmicks, clone a bitset without heap allocation
 	// 4*64=256, maxNodeChildren
 	a4 := [4]uint64{}
@@ -179,7 +187,7 @@ func (n *node[V]) overlapsSameChilds(o *node[V]) bool {
 		oChild := o.getChild(byte(addr))
 		nChild := n.getChild(byte(addr))
 
-		// rec-descent
+		// rec-descent with same child
 		if nChild.overlapsRec(oChild) {
 			return true
 		}
@@ -188,9 +196,24 @@ func (n *node[V]) overlapsSameChilds(o *node[V]) bool {
 	return false
 }
 
+func (n *node[V]) overlapsOneChildIn(o *node[V]) bool {
+	// get the single addr and child
+	addr, _ := o.childrenBitset.NextSet(0)
+	oChild := o.children[0]
+	if nChild := n.getChild(byte(addr)); nChild != nil {
+		return nChild.overlapsRec(oChild)
+	}
+	return false
+}
+
 func (n *node[V]) overlapsOneRouteIn(o *node[V]) bool {
 	// get the single prefix from o
 	idx, _ := o.prefixesBitset.NextSet(0)
+
+	// special case, overlapsPrefix is faster
+	if len(o.children) == 0 {
+		return n.overlapsPrefix(baseIndexToPrefix(idx))
+	}
 
 	// 1. Test if any route in this node overlaps prefix?
 	if n.lpmTest(idx) {
