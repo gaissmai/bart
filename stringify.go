@@ -5,6 +5,7 @@ package bart
 
 import (
 	"bytes"
+	"cmp"
 	"fmt"
 	"io"
 	"net/netip"
@@ -233,4 +234,13 @@ func cidrFromPath(path [16]byte, depth int, is4 bool, idx uint) (netip.Prefix, e
 // cmpKidByPrefix, all prefixes are already normalized (Masked).
 func cmpKidByPrefix[V any](a, b kid[V]) int {
 	return cmpPrefix(a.cidr, b.cidr)
+}
+
+// cmpPrefix, compare func for prefix sort,
+// all cidrs are already normalized
+func cmpPrefix(a, b netip.Prefix) int {
+	if cmp := a.Addr().Compare(b.Addr()); cmp != 0 {
+		return cmp
+	}
+	return cmp.Compare(a.Bits(), b.Bits())
 }
