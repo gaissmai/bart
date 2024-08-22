@@ -1730,7 +1730,7 @@ func TestSize(t *testing.T) {
 
 // ############ benchmarks ################################
 
-var benchRouteCount = []int{10, 100, 1000, 10_000, 100_000}
+var benchRouteCount = []int{1, 2, 5, 10, 100, 1000, 10_000, 100_000}
 
 func BenchmarkTableInsert(b *testing.B) {
 	for _, fam := range []string{"ipv4", "ipv6"} {
@@ -1885,7 +1885,7 @@ func BenchmarkTableOverlaps(b *testing.B) {
 			}
 
 			const (
-				intersectSize = 100
+				intersectSize = 8
 				numIntersects = 1_000
 			)
 
@@ -1900,7 +1900,7 @@ func BenchmarkTableOverlaps(b *testing.B) {
 
 			b.ResetTimer()
 			b.Run(fmt.Sprintf("%s/%d_with_%d", fam, nroutes, intersectSize), func(b *testing.B) {
-				for i := 0; i < b.N; i++ {
+				for i := range b.N {
 					boolSink = rt.Overlaps(intersects[i%numIntersects])
 				}
 			})
