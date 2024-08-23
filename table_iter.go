@@ -149,7 +149,7 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) func(yield func(netip.Prefix, V) bo
 func (t *Table[V]) All() func(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
 	return func(yield func(netip.Prefix, V) bool) {
-		_ = t.rootV4.allRec(zeroPath, 0, true, yield) && t.rootV6.allRec(zeroPath, 0, false, yield)
+		_ = t.root4.allRec(zeroPath, 0, true, yield) && t.root6.allRec(zeroPath, 0, false, yield)
 	}
 }
 
@@ -157,7 +157,7 @@ func (t *Table[V]) All() func(yield func(pfx netip.Prefix, val V) bool) {
 func (t *Table[V]) All4() func(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
 	return func(yield func(netip.Prefix, V) bool) {
-		_ = t.rootV4.allRec(zeroPath, 0, true, yield)
+		_ = t.root4.allRec(zeroPath, 0, true, yield)
 	}
 }
 
@@ -165,7 +165,7 @@ func (t *Table[V]) All4() func(yield func(pfx netip.Prefix, val V) bool) {
 func (t *Table[V]) All6() func(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
 	return func(yield func(netip.Prefix, V) bool) {
-		_ = t.rootV6.allRec(zeroPath, 0, false, yield)
+		_ = t.root6.allRec(zeroPath, 0, false, yield)
 	}
 }
 
@@ -173,7 +173,7 @@ func (t *Table[V]) All6() func(yield func(pfx netip.Prefix, val V) bool) {
 func (t *Table[V]) AllSorted() func(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
 	return func(yield func(netip.Prefix, V) bool) {
-		_ = t.rootV4.allRecSorted(zeroPath, 0, true, yield) && t.rootV6.allRecSorted(zeroPath, 0, false, yield)
+		_ = t.root4.allRecSorted(zeroPath, 0, true, yield) && t.root6.allRecSorted(zeroPath, 0, false, yield)
 	}
 }
 
@@ -181,7 +181,7 @@ func (t *Table[V]) AllSorted() func(yield func(pfx netip.Prefix, val V) bool) {
 func (t *Table[V]) All4Sorted() func(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
 	return func(yield func(netip.Prefix, V) bool) {
-		_ = t.rootV4.allRecSorted(zeroPath, 0, true, yield)
+		_ = t.root4.allRecSorted(zeroPath, 0, true, yield)
 	}
 }
 
@@ -189,6 +189,6 @@ func (t *Table[V]) All4Sorted() func(yield func(pfx netip.Prefix, val V) bool) {
 func (t *Table[V]) All6Sorted() func(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
 	return func(yield func(netip.Prefix, V) bool) {
-		_ = t.rootV6.allRecSorted(zeroPath, 0, false, yield)
+		_ = t.root6.allRecSorted(zeroPath, 0, false, yield)
 	}
 }
