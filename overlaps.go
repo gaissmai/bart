@@ -154,7 +154,7 @@ func (n *node[V]) overlapsChildsIn(o *node[V]) bool {
 
 	idxBackingArray := [maxNodePrefixes]uint{}
 	for _, idx := range n.allStrideIndexes(idxBackingArray[:]) {
-		a8 := allotedPrefixRoutes(idx)
+		a8 := allotTblFor(idx)
 		prefixRoutes.InPlaceUnion(bitset.From(a8[:]))
 	}
 
@@ -166,8 +166,8 @@ func (n *node[V]) overlapsChildsIn(o *node[V]) bool {
 	return prefixRoutes.IntersectionCardinality(hostRoutes) > 0
 }
 
-// overlapsSameChildsRec, irec-descent with same child octet in n an o,
-// find same octets with bitset intersection.
+// overlapsSameChildsRec, find same octets with bitset intersection.
+// rec-descent with same child octet in n an o,
 func (n *node[V]) overlapsSameChildsRec(o *node[V]) bool {
 	// gimmicks, clone a bitset without heap allocation
 	// 4*64=256, maxNodeChildren
@@ -224,7 +224,7 @@ func (n *node[V]) overlapsOneRouteIn(o *node[V]) bool {
 	// use bitset intersection with alloted stride table instead of range loops
 
 	// buffer for bitset backing array, make sure we don't allocate
-	pfxBuf := allotedPrefixRoutes(idx)
+	pfxBuf := allotTblFor(idx)
 	prefixRoutesBitset := bitset.From(pfxBuf[:])
 
 	// use bitset intersection instead of range loops
@@ -244,7 +244,7 @@ func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 	// use bitset intersection with alloted stride table instead of range loops
 
 	// buffer for bitset backing array, make sure we don't allocate
-	pfxBuf := allotedPrefixRoutes(idx)
+	pfxBuf := allotTblFor(idx)
 	prefixRoutesBitset := bitset.From(pfxBuf[:])
 
 	// use bitset intersection instead of range loops
@@ -261,7 +261,7 @@ func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 	hostRoutes := bitset.From(c8[:])
 
 	// buffer for bitset backing array, make sure we don't allocate
-	a8 := allotedPrefixRoutes(idx)
+	a8 := allotTblFor(idx)
 	prefixRoutes := bitset.From(a8[:])
 
 	// use bitsets intersection instead of range loops
