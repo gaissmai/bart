@@ -34,8 +34,8 @@ import (
 // The Table is safe for concurrent readers but not for
 // concurrent readers and/or writers.
 type Table[V any] struct {
-	rootV4 *node[V]
-	rootV6 *node[V]
+	root4 *node[V]
+	root6 *node[V]
 
 	size4 int
 	size6 int
@@ -44,7 +44,7 @@ type Table[V any] struct {
 	initOnce sync.Once
 }
 
-// Cloner, if implemented by payload of type V, the values are deeply copied during [Table.Clone] and [Table.Union].
+// Cloner, if implemented by payload of type V the values are deeply copied during [Table.Clone] and [Table.Union].
 type Cloner[V any] interface {
 	Clone() V
 }
@@ -54,22 +54,22 @@ func (t *Table[V]) init() {
 	// upfront nil test, faster than the atomic load in sync.Once.Do
 	// this makes bulk inserts 5% faster and the table is not safe
 	// for concurrent writers anyway
-	if t.rootV6 != nil {
+	if t.root6 != nil {
 		return
 	}
 
 	t.initOnce.Do(func() {
-		t.rootV4 = newNode[V]()
-		t.rootV6 = newNode[V]()
+		t.root4 = newNode[V]()
+		t.root6 = newNode[V]()
 	})
 }
 
 // rootNodeByVersion, select root node for ip version.
 func (t *Table[V]) rootNodeByVersion(is4 bool) *node[V] {
 	if is4 {
-		return t.rootV4
+		return t.root4
 	}
-	return t.rootV6
+	return t.root6
 }
 
 // Insert adds pfx to the tree, with value val.
@@ -481,7 +481,7 @@ func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V, 
 	return
 }
 
-// OverlapsPrefix reports whether any IP in pfx matches a route in the table or vice versa.
+// OverlapsPrefix reports whether any IP in pfx is matched by a route in the table or vice versa.
 func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 	if !pfx.IsValid() {
 		return false
@@ -530,7 +530,7 @@ func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 	return n.overlapsPrefix(lastOctet, lastOctetBits)
 }
 
-// Overlaps reports whether any IP in the table matches a route in the
+// Overlaps reports whether any IP in the table is matched by a route in the
 // other table or vice versa.
 func (t *Table[V]) Overlaps(o *Table[V]) bool {
 	t.init()
@@ -565,7 +565,7 @@ func (t *Table[V]) Overlaps4(o *Table[V]) bool {
 	t.init()
 	o.init()
 
-	return t.rootV4.overlapsRec(o.rootV4)
+	return t.root4.overlapsRec(o.root4)
 }
 
 // Overlaps6 reports whether any IPv6 in the table matches a route in the
@@ -574,7 +574,7 @@ func (t *Table[V]) Overlaps6(o *Table[V]) bool {
 	t.init()
 	o.init()
 
-	return t.rootV6.overlapsRec(o.rootV6)
+	return t.root6.overlapsRec(o.root6)
 }
 
 // Union combines two tables, changing the receiver table.
@@ -584,8 +584,8 @@ func (t *Table[V]) Union(o *Table[V]) {
 	t.init()
 	o.init()
 
-	dup4 := t.rootV4.unionRec(o.rootV4)
-	dup6 := t.rootV6.unionRec(o.rootV6)
+	dup4 := t.root4.unionRec(o.root4)
+	dup6 := t.root6.unionRec(o.root6)
 
 	t.size4 += o.size4 - dup4
 	t.size6 += o.size6 - dup6
@@ -599,8 +599,8 @@ func (t *Table[V]) Clone() *Table[V] {
 	c := new(Table[V])
 	c.init()
 
-	c.rootV4 = t.rootV4.cloneRec()
-	c.rootV6 = t.rootV6.cloneRec()
+	c.root4 = t.root4.cloneRec()
+	c.root6 = t.root6.cloneRec()
 
 	c.size4 = t.size4
 	c.size6 = t.size6
@@ -635,5 +635,5 @@ func (t *Table[V]) Size6() int {
 // nodes, calculates the IPv4 and IPv6 nodes and returns the sum.
 func (t *Table[V]) nodes() int {
 	t.init()
-	return t.rootV4.numNodesRec() + t.rootV6.numNodesRec()
+	return t.root4.numNodesRec() + t.root6.numNodesRec()
 }

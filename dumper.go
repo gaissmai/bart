@@ -61,10 +61,10 @@ func (t *Table[V]) dump(w io.Writer) {
 	t.init()
 
 	fmt.Fprint(w, "### IPv4:")
-	t.rootV4.dumpRec(w, zeroPath, 0, true)
+	t.root4.dumpRec(w, zeroPath, 0, true)
 
 	fmt.Fprint(w, "### IPv6:")
-	t.rootV6.dumpRec(w, zeroPath, 0, false)
+	t.root6.dumpRec(w, zeroPath, 0, false)
 }
 
 // dumpRec, rec-descent the trie.

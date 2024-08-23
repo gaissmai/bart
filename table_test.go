@@ -1717,12 +1717,12 @@ func TestSize(t *testing.T) {
 		t.Errorf("Size6: want: %d, got: %d", golden6, rtbl.Size6())
 	}
 
-	size4Rec := rtbl.rootV4.numPrefixesRec()
+	size4Rec := rtbl.root4.numPrefixesRec()
 	if golden4 != size4Rec {
 		t.Errorf("size4Rec: want: %d, got: %d", golden4, size4Rec)
 	}
 
-	size6Rec := rtbl.rootV6.numPrefixesRec()
+	size6Rec := rtbl.root6.numPrefixesRec()
 	if golden6 != size6Rec {
 		t.Errorf("size6Rec: want: %d, got: %d", golden6, size6Rec)
 	}

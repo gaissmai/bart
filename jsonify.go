@@ -41,20 +41,20 @@ func (t *Table[V]) MarshalJSON() ([]byte, error) {
 // It can be used to analyze the tree or build custom json representation.
 func (t *Table[V]) DumpList4() []DumpListNode[V] {
 	t.init()
-	if t.rootV4 == nil {
+	if t.root4 == nil {
 		return nil
 	}
-	return t.rootV4.dumpListRec(0, zeroPath, 0, true)
+	return t.root4.dumpListRec(0, zeroPath, 0, true)
 }
 
 // DumpList6 dumps the ipv6 tree into a list of roots and their subnets.
 // It can be used to analyze the tree or build custom json representation.
 func (t *Table[V]) DumpList6() []DumpListNode[V] {
 	t.init()
-	if t.rootV6 == nil {
+	if t.root6 == nil {
 		return nil
 	}
-	return t.rootV6.dumpListRec(0, zeroPath, 0, false)
+	return t.root6.dumpListRec(0, zeroPath, 0, false)
 }
 
 func (n *node[V]) dumpListRec(parentIdx uint, path [16]byte, depth int, is4 bool) []DumpListNode[V] {
