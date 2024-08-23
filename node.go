@@ -247,7 +247,7 @@ func (n *node[V]) allChildAddrs(buffer []uint) []uint {
 
 // eachLookupPrefix does an all prefix match in the 8-bit (stride) routing table
 // at this depth and calls yield() for any matching CIDR.
-func (n *node[V]) eachLookupPrefix(path [16]byte, depth int, is4 bool, octet byte, bits int, yield func(pfx netip.Prefix, val V) bool) bool {
+func (n *node[V]) eachLookupPrefix(path [16]byte, depth int, is4 bool, octet byte, bits int, yield func(netip.Prefix, V) bool) bool {
 	// backtracking the CBT
 	for idx := prefixToBaseIndex(octet, bits); idx > 0; idx >>= 1 {
 		if val, ok := n.getValueOK(idx); ok {
@@ -263,8 +263,12 @@ func (n *node[V]) eachLookupPrefix(path [16]byte, depth int, is4 bool, octet byt
 	return true
 }
 
-// eachSubnet calls yield() for any covered CIDR by parent prefix in natural CIDR sort order..
-func (n *node[V]) eachSubnet(path [16]byte, depth int, is4 bool, octet byte, pfxLen int, yield func(pfx netip.Prefix, val V) bool) bool {
+// eachSubnet calls yield() for any covered CIDR by parent prefix in natural CIDR sort order.
+func (n *node[V]) eachSubnet(path [16]byte, depth int, is4 bool, octet byte, pfxLen int, yield func(netip.Prefix, V) bool) bool {
+	// ###############################################################
+	// 1. collect all indices in n covered by prefix
+	// ###############################################################
+
 	pfxIdx := prefixToBaseIndex(octet, pfxLen)
 	pfxLowerHostRoute, pfxUpperHostRoute := hostRoutesByIndex(pfxIdx)
 
@@ -288,6 +292,10 @@ func (n *node[V]) eachSubnet(path [16]byte, depth int, is4 bool, octet byte, pfx
 
 	// sort indices in this node in CIDR sort order
 	slices.SortFunc(allCoveredIndices, cmpIndexRank)
+
+	// ###############################################################
+	// 2. collect all children in n covered by prefix
+	// ###############################################################
 
 	addrBackingArray := [maxNodeChildren]uint{}
 	allCoveredAddrs := addrBackingArray[:0]
@@ -315,7 +323,10 @@ func (n *node[V]) eachSubnet(path [16]byte, depth int, is4 bool, octet byte, pfx
 
 	cursor := 0
 
-	// yield indices and childs in CIDR sort order
+	// #####################################################
+	// 3. yield indices and childs in CIDR sort order
+	// #####################################################
+
 	for _, idx := range allCoveredIndices {
 		idxLowerHostRoute, _ := hostRoutesByIndex(idx)
 
@@ -353,7 +364,10 @@ func (n *node[V]) eachSubnet(path [16]byte, depth int, is4 bool, octet byte, pfx
 		}
 	}
 
-	// yield the rest of childs, if any
+	// ###############################################
+	// 4. yield the rest of childs, if any
+	// ###############################################
+
 	for j := cursor; j < len(allCoveredAddrs); j++ {
 		addr = allCoveredAddrs[j]
 
