@@ -25,7 +25,6 @@ package bart
 
 import (
 	"net/netip"
-	"sync"
 )
 
 // Table is an IPv4 and IPv6 routing table with payload V.
@@ -39,9 +38,6 @@ type Table[V any] struct {
 
 	size4 int
 	size6 int
-
-	// BitSets have to be initialized.
-	initOnce sync.Once
 }
 
 // Cloner, if implemented by payload of type V the values are deeply copied during [Table.Clone] and [Table.Union].
@@ -49,19 +45,14 @@ type Cloner[V any] interface {
 	Clone() V
 }
 
-// init BitSets once, so no constructor is needed
+// init BitSets once, so no constructor is needed and the zero value is ready to use.
+// Not using sync.Once, the table is not safe for concurrent writers anyway
 func (t *Table[V]) init() {
-	// upfront nil test, faster than the atomic load in sync.Once.Do
-	// this makes bulk inserts 5% faster and the table is not safe
-	// for concurrent writers anyway
-	if t.root6 != nil {
-		return
-	}
-
-	t.initOnce.Do(func() {
+	// could also test t.root6, no hidden magic meaning
+	if t.root4 == nil {
 		t.root4 = newNode[V]()
 		t.root6 = newNode[V]()
-	})
+	}
 }
 
 // rootNodeByVersion, select root node for ip version.
@@ -536,13 +527,7 @@ func (t *Table[V]) Overlaps(o *Table[V]) bool {
 	t.init()
 	o.init()
 
-	// t is empty
-	if t.Size() == 0 {
-		return false
-	}
-
-	// o is empty
-	if o.Size() == 0 {
+	if t.Size() == 0 || o.Size() == 0 {
 		return false
 	}
 
@@ -565,6 +550,10 @@ func (t *Table[V]) Overlaps4(o *Table[V]) bool {
 	t.init()
 	o.init()
 
+	if t.size4 == 0 || o.size4 == 0 {
+		return false
+	}
+
 	return t.root4.overlapsRec(o.root4)
 }
 
@@ -573,6 +562,10 @@ func (t *Table[V]) Overlaps4(o *Table[V]) bool {
 func (t *Table[V]) Overlaps6(o *Table[V]) bool {
 	t.init()
 	o.init()
+
+	if t.size6 == 0 || o.size6 == 0 {
+		return false
+	}
 
 	return t.root6.overlapsRec(o.root6)
 }
