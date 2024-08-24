@@ -14,6 +14,20 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 	// 1. Test if any routes overlaps
 	// ##############################
 
+	// special case, overlapsPrefix is faster
+	if nPfxLen == 1 && nChildLen == 0 {
+		// get the single prefix from n
+		idx, _ := n.prefixesBitset.NextSet(0)
+		return o.overlapsPrefix(baseIndexToPrefix(idx))
+	}
+
+	// special case, overlapsPrefix is faster
+	if oPfxLen == 1 && oChildLen == 0 {
+		// get the single prefix from o
+		idx, _ := o.prefixesBitset.NextSet(0)
+		return n.overlapsPrefix(baseIndexToPrefix(idx))
+	}
+
 	// full cross check
 	if nPfxLen > 0 && oPfxLen > 0 {
 		if n.overlapsRoutes(o) {
@@ -209,11 +223,6 @@ func (n *node[V]) overlapsOneChildIn(o *node[V]) bool {
 func (n *node[V]) overlapsOneRouteIn(o *node[V]) bool {
 	// get the single prefix from o
 	idx, _ := o.prefixesBitset.NextSet(0)
-
-	// special case, overlapsPrefix is faster
-	if len(o.children) == 0 {
-		return n.overlapsPrefix(baseIndexToPrefix(idx))
-	}
 
 	// 1. Test if any route in this node overlaps prefix?
 	if n.lpmTest(idx) {
