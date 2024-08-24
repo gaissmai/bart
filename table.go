@@ -524,12 +524,11 @@ func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 // Overlaps reports whether any IP in the table is matched by a route in the
 // other table or vice versa.
 func (t *Table[V]) Overlaps(o *Table[V]) bool {
-	t.init()
-	o.init()
-
 	if t.Size() == 0 || o.Size() == 0 {
 		return false
 	}
+
+	// t and o are already intialized (size != 0)
 
 	// at least one v4 is empty
 	if t.size4 == 0 || o.size4 == 0 {
@@ -547,26 +546,22 @@ func (t *Table[V]) Overlaps(o *Table[V]) bool {
 // Overlaps4 reports whether any IPv4 in the table matches a route in the
 // other table or vice versa.
 func (t *Table[V]) Overlaps4(o *Table[V]) bool {
-	t.init()
-	o.init()
-
 	if t.size4 == 0 || o.size4 == 0 {
 		return false
 	}
 
+	// t and o are already intialized (size != 0)
 	return t.root4.overlapsRec(o.root4)
 }
 
 // Overlaps6 reports whether any IPv6 in the table matches a route in the
 // other table or vice versa.
 func (t *Table[V]) Overlaps6(o *Table[V]) bool {
-	t.init()
-	o.init()
-
 	if t.size6 == 0 || o.size6 == 0 {
 		return false
 	}
 
+	// t and o are already intialized (size != 0)
 	return t.root6.overlapsRec(o.root6)
 }
 
@@ -602,12 +597,11 @@ func (t *Table[V]) Clone() *Table[V] {
 }
 
 func (t *Table[V]) sizeUpdate(is4 bool, n int) {
-	switch is4 {
-	case true:
+	if is4 {
 		t.size4 += n
-	case false:
-		t.size6 += n
+		return
 	}
+	t.size6 += n
 }
 
 // Size returns the prefix count.
@@ -627,6 +621,11 @@ func (t *Table[V]) Size6() int {
 
 // nodes, calculates the IPv4 and IPv6 nodes and returns the sum.
 func (t *Table[V]) nodes() int {
-	t.init()
+	// could also test t.root6, no hidden magic meaning
+	// not initialized
+	if t.root4 == nil {
+		return 0
+	}
+
 	return t.root4.numNodesRec() + t.root6.numNodesRec()
 }

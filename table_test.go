@@ -1675,6 +1675,14 @@ func TestSize(t *testing.T) {
 		t.Errorf("empty Table: want: 0, got: %d", rtbl.Size())
 	}
 
+	if rtbl.Size4() != 0 {
+		t.Errorf("empty Table: want: 0, got: %d", rtbl.Size4())
+	}
+
+	if rtbl.Size6() != 0 {
+		t.Errorf("empty Table: want: 0, got: %d", rtbl.Size6())
+	}
+
 	pfxs1 := randomPrefixes(10_000)
 	pfxs2 := randomPrefixes(10_000)
 
