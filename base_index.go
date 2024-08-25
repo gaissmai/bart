@@ -8,21 +8,17 @@ import "cmp"
 // Please read the ART paper ./doc/artlookup.pdf
 // to understand the baseIndex algorithm.
 
-// hostMasks as lookup table
-var hostMasks = [9]uint8{
-	0b1111_1111, // bits == 0
-	0b0111_1111, // bits == 1
-	0b0011_1111, // bits == 2
-	0b0001_1111, // bits == 3
-	0b0000_1111, // bits == 4
-	0b0000_0111, // bits == 5
-	0b0000_0011, // bits == 6
-	0b0000_0001, // bits == 7
-	0b0000_0000, // bits == 8
-}
-
-func netMask(mask int) uint8 {
-	return ^hostMasks[uint8(mask)]
+// netMask as lookup table
+var netMask = [9]uint8{
+	0b0000_0000, // bits == 0
+	0b1000_0000, // bits == 1
+	0b1100_0000, // bits == 2
+	0b1110_0000, // bits == 3
+	0b1111_0000, // bits == 4
+	0b1111_1000, // bits == 5
+	0b1111_1100, // bits == 6
+	0b1111_1110, // bits == 7
+	0b1111_1111, // bits == 8
 }
 
 const (
