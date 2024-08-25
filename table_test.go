@@ -1709,12 +1709,12 @@ func TestSize(t *testing.T) {
 	var golden4 int
 	var golden6 int
 
-	rtbl.All4Sorted()(func(netip.Prefix, any) bool {
+	rtbl.AllSorted4()(func(netip.Prefix, any) bool {
 		golden4++
 		return true
 	})
 
-	rtbl.All6Sorted()(func(netip.Prefix, any) bool {
+	rtbl.AllSorted6()(func(netip.Prefix, any) bool {
 		golden6++
 		return true
 	})
