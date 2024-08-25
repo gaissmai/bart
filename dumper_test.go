@@ -31,12 +31,8 @@ func TestDumperEmpty(t *testing.T) {
 	t.Parallel()
 	tbl := new(Table[any])
 	checkDump(t, tbl, dumpTest{
-		cidrs: []netip.Prefix{},
-		want: `### IPv4:
-[NULL] depth:  0 path: [] / 0
-### IPv6:
-[NULL] depth:  0 path: [] / 0
-`,
+		cidrs: nil,
+		want:  "",
 	})
 }
 

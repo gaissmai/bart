@@ -26,16 +26,17 @@ type jsonTest struct {
 	want  string
 }
 
-func TestJsonEmpty(t *testing.T) {
+func TestJSONEmpty(t *testing.T) {
 	t.Parallel()
 	tbl := new(Table[any])
-	checkJSON(t, tbl, jsonTest{
-		nodes: []jsonTestNode{},
-		want:  "{}",
-	})
+	_, err := tbl.MarshalJSON()
+	want := "table not initialized"
+	if err.Error() != want {
+		t.Errorf("expected err: %q, got %q", want, err)
+	}
 }
 
-func TestJsonDefaultRouteV4(t *testing.T) {
+func TestJSONDefaultRouteV4(t *testing.T) {
 	t.Parallel()
 	tbl := new(Table[any])
 	checkJSON(t, tbl, jsonTest{
@@ -46,7 +47,7 @@ func TestJsonDefaultRouteV4(t *testing.T) {
 	})
 }
 
-func TestJsonDefaultRouteV6(t *testing.T) {
+func TestJSONDefaultRouteV6(t *testing.T) {
 	t.Parallel()
 	tbl := new(Table[any])
 	checkJSON(t, tbl, jsonTest{
@@ -57,7 +58,7 @@ func TestJsonDefaultRouteV6(t *testing.T) {
 	})
 }
 
-func TestJsonSampleV4(t *testing.T) {
+func TestJSONSampleV4(t *testing.T) {
 	t.Parallel()
 	tbl := new(Table[any])
 	checkJSON(t, tbl, jsonTest{
@@ -102,7 +103,7 @@ func TestJsonSampleV4(t *testing.T) {
 	})
 }
 
-func TestJsonSampleV6(t *testing.T) {
+func TestJSONSampleV6(t *testing.T) {
 	t.Parallel()
 	tbl := new(Table[any])
 	checkJSON(t, tbl, jsonTest{
@@ -129,7 +130,7 @@ func TestJsonSampleV6(t *testing.T) {
 	})
 }
 
-func TestJsonSample(t *testing.T) {
+func TestJSONSample(t *testing.T) {
 	t.Parallel()
 	// ipv4 + ipv6 and various types of value
 	tbl := new(Table[any])

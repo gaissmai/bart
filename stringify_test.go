@@ -29,10 +29,11 @@ func TestStringPanic(t *testing.T) {
 func TestStringEmpty(t *testing.T) {
 	t.Parallel()
 	tbl := new(Table[any])
-	checkString(t, tbl, stringTest{
-		cidrs: []netip.Prefix{},
-		want:  "",
-	})
+	want := ""
+	got := tbl.String()
+	if got != want {
+		t.Errorf("table not initialized, expected %q, got %q", want, got)
+	}
 }
 
 func TestStringDefaultRouteV4(t *testing.T) {
@@ -151,9 +152,11 @@ func TestStringSample(t *testing.T) {
 
 func checkString(t *testing.T, tbl *Table[any], tt stringTest) {
 	t.Helper()
+
 	for _, cidr := range tt.cidrs {
 		tbl.Insert(cidr, nil)
 	}
+
 	got := tbl.String()
 	if tt.want != got {
 		t.Errorf("String got:\n%swant:\n%s", got, tt.want)

@@ -11,8 +11,7 @@ import (
 // The iteration is in reverse CIDR sort order, from longest-prefix-match to shortest-prefix-match.
 func (t *Table[V]) Supernets(pfx netip.Prefix) func(yield func(netip.Prefix, V) bool) {
 	return func(yield func(netip.Prefix, V) bool) {
-		// iterator setup
-		if !pfx.IsValid() {
+		if !pfx.IsValid() || !t.isInit() {
 			return
 		}
 
@@ -22,9 +21,6 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) func(yield func(netip.Prefix, V) 
 		bits := pfx.Bits()
 
 		n := t.rootNodeByVersion(is4)
-		if n == nil {
-			return
-		}
 
 		// do not allocate
 		path := ip.As16()
@@ -94,8 +90,7 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) func(yield func(netip.Prefix, V) 
 // The iteration is in natural CIDR sort order.
 func (t *Table[V]) Subnets(pfx netip.Prefix) func(yield func(netip.Prefix, V) bool) {
 	return func(yield func(netip.Prefix, V) bool) {
-		// iterator setup
-		if !pfx.IsValid() {
+		if !pfx.IsValid() || !t.isInit() {
 			return
 		}
 
@@ -105,9 +100,6 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) func(yield func(netip.Prefix, V) bo
 		bits := pfx.Bits()
 
 		n := t.rootNodeByVersion(is4)
-		if n == nil {
-			return
-		}
 
 		// do not allocate
 		path := ip.As16()

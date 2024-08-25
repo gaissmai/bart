@@ -58,7 +58,10 @@ func (t *Table[V]) dumpString() string {
 //
 // ...
 func (t *Table[V]) dump(w io.Writer) {
-	t.init()
+	if !t.isInit() {
+		fmt.Fprint(w, "")
+		return
+	}
 
 	fmt.Fprint(w, "### IPv4:")
 	t.root4.dumpRec(w, zeroPath, 0, true)
