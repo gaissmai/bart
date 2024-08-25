@@ -12,13 +12,13 @@ import (
 	"github.com/gaissmai/bart"
 )
 
-func ExampleTable_All4_rangeoverfunc() {
+func ExampleTable_AllSorted4_rangeoverfunc() {
 	rtbl := new(bart.Table[netip.Addr])
 	for _, item := range input {
 		rtbl.Insert(item.cidr, item.nextHop)
 	}
 
-	for pfx, val := range rtbl.All4Sorted() {
+	for pfx, val := range rtbl.AllSorted4() {
 		fmt.Printf("%v\t%v\n", pfx, val)
 	}
 

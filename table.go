@@ -562,7 +562,7 @@ func (t *Table[V]) Overlaps6(o *Table[V]) bool {
 
 // Union combines two tables, changing the receiver table.
 // If there are duplicate entries, the payload of type V is shallow copied from the other table.
-// If type V implements the Cloner interface, the values are cloned, see also [Table.Clone].
+// If type V implements the [Cloner] interface, the values are cloned, see also [Table.Clone].
 func (t *Table[V]) Union(o *Table[V]) {
 	// nothing to do
 	if !o.isInit() {
@@ -579,7 +579,7 @@ func (t *Table[V]) Union(o *Table[V]) {
 }
 
 // Clone returns a copy of the routing table.
-// The payload of type V is shallow copied, but if type V implements the Cloner interface, the values are cloned.
+// The payload of type V is shallow copied, but if type V implements the [Cloner] interface, the values are cloned.
 func (t *Table[V]) Clone() *Table[V] {
 	c := new(Table[V])
 	if !t.isInit() {

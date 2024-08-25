@@ -169,16 +169,16 @@ func (t *Table[V]) AllSorted() func(yield func(pfx netip.Prefix, val V) bool) {
 	}
 }
 
-// All4Sorted, like [Table.AllSorted] but only for the v4 routing table.
-func (t *Table[V]) All4Sorted() func(yield func(pfx netip.Prefix, val V) bool) {
+// AllSorted4, like [Table.AllSorted] but only for the v4 routing table.
+func (t *Table[V]) AllSorted4() func(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
 	return func(yield func(netip.Prefix, V) bool) {
 		_ = t.root4.allRecSorted(zeroPath, 0, true, yield)
 	}
 }
 
-// All6Sorted, like [Table.AllSorted] but only for the v6 routing table.
-func (t *Table[V]) All6Sorted() func(yield func(pfx netip.Prefix, val V) bool) {
+// AllSorted6, like [Table.AllSorted] but only for the v6 routing table.
+func (t *Table[V]) AllSorted6() func(yield func(pfx netip.Prefix, val V) bool) {
 	t.init()
 	return func(yield func(netip.Prefix, V) bool) {
 		_ = t.root6.allRecSorted(zeroPath, 0, false, yield)

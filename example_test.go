@@ -80,12 +80,12 @@ func ExampleTable_Lookup() {
 	// Lookup: 2001:7c0:3100:1::111 value: 2001:db8::1, ok: true
 }
 
-func ExampleTable_All4_callback() {
+func ExampleTable_AllSorted4_callback() {
 	rtbl := new(bart.Table[netip.Addr])
 	for _, item := range input {
 		rtbl.Insert(item.cidr, item.nextHop)
 	}
-	rtbl.All4Sorted()(func(pfx netip.Prefix, val netip.Addr) bool {
+	rtbl.AllSorted4()(func(pfx netip.Prefix, val netip.Addr) bool {
 		fmt.Printf("%v\t%v\n", pfx, val)
 		return true
 	})
