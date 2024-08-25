@@ -521,7 +521,7 @@ func TestDelete(t *testing.T) {
 		t.Parallel()
 		// Add/remove prefix from root table.
 		rtbl := &Table[int]{}
-		checkNumNodes(t, rtbl, 2)
+		checkNumNodes(t, rtbl, 0)
 
 		rtbl.Insert(mpp("10.0.0.0/8"), 1)
 		checkRoutes(t, rtbl, []tableTest{
@@ -541,7 +541,7 @@ func TestDelete(t *testing.T) {
 		t.Parallel()
 		// Create, then delete a single leaf table.
 		rtbl := &Table[int]{}
-		checkNumNodes(t, rtbl, 2)
+		checkNumNodes(t, rtbl, 0)
 
 		rtbl.Insert(mpp("192.168.0.1/32"), 1)
 		checkRoutes(t, rtbl, []tableTest{
@@ -560,7 +560,7 @@ func TestDelete(t *testing.T) {
 		t.Parallel()
 		// Create an intermediate with 2 children, then delete one leaf.
 		tbl := &Table[int]{}
-		checkNumNodes(t, tbl, 2)
+		checkNumNodes(t, tbl, 0)
 		tbl.Insert(mpp("192.168.0.1/32"), 1)
 		tbl.Insert(mpp("192.180.0.1/32"), 2)
 		checkRoutes(t, tbl, []tableTest{
@@ -582,7 +582,7 @@ func TestDelete(t *testing.T) {
 		t.Parallel()
 		// Same, but the intermediate carries a route as well.
 		rtbl := &Table[int]{}
-		checkNumNodes(t, rtbl, 2)
+		checkNumNodes(t, rtbl, 0)
 		rtbl.Insert(mpp("192.168.0.1/32"), 1)
 		rtbl.Insert(mpp("192.180.0.1/32"), 2)
 		rtbl.Insert(mpp("192.0.0.0/10"), 3)
@@ -607,7 +607,7 @@ func TestDelete(t *testing.T) {
 		t.Parallel()
 		// Intermediate with 3 leaves, then delete one leaf.
 		rtbl := &Table[int]{}
-		checkNumNodes(t, rtbl, 2)
+		checkNumNodes(t, rtbl, 0)
 		rtbl.Insert(mpp("192.168.0.1/32"), 1)
 		rtbl.Insert(mpp("192.180.0.1/32"), 2)
 		rtbl.Insert(mpp("192.200.0.1/32"), 3)
@@ -632,7 +632,7 @@ func TestDelete(t *testing.T) {
 		t.Parallel()
 		// Delete non-existent prefix, missing strideTable path.
 		rtbl := &Table[int]{}
-		checkNumNodes(t, rtbl, 2)
+		checkNumNodes(t, rtbl, 0)
 		rtbl.Insert(mpp("192.168.0.1/32"), 1)
 		checkRoutes(t, rtbl, []tableTest{
 			{"192.168.0.1", 1},
@@ -652,7 +652,7 @@ func TestDelete(t *testing.T) {
 		// Delete non-existent prefix, strideTable path exists but
 		// leaf doesn't contain route.
 		rtbl := &Table[int]{}
-		checkNumNodes(t, rtbl, 2)
+		checkNumNodes(t, rtbl, 0)
 		rtbl.Insert(mpp("192.168.0.1/32"), 1)
 		checkRoutes(t, rtbl, []tableTest{
 			{"192.168.0.1", 1},
@@ -672,7 +672,7 @@ func TestDelete(t *testing.T) {
 		// Intermediate table loses its last route and becomes
 		// compactable.
 		rtbl := &Table[int]{}
-		checkNumNodes(t, rtbl, 2)
+		checkNumNodes(t, rtbl, 0)
 		rtbl.Insert(mpp("192.168.0.1/32"), 1)
 		rtbl.Insert(mpp("192.168.0.0/22"), 2)
 		checkRoutes(t, rtbl, []tableTest{
@@ -1021,7 +1021,10 @@ func TestDeleteIsReverseOfInsert(t *testing.T) {
 	// changes that each insert did.
 	const N = 10_000
 
-	var tab Table[int]
+	tbl := new(Table[int])
+	tbl.init()
+	want := tbl.dumpString()
+
 	prefixes := randomPrefixes(N)
 
 	defer func() {
@@ -1030,15 +1033,14 @@ func TestDeleteIsReverseOfInsert(t *testing.T) {
 		}
 	}()
 
-	want := tab.dumpString()
 	for _, p := range prefixes {
-		tab.Insert(p.pfx, p.val)
+		tbl.Insert(p.pfx, p.val)
 	}
 
 	for i := len(prefixes) - 1; i >= 0; i-- {
-		tab.Delete(prefixes[i].pfx)
+		tbl.Delete(prefixes[i].pfx)
 	}
-	if got := tab.dumpString(); got != want {
+	if got := tbl.dumpString(); got != want {
 		t.Fatalf("after delete, mismatch:\n\n got: %s\n\nwant: %s", got, want)
 	}
 }
@@ -1984,6 +1986,7 @@ type tableOverlapsTest struct {
 // checkOverlaps verifies that the overlaps lookups in tt return the
 // expected results on tbl.
 func checkOverlaps(t *testing.T, tbl *Table[int], tests []tableOverlapsTest) {
+	t.Helper()
 	for _, tt := range tests {
 		got := tbl.OverlapsPrefix(mpp(tt.prefix))
 		if got != tt.want {
@@ -2018,7 +2021,6 @@ func checkRoutes(t *testing.T, tbl *Table[int], tt []tableTest) {
 }
 
 func checkNumNodes(t *testing.T, tbl *Table[int], want int) {
-	tbl.init()
 	t.Helper()
 	if got := tbl.nodes(); got != want {
 		t.Errorf("wrong table size, got %d strides want %d", got, want)
@@ -2027,7 +2029,6 @@ func checkNumNodes(t *testing.T, tbl *Table[int], want int) {
 
 // dumpAsGoldTable, just a helper to compare with golden table.
 func (t *Table[V]) dumpAsGoldTable() goldTable[V] {
-	t.init()
 	var tbl goldTable[V]
 
 	t.AllSorted()(func(pfx netip.Prefix, val V) bool {

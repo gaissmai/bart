@@ -40,16 +40,17 @@ type Table[V any] struct {
 	size6 int
 }
 
-// Cloner, if implemented by payload of type V the values are deeply copied during [Table.Clone] and [Table.Union].
-type Cloner[V any] interface {
-	Clone() V
+// isInit reports if the table is already initialized.
+func (t *Table[V]) isInit() bool {
+	// could also test t.root6, no hidden magic meaning
+	return t.root4 != nil
 }
 
 // init BitSets once, so no constructor is needed and the zero value is ready to use.
 // Not using sync.Once, the table is not safe for concurrent writers anyway
 func (t *Table[V]) init() {
 	// could also test t.root6, no hidden magic meaning
-	if t.root4 == nil {
+	if !t.isInit() {
 		t.root4 = newNode[V]()
 		t.root6 = newNode[V]()
 	}
@@ -63,14 +64,19 @@ func (t *Table[V]) rootNodeByVersion(is4 bool) *node[V] {
 	return t.root6
 }
 
+// Cloner, if implemented by payload of type V the values are deeply copied during [Table.Clone] and [Table.Union].
+type Cloner[V any] interface {
+	Clone() V
+}
+
 // Insert adds pfx to the tree, with value val.
 // If pfx is already present in the tree, its value is set to val.
 func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
-	t.init()
-
 	if !pfx.IsValid() {
 		return
 	}
+
+	t.init()
 
 	// values derived from pfx
 	ip := pfx.Addr()
@@ -137,11 +143,12 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 //
 // If the pfx does not already exist, it is set with the new value.
 func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V) {
-	t.init()
 	if !pfx.IsValid() {
 		var zero V
 		return zero
 	}
+
+	t.init()
 
 	// values derived from pfx
 	ip := pfx.Addr()
@@ -192,7 +199,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 // Get returns the associated payload for prefix and true, or false if
 // prefix is not set in the routing table.
 func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
-	if !pfx.IsValid() {
+	if !pfx.IsValid() || !t.isInit() {
 		return
 	}
 
@@ -202,9 +209,6 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 	bits := pfx.Bits()
 
 	n := t.rootNodeByVersion(is4)
-	if n == nil {
-		return
-	}
 
 	// do not allocate
 	a16 := ip.As16()
@@ -235,7 +239,7 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 
 // Delete removes pfx from the tree, pfx does not have to be present.
 func (t *Table[V]) Delete(pfx netip.Prefix) {
-	if !pfx.IsValid() {
+	if !pfx.IsValid() || !t.isInit() {
 		return
 	}
 
@@ -245,9 +249,6 @@ func (t *Table[V]) Delete(pfx netip.Prefix) {
 	bits := pfx.Bits()
 
 	n := t.rootNodeByVersion(is4)
-	if n == nil {
-		return
-	}
 
 	// do not allocate
 	a16 := ip.As16()
@@ -312,16 +313,12 @@ func (t *Table[V]) Delete(pfx netip.Prefix) {
 // Lookup does a route lookup (longest prefix match) for IP and
 // returns the associated value and true, or false if no route matched.
 func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
-	if !ip.IsValid() {
+	if !ip.IsValid() || !t.isInit() {
 		return
 	}
 
 	is4 := ip.Is4()
-
 	n := t.rootNodeByVersion(is4)
-	if n == nil {
-		return
-	}
 
 	// do not allocate
 	a16 := ip.As16()
@@ -369,6 +366,10 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 // LookupPrefix does a route lookup (longest prefix match) for pfx and
 // returns the associated value and true, or false if no route matched.
 func (t *Table[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
+	if !pfx.IsValid() || !t.isInit() {
+		return
+	}
+
 	_, _, val, ok = t.lpmPrefix(pfx)
 	return val, ok
 }
@@ -382,6 +383,10 @@ func (t *Table[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
 // If LookupPrefixLPM is to be used for IP addresses,
 // they must be converted to /32 or /128 prefixes.
 func (t *Table[V]) LookupPrefixLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) {
+	if !pfx.IsValid() || !t.isInit() {
+		return
+	}
+
 	depth, baseIdx, val, ok := t.lpmPrefix(pfx)
 
 	if ok {
@@ -396,19 +401,12 @@ func (t *Table[V]) LookupPrefixLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, o
 }
 
 func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V, ok bool) {
-	if !pfx.IsValid() {
-		return
-	}
-
 	// values derived from pfx
 	ip := pfx.Addr()
 	is4 := ip.Is4()
 	bits := pfx.Bits()
 
 	n := t.rootNodeByVersion(is4)
-	if n == nil {
-		return
-	}
 
 	// do not allocate
 	a16 := ip.As16()
@@ -474,7 +472,7 @@ func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V, 
 
 // OverlapsPrefix reports whether any IP in pfx is matched by a route in the table or vice versa.
 func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
-	if !pfx.IsValid() {
+	if !pfx.IsValid() || !t.isInit() {
 		return false
 	}
 
@@ -485,9 +483,6 @@ func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 
 	// get the root node of the routing table
 	n := t.rootNodeByVersion(is4)
-	if n == nil {
-		return false
-	}
 
 	// do not allocate
 	a16 := ip.As16()
@@ -569,8 +564,12 @@ func (t *Table[V]) Overlaps6(o *Table[V]) bool {
 // If there are duplicate entries, the payload of type V is shallow copied from the other table.
 // If type V implements the Cloner interface, the values are cloned, see also [Table.Clone].
 func (t *Table[V]) Union(o *Table[V]) {
+	// nothing to do
+	if !o.isInit() {
+		return
+	}
+
 	t.init()
-	o.init()
 
 	dup4 := t.root4.unionRec(o.root4)
 	dup6 := t.root6.unionRec(o.root6)
@@ -582,10 +581,10 @@ func (t *Table[V]) Union(o *Table[V]) {
 // Clone returns a copy of the routing table.
 // The payload of type V is shallow copied, but if type V implements the Cloner interface, the values are cloned.
 func (t *Table[V]) Clone() *Table[V] {
-	t.init()
-
 	c := new(Table[V])
-	c.init()
+	if !t.isInit() {
+		return c
+	}
 
 	c.root4 = t.root4.cloneRec()
 	c.root6 = t.root6.cloneRec()
@@ -621,9 +620,7 @@ func (t *Table[V]) Size6() int {
 
 // nodes, calculates the IPv4 and IPv6 nodes and returns the sum.
 func (t *Table[V]) nodes() int {
-	// could also test t.root6, no hidden magic meaning
-	// not initialized
-	if t.root4 == nil {
+	if !t.isInit() {
 		return 0
 	}
 

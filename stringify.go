@@ -6,6 +6,7 @@ package bart
 import (
 	"bytes"
 	"cmp"
+	"errors"
 	"fmt"
 	"io"
 	"net/netip"
@@ -32,7 +33,10 @@ type kid[V any] struct {
 // MarshalText implements the encoding.TextMarshaler interface,
 // just a wrapper for [Table.Fprint].
 func (t *Table[V]) MarshalText() ([]byte, error) {
-	t.init()
+	if !t.isInit() {
+		return nil, errors.New("table not initialized")
+	}
+
 	w := new(bytes.Buffer)
 	if err := t.Fprint(w); err != nil {
 		return nil, err
@@ -44,7 +48,10 @@ func (t *Table[V]) MarshalText() ([]byte, error) {
 // as string, just a wrapper for [Table.Fprint].
 // If Fprint returns an error, String panics.
 func (t *Table[V]) String() string {
-	t.init()
+	if !t.isInit() {
+		return ""
+	}
+
 	w := new(strings.Builder)
 	if err := t.Fprint(w); err != nil {
 		panic(err)
@@ -75,7 +82,9 @@ func (t *Table[V]) String() string {
 //	   │  └─ 2001:db8::/32 (V)
 //	   └─ fe80::/10 (V)
 func (t *Table[V]) Fprint(w io.Writer) error {
-	t.init()
+	if !t.isInit() {
+		return errors.New("table not initialized")
+	}
 
 	// v4
 	if err := t.fprint(w, true); err != nil {
