@@ -168,7 +168,7 @@ func (n *node[V]) overlapsChildsIn(o *node[V]) bool {
 
 	idxBackingArray := [maxNodePrefixes]uint{}
 	for _, idx := range n.allStrideIndexes(idxBackingArray[:]) {
-		a8 := allotTblFor(idx)
+		a8 := allotLookupTbl[idx]
 		prefixRoutes.InPlaceUnion(bitset.From(a8[:]))
 	}
 
@@ -233,11 +233,11 @@ func (n *node[V]) overlapsOneRouteIn(o *node[V]) bool {
 	// use bitset intersection with alloted stride table instead of range loops
 
 	// buffer for bitset backing array, make sure we don't allocate
-	pfxBuf := allotTblFor(idx)
-	prefixRoutesBitset := bitset.From(pfxBuf[:])
+	pfxBuf := allotLookupTbl[idx]
+	allotedPrefixRoutes := bitset.From(pfxBuf[:])
 
 	// use bitset intersection instead of range loops
-	return prefixRoutesBitset.IntersectionCardinality(n.prefixesBitset) > 0
+	return allotedPrefixRoutes.IntersectionCardinality(n.prefixesBitset) > 0
 }
 
 // overlapsPrefix returns true if node overlaps with prefix.
@@ -253,11 +253,11 @@ func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 	// use bitset intersection with alloted stride table instead of range loops
 
 	// buffer for bitset backing array, make sure we don't allocate
-	pfxBuf := allotTblFor(idx)
-	prefixRoutesBitset := bitset.From(pfxBuf[:])
+	pfxBuf := allotLookupTbl[idx]
+	allotedPrefixRoutes := bitset.From(pfxBuf[:])
 
 	// use bitset intersection instead of range loops
-	if prefixRoutesBitset.IntersectionCardinality(n.prefixesBitset) != 0 {
+	if allotedPrefixRoutes.IntersectionCardinality(n.prefixesBitset) != 0 {
 		return true
 	}
 
@@ -269,10 +269,6 @@ func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 	copy(c8[4:], n.childrenBitset.Bytes()) // 4*64= 256
 	hostRoutes := bitset.From(c8[:])
 
-	// buffer for bitset backing array, make sure we don't allocate
-	a8 := allotTblFor(idx)
-	prefixRoutes := bitset.From(a8[:])
-
 	// use bitsets intersection instead of range loops
-	return prefixRoutes.IntersectionCardinality(hostRoutes) != 0
+	return allotedPrefixRoutes.IntersectionCardinality(hostRoutes) != 0
 }
