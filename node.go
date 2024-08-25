@@ -395,9 +395,12 @@ func (n *node[V]) unionRec(o *node[V]) (duplicates int) {
 	idxBackingArray := [maxNodePrefixes]uint{}
 
 	// for all prefixes in other node do ...
-	for _, oIdx := range o.allStrideIndexes(idxBackingArray[:]) {
+	for i, oIdx := range o.allStrideIndexes(idxBackingArray[:]) {
 		// insert/overwrite prefix/value from oNode to nNode
-		if !n.insertPrefix(oIdx, o.getValue(oIdx)) {
+		ok := n.insertPrefix(oIdx, o.prefixes[i])
+
+		// this prefix is duplicate in n and o
+		if !ok {
 			duplicates++
 		}
 	}

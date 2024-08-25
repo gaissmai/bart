@@ -31,32 +31,39 @@ import (
 // The zero value is ready to use.
 //
 // The Table is safe for concurrent readers but not for
-// concurrent readers and/or writers.
+// concurrent readers and writers.
 type Table[V any] struct {
+	// the root nodes, implemented as popcount compressed multibit tries
 	root4 *node[V]
 	root6 *node[V]
 
+	// the number of prefixes in the routing table
 	size4 int
 	size6 int
 }
 
 // isInit reports if the table is already initialized.
 func (t *Table[V]) isInit() bool {
-	// could also test t.root6, no hidden magic meaning
+	// could also test t.root6, no hidden magic
 	return t.root4 != nil
 }
 
-// init BitSets once, so no constructor is needed and the zero value is ready to use.
-// Not using sync.Once, the table is not safe for concurrent writers anyway
+// init the root nodes, no public constructor needed, the zero value is ready to use.
+// Not using sync.Once here, the table is not safe for concurrent writers anyway
 func (t *Table[V]) init() {
-	// could also test t.root6, no hidden magic meaning
 	if !t.isInit() {
-		t.root4 = newNode[V]()
-		t.root6 = newNode[V]()
+		// Outlined slow-path to allow inlining of the fast-path.
+		t.slowInit()
 	}
 }
 
-// rootNodeByVersion, select root node for ip version.
+// slowInit, to complex for inlining
+func (t *Table[V]) slowInit() {
+	t.root4 = newNode[V]()
+	t.root6 = newNode[V]()
+}
+
+// rootNodeByVersion, root node getter for ip version.
 func (t *Table[V]) rootNodeByVersion(is4 bool) *node[V] {
 	if is4 {
 		return t.root4
@@ -64,12 +71,13 @@ func (t *Table[V]) rootNodeByVersion(is4 bool) *node[V] {
 	return t.root6
 }
 
-// Cloner, if implemented by payload of type V the values are deeply copied during [Table.Clone] and [Table.Union].
+// Cloner, if implemented by payload of type V the values are deeply copied
+// during [Table.Clone] and [Table.Union].
 type Cloner[V any] interface {
 	Clone() V
 }
 
-// Insert adds pfx to the tree, with value val.
+// Insert adds pfx to the tree, with given val.
 // If pfx is already present in the tree, its value is set to val.
 func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	if !pfx.IsValid() {
@@ -90,6 +98,7 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	// As16() is inlined, the preffered AsSlice() is too complex for inlining.
 	// starting with go1.23 we can use AsSlice(),
 	// see https://github.com/golang/go/issues/56136
+	// octets := ip.AsSlice()
 
 	a16 := ip.As16()
 	octets := a16[:]
@@ -116,7 +125,7 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
 	// mask the prefix, this is faster than netip.Prefix.Masked()
-	lastOctet &= netMask(lastOctetBits)
+	lastOctet &= netMask[lastOctetBits]
 
 	// find the proper trie node to insert prefix
 	for _, octet := range octets[:lastOctetIdx] {
@@ -133,13 +142,13 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	}
 
 	// insert prefix/val into node
-	if n.insertPrefix(prefixToBaseIndex(lastOctet, lastOctetBits), val) {
+	if ok := n.insertPrefix(prefixToBaseIndex(lastOctet, lastOctetBits), val); ok {
 		t.sizeUpdate(is4, 1)
 	}
 }
 
 // Update or set the value at pfx with a callback function.
-// The callback function is called with (value, ok) and returns a new value..
+// The callback function is called with (value, ok) and returns a new value.
 //
 // If the pfx does not already exist, it is set with the new value.
 func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V) {
@@ -170,7 +179,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
 	// mask the prefix
-	lastOctet &= netMask(lastOctetBits)
+	lastOctet &= netMask[lastOctetBits]
 
 	// find the proper trie node to update prefix
 	for _, octet := range octets[:lastOctetIdx] {
@@ -223,7 +232,7 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
 	// mask the prefix
-	lastOctet &= netMask(lastOctetBits)
+	lastOctet &= netMask[lastOctetBits]
 
 	// find the proper trie node
 	for _, octet := range octets[:lastOctetIdx] {
@@ -263,7 +272,7 @@ func (t *Table[V]) Delete(pfx netip.Prefix) {
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
 	// mask the prefix
-	lastOctet &= netMask(lastOctetBits)
+	lastOctet &= netMask[lastOctetBits]
 	octets[lastOctetIdx] = lastOctet
 
 	// record path to deleted node
@@ -421,7 +430,7 @@ func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V, 
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
 	// mask the prefix
-	lastOctet &= netMask(lastOctetBits)
+	lastOctet &= netMask[lastOctetBits]
 	octets[lastOctetIdx] = lastOctet
 
 	var i int
@@ -497,7 +506,7 @@ func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
 	// mask the prefix
-	lastOctet &= netMask(lastOctetBits)
+	lastOctet &= netMask[lastOctetBits]
 
 	for _, octet := range octets[:lastOctetIdx] {
 		// test if any route overlaps prefix´ so far

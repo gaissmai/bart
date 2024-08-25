@@ -36,7 +36,7 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) func(yield func(netip.Prefix, V) 
 		lastOctetBits := bits - (lastOctetIdx * strideLen)
 
 		// mask the prefix
-		lastOctet &= netMask(lastOctetBits)
+		lastOctet &= netMask[lastOctetBits]
 		octets[lastOctetIdx] = lastOctet
 
 		// stack of the traversed nodes for reverse ordering of supernets
@@ -115,7 +115,7 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) func(yield func(netip.Prefix, V) bo
 		lastOctetBits := bits - (lastOctetIdx * strideLen)
 
 		// mask the prefix
-		lastOctet &= netMask(lastOctetBits)
+		lastOctet &= netMask[lastOctetBits]
 		octets[lastOctetIdx] = lastOctet
 
 		// find the trie node
