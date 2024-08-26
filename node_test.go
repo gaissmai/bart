@@ -20,8 +20,8 @@ func TestInverseIndex(t *testing.T) {
 	for i := range maxNodeChildren {
 		for bits := 0; bits <= strideLen; bits++ {
 			octet := byte(i & (0xFF << (strideLen - bits)))
-			idx := prefixToBaseIndex(octet, bits)
-			octet2, len2 := baseIndexToPrefix(idx)
+			idx := pfxToIdx(octet, bits)
+			octet2, len2 := idxToPfx(idx)
 			if octet2 != octet || len2 != bits {
 				t.Errorf("inverse(index(%d/%d)) != %d/%d", octet, bits, octet2, len2)
 			}
@@ -32,8 +32,8 @@ func TestInverseIndex(t *testing.T) {
 func TestFringeIndex(t *testing.T) {
 	t.Parallel()
 	for i := range maxNodeChildren {
-		got := octetToBaseIndex(byte(i))
-		want := prefixToBaseIndex(byte(i), 8)
+		got := hostIndex(byte(i))
+		want := pfxToIdx(byte(i), 8)
 		if got != want {
 			t.Errorf("fringeIndex(%d) = %d, want %d", i, got, want)
 		}
@@ -52,13 +52,13 @@ func TestPrefixInsert(t *testing.T) {
 	fast := newNode[int]()
 
 	for _, pfx := range pfxs {
-		fast.insertPrefix(prefixToBaseIndex(pfx.octet, pfx.bits), pfx.val)
+		fast.insertPrefix(pfxToIdx(pfx.octet, pfx.bits), pfx.val)
 	}
 
 	for i := range 256 {
 		octet := byte(i)
 		goldVal, goldOK := gold.lpm(octet)
-		_, fastVal, fastOK := fast.lpm(octetToBaseIndex(octet))
+		_, fastVal, fastOK := fast.lpm(hostIndex(octet))
 		if !getsEqual(fastVal, fastOK, goldVal, goldOK) {
 			t.Fatalf("get(%d) = (%v, %v), want (%v, %v)", octet, fastVal, fastOK, goldVal, goldOK)
 		}
@@ -73,7 +73,7 @@ func TestPrefixDelete(t *testing.T) {
 	fast := newNode[int]()
 
 	for _, pfx := range pfxs {
-		fast.insertPrefix(prefixToBaseIndex(pfx.octet, pfx.bits), pfx.val)
+		fast.insertPrefix(pfxToIdx(pfx.octet, pfx.bits), pfx.val)
 	}
 
 	toDelete := pfxs[:50]
@@ -90,7 +90,7 @@ func TestPrefixDelete(t *testing.T) {
 	for i := range 256 {
 		octet := byte(i)
 		goldVal, goldOK := gold.lpm(octet)
-		_, fastVal, fastOK := fast.lpm(octetToBaseIndex(octet))
+		_, fastVal, fastOK := fast.lpm(hostIndex(octet))
 		if !getsEqual(fastVal, fastOK, goldVal, goldOK) {
 			t.Fatalf("get(%d) = (%v, %v), want (%v, %v)", octet, fastVal, fastOK, goldVal, goldOK)
 		}
@@ -105,7 +105,7 @@ func TestOverlapsPrefix(t *testing.T) {
 	fast := newNode[int]()
 
 	for _, pfx := range pfxs {
-		fast.insertPrefix(prefixToBaseIndex(pfx.octet, pfx.bits), pfx.val)
+		fast.insertPrefix(pfxToIdx(pfx.octet, pfx.bits), pfx.val)
 	}
 
 	for _, tt := range allStridePfxs() {
@@ -134,7 +134,7 @@ func TestOverlapsNode(t *testing.T) {
 		fast := newNode[int]()
 
 		for _, pfx := range pfxs {
-			fast.insertPrefix(prefixToBaseIndex(pfx.octet, pfx.bits), pfx.val)
+			fast.insertPrefix(pfxToIdx(pfx.octet, pfx.bits), pfx.val)
 		}
 
 		inter := all[numEntries : 2*numEntries]
@@ -142,7 +142,7 @@ func TestOverlapsNode(t *testing.T) {
 		fastInter := newNode[int]()
 
 		for _, pfx := range inter {
-			fastInter.insertPrefix(prefixToBaseIndex(pfx.octet, pfx.bits), pfx.val)
+			fastInter.insertPrefix(pfxToIdx(pfx.octet, pfx.bits), pfx.val)
 		}
 
 		gotGold := gold.strideOverlaps(&goldInter)
@@ -173,7 +173,7 @@ func BenchmarkNodePrefixInsert(b *testing.B) {
 			if i >= nroutes {
 				break
 			}
-			node.insertPrefix(prefixToBaseIndex(route.octet, route.bits), 0)
+			node.insertPrefix(pfxToIdx(route.octet, route.bits), 0)
 		}
 
 		b.Run(fmt.Sprintf("Into %d", nroutes), func(b *testing.B) {
@@ -181,7 +181,7 @@ func BenchmarkNodePrefixInsert(b *testing.B) {
 
 			b.ResetTimer()
 			for range b.N {
-				node.insertPrefix(prefixToBaseIndex(route.octet, route.bits), 0)
+				node.insertPrefix(pfxToIdx(route.octet, route.bits), 0)
 			}
 		})
 	}
@@ -197,7 +197,7 @@ func BenchmarkNodePrefixUpdate(b *testing.B) {
 			if i >= nroutes {
 				break
 			}
-			node.insertPrefix(prefixToBaseIndex(route.octet, route.bits), 0)
+			node.insertPrefix(pfxToIdx(route.octet, route.bits), 0)
 		}
 
 		b.Run(fmt.Sprintf("In %d", nroutes), func(b *testing.B) {
@@ -221,7 +221,7 @@ func BenchmarkNodePrefixDelete(b *testing.B) {
 			if i >= nroutes {
 				break
 			}
-			node.insertPrefix(prefixToBaseIndex(route.octet, route.bits), 0)
+			node.insertPrefix(pfxToIdx(route.octet, route.bits), 0)
 		}
 
 		b.Run(fmt.Sprintf("From %d", nroutes), func(b *testing.B) {
@@ -247,7 +247,7 @@ func BenchmarkNodePrefixLPM(b *testing.B) {
 			if i >= nroutes {
 				break
 			}
-			node.insertPrefix(prefixToBaseIndex(route.octet, route.bits), 0)
+			node.insertPrefix(pfxToIdx(route.octet, route.bits), 0)
 		}
 
 		b.Run(fmt.Sprintf("IN %d", nroutes), func(b *testing.B) {
@@ -255,7 +255,7 @@ func BenchmarkNodePrefixLPM(b *testing.B) {
 
 			b.ResetTimer()
 			for range b.N {
-				_, writeSink, _ = node.lpm(prefixToBaseIndex(route.octet, route.bits))
+				_, writeSink, _ = node.lpm(pfxToIdx(route.octet, route.bits))
 			}
 		})
 	}
@@ -271,16 +271,16 @@ func BenchmarkNodePrefixRank(b *testing.B) {
 			if i >= nroutes {
 				break
 			}
-			node.insertPrefix(prefixToBaseIndex(route.octet, route.bits), 0)
+			node.insertPrefix(pfxToIdx(route.octet, route.bits), 0)
 		}
 
 		b.Run(fmt.Sprintf("IN %d", nroutes), func(b *testing.B) {
 			route := routes[rand.Intn(len(routes))]
-			baseIdx := prefixToBaseIndex(route.octet, route.bits)
+			idx := pfxToIdx(route.octet, route.bits)
 
 			b.ResetTimer()
 			for range b.N {
-				writeSink = node.prefixRank(baseIdx)
+				writeSink = node.prefixRank(idx)
 			}
 		})
 	}
@@ -296,7 +296,7 @@ func BenchmarkNodePrefixNextSetMany(b *testing.B) {
 			if i >= nroutes {
 				break
 			}
-			node.insertPrefix(prefixToBaseIndex(route.octet, route.bits), 0)
+			node.insertPrefix(pfxToIdx(route.octet, route.bits), 0)
 		}
 
 		b.Run(fmt.Sprintf("IN %d", nroutes), func(b *testing.B) {
@@ -321,14 +321,14 @@ func BenchmarkNodePrefixIntersectionCardinality(b *testing.B) {
 			if i >= nroutes {
 				break
 			}
-			node.insertPrefix(prefixToBaseIndex(route.octet, route.bits), 0)
+			node.insertPrefix(pfxToIdx(route.octet, route.bits), 0)
 		}
 
 		for i, route := range routes2 {
 			if i >= nroutes {
 				break
 			}
-			other.insertPrefix(prefixToBaseIndex(route.octet, route.bits), 0)
+			other.insertPrefix(pfxToIdx(route.octet, route.bits), 0)
 		}
 
 		b.Run(fmt.Sprintf("With %d", nroutes), func(b *testing.B) {
@@ -391,11 +391,11 @@ func BenchmarkNodeChildRank(b *testing.B) {
 
 		b.Run(fmt.Sprintf("In %d", nchilds), func(b *testing.B) {
 			octet := byte(rand.Intn(maxNodeChildren))
-			baseIdx := octetToBaseIndex(octet)
+			idx := hostIndex(octet)
 
 			b.ResetTimer()
 			for range b.N {
-				node.childRank(byte(baseIdx))
+				node.childRank(byte(idx))
 			}
 		})
 	}
