@@ -269,8 +269,8 @@ func (n *node[V]) eachSubnet(path [16]byte, depth int, is4 bool, octet byte, pfx
 	// 1. collect all indices in n covered by prefix
 	// ###############################################################
 
-	pfxIdx := prefixToBaseIndex(octet, pfxLen)
-	pfxLowerHostRoute, pfxUpperHostRoute := hostRoutesByIndex(pfxIdx)
+	pfxFirstAddr := uint(octet)
+	pfxLastAddr := uint(octet | ^netMask[pfxLen])
 
 	idxBackingArray := [maxNodePrefixes]uint{}
 	allCoveredIndices := idxBackingArray[:0]
@@ -283,8 +283,12 @@ func (n *node[V]) eachSubnet(path [16]byte, depth int, is4 bool, octet byte, pfx
 		}
 
 		// idx is covered by prefix
-		lower, upper := hostRoutesByIndex(idx)
-		if lower >= pfxLowerHostRoute && upper <= pfxUpperHostRoute {
+		thisOctet, thisPfxLen := baseIndexToPrefix(idx)
+
+		thisFirstAddr := uint(thisOctet)
+		thisLastAddr := uint(thisOctet | ^netMask[thisPfxLen])
+
+		if thisFirstAddr >= pfxFirstAddr && thisLastAddr <= pfxLastAddr {
 			allCoveredIndices = append(allCoveredIndices, idx)
 		}
 		idx++
@@ -306,15 +310,12 @@ func (n *node[V]) eachSubnet(path [16]byte, depth int, is4 bool, octet byte, pfx
 			break
 		}
 
-		// addr is covered by prefix?
-		addrHostRoute := hostRouteByAddr(addr)
-
 		// host addrs are sorted in indexRank order
-		if addrHostRoute > pfxUpperHostRoute {
+		if addr > pfxLastAddr {
 			break
 		}
 
-		if addrHostRoute >= pfxLowerHostRoute {
+		if addr >= pfxFirstAddr {
 			allCoveredAddrs = append(allCoveredAddrs, addr)
 		}
 
@@ -328,15 +329,14 @@ func (n *node[V]) eachSubnet(path [16]byte, depth int, is4 bool, octet byte, pfx
 	// #####################################################
 
 	for _, idx := range allCoveredIndices {
-		idxLowerHostRoute, _ := hostRoutesByIndex(idx)
+		thisOctet, _ := baseIndexToPrefix(idx)
 
 		// yield all childs before idx
 		for j := cursor; j < len(allCoveredAddrs); j++ {
 			addr = allCoveredAddrs[j]
-			addrHostRoute := hostRouteByAddr(addr)
 
 			// yield prefix
-			if addrHostRoute >= idxLowerHostRoute {
+			if addr >= uint(thisOctet) {
 				break
 			}
 
@@ -518,14 +518,13 @@ func (n *node[V]) allRecSorted(path [16]byte, depth int, is4 bool, yield func(ne
 
 	// yield indices and childs in CIDR sort order
 	for _, idx := range allIndices {
-		idxLowerHostRoute, _ := hostRoutesByIndex(idx)
+		octet, _ := baseIndexToPrefix(idx)
 
 		// yield all childs before idx
 		for j := childCursor; j < len(childAddrs); j++ {
 			addr := childAddrs[j]
-			addrHostRoute := hostRouteByAddr(addr)
 
-			if addrHostRoute >= idxLowerHostRoute {
+			if addr >= uint(octet) {
 				break
 			}
 
