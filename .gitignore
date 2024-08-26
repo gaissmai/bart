@@ -17,8 +17,7 @@
 !go.sum
 !go.mod
 
-!README.md
-!CHANGES.md
+!*.md
 !LICENSE
 
 # ...even if they are in subdirectories
