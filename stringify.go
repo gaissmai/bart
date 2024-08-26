@@ -190,7 +190,7 @@ func (n *node[V]) getKidsRec(parentIdx uint, path [16]byte, depth int, is4 bool)
 				depth: depth,
 				idx:   idx,
 				cidr:  cidr,
-				val:   n.getValue(idx),
+				val:   n.mustGetValue(idx),
 			}
 
 			directKids = append(directKids, kid)
@@ -203,7 +203,7 @@ func (n *node[V]) getKidsRec(parentIdx uint, path [16]byte, depth int, is4 bool)
 		octet := byte(addr)
 
 		// do a longest-prefix-match
-		lpmIdx, _, _ := n.lpm(octetToBaseIndex(octet))
+		lpmIdx, _, _ := n.lpm(hostIndex(octet))
 		if lpmIdx == parentIdx {
 			c := n.children[i]
 			path[depth] = octet
@@ -218,7 +218,7 @@ func (n *node[V]) getKidsRec(parentIdx uint, path [16]byte, depth int, is4 bool)
 
 // cidrFromPath, get prefix back from byte path, depth, octet and pfxLen.
 func cidrFromPath(path [16]byte, depth int, is4 bool, idx uint) (netip.Prefix, error) {
-	octet, pfxLen := baseIndexToPrefix(idx)
+	octet, pfxLen := idxToPfx(idx)
 
 	// set (partially) masked byte in path at depth
 	path[depth] = octet

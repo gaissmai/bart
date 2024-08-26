@@ -142,7 +142,7 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	}
 
 	// insert prefix/val into node
-	if ok := n.insertPrefix(prefixToBaseIndex(lastOctet, lastOctetBits), val); ok {
+	if ok := n.insertPrefix(pfxToIdx(lastOctet, lastOctetBits), val); ok {
 		t.sizeUpdate(is4, 1)
 	}
 }
@@ -243,7 +243,7 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 		}
 		n = c
 	}
-	return n.getValueOK(prefixToBaseIndex(lastOctet, lastOctetBits))
+	return n.getValueOK(pfxToIdx(lastOctet, lastOctetBits))
 }
 
 // Delete removes pfx from the tree, pfx does not have to be present.
@@ -364,7 +364,7 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 		// longest prefix match
 		// micro benchmarking: skip if node has no prefixes
 		if len(n.prefixes) != 0 {
-			if _, val, ok = n.lpm(octetToBaseIndex(octet)); ok {
+			if _, val, ok = n.lpm(hostIndex(octet)); ok {
 				return val, true
 			}
 		}
@@ -396,19 +396,20 @@ func (t *Table[V]) LookupPrefixLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, o
 		return
 	}
 
-	depth, baseIdx, val, ok := t.lpmPrefix(pfx)
+	depth, idx, val, ok := t.lpmPrefix(pfx)
 
 	if ok {
-		// calculate the mask from baseIdx and depth
-		mask := baseIndexToPrefixLen(baseIdx, depth)
+		// calculate the bits from depth and idx
+		bits := depth*strideLen + int(baseIdxLookupTbl[idx].bits)
 
-		// calculate the lpm from ip and mask
-		lpm, _ = pfx.Addr().Prefix(mask)
+		// calculate the lpm from incoming ip and new mask
+		lpm, _ = pfx.Addr().Prefix(bits)
 	}
 
 	return lpm, val, ok
 }
 
+// lpmPrefix, returns depth, baseIdx, val and ok for a lpm match.
 func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V, ok bool) {
 	// values derived from pfx
 	ip := pfx.Addr()
@@ -465,9 +466,9 @@ func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V, 
 			// all others are just host routes
 			var idx uint
 			if depth == lastOctetIdx {
-				idx = prefixToBaseIndex(octet, lastOctetBits)
+				idx = pfxToIdx(octet, lastOctetBits)
 			} else {
-				idx = octetToBaseIndex(octet)
+				idx = hostIndex(octet)
 			}
 
 			baseIdx, val, ok = n.lpm(idx)
@@ -510,7 +511,7 @@ func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 
 	for _, octet := range octets[:lastOctetIdx] {
 		// test if any route overlaps prefix´ so far
-		if n.lpmTest(octetToBaseIndex(octet)) {
+		if n.lpmTest(hostIndex(octet)) {
 			return true
 		}
 

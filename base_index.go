@@ -19,32 +19,26 @@ var netMask = [9]uint8{
 	0b1111_1111, // bits == 8
 }
 
-// baseIndex of the first host route 0/8: prefixToBaseIndex(0,8)
-const firstHostIndex = 0b1_0000_0000 // 256
+// baseIndex of the first host route 0/8: pfxToIdx(0,8)
+const firstHostIdx = 256
 
-// prefixToBaseIndex, maps a prefix table as a 'complete binary tree'.
-// This is the so-called baseIndex a.k.a heapFunc:
-func prefixToBaseIndex(octet byte, prefixLen int) uint {
+// pfxToIdx, maps a prefix table as a 'complete binary tree'.
+func pfxToIdx(octet byte, prefixLen int) uint {
 	return uint(octet>>(strideLen-prefixLen)) + (1 << prefixLen)
 }
 
-// baseIndexToPrefixLen, calc the bits from baseIndex and octect depth
-func baseIndexToPrefixLen(baseIdx uint, depth int) int {
-	_, pfxLen := baseIndexToPrefix(baseIdx)
-	return depth*strideLen + pfxLen
+// hostIndex, just pfxToIdx(octet, 8) but faster.
+func hostIndex(octet byte) uint {
+	return uint(octet) + firstHostIdx
 }
 
-// octetToBaseIndex, just prefixToBaseIndex(octet, 8), a.k.a host routes
-// but faster, use it for host routes in Lookup.
-func octetToBaseIndex(octet byte) uint {
-	return uint(octet) + firstHostIndex
-}
-
-// cmpIndexRank, compare SortFunc to sort indexes in prefix sort order.
+// cmpIndexRank, sort indexes in prefix sort order.
 func cmpIndexRank(aIdx, bIdx uint) int {
-	aOctet, aBits := baseIndexToPrefix(aIdx)
-	bOctet, bBits := baseIndexToPrefix(bIdx)
+	// convert idx to prefix
+	aOctet, aBits := idxToPfx(aIdx)
+	bOctet, bBits := idxToPfx(bIdx)
 
+	// cmp the prefixes, first by address and then by bits
 	if aOctet == bOctet {
 		if aBits <= bBits {
 			return -1
@@ -58,21 +52,20 @@ func cmpIndexRank(aIdx, bIdx uint) int {
 	return 1
 }
 
-// baseIndexToPrefix returns the octet and prefix len of baseIdx.
-// It's the inverse to prefixToBaseIndex.
+// idxToPfx returns the octet and prefix len of baseIdx.
+// It's the inverse to pfxToIdx.
 //
 // Use the pre computed lookup table, bits.LeadingZeros is too slow.
-func baseIndexToPrefix(baseIdx uint) (octet byte, pfxLen int) {
-	item := baseIdxLookupTbl[baseIdx]
-	return item.octet, int(item.bits)
+func idxToPfx(idx uint) (octet byte, pfxLen int) {
+	return baseIdxLookupTbl[idx].octet, int(baseIdxLookupTbl[idx].bits)
 }
 
 // baseIdxLookupTbl, maps idx => octet/bits
 //
-//	func baseIndexToPrefix(baseIdx uint) (octet byte, pfxLen int) {
-//		nlz := bits.LeadingZeros(baseIdx)
+//	func baseIndexToPrefix(idx uint) (octet byte, pfxLen int) {
+//		nlz := bits.LeadingZeros(idx)
 //		pfxLen = strconv.IntSize - nlz - 1
-//		octet = (baseIdx & (0xFF >> (8 - pfxLen))) << (8 - pfxLen)
+//		octet = (idx & (0xFF >> (8 - pfxLen))) << (8 - pfxLen)
 //		return octet, pfxLen
 //	}
 //

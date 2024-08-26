@@ -60,43 +60,43 @@ func (n *node[V]) isEmpty() bool {
 
 // prefixRank, Rank() is the key of the popcount compression algorithm,
 // mapping between bitset index and slice index.
-func (n *node[V]) prefixRank(baseIdx uint) int {
+func (n *node[V]) prefixRank(idx uint) int {
 	// adjust offset by one to slice index
-	return int(n.prefixesBitset.Rank(baseIdx)) - 1
+	return int(n.prefixesBitset.Rank(idx)) - 1
 }
 
 // insertPrefix adds the route for baseIdx, with value val.
 // If the value already exists, overwrite it with val and return false.
-func (n *node[V]) insertPrefix(baseIdx uint, val V) (ok bool) {
+func (n *node[V]) insertPrefix(idx uint, val V) (ok bool) {
 	// prefix exists, overwrite val
-	if n.prefixesBitset.Test(baseIdx) {
-		n.prefixes[n.prefixRank(baseIdx)] = val
+	if n.prefixesBitset.Test(idx) {
+		n.prefixes[n.prefixRank(idx)] = val
 		return false
 	}
 
 	// new, insert into bitset and slice
-	n.prefixesBitset.Set(baseIdx)
-	n.prefixes = slices.Insert(n.prefixes, n.prefixRank(baseIdx), val)
+	n.prefixesBitset.Set(idx)
+	n.prefixes = slices.Insert(n.prefixes, n.prefixRank(idx), val)
 	return true
 }
 
 // deletePrefix removes the route octet/prefixLen.
 // Returns false if there was no prefix to delete.
 func (n *node[V]) deletePrefix(octet byte, prefixLen int) (ok bool) {
-	baseIdx := prefixToBaseIndex(octet, prefixLen)
+	idx := pfxToIdx(octet, prefixLen)
 
 	// no route entry
-	if !n.prefixesBitset.Test(baseIdx) {
+	if !n.prefixesBitset.Test(idx) {
 		return false
 	}
 
-	rnk := n.prefixRank(baseIdx)
+	rnk := n.prefixRank(idx)
 
 	// delete from slice
 	n.prefixes = slices.Delete(n.prefixes, rnk, rnk+1)
 
 	// delete from bitset, followed by Compact to reduce memory consumption
-	n.prefixesBitset.Clear(baseIdx)
+	n.prefixesBitset.Clear(idx)
 	n.prefixesBitset.Compact()
 
 	return true
@@ -106,14 +106,14 @@ func (n *node[V]) deletePrefix(octet byte, prefixLen int) (ok bool) {
 // and a bool wether the prefix was already present in the node.
 func (n *node[V]) updatePrefix(octet byte, prefixLen int, cb func(V, bool) V) (newVal V, wasPresent bool) {
 	// calculate idx once
-	baseIdx := prefixToBaseIndex(octet, prefixLen)
+	idx := pfxToIdx(octet, prefixLen)
 
 	var rnk int
 
 	// if prefix is set, get current value
 	var oldVal V
-	if wasPresent = n.prefixesBitset.Test(baseIdx); wasPresent {
-		rnk = n.prefixRank(baseIdx)
+	if wasPresent = n.prefixesBitset.Test(idx); wasPresent {
+		rnk = n.prefixRank(idx)
 		oldVal = n.prefixes[rnk]
 	}
 
@@ -127,10 +127,10 @@ func (n *node[V]) updatePrefix(octet byte, prefixLen int, cb func(V, bool) V) (n
 	}
 
 	// new prefix, insert into bitset ...
-	n.prefixesBitset.Set(baseIdx)
+	n.prefixesBitset.Set(idx)
 
 	// bitset has changed, recalc rank
-	rnk = n.prefixRank(baseIdx)
+	rnk = n.prefixRank(idx)
 
 	// ... and insert value into slice
 	n.prefixes = slices.Insert(n.prefixes, rnk, newVal)
@@ -158,9 +158,9 @@ func (n *node[V]) lpm(idx uint) (baseIdx uint, val V, ok bool) {
 }
 
 // lpmTest for faster lpm tests without value returns
-func (n *node[V]) lpmTest(baseIdx uint) bool {
+func (n *node[V]) lpmTest(idx uint) bool {
 	// backtracking the CBT
-	for idx := baseIdx; idx > 0; idx >>= 1 {
+	for idx := idx; idx > 0; idx >>= 1 {
 		if n.prefixesBitset.Test(idx) {
 			return true
 		}
@@ -169,18 +169,18 @@ func (n *node[V]) lpmTest(baseIdx uint) bool {
 	return false
 }
 
-// getValueOK for baseIdx.
-func (n *node[V]) getValueOK(baseIdx uint) (val V, ok bool) {
-	if n.prefixesBitset.Test(baseIdx) {
-		return n.prefixes[n.prefixRank(baseIdx)], true
+// getValueOK for idx..
+func (n *node[V]) getValueOK(idx uint) (val V, ok bool) {
+	if n.prefixesBitset.Test(idx) {
+		return n.prefixes[n.prefixRank(idx)], true
 	}
 	return
 }
 
-// getValue for baseIdx, use it only after a successful bitset test.
-// n.prefixesBitset.Test(baseIdx) must be true
-func (n *node[V]) getValue(baseIdx uint) V {
-	return n.prefixes[n.prefixRank(baseIdx)]
+// mustGetValue for idx, use it only after a successful bitset test.
+// n.prefixesBitset.Test(idx) must be true
+func (n *node[V]) mustGetValue(idx uint) V {
+	return n.prefixes[n.prefixRank(idx)]
 }
 
 // allStrideIndexes returns all baseIndexes set in this stride node in ascending order.
@@ -249,7 +249,7 @@ func (n *node[V]) allChildAddrs(buffer []uint) []uint {
 // at this depth and calls yield() for any matching CIDR.
 func (n *node[V]) eachLookupPrefix(path [16]byte, depth int, is4 bool, octet byte, bits int, yield func(netip.Prefix, V) bool) bool {
 	// backtracking the CBT
-	for idx := prefixToBaseIndex(octet, bits); idx > 0; idx >>= 1 {
+	for idx := pfxToIdx(octet, bits); idx > 0; idx >>= 1 {
 		if val, ok := n.getValueOK(idx); ok {
 			cidr, _ := cidrFromPath(path, depth, is4, idx)
 
@@ -283,7 +283,7 @@ func (n *node[V]) eachSubnet(path [16]byte, depth int, is4 bool, octet byte, pfx
 		}
 
 		// idx is covered by prefix
-		thisOctet, thisPfxLen := baseIndexToPrefix(idx)
+		thisOctet, thisPfxLen := idxToPfx(idx)
 
 		thisFirstAddr := uint(thisOctet)
 		thisLastAddr := uint(thisOctet | ^netMask[thisPfxLen])
@@ -294,7 +294,7 @@ func (n *node[V]) eachSubnet(path [16]byte, depth int, is4 bool, octet byte, pfx
 		idx++
 	}
 
-	// sort indices in this node in CIDR sort order
+	// sort indices in CIDR sort order
 	slices.SortFunc(allCoveredIndices, cmpIndexRank)
 
 	// ###############################################################
@@ -329,7 +329,7 @@ func (n *node[V]) eachSubnet(path [16]byte, depth int, is4 bool, octet byte, pfx
 	// #####################################################
 
 	for _, idx := range allCoveredIndices {
-		thisOctet, _ := baseIndexToPrefix(idx)
+		thisOctet, _ := idxToPfx(idx)
 
 		// yield all childs before idx
 		for j := cursor; j < len(allCoveredAddrs); j++ {
@@ -358,7 +358,7 @@ func (n *node[V]) eachSubnet(path [16]byte, depth int, is4 bool, octet byte, pfx
 
 		// yield the prefix for this idx
 		cidr, _ := cidrFromPath(path, depth, is4, idx)
-		if !yield(cidr, n.getValue(idx)) {
+		if !yield(cidr, n.mustGetValue(idx)) {
 			// early exit
 			return false
 		}
@@ -473,7 +473,7 @@ func (n *node[V]) allRec(path [16]byte, depth int, is4 bool, yield func(netip.Pr
 		cidr, _ := cidrFromPath(path, depth, is4, idx)
 
 		// make the callback for this prefix
-		if !yield(cidr, n.getValue(idx)) {
+		if !yield(cidr, n.mustGetValue(idx)) {
 			// early exit
 			return false
 		}
@@ -511,14 +511,14 @@ func (n *node[V]) allRecSorted(path [16]byte, depth int, is4 bool, yield func(ne
 	// get slice of all indexes, sorted by idx
 	allIndices := n.allStrideIndexes(idxBackingArray[:])
 
-	// re-sort indexes by prefix in place
+	// sort indices in CIDR sort order
 	slices.SortFunc(allIndices, cmpIndexRank)
 
 	childCursor := 0
 
 	// yield indices and childs in CIDR sort order
 	for _, idx := range allIndices {
-		octet, _ := baseIndexToPrefix(idx)
+		octet, _ := idxToPfx(idx)
 
 		// yield all childs before idx
 		for j := childCursor; j < len(childAddrs); j++ {
@@ -544,7 +544,7 @@ func (n *node[V]) allRecSorted(path [16]byte, depth int, is4 bool, yield func(ne
 
 		// yield the prefix for this idx
 		cidr, _ := cidrFromPath(path, depth, is4, idx)
-		if !yield(cidr, n.getValue(idx)) {
+		if !yield(cidr, n.mustGetValue(idx)) {
 			// early exit
 			return false
 		}
