@@ -163,19 +163,19 @@ func (n *node[V]) overlapsChildsIn(o *node[V]) bool {
 	// in this node
 
 	// gimmick, don't allocate, can't use bitset.New()
-	prefixArray := [8]uint64{}
-	prefixRoutes := bitset.From(prefixArray[:])
+	prefixBacking := make([]uint64, 8)
+	prefixRoutes := bitset.From(prefixBacking)
 
-	idxBackingArray := [maxNodePrefixes]uint{}
-	for _, idx := range n.allStrideIndexes(idxBackingArray[:]) {
+	idxBacking := make([]uint, maxNodePrefixes)
+	for _, idx := range n.allStrideIndexes(idxBacking) {
 		a8 := allotLookupTbl[idx]
 		prefixRoutes.InPlaceUnion(bitset.From(a8[:]))
 	}
 
 	// shift children bitset by firstHostIndex
-	c8 := [8]uint64{}
+	c8 := make([]uint64, 8)
 	copy(c8[4:], o.childrenBitset.Bytes()) // 4*64= 256
-	hostRoutes := bitset.From(c8[:])
+	hostRoutes := bitset.From(c8)
 
 	return prefixRoutes.IntersectionCardinality(hostRoutes) > 0
 }
@@ -185,9 +185,9 @@ func (n *node[V]) overlapsChildsIn(o *node[V]) bool {
 func (n *node[V]) overlapsSameChildsRec(o *node[V]) bool {
 	// gimmicks, clone a bitset without heap allocation
 	// 4*64=256, maxNodeChildren
-	a4 := [4]uint64{}
-	copy(a4[:], n.childrenBitset.Bytes())
-	nChildrenBitsetCloned := bitset.From(a4[:])
+	a4 := make([]uint64, 4)
+	copy(a4, n.childrenBitset.Bytes())
+	nChildrenBitsetCloned := bitset.From(a4)
 
 	// intersect in place the child bitsets from n and o
 	nChildrenBitsetCloned.InPlaceIntersection(o.childrenBitset)
@@ -232,7 +232,7 @@ func (n *node[V]) overlapsOneRouteIn(o *node[V]) bool {
 	// 2. Test if prefix overlaps any route in this node
 	// use bitset intersection with alloted stride table instead of range loops
 
-	// buffer for bitset backing array, make sure we don't allocate
+	// precalculated allotment for idx (complete binary tree as bitset)
 	pfxBuf := allotLookupTbl[idx]
 	allotedPrefixRoutes := bitset.From(pfxBuf[:])
 
@@ -252,9 +252,9 @@ func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 	// 2. Test if prefix overlaps any route in this node
 	// use bitset intersection with alloted stride table instead of range loops
 
-	// buffer for bitset backing array, make sure we don't allocate
-	pfxBuf := allotLookupTbl[idx]
-	allotedPrefixRoutes := bitset.From(pfxBuf[:])
+	// precalculated allotment for idx (complete binary tree as bitset)
+	allotmentForIdx := allotLookupTbl[idx]
+	allotedPrefixRoutes := bitset.From(allotmentForIdx[:])
 
 	// use bitset intersection instead of range loops
 	if allotedPrefixRoutes.IntersectionCardinality(n.prefixesBitset) != 0 {
@@ -265,9 +265,9 @@ func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 	// use bitsets intersection instead of range loops
 
 	// shift children bitset by firstHostIndex
-	c8 := [8]uint64{}
+	c8 := make([]uint64, 8)
 	copy(c8[4:], n.childrenBitset.Bytes()) // 4*64= 256
-	hostRoutes := bitset.From(c8[:])
+	hostRoutes := bitset.From(c8)
 
 	// use bitsets intersection instead of range loops
 	return allotedPrefixRoutes.IntersectionCardinality(hostRoutes) != 0

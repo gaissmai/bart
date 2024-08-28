@@ -411,10 +411,10 @@ func BenchmarkNodeChildNextSetMany(b *testing.B) {
 		}
 
 		b.Run(fmt.Sprintf("In %d", nchilds), func(b *testing.B) {
-			addrBackingArray := [maxNodeChildren]uint{}
+			addrBacking := make([]uint, maxNodeChildren)
 			b.ResetTimer()
 			for range b.N {
-				node.allChildAddrs(addrBackingArray[:])
+				node.allChildAddrs(addrBacking)
 			}
 		})
 	}

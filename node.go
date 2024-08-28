@@ -392,10 +392,10 @@ func (n *node[V]) eachSubnet(path [16]byte, depth int, is4 bool, octet byte, pfx
 // Count duplicate entries to adjust the t.size struct members.
 func (n *node[V]) unionRec(o *node[V]) (duplicates int) {
 	// make backing array, no heap allocs
-	idxBackingArray := [maxNodePrefixes]uint{}
+	idxBacking := make([]uint, maxNodePrefixes)
 
 	// for all prefixes in other node do ...
-	for i, oIdx := range o.allStrideIndexes(idxBackingArray[:]) {
+	for i, oIdx := range o.allStrideIndexes(idxBacking) {
 		// insert/overwrite prefix/value from oNode to nNode
 		ok := n.insertPrefix(oIdx, o.prefixes[i])
 
@@ -406,10 +406,10 @@ func (n *node[V]) unionRec(o *node[V]) (duplicates int) {
 	}
 
 	// make backing array, no heap allocs
-	addrBackingArray := [maxNodeChildren]uint{}
+	addrBacking := make([]uint, maxNodeChildren)
 
 	// for all children in other node do ...
-	for i, oOctet := range o.allChildAddrs(addrBackingArray[:]) {
+	for i, oOctet := range o.allChildAddrs(addrBacking) {
 		octet := byte(oOctet)
 
 		// we know the slice index, faster as o.getChild(octet)
@@ -467,9 +467,9 @@ func (n *node[V]) cloneRec() *node[V] {
 //
 // The iteration order is not defined, just the simplest and fastest recursive implementation.
 func (n *node[V]) allRec(path [16]byte, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
-	idxBackingArray := [maxNodePrefixes]uint{}
+	idxBacking := make([]uint, maxNodePrefixes)
 	// for all prefixes in this node do ...
-	for _, idx := range n.allStrideIndexes(idxBackingArray[:]) {
+	for _, idx := range n.allStrideIndexes(idxBacking) {
 		cidr, _ := cidrFromPath(path, depth, is4, idx)
 
 		// make the callback for this prefix
@@ -479,9 +479,9 @@ func (n *node[V]) allRec(path [16]byte, depth int, is4 bool, yield func(netip.Pr
 		}
 	}
 
-	addrBackingArray := [maxNodeChildren]uint{}
+	addrBacking := make([]uint, maxNodeChildren)
 	// for all children in this node do ...
-	for i, addr := range n.allChildAddrs(addrBackingArray[:]) {
+	for i, addr := range n.allChildAddrs(addrBacking) {
 		child := n.children[i]
 		path[depth] = byte(addr)
 
@@ -502,14 +502,14 @@ func (n *node[V]) allRec(path [16]byte, depth int, is4 bool, yield func(netip.Pr
 // false value is propagated.
 func (n *node[V]) allRecSorted(path [16]byte, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
 	// make backing arrays, no heap allocs
-	addrBackingArray := [maxNodeChildren]uint{}
-	idxBackingArray := [maxNodePrefixes]uint{}
+	addrBacking := make([]uint, maxNodeChildren)
+	idxBacking := make([]uint, maxNodePrefixes)
 
 	// get slice of all child octets, sorted by addr
-	childAddrs := n.allChildAddrs(addrBackingArray[:])
+	childAddrs := n.allChildAddrs(addrBacking)
 
 	// get slice of all indexes, sorted by idx
-	allIndices := n.allStrideIndexes(idxBackingArray[:])
+	allIndices := n.allStrideIndexes(idxBacking)
 
 	// sort indices in CIDR sort order
 	slices.SortFunc(allIndices, cmpIndexRank)
