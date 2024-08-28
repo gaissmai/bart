@@ -75,10 +75,10 @@ func (n *node[V]) dumpRec(w io.Writer, path [16]byte, depth int, is4 bool) {
 	n.dump(w, path, depth, is4)
 
 	// make backing array, no heap allocs
-	addrBackingArray := [maxNodeChildren]uint{}
+	addrBacking := make([]uint, maxNodeChildren)
 
 	// the node may have childs, the rec-descent monster starts
-	for i, addr := range n.allChildAddrs(addrBackingArray[:]) {
+	for i, addr := range n.allChildAddrs(addrBacking) {
 		octet := byte(addr)
 		child := n.children[i]
 		path[depth] = octet
@@ -126,8 +126,8 @@ func (n *node[V]) dump(w io.Writer, path [16]byte, depth int, is4 bool) {
 		// print the childs for this node
 		fmt.Fprintf(w, "%schilds(#%d):", indent, childs)
 
-		addrBackingArray := [maxNodeChildren]uint{}
-		for _, addr := range n.allChildAddrs(addrBackingArray[:]) {
+		addrBacking := make([]uint, maxNodeChildren)
+		for _, addr := range n.allChildAddrs(addrBacking) {
 			octet := byte(addr)
 			fmt.Fprintf(w, " %s", octetFmt(octet, is4))
 		}
