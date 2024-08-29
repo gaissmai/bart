@@ -1733,6 +1733,138 @@ func TestSize(t *testing.T) {
 	}
 }
 
+func TestInitTableIsEmpty(t *testing.T) {
+	rt := new(Table[byte])
+	ot := new(Table[byte])
+
+	pfx := mpp("1.2.3.4/32")
+
+	_ = rt.String()
+	if rt.isInit() {
+		t.Error("String() changed the init state of Table")
+	}
+
+	_ = rt.Fprint(nil)
+	if rt.isInit() {
+		t.Error("Fprint() changed the init state of Table")
+	}
+
+	_, _ = rt.MarshalText()
+	if rt.isInit() {
+		t.Error("MarshalText() changed the init state of Table")
+	}
+
+	_, _ = rt.MarshalJSON()
+	if rt.isInit() {
+		t.Error("MarshalJSON() changed the init state of Table")
+	}
+
+	_ = rt.DumpList4()
+	if rt.isInit() {
+		t.Error("DumpList4() changed the init state of Table")
+	}
+
+	_ = rt.DumpList6()
+	if rt.isInit() {
+		t.Error("DumpList6() changed the init state of Table")
+	}
+
+	_, _ = rt.Get(pfx)
+	if rt.isInit() {
+		t.Error("Get() changed the init state of Table")
+	}
+
+	_, _ = rt.Lookup(pfx.Addr())
+	if rt.isInit() {
+		t.Error("Lookup() changed the init state of Table")
+	}
+
+	_, _ = rt.LookupPrefix(pfx)
+	if rt.isInit() {
+		t.Error("LookupPrefix() changed the init state of Table")
+	}
+
+	_, _, _ = rt.LookupPrefixLPM(pfx)
+	if rt.isInit() {
+		t.Error("LookupPrefixLPM() changed the init state of Table")
+	}
+
+	_ = rt.OverlapsPrefix(pfx)
+	if rt.isInit() {
+		t.Error("OverlapsPrefix() changed the init state of Table")
+	}
+
+	_ = rt.Overlaps(ot)
+	if rt.isInit() {
+		t.Error("Overlaps() changed the init state of Table")
+	}
+
+	rt.Union(ot)
+	if rt.isInit() || ot.isInit() {
+		t.Error("Union() changed the init state of Table")
+	}
+
+	_ = rt.Clone()
+	if rt.isInit() {
+		t.Error("Clone() changed the init state of Table")
+	}
+
+	_ = rt.Size()
+	if rt.isInit() {
+		t.Error("Size() changed the init state of Table")
+	}
+
+	_ = rt.Size4()
+	if rt.isInit() {
+		t.Error("Size4() changed the init state of Table")
+	}
+
+	_ = rt.Size6()
+	if rt.isInit() {
+		t.Error("Size6() changed the init state of Table")
+	}
+
+	_ = rt.All()
+	if rt.isInit() {
+		t.Error("All() changed the init state of Table")
+	}
+
+	_ = rt.All4()
+	if rt.isInit() {
+		t.Error("All4() changed the init state of Table")
+	}
+
+	_ = rt.All6()
+	if rt.isInit() {
+		t.Error("All6() changed the init state of Table")
+	}
+
+	_ = rt.AllSorted()
+	if rt.isInit() {
+		t.Error("AllSorted() changed the init state of Table")
+	}
+
+	_ = rt.AllSorted4()
+	if rt.isInit() {
+		t.Error("AllSorted4() changed the init state of Table")
+	}
+
+	_ = rt.AllSorted6()
+	if rt.isInit() {
+		t.Error("AllSorted6() changed the init state of Table")
+	}
+
+	_ = rt.Subnets(pfx)
+	if rt.isInit() {
+		t.Error("Subnets() changed the init state of Table")
+	}
+
+	_ = rt.Supernets(pfx)
+	if rt.isInit() {
+		t.Error("Supernets() changed the init state of Table")
+	}
+}
+
 // ############ benchmarks ################################
 
 var benchRouteCount = []int{1, 2, 5, 10, 100, 1000, 10_000, 100_000}
