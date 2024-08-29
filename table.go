@@ -51,14 +51,16 @@ func (t *Table[V]) isInit() bool {
 // init the root nodes, no public constructor needed, the zero value is ready to use.
 // Not using sync.Once here, the table is not safe for concurrent writers anyway
 func (t *Table[V]) init() {
-	if !t.isInit() {
-		// Outlined slow-path to allow inlining of the fast-path.
-		t.slowInit()
+	if t.isInit() {
+		return
 	}
+
+	// Outlined slow-path to allow inlining of the fast-path.
+	t.initOnce()
 }
 
-// slowInit, to complex for inlining
-func (t *Table[V]) slowInit() {
+// initOnce, too complex for inlining
+func (t *Table[V]) initOnce() {
 	t.root4 = newNode[V]()
 	t.root6 = newNode[V]()
 }
