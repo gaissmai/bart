@@ -563,21 +563,3 @@ func (n *node[V]) allRecSorted(path [16]byte, depth int, is4 bool, yield func(ne
 
 	return true
 }
-
-// numPrefixesRec, calculate the number of prefixes under n.
-func (n *node[V]) numPrefixesRec() int {
-	size := len(n.prefixes) // this node
-	for _, c := range n.children {
-		size += c.numPrefixesRec()
-	}
-	return size
-}
-
-// numNodesRec, calculate the number of nodes under n.
-func (n *node[V]) numNodesRec() int {
-	size := 1 // this node
-	for _, c := range n.children {
-		size += c.numNodesRec()
-	}
-	return size
-}

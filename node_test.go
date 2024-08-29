@@ -15,6 +15,19 @@ import (
 	"testing"
 )
 
+// numNodesRec, calculate the number of nodes under n.
+func (n *node[V]) numNodesRec() int {
+	if n == nil {
+		return 0
+	}
+
+	size := 1 // this node
+	for _, c := range n.children {
+		size += c.numNodesRec()
+	}
+	return size
+}
+
 func TestInverseIndex(t *testing.T) {
 	t.Parallel()
 	for i := range maxNodeChildren {
