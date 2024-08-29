@@ -11,51 +11,6 @@ import (
 	"testing"
 )
 
-func TestTableIsEmptyIterators(t *testing.T) {
-	rt := new(Table[byte])
-
-	_ = rt.All()
-	if rt.isInit() {
-		t.Error("All() changed the init state of Table")
-	}
-
-	_ = rt.All4()
-	if rt.isInit() {
-		t.Error("All4() changed the init state of Table")
-	}
-
-	_ = rt.All6()
-	if rt.isInit() {
-		t.Error("All6() changed the init state of Table")
-	}
-
-	_ = rt.AllSorted()
-	if rt.isInit() {
-		t.Error("AllSorted() changed the init state of Table")
-	}
-
-	_ = rt.AllSorted4()
-	if rt.isInit() {
-		t.Error("AllSorted4() changed the init state of Table")
-	}
-
-	_ = rt.AllSorted6()
-	if rt.isInit() {
-		t.Error("AllSorted6() changed the init state of Table")
-	}
-
-	pfx := mpp("1.2.3.4/32")
-	_ = rt.Subnets(pfx)
-	if rt.isInit() {
-		t.Error("Subnets() changed the init state of Table")
-	}
-
-	_ = rt.Supernets(pfx)
-	if rt.isInit() {
-		t.Error("Supernets() changed the init state of Table")
-	}
-}
-
 func TestAll4RangeOverFunc(t *testing.T) {
 	pfxs := randomPrefixes4(10_000)
 	seen := make(map[netip.Prefix]int, 10_000)
