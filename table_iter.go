@@ -139,48 +139,66 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) func(yield func(netip.Prefix, V) bo
 // is not specified and is not guaranteed to be the same from one call to the
 // next.
 func (t *Table[V]) All() func(yield func(pfx netip.Prefix, val V) bool) {
-	t.init()
 	return func(yield func(netip.Prefix, V) bool) {
+		if !t.isInit() {
+			return
+		}
+
 		_ = t.root4.allRec(zeroPath, 0, true, yield) && t.root6.allRec(zeroPath, 0, false, yield)
 	}
 }
 
 // All4, like [Table.All] but only for the v4 routing table.
 func (t *Table[V]) All4() func(yield func(pfx netip.Prefix, val V) bool) {
-	t.init()
 	return func(yield func(netip.Prefix, V) bool) {
+		if !t.isInit() {
+			return
+		}
+
 		_ = t.root4.allRec(zeroPath, 0, true, yield)
 	}
 }
 
 // All6, like [Table.All] but only for the v6 routing table.
 func (t *Table[V]) All6() func(yield func(pfx netip.Prefix, val V) bool) {
-	t.init()
 	return func(yield func(netip.Prefix, V) bool) {
+		if !t.isInit() {
+			return
+		}
+
 		_ = t.root6.allRec(zeroPath, 0, false, yield)
 	}
 }
 
 // AllSorted returns an iterator over key-value pairs from Table in natural CIDR sort order.
 func (t *Table[V]) AllSorted() func(yield func(pfx netip.Prefix, val V) bool) {
-	t.init()
 	return func(yield func(netip.Prefix, V) bool) {
+		if !t.isInit() {
+			return
+		}
+
 		_ = t.root4.allRecSorted(zeroPath, 0, true, yield) && t.root6.allRecSorted(zeroPath, 0, false, yield)
 	}
 }
 
 // AllSorted4, like [Table.AllSorted] but only for the v4 routing table.
 func (t *Table[V]) AllSorted4() func(yield func(pfx netip.Prefix, val V) bool) {
-	t.init()
 	return func(yield func(netip.Prefix, V) bool) {
+		if !t.isInit() {
+			return
+		}
+
 		_ = t.root4.allRecSorted(zeroPath, 0, true, yield)
 	}
 }
 
 // AllSorted6, like [Table.AllSorted] but only for the v6 routing table.
 func (t *Table[V]) AllSorted6() func(yield func(pfx netip.Prefix, val V) bool) {
-	t.init()
 	return func(yield func(netip.Prefix, V) bool) {
+		if !t.isInit() {
+			return
+		}
+
 		_ = t.root6.allRecSorted(zeroPath, 0, false, yield)
 	}
 }

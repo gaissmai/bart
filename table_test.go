@@ -22,6 +22,11 @@ var mpa = netip.MustParseAddr
 
 var mpp = netip.MustParsePrefix
 
+// nodes, calculates the nodes.
+func (t *Table[V]) nodes() int {
+	return t.root4.numNodesRec() + t.root6.numNodesRec()
+}
+
 // ############ tests ################################
 
 func TestInvalidPrefix(t *testing.T) {
@@ -1725,16 +1730,6 @@ func TestSize(t *testing.T) {
 
 	if golden6 != rtbl.Size6() {
 		t.Errorf("Size6: want: %d, got: %d", golden6, rtbl.Size6())
-	}
-
-	size4Rec := rtbl.root4.numPrefixesRec()
-	if golden4 != size4Rec {
-		t.Errorf("size4Rec: want: %d, got: %d", golden4, size4Rec)
-	}
-
-	size6Rec := rtbl.root6.numPrefixesRec()
-	if golden6 != size6Rec {
-		t.Errorf("size6Rec: want: %d, got: %d", golden6, size6Rec)
 	}
 }
 
