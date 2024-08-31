@@ -43,11 +43,11 @@ type node[V any] struct {
 	children []*node[V]
 }
 
-// newNode, BitSets have to be initialized.
+// newNode, the zero-value of BitSet is ready to use
 func newNode[V any]() *node[V] {
 	return &node[V]{
-		prefixesBitset: bitset.New(0), // init BitSet
-		childrenBitset: bitset.New(0), // init BitSet
+		prefixesBitset: &bitset.BitSet{},
+		childrenBitset: &bitset.BitSet{},
 	}
 }
 

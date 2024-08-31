@@ -48,19 +48,13 @@ func (t *Table[V]) isInit() bool {
 	return t.root4 != nil
 }
 
-// init the root nodes, no public constructor needed, the zero value is ready to use.
+// initOnce the root nodes, no public constructor needed, the zero value is ready to use.
 // Not using sync.Once here, the table is not safe for concurrent writers anyway
-func (t *Table[V]) init() {
+func (t *Table[V]) initOnce() {
 	if t.isInit() {
 		return
 	}
 
-	// Outlined slow-path to allow inlining of the fast-path.
-	t.initOnce()
-}
-
-// initOnce, too complex for inlining
-func (t *Table[V]) initOnce() {
 	t.root4 = newNode[V]()
 	t.root6 = newNode[V]()
 }
@@ -86,7 +80,7 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 		return
 	}
 
-	t.init()
+	t.initOnce()
 
 	// values derived from pfx
 	ip := pfx.Addr()
@@ -159,7 +153,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 		return zero
 	}
 
-	t.init()
+	t.initOnce()
 
 	// values derived from pfx
 	ip := pfx.Addr()
@@ -565,7 +559,7 @@ func (t *Table[V]) Union(o *Table[V]) {
 		return
 	}
 
-	t.init()
+	t.initOnce()
 
 	dup4 := t.root4.unionRec(o.root4)
 	dup6 := t.root6.unionRec(o.root6)
