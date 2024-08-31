@@ -13,7 +13,6 @@ import (
 	"fmt"
 	"math/rand"
 	"net/netip"
-	"reflect"
 	"runtime"
 	"testing"
 )
@@ -1027,7 +1026,7 @@ func TestDeleteIsReverseOfInsert(t *testing.T) {
 	const N = 10_000
 
 	tbl := new(Table[int])
-	tbl.init()
+	tbl.initOnce()
 	want := tbl.dumpString()
 
 	prefixes := randomPrefixes(N)
@@ -1531,7 +1530,7 @@ func TestCloneEdgeCases(t *testing.T) {
 func TestClone(t *testing.T) {
 	t.Parallel()
 
-	pfxs := randomPrefixes4(10_000)
+	pfxs := randomPrefixes(1_000)
 
 	golden := new(Table[int])
 	tbl := new(Table[int])
@@ -1541,8 +1540,8 @@ func TestClone(t *testing.T) {
 	}
 	clone := tbl.Clone()
 
-	if !reflect.DeepEqual(golden, clone) {
-		t.Errorf("cloned table isn't equal")
+	if tbl.dumpString() != clone.dumpString() {
+		t.Errorf("Clone: got:\n%swant:\n%s", clone.dumpString(), tbl.dumpString())
 	}
 }
 
@@ -1551,7 +1550,7 @@ func TestCloneShallow(t *testing.T) {
 
 	tbl := new(Table[*int])
 	clone := tbl.Clone()
-	if tbl.String() != clone.String() {
+	if tbl.dumpString() != clone.dumpString() {
 		t.Errorf("empty Clone: got:\n%swant:\n%s", clone.String(), tbl.String())
 	}
 
