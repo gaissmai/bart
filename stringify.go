@@ -41,6 +41,7 @@ func (t *Table[V]) MarshalText() ([]byte, error) {
 	if err := t.Fprint(w); err != nil {
 		return nil, err
 	}
+
 	return w.Bytes(), nil
 }
 
@@ -56,6 +57,7 @@ func (t *Table[V]) String() string {
 	if err := t.Fprint(w); err != nil {
 		panic(err)
 	}
+
 	return w.String()
 }
 
@@ -120,6 +122,7 @@ func (t *Table[V]) fprint(w io.Writer, is4 bool) error {
 	if err := n.fprintRec(w, startKid, ""); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -249,5 +252,6 @@ func cmpPrefix(a, b netip.Prefix) int {
 	if cmp := a.Addr().Compare(b.Addr()); cmp != 0 {
 		return cmp
 	}
+
 	return cmp.Compare(a.Bits(), b.Bits())
 }

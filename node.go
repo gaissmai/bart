@@ -71,12 +71,14 @@ func (n *node[V]) insertPrefix(idx uint, val V) (ok bool) {
 	// prefix exists, overwrite val
 	if n.prefixesBitset.Test(idx) {
 		n.prefixes[n.prefixRank(idx)] = val
+
 		return false
 	}
 
 	// new, insert into bitset and slice
 	n.prefixesBitset.Set(idx)
 	n.prefixes = slices.Insert(n.prefixes, n.prefixRank(idx), val)
+
 	return true
 }
 
@@ -112,6 +114,7 @@ func (n *node[V]) updatePrefix(octet byte, prefixLen int, cb func(V, bool) V) (n
 
 	// if prefix is set, get current value
 	var oldVal V
+
 	if wasPresent = n.prefixesBitset.Test(idx); wasPresent {
 		rnk = n.prefixRank(idx)
 		oldVal = n.prefixes[rnk]
@@ -123,6 +126,7 @@ func (n *node[V]) updatePrefix(octet byte, prefixLen int, cb func(V, bool) V) (n
 	// prefix is already set, update and return value
 	if wasPresent {
 		n.prefixes[rnk] = newVal
+
 		return
 	}
 
@@ -174,6 +178,7 @@ func (n *node[V]) getValueOK(idx uint) (val V, ok bool) {
 	if n.prefixesBitset.Test(idx) {
 		return n.prefixes[n.prefixRank(idx)], true
 	}
+
 	return
 }
 
@@ -186,6 +191,7 @@ func (n *node[V]) mustGetValue(idx uint) V {
 // allStrideIndexes returns all baseIndexes set in this stride node in ascending order.
 func (n *node[V]) allStrideIndexes(buffer []uint) []uint {
 	_, buffer = n.prefixesBitset.NextSetMany(0, buffer)
+
 	return buffer
 }
 
@@ -203,6 +209,7 @@ func (n *node[V]) insertChild(octet byte, child *node[V]) {
 	// child exists, overwrite it
 	if n.childrenBitset.Test(uint(octet)) {
 		n.children[n.childRank(octet)] = child
+
 		return
 	}
 
@@ -240,6 +247,7 @@ func (n *node[V]) getChild(octet byte) *node[V] {
 // panics if the buffer isn't big enough.
 func (n *node[V]) allChildAddrs(buffer []uint) []uint {
 	_, buffer = n.childrenBitset.NextSetMany(0, buffer)
+
 	return buffer
 }
 
@@ -268,7 +276,6 @@ func (n *node[V]) eachSubnet(path [16]byte, depth int, is4 bool, octet byte, pfx
 	// ###############################################################
 	// 1. collect all indices in n covered by prefix
 	// ###############################################################
-
 	pfxFirstAddr := uint(octet)
 	pfxLastAddr := uint(octet | ^netMask[pfxLen])
 
@@ -276,7 +283,9 @@ func (n *node[V]) eachSubnet(path [16]byte, depth int, is4 bool, octet byte, pfx
 	allCoveredIndices := idxBackingArray[:0]
 
 	var idx uint
+
 	var ok bool
+
 	for {
 		if idx, ok = n.prefixesBitset.NextSet(idx); !ok {
 			break
@@ -291,6 +300,7 @@ func (n *node[V]) eachSubnet(path [16]byte, depth int, is4 bool, octet byte, pfx
 		if thisFirstAddr >= pfxFirstAddr && thisLastAddr <= pfxLastAddr {
 			allCoveredIndices = append(allCoveredIndices, idx)
 		}
+
 		idx++
 	}
 
@@ -305,6 +315,7 @@ func (n *node[V]) eachSubnet(path [16]byte, depth int, is4 bool, octet byte, pfx
 	allCoveredAddrs := addrBackingArray[:0]
 
 	var addr uint
+
 	for {
 		if addr, ok = n.childrenBitset.NextSet(addr); !ok {
 			break
@@ -353,6 +364,7 @@ func (n *node[V]) eachSubnet(path [16]byte, depth int, is4 bool, octet byte, pfx
 				// early exit
 				return false
 			}
+
 			cursor++
 		}
 
@@ -427,6 +439,7 @@ func (n *node[V]) unionRec(o *node[V]) (duplicates int) {
 			duplicates += nc.unionRec(oc)
 		}
 	}
+
 	return duplicates
 }
 
@@ -539,6 +552,7 @@ func (n *node[V]) allRecSorted(path [16]byte, depth int, is4 bool, yield func(ne
 				// early exit
 				return false
 			}
+
 			childCursor++
 		}
 
@@ -554,6 +568,7 @@ func (n *node[V]) allRecSorted(path [16]byte, depth int, is4 bool, yield func(ne
 	for j := childCursor; j < len(childAddrs); j++ {
 		addr := childAddrs[j]
 		c := n.children[j]
+
 		path[depth] = byte(addr)
 		if !c.allRecSorted(path, depth+1, is4, yield) {
 			// early exit

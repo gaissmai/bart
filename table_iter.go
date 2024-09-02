@@ -24,10 +24,12 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) func(yield func(netip.Prefix, V) 
 
 		// do not allocate
 		path := ip.As16()
+
 		octets := path[:]
 		if is4 {
 			octets = octets[12:]
 		}
+
 		copy(path[:], octets)
 
 		// see comment in Insert()
@@ -44,6 +46,7 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) func(yield func(netip.Prefix, V) 
 
 		// run variable, used after for loop
 		var i int
+
 		var octet byte
 
 		// find last node
@@ -56,6 +59,7 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) func(yield func(netip.Prefix, V) 
 			if c == nil {
 				break
 			}
+
 			n = c
 		}
 
@@ -74,6 +78,7 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) func(yield func(netip.Prefix, V) 
 					// early exit
 					return
 				}
+
 				continue
 			}
 
@@ -103,10 +108,12 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) func(yield func(netip.Prefix, V) bo
 
 		// do not allocate
 		path := ip.As16()
+
 		octets := path[:]
 		if is4 {
 			octets = octets[12:]
 		}
+
 		copy(path[:], octets)
 
 		// see comment in Insert()

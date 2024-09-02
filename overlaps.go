@@ -18,6 +18,7 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 	if nPfxLen == 1 && nChildLen == 0 {
 		// get the single prefix from n
 		idx, _ := n.prefixesBitset.NextSet(0)
+
 		return o.overlapsPrefix(idxToPfx(idx))
 	}
 
@@ -25,6 +26,7 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 	if oPfxLen == 1 && oChildLen == 0 {
 		// get the single prefix from o
 		idx, _ := o.prefixesBitset.NextSet(0)
+
 		return n.overlapsPrefix(idxToPfx(idx))
 	}
 
@@ -102,13 +104,13 @@ func (n *node[V]) overlapsRoutes(o *node[V]) bool {
 
 	// zip, range over n and o together to help chance on its way
 	for nOK || oOK {
-
 		if nOK {
 			// does any route in o overlap this prefix from n
 			if nIdx, nOK = n.prefixesBitset.NextSet(nIdx); nOK {
 				if o.lpmTest(nIdx) {
 					return true
 				}
+
 				nIdx++
 			}
 		}
@@ -119,6 +121,7 @@ func (n *node[V]) overlapsRoutes(o *node[V]) bool {
 				if n.lpmTest(oIdx) {
 					return true
 				}
+
 				oIdx++
 			}
 		}
@@ -140,6 +143,7 @@ func (n *node[V]) overlapsChildsIn(o *node[V]) bool {
 	// do range over, not so many childs and maybe to many prefixes
 	if doRange {
 		var oAddr uint
+
 		ok := true
 		for ok {
 			// does any route in o overlap this child from n
@@ -147,6 +151,7 @@ func (n *node[V]) overlapsChildsIn(o *node[V]) bool {
 				if n.lpmTest(hostIndex(byte(oAddr))) {
 					return true
 				}
+
 				oAddr++
 			}
 		}
@@ -214,9 +219,11 @@ func (n *node[V]) overlapsOneChildIn(o *node[V]) bool {
 	// get the single addr and child
 	addr, _ := o.childrenBitset.NextSet(0)
 	oChild := o.children[0]
+
 	if nChild := n.getChild(byte(addr)); nChild != nil {
 		return nChild.overlapsRec(oChild)
 	}
+
 	return false
 }
 
@@ -243,7 +250,6 @@ func (n *node[V]) overlapsOneRouteIn(o *node[V]) bool {
 // overlapsPrefix returns true if node overlaps with prefix.
 func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 	// 1. Test if any route in this node overlaps prefix?
-
 	idx := pfxToIdx(octet, pfxLen)
 	if n.lpmTest(idx) {
 		return true

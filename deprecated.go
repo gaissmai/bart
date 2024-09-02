@@ -27,10 +27,12 @@ func (t *Table[V]) EachLookupPrefix(pfx netip.Prefix, yield func(pfx netip.Prefi
 
 	// do not allocate
 	path := ip.As16()
+
 	octets := path[:]
 	if is4 {
 		octets = octets[12:]
 	}
+
 	copy(path[:], octets)
 
 	// see comment in Insert()
@@ -47,6 +49,7 @@ func (t *Table[V]) EachLookupPrefix(pfx netip.Prefix, yield func(pfx netip.Prefi
 
 	// run variable, used after for loop
 	var i int
+
 	var octet byte
 
 	// find last node
@@ -59,6 +62,7 @@ func (t *Table[V]) EachLookupPrefix(pfx netip.Prefix, yield func(pfx netip.Prefi
 		if c == nil {
 			break
 		}
+
 		n = c
 	}
 
@@ -77,6 +81,7 @@ func (t *Table[V]) EachLookupPrefix(pfx netip.Prefix, yield func(pfx netip.Prefi
 				// early exit
 				return
 			}
+
 			continue
 		}
 
@@ -107,10 +112,12 @@ func (t *Table[V]) EachSubnet(pfx netip.Prefix, yield func(pfx netip.Prefix, val
 
 	// do not allocate
 	path := ip.As16()
+
 	octets := path[:]
 	if is4 {
 		octets = octets[12:]
 	}
+
 	copy(path[:], octets)
 
 	// see comment in Insert()
@@ -126,6 +133,7 @@ func (t *Table[V]) EachSubnet(pfx netip.Prefix, yield func(pfx netip.Prefix, val
 	for i, octet := range octets {
 		if i == lastOctetIdx {
 			_ = n.eachSubnet(path, i, is4, lastOctet, lastOctetBits, yield)
+
 			return
 		}
 
