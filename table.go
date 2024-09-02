@@ -64,6 +64,7 @@ func (t *Table[V]) rootNodeByVersion(is4 bool) *node[V] {
 	if is4 {
 		return t.root4
 	}
+
 	return t.root6
 }
 
@@ -97,6 +98,7 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	// octets := ip.AsSlice()
 
 	a16 := ip.As16()
+
 	octets := a16[:]
 	if is4 {
 		octets = octets[12:]
@@ -150,6 +152,7 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V) {
 	if !pfx.IsValid() {
 		var zero V
+
 		return zero
 	}
 
@@ -164,6 +167,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 
 	// do not allocate
 	a16 := ip.As16()
+
 	octets := a16[:]
 	if is4 {
 		octets = octets[12:]
@@ -193,6 +197,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 
 	// update/insert prefix into node
 	var wasPresent bool
+
 	newVal, wasPresent = n.updatePrefix(lastOctet, lastOctetBits, cb)
 	if !wasPresent {
 		t.sizeUpdate(is4, 1)
@@ -217,6 +222,7 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 
 	// do not allocate
 	a16 := ip.As16()
+
 	octets := a16[:]
 	if is4 {
 		octets = octets[12:]
@@ -237,8 +243,10 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 			// not found
 			return
 		}
+
 		n = c
 	}
+
 	return n.getValueOK(pfxToIdx(lastOctet, lastOctetBits))
 }
 
@@ -257,6 +265,7 @@ func (t *Table[V]) Delete(pfx netip.Prefix) {
 
 	// do not allocate
 	a16 := ip.As16()
+
 	octets := a16[:]
 	if is4 {
 		octets = octets[12:]
@@ -291,6 +300,7 @@ func (t *Table[V]) Delete(pfx netip.Prefix) {
 		if c == nil {
 			return
 		}
+
 		n = c
 	}
 
@@ -299,6 +309,7 @@ func (t *Table[V]) Delete(pfx netip.Prefix) {
 		// nothing deleted
 		return
 	}
+
 	t.sizeUpdate(is4, -1)
 
 	// purge dangling nodes after successful deletion
@@ -327,6 +338,7 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 
 	// do not allocate
 	a16 := ip.As16()
+
 	octets := a16[:]
 	if is4 {
 		octets = octets[12:]
@@ -337,6 +349,7 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 
 	// run variable, used after for loop
 	var i int
+
 	var octet byte
 
 	// find leaf node
@@ -349,6 +362,7 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 		if c == nil {
 			break
 		}
+
 		n = c
 	}
 
@@ -365,6 +379,7 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 			}
 		}
 	}
+
 	return
 }
 
@@ -376,6 +391,7 @@ func (t *Table[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
 	}
 
 	_, _, val, ok = t.lpmPrefix(pfx)
+
 	return val, ok
 }
 
@@ -416,6 +432,7 @@ func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V, 
 
 	// do not allocate
 	a16 := ip.As16()
+
 	octets := a16[:]
 	if is4 {
 		octets = octets[12:]
@@ -431,6 +448,7 @@ func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V, 
 	octets[lastOctetIdx] = lastOctet
 
 	var i int
+
 	var octet byte
 
 	// record path to leaf node
@@ -446,6 +464,7 @@ func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V, 
 		if c == nil {
 			break
 		}
+
 		n = c
 	}
 
@@ -457,7 +476,6 @@ func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V, 
 		// longest prefix match
 		// micro benchmarking: skip if node has no prefixes
 		if len(n.prefixes) != 0 {
-
 			// only the lastOctet may have a different prefix len
 			// all others are just host routes
 			var idx uint
@@ -473,6 +491,7 @@ func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V, 
 			}
 		}
 	}
+
 	return
 }
 
@@ -492,6 +511,7 @@ func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 
 	// do not allocate
 	a16 := ip.As16()
+
 	octets := a16[:]
 	if is4 {
 		octets = octets[12:]
@@ -516,6 +536,7 @@ func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 		if c == nil {
 			return false
 		}
+
 		n = c
 	}
 
@@ -588,8 +609,10 @@ func (t *Table[V]) Clone() *Table[V] {
 func (t *Table[V]) sizeUpdate(is4 bool, n int) {
 	if is4 {
 		t.size4 += n
+
 		return
 	}
+
 	t.size6 += n
 }
 

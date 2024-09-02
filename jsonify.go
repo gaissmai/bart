@@ -46,6 +46,7 @@ func (t *Table[V]) DumpList4() []DumpListNode[V] {
 	if !t.isInit() {
 		return nil
 	}
+
 	return t.root4.dumpListRec(0, zeroPath, 0, true)
 }
 
@@ -55,6 +56,7 @@ func (t *Table[V]) DumpList6() []DumpListNode[V] {
 	if !t.isInit() {
 		return nil
 	}
+
 	return t.root6.dumpListRec(0, zeroPath, 0, false)
 }
 

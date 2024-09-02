@@ -27,6 +27,7 @@ const (
 func (t *Table[V]) dumpString() string {
 	w := new(strings.Builder)
 	t.dump(w)
+
 	return w.String()
 }
 
@@ -60,6 +61,7 @@ func (t *Table[V]) dumpString() string {
 func (t *Table[V]) dump(w io.Writer) {
 	if !t.isInit() {
 		fmt.Fprint(w, "")
+
 		return
 	}
 
@@ -111,6 +113,7 @@ func (n *node[V]) dump(w io.Writer, path [16]byte, depth int, is4 bool) {
 			octet, pfxLen := idxToPfx(idx)
 			fmt.Fprintf(w, " %s/%d", octetFmt(octet, is4), pfxLen)
 		}
+
 		fmt.Fprintln(w)
 
 		// print the values for this node
@@ -119,6 +122,7 @@ func (n *node[V]) dump(w io.Writer, path [16]byte, depth int, is4 bool) {
 		for _, val := range n.prefixes {
 			fmt.Fprintf(w, " %v", val)
 		}
+
 		fmt.Fprintln(w)
 	}
 
@@ -131,6 +135,7 @@ func (n *node[V]) dump(w io.Writer, path [16]byte, depth int, is4 bool) {
 			octet := byte(addr)
 			fmt.Fprintf(w, " %s", octetFmt(octet, is4))
 		}
+
 		fmt.Fprintln(w)
 	}
 }
@@ -140,6 +145,7 @@ func octetFmt(octet byte, is4 bool) string {
 	if is4 {
 		return fmt.Sprintf("%d", octet)
 	}
+
 	return fmt.Sprintf("0x%02x", octet)
 }
 
@@ -155,8 +161,10 @@ func ipStridePath(path [16]byte, depth int, is4 bool) string {
 			if i != 0 {
 				buf.WriteString(".")
 			}
+
 			buf.WriteString(strconv.Itoa(int(b)))
 		}
+
 		return buf.String()
 	}
 
@@ -164,8 +172,10 @@ func ipStridePath(path [16]byte, depth int, is4 bool) string {
 		if i != 0 && i%2 == 0 {
 			buf.WriteString(":")
 		}
+
 		buf.WriteString(fmt.Sprintf("%02x", b))
 	}
+
 	return buf.String()
 }
 
@@ -181,6 +191,7 @@ func (nt nodeType) String() string {
 	case intermediateNode:
 		return "IMED"
 	}
+
 	panic("unreachable")
 }
 
@@ -204,5 +215,6 @@ func (n *node[V]) hasType() nodeType {
 	if lenPefixes != 0 && lenChilds != 0 {
 		return fullNode
 	}
+
 	panic("unreachable")
 }

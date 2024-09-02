@@ -59,12 +59,14 @@ func TestEachLookupPrefix(t *testing.T) {
 	}
 
 	var fastPfxs []netip.Prefix
+
 	for range 10_000 {
 		pfx := randomPrefix()
 
 		goldPfxs := gold.lookupPrefixReverse(pfx)
 
 		fastPfxs = nil
+
 		fast.EachLookupPrefix(pfx, func(p netip.Prefix, _ int) bool {
 			fastPfxs = append(fastPfxs, p)
 			return true
@@ -73,6 +75,5 @@ func TestEachLookupPrefix(t *testing.T) {
 		if !reflect.DeepEqual(goldPfxs, fastPfxs) {
 			t.Fatalf("\nEachSupernet(%q):\ngot:  %v\nwant: %v", pfx, fastPfxs, goldPfxs)
 		}
-
 	}
 }

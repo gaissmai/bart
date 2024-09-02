@@ -43,12 +43,14 @@ func cmpIndexRank(aIdx, bIdx uint) int {
 		if aBits <= bBits {
 			return -1
 		}
+
 		return 1
 	}
 
 	if aOctet < bOctet {
 		return -1
 	}
+
 	return 1
 }
 
