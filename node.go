@@ -21,7 +21,7 @@ const (
 var zeroPath [16]byte
 
 // node is a level node in the multibit-trie.
-// A node has prefixes and children.
+// A node has prefixes and children, forming the multibit trie.
 //
 // The prefixes form a complete binary tree, see the artlookup.pdf
 // paper in the doc folder to understand the data structure.
@@ -35,12 +35,13 @@ var zeroPath [16]byte
 // The lookup is then slower by a factor of about 2, but this is
 // the intended trade-off to prevent memory consumption from exploding.
 type node[V any] struct {
+	// To address a specific element, the popcount of the bitset is calculated
+	// up to the desired index. This gives the position of the element in the slice.
+	prefixes []V        // prefix (octet/bits) -> baseIndex [1,511]
+	children []*node[V] // octet [0, 255]
+
 	prefixesBitset *bitset.BitSet
 	childrenBitset *bitset.BitSet
-
-	// popcount compressed slices
-	prefixes []V
-	children []*node[V]
 }
 
 // newNode, the zero-value of BitSet is ready to use
