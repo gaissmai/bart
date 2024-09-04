@@ -35,16 +35,31 @@ var zeroPath [16]byte
 // The lookup is then slower by a factor of about 2, but this is
 // the intended trade-off to prevent memory consumption from exploding.
 type node[V any] struct {
-	// To address a specific element, the popcount of the bitset is calculated
-	// up to the desired index. This gives the position of the element in the slice.
-	prefixes []V        // prefix (octet/bits) -> baseIndex [1,511]
-	children []*node[V] // octet [0, 255]
+	// prefixes contains the payload V
+	prefixes []V
 
+	// children, recursively spans the trie with a branching factor of 256
+	children []*node[V]
+
+	// Here we would be done if they were fixed arrays, but since they
+	// are popcount compressed slices we need bitsets.
+	// ---
+	// To address a specific element in prefixes or children
+	// the popcount of the bitset is calculated up to the desired element,
+	// this gives the position of the element in the corresponding slice.
+	//
+	// e.g. find the value V for prefix 10/7:
+	//  pfxToIdx(10/7) -> 133; popcount(133) -> i; V = prefixes[i]
+	//
+	// e.g. find the next node for octet(253):
+	//  popcount(253) -> i; *n = children[i]
+	//
 	prefixesBitset *bitset.BitSet
 	childrenBitset *bitset.BitSet
 }
 
-// newNode, the zero-value of BitSet is ready to use
+// newNode, the zero-value of BitSet is ready to use,
+// not using bitset.New(), this would be not inlineable.
 func newNode[V any]() *node[V] {
 	return &node[V]{
 		prefixesBitset: &bitset.BitSet{},
@@ -66,7 +81,7 @@ func (n *node[V]) prefixRank(idx uint) int {
 	return int(n.prefixesBitset.Rank(idx)) - 1
 }
 
-// insertPrefix adds the route for baseIdx, with value val.
+// insertPrefix adds the route as baseIdx, with value val.
 // If the value already exists, overwrite it with val and return false.
 func (n *node[V]) insertPrefix(idx uint, val V) (ok bool) {
 	// prefix exists, overwrite val
