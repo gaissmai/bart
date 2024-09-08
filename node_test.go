@@ -165,7 +165,6 @@ func TestOverlapsNode(t *testing.T) {
 		}
 		seenResult[gotFast]++
 	}
-	t.Log(seenResult)
 	if len(seenResult) != 2 { // saw both intersections and non-intersections
 		t.Fatalf("didn't see both intersections and non-intersections\nIntersects: %d\nNon-intersects: %d", seenResult[true], seenResult[false])
 	}
