@@ -47,9 +47,11 @@ The API has changed in v0.4.2, 0.5.3, v0.6.3, v0.10.1, v0.11.0, v0.12.0, v0.12.6
     and/or writers.
 
   func (t *Table[V]) Insert(pfx netip.Prefix, val V)
-  func (t *Table[V]) Delete(pfx netip.Prefix)
-  func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool)
   func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V)
+  func (t *Table[V]) Delete(pfx netip.Prefix)
+
+  func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool)
+  func (t *Table[V]) GetAndDelete(pfx netip.Prefix) (val V, ok bool)
 
   func (t *Table[V]) Union(o *Table[V])
   func (t *Table[V]) Clone() *Table[V]

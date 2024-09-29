@@ -252,6 +252,16 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 
 // Delete removes pfx from the tree, pfx does not have to be present.
 func (t *Table[V]) Delete(pfx netip.Prefix) {
+	_, _ = t.getAndDelete(pfx)
+}
+
+// GetAndDelete deletes the prefix and returns the associated payload for prefix and true,
+// or the zero vlaue and false if prefix is not set in the routing table.
+func (t *Table[V]) GetAndDelete(pfx netip.Prefix) (val V, ok bool) {
+	return t.getAndDelete(pfx)
+}
+
+func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 	if !pfx.IsValid() || !t.isInit() {
 		return
 	}
@@ -305,8 +315,7 @@ func (t *Table[V]) Delete(pfx netip.Prefix) {
 	}
 
 	// try to delete prefix in trie node
-	if !n.deletePrefix(lastOctet, lastOctetBits) {
-		// nothing deleted
+	if val, ok = n.deletePrefix(lastOctet, lastOctetBits); !ok {
 		return
 	}
 
@@ -324,6 +333,8 @@ func (t *Table[V]) Delete(pfx netip.Prefix) {
 		i--
 		n = stack[i]
 	}
+
+	return val, ok
 }
 
 // Lookup does a route lookup (longest prefix match) for IP and

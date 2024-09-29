@@ -98,17 +98,18 @@ func (n *node[V]) insertPrefix(idx uint, val V) (ok bool) {
 	return true
 }
 
-// deletePrefix removes the route octet/prefixLen.
-// Returns false if there was no prefix to delete.
-func (n *node[V]) deletePrefix(octet byte, prefixLen int) (ok bool) {
+// deletePrefix removes the route octet/prefixLen and returns the associated value and true
+// or false if there was no prefix to delete (and no value to return).
+func (n *node[V]) deletePrefix(octet byte, prefixLen int) (val V, ok bool) {
 	idx := pfxToIdx(octet, prefixLen)
 
 	// no route entry
 	if !n.prefixesBitset.Test(idx) {
-		return false
+		return val, false
 	}
 
 	rnk := n.prefixRank(idx)
+	val = n.prefixes[rnk]
 
 	// delete from slice
 	n.prefixes = slices.Delete(n.prefixes, rnk, rnk+1)
@@ -117,7 +118,7 @@ func (n *node[V]) deletePrefix(octet byte, prefixLen int) (ok bool) {
 	n.prefixesBitset.Clear(idx)
 	n.prefixesBitset.Compact()
 
-	return true
+	return val, true
 }
 
 // updatePrefix, update or set the value at prefix via callback. The new value returned
