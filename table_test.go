@@ -1049,6 +1049,44 @@ func TestDeleteIsReverseOfInsert(t *testing.T) {
 	}
 }
 
+func TestGetAndDelete(t *testing.T) {
+	t.Parallel()
+	// Insert N prefixes, then delete those same prefixes in shuffled
+	// order.
+	const N = 10_000
+
+	tbl := new(Table[int])
+	prefixes := randomPrefixes(N)
+
+	// insert the prefixes
+	for _, p := range prefixes {
+		tbl.Insert(p.pfx, p.val)
+	}
+
+	// shuffle the prefixes
+	rand.Shuffle(N, func(i, j int) {
+		prefixes[i], prefixes[j] = prefixes[j], prefixes[i]
+	})
+
+	for _, p := range prefixes {
+		want, _ := tbl.Get(p.pfx)
+		val, ok := tbl.GetAndDelete(p.pfx)
+
+		if !ok {
+			t.Errorf("GetAndDelete, expected true, got %v", ok)
+		}
+
+		if val != want {
+			t.Errorf("GetAndDelete, expected %v, got %v", want, val)
+		}
+
+		val, ok = tbl.GetAndDelete(p.pfx)
+		if ok {
+			t.Errorf("GetAndDelete, expected false, got (%v, %v)", val, ok)
+		}
+	}
+}
+
 func TestGet(t *testing.T) {
 	t.Parallel()
 
