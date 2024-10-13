@@ -70,9 +70,6 @@ func idxToPfx(idx uint) (octet byte, pfxLen int) {
 //		octet = (idx & (0xFF >> (8 - pfxLen))) << (8 - pfxLen)
 //		return octet, pfxLen
 //	}
-//
-// All values are written as decimals, so no hassle
-// with different byte order for little- or big-endian.
 var baseIdxLookupTbl = [512]struct {
 	octet byte
 	bits  int8
