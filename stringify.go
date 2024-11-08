@@ -173,7 +173,7 @@ func (n *node[V]) getKidsRec(parentIdx uint, path [16]byte, depth int, is4 bool)
 
 	// make backing array, no heap allocs
 	idxBacking := make([]uint, maxNodePrefixes)
-	for _, idx := range n.allStrideIndexes(idxBacking) {
+	for _, idx := range n.prefixes.AllSetBits(idxBacking) {
 		// parent or self, handled alreday in an upper stack frame.
 		if idx <= parentIdx {
 			continue
@@ -193,7 +193,7 @@ func (n *node[V]) getKidsRec(parentIdx uint, path [16]byte, depth int, is4 bool)
 				depth: depth,
 				idx:   idx,
 				cidr:  cidr,
-				val:   n.mustGetValue(idx),
+				val:   n.prefixes.MustGet(idx),
 			}
 
 			directKids = append(directKids, kid)
@@ -202,13 +202,13 @@ func (n *node[V]) getKidsRec(parentIdx uint, path [16]byte, depth int, is4 bool)
 
 	// the node may have childs, the rec-descent monster starts
 	addrBacking := make([]uint, maxNodeChildren)
-	for i, addr := range n.allChildAddrs(addrBacking) {
+	for i, addr := range n.children.AllSetBits(addrBacking) {
 		octet := byte(addr)
 
 		// do a longest-prefix-match
 		lpmIdx, _, _ := n.lpm(hostIndex(octet))
 		if lpmIdx == parentIdx {
-			c := n.children[i]
+			c := n.children.Items[i]
 			path[depth] = octet
 
 			// traverse, rec-descent call with next child node

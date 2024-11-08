@@ -55,8 +55,8 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) func(yield func(netip.Prefix, V) 
 			stack[i] = n
 
 			// go down in tight loop
-			c := n.getChild(octet)
-			if c == nil {
+			c, ok := n.children.Get(uint(octet))
+			if !ok {
 				break
 			}
 
@@ -68,7 +68,7 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) func(yield func(netip.Prefix, V) 
 			n = stack[depth]
 
 			// microbenchmarking
-			if len(n.prefixes) == 0 {
+			if n.prefixes.Count() == 0 {
 				continue
 			}
 
@@ -132,8 +132,8 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) func(yield func(netip.Prefix, V) bo
 				return
 			}
 
-			c := n.getChild(octet)
-			if c == nil {
+			c, ok := n.children.Get(uint(octet))
+			if !ok {
 				break
 			}
 

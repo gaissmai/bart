@@ -58,8 +58,8 @@ func (t *Table[V]) EachLookupPrefix(pfx netip.Prefix, yield func(pfx netip.Prefi
 		stack[i] = n
 
 		// go down in tight loop
-		c := n.getChild(octet)
-		if c == nil {
+		c, ok := n.children.Get(uint(octet))
+		if !ok {
 			break
 		}
 
@@ -71,7 +71,7 @@ func (t *Table[V]) EachLookupPrefix(pfx netip.Prefix, yield func(pfx netip.Prefi
 		n = stack[depth]
 
 		// microbenchmarking
-		if len(n.prefixes) == 0 {
+		if n.prefixes.Count() == 0 {
 			continue
 		}
 
@@ -137,8 +137,8 @@ func (t *Table[V]) EachSubnet(pfx netip.Prefix, yield func(pfx netip.Prefix, val
 			return
 		}
 
-		c := n.getChild(octet)
-		if c == nil {
+		c, ok := n.children.Get(uint(octet))
+		if !ok {
 			break
 		}
 
