@@ -80,9 +80,9 @@ func (n *node[V]) dumpRec(w io.Writer, path [16]byte, depth int, is4 bool) {
 	addrBacking := make([]uint, maxNodeChildren)
 
 	// the node may have childs, the rec-descent monster starts
-	for i, addr := range n.allChildAddrs(addrBacking) {
+	for i, addr := range n.children.AllSetBits(addrBacking) {
 		octet := byte(addr)
-		child := n.children[i]
+		child := n.children.Items[i]
 		path[depth] = octet
 
 		child.dumpRec(w, path, depth+1, is4)
@@ -98,16 +98,16 @@ func (n *node[V]) dump(w io.Writer, path [16]byte, depth int, is4 bool) {
 	fmt.Fprintf(w, "\n%s[%s] depth:  %d path: [%s] / %d\n",
 		indent, n.hasType(), depth, ipStridePath(path, depth, is4), bits)
 
-	if nPfxLen := len(n.prefixes); nPfxLen != 0 {
+	if nPfxCount := n.prefixes.Count(); nPfxCount != 0 {
 		// make backing array, no heap allocs
 		idxBackingArray := [maxNodePrefixes]uint{}
-		allIndices := n.allStrideIndexes(idxBackingArray[:])
+		allIndices := n.prefixes.AllSetBits(idxBackingArray[:])
 
 		// print the baseIndices for this node.
-		fmt.Fprintf(w, "%sindexs(#%d): %v\n", indent, nPfxLen, allIndices)
+		fmt.Fprintf(w, "%sindexs(#%d): %v\n", indent, nPfxCount, allIndices)
 
 		// print the prefixes for this node
-		fmt.Fprintf(w, "%sprefxs(#%d):", indent, nPfxLen)
+		fmt.Fprintf(w, "%sprefxs(#%d):", indent, nPfxCount)
 
 		for _, idx := range allIndices {
 			octet, pfxLen := idxToPfx(idx)
@@ -117,21 +117,21 @@ func (n *node[V]) dump(w io.Writer, path [16]byte, depth int, is4 bool) {
 		fmt.Fprintln(w)
 
 		// print the values for this node
-		fmt.Fprintf(w, "%svalues(#%d):", indent, nPfxLen)
+		fmt.Fprintf(w, "%svalues(#%d):", indent, nPfxCount)
 
-		for _, val := range n.prefixes {
+		for _, val := range n.prefixes.Items {
 			fmt.Fprintf(w, " %v", val)
 		}
 
 		fmt.Fprintln(w)
 	}
 
-	if childs := len(n.children); childs != 0 {
+	if childCount := n.children.Count(); childCount != 0 {
 		// print the childs for this node
-		fmt.Fprintf(w, "%schilds(#%d):", indent, childs)
+		fmt.Fprintf(w, "%schilds(#%d):", indent, childCount)
 
 		addrBacking := make([]uint, maxNodeChildren)
-		for _, addr := range n.allChildAddrs(addrBacking) {
+		for _, addr := range n.children.AllSetBits(addrBacking) {
 			octet := byte(addr)
 			fmt.Fprintf(w, " %s", octetFmt(octet, is4))
 		}
@@ -197,22 +197,22 @@ func (nt nodeType) String() string {
 
 // hasType returns the nodeType.
 func (n *node[V]) hasType() nodeType {
-	lenPefixes := len(n.prefixes)
-	lenChilds := len(n.children)
+	prefixCount := n.prefixes.Count()
+	childCount := n.children.Count()
 
-	if lenPefixes == 0 && lenChilds != 0 {
+	if prefixCount == 0 && childCount != 0 {
 		return intermediateNode
 	}
 
-	if lenPefixes == 0 && lenChilds == 0 {
+	if prefixCount == 0 && childCount == 0 {
 		return nullNode
 	}
 
-	if lenPefixes != 0 && lenChilds == 0 {
+	if prefixCount != 0 && childCount == 0 {
 		return leafNode
 	}
 
-	if lenPefixes != 0 && lenChilds != 0 {
+	if prefixCount != 0 && childCount != 0 {
 		return fullNode
 	}
 

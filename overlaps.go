@@ -4,34 +4,34 @@ import "github.com/bits-and-blooms/bitset"
 
 // overlapsRec returns true if any IP in the nodes n or o overlaps.
 func (n *node[V]) overlapsRec(o *node[V]) bool {
-	nPfxLen := len(n.prefixes)
-	oPfxLen := len(o.prefixes)
+	nPfxCount := n.prefixes.Count()
+	oPfxCount := o.prefixes.Count()
 
-	nChildLen := len(n.children)
-	oChildLen := len(o.children)
+	nChildCount := n.children.Count()
+	oChildCount := o.children.Count()
 
 	// ##############################
 	// 1. Test if any routes overlaps
 	// ##############################
 
 	// special case, overlapsPrefix is faster
-	if nPfxLen == 1 && nChildLen == 0 {
+	if nPfxCount == 1 && nChildCount == 0 {
 		// get the single prefix from n
-		idx, _ := n.prefixesBitset.NextSet(0)
+		idx, _ := n.prefixes.BitSet.NextSet(0)
 
 		return o.overlapsPrefix(idxToPfx(idx))
 	}
 
 	// special case, overlapsPrefix is faster
-	if oPfxLen == 1 && oChildLen == 0 {
+	if oPfxCount == 1 && oChildCount == 0 {
 		// get the single prefix from o
-		idx, _ := o.prefixesBitset.NextSet(0)
+		idx, _ := o.prefixes.BitSet.NextSet(0)
 
 		return n.overlapsPrefix(idxToPfx(idx))
 	}
 
 	// full cross check
-	if nPfxLen > 0 && oPfxLen > 0 {
+	if nPfxCount > 0 && oPfxCount > 0 {
 		if n.overlapsRoutes(o) {
 			return true
 		}
@@ -41,14 +41,14 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 	// 2. Test if routes overlaps any child
 	// ####################################
 
-	if nPfxLen > 0 && oChildLen > 0 {
+	if nPfxCount > 0 && oChildCount > 0 {
 		if n.overlapsChildsIn(o) {
 			return true
 		}
 	}
 
 	// symmetric reverse
-	if oPfxLen > 0 && nChildLen > 0 {
+	if oPfxCount > 0 && nChildCount > 0 {
 		if o.overlapsChildsIn(n) {
 			return true
 		}
@@ -59,20 +59,20 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 	// ################################################################
 
 	// stop condition, n or o have no childs
-	if nChildLen == 0 || oChildLen == 0 {
+	if nChildCount == 0 || oChildCount == 0 {
 		return false
 	}
 
-	if oChildLen == 1 {
+	if oChildCount == 1 {
 		return n.overlapsOneChildIn(o)
 	}
 
-	if nChildLen == 1 {
+	if nChildCount == 1 {
 		return o.overlapsOneChildIn(n)
 	}
 
 	// stop condition, no child with identical octet in n and o
-	if n.childrenBitset.IntersectionCardinality(o.childrenBitset) == 0 {
+	if n.children.BitSet.IntersectionCardinality(o.children.BitSet) == 0 {
 		return false
 	}
 
@@ -82,17 +82,17 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 // overlapsRoutes, test if n overlaps o prefixes and vice versa
 func (n *node[V]) overlapsRoutes(o *node[V]) bool {
 	// one node has just one prefix, use bitset algo
-	if len(n.prefixes) == 1 {
+	if n.prefixes.Count() == 1 {
 		return o.overlapsOneRouteIn(n)
 	}
 
 	// one node has just one prefix, use bitset algo
-	if len(o.prefixes) == 1 {
+	if o.prefixes.Count() == 1 {
 		return n.overlapsOneRouteIn(o)
 	}
 
 	// some prefixes are identical, trivial overlap
-	if n.prefixesBitset.IntersectionCardinality(o.prefixesBitset) > 0 {
+	if n.prefixes.BitSet.IntersectionCardinality(o.prefixes.BitSet) > 0 {
 		return true
 	}
 
@@ -106,7 +106,7 @@ func (n *node[V]) overlapsRoutes(o *node[V]) bool {
 	for nOK || oOK {
 		if nOK {
 			// does any route in o overlap this prefix from n
-			if nIdx, nOK = n.prefixesBitset.NextSet(nIdx); nOK {
+			if nIdx, nOK = n.prefixes.BitSet.NextSet(nIdx); nOK {
 				if o.lpmTest(nIdx) {
 					return true
 				}
@@ -117,7 +117,7 @@ func (n *node[V]) overlapsRoutes(o *node[V]) bool {
 
 		if oOK {
 			// does any route in n overlap this prefix from o
-			if oIdx, oOK = o.prefixesBitset.NextSet(oIdx); oOK {
+			if oIdx, oOK = o.prefixes.BitSet.NextSet(oIdx); oOK {
 				if n.lpmTest(oIdx) {
 					return true
 				}
@@ -132,13 +132,13 @@ func (n *node[V]) overlapsRoutes(o *node[V]) bool {
 
 // overlapsChildsIn, test if prefixes in n overlaps child octets in o.
 func (n *node[V]) overlapsChildsIn(o *node[V]) bool {
-	pfxLen := len(n.prefixes)
-	childLen := len(o.children)
+	pfxCount := n.prefixes.Count()
+	childCount := o.children.Count()
 
 	// heuristic, compare benchmarks
 	// when will re range over the children and when will we do bitset calc?
 	magicNumber := 15
-	doRange := childLen < magicNumber || pfxLen > magicNumber
+	doRange := childCount < magicNumber || pfxCount > magicNumber
 
 	// do range over, not so many childs and maybe to many prefixes
 	if doRange {
@@ -147,7 +147,7 @@ func (n *node[V]) overlapsChildsIn(o *node[V]) bool {
 		ok := true
 		for ok {
 			// does any route in o overlap this child from n
-			if oAddr, ok = o.childrenBitset.NextSet(oAddr); ok {
+			if oAddr, ok = o.children.BitSet.NextSet(oAddr); ok {
 				if n.lpmTest(hostIndex(byte(oAddr))) {
 					return true
 				}
@@ -172,14 +172,14 @@ func (n *node[V]) overlapsChildsIn(o *node[V]) bool {
 	prefixRoutes := bitset.From(prefixBacking)
 
 	idxBacking := make([]uint, maxNodePrefixes)
-	for _, idx := range n.allStrideIndexes(idxBacking) {
+	for _, idx := range n.prefixes.AllSetBits(idxBacking) {
 		a8 := allotLookupTbl[idx]
 		prefixRoutes.InPlaceUnion(bitset.From(a8[:]))
 	}
 
 	// shift children bitset by firstHostIndex
 	c8 := make([]uint64, 8)
-	copy(c8[4:], o.childrenBitset.Bytes()) // 4*64= 256
+	copy(c8[4:], o.children.BitSet.Bytes()) // 4*64= 256
 	hostRoutes := bitset.From(c8)
 
 	return prefixRoutes.IntersectionCardinality(hostRoutes) > 0
@@ -191,11 +191,11 @@ func (n *node[V]) overlapsSameChildsRec(o *node[V]) bool {
 	// gimmicks, clone a bitset without heap allocation
 	// 4*64=256, maxNodeChildren
 	a4 := make([]uint64, 4)
-	copy(a4, n.childrenBitset.Bytes())
+	copy(a4, n.children.BitSet.Bytes())
 	nChildrenBitsetCloned := bitset.From(a4)
 
 	// intersect in place the child bitsets from n and o
-	nChildrenBitsetCloned.InPlaceIntersection(o.childrenBitset)
+	nChildrenBitsetCloned.InPlaceIntersection(o.children.BitSet)
 
 	// gimmick, don't allocate
 	addrBuf := [maxNodeChildren]uint{}
@@ -203,8 +203,8 @@ func (n *node[V]) overlapsSameChildsRec(o *node[V]) bool {
 
 	// range over all child addrs, common in n and o
 	for _, addr := range allCommonChilds {
-		oChild := o.getChild(byte(addr))
-		nChild := n.getChild(byte(addr))
+		oChild, _ := o.children.Get(addr)
+		nChild, _ := n.children.Get(addr)
 
 		// rec-descent with same child
 		if nChild.overlapsRec(oChild) {
@@ -217,10 +217,10 @@ func (n *node[V]) overlapsSameChildsRec(o *node[V]) bool {
 
 func (n *node[V]) overlapsOneChildIn(o *node[V]) bool {
 	// get the single addr and child
-	addr, _ := o.childrenBitset.NextSet(0)
-	oChild := o.children[0]
+	addr, _ := o.children.BitSet.NextSet(0)
+	oChild := o.children.Items[0]
 
-	if nChild := n.getChild(byte(addr)); nChild != nil {
+	if nChild, ok := n.children.Get(addr); ok {
 		return nChild.overlapsRec(oChild)
 	}
 
@@ -229,7 +229,7 @@ func (n *node[V]) overlapsOneChildIn(o *node[V]) bool {
 
 func (n *node[V]) overlapsOneRouteIn(o *node[V]) bool {
 	// get the single prefix from o
-	idx, _ := o.prefixesBitset.NextSet(0)
+	idx, _ := o.prefixes.BitSet.NextSet(0)
 
 	// 1. Test if any route in this node overlaps prefix?
 	if n.lpmTest(idx) {
@@ -244,7 +244,7 @@ func (n *node[V]) overlapsOneRouteIn(o *node[V]) bool {
 	allotedPrefixRoutes := bitset.From(pfxBuf[:])
 
 	// use bitset intersection instead of range loops
-	return allotedPrefixRoutes.IntersectionCardinality(n.prefixesBitset) > 0
+	return allotedPrefixRoutes.IntersectionCardinality(n.prefixes.BitSet) > 0
 }
 
 // overlapsPrefix returns true if node overlaps with prefix.
@@ -263,7 +263,7 @@ func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 	allotedPrefixRoutes := bitset.From(allotmentForIdx[:])
 
 	// use bitset intersection instead of range loops
-	if allotedPrefixRoutes.IntersectionCardinality(n.prefixesBitset) != 0 {
+	if allotedPrefixRoutes.IntersectionCardinality(n.prefixes.BitSet) != 0 {
 		return true
 	}
 
@@ -272,7 +272,7 @@ func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 
 	// shift children bitset by firstHostIndex
 	c8 := make([]uint64, 8)
-	copy(c8[4:], n.childrenBitset.Bytes()) // 4*64= 256
+	copy(c8[4:], n.children.BitSet.Bytes()) // 4*64= 256
 	hostRoutes := bitset.From(c8)
 
 	// use bitsets intersection instead of range loops
