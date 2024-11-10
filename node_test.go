@@ -367,7 +367,7 @@ func BenchmarkNodeChildDelete(b *testing.B) {
 	}
 }
 
-func BenchmarkNodeChildesAllSetBits(b *testing.B) {
+func BenchmarkNodeChildrenAllSetBits(b *testing.B) {
 	for _, nchilds := range childCount {
 		node := newNode[int]()
 

@@ -42,14 +42,14 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 	// ####################################
 
 	if nPfxCount > 0 && oChildCount > 0 {
-		if n.overlapsChildsIn(o) {
+		if n.overlapsChildrenIn(o) {
 			return true
 		}
 	}
 
 	// symmetric reverse
 	if oPfxCount > 0 && nChildCount > 0 {
-		if o.overlapsChildsIn(n) {
+		if o.overlapsChildrenIn(n) {
 			return true
 		}
 	}
@@ -76,7 +76,7 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 		return false
 	}
 
-	return n.overlapsSameChildsRec(o)
+	return n.overlapsSameChildrenRec(o)
 }
 
 // overlapsRoutes, test if n overlaps o prefixes and vice versa
@@ -130,8 +130,8 @@ func (n *node[V]) overlapsRoutes(o *node[V]) bool {
 	return false
 }
 
-// overlapsChildsIn, test if prefixes in n overlaps child octets in o.
-func (n *node[V]) overlapsChildsIn(o *node[V]) bool {
+// overlapsChildrenIn, test if prefixes in n overlaps child octets in o.
+func (n *node[V]) overlapsChildrenIn(o *node[V]) bool {
 	pfxCount := n.prefixes.Count()
 	childCount := o.children.Count()
 
@@ -185,9 +185,9 @@ func (n *node[V]) overlapsChildsIn(o *node[V]) bool {
 	return prefixRoutes.IntersectionCardinality(hostRoutes) > 0
 }
 
-// overlapsSameChildsRec, find same octets with bitset intersection.
+// overlapsSameChildrenRec, find same octets with bitset intersection.
 // rec-descent with same child octet in n an o,
-func (n *node[V]) overlapsSameChildsRec(o *node[V]) bool {
+func (n *node[V]) overlapsSameChildrenRec(o *node[V]) bool {
 	// gimmicks, clone a bitset without heap allocation
 	// 4*64=256, maxNodeChildren
 	a4 := make([]uint64, 4)
@@ -199,10 +199,10 @@ func (n *node[V]) overlapsSameChildsRec(o *node[V]) bool {
 
 	// gimmick, don't allocate
 	addrBuf := [maxNodeChildren]uint{}
-	_, allCommonChilds := nChildrenBitsetCloned.NextSetMany(0, addrBuf[:])
+	_, allCommonChildren := nChildrenBitsetCloned.NextSetMany(0, addrBuf[:])
 
 	// range over all child addrs, common in n and o
-	for _, addr := range allCommonChilds {
+	for _, addr := range allCommonChildren {
 		oChild, _ := o.children.Get(addr)
 		nChild, _ := n.children.Get(addr)
 
