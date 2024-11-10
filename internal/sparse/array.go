@@ -81,7 +81,7 @@ func (s *Array[T]) Get(idx uint) (T, bool) {
 }
 
 // MustGet, use it only after a successful test,
-// panics otherwise.
+// or the behavior is undefined, maybe it panics.
 func (s *Array[T]) MustGet(idx uint) T {
 	return s.Items[int(s.BitSet.Rank(idx))-1]
 }
