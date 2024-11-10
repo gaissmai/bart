@@ -273,7 +273,7 @@ func BenchmarkNodePrefixLPM(b *testing.B) {
 	}
 }
 
-func BenchmarkNodePrefixNextSetMany(b *testing.B) {
+func BenchmarkNodePrefixesAllSetBits(b *testing.B) {
 	routes := shuffleStridePfxs(allStridePfxs())
 
 	for _, nroutes := range prefixCount {
@@ -367,7 +367,7 @@ func BenchmarkNodeChildDelete(b *testing.B) {
 	}
 }
 
-func BenchmarkNodeChildNextSetMany(b *testing.B) {
+func BenchmarkNodeChildesAllSetBits(b *testing.B) {
 	for _, nchilds := range childCount {
 		node := newNode[int]()
 
