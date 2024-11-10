@@ -2,6 +2,7 @@ package sparse
 
 import (
 	"math/rand/v2"
+	"slices"
 	"testing"
 )
 
@@ -18,12 +19,14 @@ func TestSparseArrayCount(t *testing.T) {
 
 	for i := range 10_000 {
 		a.InsertAt(uint(i), i)
+		a.InsertAt(uint(i), i)
 	}
 	if c := a.Count(); c != 10_000 {
 		t.Errorf("Count, expected 10_000, got %d", c)
 	}
 
 	for i := range 5_000 {
+		a.DeleteAt(uint(i))
 		a.DeleteAt(uint(i))
 	}
 	if c := a.Count(); c != 5_000 {
@@ -74,8 +77,8 @@ func TestSparseArrayMustGetPanic(t *testing.T) {
 		a.InsertAt(uint(i), i)
 	}
 
-	// it panics, runtime error: index out of range [-1]
-	_ = a.MustGet(0)
+	// must panic, runtime error: index out of range [-1]
+	a.MustGet(0)
 }
 
 func TestSparseArrayUpdate(t *testing.T) {
@@ -109,4 +112,34 @@ func TestSparseArrayUpdate(t *testing.T) {
 			t.Errorf("UpdateAt, expected %d, got %d", 3*i, v)
 		}
 	}
+}
+
+func TestSparseArrayAllSetBits(t *testing.T) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Errorf("buffer too small, expected panic")
+		}
+	}()
+
+	const n = 32
+	a := NewArray[int]()
+
+	want := make([]uint, 0, n)
+
+	for i := range n {
+		a.InsertAt(uint(i), i)
+		want = append(want, uint(i))
+	}
+
+	backingBuf := make([]uint, n)
+	got := a.AllSetBits(backingBuf)
+
+	if !slices.Equal(want, got) {
+		t.Errorf("AllSetBits, want:\n%v\ngot:\n%v\n", want, got)
+	}
+
+	// must panic
+	backingBuf = make([]uint, n/2)
+	a.AllSetBits(backingBuf)
 }
