@@ -98,7 +98,7 @@ func (n *node[V]) dump(w io.Writer, path [16]byte, depth int, is4 bool) {
 	fmt.Fprintf(w, "\n%s[%s] depth:  %d path: [%s] / %d\n",
 		indent, n.hasType(), depth, ipStridePath(path, depth, is4), bits)
 
-	if nPfxCount := n.prefixes.Count(); nPfxCount != 0 {
+	if nPfxCount := n.prefixes.Len(); nPfxCount != 0 {
 		// make backing array, no heap allocs
 		idxBackingArray := [maxNodePrefixes]uint{}
 		allIndices := n.prefixes.AllSetBits(idxBackingArray[:])
@@ -126,7 +126,7 @@ func (n *node[V]) dump(w io.Writer, path [16]byte, depth int, is4 bool) {
 		fmt.Fprintln(w)
 	}
 
-	if childCount := n.children.Count(); childCount != 0 {
+	if childCount := n.children.Len(); childCount != 0 {
 		// print the childs for this node
 		fmt.Fprintf(w, "%schilds(#%d):", indent, childCount)
 
@@ -197,8 +197,8 @@ func (nt nodeType) String() string {
 
 // hasType returns the nodeType.
 func (n *node[V]) hasType() nodeType {
-	prefixCount := n.prefixes.Count()
-	childCount := n.children.Count()
+	prefixCount := n.prefixes.Len()
+	childCount := n.children.Len()
 
 	if prefixCount == 0 && childCount != 0 {
 		return intermediateNode

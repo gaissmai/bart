@@ -68,7 +68,7 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) func(yield func(netip.Prefix, V) 
 			n = stack[depth]
 
 			// microbenchmarking
-			if n.prefixes.Count() == 0 {
+			if n.prefixes.Len() == 0 {
 				continue
 			}
 

@@ -52,7 +52,7 @@ func newNode[V any]() *node[V] {
 
 // isEmpty returns true if node has neither prefixes nor children.
 func (n *node[V]) isEmpty() bool {
-	return n.prefixes.Count() == 0 && n.children.Count() == 0
+	return n.prefixes.Len() == 0 && n.children.Len() == 0
 }
 
 // lpm does a route lookup for idx in the 8-bit (stride) routing table

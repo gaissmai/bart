@@ -71,7 +71,7 @@ func (t *Table[V]) EachLookupPrefix(pfx netip.Prefix, yield func(pfx netip.Prefi
 		n = stack[depth]
 
 		// microbenchmarking
-		if n.prefixes.Count() == 0 {
+		if n.prefixes.Len() == 0 {
 			continue
 		}
 
