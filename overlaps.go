@@ -4,11 +4,11 @@ import "github.com/bits-and-blooms/bitset"
 
 // overlapsRec returns true if any IP in the nodes n or o overlaps.
 func (n *node[V]) overlapsRec(o *node[V]) bool {
-	nPfxCount := n.prefixes.Count()
-	oPfxCount := o.prefixes.Count()
+	nPfxCount := n.prefixes.Len()
+	oPfxCount := o.prefixes.Len()
 
-	nChildCount := n.children.Count()
-	oChildCount := o.children.Count()
+	nChildCount := n.children.Len()
+	oChildCount := o.children.Len()
 
 	// ##############################
 	// 1. Test if any routes overlaps
@@ -82,12 +82,12 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 // overlapsRoutes, test if n overlaps o prefixes and vice versa
 func (n *node[V]) overlapsRoutes(o *node[V]) bool {
 	// one node has just one prefix, use bitset algo
-	if n.prefixes.Count() == 1 {
+	if n.prefixes.Len() == 1 {
 		return o.overlapsOneRouteIn(n)
 	}
 
 	// one node has just one prefix, use bitset algo
-	if o.prefixes.Count() == 1 {
+	if o.prefixes.Len() == 1 {
 		return n.overlapsOneRouteIn(o)
 	}
 
@@ -132,8 +132,8 @@ func (n *node[V]) overlapsRoutes(o *node[V]) bool {
 
 // overlapsChildrenIn, test if prefixes in n overlaps child octets in o.
 func (n *node[V]) overlapsChildrenIn(o *node[V]) bool {
-	pfxCount := n.prefixes.Count()
-	childCount := o.children.Count()
+	pfxCount := n.prefixes.Len()
+	childCount := o.children.Len()
 
 	// heuristic, compare benchmarks
 	// when will re range over the children and when will we do bitset calc?
@@ -173,6 +173,7 @@ func (n *node[V]) overlapsChildrenIn(o *node[V]) bool {
 
 	idxBacking := make([]uint, maxNodePrefixes)
 	for _, idx := range n.prefixes.AllSetBits(idxBacking) {
+		// get pre alloted bitset for idx
 		a8 := allotLookupTbl[idx]
 		prefixRoutes.InPlaceUnion(bitset.From(a8[:]))
 	}

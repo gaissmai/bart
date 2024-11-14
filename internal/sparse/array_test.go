@@ -9,7 +9,7 @@ import (
 func TestNewArray(t *testing.T) {
 	a := NewArray[int]()
 
-	if c := a.Count(); c != 0 {
+	if c := a.Len(); c != 0 {
 		t.Errorf("Count, expected 0, got %d", c)
 	}
 }
@@ -21,7 +21,7 @@ func TestSparseArrayCount(t *testing.T) {
 		a.InsertAt(uint(i), i)
 		a.InsertAt(uint(i), i)
 	}
-	if c := a.Count(); c != 10_000 {
+	if c := a.Len(); c != 10_000 {
 		t.Errorf("Count, expected 10_000, got %d", c)
 	}
 
@@ -29,7 +29,7 @@ func TestSparseArrayCount(t *testing.T) {
 		a.DeleteAt(uint(i))
 		a.DeleteAt(uint(i))
 	}
-	if c := a.Count(); c != 5_000 {
+	if c := a.Len(); c != 5_000 {
 		t.Errorf("Count, expected 5_000, got %d", c)
 	}
 }

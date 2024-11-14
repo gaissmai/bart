@@ -209,8 +209,10 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 // Get returns the associated payload for prefix and true, or false if
 // prefix is not set in the routing table.
 func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
+	var zero V
+
 	if !pfx.IsValid() || !t.isInit() {
-		return val, ok
+		return zero, false
 	}
 
 	// values derived from pfx
@@ -240,7 +242,7 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 	for _, octet := range octets[:lastOctetIdx] {
 		c, ok := n.children.Get(uint(octet))
 		if !ok {
-			return val, ok
+			return zero, false
 		}
 
 		n = c
@@ -261,8 +263,10 @@ func (t *Table[V]) GetAndDelete(pfx netip.Prefix) (val V, ok bool) {
 }
 
 func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
+	var zero V
+
 	if !pfx.IsValid() || !t.isInit() {
-		return val, ok
+		return zero, false
 	}
 
 	// values derived from pfx
@@ -307,7 +311,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 		// descend down to next level
 		c, ok := n.children.Get(uint(octets[i]))
 		if !ok {
-			return val, ok
+			return zero, false
 		}
 
 		n = c
@@ -315,7 +319,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 
 	// try to delete prefix in trie node
 	if val, ok = n.prefixes.DeleteAt(pfxToIdx(lastOctet, lastOctetBits)); !ok {
-		return val, ok
+		return zero, false
 	}
 
 	t.sizeUpdate(is4, -1)
@@ -339,8 +343,10 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 // Lookup does a route lookup (longest prefix match) for IP and
 // returns the associated value and true, or false if no route matched.
 func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
+	var zero V
+
 	if !ip.IsValid() || !t.isInit() {
-		return val, ok
+		return zero, false
 	}
 
 	is4 := ip.Is4()
@@ -383,21 +389,23 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 
 		// longest prefix match
 		// micro benchmarking: skip if node has no prefixes
-		if n.prefixes.Count() != 0 {
+		if n.prefixes.Len() != 0 {
 			if _, val, ok = n.lpm(hostIndex(octet)); ok {
 				return val, ok
 			}
 		}
 	}
 
-	return val, ok
+	return zero, false
 }
 
 // LookupPrefix does a route lookup (longest prefix match) for pfx and
 // returns the associated value and true, or false if no route matched.
 func (t *Table[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
+	var zero V
+
 	if !pfx.IsValid() || !t.isInit() {
-		return
+		return zero, false
 	}
 
 	_, _, val, ok = t.lpmPrefix(pfx)
@@ -485,7 +493,7 @@ func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V, 
 
 		// longest prefix match
 		// micro benchmarking: skip if node has no prefixes
-		if n.prefixes.Count() != 0 {
+		if n.prefixes.Len() != 0 {
 			// only the lastOctet may have a different prefix len
 			// all others are just host routes
 			var idx uint

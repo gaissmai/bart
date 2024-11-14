@@ -16,65 +16,64 @@ type Array[T any] struct {
 // NewArray, initialize BitSet with zero value.
 func NewArray[T any]() *Array[T] {
 	return &Array[T]{
-		BitSet: &bitset.BitSet{},
+		BitSet: new(bitset.BitSet),
 	}
 }
 
-// Count, number of items in sparse array.
-func (s *Array[T]) Count() int {
-	// faster than BitSet.Count()
+// Len returns the number of items in sparse array.
+func (s *Array[T]) Len() int {
 	return len(s.Items)
 }
 
 // rank is the key of the popcount compression algorithm,
 // mapping between bitset index and slice index.
-func (s *Array[T]) rank(idx uint) int {
+func (s *Array[T]) rank(i uint) int {
 	// adjust offset by one to slice index.
-	return int(s.BitSet.Rank(idx)) - 1
+	return int(s.BitSet.Rank(i)) - 1
 }
 
-// InsertAt a value at idx into the sparse array.
-func (s *Array[T]) InsertAt(idx uint, val T) (ok bool) {
-	// prefix exists, overwrite val
-	if s.BitSet.Test(idx) {
-		s.Items[s.rank(idx)] = val
+// InsertAt a value at i into the sparse array.
+func (s *Array[T]) InsertAt(i uint, val T) (ok bool) {
+	// slot exists, overwrite val
+	if s.BitSet.Test(i) {
+		s.Items[s.rank(i)] = val
 
 		return false
 	}
 
 	// new, insert into bitset and slice
-	s.BitSet.Set(idx)
-	s.Items = slices.Insert(s.Items, s.rank(idx), val)
+	s.BitSet.Set(i)
+	s.Items = slices.Insert(s.Items, s.rank(i), val)
 
 	return true
 }
 
-// DeleteAt, delete a value at idx from the sparse array.
-func (s *Array[T]) DeleteAt(idx uint) (T, bool) {
+// DeleteAt, delete a value at i from the sparse array.
+func (s *Array[T]) DeleteAt(i uint) (T, bool) {
 	var zero T
-	if !s.BitSet.Test(idx) {
+	if !s.BitSet.Test(i) {
 		return zero, false
 	}
 
-	rnk := s.rank(idx)
+	rnk := s.rank(i)
 	val := s.Items[rnk]
 
 	// delete from slice
 	s.Items = slices.Delete(s.Items, rnk, rnk+1)
 
 	// delete from bitset, followed by Compact to reduce memory consumption
-	s.BitSet.Clear(idx)
+	s.BitSet.Clear(i)
 	s.BitSet.Compact()
 
 	return val, true
 }
 
-// Get, get the value at idx from sparse array.
-func (s *Array[T]) Get(idx uint) (T, bool) {
+// Get, get the value at i from sparse array.
+func (s *Array[T]) Get(i uint) (T, bool) {
 	var zero T
 
-	if s.BitSet.Test(idx) {
-		return s.Items[int(s.BitSet.Rank(idx))-1], true
+	if s.BitSet.Test(i) {
+		return s.Items[int(s.BitSet.Rank(i))-1], true
 	}
 
 	return zero, false
@@ -82,20 +81,20 @@ func (s *Array[T]) Get(idx uint) (T, bool) {
 
 // MustGet, use it only after a successful test,
 // or the behavior is undefined, maybe it panics.
-func (s *Array[T]) MustGet(idx uint) T {
-	return s.Items[int(s.BitSet.Rank(idx))-1]
+func (s *Array[T]) MustGet(i uint) T {
+	return s.Items[int(s.BitSet.Rank(i))-1]
 }
 
-// UpdateAt or set the value at idx via callback. The new value is returned
+// UpdateAt or set the value at i via callback. The new value is returned
 // and true if the val was already present.
-func (s *Array[T]) UpdateAt(idx uint, cb func(T, bool) T) (newVal T, wasPresent bool) {
+func (s *Array[T]) UpdateAt(i uint, cb func(T, bool) T) (newVal T, wasPresent bool) {
 	var rnk int
 
 	// if already set, get current value
 	var oldVal T
 
-	if wasPresent = s.BitSet.Test(idx); wasPresent {
-		rnk = s.rank(idx)
+	if wasPresent = s.BitSet.Test(i); wasPresent {
+		rnk = s.rank(i)
 		oldVal = s.Items[rnk]
 	}
 
@@ -110,10 +109,10 @@ func (s *Array[T]) UpdateAt(idx uint, cb func(T, bool) T) (newVal T, wasPresent 
 	}
 
 	// new val, insert into bitset ...
-	s.BitSet.Set(idx)
+	s.BitSet.Set(i)
 
 	// bitset has changed, recalc rank
-	rnk = s.rank(idx)
+	rnk = s.rank(i)
 
 	// ... and insert value into slice
 	s.Items = slices.Insert(s.Items, rnk, newVal)
@@ -123,7 +122,7 @@ func (s *Array[T]) UpdateAt(idx uint, cb func(T, bool) T) (newVal T, wasPresent 
 
 // AllSetBits, retrieve all set bits in the sparse array, panics if the buffer isn't big enough.
 func (s *Array[T]) AllSetBits(buffer []uint) []uint {
-	if cap(buffer) < s.Count() {
+	if cap(buffer) < s.Len() {
 		panic("buffer capacity too small")
 	}
 
