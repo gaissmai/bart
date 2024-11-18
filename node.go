@@ -258,10 +258,10 @@ func (n *node[V]) unionRec(o *node[V]) (duplicates int) {
 	// for all prefixes in other node do ...
 	for i, oIdx := range o.prefixes.AllSetBits(idxBacking) {
 		// insert/overwrite prefix/value from oNode to nNode
-		ok := n.prefixes.InsertAt(oIdx, o.prefixes.Items[i])
+		exists := n.prefixes.InsertAt(oIdx, o.prefixes.Items[i])
 
 		// this prefix is duplicate in n and o
-		if !ok {
+		if exists {
 			duplicates++
 		}
 	}
