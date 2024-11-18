@@ -33,19 +33,20 @@ func (s *Array[T]) rank(i uint) int {
 }
 
 // InsertAt a value at i into the sparse array.
-func (s *Array[T]) InsertAt(i uint, val T) (ok bool) {
+// If the value already exists, overwrite it with val and return true.
+func (s *Array[T]) InsertAt(i uint, val T) (exists bool) {
 	// slot exists, overwrite val
 	if s.BitSet.Test(i) {
 		s.Items[s.rank(i)] = val
 
-		return false
+		return true
 	}
 
 	// new, insert into bitset and slice
 	s.BitSet.Set(i)
 	s.Items = slices.Insert(s.Items, s.rank(i), val)
 
-	return true
+	return false
 }
 
 // DeleteAt, delete a value at i from the sparse array.

@@ -140,7 +140,7 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	}
 
 	// insert prefix/val into node
-	if ok := n.prefixes.InsertAt(pfxToIdx(lastOctet, lastOctetBits), val); ok {
+	if exists := n.prefixes.InsertAt(pfxToIdx(lastOctet, lastOctetBits), val); !exists {
 		t.sizeUpdate(is4, 1)
 	}
 }
