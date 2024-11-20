@@ -252,11 +252,11 @@ func (n *node[V]) eachSubnet(
 // If there are duplicate entries, the value is taken from the other node.
 // Count duplicate entries to adjust the t.size struct members.
 func (n *node[V]) unionRec(o *node[V]) (duplicates int) {
-	// make backing array, no heap allocs
-	idxBacking := make([]uint, maxNodePrefixes)
+	// no heap allocs
+	_, allIndices := o.prefixes.BitSet.NextSetMany(0, make([]uint, maxNodePrefixes))
 
 	// for all prefixes in other node do ...
-	for i, oIdx := range o.prefixes.AllSetBits(idxBacking) {
+	for i, oIdx := range allIndices {
 		// insert/overwrite prefix/value from oNode to nNode
 		exists := n.prefixes.InsertAt(oIdx, o.prefixes.Items[i])
 
@@ -266,11 +266,11 @@ func (n *node[V]) unionRec(o *node[V]) (duplicates int) {
 		}
 	}
 
-	// make backing array, no heap allocs
-	addrBacking := make([]uint, maxNodeChildren)
+	// no heap allocs
+	_, allIndices = o.children.BitSet.NextSetMany(0, make([]uint, maxNodeChildren))
 
 	// for all children in other node do ...
-	for i, oOctet := range o.children.AllSetBits(addrBacking) {
+	for i, oOctet := range allIndices {
 		octet := byte(oOctet)
 
 		// we know the slice index, faster as o.getChild(octet)
@@ -332,9 +332,10 @@ func (n *node[V]) allRec(
 	is4 bool,
 	yield func(netip.Prefix, V) bool,
 ) bool {
-	idxBacking := make([]uint, maxNodePrefixes)
+	_, allIndices := n.prefixes.BitSet.NextSetMany(0, make([]uint, maxNodePrefixes))
+
 	// for all prefixes in this node do ...
-	for _, idx := range n.prefixes.AllSetBits(idxBacking) {
+	for _, idx := range allIndices {
 		cidr, _ := cidrFromPath(path, depth, is4, idx)
 
 		// make the callback for this prefix
@@ -344,9 +345,9 @@ func (n *node[V]) allRec(
 		}
 	}
 
-	addrBacking := make([]uint, maxNodeChildren)
+	_, allChildAddrs := n.children.BitSet.NextSetMany(0, make([]uint, maxNodeChildren))
 	// for all children in this node do ...
-	for i, addr := range n.children.AllSetBits(addrBacking) {
+	for i, addr := range allChildAddrs {
 		child := n.children.Items[i]
 		path[depth] = byte(addr)
 
@@ -371,15 +372,11 @@ func (n *node[V]) allRecSorted(
 	is4 bool,
 	yield func(netip.Prefix, V) bool,
 ) bool {
-	// make backing arrays, no heap allocs
-	addrBacking := make([]uint, maxNodeChildren)
-	idxBacking := make([]uint, maxNodePrefixes)
-
 	// get slice of all child octets, sorted by addr
-	childAddrs := n.children.AllSetBits(addrBacking)
+	_, childAddrs := n.children.BitSet.NextSetMany(0, make([]uint, maxNodeChildren))
 
 	// get slice of all indexes, sorted by idx
-	allIndices := n.prefixes.AllSetBits(idxBacking)
+	_, allIndices := n.prefixes.BitSet.NextSetMany(0, make([]uint, maxNodePrefixes))
 
 	// sort indices in CIDR sort order
 	slices.SortFunc(allIndices, cmpIndexRank)
