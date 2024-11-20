@@ -168,11 +168,11 @@ func (n *node[V]) overlapsChildrenIn(o *node[V]) bool {
 	// in this node
 
 	// gimmick, don't allocate, can't use bitset.New()
-	prefixBacking := make([]uint64, 8)
-	prefixRoutes := bitset.From(prefixBacking)
+	prefixRoutes := bitset.From(make([]uint64, 8))
 
-	idxBacking := make([]uint, maxNodePrefixes)
-	for _, idx := range n.prefixes.AllSetBits(idxBacking) {
+	_, allIndices := n.prefixes.BitSet.NextSetMany(0, make([]uint, maxNodePrefixes))
+
+	for _, idx := range allIndices {
 		// get pre alloted bitset for idx
 		a8 := allotLookupTbl[idx]
 		prefixRoutes.InPlaceUnion(bitset.From(a8[:]))

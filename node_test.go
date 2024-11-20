@@ -287,10 +287,9 @@ func BenchmarkNodePrefixesAllSetBits(b *testing.B) {
 		}
 
 		b.Run(fmt.Sprintf("IN %d", nroutes), func(b *testing.B) {
-			idxBackingArray := [maxNodePrefixes]uint{}
 			b.ResetTimer()
 			for range b.N {
-				node.prefixes.AllSetBits(idxBackingArray[:])
+				node.prefixes.BitSet.NextSetMany(0, make([]uint, maxNodePrefixes))
 			}
 		})
 	}
@@ -377,10 +376,9 @@ func BenchmarkNodeChildrenAllSetBits(b *testing.B) {
 		}
 
 		b.Run(fmt.Sprintf("In %d", nchilds), func(b *testing.B) {
-			addrBacking := make([]uint, maxNodeChildren)
 			b.ResetTimer()
 			for range b.N {
-				node.children.AllSetBits(addrBacking)
+				node.children.BitSet.NextSetMany(0, make([]uint, maxNodeChildren))
 			}
 		})
 	}

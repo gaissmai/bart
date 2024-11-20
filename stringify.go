@@ -171,9 +171,10 @@ func (n *node[V]) fprintRec(w io.Writer, parent kid[V], pad string) error {
 func (n *node[V]) getKidsRec(parentIdx uint, path [16]byte, depth int, is4 bool) []kid[V] {
 	directKids := []kid[V]{}
 
-	// make backing array, no heap allocs
-	idxBacking := make([]uint, maxNodePrefixes)
-	for _, idx := range n.prefixes.AllSetBits(idxBacking) {
+	// no heap allocs
+	_, allIndices := n.prefixes.BitSet.NextSetMany(0, make([]uint, maxNodePrefixes))
+
+	for _, idx := range allIndices {
 		// parent or self, handled alreday in an upper stack frame.
 		if idx <= parentIdx {
 			continue
@@ -201,8 +202,11 @@ func (n *node[V]) getKidsRec(parentIdx uint, path [16]byte, depth int, is4 bool)
 	}
 
 	// the node may have childs, the rec-descent monster starts
-	addrBacking := make([]uint, maxNodeChildren)
-	for i, addr := range n.children.AllSetBits(addrBacking) {
+
+	// no heap allocs
+	_, allAddrs := n.children.BitSet.NextSetMany(0, make([]uint, maxNodeChildren))
+
+	for i, addr := range allAddrs {
 		octet := byte(addr)
 
 		// do a longest-prefix-match

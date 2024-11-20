@@ -76,11 +76,11 @@ func (t *Table[V]) dump(w io.Writer) {
 func (n *node[V]) dumpRec(w io.Writer, path [16]byte, depth int, is4 bool) {
 	n.dump(w, path, depth, is4)
 
-	// make backing array, no heap allocs
-	addrBacking := make([]uint, maxNodeChildren)
+	// no heap allocs
+	_, allChildAddrs := n.children.BitSet.NextSetMany(0, make([]uint, maxNodeChildren))
 
 	// the node may have childs, the rec-descent monster starts
-	for i, addr := range n.children.AllSetBits(addrBacking) {
+	for i, addr := range allChildAddrs {
 		octet := byte(addr)
 		child := n.children.Items[i]
 		path[depth] = octet
@@ -99,9 +99,8 @@ func (n *node[V]) dump(w io.Writer, path [16]byte, depth int, is4 bool) {
 		indent, n.hasType(), depth, ipStridePath(path, depth, is4), bits)
 
 	if nPfxCount := n.prefixes.Len(); nPfxCount != 0 {
-		// make backing array, no heap allocs
-		idxBackingArray := [maxNodePrefixes]uint{}
-		allIndices := n.prefixes.AllSetBits(idxBackingArray[:])
+		// no heap allocs
+		_, allIndices := n.prefixes.BitSet.NextSetMany(0, make([]uint, maxNodePrefixes))
 
 		// print the baseIndices for this node.
 		fmt.Fprintf(w, "%sindexs(#%d): %v\n", indent, nPfxCount, allIndices)
@@ -130,8 +129,8 @@ func (n *node[V]) dump(w io.Writer, path [16]byte, depth int, is4 bool) {
 		// print the childs for this node
 		fmt.Fprintf(w, "%schilds(#%d):", indent, childCount)
 
-		addrBacking := make([]uint, maxNodeChildren)
-		for _, addr := range n.children.AllSetBits(addrBacking) {
+		_, allChildAddrs := n.children.BitSet.NextSetMany(0, make([]uint, maxNodeChildren))
+		for _, addr := range allChildAddrs {
 			octet := byte(addr)
 			fmt.Fprintf(w, " %s", octetFmt(octet, is4))
 		}

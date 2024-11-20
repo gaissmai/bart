@@ -121,14 +121,3 @@ func (s *Array[T]) UpdateAt(i uint, cb func(T, bool) T) (newVal T, wasPresent bo
 
 	return newVal, wasPresent
 }
-
-// AllSetBits, retrieve all set bits in the sparse array, panics if the buffer isn't big enough.
-func (s *Array[T]) AllSetBits(buffer []uint) []uint {
-	if cap(buffer) < len(s.Items) {
-		panic("buffer capacity too small")
-	}
-
-	_, buffer = s.BitSet.NextSetMany(0, buffer)
-
-	return buffer
-}
