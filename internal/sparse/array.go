@@ -69,20 +69,21 @@ func (s *Array[T]) DeleteAt(i uint) (T, bool) {
 	return val, true
 }
 
-// Get, get the value at i from sparse array.
-func (s *Array[T]) Get(i uint) (T, bool) {
+// Get the value at i from sparse array.
+func (s *Array[T]) Get(i uint) (val T, ok bool) {
 	var zero T
 
 	if s.BitSet.Test(i) {
-		return s.Items[int(s.BitSet.Rank(i))-1], true
+		return s.Items[s.rank(i)], true
 	}
 
 	return zero, false
 }
 
-// MustGet, use it only after a successful test,
+// MustGet, use it only after a successful test
 // or the behavior is undefined, maybe it panics.
 func (s *Array[T]) MustGet(i uint) T {
+	// can't use s.Items[s.rank(i)], make it inlineable
 	return s.Items[int(s.BitSet.Rank(i))-1]
 }
 
@@ -123,7 +124,7 @@ func (s *Array[T]) UpdateAt(i uint, cb func(T, bool) T) (newVal T, wasPresent bo
 
 // AllSetBits, retrieve all set bits in the sparse array, panics if the buffer isn't big enough.
 func (s *Array[T]) AllSetBits(buffer []uint) []uint {
-	if cap(buffer) < s.Len() {
+	if cap(buffer) < len(s.Items) {
 		panic("buffer capacity too small")
 	}
 
