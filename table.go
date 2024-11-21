@@ -92,7 +92,7 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	n := t.rootNodeByVersion(is4)
 
 	// Do not allocate!
-	// As16() is inlined, the preffered AsSlice() is too complex for inlining.
+	// As16() is inlined, the preferred AsSlice() is too complex for inlining.
 	// starting with go1.23 we can use AsSlice(),
 	// see https://github.com/golang/go/issues/56136
 	// octets := ip.AsSlice()
@@ -139,8 +139,10 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 		n = c
 	}
 
-	// insert prefix/val into node
-	if exists := n.prefixes.InsertAt(pfxToIdx(lastOctet, lastOctetBits), val); !exists {
+	// insert/override prefix/val into node
+	override := n.prefixes.InsertAt(pfxToIdx(lastOctet, lastOctetBits), val)
+
+	if !override {
 		t.sizeUpdate(is4, 1)
 	}
 }
@@ -150,9 +152,9 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 //
 // If the pfx does not already exist, it is set with the new value.
 func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V) {
-	if !pfx.IsValid() {
-		var zero V
+	var zero V
 
+	if !pfx.IsValid() {
 		return zero
 	}
 
@@ -238,14 +240,13 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 	// mask the prefix
 	lastOctet &= netMask[lastOctetBits]
 
-	// find the proper trie node
+	// find the proper trie node in tight loop
 	for _, octet := range octets[:lastOctetIdx] {
-		c, ok := n.children.Get(uint(octet))
+		n, ok = n.children.Get(uint(octet))
+
 		if !ok {
 			return zero, false
 		}
-
-		n = c
 	}
 
 	return n.prefixes.Get(pfxToIdx(lastOctet, lastOctetBits))
@@ -308,13 +309,12 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 			break
 		}
 
-		// descend down to next level
-		c, ok := n.children.Get(uint(octets[i]))
+		// descend down to next level in tight loop
+		n, ok = n.children.Get(uint(octets[i]))
+
 		if !ok {
 			return zero, false
 		}
-
-		n = c
 	}
 
 	// try to delete prefix in trie node
@@ -365,7 +365,6 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 
 	// run variable, used after for loop
 	var i int
-
 	var octet byte
 
 	// find leaf node
@@ -374,12 +373,11 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 		stack[i] = n
 
 		// go down in tight loop to leaf node
-		c, ok := n.children.Get(uint(octet))
+		n, ok = n.children.Get(uint(octet))
+
 		if !ok {
 			break
 		}
-
-		n = c
 	}
 
 	// start backtracking, unwind the stack
@@ -466,7 +464,6 @@ func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V, 
 	octets[lastOctetIdx] = lastOctet
 
 	var i int
-
 	var octet byte
 
 	// record path to leaf node
@@ -478,12 +475,11 @@ func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V, 
 		stack[i] = n
 
 		// go down in tight loop
-		c, ok := n.children.Get(uint(octet))
+		n, ok = n.children.Get(uint(octet))
+
 		if !ok {
 			break
 		}
-
-		n = c
 	}
 
 	// start backtracking, unwind the stack
@@ -543,19 +539,19 @@ func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 	// mask the prefix
 	lastOctet &= netMask[lastOctetBits]
 
+	var ok bool
 	for _, octet := range octets[:lastOctetIdx] {
 		// test if any route overlaps prefix´ so far
 		if n.lpmTest(hostIndex(octet)) {
 			return true
 		}
 
-		// no overlap so far, go down to next c
-		c, ok := n.children.Get(uint(octet))
+		// no overlap so far, go down to next child
+		n, ok = n.children.Get(uint(octet))
+
 		if !ok {
 			return false
 		}
-
-		n = c
 	}
 
 	return n.overlapsPrefix(lastOctet, lastOctetBits)
