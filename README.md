@@ -14,21 +14,22 @@
 BART is balanced in terms of memory consumption versus
 lookup time.
 
-The lookup time is by a factor of ~2 slower on average as the
-routing algorithms ART, SMART, CPE, ... but reduces the memory
-consumption by an order of magnitude in comparison.
+The lookup time is by a factor of 2 slower on average as the
+routing algorithm ART but reduces the memory consumption by an
+order of magnitude in comparison.
 
 BART is a multibit-trie with fixed stride length of 8 bits,
 using the _baseIndex_ function from the ART algorithm to
 build the complete-binary-tree (CBT) of prefixes for each stride.
 
-The second key factor is popcount array compression at each stride level
-of the CBT prefix tree and backtracking along the CBT in O(k).
+| ![example 4bit stride](https://github.com/user-attachments/assets/3b9f22c1-cfcc-4e01-bb13-864713ce5ae8) |
+|:--:|
+| *example from artlookup.pdf for a 4bit stride* |
 
 The CBT is implemented as a bitvector, backtracking is just
 a matter of fast cache friendly bitmask operations.
 
-The child array at each stride level is also popcount compressed.
+The prefix and child arrays at each stride level are popcount compressed sparse arrays.
 
 ## API
 
