@@ -198,9 +198,7 @@ func (n *node[V]) overlapsSameChildrenRec(o *node[V]) bool {
 	// intersect in place the child bitsets from n and o
 	nChildrenBitsetCloned.InPlaceIntersection(o.children.BitSet)
 
-	// gimmick, don't allocate
-	addrBuf := [maxNodeChildren]uint{}
-	_, allCommonChildren := nChildrenBitsetCloned.NextSetMany(0, addrBuf[:])
+	_, allCommonChildren := nChildrenBitsetCloned.NextSetMany(0, make([]uint, maxNodeChildren))
 
 	// range over all child addrs, common in n and o
 	for _, addr := range allCommonChildren {
@@ -240,7 +238,7 @@ func (n *node[V]) overlapsOneRouteIn(o *node[V]) bool {
 	// 2. Test if prefix overlaps any route in this node
 	// use bitset intersection with alloted stride table instead of range loops
 
-	// precalculated allotment for idx (complete binary tree as bitset)
+	// get pre alloted bitset for idx
 	pfxBuf := allotLookupTbl[idx]
 	allotedPrefixRoutes := bitset.From(pfxBuf[:])
 
@@ -259,7 +257,7 @@ func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 	// 2. Test if prefix overlaps any route in this node
 	// use bitset intersection with alloted stride table instead of range loops
 
-	// precalculated allotment for idx (complete binary tree as bitset)
+	// get pre alloted bitset for idx
 	allotmentForIdx := allotLookupTbl[idx]
 	allotedPrefixRoutes := bitset.From(allotmentForIdx[:])
 
