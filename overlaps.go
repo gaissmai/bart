@@ -178,7 +178,7 @@ func (n *node[V]) overlapsChildrenIn(o *node[V]) bool {
 		prefixRoutes.InPlaceUnion(bitset.From(a8[:]))
 	}
 
-	// shift children bitset by firstHostIndex
+	// shift-right children bitset by 256 (firstHostIndex)
 	c8 := make([]uint64, 8)
 	copy(c8[4:], o.children.BitSet.Bytes()) // 4*64= 256
 	hostRoutes := bitset.From(c8)
@@ -239,8 +239,8 @@ func (n *node[V]) overlapsOneRouteIn(o *node[V]) bool {
 	// use bitset intersection with alloted stride table instead of range loops
 
 	// get pre alloted bitset for idx
-	pfxBuf := allotLookupTbl[idx]
-	allotedPrefixRoutes := bitset.From(pfxBuf[:])
+	a8 := allotLookupTbl[idx]
+	allotedPrefixRoutes := bitset.From(a8[:])
 
 	// use bitset intersection instead of range loops
 	return allotedPrefixRoutes.IntersectionCardinality(n.prefixes.BitSet) > 0
@@ -258,8 +258,8 @@ func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 	// use bitset intersection with alloted stride table instead of range loops
 
 	// get pre alloted bitset for idx
-	allotmentForIdx := allotLookupTbl[idx]
-	allotedPrefixRoutes := bitset.From(allotmentForIdx[:])
+	a8 := allotLookupTbl[idx]
+	allotedPrefixRoutes := bitset.From(a8[:])
 
 	// use bitset intersection instead of range loops
 	if allotedPrefixRoutes.IntersectionCardinality(n.prefixes.BitSet) != 0 {
@@ -269,7 +269,7 @@ func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 	// 3. Test if prefix overlaps any child in this node
 	// use bitsets intersection instead of range loops
 
-	// shift children bitset by firstHostIndex
+	// shift-right children bitset by 256 (firstHostIndex)
 	c8 := make([]uint64, 8)
 	copy(c8[4:], n.children.BitSet.Bytes()) // 4*64= 256
 	hostRoutes := bitset.From(c8)
