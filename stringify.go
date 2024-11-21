@@ -204,9 +204,9 @@ func (n *node[V]) getKidsRec(parentIdx uint, path [16]byte, depth int, is4 bool)
 	// the node may have childs, the rec-descent monster starts
 
 	// no heap allocs
-	_, allAddrs := n.children.BitSet.NextSetMany(0, make([]uint, maxNodeChildren))
+	_, allChildAddrs := n.children.BitSet.NextSetMany(0, make([]uint, maxNodeChildren))
 
-	for i, addr := range allAddrs {
+	for i, addr := range allChildAddrs {
 		octet := byte(addr)
 
 		// do a longest-prefix-match

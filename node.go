@@ -95,11 +95,11 @@ func (n *node[V]) eachLookupPrefix(
 	depth int,
 	is4 bool,
 	octet byte,
-	bits int,
+	pfxLen int,
 	yield func(netip.Prefix, V) bool,
 ) bool {
 	// backtracking the CBT
-	for idx := pfxToIdx(octet, bits); idx > 0; idx >>= 1 {
+	for idx := pfxToIdx(octet, pfxLen); idx > 0; idx >>= 1 {
 		if val, ok := n.prefixes.Get(idx); ok {
 			cidr, _ := cidrFromPath(path, depth, is4, idx)
 
@@ -128,13 +128,10 @@ func (n *node[V]) eachSubnet(
 	pfxFirstAddr := uint(octet)
 	pfxLastAddr := uint(octet | ^netMask[pfxLen])
 
-	idxBackingArray := [maxNodePrefixes]uint{}
-	allCoveredIndices := idxBackingArray[:0]
+	allCoveredIndices := make([]uint, 0, maxNodePrefixes)
 
 	var idx uint
-
 	var ok bool
-
 	for {
 		if idx, ok = n.prefixes.BitSet.NextSet(idx); !ok {
 			break
@@ -160,8 +157,7 @@ func (n *node[V]) eachSubnet(
 	// 2. collect all children in n covered by prefix
 	// ###############################################################
 
-	addrBackingArray := [maxNodeChildren]uint{}
-	allCoveredAddrs := addrBackingArray[:0]
+	allCoveredAddrs := make([]uint, 0, maxNodeChildren)
 
 	var addr uint
 
@@ -267,10 +263,10 @@ func (n *node[V]) unionRec(o *node[V]) (duplicates int) {
 	}
 
 	// no heap allocs
-	_, allIndices = o.children.BitSet.NextSetMany(0, make([]uint, maxNodeChildren))
+	_, allChildAddrs := o.children.BitSet.NextSetMany(0, make([]uint, maxNodeChildren))
 
 	// for all children in other node do ...
-	for i, oOctet := range allIndices {
+	for i, oOctet := range allChildAddrs {
 		octet := byte(oOctet)
 
 		// we know the slice index, faster as o.getChild(octet)
@@ -373,7 +369,7 @@ func (n *node[V]) allRecSorted(
 	yield func(netip.Prefix, V) bool,
 ) bool {
 	// get slice of all child octets, sorted by addr
-	_, childAddrs := n.children.BitSet.NextSetMany(0, make([]uint, maxNodeChildren))
+	_, allChildAddrs := n.children.BitSet.NextSetMany(0, make([]uint, maxNodeChildren))
 
 	// get slice of all indexes, sorted by idx
 	_, allIndices := n.prefixes.BitSet.NextSetMany(0, make([]uint, maxNodePrefixes))
@@ -388,8 +384,8 @@ func (n *node[V]) allRecSorted(
 		octet, _ := idxToPfx(idx)
 
 		// yield all childs before idx
-		for j := childCursor; j < len(childAddrs); j++ {
-			addr := childAddrs[j]
+		for j := childCursor; j < len(allChildAddrs); j++ {
+			addr := allChildAddrs[j]
 
 			if addr >= uint(octet) {
 				break
@@ -419,8 +415,8 @@ func (n *node[V]) allRecSorted(
 	}
 
 	// yield the rest of childs, if any
-	for j := childCursor; j < len(childAddrs); j++ {
-		addr := childAddrs[j]
+	for j := childCursor; j < len(allChildAddrs); j++ {
+		addr := allChildAddrs[j]
 		c := n.children.Items[j]
 
 		path[depth] = byte(addr)

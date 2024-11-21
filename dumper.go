@@ -129,7 +129,9 @@ func (n *node[V]) dump(w io.Writer, path [16]byte, depth int, is4 bool) {
 		// print the childs for this node
 		fmt.Fprintf(w, "%schilds(#%d):", indent, childCount)
 
+		// no heap allocs
 		_, allChildAddrs := n.children.BitSet.NextSetMany(0, make([]uint, maxNodeChildren))
+
 		for _, addr := range allChildAddrs {
 			octet := byte(addr)
 			fmt.Fprintf(w, " %s", octetFmt(octet, is4))
