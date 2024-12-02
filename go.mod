@@ -2,4 +2,4 @@ module github.com/gaissmai/bart
 
 go 1.22.0
 
-require github.com/bits-and-blooms/bitset v1.15.0
+require github.com/bits-and-blooms/bitset v1.17.0
