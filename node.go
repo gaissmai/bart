@@ -45,8 +45,8 @@ type node[V any] struct {
 // newNode with sparse arrays for prefixes and children.
 func newNode[V any]() *node[V] {
 	return &node[V]{
-		prefixes: sparse.NewArray[V](),
-		children: sparse.NewArray[*node[V]](),
+		prefixes: sparse.New[V](),
+		children: sparse.New[*node[V]](),
 	}
 }
 

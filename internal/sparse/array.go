@@ -13,8 +13,8 @@ type Array[T any] struct {
 	Items []T
 }
 
-// NewArray, initialize BitSet with zero value.
-func NewArray[T any]() *Array[T] {
+// New, allocates memory for internal data structs.
+func New[T any]() *Array[T] {
 	return &Array[T]{
 		BitSet: new(bitset.BitSet),
 	}
