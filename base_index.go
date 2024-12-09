@@ -56,18 +56,19 @@ func cmpIndexRank(aIdx, bIdx uint) int {
 
 // idxToPfx returns the octet and prefix len of baseIdx.
 // It's the inverse to pfxToIdx.
-//
-// Use the pre computed lookup table, bits.LeadingZeros is too slow.
 func idxToPfx(idx uint) (octet byte, pfxLen int) {
 	return baseIdxLookupTbl[idx].octet, int(baseIdxLookupTbl[idx].bits)
 }
 
 // baseIdxLookupTbl, maps idx => octet/bits
 //
+// Use the pre computed lookup table, the func baseIndexToPrefix is too slow
+// in comparison to an array access.
+//
 //	func baseIndexToPrefix(idx uint) (octet byte, pfxLen int) {
 //		nlz := bits.LeadingZeros(idx)
 //		pfxLen = strconv.IntSize - nlz - 1
-//		octet = (idx & (0xFF >> (8 - pfxLen))) << (8 - pfxLen)
+//		octet = byte((idx & (0xFF >> (8 - pfxLen))) << (8 - pfxLen))
 //		return octet, pfxLen
 //	}
 var baseIdxLookupTbl = [512]struct {
