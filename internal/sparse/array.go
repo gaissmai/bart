@@ -3,21 +3,14 @@ package sparse
 import (
 	"slices"
 
-	"github.com/bits-and-blooms/bitset"
+	"github.com/gaissmai/bart/internal/bitset"
 )
 
 // Array, a generic implementation of a sparse array
 // with popcount compression and payload T.
 type Array[T any] struct {
-	*bitset.BitSet
+	bitset.BitSet
 	Items []T
-}
-
-// NewArray, initialize BitSet with zero value.
-func NewArray[T any]() *Array[T] {
-	return &Array[T]{
-		BitSet: new(bitset.BitSet),
-	}
 }
 
 // Len returns the number of items in sparse array.

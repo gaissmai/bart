@@ -1,6 +1,6 @@
 package bart
 
-import "github.com/bits-and-blooms/bitset"
+import "github.com/gaissmai/bart/internal/bitset"
 
 // overlapsRec returns true if any IP in the nodes n or o overlaps.
 func (n *node[V]) overlapsRec(o *node[V]) bool {
@@ -180,7 +180,7 @@ func (n *node[V]) overlapsChildrenIn(o *node[V]) bool {
 
 	// shift-right children bitset by 256 (firstHostIndex)
 	c8 := make([]uint64, 8)
-	copy(c8[4:], o.children.BitSet.Bytes()) // 4*64= 256
+	copy(c8[4:], o.children.BitSet.Words()) // 4*64= 256
 	hostRoutes := bitset.From(c8)
 
 	return prefixRoutes.IntersectionCardinality(hostRoutes) > 0
@@ -192,7 +192,7 @@ func (n *node[V]) overlapsSameChildrenRec(o *node[V]) bool {
 	// gimmicks, clone a bitset without heap allocation
 	// 4*64=256, maxNodeChildren
 	a4 := make([]uint64, 4)
-	copy(a4, n.children.BitSet.Bytes())
+	copy(a4, n.children.BitSet.Words())
 	nChildrenBitsetCloned := bitset.From(a4)
 
 	// intersect in place the child bitsets from n and o
@@ -271,7 +271,7 @@ func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 
 	// shift-right children bitset by 256 (firstHostIndex)
 	c8 := make([]uint64, 8)
-	copy(c8[4:], n.children.BitSet.Bytes()) // 4*64= 256
+	copy(c8[4:], n.children.BitSet.Words()) // 4*64= 256
 	hostRoutes := bitset.From(c8)
 
 	// use bitsets intersection instead of range loops

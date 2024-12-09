@@ -6,7 +6,7 @@ import (
 )
 
 func TestNewArray(t *testing.T) {
-	a := NewArray[int]()
+	a := new(Array[int])
 
 	if c := a.Len(); c != 0 {
 		t.Errorf("Count, expected 0, got %d", c)
@@ -14,7 +14,7 @@ func TestNewArray(t *testing.T) {
 }
 
 func TestSparseArrayCount(t *testing.T) {
-	a := NewArray[int]()
+	a := new(Array[int])
 
 	for i := range 10_000 {
 		a.InsertAt(uint(i), i)
@@ -34,7 +34,7 @@ func TestSparseArrayCount(t *testing.T) {
 }
 
 func TestSparseArrayGet(t *testing.T) {
-	a := NewArray[int]()
+	a := new(Array[int])
 
 	for i := range 10_000 {
 		a.InsertAt(uint(i), i)
@@ -70,7 +70,7 @@ func TestSparseArrayMustGetPanic(t *testing.T) {
 		}
 	}()
 
-	a := NewArray[int]()
+	a := new(Array[int])
 
 	for i := 5; i <= 10; i++ {
 		a.InsertAt(uint(i), i)
@@ -81,7 +81,7 @@ func TestSparseArrayMustGetPanic(t *testing.T) {
 }
 
 func TestSparseArrayUpdate(t *testing.T) {
-	a := NewArray[int]()
+	a := new(Array[int])
 
 	for i := range 10_000 {
 		a.InsertAt(uint(i), i)
