@@ -1,3 +1,5 @@
+// package sparse implements a generic sparse array
+// with popcount compression.
 package sparse
 
 import (

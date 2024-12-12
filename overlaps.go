@@ -238,7 +238,7 @@ func (n *node[V]) overlapsOneRouteIn(o *node[V]) bool {
 	// 2. Test if prefix overlaps any route in this node
 	// use bitset intersection with alloted stride table instead of range loops
 
-	// get pre alloted bitset for idx
+	// copy pre alloted bitset for idx
 	a8 := allotLookupTbl[idx]
 	allotedPrefixRoutes := bitset.BitSet(a8[:])
 
@@ -257,7 +257,7 @@ func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 	// 2. Test if prefix overlaps any route in this node
 	// use bitset intersection with alloted stride table instead of range loops
 
-	// get pre alloted bitset for idx
+	// copy pre alloted bitset for idx
 	a8 := allotLookupTbl[idx]
 	allotedPrefixRoutes := bitset.BitSet(a8[:])
 
