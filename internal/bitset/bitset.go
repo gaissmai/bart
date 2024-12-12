@@ -50,8 +50,8 @@ func wordsNeeded(i uint) int {
 	return int(i+wordSize) >> log2WordSize
 }
 
-// wordsIndex calculates the index of i in a `uint64`
-func wordsIndex(i uint) uint {
+// bitsIndex calculates the index of i in a `uint64`
+func bitsIndex(i uint) uint {
 	return i & (wordSize - 1) // (i % 64) but faster
 }
 
@@ -60,7 +60,7 @@ func (b BitSet) Test(i uint) bool {
 	if i >= b.bitsCapacity() {
 		return false
 	}
-	return b[i>>log2WordSize]&(1<<wordsIndex(i)) != 0
+	return b[i>>log2WordSize]&(1<<bitsIndex(i)) != 0
 }
 
 // Set bit i to 1, the capacity of the bitset is increased accordingly.
@@ -68,7 +68,7 @@ func (b *BitSet) Set(i uint) {
 	if i >= b.bitsCapacity() {
 		b.extendSet(i)
 	}
-	(*b)[i>>log2WordSize] |= (1 << wordsIndex(i))
+	(*b)[i>>log2WordSize] |= (1 << bitsIndex(i))
 }
 
 // Clear bit i to 0.
@@ -76,7 +76,7 @@ func (b *BitSet) Clear(i uint) {
 	if i >= b.bitsCapacity() {
 		return
 	}
-	(*b)[i>>log2WordSize] &^= (1 << wordsIndex(i))
+	(*b)[i>>log2WordSize] &^= (1 << bitsIndex(i))
 }
 
 // Clone this BitSet, returning a new BitSet that has the same bits set.
@@ -87,9 +87,7 @@ func (b BitSet) Clone() BitSet {
 }
 
 // Compact shrinks BitSet so that we preserve all set bits, while minimizing
-// memory usage.
-// A new slice is allocated to store the new bits, so you may see an increase in
-// memory usage until the GC runs. Normally this should not be a problem, but if you
+// memory usage. A new slice is allocated to store the new bits.
 func (b *BitSet) Compact() {
 	idx := len(*b) - 1
 
@@ -108,16 +106,14 @@ func (b *BitSet) Compact() {
 }
 
 // NextSet returns the next bit set from the specified index,
-// including possibly the current index
-// along with an error code (true = valid, false = no set bit found)
-// for i,e := b.NextSet(0); e; i,e = b.NextSet(i + 1) {...}
+// including possibly the current index along with an ok code.
 func (b BitSet) NextSet(i uint) (uint, bool) {
 	x := int(i >> log2WordSize)
 	if x >= len(b) {
 		return 0, false
 	}
 	word := b[x]
-	word = word >> wordsIndex(i)
+	word = word >> bitsIndex(i)
 	if word != 0 {
 		return i + uint(bits.TrailingZeros64(word)), true
 	}
@@ -151,7 +147,7 @@ func (b BitSet) NextSetMany(i uint, buffer []uint) (uint, []uint) {
 	if x >= len(b) || capacity == 0 {
 		return 0, myanswer[:0]
 	}
-	word := b[x] >> wordsIndex(i)
+	word := b[x] >> bitsIndex(i)
 	myanswer = myanswer[:capacity]
 	size := int(0)
 	for word != 0 {
@@ -268,17 +264,20 @@ func (b BitSet) Count() int {
 // Rank returns the number of set bits up to and including the index
 // that are set in the bitset.
 func (b BitSet) Rank(index uint) int {
-	if index >= b.bitsCapacity() {
+	wordIdx := int((index + 1) >> log2WordSize)
+
+	if wordIdx >= len(b) {
 		return popcntSlice(b)
 	}
 
-	leftover := (index + 1) & 63
-	answer := popcntSlice(b[:(index+1)>>6])
+	answer := popcntSlice(b[:wordIdx])
 
-	if leftover != 0 {
-		answer += bits.OnesCount64(b[(index+1)>>6] << (64 - leftover))
+	bitsIdx := bitsIndex(index + 1)
+	if bitsIdx == 0 {
+		return answer
 	}
-	return answer
+
+	return answer + bits.OnesCount64(b[wordIdx]<<(64-bitsIdx))
 }
 
 func popcntSlice(s []uint64) int {
