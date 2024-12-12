@@ -22,7 +22,7 @@ func (s *Array[T]) Len() int {
 // mapping between bitset index and slice index.
 func (s *Array[T]) rank(i uint) int {
 	// adjust offset by one to slice index.
-	return int(s.BitSet.Rank(i)) - 1
+	return s.BitSet.Rank(i) - 1
 }
 
 // InsertAt a value at i into the sparse array.
@@ -76,8 +76,8 @@ func (s *Array[T]) Get(i uint) (val T, ok bool) {
 // MustGet, use it only after a successful test
 // or the behavior is undefined, maybe it panics.
 func (s *Array[T]) MustGet(i uint) T {
-	// can't use s.Items[s.rank(i)], make it inlineable
-	return s.Items[int(s.BitSet.Rank(i))-1]
+	// maybe't use s.Items[s.rank(i)], still inlineable?
+	return s.Items[s.BitSet.Rank(i)-1]
 }
 
 // UpdateAt or set the value at i via callback. The new value is returned

@@ -34,20 +34,24 @@ func From(buf []uint64) BitSet {
 	return BitSet{buf}
 }
 
-// MustNew creates a new BitSet with the given length bits.
-// It panics if length exceeds the possible capacity or by a lack of memory.
-func MustNew(length uint) BitSet {
-	return BitSet{
-		make([]uint64, wordsNeeded(length)),
-	}
+// Len returns the len in uint64 words.
+func (b BitSet) Len() int {
+	return len(b.set)
+}
+
+// Cap returns the cap in uint64 words.
+func (b BitSet) Cap() int {
+	return cap(b.set)
 }
 
 // extendSet adds additional words to incorporate new bits if needed.
 func (b *BitSet) extendSet(i uint) {
-	nsize := wordsNeeded(i + 1)
+	nsize := wordsNeeded(i)
 	if b.set == nil {
 		b.set = make([]uint64, nsize)
-	} else if len(b.set) < nsize {
+	} else if b.Cap() >= nsize {
+		b.set = b.set[:nsize]
+	} else if b.Len() < nsize {
 		newset := make([]uint64, nsize)
 		copy(newset, b.set)
 		b.set = newset
@@ -56,12 +60,12 @@ func (b *BitSet) extendSet(i uint) {
 
 // bitsCapacity returns the number of possible bits in the current set.
 func (b BitSet) bitsCapacity() uint {
-	return uint(len(b.set) * 64)
+	return uint(b.Len() * 64)
 }
 
 // wordsNeeded calculates the number of words needed for i bits.
 func wordsNeeded(i uint) int {
-	return int((i + (wordSize - 1)) >> log2WordSize)
+	return int(i+wordSize) >> log2WordSize
 }
 
 // wordsIndex calculates the index of words in a `uint64`
@@ -102,13 +106,17 @@ func (b *BitSet) Clear(i uint) {
 
 // Compact shrinks BitSet so that we preserve all set bits, while minimizing
 // memory usage.
+// A new slice is allocated to store the new bits, so you may see an increase in
+// memory usage until the GC runs. Normally this should not be a problem, but if you
 func (b *BitSet) Compact() {
-	idx := len(b.set) - 1
+	idx := b.Len() - 1
 
 	// find last word with at least one bit set.
 	for ; idx >= 0; idx-- {
 		if b.set[idx] != 0 {
-			b.set = b.set[: idx+1 : idx+1] // shrink len and cap
+			newset := make([]uint64, idx+1)
+			copy(newset, b.set[:idx+1])
+			b.set = newset
 			return
 		}
 	}
@@ -120,10 +128,10 @@ func (b *BitSet) Compact() {
 // NextSet returns the next bit set from the specified index,
 // including possibly the current index
 // along with an error code (true = valid, false = no set bit found)
-// for i,e := v.NextSet(0); e; i,e = v.NextSet(i + 1) {...}
+// for i,e := b.NextSet(0); e; i,e = b.NextSet(i + 1) {...}
 func (b BitSet) NextSet(i uint) (uint, bool) {
 	x := int(i >> log2WordSize)
-	if x >= len(b.set) {
+	if x >= b.Len() {
 		return 0, false
 	}
 	w := b.set[x]
@@ -136,7 +144,7 @@ func (b BitSet) NextSet(i uint) (uint, bool) {
 	if x < 0 {
 		return 0, false
 	}
-	for x < len(b.set) {
+	for x < b.Len() {
 		if b.set[x] != 0 {
 			return uint(x)*wordSize + uint(bits.TrailingZeros64(b.set[x])), true
 		}
@@ -150,25 +158,15 @@ func (b BitSet) NextSet(i uint) (uint, bool) {
 // including possibly the current index and up to cap(buffer).
 // If the returned slice has len zero, then no more set bits were found
 //
-//	buffer := make([]uint, 256) // this should be reused
-//	j := uint(0)
-//	j, buffer = bitmap.NextSetMany(j, buffer)
-//	for ; len(buffer) > 0; j, buffer = bitmap.NextSetMany(j,buffer) {
-//	 for k := range buffer {
-//	  do something with buffer[k]
-//	 }
-//	 j += 1
-//	}
-//
 // It is possible to retrieve all set bits as follow:
 //
-//	indices := make([]uint, bitmap.Count())
-//	bitmap.NextSetMany(0, indices)
+//	indices := make([]uint, b.Count())
+//	b.NextSetMany(0, indices)
 func (b BitSet) NextSetMany(i uint, buffer []uint) (uint, []uint) {
 	myanswer := buffer
 	capacity := cap(buffer)
 	x := int(i >> log2WordSize)
-	if x >= len(b.set) || capacity == 0 {
+	if x >= b.Len() || capacity == 0 {
 		return 0, myanswer[:0]
 	}
 	skip := wordsIndex(i)
@@ -212,23 +210,14 @@ func (b BitSet) Clone() BitSet {
 	}
 
 	c := BitSet{}
-	c.set = make([]uint64, len(b.set))
+	c.set = make([]uint64, b.Len())
 	copy(c.set, b.set)
 	return c
 }
 
-// Count (number of set bits).
-// Also known as "popcount" or "population count".
-func (b BitSet) Count() uint {
-	if b.set != nil {
-		return uint(popcntSlice(b.set))
-	}
-	return 0
-}
-
 // IntersectionCardinality computes the cardinality of the intersection
 func (b BitSet) IntersectionCardinality(c BitSet) uint {
-	if len(b.set) <= len(c.set) {
+	if b.Len() <= c.Len() {
 		return uint(popcntAndSlice(b.set, c.set))
 	}
 	return uint(popcntAndSlice(c.set, b.set))
@@ -238,8 +227,8 @@ func (b BitSet) IntersectionCardinality(c BitSet) uint {
 // base set with the compare set.
 // This is the BitSet equivalent of & (and)
 func (b *BitSet) InPlaceIntersection(c BitSet) {
-	bLen := len(b.set)
-	cLen := len(c.set)
+	bLen := b.Len()
+	cLen := c.Len()
 
 	// intersect b with shorter or equal c
 	if bLen >= cLen {
@@ -273,8 +262,8 @@ func (b *BitSet) InPlaceIntersection(c BitSet) {
 // InPlaceUnion creates the destructive union of base set with compare set.
 // This is the BitSet equivalent of | (or).
 func (b *BitSet) InPlaceUnion(c BitSet) {
-	bLen := len(b.set)
-	cLen := len(c.set)
+	bLen := b.Len()
+	cLen := c.Len()
 
 	// union b with shorter or equal c
 	if bLen >= cLen {
@@ -301,36 +290,39 @@ func (b *BitSet) InPlaceUnion(c BitSet) {
 	}
 }
 
+// Count (number of set bits).
+// Also known as "popcount" or "population count".
+func (b BitSet) Count() int {
+	return popcntSlice(b.set)
+}
+
 // Rank returns the number of set bits up to and including the index
 // that are set in the bitset.
-func (b BitSet) Rank(index uint) uint {
+func (b BitSet) Rank(index uint) int {
 	if index >= b.bitsCapacity() {
-		return b.Count()
+		return popcntSlice(b.set)
 	}
 	leftover := (index + 1) & 63
-	answer := uint(popcntSlice(b.set[:(index+1)>>6]))
+	answer := popcntSlice(b.set[:(index+1)>>6])
 	if leftover != 0 {
-		answer += uint(bits.OnesCount64(b.set[(index+1)>>6] << (64 - leftover)))
+		answer += bits.OnesCount64(b.set[(index+1)>>6] << (64 - leftover))
 	}
 	return answer
 }
 
-func popcntSlice(s []uint64) uint64 {
+func popcntSlice(s []uint64) int {
 	var cnt int
 	for _, x := range s {
 		cnt += bits.OnesCount64(x)
 	}
-	return uint64(cnt)
+	return cnt
 }
 
-func popcntAndSlice(s, m []uint64) uint64 {
+func popcntAndSlice(s, m []uint64) int {
 	var cnt int
-	// this explicit check eliminates a bounds check in the loop
-	if len(m) < len(s) {
-		panic("mask slice is too short")
-	}
 	for i := range s {
+		// panics if mask slice m is too short
 		cnt += bits.OnesCount64(s[i] & m[i])
 	}
-	return uint64(cnt)
+	return cnt
 }
