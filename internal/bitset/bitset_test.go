@@ -7,20 +7,47 @@
 package bitset
 
 import (
+	"math/rand/v2"
+	"slices"
 	"testing"
 )
 
 func TestZeroValue(t *testing.T) {
 	defer func() {
 		if r := recover(); r != nil {
-			t.Error("A zero-length bitset should not panic")
+			t.Error("A zero value bitset should not panic")
 		}
 	}()
 
-	var b BitSet
-	if b.bitsCapacity() != 0 {
-		t.Errorf("Empty set should have capacity 0, not %d", b.bitsCapacity())
-	}
+	b := BitSet{}
+	b.Set(0)
+
+	b = BitSet{}
+	b.Clear(1000)
+
+	b = BitSet{}
+	b.Compact()
+
+	b = BitSet{}
+	b.Clone()
+
+	b = BitSet{}
+	b.Rank(100)
+
+	b = BitSet{}
+	b.Test(42)
+
+	b = BitSet{}
+	c := BitSet{}
+	b.InPlaceIntersection(c)
+
+	b = BitSet{}
+	c = BitSet{}
+	b.InPlaceUnion(c)
+
+	b = BitSet{}
+	c = BitSet{}
+	b.IntersectionCardinality(c)
 }
 
 func TestBitSetUntil(t *testing.T) {
@@ -45,6 +72,28 @@ func TestExpand(t *testing.T) {
 	}
 	if cap(b) != want {
 		t.Errorf("Set(511), want cap: %d, got: %d", want, cap(b))
+	}
+}
+
+func TestClone(t *testing.T) {
+	var b BitSet
+	c := b.Clone()
+
+	if !slices.Equal(b, c) {
+		t.Error("clone of nil BitSet should also be nil")
+	}
+
+	// make random numbers
+	var rands []uint64
+	for range 8 {
+		rands = append(rands, rand.Uint64())
+	}
+
+	b = rands
+	c = b.Clone()
+
+	if !slices.Equal(b, c) {
+		t.Error("cloned random BitSet is not equal")
 	}
 }
 
@@ -281,6 +330,10 @@ func TestRank(t *testing.T) {
 		return
 	}
 	if b.Rank(6) != 3 {
+		t.Error("Unexpected rank")
+		return
+	}
+	if b.Rank(63) != 5 {
 		t.Error("Unexpected rank")
 		return
 	}

@@ -14,8 +14,8 @@ func BenchmarkRankChild(b *testing.B) {
 		bs.Set(uint(rand.IntN(256)))
 	}
 
-	// make uniques random numbers
-	var randsUnique = map[int]bool{}
+	// make unique random numbers
+	randsUnique := map[int]bool{}
 	for range 10 {
 		randsUnique[rand.IntN(256)] = true
 	}
@@ -31,9 +31,9 @@ func BenchmarkRankChild(b *testing.B) {
 				_ = bs.Rank(uint(r))
 			}
 		})
-
 	}
 }
+
 func BenchmarkRankPrefix(b *testing.B) {
 	var bs BitSet
 	for range 200 {
@@ -41,7 +41,7 @@ func BenchmarkRankPrefix(b *testing.B) {
 	}
 
 	// make uniques random numbers
-	var randsUnique = map[int]bool{}
+	randsUnique := map[int]bool{}
 	for range 10 {
 		randsUnique[rand.IntN(512)] = true
 	}
@@ -57,6 +57,5 @@ func BenchmarkRankPrefix(b *testing.B) {
 				_ = bs.Rank(uint(r))
 			}
 		})
-
 	}
 }
