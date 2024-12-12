@@ -159,7 +159,7 @@ func TestCount(t *testing.T) {
 	v := MustNew(tot)
 	checkLast := true
 	for i := range tot {
-		sz := v.Count()
+		sz := uint(v.Count())
 		if sz != i {
 			t.Errorf("Count reported as %d, but it should be %d", sz, i)
 			checkLast = false
@@ -168,7 +168,7 @@ func TestCount(t *testing.T) {
 		v.Set(i)
 	}
 	if checkLast {
-		sz := v.Count()
+		sz := uint(v.Count())
 		if sz != tot {
 			t.Errorf("After all bits set, size reported as %d, but it should be %d", sz, tot)
 		}
@@ -180,7 +180,7 @@ func TestCount2(t *testing.T) {
 	tot := uint(64*4 + 11) // just some multi unit64 number
 	v := MustNew(tot)
 	for i := uint(0); i < tot; i += 3 {
-		sz := v.Count()
+		sz := uint(v.Count())
 		if sz != i/3 {
 			t.Errorf("Count reported as %d, but it should be %d", sz, i)
 			break
@@ -375,7 +375,7 @@ func TestNextSetError(t *testing.T) {
 
 func TestPopcntSlice(t *testing.T) {
 	s := []uint64{2, 3, 5, 7, 11, 13, 17, 19, 23, 29}
-	res := popcntSlice(s)
+	res := uint64(popcntSlice(s))
 	const l uint64 = 27
 	if res != l {
 		t.Errorf("Wrong popcount %d != %d", res, l)
@@ -385,7 +385,7 @@ func TestPopcntSlice(t *testing.T) {
 func TestPopcntAndSlice(t *testing.T) {
 	s := []uint64{2, 3, 5, 7, 11, 13, 17, 19, 23, 29}
 	m := []uint64{31, 37, 41, 43, 47, 53, 59, 61, 67, 71}
-	res := popcntAndSlice(s, m)
+	res := uint64(popcntAndSlice(s, m))
 	const l uint64 = 18
 	if res != l {
 		t.Errorf("Wrong And %d !=  %d", res, l)
