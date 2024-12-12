@@ -1,17 +1,18 @@
-/*
-Copyright 2014 Will Fitzgerald. All rights reserved.
-Use of this source code is governed by a BSD-style
-license that can be found in the LICENSE file.
-*/
+// This is an adapted version to local needs of:
+//
+//  github.com/bits-and-blooms/bitset
+//
+// All introduced bugs belong to me!
+//
+// original license:
+//
+// Copyright 2014 Will Fitzgerald. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+//
 
 // Package bitset implements bitsets, a mapping
 // between non-negative integers and boolean values.
-//
-// This is a simplified and stripped down version of:
-//
-//	github.com/bits-and-blooms/bitset
-//
-// All bugs belong to me.
 package bitset
 
 import (
@@ -81,6 +82,9 @@ func (b *BitSet) Clear(i uint) {
 
 // Clone this BitSet, returning a new BitSet that has the same bits set.
 func (b BitSet) Clone() BitSet {
+	if b == nil {
+		return nil
+	}
 	c := BitSet(make([]uint64, len(b)))
 	copy(c, b)
 	return c
@@ -196,11 +200,7 @@ func (b *BitSet) InPlaceIntersection(c BitSet) {
 	cLen := len(c)
 
 	// intersect b with shorter or equal c
-	if bLen >= cLen {
-		// bounds check elimination
-		_ = (*b)[cLen-1]
-		_ = c[cLen-1]
-
+	if bLen >= cLen && cLen != 0 {
 		for i := range cLen {
 			(*b)[i] &= c[i]
 		}
@@ -211,10 +211,6 @@ func (b *BitSet) InPlaceIntersection(c BitSet) {
 	}
 
 	// intersect b with longer c
-	// bounds check elimination
-	_ = (*b)[bLen-1]
-	_ = c[bLen-1]
-
 	for i := range bLen {
 		(*b)[i] &= c[i]
 	}
@@ -232,10 +228,6 @@ func (b *BitSet) InPlaceUnion(c BitSet) {
 
 	// union b with shorter or equal c
 	if bLen >= cLen {
-		// bounds check elimination
-		_ = (*b)[cLen-1]
-		_ = c[cLen-1]
-
 		for i := range cLen {
 			(*b)[i] |= c[i]
 		}
@@ -246,9 +238,6 @@ func (b *BitSet) InPlaceUnion(c BitSet) {
 	newset := make([]uint64, cLen)
 	copy(newset, *b)
 	*b = newset
-	// bounds check elimination
-	_ = (*b)[cLen-1]
-	_ = c[cLen-1]
 
 	for i := range cLen {
 		(*b)[i] |= c[i]
