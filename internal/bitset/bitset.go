@@ -19,48 +19,30 @@ import (
 )
 
 // the wordSize of a bit set
-const wordSize = uint(64)
+const wordSize = 64
 
 // log2WordSize is lg(wordSize)
-const log2WordSize = uint(6)
+const log2WordSize = 6
 
-// A BitSet is a set of bits.
-type BitSet struct {
-	set []uint64
-}
-
-// From is a constructor used to create a BitSet from a slice of words
-func From(buf []uint64) BitSet {
-	return BitSet{buf}
-}
-
-// Len returns the len in uint64 words.
-func (b BitSet) Len() int {
-	return len(b.set)
-}
-
-// Cap returns the cap in uint64 words.
-func (b BitSet) Cap() int {
-	return cap(b.set)
-}
+// A BitSet is a slice of words. This is an internal package
+// with a wide open public API.
+type BitSet []uint64
 
 // extendSet adds additional words to incorporate new bits if needed.
 func (b *BitSet) extendSet(i uint) {
 	nsize := wordsNeeded(i)
-	if b.set == nil {
-		b.set = make([]uint64, nsize)
-	} else if b.Cap() >= nsize {
-		b.set = b.set[:nsize]
-	} else if b.Len() < nsize {
+	if b == nil {
+		*b = make([]uint64, nsize)
+	} else if len(*b) < nsize {
 		newset := make([]uint64, nsize)
-		copy(newset, b.set)
-		b.set = newset
+		copy(newset, *b)
+		*b = newset
 	}
 }
 
 // bitsCapacity returns the number of possible bits in the current set.
 func (b BitSet) bitsCapacity() uint {
-	return uint(b.Len() * 64)
+	return uint(len(b) * 64)
 }
 
 // wordsNeeded calculates the number of words needed for i bits.
@@ -68,16 +50,9 @@ func wordsNeeded(i uint) int {
 	return int(i+wordSize) >> log2WordSize
 }
 
-// wordsIndex calculates the index of words in a `uint64`
+// wordsIndex calculates the index of i in a `uint64`
 func wordsIndex(i uint) uint {
-	return i & (wordSize - 1)
-}
-
-// Words returns the bitset as a slice of uint64 words, giving direct access to the internal representation.
-// It is meant for advanced users.
-// It is not a copy, so changes to the returned slice will affect the bitset.
-func (b BitSet) Words() []uint64 {
-	return b.set
+	return i & (wordSize - 1) // (i % 64) but faster
 }
 
 // Test whether bit i is set.
@@ -85,7 +60,7 @@ func (b BitSet) Test(i uint) bool {
 	if i >= b.bitsCapacity() {
 		return false
 	}
-	return b.set[i>>log2WordSize]&(1<<wordsIndex(i)) != 0
+	return b[i>>log2WordSize]&(1<<wordsIndex(i)) != 0
 }
 
 // Set bit i to 1, the capacity of the bitset is increased accordingly.
@@ -93,7 +68,7 @@ func (b *BitSet) Set(i uint) {
 	if i >= b.bitsCapacity() {
 		b.extendSet(i)
 	}
-	b.set[i>>log2WordSize] |= 1 << wordsIndex(i)
+	(*b)[i>>log2WordSize] |= (1 << wordsIndex(i))
 }
 
 // Clear bit i to 0.
@@ -101,7 +76,14 @@ func (b *BitSet) Clear(i uint) {
 	if i >= b.bitsCapacity() {
 		return
 	}
-	b.set[i>>log2WordSize] &^= 1 << wordsIndex(i)
+	(*b)[i>>log2WordSize] &^= (1 << wordsIndex(i))
+}
+
+// Clone this BitSet, returning a new BitSet that has the same bits set.
+func (b BitSet) Clone() BitSet {
+	c := BitSet(make([]uint64, len(b)))
+	copy(c, b)
+	return c
 }
 
 // Compact shrinks BitSet so that we preserve all set bits, while minimizing
@@ -109,20 +91,20 @@ func (b *BitSet) Clear(i uint) {
 // A new slice is allocated to store the new bits, so you may see an increase in
 // memory usage until the GC runs. Normally this should not be a problem, but if you
 func (b *BitSet) Compact() {
-	idx := b.Len() - 1
+	idx := len(*b) - 1
 
 	// find last word with at least one bit set.
 	for ; idx >= 0; idx-- {
-		if b.set[idx] != 0 {
+		if (*b)[idx] != 0 {
 			newset := make([]uint64, idx+1)
-			copy(newset, b.set[:idx+1])
-			b.set = newset
+			copy(newset, (*b)[:idx+1])
+			*b = newset
 			return
 		}
 	}
 
 	// not found
-	b.set = nil
+	*b = nil
 }
 
 // NextSet returns the next bit set from the specified index,
@@ -131,22 +113,22 @@ func (b *BitSet) Compact() {
 // for i,e := b.NextSet(0); e; i,e = b.NextSet(i + 1) {...}
 func (b BitSet) NextSet(i uint) (uint, bool) {
 	x := int(i >> log2WordSize)
-	if x >= b.Len() {
+	if x >= len(b) {
 		return 0, false
 	}
-	w := b.set[x]
-	w = w >> wordsIndex(i)
-	if w != 0 {
-		return i + uint(bits.TrailingZeros64(w)), true
+	word := b[x]
+	word = word >> wordsIndex(i)
+	if word != 0 {
+		return i + uint(bits.TrailingZeros64(word)), true
 	}
 	x++
 	// bounds check elimination in the loop
 	if x < 0 {
 		return 0, false
 	}
-	for x < b.Len() {
-		if b.set[x] != 0 {
-			return uint(x)*wordSize + uint(bits.TrailingZeros64(b.set[x])), true
+	for x < len(b) {
+		if b[x] != 0 {
+			return uint(x*wordSize + bits.TrailingZeros64(b[x])), true
 		}
 		x++
 
@@ -166,11 +148,10 @@ func (b BitSet) NextSetMany(i uint, buffer []uint) (uint, []uint) {
 	myanswer := buffer
 	capacity := cap(buffer)
 	x := int(i >> log2WordSize)
-	if x >= b.Len() || capacity == 0 {
+	if x >= len(b) || capacity == 0 {
 		return 0, myanswer[:0]
 	}
-	skip := wordsIndex(i)
-	word := b.set[x] >> skip
+	word := b[x] >> wordsIndex(i)
 	myanswer = myanswer[:capacity]
 	size := int(0)
 	for word != 0 {
@@ -184,7 +165,7 @@ func (b BitSet) NextSetMany(i uint, buffer []uint) (uint, []uint) {
 		word = word ^ t
 	}
 	x++
-	for idx, word := range b.set[x:] {
+	for idx, word := range b[x:] {
 		for word != 0 {
 			r := uint(bits.TrailingZeros64(word))
 			t := word & ((^word) + 1)
@@ -203,109 +184,99 @@ End:
 	return 0, myanswer[:0]
 }
 
-// Clone this BitSet, returning a new BitSet that has the same bits set.
-func (b BitSet) Clone() BitSet {
-	if b.set == nil {
-		return BitSet{}
-	}
-
-	c := BitSet{}
-	c.set = make([]uint64, b.Len())
-	copy(c.set, b.set)
-	return c
-}
-
 // IntersectionCardinality computes the cardinality of the intersection
 func (b BitSet) IntersectionCardinality(c BitSet) uint {
-	if b.Len() <= c.Len() {
-		return uint(popcntAndSlice(b.set, c.set))
+	if len(b) <= len(c) {
+		return uint(popcntAndSlice(b, c))
 	}
-	return uint(popcntAndSlice(c.set, b.set))
+	return uint(popcntAndSlice(c, b))
 }
 
 // InPlaceIntersection overwrites and computes the intersection of
 // base set with the compare set.
 // This is the BitSet equivalent of & (and)
 func (b *BitSet) InPlaceIntersection(c BitSet) {
-	bLen := b.Len()
-	cLen := c.Len()
+	bLen := len(*b)
+	cLen := len(c)
 
 	// intersect b with shorter or equal c
 	if bLen >= cLen {
 		// bounds check elimination
-		_ = b.set[cLen-1]
-		_ = c.set[cLen-1]
+		_ = (*b)[cLen-1]
+		_ = c[cLen-1]
 
 		for i := range cLen {
-			b.set[i] &= c.set[i]
+			(*b)[i] &= c[i]
 		}
 		for i := cLen; i < bLen; i++ {
-			b.set[i] = 0
+			(*b)[i] = 0
 		}
 		return
 	}
 
 	// intersect b with longer c
 	// bounds check elimination
-	_ = b.set[bLen-1]
-	_ = c.set[bLen-1]
+	_ = (*b)[bLen-1]
+	_ = c[bLen-1]
 
 	for i := range bLen {
-		b.set[i] &= c.set[i]
+		(*b)[i] &= c[i]
 	}
 
 	newset := make([]uint64, cLen)
-	copy(newset, b.set)
-	b.set = newset
+	copy(newset, *b)
+	*b = newset
 }
 
 // InPlaceUnion creates the destructive union of base set with compare set.
 // This is the BitSet equivalent of | (or).
 func (b *BitSet) InPlaceUnion(c BitSet) {
-	bLen := b.Len()
-	cLen := c.Len()
+	bLen := len(*b)
+	cLen := len(c)
 
 	// union b with shorter or equal c
 	if bLen >= cLen {
 		// bounds check elimination
-		_ = b.set[cLen-1]
-		_ = c.set[cLen-1]
+		_ = (*b)[cLen-1]
+		_ = c[cLen-1]
 
 		for i := range cLen {
-			b.set[i] |= c.set[i]
+			(*b)[i] |= c[i]
 		}
 		return
 	}
 
 	// union b with longer c
 	newset := make([]uint64, cLen)
-	copy(newset, b.set)
-	b.set = newset
+	copy(newset, *b)
+	*b = newset
 	// bounds check elimination
-	_ = b.set[cLen-1]
-	_ = c.set[cLen-1]
+	_ = (*b)[cLen-1]
+	_ = c[cLen-1]
 
 	for i := range cLen {
-		b.set[i] |= c.set[i]
+		(*b)[i] |= c[i]
 	}
 }
 
 // Count (number of set bits).
 // Also known as "popcount" or "population count".
 func (b BitSet) Count() int {
-	return popcntSlice(b.set)
+	return popcntSlice(b)
 }
 
 // Rank returns the number of set bits up to and including the index
 // that are set in the bitset.
 func (b BitSet) Rank(index uint) int {
 	if index >= b.bitsCapacity() {
-		return popcntSlice(b.set)
+		return popcntSlice(b)
 	}
+
 	leftover := (index + 1) & 63
-	answer := popcntSlice(b.set[:(index+1)>>6])
+	answer := popcntSlice(b[:(index+1)>>6])
+
 	if leftover != 0 {
-		answer += bits.OnesCount64(b.set[(index+1)>>6] << (64 - leftover))
+		answer += bits.OnesCount64(b[(index+1)>>6] << (64 - leftover))
 	}
 	return answer
 }
