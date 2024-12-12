@@ -1904,7 +1904,7 @@ func TestInitTableIsEmpty(t *testing.T) {
 
 // ############ benchmarks ################################
 
-var benchRouteCount = []int{1, 2, 5, 10, 100, 1000, 10_000, 100_000}
+var benchRouteCount = []int{1, 2, 5, 10, 100, 1000, 10_000, 100_000, 1_000_000}
 
 func BenchmarkTableInsert(b *testing.B) {
 	for _, fam := range []string{"ipv4", "ipv6"} {

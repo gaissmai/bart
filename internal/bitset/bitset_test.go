@@ -7,14 +7,13 @@
 package bitset
 
 import (
-	"fmt"
 	"testing"
 )
 
-func TestZeroValueBitSet(t *testing.T) {
+func TestZeroValue(t *testing.T) {
 	defer func() {
 		if r := recover(); r != nil {
-			t.Error("A zero-length bitset should be fine")
+			t.Error("A zero-length bitset should not panic")
 		}
 	}()
 
@@ -24,11 +23,12 @@ func TestZeroValueBitSet(t *testing.T) {
 	}
 }
 
-func TestBitSetIsClear(t *testing.T) {
+func TestBitSetUntil(t *testing.T) {
 	var b BitSet
-	b.Set(1000)
-	for i := range 1000 {
-		if b.Test(uint(i)) {
+	var til uint = 900
+	b.Set(til)
+	for i := range til {
+		if b.Test(i) {
 			t.Errorf("Bit %d is set, and it shouldn't be.", i)
 		}
 	}
@@ -39,15 +39,60 @@ func TestExpand(t *testing.T) {
 	for i := range 512 {
 		b.Set(uint(i))
 	}
-	if b.Len() != 8 {
-		t.Errorf("Set(511), want len: 8, got: %d", b.Len())
+	want := 8
+	if len(b) != want {
+		t.Errorf("Set(511), want len: %d, got: %d", want, len(b))
 	}
-	if b.Cap() != 8 {
-		t.Errorf("Set(511), want cap: 8, got: %d", b.Cap())
+	if cap(b) != want {
+		t.Errorf("Set(511), want cap: %d, got: %d", want, cap(b))
 	}
 }
 
-func TestBitSetAndGet(t *testing.T) {
+func TestCompact(t *testing.T) {
+	var b BitSet
+	for _, i := range []uint{1, 2, 5, 10, 20, 50, 100, 200, 500, 1023} {
+		b.Set(i)
+	}
+
+	want := 16
+	if len(b) != want {
+		t.Errorf("Set(...), want len: %d, got: %d", want, len(b))
+	}
+	if cap(b) != want {
+		t.Errorf("Set(...), want cap: %d, got: %d", want, cap(b))
+	}
+
+	b.Clear(1023)
+	if len(b) != want {
+		t.Errorf("Set(...), want len: %d, got: %d", want, len(b))
+	}
+	if cap(b) != want {
+		t.Errorf("Set(...), want cap: %d, got: %d", want, cap(b))
+	}
+
+	b.Compact()
+	want = 8
+	if len(b) != want {
+		t.Errorf("Compact(), want len: %d, got: %d", want, len(b))
+	}
+	if cap(b) != want {
+		t.Errorf("Compact(), want cap: %d, got: %d", want, cap(b))
+	}
+
+	b.Set(10_000)
+	b.Clear(10_000)
+	b.Compact()
+
+	want = 8
+	if len(b) != want {
+		t.Errorf("Compact(), want len: %d, got: %d", want, len(b))
+	}
+	if cap(b) != want {
+		t.Errorf("Compact(), want cap: %d, got: %d", want, cap(b))
+	}
+}
+
+func TestBitGet(t *testing.T) {
 	var b BitSet
 	b.Set(100)
 	if !b.Test(100) {
@@ -55,7 +100,7 @@ func TestBitSetAndGet(t *testing.T) {
 	}
 }
 
-func TestIterate(t *testing.T) {
+func TestNextSet(t *testing.T) {
 	var b BitSet
 	b.Set(0)
 	b.Set(1)
@@ -221,39 +266,6 @@ func TestInplaceIntersection(t *testing.T) {
 	}
 	if d.Count() != 50 {
 		t.Errorf("Intersection should have 50 bits set, but had %d", d.Count())
-	}
-}
-
-func TestFrom(t *testing.T) {
-	u := []uint64{2, 3, 5, 7, 11}
-	b := From(u)
-	outType := fmt.Sprintf("%T", b)
-	expType := "bitset.BitSet"
-	if outType != expType {
-		t.Error("Expecting type: ", expType, ", gotf:", outType)
-		return
-	}
-}
-
-func TestWords(t *testing.T) {
-	var b BitSet
-	c := b.Words()
-	outType := fmt.Sprintf("%T", c)
-	expType := "[]uint64"
-
-	if outType != expType {
-		t.Error("Expecting type: ", expType, ", gotf:", outType)
-		return
-	}
-
-	if c != nil {
-		t.Error("The slice should be nil")
-		return
-	}
-
-	if len(c) != 0 {
-		t.Error("The slice should be empty")
-		return
 	}
 }
 
