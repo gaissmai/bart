@@ -1,5 +1,5 @@
 //
-// Some tests are taken but modified from:
+// Some tests are taken and modified from:
 //
 //  github.com/bits-and-blooms/bitset
 //
