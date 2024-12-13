@@ -1,15 +1,17 @@
-// This is an adapted version to local needs of:
+//
+// This is an adapted and simplified version of:
 //
 //  github.com/bits-and-blooms/bitset
 //
 // All introduced bugs belong to me!
 //
+// ---------------------------------------------------
 // original license:
 //
 // Copyright 2014 Will Fitzgerald. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
-//
+// ---------------------------------------------------
 
 // Package bitset implements bitsets, a mapping
 // between non-negative integers and boolean values.
@@ -29,39 +31,48 @@ const log2WordSize = 6
 // with a wide open public API.
 type BitSet []uint64
 
-// extendSet adds additional words to incorporate new bits if needed.
-func (b *BitSet) extendSet(i uint) {
-	nsize := wordsNeeded(i)
-	if b == nil {
-		*b = make([]uint64, nsize)
-	} else if len(*b) < nsize {
-		newset := make([]uint64, nsize)
-		copy(newset, *b)
-		*b = newset
-	}
-}
-
 // bitsCapacity returns the number of possible bits in the current set.
 func (b BitSet) bitsCapacity() uint {
 	return uint(len(b) * 64)
 }
 
-// wordsNeeded calculates the number of words needed for i bits.
+// xIdx calculates the index of i in a []uint64
+func wIdx(i uint) int {
+	return int(i >> log2WordSize) // (i / 64) but faster
+}
+
+// bIdx calculates the index of i in a `uint64`
+func bIdx(i uint) uint {
+	return i & 63 // (i % 64) but faster
+}
+
+// wordsNeeded calculates the last word in slice for bit i.
 func wordsNeeded(i uint) int {
-	return int(i+wordSize) >> log2WordSize
+	return wIdx(i + wordSize)
 }
 
-// bitsIndex calculates the index of i in a `uint64`
-func bitsIndex(i uint) uint {
-	return i & (wordSize - 1) // (i % 64) but faster
+// extendSet adds additional words to incorporate new bits if needed.
+func (b *BitSet) extendSet(i uint) {
+	size := wordsNeeded(i)
+
+	switch {
+	case b == nil:
+		*b = make([]uint64, size)
+	case cap(*b) >= size:
+		*b = (*b)[:size]
+	case len(*b) < size:
+		newset := make([]uint64, size)
+		copy(newset, *b)
+		*b = newset
+	}
 }
 
-// Test whether bit i is set.
+// Test if bit i is set.
 func (b BitSet) Test(i uint) bool {
 	if i >= b.bitsCapacity() {
 		return false
 	}
-	return b[i>>log2WordSize]&(1<<bitsIndex(i)) != 0
+	return b[wIdx(i)]&(1<<bIdx(i)) != 0
 }
 
 // Set bit i to 1, the capacity of the bitset is increased accordingly.
@@ -69,7 +80,7 @@ func (b *BitSet) Set(i uint) {
 	if i >= b.bitsCapacity() {
 		b.extendSet(i)
 	}
-	(*b)[i>>log2WordSize] |= (1 << bitsIndex(i))
+	(*b)[wIdx(i)] |= (1 << bIdx(i))
 }
 
 // Clear bit i to 0.
@@ -77,7 +88,7 @@ func (b *BitSet) Clear(i uint) {
 	if i >= b.bitsCapacity() {
 		return
 	}
-	(*b)[i>>log2WordSize] &^= (1 << bitsIndex(i))
+	(*b)[wIdx(i)] &^= (1 << bIdx(i))
 }
 
 // Clone this BitSet, returning a new BitSet that has the same bits set.
@@ -93,45 +104,42 @@ func (b BitSet) Clone() BitSet {
 // Compact shrinks BitSet so that we preserve all set bits, while minimizing
 // memory usage. A new slice is allocated to store the new bits.
 func (b *BitSet) Compact() {
-	idx := len(*b) - 1
+	last := len(*b) - 1
 
 	// find last word with at least one bit set.
-	for ; idx >= 0; idx-- {
-		if (*b)[idx] != 0 {
-			newset := make([]uint64, idx+1)
-			copy(newset, (*b)[:idx+1])
+	for ; last >= 0; last-- {
+		if (*b)[last] != 0 {
+			newset := make([]uint64, last+1)
+			copy(newset, (*b)[:last+1])
 			*b = newset
 			return
 		}
 	}
 
-	// not found
+	// not found, shrink to nil
 	*b = nil
 }
 
 // NextSet returns the next bit set from the specified index,
 // including possibly the current index along with an ok code.
 func (b BitSet) NextSet(i uint) (uint, bool) {
-	x := int(i >> log2WordSize)
+	x := wIdx(i)
 	if x >= len(b) {
 		return 0, false
 	}
-	word := b[x]
-	word = word >> bitsIndex(i)
+
+	// process the first word
+	word := b[x] >> bIdx(i) // bIdx(i) = i % 64
 	if word != 0 {
 		return i + uint(bits.TrailingZeros64(word)), true
 	}
-	x++
-	// bounds check elimination in the loop
-	if x < 0 {
-		return 0, false
-	}
-	for x < len(b) {
-		if b[x] != 0 {
-			return uint(x*wordSize + bits.TrailingZeros64(b[x])), true
-		}
-		x++
 
+	// process the following full words
+	x++
+	for ; x < len(b); x++ {
+		if b[x] != 0 {
+			return uint(x*wordSize) + uint(bits.TrailingZeros64(b[x])), true
+		}
 	}
 	return 0, false
 }
@@ -145,43 +153,54 @@ func (b BitSet) NextSet(i uint) (uint, bool) {
 //	indices := make([]uint, b.Count())
 //	b.NextSetMany(0, indices)
 func (b BitSet) NextSetMany(i uint, buffer []uint) (uint, []uint) {
-	myanswer := buffer
 	capacity := cap(buffer)
-	x := int(i >> log2WordSize)
+	result := buffer[:capacity]
+
+	x := wIdx(i)
 	if x >= len(b) || capacity == 0 {
-		return 0, myanswer[:0]
+		return 0, result[:0]
 	}
-	word := b[x] >> bitsIndex(i)
-	myanswer = myanswer[:capacity]
-	size := int(0)
+
+	// process the first word
+	word := b[x] >> bIdx(i) // bIdx(i) = i % 64
+
+	size := 0
 	for word != 0 {
-		r := uint(bits.TrailingZeros64(word))
-		t := word & ((^word) + 1)
-		myanswer[size] = r + i
+		result[size] = i + uint(bits.TrailingZeros64(word))
+
 		size++
 		if size == capacity {
 			goto End
 		}
+
+		// t contains only the rightmost set bit of word.
+		t := word & ((^word) + 1)
+
+		// clear the rightmost set bit
 		word = word ^ t
 	}
+
+	// process the following full words
 	x++
-	for idx, word := range b[x:] {
+	for j, word := range b[x:] {
 		for word != 0 {
-			r := uint(bits.TrailingZeros64(word))
-			t := word & ((^word) + 1)
-			myanswer[size] = r + (uint(x+idx) << 6)
+			result[size] = (uint(x+j) << 6) + uint(bits.TrailingZeros64(word))
+
 			size++
 			if size == capacity {
 				goto End
 			}
+
+			// clear the rightmost set bit
+			t := word & ((^word) + 1)
 			word = word ^ t
 		}
 	}
 End:
 	if size > 0 {
-		return myanswer[size-1], myanswer[:size]
+		return result[size-1], result[:size]
 	}
-	return 0, myanswer[:0]
+	return 0, result[:0]
 }
 
 // IntersectionCardinality computes the cardinality of the intersection
@@ -252,21 +271,18 @@ func (b BitSet) Count() int {
 
 // Rank returns the number of set bits up to and including the index
 // that are set in the bitset.
-func (b BitSet) Rank(index uint) int {
-	wordIdx := int((index + 1) >> log2WordSize)
-
-	if wordIdx >= len(b) {
+func (b BitSet) Rank(i uint) int {
+	if wIdx(i+1) >= len(b) {
 		return popcntSlice(b)
 	}
 
-	answer := popcntSlice(b[:wordIdx])
+	answer := popcntSlice(b[:wIdx(i+1)])
 
-	bitsIdx := bitsIndex(index + 1)
-	if bitsIdx == 0 {
+	if bIdx(i+1) == 0 {
 		return answer
 	}
 
-	return answer + bits.OnesCount64(b[wordIdx]<<(64-bitsIdx))
+	return answer + bits.OnesCount64(b[wIdx(i+1)]<<(64-bIdx(i+1)))
 }
 
 func popcntSlice(s []uint64) int {
@@ -279,9 +295,9 @@ func popcntSlice(s []uint64) int {
 
 func popcntAndSlice(s, m []uint64) int {
 	var cnt int
-	for i := range s {
+	for j := range s {
 		// panics if mask slice m is too short
-		cnt += bits.OnesCount64(s[i] & m[i])
+		cnt += bits.OnesCount64(s[j] & m[j])
 	}
 	return cnt
 }
