@@ -1,8 +1,17 @@
+//
+// Some tests are taken but modified from:
+//
+//  github.com/bits-and-blooms/bitset
+//
+// All introduced bugs belong to me!
+//
+// ---------------------------------------------------
+// original license:
+//
 // Copyright 2014 Will Fitzgerald. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
-
-// This file tests bit sets
+// ---------------------------------------------------
 
 package bitset
 
@@ -15,7 +24,7 @@ import (
 func TestZeroValue(t *testing.T) {
 	defer func() {
 		if r := recover(); r != nil {
-			t.Error("A zero value bitset should not panic")
+			t.Error("A zero value bitset must not panic")
 		}
 	}()
 
@@ -32,10 +41,19 @@ func TestZeroValue(t *testing.T) {
 	b.Clone()
 
 	b = BitSet{}
+	b.Count()
+
+	b = BitSet{}
 	b.Rank(100)
 
 	b = BitSet{}
 	b.Test(42)
+
+	b = BitSet{}
+	b.NextSet(0)
+
+	b = BitSet{}
+	b.NextSetMany(0, nil)
 
 	b = BitSet{}
 	c := BitSet{}
@@ -52,9 +70,9 @@ func TestZeroValue(t *testing.T) {
 
 func TestBitSetUntil(t *testing.T) {
 	var b BitSet
-	var til uint = 900
-	b.Set(til)
-	for i := range til {
+	var last uint = 900
+	b.Set(last)
+	for i := range last {
 		if b.Test(i) {
 			t.Errorf("Bit %d is set, and it shouldn't be.", i)
 		}
@@ -141,7 +159,7 @@ func TestCompact(t *testing.T) {
 	}
 }
 
-func TestBitGet(t *testing.T) {
+func TestTest(t *testing.T) {
 	var b BitSet
 	b.Set(100)
 	if !b.Test(100) {
@@ -194,9 +212,88 @@ func TestNextSet(t *testing.T) {
 	}
 }
 
+func TestNextSetMany(t *testing.T) {
+	tcs := []struct {
+		name    string
+		input   []uint
+		del     []uint
+		buf     []uint
+		wantBuf []uint
+		//
+		start   uint
+		wantIdx uint
+	}{
+		{
+			name:    "null",
+			input:   []uint{},
+			del:     []uint{},
+			buf:     make([]uint, 0, 512),
+			wantBuf: []uint{},
+			start:   0,
+			wantIdx: 0,
+		},
+		{
+			name:    "zero",
+			input:   []uint{0},
+			del:     []uint{},
+			buf:     make([]uint, 0, 512),
+			wantBuf: []uint{0}, // bit #0 is set
+			start:   0,
+			wantIdx: 0,
+		},
+		{
+			name:    "1,5",
+			input:   []uint{1, 5},
+			del:     []uint{},
+			buf:     make([]uint, 0, 512),
+			wantBuf: []uint{1, 5},
+			start:   0,
+			wantIdx: 5,
+		},
+		{
+			name:    "511",
+			input:   []uint{511},
+			del:     []uint{},
+			buf:     make([]uint, 0, 512),
+			wantBuf: []uint{511},
+			start:   0,
+			wantIdx: 511,
+		},
+		{
+			name:    "buf to low",
+			input:   []uint{511},
+			del:     []uint{511},
+			buf:     make([]uint, 0, 1),
+			wantBuf: []uint{},
+			start:   0,
+			wantIdx: 0,
+		},
+	}
+	for _, tc := range tcs {
+		var b BitSet
+		for _, u := range tc.input {
+			b.Set(u)
+		}
+		// clear but don't shrink
+		for _, u := range tc.del {
+			b.Clear(u)
+		}
+		idx, buf := b.NextSetMany(tc.start, tc.buf)
+
+		if idx != tc.wantIdx {
+			t.Errorf("NextSetMany, %s: got next idx: %d, want: %d", tc.name, idx, tc.wantIdx)
+		}
+
+		if !slices.Equal(buf, tc.wantBuf) {
+			t.Errorf("NextSetMany, %s: returned buf is not equal as expected:\ngot:  %v\nwant: %v",
+				tc.name, buf, tc.wantBuf)
+		}
+	}
+}
+
 func TestCount(t *testing.T) {
 	var b BitSet
-	tot := uint(64*4 + 11) // just some multi unit64 number
+	tot := uint(64*4 + 11) // just an unmagic number
 	checkLast := true
 	for i := range tot {
 		sz := uint(b.Count())
@@ -218,7 +315,7 @@ func TestCount(t *testing.T) {
 // test setting every 3rd bit, just in case something odd is happening
 func TestCount2(t *testing.T) {
 	var b BitSet
-	tot := uint(64*4 + 11) // just some multi unit64 number
+	tot := uint(64*4 + 11)
 	for i := uint(0); i < tot; i += 3 {
 		sz := uint(b.Count())
 		if sz != i/3 {
@@ -226,50 +323,6 @@ func TestCount2(t *testing.T) {
 			break
 		}
 		b.Set(i)
-	}
-}
-
-// nil tests
-func TestNullTest(t *testing.T) {
-	var v *BitSet
-	defer func() {
-		if r := recover(); r == nil {
-			t.Error("Checking bit of null reference should have caused a panic")
-		}
-	}()
-	v.Test(66)
-}
-
-func TestNullSet(t *testing.T) {
-	var v *BitSet
-	defer func() {
-		if r := recover(); r == nil {
-			t.Error("Setting bit of null reference should have caused a panic")
-		}
-	}()
-	v.Set(66)
-}
-
-func TestNullClear(t *testing.T) {
-	var v *BitSet
-	defer func() {
-		if r := recover(); r == nil {
-			t.Error("Clearning bit of null reference should have caused a panic")
-		}
-	}()
-	v.Clear(66)
-}
-
-func TestNullCount(t *testing.T) {
-	var v BitSet
-	defer func() {
-		if r := recover(); r != nil {
-			t.Error("Counting null reference should not have caused a panic")
-		}
-	}()
-	cnt := v.Count()
-	if cnt != 0 {
-		t.Errorf("Count reported as %d, but it should be 0", cnt)
 	}
 }
 
@@ -339,15 +392,6 @@ func TestRank(t *testing.T) {
 	}
 	if b.Rank(1500) != 7 {
 		t.Error("Unexpected rank")
-		return
-	}
-}
-
-func TestNextSetError(t *testing.T) {
-	var b BitSet
-	c, d := b.NextSet(1)
-	if c != 0 || d {
-		t.Error("Unexpected values")
 		return
 	}
 }
