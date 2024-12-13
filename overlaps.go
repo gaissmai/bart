@@ -1,3 +1,6 @@
+// Copyright (c) 2024 Karl Gaissmaier
+// SPDX-License-Identifier: MIT
+
 package bart
 
 import "github.com/gaissmai/bart/internal/bitset"

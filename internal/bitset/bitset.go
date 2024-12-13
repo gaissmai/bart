@@ -1,3 +1,6 @@
+// Copyright (c) 2024 Karl Gaissmaier
+// SPDX-License-Identifier: MIT
+
 //
 // This is an adapted and simplified version of:
 //
@@ -5,9 +8,8 @@
 //
 // All introduced bugs belong to me!
 //
-// ---------------------------------------------------
 // original license:
-//
+// ---------------------------------------------------
 // Copyright 2014 Will Fitzgerald. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
