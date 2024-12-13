@@ -172,11 +172,12 @@ func TestNextSet(t *testing.T) {
 	b.Set(0)
 	b.Set(1)
 	b.Set(2)
+
 	data := make([]uint, 3)
-	c := 0
-	for i, e := b.NextSet(0); e; i, e = b.NextSet(i + 1) {
-		data[c] = i
-		c++
+	j := 0
+	for i, ok := b.NextSet(0); ok; i, ok = b.NextSet(i + 1) {
+		data[j] = i
+		j++
 	}
 	if data[0] != 0 {
 		t.Errorf("bug 0")
@@ -189,11 +190,12 @@ func TestNextSet(t *testing.T) {
 	}
 	b.Set(10)
 	b.Set(2000)
+
 	data = make([]uint, 5)
-	c = 0
+	j = 0
 	for i, e := b.NextSet(0); e; i, e = b.NextSet(i + 1) {
-		data[c] = i
-		c++
+		data[j] = i
+		j++
 	}
 	if data[0] != 0 {
 		t.Errorf("bug 0")
@@ -213,80 +215,120 @@ func TestNextSet(t *testing.T) {
 }
 
 func TestNextSetMany(t *testing.T) {
-	tcs := []struct {
-		name    string
-		input   []uint
-		del     []uint
-		buf     []uint
-		wantBuf []uint
+	testCases := []struct {
+		name string
 		//
-		start   uint
-		wantIdx uint
+		set []uint
+		del []uint
+		//
+		buf      []uint
+		wantData []uint
+		//
+		startIdx uint
+		wantIdx  uint
 	}{
 		{
-			name:    "null",
-			input:   []uint{},
-			del:     []uint{},
-			buf:     make([]uint, 0, 512),
-			wantBuf: []uint{},
-			start:   0,
-			wantIdx: 0,
+			name:     "null",
+			set:      []uint{},
+			del:      []uint{},
+			buf:      make([]uint, 0, 512),
+			wantData: []uint{},
+			startIdx: 0,
+			wantIdx:  0,
 		},
 		{
-			name:    "zero",
-			input:   []uint{0},
-			del:     []uint{},
-			buf:     make([]uint, 0, 512),
-			wantBuf: []uint{0}, // bit #0 is set
-			start:   0,
-			wantIdx: 0,
+			name:     "zero",
+			set:      []uint{0},
+			del:      []uint{},
+			buf:      make([]uint, 0, 512),
+			wantData: []uint{0}, // bit #0 is set
+			startIdx: 0,
+			wantIdx:  0,
 		},
 		{
-			name:    "1,5",
-			input:   []uint{1, 5},
-			del:     []uint{},
-			buf:     make([]uint, 0, 512),
-			wantBuf: []uint{1, 5},
-			start:   0,
-			wantIdx: 5,
+			name:     "1,5",
+			set:      []uint{1, 5},
+			del:      []uint{},
+			buf:      make([]uint, 0, 512),
+			wantData: []uint{1, 5},
+			startIdx: 0,
+			wantIdx:  5,
 		},
 		{
-			name:    "511",
-			input:   []uint{511},
-			del:     []uint{},
-			buf:     make([]uint, 0, 512),
-			wantBuf: []uint{511},
-			start:   0,
-			wantIdx: 511,
+			name:     "many",
+			set:      []uint{1, 65, 130, 190, 250, 300, 380, 420, 480, 511},
+			del:      []uint{},
+			buf:      make([]uint, 0, 512),
+			wantData: []uint{1, 65, 130, 190, 250, 300, 380, 420, 480, 511},
+			startIdx: 0,
+			wantIdx:  511,
 		},
 		{
-			name:    "buf to low",
-			input:   []uint{511},
-			del:     []uint{511},
-			buf:     make([]uint, 0, 1),
-			wantBuf: []uint{},
-			start:   0,
-			wantIdx: 0,
+			name:     "start idx",
+			set:      []uint{1, 65, 130, 190, 250, 300, 380, 420, 480, 511},
+			del:      []uint{},
+			buf:      make([]uint, 0, 512),
+			wantData: []uint{250, 300, 380, 420, 480, 511},
+			startIdx: 195,
+			wantIdx:  511,
+		},
+		{
+			name:     "zero buffer",
+			set:      []uint{1, 2, 3, 4, 511},
+			del:      []uint{},
+			buf:      make([]uint, 0), // buffer
+			wantData: []uint{},
+			startIdx: 0,
+			wantIdx:  0,
+		},
+		{
+			name:     "buffer too short, first word",
+			set:      []uint{1, 2, 3, 4, 5, 6, 7, 8, 9},
+			del:      []uint{},
+			buf:      make([]uint, 0, 5), // buffer
+			wantData: []uint{1, 2, 3, 4, 5},
+			startIdx: 0,
+			wantIdx:  5,
+		},
+		{
+			name:     "buffer too short",
+			set:      []uint{65, 66, 67, 68, 69, 70},
+			del:      []uint{},
+			buf:      make([]uint, 0, 5), // buffer
+			wantData: []uint{65, 66, 67, 68, 69},
+			startIdx: 0,
+			wantIdx:  69,
+		},
+		{
+			name:     "special, last return",
+			set:      []uint{1},
+			del:      []uint{1},          // delete without compact
+			buf:      make([]uint, 0, 5), // buffer
+			wantData: []uint{},
+			startIdx: 0,
+			wantIdx:  0,
 		},
 	}
-	for _, tc := range tcs {
+
+	for _, tc := range testCases {
 		var b BitSet
-		for _, u := range tc.input {
+		for _, u := range tc.set {
 			b.Set(u)
 		}
-		// clear but don't shrink
+
 		for _, u := range tc.del {
-			b.Clear(u)
+			b.Clear(u) // without compact
 		}
-		idx, buf := b.NextSetMany(tc.start, tc.buf)
+
+		idx, buf := b.NextSetMany(tc.startIdx, tc.buf)
 
 		if idx != tc.wantIdx {
 			t.Errorf("NextSetMany, %s: got next idx: %d, want: %d", tc.name, idx, tc.wantIdx)
 		}
 
-		if !slices.Equal(buf, tc.wantBuf) {
+		if !slices.Equal(buf, tc.wantData) {
 			t.Errorf("NextSetMany, %s: returned buf is not equal as expected:\ngot:  %v\nwant: %v",
-				tc.name, buf, tc.wantBuf)
+				tc.name, buf, tc.wantData)
 		}
 	}
 }
@@ -368,6 +410,12 @@ func TestInplaceIntersection(t *testing.T) {
 	}
 	if d.Count() != 50 {
 		t.Errorf("Intersection should have 50 bits set, but had %d", d.Count())
+	}
+	if a.IntersectionCardinality(b) != c.Count() {
+		t.Error("Intersection and IntersectionCardinality differ")
+	}
+	if b.IntersectionCardinality(a) != c.Count() {
+		t.Error("Intersection and IntersectionCardinality differ")
 	}
 }
 

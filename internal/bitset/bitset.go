@@ -52,19 +52,20 @@ func wordsNeeded(i uint) int {
 }
 
 // extendSet adds additional words to incorporate new bits if needed.
-func (b *BitSet) extendSet(i uint) {
+func (b BitSet) extendSet(i uint) BitSet {
 	size := wordsNeeded(i)
 
 	switch {
 	case b == nil:
-		*b = make([]uint64, size)
-	case cap(*b) >= size:
-		*b = (*b)[:size]
-	case len(*b) < size:
+		b = make([]uint64, size)
+	case cap(b) >= size:
+		b = b[:size]
+	case len(b) < size:
 		newset := make([]uint64, size)
-		copy(newset, *b)
-		*b = newset
+		copy(newset, b)
+		b = newset
 	}
+	return b
 }
 
 // Test if bit i is set.
@@ -78,7 +79,7 @@ func (b BitSet) Test(i uint) bool {
 // Set bit i to 1, the capacity of the bitset is increased accordingly.
 func (b *BitSet) Set(i uint) {
 	if i >= b.bitsCapacity() {
-		b.extendSet(i)
+		*b = b.extendSet(i)
 	}
 	(*b)[wIdx(i)] |= (1 << bIdx(i))
 }
@@ -170,14 +171,11 @@ func (b BitSet) NextSetMany(i uint, buffer []uint) (uint, []uint) {
 
 		size++
 		if size == capacity {
-			goto End
+			return result[size-1], result[:size]
 		}
 
-		// t contains only the rightmost set bit of word.
-		t := word & ((^word) + 1)
-
 		// clear the rightmost set bit
-		word = word ^ t
+		word &= word - 1
 	}
 
 	// process the following full words
@@ -188,27 +186,24 @@ func (b BitSet) NextSetMany(i uint, buffer []uint) (uint, []uint) {
 
 			size++
 			if size == capacity {
-				goto End
+				return result[size-1], result[:size]
 			}
 
 			// clear the rightmost set bit
-			t := word & ((^word) + 1)
-			word = word ^ t
+			word &= word - 1
 		}
 	}
-End:
+
 	if size > 0 {
 		return result[size-1], result[:size]
 	}
+
 	return 0, result[:0]
 }
 
 // IntersectionCardinality computes the cardinality of the intersection
-func (b BitSet) IntersectionCardinality(c BitSet) uint {
-	if len(b) <= len(c) {
-		return uint(popcntAndSlice(b, c))
-	}
-	return uint(popcntAndSlice(c, b))
+func (b BitSet) IntersectionCardinality(c BitSet) int {
+	return popcntAndSlice(b, c)
 }
 
 // InPlaceIntersection overwrites and computes the intersection of
@@ -278,6 +273,7 @@ func (b BitSet) Rank(i uint) int {
 
 	answer := popcntSlice(b[:wIdx(i+1)])
 
+	// word boundary?
 	if bIdx(i+1) == 0 {
 		return answer
 	}
@@ -285,6 +281,7 @@ func (b BitSet) Rank(i uint) int {
 	return answer + bits.OnesCount64(b[wIdx(i+1)]<<(64-bIdx(i+1)))
 }
 
+// popcntSlice, count the bits set in slice.
 func popcntSlice(s []uint64) int {
 	var cnt int
 	for _, x := range s {
@@ -293,10 +290,14 @@ func popcntSlice(s []uint64) int {
 	return cnt
 }
 
+// popcntAndSlice, uint64 words are bitwise & followed by popcount.
 func popcntAndSlice(s, m []uint64) int {
+	if len(m) < len(s) {
+		s, m = m, s
+	}
+
 	var cnt int
 	for j := range s {
-		// panics if mask slice m is too short
 		cnt += bits.OnesCount64(s[j] & m[j])
 	}
 	return cnt
