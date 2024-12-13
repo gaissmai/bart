@@ -1,5 +1,8 @@
 //go:build go1.23
 
+// Copyright (c) 2024 Karl Gaissmaier
+// SPDX-License-Identifier: MIT
+
 package bitset
 
 import (
