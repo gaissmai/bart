@@ -20,8 +20,9 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
+---
 
-The derived bitset code is licensed under:
+The original bitset code is licensed as:
 
 Copyright (c) 2014 Will Fitzgerald. All rights reserved.
 
