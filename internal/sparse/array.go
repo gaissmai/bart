@@ -128,7 +128,7 @@ func slicesInsert[S ~[]E, E any](s S, e E, i int) S {
 		return s
 	}
 
-	newSlice := make([]E, len(s)+1, len(s)+1)
+	newSlice := make([]E, len(s)+1)
 	copy(newSlice, s[:i])
 	copy(newSlice[i+1:], s[i:])
 	newSlice[i] = e

@@ -40,7 +40,7 @@ func TestNil(t *testing.T) {
 	b.Compact()
 
 	b = BitSet(nil)
-	c := b.Clone()
+	_ = b.Clone()
 
 	b = BitSet(nil)
 	b.Count()
@@ -58,7 +58,7 @@ func TestNil(t *testing.T) {
 	b.NextSetMany(0, nil)
 
 	b = BitSet(nil)
-	c = BitSet(nil)
+	c := BitSet(nil)
 	b.InPlaceIntersection(c)
 
 	b = BitSet(nil)
