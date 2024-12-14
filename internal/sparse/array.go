@@ -6,8 +6,6 @@
 package sparse
 
 import (
-	"slices"
-
 	"github.com/gaissmai/bart/internal/bitset"
 )
 
@@ -42,7 +40,7 @@ func (s *Array[T]) InsertAt(i uint, val T) (exists bool) {
 
 	// new, insert into bitset and slice
 	s.BitSet.Set(i)
-	s.Items = slices.Insert(s.Items, s.rank(i), val)
+	s.Items = slicesInsert(s.Items, val, s.rank(i))
 
 	return false
 }
@@ -57,8 +55,8 @@ func (s *Array[T]) DeleteAt(i uint) (T, bool) {
 	rnk := s.rank(i)
 	val := s.Items[rnk]
 
-	// delete from slice
-	s.Items = slices.Delete(s.Items, rnk, rnk+1)
+	// delete from slice and compact it
+	s.Items = slicesDelete(s.Items, rnk)
 
 	// delete from bitset, followed by Compact to reduce memory consumption
 	s.BitSet.Clear(i)
@@ -114,7 +112,40 @@ func (s *Array[T]) UpdateAt(i uint, cb func(T, bool) T) (newVal T, wasPresent bo
 	rnk = s.rank(i)
 
 	// ... and insert value into slice
-	s.Items = slices.Insert(s.Items, rnk, newVal)
+	s.Items = slicesInsert(s.Items, newVal, rnk)
 
 	return newVal, wasPresent
+}
+
+// slicesInsert inserts the element e at index i, returning the modified slice.
+//
+// slicesInsert panics if i is out of range.
+func slicesInsert[S ~[]E, E any](s S, e E, i int) S {
+	if len(s) < cap(s) {
+		s = s[:len(s)+1] // fast resize, no alloc
+		copy(s[i+1:], s[i:])
+		s[i] = e
+		return s
+	}
+
+	newSlice := make([]E, len(s)+1, len(s)+1)
+	copy(newSlice, s[:i])
+	copy(newSlice[i+1:], s[i:])
+	newSlice[i] = e
+	return newSlice
+}
+
+// slicesDelete deletes the element e at index i, returning the modified slice.
+// It clears/zeroes the elements s[len(s):] and if cap() >= 2*len() compacts the slice.
+//
+// slicesDelete panics if i is out of range.
+func slicesDelete[S ~[]E, E any](s S, i int) S {
+	l := len(s) - 1      // new len
+	copy(s[i:], s[i+1:]) // overwrite s[i]
+	clear(s[l:])         // clear/zeroes the tail
+	s = s[:l]            // cut to new len
+	if cap(s) >= 2*l {   // compact to new len
+		s = s[:l:l]
+	}
+	return s
 }
