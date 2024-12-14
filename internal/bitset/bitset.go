@@ -70,14 +70,6 @@ func (b BitSet) extendSet(i uint) BitSet {
 	return b
 }
 
-// Test if bit i is set.
-func (b BitSet) Test(i uint) bool {
-	if i >= b.bitsCapacity() {
-		return false
-	}
-	return b[wIdx(i)]&(1<<bIdx(i)) != 0
-}
-
 // Set bit i to 1, the capacity of the bitset is increased accordingly.
 func (b *BitSet) Set(i uint) {
 	if i >= b.bitsCapacity() {
@@ -92,6 +84,14 @@ func (b *BitSet) Clear(i uint) {
 		return
 	}
 	(*b)[wIdx(i)] &^= (1 << bIdx(i))
+}
+
+// Test if bit i is set.
+func (b BitSet) Test(i uint) bool {
+	if i >= b.bitsCapacity() {
+		return false
+	}
+	return b[wIdx(i)]&(1<<bIdx(i)) != 0
 }
 
 // Clone this BitSet, returning a new BitSet that has the same bits set.
@@ -131,17 +131,18 @@ func (b BitSet) NextSet(i uint) (uint, bool) {
 		return 0, false
 	}
 
-	// process the first word
+	// process the first (maybe partial) word
 	word := b[x] >> bIdx(i) // bIdx(i) = i % 64
 	if word != 0 {
 		return i + uint(bits.TrailingZeros64(word)), true
 	}
 
-	// process the following full words
+	// process the following words until next bit is set
+	// x < len(b), no out-of-bounds panic in following slice expression
 	x++
-	for ; x < len(b); x++ {
-		if b[x] != 0 {
-			return uint(x*wordSize) + uint(bits.TrailingZeros64(b[x])), true
+	for j, word := range b[x:] {
+		if word != 0 {
+			return uint((x+j)<<log2WordSize + bits.TrailingZeros64(word)), true
 		}
 	}
 	return 0, false
@@ -164,7 +165,7 @@ func (b BitSet) NextSetMany(i uint, buffer []uint) (uint, []uint) {
 		return 0, result[:0]
 	}
 
-	// process the first word
+	// process the first (maybe partial) word
 	word := b[x] >> bIdx(i) // bIdx(i) = i % 64
 
 	size := 0
@@ -181,10 +182,11 @@ func (b BitSet) NextSetMany(i uint, buffer []uint) (uint, []uint) {
 	}
 
 	// process the following full words
+	// x < len(b), no out-of-bounds panic in following slice expression
 	x++
 	for j, word := range b[x:] {
 		for word != 0 {
-			result[size] = (uint(x+j) << 6) + uint(bits.TrailingZeros64(word))
+			result[size] = uint((x+j)<<log2WordSize + bits.TrailingZeros64(word))
 
 			size++
 			if size == capacity {
