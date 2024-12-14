@@ -23,6 +23,53 @@ import (
 	"testing"
 )
 
+func TestNil(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Error("A nil bitset must not panic")
+		}
+	}()
+
+	b := BitSet(nil)
+	b.Set(0)
+
+	b = BitSet(nil)
+	b.Clear(1000)
+
+	b = BitSet(nil)
+	b.Compact()
+
+	b = BitSet(nil)
+	c := b.Clone()
+
+	b = BitSet(nil)
+	b.Count()
+
+	b = BitSet(nil)
+	b.Rank(100)
+
+	b = BitSet(nil)
+	b.Test(42)
+
+	b = BitSet(nil)
+	b.NextSet(0)
+
+	b = BitSet(nil)
+	b.NextSetMany(0, nil)
+
+	b = BitSet(nil)
+	c = BitSet(nil)
+	b.InPlaceIntersection(c)
+
+	b = BitSet(nil)
+	c = BitSet(nil)
+	b.InPlaceUnion(c)
+
+	b = BitSet(nil)
+	c = BitSet(nil)
+	b.IntersectionCardinality(c)
+}
+
 func TestZeroValue(t *testing.T) {
 	defer func() {
 		if r := recover(); r != nil {
