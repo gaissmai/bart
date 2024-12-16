@@ -172,7 +172,7 @@ func (n *node[V]) getKidsRec(parentIdx uint, path [16]byte, depth int, is4 bool)
 	directKids := []kid[V]{}
 
 	// no heap allocs
-	_, allIndices := n.prefixes.BitSet.NextSetMany(0, make([]uint, maxNodePrefixes))
+	allIndices := n.prefixes.BitSet.AllSet(make([]uint, maxNodePrefixes))
 
 	for _, idx := range allIndices {
 		// parent or self, handled alreday in an upper stack frame.
@@ -204,7 +204,7 @@ func (n *node[V]) getKidsRec(parentIdx uint, path [16]byte, depth int, is4 bool)
 	// the node may have childs, the rec-descent monster starts
 
 	// no heap allocs
-	_, allChildAddrs := n.children.BitSet.NextSetMany(0, make([]uint, maxNodeChildren))
+	allChildAddrs := n.children.BitSet.AllSet(make([]uint, maxNodeChildren))
 
 	for i, addr := range allChildAddrs {
 		octet := byte(addr)

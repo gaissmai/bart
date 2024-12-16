@@ -17,6 +17,7 @@
 package bitset
 
 import (
+	"fmt"
 	"math/rand/v2"
 	"slices"
 	"testing"
@@ -54,7 +55,7 @@ func TestNil(t *testing.T) {
 	b.NextSet(0)
 
 	b = BitSet(nil)
-	b.NextSetMany(0, nil)
+	b.AllSet(nil)
 
 	b = BitSet(nil)
 	c := BitSet(nil)
@@ -101,7 +102,7 @@ func TestZeroValue(t *testing.T) {
 	b.NextSet(0)
 
 	b = BitSet{}
-	b.NextSetMany(0, nil)
+	b.AllSet(nil)
 
 	b = BitSet{}
 	c := BitSet{}
@@ -262,7 +263,7 @@ func TestNextSet(t *testing.T) {
 	}
 }
 
-func TestNextSetMany(t *testing.T) {
+func TestAllSet(t *testing.T) {
 	testCases := []struct {
 		name string
 		//
@@ -271,9 +272,6 @@ func TestNextSetMany(t *testing.T) {
 		//
 		buf      []uint
 		wantData []uint
-		//
-		startIdx uint
-		wantIdx  uint
 	}{
 		{
 			name:     "null",
@@ -281,8 +279,6 @@ func TestNextSetMany(t *testing.T) {
 			del:      []uint{},
 			buf:      make([]uint, 0, 512),
 			wantData: []uint{},
-			startIdx: 0,
-			wantIdx:  0,
 		},
 		{
 			name:     "zero",
@@ -290,8 +286,6 @@ func TestNextSetMany(t *testing.T) {
 			del:      []uint{},
 			buf:      make([]uint, 0, 512),
 			wantData: []uint{0}, // bit #0 is set
-			startIdx: 0,
-			wantIdx:  0,
 		},
 		{
 			name:     "1,5",
@@ -299,8 +293,6 @@ func TestNextSetMany(t *testing.T) {
 			del:      []uint{},
 			buf:      make([]uint, 0, 512),
 			wantData: []uint{1, 5},
-			startIdx: 0,
-			wantIdx:  5,
 		},
 		{
 			name:     "many",
@@ -308,44 +300,6 @@ func TestNextSetMany(t *testing.T) {
 			del:      []uint{},
 			buf:      make([]uint, 0, 512),
 			wantData: []uint{1, 65, 130, 190, 250, 300, 380, 420, 480, 511},
-			startIdx: 0,
-			wantIdx:  511,
-		},
-		{
-			name:     "start idx",
-			set:      []uint{1, 65, 130, 190, 250, 300, 380, 420, 480, 511},
-			del:      []uint{},
-			buf:      make([]uint, 0, 512),
-			wantData: []uint{250, 300, 380, 420, 480, 511},
-			startIdx: 195,
-			wantIdx:  511,
-		},
-		{
-			name:     "zero buffer",
-			set:      []uint{1, 2, 3, 4, 511},
-			del:      []uint{},
-			buf:      make([]uint, 0), // buffer
-			wantData: []uint{},
-			startIdx: 0,
-			wantIdx:  0,
-		},
-		{
-			name:     "buffer too short, first word",
-			set:      []uint{1, 2, 3, 4, 5, 6, 7, 8, 9},
-			del:      []uint{},
-			buf:      make([]uint, 0, 5), // buffer
-			wantData: []uint{1, 2, 3, 4, 5},
-			startIdx: 0,
-			wantIdx:  5,
-		},
-		{
-			name:     "buffer too short",
-			set:      []uint{65, 66, 67, 68, 69, 70},
-			del:      []uint{},
-			buf:      make([]uint, 0, 5), // buffer
-			wantData: []uint{65, 66, 67, 68, 69},
-			startIdx: 0,
-			wantIdx:  69,
 		},
 		{
 			name:     "special, last return",
@@ -353,8 +307,6 @@ func TestNextSetMany(t *testing.T) {
 			del:      []uint{1},          // delete without compact
 			buf:      make([]uint, 0, 5), // buffer
 			wantData: []uint{},
-			startIdx: 0,
-			wantIdx:  0,
 		},
 	}
 
@@ -368,16 +320,56 @@ func TestNextSetMany(t *testing.T) {
 			b.Clear(u) // without compact
 		}
 
-		idx, buf := b.NextSetMany(tc.startIdx, tc.buf)
-
-		if idx != tc.wantIdx {
-			t.Errorf("NextSetMany, %s: got next idx: %d, want: %d", tc.name, idx, tc.wantIdx)
-		}
+		buf := b.AllSet(tc.buf)
 
 		if !slices.Equal(buf, tc.wantData) {
 			t.Errorf("NextSetMany, %s: returned buf is not equal as expected:\ngot:  %v\nwant: %v",
 				tc.name, buf, tc.wantData)
 		}
+	}
+}
+
+func TestAllSetPanic(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("AllSet, buf too small, must panic")
+		}
+	}()
+
+	var b BitSet = []uint64{1, 2, 3, 4}
+	var buf []uint
+
+	// buf too small, must panic
+	b.AllSet(buf)
+}
+
+func TestAllBitSetCallback(t *testing.T) {
+	tc := []uint{0, 1, 2, 5, 10, 20, 50, 100, 200, 500, 511}
+
+	for _, n := range tc {
+		t.Run(fmt.Sprintf("n: %3d", n), func(t *testing.T) {
+			var b BitSet
+			seen := make(map[uint]bool)
+
+			for u := range n {
+				b.Set(u)
+				seen[u] = true
+			}
+
+			// All() with callback, no range-over-func before go1.23
+			b.All()(func(u uint) bool {
+				if seen[u] != true {
+					t.Errorf("bit: %d, expected true, got false", u)
+				}
+				delete(seen, u)
+				return true
+			})
+
+			// check if all entries visited
+			if len(seen) != 0 {
+				t.Fatalf("traverse error, not all entries visited")
+			}
+		})
 	}
 }
 

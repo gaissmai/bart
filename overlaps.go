@@ -173,7 +173,7 @@ func (n *node[V]) overlapsChildrenIn(o *node[V]) bool {
 	// gimmick, don't allocate, can't use bitset.New()
 	prefixRoutes := bitset.BitSet(make([]uint64, 8))
 
-	_, allIndices := n.prefixes.BitSet.NextSetMany(0, make([]uint, maxNodePrefixes))
+	allIndices := n.prefixes.BitSet.AllSet(make([]uint, maxNodePrefixes))
 
 	for _, idx := range allIndices {
 		// get pre alloted bitset for idx
@@ -201,7 +201,7 @@ func (n *node[V]) overlapsSameChildrenRec(o *node[V]) bool {
 	// intersect in place the child bitsets from n and o
 	nChildrenBitsetCloned.InPlaceIntersection(o.children.BitSet)
 
-	_, allCommonChildren := nChildrenBitsetCloned.NextSetMany(0, make([]uint, maxNodeChildren))
+	allCommonChildren := nChildrenBitsetCloned.AllSet(make([]uint, maxNodeChildren))
 
 	// range over all child addrs, common in n and o
 	for _, addr := range allCommonChildren {

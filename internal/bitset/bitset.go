@@ -147,61 +147,42 @@ func (b BitSet) NextSet(i uint) (uint, bool) {
 	return 0, false
 }
 
-// NextSetMany returns many next bit sets from the specified index,
-// including possibly the current index and up to cap(buffer).
-// If the returned slice has len zero, then no more set bits were found
-//
-// It is possible to retrieve all set bits as follow:
-//
-//	indices := make([]uint, b.Count())
-//	b.NextSetMany(0, indices)
-func (b BitSet) NextSetMany(i uint, buffer []uint) (uint, []uint) {
-	capacity := cap(buffer)
-	result := buffer[:capacity]
-
-	x := wIdx(i)
-	if x >= len(b) || capacity == 0 {
-		return 0, result[:0]
-	}
-
-	// process the first (maybe partial) word
-	word := b[x] >> bIdx(i) // bIdx(i) = i % 64
+// AllSet returns all bits set.
+// It panics if the capacity of buf is < b.Count()
+func (b BitSet) AllSet(buf []uint) []uint {
+	buf = buf[:cap(buf)] // len = cap
 
 	size := 0
-	for word != 0 {
-		result[size] = i + uint(bits.TrailingZeros64(word))
-
-		size++
-		if size == capacity {
-			return result[size-1], result[:size]
-		}
-
-		// clear the rightmost set bit
-		word &= word - 1
-	}
-
-	// process the following full words
-	// x < len(b), no out-of-bounds panic in following slice expression
-	x++
-	for j, word := range b[x:] {
-		for word != 0 {
-			result[size] = uint((x+j)<<log2WordSize + bits.TrailingZeros64(word))
-
-			size++
-			if size == capacity {
-				return result[size-1], result[:size]
-			}
+	for idx, word := range b {
+		for ; word != 0; size++ {
+			// panics if capacity of buf is exceeded.
+			buf[size] = uint(idx<<log2WordSize + bits.TrailingZeros64(word))
 
 			// clear the rightmost set bit
 			word &= word - 1
 		}
 	}
 
-	if size > 0 {
-		return result[size-1], result[:size]
-	}
+	buf = buf[:size]
+	return buf
+}
 
-	return 0, result[:0]
+// All iterates over all bits set.
+func (b BitSet) All() func(yield func(x uint) bool) {
+	return func(yield func(u uint) bool) {
+		for idx, word := range b {
+			for word != 0 {
+				u := uint(idx<<log2WordSize + bits.TrailingZeros64(word))
+
+				if !yield(u) {
+					return
+				}
+
+				// clear the rightmost set bit
+				word &= word - 1
+			}
+		}
+	}
 }
 
 // IntersectionCardinality computes the cardinality of the intersection
