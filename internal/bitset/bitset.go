@@ -276,12 +276,8 @@ func popcntSlice(s []uint64) int {
 
 // popcntAndSlice, uint64 words are bitwise & followed by popcount.
 func popcntAndSlice(s, m []uint64) int {
-	if len(m) < len(s) {
-		s, m = m, s
-	}
-
 	var cnt int
-	for j := range s {
+	for j := 0; j < len(s) && j < len(m); j++ {
 		cnt += bits.OnesCount64(s[j] & m[j])
 	}
 	return cnt
