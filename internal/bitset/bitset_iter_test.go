@@ -19,7 +19,7 @@ func TestAllBitSetIter(t *testing.T) {
 			seen := make(map[uint]bool)
 
 			for u := range n {
-				b.Set(u)
+				b = b.Set(u)
 				seen[u] = true
 			}
 
@@ -30,6 +30,36 @@ func TestAllBitSetIter(t *testing.T) {
 				}
 				delete(seen, u)
 			}
+
+			// check if all entries visited
+			if len(seen) != 0 {
+				t.Fatalf("traverse error, not all entries visited")
+			}
+		})
+	}
+}
+
+func TestAllBitSetCallback(t *testing.T) {
+	tc := []uint{0, 1, 2, 5, 10, 20, 50, 100, 200, 500, 511}
+
+	for _, n := range tc {
+		t.Run(fmt.Sprintf("n: %3d", n), func(t *testing.T) {
+			var b BitSet
+			seen := make(map[uint]bool)
+
+			for u := range n {
+				b = b.Set(u)
+				seen[u] = true
+			}
+
+			// All() with callback, no range-over-func before go1.23
+			b.All()(func(u uint) bool {
+				if seen[u] != true {
+					t.Errorf("bit: %d, expected true, got false", u)
+				}
+				delete(seen, u)
+				return true
+			})
 
 			// check if all entries visited
 			if len(seen) != 0 {
