@@ -7,7 +7,6 @@
 [![Coverage Status](https://coveralls.io/repos/github/gaissmai/bart/badge.svg)](https://coveralls.io/github/gaissmai/bart)
 [![Go Report Card](https://goreportcard.com/badge/github.com/gaissmai/bart)](https://goreportcard.com/report/github.com/gaissmai/bart)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
-[![License: BSD-3](https://img.shields.io/badge/License-BSD_3--Clause-green.svg)](https://opensource.org/licenses/BSD-3-Clause)
 [![Stand With Ukraine](https://raw.githubusercontent.com/vshymanskyy/StandWithUkraine/main/badges/StandWithUkraine.svg)](https://stand-with-ukraine.pp.ua)
 
 ## Overview
@@ -124,7 +123,7 @@ Standing on the shoulders of giants.
 Credits for many inspirations go to
 
 - the clever guys at tailscale,
-- to Daniel Lemire for the super-fast bitset package and
+- to Daniel Lemire and his blog, and
 - to Donald E. Knuth for the **ART** routing algorithm and
 
 all the rest of his *Art* and for keeping important algorithms

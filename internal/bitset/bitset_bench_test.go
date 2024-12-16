@@ -16,7 +16,7 @@ import (
 func BenchmarkRankChild(b *testing.B) {
 	var bs BitSet
 	for range 200 {
-		bs.Set(uint(rand.IntN(256)))
+		bs = bs.Set(uint(rand.IntN(256)))
 	}
 
 	// make unique random numbers
@@ -42,7 +42,7 @@ func BenchmarkRankChild(b *testing.B) {
 func BenchmarkRankPrefix(b *testing.B) {
 	var bs BitSet
 	for range 200 {
-		bs.Set(uint(rand.IntN(512)))
+		bs = bs.Set(uint(rand.IntN(512)))
 	}
 
 	// make uniques random numbers

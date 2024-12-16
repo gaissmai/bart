@@ -39,7 +39,7 @@ func (s *Array[T]) InsertAt(i uint, val T) (exists bool) {
 	}
 
 	// new, insert into bitset and slice
-	s.BitSet.Set(i)
+	s.BitSet = s.BitSet.Set(i)
 	s.Items = slicesInsert(s.Items, val, s.rank(i))
 
 	return false
@@ -59,8 +59,7 @@ func (s *Array[T]) DeleteAt(i uint) (T, bool) {
 	s.Items = slicesDelete(s.Items, rnk)
 
 	// delete from bitset, followed by Compact to reduce memory consumption
-	s.BitSet.Clear(i)
-	s.BitSet.Compact()
+	s.BitSet = s.BitSet.Clear(i).Compact()
 
 	return val, true
 }
@@ -106,7 +105,7 @@ func (s *Array[T]) UpdateAt(i uint, cb func(T, bool) T) (newVal T, wasPresent bo
 	}
 
 	// new val, insert into bitset ...
-	s.BitSet.Set(i)
+	s.BitSet = s.BitSet.Set(i)
 
 	// bitset has changed, recalc rank
 	rnk = s.rank(i)

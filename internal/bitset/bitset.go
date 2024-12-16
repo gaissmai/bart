@@ -1,19 +1,6 @@
 // Copyright (c) 2024 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
-//
-// This is an adapted and simplified version of:
-//
-//  github.com/bits-and-blooms/bitset
-//
-// All introduced bugs belong to me!
-//
-// original license:
-// ---------------------------------------------------
-// Copyright 2014 Will Fitzgerald. All rights reserved.
-// SPDX-License-Identifier: BSD-3-Clause
-// ---------------------------------------------------
-
 // Package bitset implements bitsets, a mapping
 // between non-negative integers and boolean values.
 package bitset
@@ -70,19 +57,20 @@ func (b BitSet) extendSet(i uint) BitSet {
 }
 
 // Set bit i to 1, the capacity of the bitset is increased accordingly.
-func (b *BitSet) Set(i uint) {
+func (b BitSet) Set(i uint) BitSet {
 	if i >= b.bitsCapacity() {
-		*b = b.extendSet(i)
+		b = b.extendSet(i)
 	}
-	(*b)[wIdx(i)] |= (1 << bIdx(i))
+	b[wIdx(i)] |= (1 << bIdx(i))
+	return b
 }
 
 // Clear bit i to 0.
-func (b *BitSet) Clear(i uint) {
-	if i >= b.bitsCapacity() {
-		return
+func (b BitSet) Clear(i uint) BitSet {
+	if i < b.bitsCapacity() {
+		b[wIdx(i)] &^= (1 << bIdx(i))
 	}
-	(*b)[wIdx(i)] &^= (1 << bIdx(i))
+	return b
 }
 
 // Test if bit i is set.
@@ -105,21 +93,21 @@ func (b BitSet) Clone() BitSet {
 
 // Compact shrinks BitSet so that we preserve all set bits, while minimizing
 // memory usage. A new slice is allocated to store the new bits.
-func (b *BitSet) Compact() {
-	last := len(*b) - 1
+func (b BitSet) Compact() BitSet {
+	last := len(b) - 1
 
 	// find last word with at least one bit set.
 	for ; last >= 0; last-- {
-		if (*b)[last] != 0 {
+		if b[last] != 0 {
 			newset := make([]uint64, last+1)
-			copy(newset, (*b)[:last+1])
-			*b = newset
-			return
+			copy(newset, b[:last+1])
+			b = newset
+			return b
 		}
 	}
 
 	// not found, shrink to nil
-	*b = nil
+	return nil
 }
 
 // NextSet returns the next bit set from the specified index,
@@ -167,27 +155,9 @@ func (b BitSet) AllSet(buf []uint) []uint {
 	return buf
 }
 
-// All iterates over all bits set.
-func (b BitSet) All() func(yield func(x uint) bool) {
-	return func(yield func(u uint) bool) {
-		for idx, word := range b {
-			for word != 0 {
-				u := uint(idx<<log2WordSize + bits.TrailingZeros64(word))
-
-				if !yield(u) {
-					return
-				}
-
-				// clear the rightmost set bit
-				word &= word - 1
-			}
-		}
-	}
-}
-
 // IntersectionCardinality computes the cardinality of the intersection
 func (b BitSet) IntersectionCardinality(c BitSet) int {
-	return popcntAndSlice(b, c)
+	return popcountAnd(b, c)
 }
 
 // InPlaceIntersection overwrites and computes the intersection of
@@ -245,17 +215,17 @@ func (b *BitSet) InPlaceUnion(c BitSet) {
 // Count (number of set bits).
 // Also known as "popcount" or "population count".
 func (b BitSet) Count() int {
-	return popcntSlice(b)
+	return popcount(b)
 }
 
 // Rank returns the number of set bits up to and including the index
 // that are set in the bitset.
 func (b BitSet) Rank(i uint) int {
 	if wIdx(i+1) >= len(b) {
-		return popcntSlice(b)
+		return popcount(b)
 	}
 
-	answer := popcntSlice(b[:wIdx(i+1)])
+	answer := popcount(b[:wIdx(i+1)])
 
 	// word boundary?
 	if bIdx(i+1) == 0 {
@@ -265,8 +235,8 @@ func (b BitSet) Rank(i uint) int {
 	return answer + bits.OnesCount64(b[wIdx(i+1)]<<(64-bIdx(i+1)))
 }
 
-// popcntSlice, count the bits set in slice.
-func popcntSlice(s []uint64) int {
+// popcount, count all the bits set in slice.
+func popcount(s []uint64) int {
 	var cnt int
 	for _, x := range s {
 		cnt += bits.OnesCount64(x)
@@ -274,8 +244,8 @@ func popcntSlice(s []uint64) int {
 	return cnt
 }
 
-// popcntAndSlice, uint64 words are bitwise & followed by popcount.
-func popcntAndSlice(s, m []uint64) int {
+// popcountAnd, uint64 words are bitwise & followed by popcount.
+func popcountAnd(s, m []uint64) int {
 	var cnt int
 	for j := 0; j < len(s) && j < len(m); j++ {
 		cnt += bits.OnesCount64(s[j] & m[j])

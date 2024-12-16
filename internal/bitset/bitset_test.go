@@ -1,23 +1,9 @@
 // Copyright (c) 2024 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
-//
-// Some tests are taken and modified from:
-//
-//  github.com/bits-and-blooms/bitset
-//
-// All introduced bugs belong to me!
-//
-// original license:
-// ---------------------------------------------------
-// Copyright 2014 Will Fitzgerald. All rights reserved.
-// SPDX-License-Identifier: BSD-3-Clause
-// ---------------------------------------------------
-
 package bitset
 
 import (
-	"fmt"
 	"math/rand/v2"
 	"slices"
 	"testing"
@@ -34,7 +20,7 @@ func TestNil(t *testing.T) {
 	b.Set(0)
 
 	b = BitSet(nil)
-	b.Clear(1000)
+	_ = b.Clear(1000)
 
 	b = BitSet(nil)
 	b.Compact()
@@ -81,7 +67,7 @@ func TestZeroValue(t *testing.T) {
 	b.Set(0)
 
 	b = BitSet{}
-	b.Clear(1000)
+	_ = b.Clear(1000)
 
 	b = BitSet{}
 	b.Compact()
@@ -120,7 +106,7 @@ func TestZeroValue(t *testing.T) {
 func TestBitSetUntil(t *testing.T) {
 	var b BitSet
 	var last uint = 900
-	b.Set(last)
+	b = b.Set(last)
 	for i := range last {
 		if b.Test(i) {
 			t.Errorf("Bit %d is set, and it shouldn't be.", i)
@@ -131,7 +117,7 @@ func TestBitSetUntil(t *testing.T) {
 func TestExpand(t *testing.T) {
 	var b BitSet
 	for i := range 512 {
-		b.Set(uint(i))
+		b = b.Set(uint(i))
 	}
 	want := 8
 	if len(b) != want {
@@ -167,7 +153,7 @@ func TestClone(t *testing.T) {
 func TestCompact(t *testing.T) {
 	var b BitSet
 	for _, i := range []uint{1, 2, 5, 10, 20, 50, 100, 200, 500, 1023} {
-		b.Set(i)
+		b = b.Set(i)
 	}
 
 	want := 16
@@ -178,7 +164,7 @@ func TestCompact(t *testing.T) {
 		t.Errorf("Set(...), want cap: %d, got: %d", want, cap(b))
 	}
 
-	b.Clear(1023)
+	b = b.Clear(1023)
 	if len(b) != want {
 		t.Errorf("Set(...), want len: %d, got: %d", want, len(b))
 	}
@@ -186,7 +172,7 @@ func TestCompact(t *testing.T) {
 		t.Errorf("Set(...), want cap: %d, got: %d", want, cap(b))
 	}
 
-	b.Compact()
+	b = b.Compact()
 	want = 8
 	if len(b) != want {
 		t.Errorf("Compact(), want len: %d, got: %d", want, len(b))
@@ -195,9 +181,9 @@ func TestCompact(t *testing.T) {
 		t.Errorf("Compact(), want cap: %d, got: %d", want, cap(b))
 	}
 
-	b.Set(10_000)
-	b.Clear(10_000)
-	b.Compact()
+	b = b.Set(10_000)
+	b = b.Clear(10_000)
+	b = b.Compact()
 
 	want = 8
 	if len(b) != want {
@@ -210,56 +196,100 @@ func TestCompact(t *testing.T) {
 
 func TestTest(t *testing.T) {
 	var b BitSet
-	b.Set(100)
+	b = b.Set(100)
 	if !b.Test(100) {
 		t.Errorf("Bit %d is clear, and it shouldn't be.", 100)
 	}
 }
 
 func TestNextSet(t *testing.T) {
-	var b BitSet
-	b.Set(0)
-	b.Set(1)
-	b.Set(2)
+	testCases := []struct {
+		name string
+		//
+		set   []uint
+		del   []uint
+		start uint
+		//
+		wantIdx uint
+		wantOk  bool
+	}{
+		{
+			name:    "null",
+			set:     []uint{},
+			del:     []uint{},
+			start:   0,
+			wantIdx: 0,
+			wantOk:  false,
+		},
+		{
+			name:    "zero",
+			set:     []uint{0},
+			del:     []uint{},
+			start:   0,
+			wantIdx: 0,
+			wantOk:  true,
+		},
+		{
+			name:    "1,5",
+			set:     []uint{1, 5},
+			del:     []uint{},
+			start:   0,
+			wantIdx: 1,
+			wantOk:  true,
+		},
+		{
+			name:    "1,5",
+			set:     []uint{1, 5},
+			del:     []uint{},
+			start:   2,
+			wantIdx: 5,
+			wantOk:  true,
+		},
+		{
+			name:    "1,5",
+			set:     []uint{1, 5},
+			del:     []uint{},
+			start:   6,
+			wantIdx: 0,
+			wantOk:  false,
+		},
+		{
+			name:    "1,5,7",
+			set:     []uint{1, 5, 7},
+			del:     []uint{5},
+			start:   2,
+			wantIdx: 7,
+			wantOk:  true,
+		},
+		{
+			name:    "1,5,7",
+			set:     []uint{1, 5, 7},
+			del:     []uint{1, 5},
+			start:   0,
+			wantIdx: 7,
+			wantOk:  true,
+		},
+	}
 
-	data := make([]uint, 3)
-	j := 0
-	for i, ok := b.NextSet(0); ok; i, ok = b.NextSet(i + 1) {
-		data[j] = i
-		j++
-	}
-	if data[0] != 0 {
-		t.Errorf("bug 0")
-	}
-	if data[1] != 1 {
-		t.Errorf("bug 1")
-	}
-	if data[2] != 2 {
-		t.Errorf("bug 2")
-	}
-	b.Set(10)
-	b.Set(2000)
+	for _, tc := range testCases {
+		var b BitSet
+		for _, u := range tc.set {
+			b = b.Set(u)
+		}
 
-	data = make([]uint, 5)
-	j = 0
-	for i, e := b.NextSet(0); e; i, e = b.NextSet(i + 1) {
-		data[j] = i
-		j++
-	}
-	if data[0] != 0 {
-		t.Errorf("bug 0")
-	}
-	if data[1] != 1 {
-		t.Errorf("bug 1")
-	}
-	if data[2] != 2 {
-		t.Errorf("bug 2")
-	}
-	if data[3] != 10 {
-		t.Errorf("bug 3")
-	}
-	if data[4] != 2000 {
-		t.Errorf("bug 4")
+		for _, u := range tc.del {
+			b = b.Clear(u) // without compact
+		}
+
+		idx, ok := b.NextSet(tc.start)
+
+		if ok != tc.wantOk {
+			t.Errorf("NextSet, %s: got ok: %v, want: %v", tc.name, ok, tc.wantOk)
+		}
+
+		if idx != tc.wantIdx {
+			t.Errorf("NextSet, %s: got idx: %d, want: %d", tc.name, idx, tc.wantIdx)
+		}
 	}
 }
 
@@ -313,17 +343,17 @@ func TestAllSet(t *testing.T) {
 	for _, tc := range testCases {
 		var b BitSet
 		for _, u := range tc.set {
-			b.Set(u)
+			b = b.Set(u)
 		}
 
 		for _, u := range tc.del {
-			b.Clear(u) // without compact
+			b = b.Clear(u) // without compact
 		}
 
 		buf := b.AllSet(tc.buf)
 
 		if !slices.Equal(buf, tc.wantData) {
-			t.Errorf("NextSetMany, %s: returned buf is not equal as expected:\ngot:  %v\nwant: %v",
+			t.Errorf("AllSet, %s: returned buf is not equal as expected:\ngot:  %v\nwant: %v",
 				tc.name, buf, tc.wantData)
 		}
 	}
@@ -343,36 +373,6 @@ func TestAllSetPanic(t *testing.T) {
 	b.AllSet(buf)
 }
 
-func TestAllBitSetCallback(t *testing.T) {
-	tc := []uint{0, 1, 2, 5, 10, 20, 50, 100, 200, 500, 511}
-
-	for _, n := range tc {
-		t.Run(fmt.Sprintf("n: %3d", n), func(t *testing.T) {
-			var b BitSet
-			seen := make(map[uint]bool)
-
-			for u := range n {
-				b.Set(u)
-				seen[u] = true
-			}
-
-			// All() with callback, no range-over-func before go1.23
-			b.All()(func(u uint) bool {
-				if seen[u] != true {
-					t.Errorf("bit: %d, expected true, got false", u)
-				}
-				delete(seen, u)
-				return true
-			})
-
-			// check if all entries visited
-			if len(seen) != 0 {
-				t.Fatalf("traverse error, not all entries visited")
-			}
-		})
-	}
-}
-
 func TestCount(t *testing.T) {
 	var b BitSet
 	tot := uint(64*4 + 11) // just an unmagic number
@@ -384,7 +384,7 @@ func TestCount(t *testing.T) {
 			checkLast = false
 			break
 		}
-		b.Set(i)
+		b = b.Set(i)
 	}
 	if checkLast {
 		sz := uint(b.Count())
@@ -404,7 +404,7 @@ func TestCount2(t *testing.T) {
 			t.Errorf("Count reported as %d, but it should be %d", sz, i)
 			break
 		}
-		b.Set(i)
+		b = b.Set(i)
 	}
 }
 
@@ -412,11 +412,11 @@ func TestInPlaceUnion(t *testing.T) {
 	var a BitSet
 	var b BitSet
 	for i := uint(1); i < 100; i += 2 {
-		a.Set(i)
-		b.Set(i - 1)
+		a = a.Set(i)
+		b = b.Set(i - 1)
 	}
 	for i := uint(100); i < 200; i++ {
-		b.Set(i)
+		b = b.Set(i)
 	}
 	c := a.Clone()
 	c.InPlaceUnion(b)
@@ -434,12 +434,12 @@ func TestInplaceIntersection(t *testing.T) {
 	var a BitSet
 	var b BitSet
 	for i := uint(1); i < 100; i += 2 {
-		a.Set(i)
-		b.Set(i - 1)
-		b.Set(i)
+		a = a.Set(i)
+		b = b.Set(i - 1)
+		b = b.Set(i)
 	}
 	for i := uint(100); i < 200; i++ {
-		b.Set(i)
+		b = b.Set(i)
 	}
 	c := a.Clone()
 	c.InPlaceIntersection(b)
@@ -463,7 +463,7 @@ func TestRank(t *testing.T) {
 	u := []uint{2, 3, 5, 7, 11, 70, 150}
 	var b BitSet
 	for _, v := range u {
-		b.Set(v)
+		b = b.Set(v)
 	}
 
 	if b.Rank(5) != 3 {
@@ -486,7 +486,7 @@ func TestRank(t *testing.T) {
 
 func TestPopcntSlice(t *testing.T) {
 	s := []uint64{2, 3, 5, 7, 11, 13, 17, 19, 23, 29}
-	res := uint64(popcntSlice(s))
+	res := uint64(popcount(s))
 	const l uint64 = 27
 	if res != l {
 		t.Errorf("Wrong popcount %d != %d", res, l)
@@ -496,7 +496,7 @@ func TestPopcntSlice(t *testing.T) {
 func TestPopcntAndSlice(t *testing.T) {
 	s := []uint64{2, 3, 5, 7, 11, 13, 17, 19, 23, 29}
 	m := []uint64{31, 37, 41, 43, 47, 53, 59, 61, 67, 71}
-	res := uint64(popcntAndSlice(s, m))
+	res := uint64(popcountAnd(s, m))
 	const l uint64 = 18
 	if res != l {
 		t.Errorf("Wrong And %d !=  %d", res, l)
