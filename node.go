@@ -249,7 +249,7 @@ func (n *node[V]) eachSubnet(
 // Count duplicate entries to adjust the t.size struct members.
 func (n *node[V]) unionRec(o *node[V]) (duplicates int) {
 	// no heap allocs
-	_, allIndices := o.prefixes.BitSet.NextSetMany(0, make([]uint, maxNodePrefixes))
+	allIndices := o.prefixes.BitSet.AllSet(make([]uint, maxNodePrefixes))
 
 	// for all prefixes in other node do ...
 	for i, oIdx := range allIndices {
@@ -263,7 +263,7 @@ func (n *node[V]) unionRec(o *node[V]) (duplicates int) {
 	}
 
 	// no heap allocs
-	_, allChildAddrs := o.children.BitSet.NextSetMany(0, make([]uint, maxNodeChildren))
+	allChildAddrs := o.children.BitSet.AllSet(make([]uint, maxNodeChildren))
 
 	// for all children in other node do ...
 	for i, oOctet := range allChildAddrs {
@@ -328,7 +328,7 @@ func (n *node[V]) allRec(
 	is4 bool,
 	yield func(netip.Prefix, V) bool,
 ) bool {
-	_, allIndices := n.prefixes.BitSet.NextSetMany(0, make([]uint, maxNodePrefixes))
+	allIndices := n.prefixes.BitSet.AllSet(make([]uint, maxNodePrefixes))
 
 	// for all prefixes in this node do ...
 	for _, idx := range allIndices {
@@ -341,7 +341,7 @@ func (n *node[V]) allRec(
 		}
 	}
 
-	_, allChildAddrs := n.children.BitSet.NextSetMany(0, make([]uint, maxNodeChildren))
+	allChildAddrs := n.children.BitSet.AllSet(make([]uint, maxNodeChildren))
 	// for all children in this node do ...
 	for i, addr := range allChildAddrs {
 		child := n.children.Items[i]
@@ -369,10 +369,10 @@ func (n *node[V]) allRecSorted(
 	yield func(netip.Prefix, V) bool,
 ) bool {
 	// get slice of all child octets, sorted by addr
-	_, allChildAddrs := n.children.BitSet.NextSetMany(0, make([]uint, maxNodeChildren))
+	allChildAddrs := n.children.BitSet.AllSet(make([]uint, maxNodeChildren))
 
 	// get slice of all indexes, sorted by idx
-	_, allIndices := n.prefixes.BitSet.NextSetMany(0, make([]uint, maxNodePrefixes))
+	allIndices := n.prefixes.BitSet.AllSet(make([]uint, maxNodePrefixes))
 
 	// sort indices in CIDR sort order
 	slices.SortFunc(allIndices, cmpIndexRank)

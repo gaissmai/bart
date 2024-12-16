@@ -77,7 +77,7 @@ func (n *node[V]) dumpRec(w io.Writer, path [16]byte, depth int, is4 bool) {
 	n.dump(w, path, depth, is4)
 
 	// no heap allocs
-	_, allChildAddrs := n.children.BitSet.NextSetMany(0, make([]uint, maxNodeChildren))
+	allChildAddrs := n.children.BitSet.AllSet(make([]uint, maxNodeChildren))
 
 	// the node may have childs, the rec-descent monster starts
 	for i, addr := range allChildAddrs {
@@ -100,7 +100,7 @@ func (n *node[V]) dump(w io.Writer, path [16]byte, depth int, is4 bool) {
 
 	if nPfxCount := n.prefixes.Len(); nPfxCount != 0 {
 		// no heap allocs
-		_, allIndices := n.prefixes.BitSet.NextSetMany(0, make([]uint, maxNodePrefixes))
+		allIndices := n.prefixes.BitSet.AllSet(make([]uint, maxNodePrefixes))
 
 		// print the baseIndices for this node.
 		fmt.Fprintf(w, "%sindexs(#%d): %v\n", indent, nPfxCount, allIndices)
@@ -130,7 +130,7 @@ func (n *node[V]) dump(w io.Writer, path [16]byte, depth int, is4 bool) {
 		fmt.Fprintf(w, "%schilds(#%d):", indent, childCount)
 
 		// no heap allocs
-		_, allChildAddrs := n.children.BitSet.NextSetMany(0, make([]uint, maxNodeChildren))
+		allChildAddrs := n.children.BitSet.AllSet(make([]uint, maxNodeChildren))
 
 		for _, addr := range allChildAddrs {
 			octet := byte(addr)

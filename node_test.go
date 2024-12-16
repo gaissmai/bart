@@ -286,10 +286,10 @@ func BenchmarkNodePrefixesAllSetBits(b *testing.B) {
 			node.prefixes.InsertAt(pfxToIdx(route.octet, route.bits), 0)
 		}
 
-		b.Run(fmt.Sprintf("IN %d", nroutes), func(b *testing.B) {
+		b.Run(fmt.Sprintf("Set %d", nroutes), func(b *testing.B) {
 			b.ResetTimer()
 			for range b.N {
-				node.prefixes.BitSet.NextSetMany(0, make([]uint, maxNodePrefixes))
+				node.prefixes.BitSet.AllSet(make([]uint, maxNodePrefixes))
 			}
 		})
 	}
@@ -375,10 +375,10 @@ func BenchmarkNodeChildrenAllSetBits(b *testing.B) {
 			node.children.InsertAt(uint(octet), nil)
 		}
 
-		b.Run(fmt.Sprintf("In %d", nchilds), func(b *testing.B) {
+		b.Run(fmt.Sprintf("Set %d", nchilds), func(b *testing.B) {
 			b.ResetTimer()
 			for range b.N {
-				node.children.BitSet.NextSetMany(0, make([]uint, maxNodeChildren))
+				node.children.BitSet.AllSet(make([]uint, maxNodeChildren))
 			}
 		})
 	}
