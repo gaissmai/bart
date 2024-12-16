@@ -80,6 +80,13 @@ func BenchmarkFullMatchV4(b *testing.B) {
 		}
 	}
 
+	b.Run("Contains", func(b *testing.B) {
+		b.ResetTimer()
+		for range b.N {
+			okSink = rt.Contains(ip)
+		}
+	})
+
 	b.Run("Lookup", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
@@ -121,6 +128,13 @@ func BenchmarkFullMatchV6(b *testing.B) {
 			break
 		}
 	}
+
+	b.Run("Contains", func(b *testing.B) {
+		b.ResetTimer()
+		for range b.N {
+			okSink = rt.Contains(ip)
+		}
+	})
 
 	b.Run("Lookup", func(b *testing.B) {
 		b.ResetTimer()
@@ -164,6 +178,13 @@ func BenchmarkFullMissV4(b *testing.B) {
 		}
 	}
 
+	b.Run("Contains", func(b *testing.B) {
+		b.ResetTimer()
+		for range b.N {
+			okSink = rt.Contains(ip)
+		}
+	})
+
 	b.Run("Lookup", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
@@ -205,6 +226,13 @@ func BenchmarkFullMissV6(b *testing.B) {
 			break
 		}
 	}
+
+	b.Run("Contains", func(b *testing.B) {
+		b.ResetTimer()
+		for range b.N {
+			okSink = rt.Contains(ip)
+		}
+	})
 
 	b.Run("Lookup", func(b *testing.B) {
 		b.ResetTimer()

@@ -711,6 +711,31 @@ func TestDelete(t *testing.T) {
 	})
 }
 
+func TestContainsCompare(t *testing.T) {
+	// Create large route tables repeatedly, and compare Table's
+	// behavior to a naive and slow but correct implementation.
+	t.Parallel()
+	pfxs := randomPrefixes(10_000)
+
+	gold := goldTable[int](pfxs)
+	fast := Table[int]{}
+
+	for _, pfx := range pfxs {
+		fast.Insert(pfx.pfx, pfx.val)
+	}
+
+	for range 10_000 {
+		a := randomAddr()
+
+		_, goldOK := gold.lookup(a)
+		fastOK := fast.Contains(a)
+
+		if goldOK != fastOK {
+			t.Fatalf("Contains(%q) = %v, want %v", a, fastOK, goldOK)
+		}
+	}
+}
+
 func TestLookupCompare(t *testing.T) {
 	// Create large route tables repeatedly, and compare Table's
 	// behavior to a naive and slow but correct implementation.
@@ -1995,6 +2020,13 @@ func BenchmarkTableLookup(b *testing.B) {
 			}
 
 			probe := rng(1)[0]
+
+			b.ResetTimer()
+			b.Run(fmt.Sprintf("%s/In_%6d/%s", fam, nroutes, "Contains"), func(b *testing.B) {
+				for range b.N {
+					okSink = rt.Contains(probe.pfx.Addr())
+				}
+			})
 
 			b.ResetTimer()
 			b.Run(fmt.Sprintf("%s/In_%6d/%s", fam, nroutes, "Lookup"), func(b *testing.B) {
