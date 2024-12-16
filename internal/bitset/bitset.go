@@ -135,9 +135,9 @@ func (b BitSet) NextSet(i uint) (uint, bool) {
 	return 0, false
 }
 
-// AllSet returns all bits set.
+// AsSlice returns all set bits as slice of uint.
 // It panics if the capacity of buf is < b.Count()
-func (b BitSet) AllSet(buf []uint) []uint {
+func (b BitSet) AsSlice(buf []uint) []uint {
 	buf = buf[:cap(buf)] // len = cap
 
 	size := 0
@@ -152,6 +152,20 @@ func (b BitSet) AllSet(buf []uint) []uint {
 	}
 
 	buf = buf[:size]
+	return buf
+}
+
+// AppendTo appends all set bits to buf and returns the (maybe extended) buf.
+func (b BitSet) AppendTo(buf []uint) []uint {
+	for idx, word := range b {
+		for word != 0 {
+			buf = append(buf, uint(idx<<log2WordSize+bits.TrailingZeros64(word)))
+
+			// clear the rightmost set bit
+			word &= word - 1
+		}
+	}
+
 	return buf
 }
 

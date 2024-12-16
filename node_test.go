@@ -289,7 +289,7 @@ func BenchmarkNodePrefixesAllSetBits(b *testing.B) {
 		b.Run(fmt.Sprintf("Set %d", nroutes), func(b *testing.B) {
 			b.ResetTimer()
 			for range b.N {
-				node.prefixes.BitSet.AllSet(make([]uint, maxNodePrefixes))
+				node.prefixes.BitSet.AsSlice(make([]uint, 0, maxNodePrefixes))
 			}
 		})
 	}
@@ -378,7 +378,7 @@ func BenchmarkNodeChildrenAllSetBits(b *testing.B) {
 		b.Run(fmt.Sprintf("Set %d", nchilds), func(b *testing.B) {
 			b.ResetTimer()
 			for range b.N {
-				node.children.BitSet.AllSet(make([]uint, maxNodeChildren))
+				node.children.BitSet.AsSlice(make([]uint, 0, maxNodeChildren))
 			}
 		})
 	}
