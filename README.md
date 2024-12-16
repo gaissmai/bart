@@ -59,8 +59,8 @@ The API has changed in v0.4.2, 0.5.3, v0.6.3, v0.10.1, v0.11.0, v0.12.0, v0.12.6
   func (t *Table[V]) Union(o *Table[V])
   func (t *Table[V]) Clone() *Table[V]
 
+  func (t *Table[V]) Contains(ip netip.Addr) bool
   func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool)
-
   func (t *Table[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool)
   func (t *Table[V]) LookupPrefixLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool)
 

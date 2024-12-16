@@ -340,6 +340,65 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 	return val, ok
 }
 
+// Contains does a route lookup (longest prefix match, lpm) for IP and
+// returns true if any route matched or false if not.
+//
+// Contains does not return the prefix nor the value for the lpm item,
+// but as a test against a black- or whitelist it's often sufficient.
+func (t *Table[V]) Contains(ip netip.Addr) bool {
+	if !ip.IsValid() || !t.isInit() {
+		return false
+	}
+
+	is4 := ip.Is4()
+	n := t.rootNodeByVersion(is4)
+
+	// do not allocate
+	a16 := ip.As16()
+
+	octets := a16[:]
+	if is4 {
+		octets = octets[12:]
+	}
+
+	// stack of the traversed nodes for fast backtracking, if needed
+	stack := [maxTreeDepth]*node[V]{}
+
+	// run variable, used after for loop
+	var i int
+	var octet byte
+
+	// find leaf node
+	for i, octet = range octets {
+		// push current node on stack for fast backtracking
+		stack[i] = n
+
+		// go down in tight loop to leaf node
+		var ok bool
+		n, ok = n.children.Get(uint(octet))
+
+		if !ok {
+			break
+		}
+	}
+
+	// start backtracking, unwind the stack
+	for depth := i; depth >= 0; depth-- {
+		n := stack[depth]
+		octet = octets[depth]
+
+		// longest prefix match
+		// micro benchmarking: skip if node has no prefixes
+		if n.prefixes.Len() != 0 {
+			if ok := n.lpmTest(hostIndex(octet)); ok {
+				return ok
+			}
+		}
+	}
+
+	return false
+}
+
 // Lookup does a route lookup (longest prefix match) for IP and
 // returns the associated value and true, or false if no route matched.
 func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
