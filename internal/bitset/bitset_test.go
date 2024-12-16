@@ -41,7 +41,7 @@ func TestNil(t *testing.T) {
 	b.NextSet(0)
 
 	b = BitSet(nil)
-	b.AllSet(nil)
+	b.AsSlice(nil)
 
 	b = BitSet(nil)
 	c := BitSet(nil)
@@ -88,7 +88,7 @@ func TestZeroValue(t *testing.T) {
 	b.NextSet(0)
 
 	b = BitSet{}
-	b.AllSet(nil)
+	b.AsSlice(nil)
 
 	b = BitSet{}
 	c := BitSet{}
@@ -293,7 +293,7 @@ func TestNextSet(t *testing.T) {
 	}
 }
 
-func TestAllSet(t *testing.T) {
+func TestAppenTo(t *testing.T) {
 	testCases := []struct {
 		name string
 		//
@@ -350,27 +350,13 @@ func TestAllSet(t *testing.T) {
 			b = b.Clear(u) // without compact
 		}
 
-		buf := b.AllSet(tc.buf)
+		buf := b.AsSlice(tc.buf)
 
 		if !slices.Equal(buf, tc.wantData) {
-			t.Errorf("AllSet, %s: returned buf is not equal as expected:\ngot:  %v\nwant: %v",
+			t.Errorf("AppenTo, %s: returned buf is not equal as expected:\ngot:  %v\nwant: %v",
 				tc.name, buf, tc.wantData)
 		}
 	}
-}
-
-func TestAllSetPanic(t *testing.T) {
-	defer func() {
-		if r := recover(); r == nil {
-			t.Error("AllSet, buf too small, must panic")
-		}
-	}()
-
-	var b BitSet = []uint64{1, 2, 3, 4}
-	var buf []uint
-
-	// buf too small, must panic
-	b.AllSet(buf)
 }
 
 func TestCount(t *testing.T) {
