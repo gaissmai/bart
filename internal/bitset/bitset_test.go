@@ -44,6 +44,9 @@ func TestNil(t *testing.T) {
 	b.AsSlice(nil)
 
 	b = BitSet(nil)
+	b.AppendTo(nil)
+
+	b = BitSet(nil)
 	c := BitSet(nil)
 	b.InPlaceIntersection(c)
 
@@ -91,6 +94,9 @@ func TestZeroValue(t *testing.T) {
 	b.AsSlice(nil)
 
 	b = BitSet{}
+	b.AppendTo(nil)
+
+	b = BitSet{}
 	c := BitSet{}
 	b.InPlaceIntersection(c)
 
@@ -125,6 +131,16 @@ func TestExpand(t *testing.T) {
 	}
 	if cap(b) != want {
 		t.Errorf("Set(511), want cap: %d, got: %d", want, cap(b))
+	}
+
+	b = make([]uint64, 0, 4)
+	b = b.Set(250)
+	want = 4
+	if len(b) != want {
+		t.Errorf("Set(250), want len: %d, got: %d", want, len(b))
+	}
+	if cap(b) != want {
+		t.Errorf("Set(250), want cap: %d, got: %d", want, cap(b))
 	}
 }
 
@@ -262,11 +278,11 @@ func TestNextSet(t *testing.T) {
 			wantOk:  true,
 		},
 		{
-			name:    "1,5,7",
-			set:     []uint{1, 5, 7},
-			del:     []uint{1, 5},
-			start:   0,
-			wantIdx: 7,
+			name:    "2. word",
+			set:     []uint{1, 70, 777},
+			del:     []uint{},
+			start:   2,
+			wantIdx: 70,
 			wantOk:  true,
 		},
 	}
@@ -293,7 +309,73 @@ func TestNextSet(t *testing.T) {
 	}
 }
 
-func TestAppenTo(t *testing.T) {
+func TestAppendTo(t *testing.T) {
+	testCases := []struct {
+		name string
+		//
+		set []uint
+		del []uint
+		//
+		buf      []uint
+		wantData []uint
+	}{
+		{
+			name:     "null",
+			set:      []uint{},
+			del:      []uint{},
+			buf:      nil,
+			wantData: []uint{},
+		},
+		{
+			name:     "zero",
+			set:      []uint{0},
+			del:      []uint{},
+			buf:      nil,
+			wantData: []uint{0}, // bit #0 is set
+		},
+		{
+			name:     "1,5",
+			set:      []uint{1, 5},
+			del:      []uint{},
+			buf:      nil,
+			wantData: []uint{1, 5},
+		},
+		{
+			name:     "many",
+			set:      []uint{1, 65, 130, 190, 250, 300, 380, 420, 480, 511},
+			del:      []uint{},
+			buf:      nil,
+			wantData: []uint{1, 65, 130, 190, 250, 300, 380, 420, 480, 511},
+		},
+		{
+			name:     "special, last return",
+			set:      []uint{1},
+			del:      []uint{1}, // delete without compact
+			buf:      nil,
+			wantData: []uint{},
+		},
+	}
+
+	for _, tc := range testCases {
+		var b BitSet
+		for _, u := range tc.set {
+			b = b.Set(u)
+		}
+
+		for _, u := range tc.del {
+			b = b.Clear(u) // without compact
+		}
+
+		buf := b.AppendTo(tc.buf)
+
+		if !slices.Equal(buf, tc.wantData) {
+			t.Errorf("AppendTo, %s: returned buf is not equal as expected:\ngot:  %v\nwant: %v",
+				tc.name, buf, tc.wantData)
+		}
+	}
+}
+
+func TestAsSlice(t *testing.T) {
 	testCases := []struct {
 		name string
 		//
@@ -353,7 +435,7 @@ func TestAppenTo(t *testing.T) {
 		buf := b.AsSlice(tc.buf)
 
 		if !slices.Equal(buf, tc.wantData) {
-			t.Errorf("AppenTo, %s: returned buf is not equal as expected:\ngot:  %v\nwant: %v",
+			t.Errorf("AsSlice, %s: returned buf is not equal as expected:\ngot:  %v\nwant: %v",
 				tc.name, buf, tc.wantData)
 		}
 	}
