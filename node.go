@@ -126,7 +126,7 @@ func (n *node[V]) eachSubnet(
 	// 1. collect all indices in n covered by prefix
 	// ###############################################################
 	pfxFirstAddr := uint(octet)
-	pfxLastAddr := uint(octet | ^netMask[pfxLen])
+	pfxLastAddr := uint(octet | ^netMask(pfxLen))
 
 	allCoveredIndices := make([]uint, 0, maxNodePrefixes)
 
@@ -141,7 +141,7 @@ func (n *node[V]) eachSubnet(
 		thisOctet, thisPfxLen := idxToPfx(idx)
 
 		thisFirstAddr := uint(thisOctet)
-		thisLastAddr := uint(thisOctet | ^netMask[thisPfxLen])
+		thisLastAddr := uint(thisOctet | ^netMask(thisPfxLen))
 
 		if thisFirstAddr >= pfxFirstAddr && thisLastAddr <= pfxLastAddr {
 			allCoveredIndices = append(allCoveredIndices, idx)

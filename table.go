@@ -123,7 +123,7 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
 	// mask the prefix, this is faster than netip.Prefix.Masked()
-	lastOctet &= netMask[lastOctetBits]
+	lastOctet &= netMask(lastOctetBits)
 
 	// find the proper trie node to insert prefix
 	for _, octet := range octets[:lastOctetIdx] {
@@ -181,7 +181,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
 	// mask the prefix
-	lastOctet &= netMask[lastOctetBits]
+	lastOctet &= netMask(lastOctetBits)
 
 	// find the proper trie node to update prefix
 	for _, octet := range octets[:lastOctetIdx] {
@@ -238,7 +238,7 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
 	// mask the prefix
-	lastOctet &= netMask[lastOctetBits]
+	lastOctet &= netMask(lastOctetBits)
 
 	// find the proper trie node in tight loop
 	for _, octet := range octets[:lastOctetIdx] {
@@ -291,7 +291,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
 	// mask the prefix
-	lastOctet &= netMask[lastOctetBits]
+	lastOctet &= netMask(lastOctetBits)
 	octets[lastOctetIdx] = lastOctet
 
 	// record path to deleted node
@@ -519,7 +519,7 @@ func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V, 
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
 	// mask the prefix
-	lastOctet &= netMask[lastOctetBits]
+	lastOctet &= netMask(lastOctetBits)
 	octets[lastOctetIdx] = lastOctet
 
 	var i int
@@ -596,7 +596,7 @@ func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
 	// mask the prefix
-	lastOctet &= netMask[lastOctetBits]
+	lastOctet &= netMask(lastOctetBits)
 
 	var ok bool
 	for _, octet := range octets[:lastOctetIdx] {
