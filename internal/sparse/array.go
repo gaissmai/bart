@@ -78,7 +78,8 @@ func (s *Array[T]) Get(i uint) (val T, ok bool) {
 // MustGet, use it only after a successful test
 // or the behavior is undefined, maybe it panics.
 func (s *Array[T]) MustGet(i uint) T {
-	return s.Items[s.rank(i)]
+	// make MustGet inlineable, would be: s.Items[s.rank(i)]
+	return s.Items[s.BitSet.Rank(i)-1]
 }
 
 // UpdateAt or set the value at i via callback. The new value is returned
