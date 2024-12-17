@@ -236,18 +236,32 @@ func (b BitSet) Size() int {
 // Rank returns the number of set bits up to and including the index
 // that are set in the bitset.
 func (b BitSet) Rank(i uint) int {
-	if wIdx(i+1) >= len(b) {
-		return popcount(b)
-	}
+	// inlined popcount to make Rank inlineable
+	var answer int
 
-	answer := popcount(b[:wIdx(i+1)])
+	i++ // Rank count is inclusive
+	wordIdx := i >> lg64
+	bitsIdx := i & 63
 
-	// word boundary?
-	if bIdx(i+1) == 0 {
+	if int(wordIdx) >= len(b) {
+		// inlined popcount, whole slice
+		for _, x := range b {
+			answer += bits.OnesCount64(x)
+		}
 		return answer
 	}
 
-	return answer + bits.OnesCount64(b[wIdx(i+1)]<<(64-bIdx(i+1)))
+	// inlined popcount, partial slice
+	for _, x := range b[:wordIdx] {
+		answer += bits.OnesCount64(x)
+	}
+
+	if bitsIdx == 0 {
+		return answer
+	}
+
+	// plus partial word
+	return answer + bits.OnesCount64(b[wordIdx]<<(64-bitsIdx))
 }
 
 // popcount
