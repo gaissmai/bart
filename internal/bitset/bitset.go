@@ -3,17 +3,18 @@
 
 // Package bitset implements bitsets, a mapping
 // between non-negative integers and boolean values.
+//
+// Studied [github.com/bits-and-blooms/bitset] inside out
+// and rewrote it from scratch for the needs of this project.
 package bitset
 
-import (
-	"math/bits"
-)
+import "math/bits"
 
 // the wordSize of a bit set
 const wordSize = 64
 
-// log2WordSize is lg(wordSize)
-const log2WordSize = 6
+// lg64 is lg(wordSize)
+const lg64 = 6
 
 // A BitSet is a slice of words. This is an internal package
 // with a wide open public API.
@@ -26,7 +27,7 @@ func (b BitSet) bitsCapacity() uint {
 
 // xIdx calculates the index of i in a []uint64
 func wIdx(i uint) int {
-	return int(i >> log2WordSize) // (i / 64) but faster
+	return int(i >> lg64) // (i / 64) but faster
 }
 
 // bIdx calculates the index of i in a `uint64`
@@ -39,17 +40,17 @@ func wordsNeeded(i uint) int {
 	return wIdx(i + wordSize)
 }
 
-// extendSet adds additional words to incorporate new bits if needed.
-func (b BitSet) extendSet(i uint) BitSet {
-	size := wordsNeeded(i)
+// grow adds additional words if needed.
+func (b BitSet) grow(i uint) BitSet {
+	words := wordsNeeded(i)
 
 	switch {
 	case b == nil:
-		b = make([]uint64, size)
-	case cap(b) >= size:
-		b = b[:size]
-	case len(b) < size:
-		newset := make([]uint64, size)
+		b = make([]uint64, words)
+	case cap(b) >= words:
+		b = b[:words]
+	case len(b) < words:
+		newset := make([]uint64, words)
 		copy(newset, b)
 		b = newset
 	}
@@ -59,7 +60,7 @@ func (b BitSet) extendSet(i uint) BitSet {
 // Set bit i to 1, the capacity of the bitset is increased accordingly.
 func (b BitSet) Set(i uint) BitSet {
 	if i >= b.bitsCapacity() {
-		b = b.extendSet(i)
+		b = b.grow(i)
 	}
 	b[wIdx(i)] |= (1 << bIdx(i))
 	return b
@@ -91,8 +92,8 @@ func (b BitSet) Clone() BitSet {
 	return c
 }
 
-// Compact shrinks BitSet so that we preserve all set bits, while minimizing
-// memory usage. A new slice is allocated to store the new bits.
+// Compact, preserve all set bits, while minimizing memory usage.
+// A new slice is allocated to store the new bits.
 func (b BitSet) Compact() BitSet {
 	last := len(b) - 1
 
@@ -106,7 +107,7 @@ func (b BitSet) Compact() BitSet {
 		}
 	}
 
-	// not found, shrink to nil
+	// BitSet was empty, shrink to nil
 	return nil
 }
 
@@ -129,14 +130,17 @@ func (b BitSet) NextSet(i uint) (uint, bool) {
 	x++
 	for j, word := range b[x:] {
 		if word != 0 {
-			return uint((x+j)<<log2WordSize + bits.TrailingZeros64(word)), true
+			return uint((x+j)<<lg64 + bits.TrailingZeros64(word)), true
 		}
 	}
 	return 0, false
 }
 
-// AsSlice returns all set bits as slice of uint.
-// It panics if the capacity of buf is < b.Count()
+// AsSlice returns all set bits as slice of uint without
+// heap allocations.
+//
+// This is faster than AppendTo, but also more dangerous,
+// it panics if the capacity of buf is < b.Size()
 func (b BitSet) AsSlice(buf []uint) []uint {
 	buf = buf[:cap(buf)] // len = cap
 
@@ -144,7 +148,7 @@ func (b BitSet) AsSlice(buf []uint) []uint {
 	for idx, word := range b {
 		for ; word != 0; size++ {
 			// panics if capacity of buf is exceeded.
-			buf[size] = uint(idx<<log2WordSize + bits.TrailingZeros64(word))
+			buf[size] = uint(idx<<lg64 + bits.TrailingZeros64(word))
 
 			// clear the rightmost set bit
 			word &= word - 1
@@ -156,10 +160,11 @@ func (b BitSet) AsSlice(buf []uint) []uint {
 }
 
 // AppendTo appends all set bits to buf and returns the (maybe extended) buf.
+// If the capacity of buf is < b.Size() new memory is allocated.
 func (b BitSet) AppendTo(buf []uint) []uint {
 	for idx, word := range b {
 		for word != 0 {
-			buf = append(buf, uint(idx<<log2WordSize+bits.TrailingZeros64(word)))
+			buf = append(buf, uint(idx<<lg64+bits.TrailingZeros64(word)))
 
 			// clear the rightmost set bit
 			word &= word - 1
@@ -169,66 +174,62 @@ func (b BitSet) AppendTo(buf []uint) []uint {
 	return buf
 }
 
-// IntersectionCardinality computes the cardinality of the intersection
+// IntersectionCardinality computes the popcount of the intersection.
 func (b BitSet) IntersectionCardinality(c BitSet) int {
 	return popcountAnd(b, c)
 }
 
 // InPlaceIntersection overwrites and computes the intersection of
-// base set with the compare set.
-// This is the BitSet equivalent of & (and)
+// base set with the compare set. This is the BitSet equivalent of & (and).
+// If len(c) > len(b), new memory is allocated.
 func (b *BitSet) InPlaceIntersection(c BitSet) {
-	bLen := len(*b)
-	cLen := len(c)
+	// bounds check eliminated, range until minLen(b,c)
+	for i := 0; i < len(*b) && i < len(c); i++ {
+		(*b)[i] &= c[i]
+	}
 
-	// intersect b with shorter or equal c
-	if bLen >= cLen && cLen != 0 {
-		for i := range cLen {
-			(*b)[i] &= c[i]
-		}
-		for i := cLen; i < bLen; i++ {
+	// b >= c
+	if len(*b) >= len(c) {
+		// bounds check eliminated
+		for i := len(c); i < len(*b); i++ {
 			(*b)[i] = 0
 		}
 		return
 	}
 
-	// intersect b with longer c
-	for i := range bLen {
-		(*b)[i] &= c[i]
-	}
-
-	newset := make([]uint64, cLen)
+	// b < c
+	newset := make([]uint64, len(c))
 	copy(newset, *b)
 	*b = newset
 }
 
 // InPlaceUnion creates the destructive union of base set with compare set.
 // This is the BitSet equivalent of | (or).
+// If len(c) > len(b), new memory is allocated.
 func (b *BitSet) InPlaceUnion(c BitSet) {
-	bLen := len(*b)
-	cLen := len(c)
-
-	// union b with shorter or equal c
-	if bLen >= cLen {
-		for i := range cLen {
+	// b >= c
+	if len(*b) >= len(c) {
+		// bounds check eliminated
+		for i := 0; i < len(*b) && i < len(c); i++ {
 			(*b)[i] |= c[i]
 		}
+
 		return
 	}
 
-	// union b with longer c
-	newset := make([]uint64, cLen)
+	// b < c
+	newset := make([]uint64, len(c))
 	copy(newset, *b)
 	*b = newset
 
-	for i := range cLen {
+	// bounds check eliminated
+	for i := 0; i < len(*b) && i < len(c); i++ {
 		(*b)[i] |= c[i]
 	}
 }
 
-// Count (number of set bits).
-// Also known as "popcount" or "population count".
-func (b BitSet) Count() int {
+// Size (number of set bits).
+func (b BitSet) Size() int {
 	return popcount(b)
 }
 
@@ -249,19 +250,21 @@ func (b BitSet) Rank(i uint) int {
 	return answer + bits.OnesCount64(b[wIdx(i+1)]<<(64-bIdx(i+1)))
 }
 
-// popcount, count all the bits set in slice.
+// popcount
 func popcount(s []uint64) int {
 	var cnt int
 	for _, x := range s {
+		// count all the bits set in slice.
 		cnt += bits.OnesCount64(x)
 	}
 	return cnt
 }
 
-// popcountAnd, uint64 words are bitwise & followed by popcount.
+// popcountAnd
 func popcountAnd(s, m []uint64) int {
 	var cnt int
 	for j := 0; j < len(s) && j < len(m); j++ {
+		// words are bitwise & followed by popcount.
 		cnt += bits.OnesCount64(s[j] & m[j])
 	}
 	return cnt

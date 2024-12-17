@@ -64,3 +64,89 @@ func BenchmarkRankPrefix(b *testing.B) {
 		})
 	}
 }
+
+func BenchmarkInPlace(b *testing.B) {
+	bs := BitSet([]uint64{})
+	cs := BitSet([]uint64{})
+	for range 200 {
+		bs = bs.Set(uint(rand.IntN(512)))
+	}
+	for range 200 {
+		cs = cs.Set(uint(rand.IntN(512)))
+	}
+
+	b.Run("InPlaceIntersection len(b)==len(c)", func(b *testing.B) {
+		for range b.N {
+			(&bs).InPlaceIntersection(cs)
+		}
+	})
+
+	bs = BitSet([]uint64{})
+	cs = BitSet([]uint64{})
+	for range 200 {
+		bs = bs.Set(uint(rand.IntN(512)))
+	}
+	for range 200 {
+		cs = cs.Set(uint(rand.IntN(512)))
+	}
+	b.Run("InPlaceUnion len(b)==len(c)", func(b *testing.B) {
+		for range b.N {
+			(&bs).InPlaceUnion(cs)
+		}
+	})
+
+	bs = BitSet([]uint64{})
+	cs = BitSet([]uint64{})
+	for range 200 {
+		bs = bs.Set(uint(rand.IntN(512)))
+	}
+	for range 200 {
+		cs = cs.Set(uint(rand.IntN(256)))
+	}
+	b.Run("InPlaceIntersection len(b)>len(c)", func(b *testing.B) {
+		for range b.N {
+			(&bs).InPlaceIntersection(cs)
+		}
+	})
+
+	bs = BitSet([]uint64{})
+	cs = BitSet([]uint64{})
+	for range 200 {
+		bs = bs.Set(uint(rand.IntN(512)))
+	}
+	for range 200 {
+		cs = cs.Set(uint(rand.IntN(256)))
+	}
+	b.Run("InPlaceUnion len(b)>len(c)", func(b *testing.B) {
+		for range b.N {
+			(&bs).InPlaceUnion(cs)
+		}
+	})
+	bs = BitSet([]uint64{})
+	cs = BitSet([]uint64{})
+	for range 200 {
+		bs = bs.Set(uint(rand.IntN(256)))
+	}
+	for range 200 {
+		cs = cs.Set(uint(rand.IntN(512)))
+	}
+	b.Run("InPlaceIntersection len(b)<len(c)", func(b *testing.B) {
+		for range b.N {
+			(&bs).InPlaceIntersection(cs)
+		}
+	})
+
+	bs = BitSet([]uint64{})
+	cs = BitSet([]uint64{})
+	for range 200 {
+		bs = bs.Set(uint(rand.IntN(256)))
+	}
+	for range 200 {
+		cs = cs.Set(uint(rand.IntN(512)))
+	}
+	b.Run("InPlaceUnion len(b)<len(c)", func(b *testing.B) {
+		for range b.N {
+			(&bs).InPlaceUnion(cs)
+		}
+	})
+}
