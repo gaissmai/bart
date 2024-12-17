@@ -15,7 +15,7 @@ func (b BitSet) All() iter.Seq[uint] {
 	return func(yield func(u uint) bool) {
 		for idx, word := range b {
 			for word != 0 {
-				u := uint(idx<<log2WordSize + bits.TrailingZeros64(word))
+				u := uint(idx<<lg64 + bits.TrailingZeros64(word))
 
 				if !yield(u) {
 					return

@@ -29,7 +29,7 @@ func TestNil(t *testing.T) {
 	_ = b.Clone()
 
 	b = BitSet(nil)
-	b.Count()
+	b.Size()
 
 	b = BitSet(nil)
 	b.Rank(100)
@@ -76,7 +76,7 @@ func TestZeroValue(t *testing.T) {
 	b.Clone()
 
 	b = BitSet{}
-	b.Count()
+	b.Size()
 
 	b = BitSet{}
 	b.Rank(100)
@@ -364,7 +364,7 @@ func TestCount(t *testing.T) {
 	tot := uint(64*4 + 11) // just an unmagic number
 	checkLast := true
 	for i := range tot {
-		sz := uint(b.Count())
+		sz := uint(b.Size())
 		if sz != i {
 			t.Errorf("Count reported as %d, but it should be %d", sz, i)
 			checkLast = false
@@ -373,7 +373,7 @@ func TestCount(t *testing.T) {
 		b = b.Set(i)
 	}
 	if checkLast {
-		sz := uint(b.Count())
+		sz := uint(b.Size())
 		if sz != tot {
 			t.Errorf("After all bits set, size reported as %d, but it should be %d", sz, tot)
 		}
@@ -385,7 +385,7 @@ func TestCount2(t *testing.T) {
 	var b BitSet
 	tot := uint(64*4 + 11)
 	for i := uint(0); i < tot; i += 3 {
-		sz := uint(b.Count())
+		sz := uint(b.Size())
 		if sz != i/3 {
 			t.Errorf("Count reported as %d, but it should be %d", sz, i)
 			break
@@ -408,11 +408,11 @@ func TestInPlaceUnion(t *testing.T) {
 	c.InPlaceUnion(b)
 	d := b.Clone()
 	d.InPlaceUnion(a)
-	if c.Count() != 200 {
-		t.Errorf("Union should have 200 bits set, but had %d", c.Count())
+	if c.Size() != 200 {
+		t.Errorf("Union should have 200 bits set, but had %d", c.Size())
 	}
-	if d.Count() != 200 {
-		t.Errorf("Union should have 200 bits set, but had %d", d.Count())
+	if d.Size() != 200 {
+		t.Errorf("Union should have 200 bits set, but had %d", d.Size())
 	}
 }
 
@@ -431,16 +431,16 @@ func TestInplaceIntersection(t *testing.T) {
 	c.InPlaceIntersection(b)
 	d := b.Clone()
 	d.InPlaceIntersection(a)
-	if c.Count() != 50 {
-		t.Errorf("Intersection should have 50 bits set, but had %d", c.Count())
+	if c.Size() != 50 {
+		t.Errorf("Intersection should have 50 bits set, but had %d", c.Size())
 	}
-	if d.Count() != 50 {
-		t.Errorf("Intersection should have 50 bits set, but had %d", d.Count())
+	if d.Size() != 50 {
+		t.Errorf("Intersection should have 50 bits set, but had %d", d.Size())
 	}
-	if a.IntersectionCardinality(b) != c.Count() {
+	if a.IntersectionCardinality(b) != c.Size() {
 		t.Error("Intersection and IntersectionCardinality differ")
 	}
-	if b.IntersectionCardinality(a) != c.Count() {
+	if b.IntersectionCardinality(a) != c.Size() {
 		t.Error("Intersection and IntersectionCardinality differ")
 	}
 }
