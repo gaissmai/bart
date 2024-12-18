@@ -55,8 +55,8 @@ func (t *Table[V]) initOnce() {
 		return
 	}
 
-	t.root4 = newNode[V]()
-	t.root6 = newNode[V]()
+	t.root4 = new(node[V])
+	t.root6 = new(node[V])
 }
 
 // rootNodeByVersion, root node getter for ip version.
@@ -131,7 +131,7 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 		c, ok := n.children.Get(uint(octet))
 		if !ok {
 			// create and insert missing intermediate child
-			c = newNode[V]()
+			c = new(node[V])
 			n.children.InsertAt(uint(octet), c)
 		}
 
@@ -189,7 +189,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 		c, ok := n.children.Get(uint(octet))
 		if !ok {
 			// create and insert missing intermediate child
-			c = newNode[V]()
+			c = new(node[V])
 			n.children.InsertAt(uint(octet), c)
 		}
 
