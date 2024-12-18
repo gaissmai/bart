@@ -26,6 +26,21 @@ type jsonTest struct {
 	want  string
 }
 
+func TestJSONTableIsNil(t *testing.T) {
+	t.Parallel()
+	var tbl *Table[any]
+	checkJSON(t, tbl, jsonTest{
+		want: "null",
+	})
+}
+
+func TestJSONEmpty(t *testing.T) {
+	tbl := new(Table[any])
+	checkJSON(t, tbl, jsonTest{
+		want: "{}",
+	})
+}
+
 func TestJSONDefaultRouteV4(t *testing.T) {
 	t.Parallel()
 	tbl := new(Table[any])
