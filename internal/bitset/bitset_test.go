@@ -10,6 +10,7 @@ import (
 )
 
 func TestNil(t *testing.T) {
+	t.Parallel()
 	defer func() {
 		if r := recover(); r != nil {
 			t.Error("A nil bitset must not panic")
@@ -60,6 +61,7 @@ func TestNil(t *testing.T) {
 }
 
 func TestZeroValue(t *testing.T) {
+	t.Parallel()
 	defer func() {
 		if r := recover(); r != nil {
 			t.Error("A zero value bitset must not panic")
@@ -110,6 +112,7 @@ func TestZeroValue(t *testing.T) {
 }
 
 func TestBitSetUntil(t *testing.T) {
+	t.Parallel()
 	var b BitSet
 	var last uint = 900
 	b = b.Set(last)
@@ -121,6 +124,7 @@ func TestBitSetUntil(t *testing.T) {
 }
 
 func TestExpand(t *testing.T) {
+	t.Parallel()
 	var b BitSet
 	for i := range 512 {
 		b = b.Set(uint(i))
@@ -145,6 +149,7 @@ func TestExpand(t *testing.T) {
 }
 
 func TestClone(t *testing.T) {
+	t.Parallel()
 	var b BitSet
 	c := b.Clone()
 
@@ -167,6 +172,7 @@ func TestClone(t *testing.T) {
 }
 
 func TestCompact(t *testing.T) {
+	t.Parallel()
 	var b BitSet
 	for _, i := range []uint{1, 2, 5, 10, 20, 50, 100, 200, 500, 1023} {
 		b = b.Set(i)
@@ -211,6 +217,7 @@ func TestCompact(t *testing.T) {
 }
 
 func TestTest(t *testing.T) {
+	t.Parallel()
 	var b BitSet
 	b = b.Set(100)
 	if !b.Test(100) {
@@ -219,6 +226,7 @@ func TestTest(t *testing.T) {
 }
 
 func TestNextSet(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name string
 		//
@@ -310,6 +318,7 @@ func TestNextSet(t *testing.T) {
 }
 
 func TestAppendTo(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name string
 		//
@@ -376,6 +385,7 @@ func TestAppendTo(t *testing.T) {
 }
 
 func TestAsSlice(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name string
 		//
@@ -442,6 +452,7 @@ func TestAsSlice(t *testing.T) {
 }
 
 func TestCount(t *testing.T) {
+	t.Parallel()
 	var b BitSet
 	tot := uint(64*4 + 11) // just an unmagic number
 	checkLast := true
@@ -464,6 +475,7 @@ func TestCount(t *testing.T) {
 
 // test setting every 3rd bit, just in case something odd is happening
 func TestCount2(t *testing.T) {
+	t.Parallel()
 	var b BitSet
 	tot := uint(64*4 + 11)
 	for i := uint(0); i < tot; i += 3 {
@@ -477,6 +489,7 @@ func TestCount2(t *testing.T) {
 }
 
 func TestInPlaceUnion(t *testing.T) {
+	t.Parallel()
 	var a BitSet
 	var b BitSet
 	for i := uint(1); i < 100; i += 2 {
@@ -499,6 +512,7 @@ func TestInPlaceUnion(t *testing.T) {
 }
 
 func TestInplaceIntersection(t *testing.T) {
+	t.Parallel()
 	var a BitSet
 	var b BitSet
 	for i := uint(1); i < 100; i += 2 {
@@ -528,6 +542,7 @@ func TestInplaceIntersection(t *testing.T) {
 }
 
 func TestRank(t *testing.T) {
+	t.Parallel()
 	u := []uint{2, 3, 5, 7, 11, 70, 150}
 	var b BitSet
 	for _, v := range u {
@@ -553,6 +568,7 @@ func TestRank(t *testing.T) {
 }
 
 func TestPopcntSlice(t *testing.T) {
+	t.Parallel()
 	s := []uint64{2, 3, 5, 7, 11, 13, 17, 19, 23, 29}
 	res := uint64(popcount(s))
 	const l uint64 = 27
@@ -562,6 +578,7 @@ func TestPopcntSlice(t *testing.T) {
 }
 
 func TestPopcntAndSlice(t *testing.T) {
+	t.Parallel()
 	s := []uint64{2, 3, 5, 7, 11, 13, 17, 19, 23, 29}
 	m := []uint64{31, 37, 41, 43, 47, 53, 59, 61, 67, 71}
 	res := uint64(popcountAnd(s, m))

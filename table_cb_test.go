@@ -80,6 +80,7 @@ func TestAll(t *testing.T) {
 	pfxs := randomPrefixes(10_000)
 
 	t.Run("All", func(t *testing.T) {
+		t.Parallel()
 		rtbl := new(Table[int])
 		seen := make(map[netip.Prefix]int, 10_000)
 		for _, item := range pfxs {
@@ -103,6 +104,7 @@ func TestAll(t *testing.T) {
 	})
 
 	t.Run("All_4&6", func(t *testing.T) {
+		t.Parallel()
 		rtbl := new(Table[int])
 		seen := make(map[netip.Prefix]int, 10_000)
 		for _, item := range pfxs {
@@ -135,6 +137,7 @@ func TestAll(t *testing.T) {
 
 	// make an iteration and update the values in the callback
 	t.Run("All and Update", func(t *testing.T) {
+		t.Parallel()
 		rtbl := new(Table[int])
 		seen := make(map[netip.Prefix]int, 10_000)
 		for _, item := range pfxs {
@@ -165,6 +168,7 @@ func TestAll(t *testing.T) {
 	})
 
 	t.Run("All with premature exit", func(t *testing.T) {
+		t.Parallel()
 		rtbl := new(Table[int])
 		for _, item := range pfxs {
 			rtbl.Insert(item.pfx, item.val)

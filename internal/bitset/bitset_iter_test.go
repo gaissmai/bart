@@ -11,10 +11,12 @@ import (
 )
 
 func TestAllBitSetIter(t *testing.T) {
+	t.Parallel()
 	tc := []uint{0, 1, 2, 5, 10, 20, 50, 100, 200, 500, 511}
 
 	for _, n := range tc {
 		t.Run(fmt.Sprintf("n: %3d", n), func(t *testing.T) {
+			t.Parallel()
 			var b BitSet
 			seen := make(map[uint]bool)
 
@@ -40,10 +42,12 @@ func TestAllBitSetIter(t *testing.T) {
 }
 
 func TestAllBitSetCallback(t *testing.T) {
+	t.Parallel()
 	tc := []uint{0, 1, 2, 5, 10, 20, 50, 100, 200, 500, 511}
 
 	for _, n := range tc {
 		t.Run(fmt.Sprintf("n: %3d", n), func(t *testing.T) {
+			t.Parallel()
 			var b BitSet
 			seen := make(map[uint]bool)
 

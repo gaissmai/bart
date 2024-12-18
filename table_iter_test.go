@@ -12,10 +12,12 @@ import (
 )
 
 func TestAll4RangeOverFunc(t *testing.T) {
+	t.Parallel()
 	pfxs := randomPrefixes4(10_000)
 	seen := make(map[netip.Prefix]int, 10_000)
 
 	t.Run("All4RangeOverFunc", func(t *testing.T) {
+		t.Parallel()
 		rtbl := new(Table[int])
 		for _, item := range pfxs {
 			rtbl.Insert(item.pfx, item.val)
@@ -38,6 +40,7 @@ func TestAll4RangeOverFunc(t *testing.T) {
 	})
 
 	t.Run("All4RangeOverFunc with premature exit", func(t *testing.T) {
+		t.Parallel()
 		rtbl := new(Table[int])
 		for _, item := range pfxs {
 			rtbl.Insert(item.pfx, item.val)
@@ -60,10 +63,12 @@ func TestAll4RangeOverFunc(t *testing.T) {
 }
 
 func TestAll6RangeOverFunc(t *testing.T) {
+	t.Parallel()
 	pfxs := randomPrefixes6(10_000)
 	seen := make(map[netip.Prefix]int, 10_000)
 
 	t.Run("All6RangeOverFunc", func(t *testing.T) {
+		t.Parallel()
 		rtbl := new(Table[int])
 		for _, item := range pfxs {
 			rtbl.Insert(item.pfx, item.val)
@@ -86,6 +91,7 @@ func TestAll6RangeOverFunc(t *testing.T) {
 	})
 
 	t.Run("All6RangeOverFunc with premature exit", func(t *testing.T) {
+		t.Parallel()
 		rtbl := new(Table[int])
 		for _, item := range pfxs {
 			rtbl.Insert(item.pfx, item.val)
@@ -108,10 +114,12 @@ func TestAll6RangeOverFunc(t *testing.T) {
 }
 
 func TestAllRangeOverFunc(t *testing.T) {
+	t.Parallel()
 	pfxs := randomPrefixes(10_000)
 	seen := make(map[netip.Prefix]int, 10_000)
 
 	t.Run("AllRangeOverFunc", func(t *testing.T) {
+		t.Parallel()
 		rtbl := new(Table[int])
 		for _, item := range pfxs {
 			rtbl.Insert(item.pfx, item.val)
@@ -134,6 +142,7 @@ func TestAllRangeOverFunc(t *testing.T) {
 	})
 
 	t.Run("AllRangeOverFunc with premature exit", func(t *testing.T) {
+		t.Parallel()
 		rtbl := new(Table[int])
 		for _, item := range pfxs {
 			rtbl.Insert(item.pfx, item.val)
@@ -156,10 +165,12 @@ func TestAllRangeOverFunc(t *testing.T) {
 }
 
 func TestAll4SortedIter(t *testing.T) {
+	t.Parallel()
 	pfxs := randomPrefixes4(10_000)
 	seen := make(map[netip.Prefix]int, 10_000)
 
 	t.Run("All4SortedRangeOverFunc", func(t *testing.T) {
+		t.Parallel()
 		rtbl := new(Table[int])
 		for _, item := range pfxs {
 			rtbl.Insert(item.pfx, item.val)
@@ -182,6 +193,7 @@ func TestAll4SortedIter(t *testing.T) {
 	})
 
 	t.Run("All4SortedRangeOverFunc with premature exit", func(t *testing.T) {
+		t.Parallel()
 		rtbl := new(Table[int])
 		for _, item := range pfxs {
 			rtbl.Insert(item.pfx, item.val)
@@ -204,10 +216,12 @@ func TestAll4SortedIter(t *testing.T) {
 }
 
 func TestAll6SortedRangeOverFunc(t *testing.T) {
+	t.Parallel()
 	pfxs := randomPrefixes6(10_000)
 	seen := make(map[netip.Prefix]int, 10_000)
 
 	t.Run("All6SortedRangeOverFunc", func(t *testing.T) {
+		t.Parallel()
 		rtbl := new(Table[int])
 		for _, item := range pfxs {
 			rtbl.Insert(item.pfx, item.val)
@@ -230,6 +244,7 @@ func TestAll6SortedRangeOverFunc(t *testing.T) {
 	})
 
 	t.Run("All6SortedRangeOverFunc with premature exit", func(t *testing.T) {
+		t.Parallel()
 		rtbl := new(Table[int])
 		for _, item := range pfxs {
 			rtbl.Insert(item.pfx, item.val)
@@ -252,10 +267,12 @@ func TestAll6SortedRangeOverFunc(t *testing.T) {
 }
 
 func TestAllSortedRangeOverFunc(t *testing.T) {
+	t.Parallel()
 	pfxs := randomPrefixes(10_000)
 	seen := make(map[netip.Prefix]int, 10_000)
 
 	t.Run("AllSortedRangeOverFunc", func(t *testing.T) {
+		t.Parallel()
 		rtbl := new(Table[int])
 		for _, item := range pfxs {
 			rtbl.Insert(item.pfx, item.val)
@@ -278,6 +295,7 @@ func TestAllSortedRangeOverFunc(t *testing.T) {
 	})
 
 	t.Run("AllSortedRangeOverFunc with premature exit", func(t *testing.T) {
+		t.Parallel()
 		rtbl := new(Table[int])
 		for _, item := range pfxs {
 			rtbl.Insert(item.pfx, item.val)

@@ -9,6 +9,7 @@ import (
 )
 
 func TestNewArray(t *testing.T) {
+	t.Parallel()
 	a := new(Array[int])
 
 	if c := a.Len(); c != 0 {
@@ -17,6 +18,7 @@ func TestNewArray(t *testing.T) {
 }
 
 func TestSparseArrayCount(t *testing.T) {
+	t.Parallel()
 	a := new(Array[int])
 
 	for i := range 10_000 {
@@ -37,6 +39,7 @@ func TestSparseArrayCount(t *testing.T) {
 }
 
 func TestSparseArrayGet(t *testing.T) {
+	t.Parallel()
 	a := new(Array[int])
 
 	for i := range 10_000 {
@@ -66,6 +69,7 @@ func TestSparseArrayGet(t *testing.T) {
 }
 
 func TestSparseArrayMustGetPanic(t *testing.T) {
+	t.Parallel()
 	defer func() {
 		r := recover()
 		if r == nil {
@@ -84,6 +88,7 @@ func TestSparseArrayMustGetPanic(t *testing.T) {
 }
 
 func TestSparseArrayUpdate(t *testing.T) {
+	t.Parallel()
 	a := new(Array[int])
 
 	for i := range 10_000 {
