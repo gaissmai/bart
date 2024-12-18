@@ -320,10 +320,11 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 }
 
 // Contains does a route lookup (longest prefix match, lpm) for IP and
-// returns true if any route matched or false if not.
+// returns true if any route matched, or false if not.
 //
-// Contains does not return the prefix nor the value for the lpm item,
-// but as a test against a black- or whitelist it's often sufficient.
+// Contains does not return the value nor the prefix of the matching item,
+// but as a test against a black- or whitelist it's often sufficient
+// and even few nanoseconds faster than [Table.Lookup].
 func (t *Table[V]) Contains(ip netip.Addr) bool {
 	if !ip.IsValid() {
 		return false
