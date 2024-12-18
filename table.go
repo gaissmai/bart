@@ -34,38 +34,21 @@ import (
 // concurrent readers and writers.
 type Table[V any] struct {
 	// the root nodes, implemented as popcount compressed multibit tries
-	root4 *node[V]
-	root6 *node[V]
+	root4 node[V]
+	root6 node[V]
 
 	// the number of prefixes in the routing table
 	size4 int
 	size6 int
 }
 
-// isInit reports if the table is already initialized.
-func (t *Table[V]) isInit() bool {
-	// could also test t.root6, no hidden magic
-	return t.root4 != nil
-}
-
-// initOnce the root nodes, no public constructor needed, the zero value is ready to use.
-// Not using sync.Once here, the table is not safe for concurrent writers anyway
-func (t *Table[V]) initOnce() {
-	if t.isInit() {
-		return
-	}
-
-	t.root4 = new(node[V])
-	t.root6 = new(node[V])
-}
-
 // rootNodeByVersion, root node getter for ip version.
 func (t *Table[V]) rootNodeByVersion(is4 bool) *node[V] {
 	if is4 {
-		return t.root4
+		return &(t.root4)
 	}
 
-	return t.root6
+	return &(t.root6)
 }
 
 // Cloner, if implemented by payload of type V the values are deeply copied
@@ -80,8 +63,6 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	if !pfx.IsValid() {
 		return
 	}
-
-	t.initOnce()
 
 	// values derived from pfx
 	ip := pfx.Addr()
@@ -158,8 +139,6 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 		return zero
 	}
 
-	t.initOnce()
-
 	// values derived from pfx
 	ip := pfx.Addr()
 	is4 := ip.Is4()
@@ -213,7 +192,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 	var zero V
 
-	if !pfx.IsValid() || !t.isInit() {
+	if !pfx.IsValid() {
 		return zero, false
 	}
 
@@ -266,7 +245,7 @@ func (t *Table[V]) GetAndDelete(pfx netip.Prefix) (val V, ok bool) {
 func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 	var zero V
 
-	if !pfx.IsValid() || !t.isInit() {
+	if !pfx.IsValid() {
 		return zero, false
 	}
 
@@ -346,7 +325,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 // Contains does not return the prefix nor the value for the lpm item,
 // but as a test against a black- or whitelist it's often sufficient.
 func (t *Table[V]) Contains(ip netip.Addr) bool {
-	if !ip.IsValid() || !t.isInit() {
+	if !ip.IsValid() {
 		return false
 	}
 
@@ -404,7 +383,7 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	var zero V
 
-	if !ip.IsValid() || !t.isInit() {
+	if !ip.IsValid() {
 		return zero, false
 	}
 
@@ -461,7 +440,7 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 func (t *Table[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
 	var zero V
 
-	if !pfx.IsValid() || !t.isInit() {
+	if !pfx.IsValid() {
 		return zero, false
 	}
 
@@ -479,7 +458,7 @@ func (t *Table[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
 // If LookupPrefixLPM is to be used for IP addresses,
 // they must be converted to /32 or /128 prefixes.
 func (t *Table[V]) LookupPrefixLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) {
-	if !pfx.IsValid() || !t.isInit() {
+	if !pfx.IsValid() {
 		return
 	}
 
@@ -570,7 +549,7 @@ func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V, 
 
 // OverlapsPrefix reports whether any IP in pfx is matched by a route in the table or vice versa.
 func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
-	if !pfx.IsValid() || !t.isInit() {
+	if !pfx.IsValid() {
 		return false
 	}
 
@@ -630,7 +609,7 @@ func (t *Table[V]) Overlaps4(o *Table[V]) bool {
 	}
 
 	// t and o are already intialized (size4 != 0)
-	return t.root4.overlapsRec(o.root4)
+	return t.root4.overlapsRec(&o.root4)
 }
 
 // Overlaps6 reports whether any IPv6 in the table matches a route in the
@@ -641,22 +620,15 @@ func (t *Table[V]) Overlaps6(o *Table[V]) bool {
 	}
 
 	// t and o are already intialized (size6 != 0)
-	return t.root6.overlapsRec(o.root6)
+	return t.root6.overlapsRec(&o.root6)
 }
 
 // Union combines two tables, changing the receiver table.
 // If there are duplicate entries, the payload of type V is shallow copied from the other table.
 // If type V implements the [Cloner] interface, the values are cloned, see also [Table.Clone].
 func (t *Table[V]) Union(o *Table[V]) {
-	// nothing to do
-	if !o.isInit() {
-		return
-	}
-
-	t.initOnce()
-
-	dup4 := t.root4.unionRec(o.root4)
-	dup6 := t.root6.unionRec(o.root6)
+	dup4 := t.root4.unionRec(&o.root4)
+	dup6 := t.root6.unionRec(&o.root6)
 
 	t.size4 += o.size4 - dup4
 	t.size6 += o.size6 - dup6
@@ -666,12 +638,9 @@ func (t *Table[V]) Union(o *Table[V]) {
 // The payload of type V is shallow copied, but if type V implements the [Cloner] interface, the values are cloned.
 func (t *Table[V]) Clone() *Table[V] {
 	c := new(Table[V])
-	if !t.isInit() {
-		return c
-	}
 
-	c.root4 = t.root4.cloneRec()
-	c.root6 = t.root6.cloneRec()
+	c.root4 = *(t.root4.cloneRec())
+	c.root6 = *(t.root6.cloneRec())
 
 	c.size4 = t.size4
 	c.size6 = t.size6
