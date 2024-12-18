@@ -36,18 +36,10 @@ var zeroPath [16]byte
 // the intended trade-off to prevent memory consumption from exploding.
 type node[V any] struct {
 	// prefixes contains the routes with payload V
-	prefixes *sparse.Array[V]
+	prefixes sparse.Array[V]
 
 	// children, recursively spans the trie with a branching factor of 256
-	children *sparse.Array[*node[V]]
-}
-
-// newNode with sparse arrays for prefixes and children.
-func newNode[V any]() *node[V] {
-	return &node[V]{
-		prefixes: new(sparse.Array[V]),
-		children: new(sparse.Array[*node[V]]),
-	}
+	children sparse.Array[*node[V]]
 }
 
 // isEmpty returns true if node has neither prefixes nor children.
@@ -288,7 +280,7 @@ func (n *node[V]) unionRec(o *node[V]) (duplicates int) {
 
 // cloneRec, clones the node recursive.
 func (n *node[V]) cloneRec() *node[V] {
-	c := newNode[V]()
+	c := new(node[V])
 	if n.isEmpty() {
 		return c
 	}

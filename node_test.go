@@ -62,7 +62,7 @@ func TestPrefixInsert(t *testing.T) {
 
 	pfxs := shuffleStridePfxs(allStridePfxs())[:100]
 	gold := goldStrideTbl[int](pfxs)
-	fast := newNode[int]()
+	fast := new(node[int])
 
 	for _, pfx := range pfxs {
 		fast.prefixes.InsertAt(pfxToIdx(pfx.octet, pfx.bits), pfx.val)
@@ -83,7 +83,7 @@ func TestPrefixDelete(t *testing.T) {
 	// Compare route deletion to our reference table.
 	pfxs := shuffleStridePfxs(allStridePfxs())[:100]
 	gold := goldStrideTbl[int](pfxs)
-	fast := newNode[int]()
+	fast := new(node[int])
 
 	for _, pfx := range pfxs {
 		fast.prefixes.InsertAt(pfxToIdx(pfx.octet, pfx.bits), pfx.val)
@@ -115,7 +115,7 @@ func TestOverlapsPrefix(t *testing.T) {
 
 	pfxs := shuffleStridePfxs(allStridePfxs())[:100]
 	gold := goldStrideTbl[int](pfxs)
-	fast := newNode[int]()
+	fast := new(node[int])
 
 	for _, pfx := range pfxs {
 		fast.prefixes.InsertAt(pfxToIdx(pfx.octet, pfx.bits), pfx.val)
@@ -144,7 +144,7 @@ func TestOverlapsNode(t *testing.T) {
 		pfxs := all[:numEntries]
 
 		gold := goldStrideTbl[int](pfxs)
-		fast := newNode[int]()
+		fast := new(node[int])
 
 		for _, pfx := range pfxs {
 			fast.prefixes.InsertAt(pfxToIdx(pfx.octet, pfx.bits), pfx.val)
@@ -152,7 +152,7 @@ func TestOverlapsNode(t *testing.T) {
 
 		inter := all[numEntries : 2*numEntries]
 		goldInter := goldStrideTbl[int](inter)
-		fastInter := newNode[int]()
+		fastInter := new(node[int])
 
 		for _, pfx := range inter {
 			fastInter.prefixes.InsertAt(pfxToIdx(pfx.octet, pfx.bits), pfx.val)
@@ -179,13 +179,13 @@ func BenchmarkNodePrefixInsert(b *testing.B) {
 	routes := shuffleStridePfxs(allStridePfxs())
 
 	for _, nroutes := range prefixCount {
-		node := newNode[int]()
+		this := new(node[int])
 
 		for i, route := range routes {
 			if i >= nroutes {
 				break
 			}
-			node.prefixes.InsertAt(pfxToIdx(route.octet, route.bits), 0)
+			this.prefixes.InsertAt(pfxToIdx(route.octet, route.bits), 0)
 		}
 
 		b.Run(fmt.Sprintf("Into %d", nroutes), func(b *testing.B) {
@@ -193,7 +193,7 @@ func BenchmarkNodePrefixInsert(b *testing.B) {
 
 			b.ResetTimer()
 			for range b.N {
-				node.prefixes.InsertAt(pfxToIdx(route.octet, route.bits), 0)
+				this.prefixes.InsertAt(pfxToIdx(route.octet, route.bits), 0)
 			}
 		})
 	}
@@ -203,13 +203,13 @@ func BenchmarkNodePrefixUpdate(b *testing.B) {
 	routes := shuffleStridePfxs(allStridePfxs())
 
 	for _, nroutes := range prefixCount {
-		node := newNode[int]()
+		this := new(node[int])
 
 		for i, route := range routes {
 			if i >= nroutes {
 				break
 			}
-			node.prefixes.InsertAt(pfxToIdx(route.octet, route.bits), 0)
+			this.prefixes.InsertAt(pfxToIdx(route.octet, route.bits), 0)
 		}
 
 		b.Run(fmt.Sprintf("In %d", nroutes), func(b *testing.B) {
@@ -217,7 +217,7 @@ func BenchmarkNodePrefixUpdate(b *testing.B) {
 
 			b.ResetTimer()
 			for range b.N {
-				node.prefixes.UpdateAt(pfxToIdx(route.octet, route.bits), func(int, bool) int { return 1 })
+				this.prefixes.UpdateAt(pfxToIdx(route.octet, route.bits), func(int, bool) int { return 1 })
 			}
 		})
 	}
@@ -227,13 +227,13 @@ func BenchmarkNodePrefixDelete(b *testing.B) {
 	routes := shuffleStridePfxs(allStridePfxs())
 
 	for _, nroutes := range prefixCount {
-		node := newNode[int]()
+		this := new(node[int])
 
 		for i, route := range routes {
 			if i >= nroutes {
 				break
 			}
-			node.prefixes.InsertAt(pfxToIdx(route.octet, route.bits), 0)
+			this.prefixes.InsertAt(pfxToIdx(route.octet, route.bits), 0)
 		}
 
 		b.Run(fmt.Sprintf("From %d", nroutes), func(b *testing.B) {
@@ -241,7 +241,7 @@ func BenchmarkNodePrefixDelete(b *testing.B) {
 
 			b.ResetTimer()
 			for range b.N {
-				node.prefixes.DeleteAt(pfxToIdx(route.octet, route.bits))
+				this.prefixes.DeleteAt(pfxToIdx(route.octet, route.bits))
 			}
 		})
 	}
@@ -253,13 +253,13 @@ func BenchmarkNodePrefixLPM(b *testing.B) {
 	routes := shuffleStridePfxs(allStridePfxs())
 
 	for _, nroutes := range prefixCount {
-		node := newNode[int]()
+		this := new(node[int])
 
 		for i, route := range routes {
 			if i >= nroutes {
 				break
 			}
-			node.prefixes.InsertAt(pfxToIdx(route.octet, route.bits), 0)
+			this.prefixes.InsertAt(pfxToIdx(route.octet, route.bits), 0)
 		}
 
 		b.Run(fmt.Sprintf("IN %d", nroutes), func(b *testing.B) {
@@ -267,7 +267,7 @@ func BenchmarkNodePrefixLPM(b *testing.B) {
 
 			b.ResetTimer()
 			for range b.N {
-				_, writeSink, _ = node.lpm(pfxToIdx(route.octet, route.bits))
+				_, writeSink, _ = this.lpm(pfxToIdx(route.octet, route.bits))
 			}
 		})
 	}
@@ -277,19 +277,19 @@ func BenchmarkNodePrefixesAsSlice(b *testing.B) {
 	routes := shuffleStridePfxs(allStridePfxs())
 
 	for _, nroutes := range prefixCount {
-		node := newNode[int]()
+		this := new(node[int])
 
 		for i, route := range routes {
 			if i >= nroutes {
 				break
 			}
-			node.prefixes.InsertAt(pfxToIdx(route.octet, route.bits), 0)
+			this.prefixes.InsertAt(pfxToIdx(route.octet, route.bits), 0)
 		}
 
 		b.Run(fmt.Sprintf("Set %d", nroutes), func(b *testing.B) {
 			b.ResetTimer()
 			for range b.N {
-				node.prefixes.BitSet.AsSlice(make([]uint, 0, maxNodePrefixes))
+				this.prefixes.BitSet.AsSlice(make([]uint, 0, maxNodePrefixes))
 			}
 		})
 	}
@@ -300,14 +300,14 @@ func BenchmarkNodePrefixIntersectionCardinality(b *testing.B) {
 	routes2 := shuffleStridePfxs(allStridePfxs())
 
 	for _, nroutes := range prefixCount {
-		node := newNode[int]()
-		other := newNode[int]()
+		this := new(node[int])
+		other := new(node[int])
 
 		for i, route := range routes1 {
 			if i >= nroutes {
 				break
 			}
-			node.prefixes.InsertAt(pfxToIdx(route.octet, route.bits), 0)
+			this.prefixes.InsertAt(pfxToIdx(route.octet, route.bits), 0)
 		}
 
 		for i, route := range routes2 {
@@ -320,7 +320,7 @@ func BenchmarkNodePrefixIntersectionCardinality(b *testing.B) {
 		b.Run(fmt.Sprintf("With %d", nroutes), func(b *testing.B) {
 			b.ResetTimer()
 			for range b.N {
-				node.prefixes.BitSet.IntersectionCardinality(other.prefixes.BitSet)
+				this.prefixes.BitSet.IntersectionCardinality(other.prefixes.BitSet)
 			}
 		})
 	}
@@ -328,11 +328,11 @@ func BenchmarkNodePrefixIntersectionCardinality(b *testing.B) {
 
 func BenchmarkNodeChildInsert(b *testing.B) {
 	for _, nchilds := range childCount {
-		node := newNode[int]()
+		this := new(node[int])
 
 		for range nchilds {
 			octet := rand.Intn(maxNodeChildren)
-			node.children.InsertAt(uint(octet), nil)
+			this.children.InsertAt(uint(octet), nil)
 		}
 
 		b.Run(fmt.Sprintf("Into %d", nchilds), func(b *testing.B) {
@@ -340,7 +340,7 @@ func BenchmarkNodeChildInsert(b *testing.B) {
 
 			b.ResetTimer()
 			for range b.N {
-				node.children.InsertAt(uint(octet), nil)
+				this.children.InsertAt(uint(octet), nil)
 			}
 		})
 	}
@@ -348,11 +348,11 @@ func BenchmarkNodeChildInsert(b *testing.B) {
 
 func BenchmarkNodeChildDelete(b *testing.B) {
 	for _, nchilds := range childCount {
-		node := newNode[int]()
+		this := new(node[int])
 
 		for range nchilds {
 			octet := rand.Intn(maxNodeChildren)
-			node.children.InsertAt(uint(octet), nil)
+			this.children.InsertAt(uint(octet), nil)
 		}
 
 		b.Run(fmt.Sprintf("From %d", nchilds), func(b *testing.B) {
@@ -360,7 +360,7 @@ func BenchmarkNodeChildDelete(b *testing.B) {
 
 			b.ResetTimer()
 			for range b.N {
-				node.children.DeleteAt(uint(octet))
+				this.children.DeleteAt(uint(octet))
 			}
 		})
 	}
@@ -368,17 +368,17 @@ func BenchmarkNodeChildDelete(b *testing.B) {
 
 func BenchmarkNodeChildrenAsSlice(b *testing.B) {
 	for _, nchilds := range childCount {
-		node := newNode[int]()
+		this := new(node[int])
 
 		for range nchilds {
 			octet := byte(rand.Intn(maxNodeChildren))
-			node.children.InsertAt(uint(octet), nil)
+			this.children.InsertAt(uint(octet), nil)
 		}
 
 		b.Run(fmt.Sprintf("Set %d", nchilds), func(b *testing.B) {
 			b.ResetTimer()
 			for range b.N {
-				node.children.BitSet.AsSlice(make([]uint, 0, maxNodeChildren))
+				this.children.BitSet.AsSlice(make([]uint, 0, maxNodeChildren))
 			}
 		})
 	}
@@ -386,12 +386,12 @@ func BenchmarkNodeChildrenAsSlice(b *testing.B) {
 
 func BenchmarkNodeChildIntersectionCardinality(b *testing.B) {
 	for _, nchilds := range childCount {
-		node := newNode[int]()
-		other := newNode[int]()
+		this := new(node[int])
+		other := new(node[int])
 
 		for range nchilds {
 			octet := byte(rand.Intn(maxNodeChildren))
-			node.children.InsertAt(uint(octet), nil)
+			this.children.InsertAt(uint(octet), nil)
 
 			octet = byte(rand.Intn(maxNodeChildren))
 			other.children.InsertAt(uint(octet), nil)
@@ -400,7 +400,7 @@ func BenchmarkNodeChildIntersectionCardinality(b *testing.B) {
 		b.Run(fmt.Sprintf("With %d", nchilds), func(b *testing.B) {
 			b.ResetTimer()
 			for range b.N {
-				node.children.BitSet.IntersectionCardinality(other.children.BitSet)
+				this.children.BitSet.IntersectionCardinality(other.children.BitSet)
 			}
 		})
 	}
