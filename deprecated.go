@@ -15,7 +15,7 @@ import (
 //
 // Deprecated: EachLookupPrefix is deprecated. Use [Table.Supernets] instead.
 func (t *Table[V]) EachLookupPrefix(pfx netip.Prefix, yield func(pfx netip.Prefix, val V) bool) {
-	if !pfx.IsValid() || !t.isInit() {
+	if !pfx.IsValid() {
 		return
 	}
 	// values derived from pfx
@@ -99,7 +99,7 @@ func (t *Table[V]) EachLookupPrefix(pfx netip.Prefix, yield func(pfx netip.Prefi
 //
 // Deprecated: EachSubnet is deprecated. Use [Table.Subnets] instead.
 func (t *Table[V]) EachSubnet(pfx netip.Prefix, yield func(pfx netip.Prefix, val V) bool) {
-	if !pfx.IsValid() || !t.isInit() {
+	if !pfx.IsValid() {
 		return
 	}
 

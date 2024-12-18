@@ -11,7 +11,7 @@ import (
 // The iteration is in reverse CIDR sort order, from longest-prefix-match to shortest-prefix-match.
 func (t *Table[V]) Supernets(pfx netip.Prefix) func(yield func(netip.Prefix, V) bool) {
 	return func(yield func(netip.Prefix, V) bool) {
-		if !pfx.IsValid() || !t.isInit() {
+		if !pfx.IsValid() {
 			return
 		}
 
@@ -95,7 +95,7 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) func(yield func(netip.Prefix, V) 
 // The iteration is in natural CIDR sort order.
 func (t *Table[V]) Subnets(pfx netip.Prefix) func(yield func(netip.Prefix, V) bool) {
 	return func(yield func(netip.Prefix, V) bool) {
-		if !pfx.IsValid() || !t.isInit() {
+		if !pfx.IsValid() {
 			return
 		}
 
@@ -147,10 +147,6 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) func(yield func(netip.Prefix, V) bo
 // next.
 func (t *Table[V]) All() func(yield func(pfx netip.Prefix, val V) bool) {
 	return func(yield func(netip.Prefix, V) bool) {
-		if !t.isInit() {
-			return
-		}
-
 		_ = t.root4.allRec(zeroPath, 0, true, yield) && t.root6.allRec(zeroPath, 0, false, yield)
 	}
 }
@@ -158,10 +154,6 @@ func (t *Table[V]) All() func(yield func(pfx netip.Prefix, val V) bool) {
 // All4, like [Table.All] but only for the v4 routing table.
 func (t *Table[V]) All4() func(yield func(pfx netip.Prefix, val V) bool) {
 	return func(yield func(netip.Prefix, V) bool) {
-		if !t.isInit() {
-			return
-		}
-
 		_ = t.root4.allRec(zeroPath, 0, true, yield)
 	}
 }
@@ -169,10 +161,6 @@ func (t *Table[V]) All4() func(yield func(pfx netip.Prefix, val V) bool) {
 // All6, like [Table.All] but only for the v6 routing table.
 func (t *Table[V]) All6() func(yield func(pfx netip.Prefix, val V) bool) {
 	return func(yield func(netip.Prefix, V) bool) {
-		if !t.isInit() {
-			return
-		}
-
 		_ = t.root6.allRec(zeroPath, 0, false, yield)
 	}
 }
@@ -180,10 +168,6 @@ func (t *Table[V]) All6() func(yield func(pfx netip.Prefix, val V) bool) {
 // AllSorted returns an iterator over key-value pairs from Table in natural CIDR sort order.
 func (t *Table[V]) AllSorted() func(yield func(pfx netip.Prefix, val V) bool) {
 	return func(yield func(netip.Prefix, V) bool) {
-		if !t.isInit() {
-			return
-		}
-
 		_ = t.root4.allRecSorted(zeroPath, 0, true, yield) && t.root6.allRecSorted(zeroPath, 0, false, yield)
 	}
 }
@@ -191,10 +175,6 @@ func (t *Table[V]) AllSorted() func(yield func(pfx netip.Prefix, val V) bool) {
 // AllSorted4, like [Table.AllSorted] but only for the v4 routing table.
 func (t *Table[V]) AllSorted4() func(yield func(pfx netip.Prefix, val V) bool) {
 	return func(yield func(netip.Prefix, V) bool) {
-		if !t.isInit() {
-			return
-		}
-
 		_ = t.root4.allRecSorted(zeroPath, 0, true, yield)
 	}
 }
@@ -202,10 +182,6 @@ func (t *Table[V]) AllSorted4() func(yield func(pfx netip.Prefix, val V) bool) {
 // AllSorted6, like [Table.AllSorted] but only for the v6 routing table.
 func (t *Table[V]) AllSorted6() func(yield func(pfx netip.Prefix, val V) bool) {
 	return func(yield func(netip.Prefix, V) bool) {
-		if !t.isInit() {
-			return
-		}
-
 		_ = t.root6.allRecSorted(zeroPath, 0, false, yield)
 	}
 }

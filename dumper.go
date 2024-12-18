@@ -59,7 +59,7 @@ func (t *Table[V]) dumpString() string {
 //
 // ...
 func (t *Table[V]) dump(w io.Writer) {
-	if !t.isInit() {
+	if t.Size() == 0 {
 		fmt.Fprint(w, "")
 
 		return

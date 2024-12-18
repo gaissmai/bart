@@ -17,7 +17,7 @@ import (
 
 // numNodesRec, calculate the number of nodes under n.
 func (n *node[V]) numNodesRec() int {
-	if n == nil {
+	if n == nil || n.isEmpty() {
 		return 0
 	}
 

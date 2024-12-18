@@ -532,13 +532,13 @@ func TestDelete(t *testing.T) {
 			{"10.0.0.1", 1},
 			{"255.255.255.255", -1},
 		})
-		checkNumNodes(t, rtbl, 2)
+		checkNumNodes(t, rtbl, 1)
 		rtbl.Delete(mpp("10.0.0.0/8"))
 		checkRoutes(t, rtbl, []tableTest{
 			{"10.0.0.1", -1},
 			{"255.255.255.255", -1},
 		})
-		checkNumNodes(t, rtbl, 2)
+		checkNumNodes(t, rtbl, 0)
 	})
 
 	t.Run("prefix_in_leaf", func(t *testing.T) {
@@ -557,7 +557,7 @@ func TestDelete(t *testing.T) {
 			{"192.168.0.1", -1},
 			{"255.255.255.255", -1},
 		})
-		checkNumNodes(t, rtbl, 2)
+		checkNumNodes(t, rtbl, 0)
 	})
 
 	t.Run("intermediate_no_routes", func(t *testing.T) {
@@ -572,14 +572,14 @@ func TestDelete(t *testing.T) {
 			{"192.180.0.1", 2},
 			{"192.40.0.1", -1},
 		})
-		checkNumNodes(t, tbl, 7) // 2 roots, 3 intermediate, 2 leaves
+		checkNumNodes(t, tbl, 6) // 1 root4, 3 intermediate, 2 leaves
 		tbl.Delete(mpp("192.180.0.1/32"))
 		checkRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.180.0.1", -1},
 			{"192.40.0.1", -1},
 		})
-		checkNumNodes(t, tbl, 5) // 2 roots, 2 intermediates, 1 leaf
+		checkNumNodes(t, tbl, 4) // 1 root4, 2 intermediates, 1 leaf
 	})
 
 	t.Run("intermediate_with_route", func(t *testing.T) {
@@ -596,7 +596,7 @@ func TestDelete(t *testing.T) {
 			{"192.40.0.1", 3},
 			{"192.255.0.1", -1},
 		})
-		checkNumNodes(t, rtbl, 7) // 2 roots, 2 intermediates, 2 leaves
+		checkNumNodes(t, rtbl, 6) // 1 root4, 2 intermediates, 2 leaves
 		rtbl.Delete(mpp("192.180.0.1/32"))
 		checkRoutes(t, rtbl, []tableTest{
 			{"192.168.0.1", 1},
@@ -604,7 +604,7 @@ func TestDelete(t *testing.T) {
 			{"192.40.0.1", 3},
 			{"192.255.0.1", -1},
 		})
-		checkNumNodes(t, rtbl, 5) // 2 roots, 1 full, 1 intermediate, 1 leaf
+		checkNumNodes(t, rtbl, 4) // 1 root4, 1 full, 1 intermediate, 1 leaf
 	})
 
 	t.Run("intermediate_many_leaves", func(t *testing.T) {
@@ -621,7 +621,7 @@ func TestDelete(t *testing.T) {
 			{"192.200.0.1", 3},
 			{"192.255.0.1", -1},
 		})
-		checkNumNodes(t, rtbl, 9) // 2 roots, 4 intermediate, 3 leaves
+		checkNumNodes(t, rtbl, 8) // 1 root4, 4 intermediate, 3 leaves
 		rtbl.Delete(mpp("192.180.0.1/32"))
 		checkRoutes(t, rtbl, []tableTest{
 			{"192.168.0.1", 1},
@@ -629,7 +629,7 @@ func TestDelete(t *testing.T) {
 			{"192.200.0.1", 3},
 			{"192.255.0.1", -1},
 		})
-		checkNumNodes(t, rtbl, 7) // 2 roots, 3 intermediate, 2 leaves
+		checkNumNodes(t, rtbl, 6) // 1 root4, 3 intermediate, 2 leaves
 	})
 
 	t.Run("nosuchprefix_missing_child", func(t *testing.T) {
@@ -642,13 +642,13 @@ func TestDelete(t *testing.T) {
 			{"192.168.0.1", 1},
 			{"192.255.0.1", -1},
 		})
-		checkNumNodes(t, rtbl, 5)        // 2 roots, 2 intermediate, 1 leaf
+		checkNumNodes(t, rtbl, 4)        // 1 root4, 2 intermediate, 1 leaf
 		rtbl.Delete(mpp("200.0.0.0/32")) // lookup miss in root
 		checkRoutes(t, rtbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.255.0.1", -1},
 		})
-		checkNumNodes(t, rtbl, 5) // 2 roots, 2 intermediate, 1 leaf
+		checkNumNodes(t, rtbl, 4) // 1 root4, 2 intermediate, 1 leaf
 	})
 
 	t.Run("nosuchprefix_not_in_leaf", func(t *testing.T) {
@@ -662,13 +662,13 @@ func TestDelete(t *testing.T) {
 			{"192.168.0.1", 1},
 			{"192.255.0.1", -1},
 		})
-		checkNumNodes(t, rtbl, 5)          // 2 roots, 2 intermediate, 1 leaf
+		checkNumNodes(t, rtbl, 4)          // 1 root4, 2 intermediate, 1 leaf
 		rtbl.Delete(mpp("192.168.0.5/32")) // right leaf, no route
 		checkRoutes(t, rtbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.255.0.1", -1},
 		})
-		checkNumNodes(t, rtbl, 5) // 2 roots, 2 intermediate, 1 leaf
+		checkNumNodes(t, rtbl, 4) // 1 root4, 2 intermediate, 1 leaf
 	})
 
 	t.Run("intermediate_with_deleted_route", func(t *testing.T) {
@@ -684,14 +684,14 @@ func TestDelete(t *testing.T) {
 			{"192.168.0.2", 2},
 			{"192.255.0.1", -1},
 		})
-		checkNumNodes(t, rtbl, 5) // 2 roots, 1 intermediate, 1 full, 1 leaf
+		checkNumNodes(t, rtbl, 4) // 1 root4, 1 intermediate, 1 full, 1 leaf
 		rtbl.Delete(mpp("192.168.0.0/22"))
 		checkRoutes(t, rtbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.168.0.2", -1},
 			{"192.255.0.1", -1},
 		})
-		checkNumNodes(t, rtbl, 5) // 2 roots, 2 intermediate, 1 leaf
+		checkNumNodes(t, rtbl, 4) // 1 root4, 2 intermediate, 1 leaf
 	})
 
 	t.Run("default_route", func(t *testing.T) {
@@ -707,7 +707,7 @@ func TestDelete(t *testing.T) {
 			{"1.2.3.4", -1},
 			{"::1", 1},
 		})
-		checkNumNodes(t, rtbl, 2) // 2 roots
+		checkNumNodes(t, rtbl, 1) // 1 root6
 	})
 }
 
@@ -1051,7 +1051,6 @@ func TestDeleteIsReverseOfInsert(t *testing.T) {
 	const N = 10_000
 
 	tbl := new(Table[int])
-	tbl.initOnce()
 	want := tbl.dumpString()
 
 	prefixes := randomPrefixes(N)
@@ -1792,138 +1791,6 @@ func TestSize(t *testing.T) {
 
 	if golden6 != rtbl.Size6() {
 		t.Errorf("Size6: want: %d, got: %d", golden6, rtbl.Size6())
-	}
-}
-
-func TestInitTableIsEmpty(t *testing.T) {
-	rt := new(Table[byte])
-	ot := new(Table[byte])
-
-	pfx := mpp("1.2.3.4/32")
-
-	_ = rt.String()
-	if rt.isInit() {
-		t.Error("String() changed the init state of Table")
-	}
-
-	_ = rt.Fprint(nil)
-	if rt.isInit() {
-		t.Error("Fprint() changed the init state of Table")
-	}
-
-	_, _ = rt.MarshalText()
-	if rt.isInit() {
-		t.Error("MarshalText() changed the init state of Table")
-	}
-
-	_, _ = rt.MarshalJSON()
-	if rt.isInit() {
-		t.Error("MarshalJSON() changed the init state of Table")
-	}
-
-	_ = rt.DumpList4()
-	if rt.isInit() {
-		t.Error("DumpList4() changed the init state of Table")
-	}
-
-	_ = rt.DumpList6()
-	if rt.isInit() {
-		t.Error("DumpList6() changed the init state of Table")
-	}
-
-	_, _ = rt.Get(pfx)
-	if rt.isInit() {
-		t.Error("Get() changed the init state of Table")
-	}
-
-	_, _ = rt.Lookup(pfx.Addr())
-	if rt.isInit() {
-		t.Error("Lookup() changed the init state of Table")
-	}
-
-	_, _ = rt.LookupPrefix(pfx)
-	if rt.isInit() {
-		t.Error("LookupPrefix() changed the init state of Table")
-	}
-
-	_, _, _ = rt.LookupPrefixLPM(pfx)
-	if rt.isInit() {
-		t.Error("LookupPrefixLPM() changed the init state of Table")
-	}
-
-	_ = rt.OverlapsPrefix(pfx)
-	if rt.isInit() {
-		t.Error("OverlapsPrefix() changed the init state of Table")
-	}
-
-	_ = rt.Overlaps(ot)
-	if rt.isInit() {
-		t.Error("Overlaps() changed the init state of Table")
-	}
-
-	rt.Union(ot)
-	if rt.isInit() || ot.isInit() {
-		t.Error("Union() changed the init state of Table")
-	}
-
-	_ = rt.Clone()
-	if rt.isInit() {
-		t.Error("Clone() changed the init state of Table")
-	}
-
-	_ = rt.Size()
-	if rt.isInit() {
-		t.Error("Size() changed the init state of Table")
-	}
-
-	_ = rt.Size4()
-	if rt.isInit() {
-		t.Error("Size4() changed the init state of Table")
-	}
-
-	_ = rt.Size6()
-	if rt.isInit() {
-		t.Error("Size6() changed the init state of Table")
-	}
-
-	_ = rt.All()
-	if rt.isInit() {
-		t.Error("All() changed the init state of Table")
-	}
-
-	_ = rt.All4()
-	if rt.isInit() {
-		t.Error("All4() changed the init state of Table")
-	}
-
-	_ = rt.All6()
-	if rt.isInit() {
-		t.Error("All6() changed the init state of Table")
-	}
-
-	_ = rt.AllSorted()
-	if rt.isInit() {
-		t.Error("AllSorted() changed the init state of Table")
-	}
-
-	_ = rt.AllSorted4()
-	if rt.isInit() {
-		t.Error("AllSorted4() changed the init state of Table")
-	}
-
-	_ = rt.AllSorted6()
-	if rt.isInit() {
-		t.Error("AllSorted6() changed the init state of Table")
-	}
-
-	_ = rt.Subnets(pfx)
-	if rt.isInit() {
-		t.Error("Subnets() changed the init state of Table")
-	}
-
-	_ = rt.Supernets(pfx)
-	if rt.isInit() {
-		t.Error("Supernets() changed the init state of Table")
 	}
 }
 

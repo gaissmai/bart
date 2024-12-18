@@ -26,16 +26,6 @@ type jsonTest struct {
 	want  string
 }
 
-func TestJSONEmpty(t *testing.T) {
-	t.Parallel()
-	tbl := new(Table[any])
-	_, err := tbl.MarshalJSON()
-	want := "table not initialized"
-	if err.Error() != want {
-		t.Errorf("expected err: %q, got %q", want, err)
-	}
-}
-
 func TestJSONDefaultRouteV4(t *testing.T) {
 	t.Parallel()
 	tbl := new(Table[any])
