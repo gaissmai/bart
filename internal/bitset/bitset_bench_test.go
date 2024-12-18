@@ -13,7 +13,7 @@ import (
 	"testing"
 )
 
-func BenchmarkRankChild(b *testing.B) {
+func BenchmarkBitSetRankChild(b *testing.B) {
 	var bs BitSet
 	for range 200 {
 		bs = bs.Set(uint(rand.IntN(256)))
@@ -39,7 +39,7 @@ func BenchmarkRankChild(b *testing.B) {
 	}
 }
 
-func BenchmarkRankPrefix(b *testing.B) {
+func BenchmarkBitSetRankPrefix(b *testing.B) {
 	var bs BitSet
 	for range 200 {
 		bs = bs.Set(uint(rand.IntN(512)))
@@ -65,7 +65,7 @@ func BenchmarkRankPrefix(b *testing.B) {
 	}
 }
 
-func BenchmarkInPlace(b *testing.B) {
+func BenchmarkBitSetInPlace(b *testing.B) {
 	bs := BitSet([]uint64{})
 	cs := BitSet([]uint64{})
 	for range 200 {
