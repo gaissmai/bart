@@ -101,15 +101,15 @@ Please see the extensive [benchmarks](https://github.com/gaissmai/iprbench) comp
 Just a teaser, LPM lookups against the full Internet routing table with random probes:
 
 ```
+$ go test -run=xxx -benchmem -cpu=1 -bench=Full/Contains
 goos: linux
 goarch: amd64
 pkg: github.com/gaissmai/bart
 cpu: Intel(R) Core(TM) i5-8250U CPU @ 1.60GHz
-
-BenchmarkFullMatchV4/Lookup                     24484828            49.03 ns/op
-BenchmarkFullMatchV6/Lookup                     17098262            70.15 ns/op
-BenchmarkFullMissV4/Lookup                      24480925            49.15 ns/op
-BenchmarkFullMissV6/Lookup                      54955310            21.79 ns/op
+BenchmarkFullMatchV4/Contains  30738159	  37.30 ns/op	0 B/op	0 allocs/op
+BenchmarkFullMatchV6/Contains  34828777	  33.19 ns/op	0 B/op	0 allocs/op
+BenchmarkFullMissV4/Contains   44398612	  24.46 ns/op	0 B/op	0 allocs/op
+BenchmarkFullMissV6/Contains   83133955	  13.59 ns/op	0 B/op	0 allocs/op
 ```
 
 ## CONTRIBUTION
