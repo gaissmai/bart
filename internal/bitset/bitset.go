@@ -216,7 +216,7 @@ func (b BitSet) Size() int {
 // that are set in the bitset.
 func (b BitSet) Rank(i uint) int {
 	// inlined popcount to make Rank inlineable
-	var answer int
+	var rnk int
 
 	i++ // Rank count is inclusive
 	wordIdx := i >> 6
@@ -225,22 +225,22 @@ func (b BitSet) Rank(i uint) int {
 	if int(wordIdx) >= len(b) {
 		// inlined popcount, whole slice
 		for _, x := range b {
-			answer += bits.OnesCount64(x)
+			rnk += bits.OnesCount64(x)
 		}
-		return answer
+		return rnk
 	}
 
 	// inlined popcount, partial slice
 	for _, x := range b[:wordIdx] {
-		answer += bits.OnesCount64(x)
+		rnk += bits.OnesCount64(x)
 	}
 
 	if bitsIdx == 0 {
-		return answer
+		return rnk
 	}
 
 	// plus partial word
-	return answer + bits.OnesCount64(b[wordIdx]<<(64-bitsIdx))
+	return rnk + bits.OnesCount64(b[wordIdx]<<(64-bitsIdx))
 }
 
 // popcount
