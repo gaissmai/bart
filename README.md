@@ -35,7 +35,7 @@ The prefix and child arrays at each stride level are popcount compressed sparse 
 
 ## API
 
-The API has changed in v0.4.2, 0.5.3, v0.6.3, v0.10.1, v0.11.0, v0.12.0, v0.12.6
+The API has changed in ..., v0.10.1, v0.11.0, v0.12.0, v0.12.6, v0.16.0
 
 ```golang
   import "github.com/gaissmai/bart"
