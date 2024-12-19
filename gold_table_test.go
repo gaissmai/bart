@@ -113,6 +113,7 @@ func (t *goldTable[V]) lookupPfxLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, 
 	return
 }
 
+/*
 func (t *goldTable[V]) subnets(pfx netip.Prefix) []netip.Prefix {
 	var result []netip.Prefix
 
@@ -124,6 +125,7 @@ func (t *goldTable[V]) subnets(pfx netip.Prefix) []netip.Prefix {
 	slices.SortFunc(result, cmpPrefix)
 	return result
 }
+*/
 
 func (t *goldTable[V]) lookupPrefixReverse(pfx netip.Prefix) []netip.Prefix {
 	var result []netip.Prefix
