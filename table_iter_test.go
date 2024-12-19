@@ -8,6 +8,7 @@ package bart
 import (
 	"net/netip"
 	"reflect"
+	"slices"
 	"testing"
 )
 
@@ -396,4 +397,20 @@ func TestSubnets(t *testing.T) {
 			t.Errorf("Subnet(%v), got: %v, want: %v", pfx, v.(string), val)
 		}
 	}
+}
+
+func (t *goldTable[V]) lookupPrefixReverse(pfx netip.Prefix) []netip.Prefix {
+	var result []netip.Prefix
+
+	for _, item := range *t {
+		if item.pfx.Overlaps(pfx) && item.pfx.Bits() <= pfx.Bits() {
+			result = append(result, item.pfx)
+		}
+	}
+
+	// b,a reverse sort order!
+	slices.SortFunc(result, func(a, b netip.Prefix) int {
+		return cmpPrefix(b, a)
+	})
+	return result
 }
