@@ -35,26 +35,20 @@ func bIdx(i uint) uint {
 	return i & 63 // (i % 64) but faster
 }
 
-// wordsNeeded calculates the last word in slice for bit i.
-func wordsNeeded(i uint) int {
-	return wIdx(i + wordSize)
-}
-
 // grow adds additional words if needed.
 func (b BitSet) grow(i uint) BitSet {
-	words := wordsNeeded(i)
+	wordsNeeded := int((i + wordSize) >> lg64)
 
 	switch {
 	case b == nil:
-		b = make([]uint64, words)
-	case cap(b) >= words:
-		b = b[:words]
-	case len(b) < words:
-		newset := make([]uint64, words)
+		return make([]uint64, wordsNeeded)
+	case cap(b) >= wordsNeeded:
+		return b[:wordsNeeded]
+	default:
+		newset := make([]uint64, wordsNeeded)
 		copy(newset, b)
-		b = newset
+		return newset
 	}
-	return b
 }
 
 // Set bit i to 1, the capacity of the bitset is increased accordingly.
