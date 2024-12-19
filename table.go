@@ -608,8 +608,6 @@ func (t *Table[V]) Overlaps4(o *Table[V]) bool {
 	if t.size4 == 0 || o.size4 == 0 {
 		return false
 	}
-
-	// t and o are already intialized (size4 != 0)
 	return t.root4.overlapsRec(&o.root4)
 }
 
@@ -619,8 +617,6 @@ func (t *Table[V]) Overlaps6(o *Table[V]) bool {
 	if t.size6 == 0 || o.size6 == 0 {
 		return false
 	}
-
-	// t and o are already intialized (size6 != 0)
 	return t.root6.overlapsRec(&o.root6)
 }
 

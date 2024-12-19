@@ -32,7 +32,7 @@ func TestStringEmpty(t *testing.T) {
 	want := ""
 	got := tbl.String()
 	if got != want {
-		t.Errorf("table not initialized, expected %q, got %q", want, got)
+		t.Errorf("table is nil, expected %q, got %q", want, got)
 	}
 }
 
