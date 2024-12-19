@@ -20,11 +20,6 @@ const lg64 = 6
 // with a wide open public API.
 type BitSet []uint64
 
-// bitsCapacity returns the number of possible bits in the current set.
-func (b BitSet) bitsCapacity() uint {
-	return uint(len(b) * 64)
-}
-
 // xIdx calculates the index of i in a []uint64
 func wIdx(i uint) int {
 	return int(i >> lg64) // (i / 64) but faster
@@ -37,15 +32,15 @@ func bIdx(i uint) uint {
 
 // grow adds additional words if needed.
 func (b BitSet) grow(i uint) BitSet {
-	wordsNeeded := int((i + wordSize) >> lg64)
+	words := int((i + 64) >> lg64)
 
 	switch {
 	case b == nil:
-		return make([]uint64, wordsNeeded)
-	case cap(b) >= wordsNeeded:
-		return b[:wordsNeeded]
+		return make([]uint64, words)
+	case cap(b) >= words:
+		return b[:words]
 	default:
-		newset := make([]uint64, wordsNeeded)
+		newset := make([]uint64, words)
 		copy(newset, b)
 		return newset
 	}
@@ -53,27 +48,39 @@ func (b BitSet) grow(i uint) BitSet {
 
 // Set bit i to 1, the capacity of the bitset is increased accordingly.
 func (b BitSet) Set(i uint) BitSet {
-	if i >= b.bitsCapacity() {
-		b = b.grow(i)
+	// grow?
+	if i >= uint(len(b))*64 {
+		words := int((i + 64) >> lg64)
+		switch {
+		case b == nil:
+			b = make([]uint64, words)
+		case cap(b) >= words:
+			b = b[:words]
+		default:
+			newset := make([]uint64, words)
+			copy(newset, b)
+			b = newset
+		}
 	}
-	b[wIdx(i)] |= (1 << bIdx(i))
+
+	b[i>>lg64] |= 1 << (i & 63)
 	return b
 }
 
 // Clear bit i to 0.
 func (b BitSet) Clear(i uint) BitSet {
-	if i < b.bitsCapacity() {
-		b[wIdx(i)] &^= (1 << bIdx(i))
+	if i < uint(len(b))*64 {
+		b[i>>lg64] &^= 1 << (i & 63)
 	}
 	return b
 }
 
 // Test if bit i is set.
 func (b BitSet) Test(i uint) bool {
-	if i >= b.bitsCapacity() {
+	if i >= uint(len(b))*64 {
 		return false
 	}
-	return b[wIdx(i)]&(1<<bIdx(i)) != 0
+	return b[i>>lg64]&(1<<(i&63)) != 0
 }
 
 // Clone this BitSet, returning a new BitSet that has the same bits set.

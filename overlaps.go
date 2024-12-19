@@ -194,9 +194,8 @@ func (n *node[V]) overlapsChildrenIn(o *node[V]) bool {
 func (n *node[V]) overlapsSameChildrenRec(o *node[V]) bool {
 	// gimmicks, clone a bitset without heap allocation
 	// 4*64=256, maxNodeChildren
-	a4 := make([]uint64, 4)
-	copy(a4, n.children.BitSet)
-	nChildrenBitsetCloned := bitset.BitSet(a4)
+	var nChildrenBitsetCloned bitset.BitSet = make([]uint64, 4)
+	copy(nChildrenBitsetCloned, n.children.BitSet)
 
 	// intersect in place the child bitsets from n and o
 	nChildrenBitsetCloned.InPlaceIntersection(o.children.BitSet)
