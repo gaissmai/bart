@@ -127,22 +127,6 @@ func (t *goldTable[V]) subnets(pfx netip.Prefix) []netip.Prefix {
 }
 */
 
-func (t *goldTable[V]) lookupPrefixReverse(pfx netip.Prefix) []netip.Prefix {
-	var result []netip.Prefix
-
-	for _, item := range *t {
-		if item.pfx.Overlaps(pfx) && item.pfx.Bits() <= pfx.Bits() {
-			result = append(result, item.pfx)
-		}
-	}
-
-	// b,a reverse sort order!
-	slices.SortFunc(result, func(a, b netip.Prefix) int {
-		return cmpPrefix(b, a)
-	})
-	return result
-}
-
 func (t *goldTable[V]) overlapsPrefix(pfx netip.Prefix) bool {
 	for _, p := range *t {
 		if p.pfx.Overlaps(pfx) {
