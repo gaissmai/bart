@@ -3,10 +3,18 @@
 
 package bart
 
+// IdxToAllotment returns the precalculated bitset for idx.
+// Only used for fast bitset intersections instead of
+// range loops in table overlaps methods.
+//
+// Please read the ART paper ./doc/artlookup.pdf
+// to understand the allotment algorithm.
+func idxToAllot(idx uint) [8]uint64 {
+	return allotLookupTbl[idx]
+}
+
 // allotLookupTbl, as precalculated bitsets,
 // map the baseIndex to bitset with precomputed complete binary tree.
-//
-// Used for bitset intersections instead of range loops in overlaps tests.
 //
 //	  // 1 <= idx <= 511
 //		func allotRec(aTbl *bitset.BitSet, idx uint) {

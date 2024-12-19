@@ -177,7 +177,7 @@ func (n *node[V]) overlapsChildrenIn(o *node[V]) bool {
 
 	for _, idx := range allIndices {
 		// get pre alloted bitset for idx
-		a8 := allotLookupTbl[idx]
+		a8 := idxToAllot(idx)
 		prefixRoutes.InPlaceUnion(bitset.BitSet(a8[:]))
 	}
 
@@ -241,7 +241,7 @@ func (n *node[V]) overlapsOneRouteIn(o *node[V]) bool {
 	// use bitset intersection with alloted stride table instead of range loops
 
 	// copy pre alloted bitset for idx
-	a8 := allotLookupTbl[idx]
+	a8 := idxToAllot(idx)
 	allotedPrefixRoutes := bitset.BitSet(a8[:])
 
 	// use bitset intersection instead of range loops
@@ -260,7 +260,7 @@ func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 	// use bitset intersection with alloted stride table instead of range loops
 
 	// copy pre alloted bitset for idx
-	a8 := allotLookupTbl[idx]
+	a8 := idxToAllot(idx)
 	allotedPrefixRoutes := bitset.BitSet(a8[:])
 
 	// use bitset intersection instead of range loops
