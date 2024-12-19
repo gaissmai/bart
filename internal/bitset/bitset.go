@@ -10,19 +10,13 @@ package bitset
 
 import "math/bits"
 
-// the wordSize of a bit set
-const wordSize = 64
-
-// lg64 is lg(wordSize)
-const lg64 = 6
-
 // A BitSet is a slice of words. This is an internal package
 // with a wide open public API.
 type BitSet []uint64
 
 // xIdx calculates the index of i in a []uint64
 func wIdx(i uint) int {
-	return int(i >> lg64) // (i / 64) but faster
+	return int(i >> 6) // (i / 64) but faster
 }
 
 // bIdx calculates the index of i in a `uint64`
@@ -30,27 +24,11 @@ func bIdx(i uint) uint {
 	return i & 63 // (i % 64) but faster
 }
 
-// grow adds additional words if needed.
-func (b BitSet) grow(i uint) BitSet {
-	words := int((i + 64) >> lg64)
-
-	switch {
-	case b == nil:
-		return make([]uint64, words)
-	case cap(b) >= words:
-		return b[:words]
-	default:
-		newset := make([]uint64, words)
-		copy(newset, b)
-		return newset
-	}
-}
-
 // Set bit i to 1, the capacity of the bitset is increased accordingly.
 func (b BitSet) Set(i uint) BitSet {
 	// grow?
 	if i >= uint(len(b))*64 {
-		words := int((i + 64) >> lg64)
+		words := int((i + 64) >> 6)
 		switch {
 		case b == nil:
 			b = make([]uint64, words)
@@ -63,14 +41,14 @@ func (b BitSet) Set(i uint) BitSet {
 		}
 	}
 
-	b[i>>lg64] |= 1 << (i & 63)
+	b[i>>6] |= 1 << (i & 63)
 	return b
 }
 
 // Clear bit i to 0.
 func (b BitSet) Clear(i uint) BitSet {
 	if i < uint(len(b))*64 {
-		b[i>>lg64] &^= 1 << (i & 63)
+		b[i>>6] &^= 1 << (i & 63)
 	}
 	return b
 }
@@ -80,7 +58,7 @@ func (b BitSet) Test(i uint) bool {
 	if i >= uint(len(b))*64 {
 		return false
 	}
-	return b[i>>lg64]&(1<<(i&63)) != 0
+	return b[i>>6]&(1<<(i&63)) != 0
 }
 
 // Clone this BitSet, returning a new BitSet that has the same bits set.
@@ -131,7 +109,7 @@ func (b BitSet) NextSet(i uint) (uint, bool) {
 	x++
 	for j, word := range b[x:] {
 		if word != 0 {
-			return uint((x+j)<<lg64 + bits.TrailingZeros64(word)), true
+			return uint((x+j)<<6 + bits.TrailingZeros64(word)), true
 		}
 	}
 	return 0, false
@@ -149,7 +127,7 @@ func (b BitSet) AsSlice(buf []uint) []uint {
 	for idx, word := range b {
 		for ; word != 0; size++ {
 			// panics if capacity of buf is exceeded.
-			buf[size] = uint(idx<<lg64 + bits.TrailingZeros64(word))
+			buf[size] = uint(idx<<6 + bits.TrailingZeros64(word))
 
 			// clear the rightmost set bit
 			word &= word - 1
@@ -165,7 +143,7 @@ func (b BitSet) AsSlice(buf []uint) []uint {
 func (b BitSet) AppendTo(buf []uint) []uint {
 	for idx, word := range b {
 		for word != 0 {
-			buf = append(buf, uint(idx<<lg64+bits.TrailingZeros64(word)))
+			buf = append(buf, uint(idx<<6+bits.TrailingZeros64(word)))
 
 			// clear the rightmost set bit
 			word &= word - 1
@@ -241,7 +219,7 @@ func (b BitSet) Rank(i uint) int {
 	var answer int
 
 	i++ // Rank count is inclusive
-	wordIdx := i >> lg64
+	wordIdx := i >> 6
 	bitsIdx := i & 63
 
 	if int(wordIdx) >= len(b) {
