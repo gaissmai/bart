@@ -15,14 +15,14 @@ import "math/bits"
 type BitSet []uint64
 
 // xIdx calculates the index of i in a []uint64
-func wIdx(i uint) int {
-	return int(i >> 6) // (i / 64) but faster
-}
+// func wIdx(i uint) int {
+// 	return int(i >> 6) // like (i / 64) but faster
+// }
 
 // bIdx calculates the index of i in a `uint64`
-func bIdx(i uint) uint {
-	return i & 63 // (i % 64) but faster
-}
+// func bIdx(i uint) uint {
+// 	return i & 63 // like (i % 64) but faster
+// }
 
 // Set bit i to 1, the capacity of the bitset is increased accordingly.
 func (b BitSet) Set(i uint) BitSet {
