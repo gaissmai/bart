@@ -2102,3 +2102,106 @@ func (t *Table[V]) dumpAsGoldTable() goldTable[V] {
 
 	return tbl
 }
+
+func BenchmarkWorstCase(b *testing.B) {
+	b.Run("match IP4", func(b *testing.B) {
+		pfxs := []netip.Prefix{
+			mpp("250.0.0.0/8"),
+			mpp("250.255.0.0/16"),
+			mpp("250.250.255.0/24"),
+			mpp("250.250.250.255/32"),
+			mpp("250.250.250.250/32"),
+		}
+
+		tbl := new(Table[string])
+		for _, p := range pfxs {
+			tbl.Insert(p, p.String())
+		}
+
+		probe := mpa("250.250.250.251")
+		for range b.N {
+			boolSink = tbl.Contains(probe)
+		}
+	})
+
+	b.Run("miss  IP4", func(b *testing.B) {
+		pfxs := []netip.Prefix{
+			mpp("250.255.0.0/16"),
+			mpp("250.250.255.0/24"),
+			mpp("250.250.250.255/32"),
+			mpp("250.250.250.250/32"),
+		}
+
+		tbl := new(Table[string])
+		for _, p := range pfxs {
+			tbl.Insert(p, p.String())
+		}
+
+		probe := mpa("250.250.250.251")
+		for range b.N {
+			boolSink = tbl.Contains(probe)
+		}
+	})
+
+	b.Run("match IP6", func(b *testing.B) {
+		pfxs := []netip.Prefix{
+			mpp("ff00::/8"),
+			mpp("fffe::/16"),
+			mpp("fffe:ff00::/24"),
+			mpp("fffe:fffe:fffe:fffe::/32"),
+			mpp("fffe:fffe:fffe:fffe:fffe::/40"),
+			mpp("fffe:fffe:fffe:fffe:fffe:fffe::/48"),
+			mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe::/56"),
+			mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/64"),
+			mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/72"),
+			mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/80"),
+			mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/88"),
+			mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/96"),
+			mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/104"),
+			mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/112"),
+			mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/120"),
+			mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/128"),
+		}
+
+		tbl := new(Table[string])
+		for _, p := range pfxs {
+			tbl.Insert(p, p.String())
+		}
+
+		probe := mpa("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:ffff::/128")
+		for range b.N {
+			boolSink = tbl.Contains(probe)
+		}
+	})
+
+	b.Run("miss  IP6", func(b *testing.B) {
+		pfxs := []netip.Prefix{
+			// mpp("fffe::/8"),
+			mpp("fffe:fffe::/16"),
+			mpp("fffe:fffe:fffe::/24"),
+			mpp("fffe:fffe:fffe:fffe::/32"),
+			mpp("fffe:fffe:fffe:fffe:fffe::/40"),
+			mpp("fffe:fffe:fffe:fffe:fffe:fffe::/48"),
+			mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe::/56"),
+			mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/64"),
+			mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/72"),
+			mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/80"),
+			mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/88"),
+			mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/96"),
+			mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/104"),
+			mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/112"),
+			mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/120"),
+			mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/128"),
+		}
+
+		tbl := new(Table[string])
+		for _, p := range pfxs {
+			tbl.Insert(p, p.String())
+		}
+
+		probe := mpa("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:ffff::/128")
+		for range b.N {
+			boolSink = tbl.Contains(probe)
+		}
+	})
+}

@@ -27,7 +27,7 @@ func bIdx(i uint) uint {
 // Set bit i to 1, the capacity of the bitset is increased accordingly.
 func (b BitSet) Set(i uint) BitSet {
 	// grow?
-	if i >= uint(len(b))*64 {
+	if i >= uint(len(b)<<6) {
 		words := int((i + 64) >> 6)
 		switch {
 		case b == nil:
@@ -47,18 +47,18 @@ func (b BitSet) Set(i uint) BitSet {
 
 // Clear bit i to 0.
 func (b BitSet) Clear(i uint) BitSet {
-	if i < uint(len(b))*64 {
-		b[i>>6] &^= 1 << (i & 63)
+	if x := int(i >> 6); x < len(b) {
+		b[x] &^= 1 << (i & 63)
 	}
 	return b
 }
 
 // Test if bit i is set.
 func (b BitSet) Test(i uint) bool {
-	if i >= uint(len(b))*64 {
-		return false
+	if x := int(i >> 6); x < len(b) {
+		return b[x]&(1<<(i&63)) != 0
 	}
-	return b[i>>6]&(1<<(i&63)) != 0
+	return false
 }
 
 // Clone this BitSet, returning a new BitSet that has the same bits set.
@@ -93,15 +93,15 @@ func (b BitSet) Compact() BitSet {
 // NextSet returns the next bit set from the specified index,
 // including possibly the current index along with an ok code.
 func (b BitSet) NextSet(i uint) (uint, bool) {
-	x := wIdx(i)
+	x := int(i >> 6)
 	if x >= len(b) {
 		return 0, false
 	}
 
-	// process the first (maybe partial) word
-	word := b[x] >> bIdx(i) // bIdx(i) = i % 64
-	if word != 0 {
-		return i + uint(bits.TrailingZeros64(word)), true
+	// process the first (maybe partial) first
+	first := b[x] >> (i & 63) // i % 64
+	if first != 0 {
+		return i + uint(bits.TrailingZeros64(first)), true
 	}
 
 	// process the following words until next bit is set
