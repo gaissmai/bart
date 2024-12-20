@@ -289,7 +289,7 @@ func BenchmarkNodePrefixesAsSlice(b *testing.B) {
 		b.Run(fmt.Sprintf("Set %d", nroutes), func(b *testing.B) {
 			b.ResetTimer()
 			for range b.N {
-				this.prefixes.BitSet.AsSlice(make([]uint, 0, maxNodePrefixes))
+				this.prefixes.AsSlice(make([]uint, 0, maxNodePrefixes))
 			}
 		})
 	}
@@ -320,7 +320,7 @@ func BenchmarkNodePrefixIntersectionCardinality(b *testing.B) {
 		b.Run(fmt.Sprintf("With %d", nroutes), func(b *testing.B) {
 			b.ResetTimer()
 			for range b.N {
-				this.prefixes.BitSet.IntersectionCardinality(other.prefixes.BitSet)
+				this.prefixes.IntersectionCardinality(other.prefixes.BitSet)
 			}
 		})
 	}
@@ -378,7 +378,7 @@ func BenchmarkNodeChildrenAsSlice(b *testing.B) {
 		b.Run(fmt.Sprintf("Set %d", nchilds), func(b *testing.B) {
 			b.ResetTimer()
 			for range b.N {
-				this.children.BitSet.AsSlice(make([]uint, 0, maxNodeChildren))
+				this.children.AsSlice(make([]uint, 0, maxNodeChildren))
 			}
 		})
 	}
@@ -400,7 +400,7 @@ func BenchmarkNodeChildIntersectionCardinality(b *testing.B) {
 		b.Run(fmt.Sprintf("With %d", nchilds), func(b *testing.B) {
 			b.ResetTimer()
 			for range b.N {
-				this.children.BitSet.IntersectionCardinality(other.children.BitSet)
+				this.children.IntersectionCardinality(other.children.BitSet)
 			}
 		})
 	}

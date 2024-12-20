@@ -25,21 +25,21 @@ func (s *Array[T]) Len() int {
 // mapping between bitset index and slice index.
 func (s *Array[T]) rank(i uint) int {
 	// adjust offset by one to slice index.
-	return s.BitSet.Rank(i) - 1
+	return s.Rank(i) - 1
 }
 
 // InsertAt a value at i into the sparse array.
 // If the value already exists, overwrite it with val and return true.
 func (s *Array[T]) InsertAt(i uint, val T) (exists bool) {
 	// slot exists, overwrite val
-	if s.BitSet.Test(i) {
+	if s.Test(i) {
 		s.Items[s.rank(i)] = val
 
 		return true
 	}
 
 	// new, insert into bitset and slice
-	s.BitSet = s.BitSet.Set(i)
+	s.BitSet = s.Set(i)
 	s.Items = slicesInsert(s.Items, val, s.rank(i))
 
 	return false
@@ -48,7 +48,7 @@ func (s *Array[T]) InsertAt(i uint, val T) (exists bool) {
 // DeleteAt, delete a value at i from the sparse array.
 func (s *Array[T]) DeleteAt(i uint) (T, bool) {
 	var zero T
-	if !s.BitSet.Test(i) {
+	if !s.Test(i) {
 		return zero, false
 	}
 
@@ -59,7 +59,7 @@ func (s *Array[T]) DeleteAt(i uint) (T, bool) {
 	s.Items = slicesDelete(s.Items, rnk)
 
 	// delete from bitset, followed by Compact to reduce memory consumption
-	s.BitSet = s.BitSet.Clear(i).Compact()
+	s.BitSet = s.Clear(i).Compact()
 
 	return val, true
 }
@@ -68,7 +68,7 @@ func (s *Array[T]) DeleteAt(i uint) (T, bool) {
 func (s *Array[T]) Get(i uint) (val T, ok bool) {
 	var zero T
 
-	if s.BitSet.Test(i) {
+	if s.Test(i) {
 		return s.Items[s.rank(i)], true
 	}
 
@@ -89,7 +89,7 @@ func (s *Array[T]) UpdateAt(i uint, cb func(T, bool) T) (newVal T, wasPresent bo
 	// if already set, get current value
 	var oldVal T
 
-	if wasPresent = s.BitSet.Test(i); wasPresent {
+	if wasPresent = s.Test(i); wasPresent {
 		rnk = s.rank(i)
 		oldVal = s.Items[rnk]
 	}
@@ -105,7 +105,7 @@ func (s *Array[T]) UpdateAt(i uint, cb func(T, bool) T) (newVal T, wasPresent bo
 	}
 
 	// new val, insert into bitset ...
-	s.BitSet = s.BitSet.Set(i)
+	s.BitSet = s.Set(i)
 
 	// bitset has changed, recalc rank
 	rnk = s.rank(i)
