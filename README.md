@@ -106,10 +106,12 @@ goos: linux
 goarch: amd64
 pkg: github.com/gaissmai/bart
 cpu: Intel(R) Core(TM) i5-8250U CPU @ 1.60GHz
-BenchmarkFullMatchV4/Contains  30738159	  37.30 ns/op	0 B/op	0 allocs/op
-BenchmarkFullMatchV6/Contains  34828777	  33.19 ns/op	0 B/op	0 allocs/op
-BenchmarkFullMissV4/Contains   44398612	  24.46 ns/op	0 B/op	0 allocs/op
-BenchmarkFullMissV6/Contains   83133955	  13.59 ns/op	0 B/op	0 allocs/op
+BenchmarkFullMatchV4/Contains         	48157468	        22.14 ns/op	       0 B/op	       0 allocs/op
+BenchmarkFullMatchV6/Contains         	34797141	        31.83 ns/op	       0 B/op	       0 allocs/op
+BenchmarkFullMissV4/Contains          	46614062	        22.72 ns/op	       0 B/op	       0 allocs/op
+BenchmarkFullMissV6/Contains          	61439612	        16.79 ns/op	       0 B/op	       0 allocs/op
+PASS
+ok  	github.com/gaissmai/bart	18.153s
 ```
 
 ## CONTRIBUTION
