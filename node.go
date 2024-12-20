@@ -55,7 +55,7 @@ func (n *node[V]) isEmpty() bool {
 // max steps in backtracking is the stride length.
 func (n *node[V]) lpm(idx uint) (baseIdx uint, val V, ok bool) {
 	// shortcut optimization
-	minIdx, ok := n.prefixes.NextSet(0)
+	minIdx, ok := n.prefixes.FirstSet()
 	if !ok {
 		return 0, val, false
 	}
@@ -75,7 +75,7 @@ func (n *node[V]) lpm(idx uint) (baseIdx uint, val V, ok bool) {
 // lpmTest for faster lpm tests without value returns
 func (n *node[V]) lpmTest(idx uint) bool {
 	// shortcut optimization
-	minIdx, ok := n.prefixes.NextSet(0)
+	minIdx, ok := n.prefixes.FirstSet()
 	if !ok {
 		return false
 	}

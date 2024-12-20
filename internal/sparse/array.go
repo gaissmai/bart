@@ -32,7 +32,7 @@ func (s *Array[T]) rank(i uint) int {
 // If the value already exists, overwrite it with val and return true.
 func (s *Array[T]) InsertAt(i uint, val T) (exists bool) {
 	// slot exists, overwrite val
-	if s.Test(i) {
+	if s.Len() != 0 && s.Test(i) {
 		s.Items[s.rank(i)] = val
 
 		return true
@@ -48,7 +48,7 @@ func (s *Array[T]) InsertAt(i uint, val T) (exists bool) {
 // DeleteAt, delete a value at i from the sparse array.
 func (s *Array[T]) DeleteAt(i uint) (T, bool) {
 	var zero T
-	if !s.Test(i) {
+	if s.Len() == 0 || !s.Test(i) {
 		return zero, false
 	}
 
@@ -68,7 +68,7 @@ func (s *Array[T]) DeleteAt(i uint) (T, bool) {
 func (s *Array[T]) Get(i uint) (val T, ok bool) {
 	var zero T
 
-	if s.Test(i) {
+	if s.Len() != 0 && s.Test(i) {
 		return s.Items[s.rank(i)], true
 	}
 
