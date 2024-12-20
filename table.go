@@ -581,7 +581,7 @@ func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 	var ok bool
 	for _, octet := range octets[:lastOctetIdx] {
 		// test if any route overlaps prefix´ so far
-		if n.lpmTest(hostIndex(octet)) {
+		if n.prefixes.Len() != 0 && n.lpmTest(hostIndex(octet)) {
 			return true
 		}
 

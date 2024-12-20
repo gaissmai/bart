@@ -90,6 +90,16 @@ func (b BitSet) Compact() BitSet {
 	return nil
 }
 
+// FirstSet returns the first bit set along with an ok code.
+func (b BitSet) FirstSet() (uint, bool) {
+	for x, word := range b {
+		if word != 0 {
+			return uint(x<<6 + bits.TrailingZeros64(word)), true
+		}
+	}
+	return 0, false
+}
+
 // NextSet returns the next bit set from the specified index,
 // including possibly the current index along with an ok code.
 func (b BitSet) NextSet(i uint) (uint, bool) {
