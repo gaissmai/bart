@@ -54,8 +54,14 @@ func (n *node[V]) isEmpty() bool {
 // backtracking is fast, it's just a bitset test and, if found, one popcount.
 // max steps in backtracking is the stride length.
 func (n *node[V]) lpm(idx uint) (baseIdx uint, val V, ok bool) {
-	// backtracking the CBT, make it as fast as possible
-	for baseIdx = idx; baseIdx > 0; baseIdx >>= 1 {
+	// shortcut optimization
+	minIdx, ok := n.prefixes.NextSet(0)
+	if !ok {
+		return 0, val, false
+	}
+
+	// backtracking the CBT
+	for baseIdx = idx; baseIdx >= minIdx; baseIdx >>= 1 {
 		// practically it's get, but get is not inlined
 		if n.prefixes.Test(baseIdx) {
 			return baseIdx, n.prefixes.MustGet(baseIdx), true
@@ -68,8 +74,14 @@ func (n *node[V]) lpm(idx uint) (baseIdx uint, val V, ok bool) {
 
 // lpmTest for faster lpm tests without value returns
 func (n *node[V]) lpmTest(idx uint) bool {
+	// shortcut optimization
+	minIdx, ok := n.prefixes.NextSet(0)
+	if !ok {
+		return false
+	}
+
 	// backtracking the CBT
-	for idx := idx; idx > 0; idx >>= 1 {
+	for idx := idx; idx >= minIdx; idx >>= 1 {
 		if n.prefixes.Test(idx) {
 			return true
 		}

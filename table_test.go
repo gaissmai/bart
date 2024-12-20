@@ -2143,65 +2143,67 @@ func BenchmarkWorstCase(b *testing.B) {
 		}
 	})
 
-	b.Run("match IP6", func(b *testing.B) {
-		pfxs := []netip.Prefix{
-			mpp("ff00::/8"),
-			mpp("fffe::/16"),
-			mpp("fffe:ff00::/24"),
-			mpp("fffe:fffe:fffe:fffe::/32"),
-			mpp("fffe:fffe:fffe:fffe:fffe::/40"),
-			mpp("fffe:fffe:fffe:fffe:fffe:fffe::/48"),
-			mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe::/56"),
-			mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/64"),
-			mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/72"),
-			mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/80"),
-			mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/88"),
-			mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/96"),
-			mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/104"),
-			mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/112"),
-			mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/120"),
-			mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/128"),
-		}
+	/*
+		b.Run("match IP6", func(b *testing.B) {
+			pfxs := []netip.Prefix{
+				mpp("ff00::/8"),
+				mpp("fffe::/16"),
+				mpp("fffe:ff00::/24"),
+				mpp("fffe:fffe:fffe:fffe::/32"),
+				mpp("fffe:fffe:fffe:fffe:fffe::/40"),
+				mpp("fffe:fffe:fffe:fffe:fffe:fffe::/48"),
+				mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe::/56"),
+				mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/64"),
+				mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/72"),
+				mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/80"),
+				mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/88"),
+				mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/96"),
+				mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/104"),
+				mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/112"),
+				mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/120"),
+				mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/128"),
+			}
 
-		tbl := new(Table[string])
-		for _, p := range pfxs {
-			tbl.Insert(p, p.String())
-		}
+			tbl := new(Table[string])
+			for _, p := range pfxs {
+				tbl.Insert(p, p.String())
+			}
 
-		probe := mpa("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:ffff::/128")
-		for range b.N {
-			boolSink = tbl.Contains(probe)
-		}
-	})
+			probe := mpa("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:ffff::/128")
+			for range b.N {
+				boolSink = tbl.Contains(probe)
+			}
+		})
 
-	b.Run("miss  IP6", func(b *testing.B) {
-		pfxs := []netip.Prefix{
-			// mpp("fffe::/8"),
-			mpp("fffe:fffe::/16"),
-			mpp("fffe:fffe:fffe::/24"),
-			mpp("fffe:fffe:fffe:fffe::/32"),
-			mpp("fffe:fffe:fffe:fffe:fffe::/40"),
-			mpp("fffe:fffe:fffe:fffe:fffe:fffe::/48"),
-			mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe::/56"),
-			mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/64"),
-			mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/72"),
-			mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/80"),
-			mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/88"),
-			mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/96"),
-			mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/104"),
-			mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/112"),
-			mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/120"),
-			mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/128"),
-		}
+		b.Run("miss  IP6", func(b *testing.B) {
+			pfxs := []netip.Prefix{
+				// mpp("fffe::/8"),
+				mpp("fffe:fffe::/16"),
+				mpp("fffe:fffe:fffe::/24"),
+				mpp("fffe:fffe:fffe:fffe::/32"),
+				mpp("fffe:fffe:fffe:fffe:fffe::/40"),
+				mpp("fffe:fffe:fffe:fffe:fffe:fffe::/48"),
+				mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe::/56"),
+				mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/64"),
+				mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/72"),
+				mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/80"),
+				mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/88"),
+				mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/96"),
+				mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/104"),
+				mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/112"),
+				mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/120"),
+				mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/128"),
+			}
 
-		tbl := new(Table[string])
-		for _, p := range pfxs {
-			tbl.Insert(p, p.String())
-		}
+			tbl := new(Table[string])
+			for _, p := range pfxs {
+				tbl.Insert(p, p.String())
+			}
 
-		probe := mpa("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:ffff::/128")
-		for range b.N {
-			boolSink = tbl.Contains(probe)
-		}
-	})
+			probe := mpa("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:ffff::/128")
+			for range b.N {
+				boolSink = tbl.Contains(probe)
+			}
+		})
+	*/
 }
