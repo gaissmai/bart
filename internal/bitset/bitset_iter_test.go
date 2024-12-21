@@ -7,6 +7,7 @@ package bitset
 
 import (
 	"fmt"
+	"slices"
 	"testing"
 )
 
@@ -38,6 +39,31 @@ func TestAllBitSetIter(t *testing.T) {
 				t.Fatalf("traverse error, not all entries visited")
 			}
 		})
+	}
+}
+
+func TestAllBitSetIterStop(t *testing.T) {
+	t.Parallel()
+
+	var b BitSet
+
+	for u := range uint(20) {
+		b = b.Set(u)
+	}
+
+	got := []uint{}
+	want := []uint{0, 1, 2, 3, 4}
+
+	// range over func
+	for u := range b.All() {
+		if u > 4 {
+			break
+		}
+		got = append(got, u)
+	}
+
+	if !slices.Equal(got, want) {
+		t.Fatalf("rangefunc with break condition, expected: %v, got: %v", want, got)
 	}
 }
 
