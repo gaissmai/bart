@@ -2103,10 +2103,95 @@ func (t *Table[V]) dumpAsGoldTable() goldTable[V] {
 	return tbl
 }
 
+func TestWorstCaseLookup(t *testing.T) {
+	probe := mpa("250.250.250.251")
+
+	pfxs := []netip.Prefix{
+		mpp("250.0.0.0/8"), // matching prefix
+		mpp("250.255.0.0/16"),
+		mpp("250.250.255.0/24"),
+		mpp("250.250.250.255/32"),
+		mpp("250.250.250.250/32"),
+	}
+
+	tbl := new(Table[string])
+	for _, p := range pfxs {
+		tbl.Insert(p, p.String())
+	}
+
+	t.Run("match IP4", func(t *testing.T) {
+		gotVal, gotOk := tbl.Lookup(probe)
+		if gotOk != true {
+			t.Errorf("Lookup v4 worst case match, expected OK: true, got: %v", gotOk)
+		}
+		if gotVal != mpp("250.0.0.0/8").String() {
+			t.Errorf("Lookup v4 worst case match, expected Val: %s, got: %s", "250.0.0.0/8", gotVal)
+		}
+	})
+
+	tbl.Delete(mpp("250.0.0.0/8")) // delete matching prefix
+
+	t.Run("miss  IP4", func(t *testing.T) {
+		_, gotOk := tbl.Lookup(probe)
+		if gotOk == true {
+			t.Errorf("Lookup v4 worst case miss, expected OK: false, got: %v", gotOk)
+		}
+	})
+
+	probe = mpa("eeee:eeee:eeee:eeee:eeee:eeee:eeee:eeee")
+
+	pfxs = []netip.Prefix{
+		mpp("ee00::/8"), // matching prefix
+		//
+		mpp("ff00::/8"),
+		mpp("eeff::/16"),
+		mpp("eeee:ff00::/24"),
+		mpp("eeee:eeff::/32"),
+		mpp("eeee:eeee:ff00::/40"),
+		mpp("eeee:eeee:eeff::/48"),
+		mpp("eeee:eeee:eeee:ff00::/56"),
+		mpp("eeee:eeee:eeee:eeff::/64"),
+		mpp("eeee:eeee:eeee:eeee:ff00::/72"),
+		mpp("eeee:eeee:eeee:eeee:eeff::/80"),
+		mpp("eeee:eeee:eeee:eeee:eeee:ff00::/88"),
+		mpp("eeee:eeee:eeee:eeee:eeee:eeff::/96"),
+		mpp("eeee:eeee:eeee:eeee:eeee:eeee:ff00::/104"),
+		mpp("eeee:eeee:eeee:eeee:eeee:eeee:eeff::/112"),
+		mpp("eeee:eeee:eeee:eeee:eeee:eeee:eeee:ff00/120"),
+		mpp("eeee:eeee:eeee:eeee:eeee:eeee:eeee:eeff/128"),
+	}
+
+	tbl = new(Table[string])
+	for _, p := range pfxs {
+		tbl.Insert(p, p.String())
+	}
+
+	t.Run("match IP6", func(t *testing.T) {
+		gotVal, gotOk := tbl.Lookup(probe)
+		if gotOk != true {
+			t.Errorf("Lookup v6 worst case match, expected OK: true, got: %v", gotOk)
+		}
+		if gotVal != mpp("ee00::/8").String() {
+			t.Errorf("Lookup v6 worst case match, expected Val: %s, got: %s", "ee00::/8", gotVal)
+		}
+	})
+
+	tbl.Delete(mpp("ee00::/8")) // delete matching prefix
+
+	t.Run("miss  IP6", func(t *testing.T) {
+		_, gotOk := tbl.Lookup(probe)
+		if gotOk == true {
+			t.Errorf("Lookup v6 worst case miss, expected OK: false, got: %v", gotOk)
+		}
+	})
+}
+
 func BenchmarkWorstCase(b *testing.B) {
 	b.Run("match IP4", func(b *testing.B) {
+		probe := mpa("250.250.250.251")
+
 		pfxs := []netip.Prefix{
-			mpp("250.0.0.0/8"),
+			mpp("250.0.0.0/8"), // matching prefix
 			mpp("250.255.0.0/16"),
 			mpp("250.250.255.0/24"),
 			mpp("250.250.250.255/32"),
@@ -2118,13 +2203,14 @@ func BenchmarkWorstCase(b *testing.B) {
 			tbl.Insert(p, p.String())
 		}
 
-		probe := mpa("250.250.250.251")
 		for range b.N {
 			boolSink = tbl.Contains(probe)
 		}
 	})
 
 	b.Run("miss  IP4", func(b *testing.B) {
+		probe := mpa("250.250.250.251")
+
 		pfxs := []netip.Prefix{
 			mpp("250.255.0.0/16"),
 			mpp("250.250.255.0/24"),
@@ -2137,73 +2223,75 @@ func BenchmarkWorstCase(b *testing.B) {
 			tbl.Insert(p, p.String())
 		}
 
-		probe := mpa("250.250.250.251")
 		for range b.N {
 			boolSink = tbl.Contains(probe)
 		}
 	})
 
-	/*
-		b.Run("match IP6", func(b *testing.B) {
-			pfxs := []netip.Prefix{
-				mpp("ff00::/8"),
-				mpp("fffe::/16"),
-				mpp("fffe:ff00::/24"),
-				mpp("fffe:fffe:fffe:fffe::/32"),
-				mpp("fffe:fffe:fffe:fffe:fffe::/40"),
-				mpp("fffe:fffe:fffe:fffe:fffe:fffe::/48"),
-				mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe::/56"),
-				mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/64"),
-				mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/72"),
-				mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/80"),
-				mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/88"),
-				mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/96"),
-				mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/104"),
-				mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/112"),
-				mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/120"),
-				mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/128"),
-			}
+	b.Run("match IP6", func(b *testing.B) {
+		probe := mpa("eeee:eeee:eeee:eeee:eeee:eeee:eeee:eeee")
 
-			tbl := new(Table[string])
-			for _, p := range pfxs {
-				tbl.Insert(p, p.String())
-			}
+		pfxs := []netip.Prefix{
+			mpp("ee00::/8"), // matching prefix
+			//
+			mpp("ff00::/8"),
+			mpp("eeff::/16"),
+			mpp("eeee:ff00::/24"),
+			mpp("eeee:eeff::/32"),
+			mpp("eeee:eeee:ff00::/40"),
+			mpp("eeee:eeee:eeff::/48"),
+			mpp("eeee:eeee:eeee:ff00::/56"),
+			mpp("eeee:eeee:eeee:eeff::/64"),
+			mpp("eeee:eeee:eeee:eeee:ff00::/72"),
+			mpp("eeee:eeee:eeee:eeee:eeff::/80"),
+			mpp("eeee:eeee:eeee:eeee:eeee:ff00::/88"),
+			mpp("eeee:eeee:eeee:eeee:eeee:eeff::/96"),
+			mpp("eeee:eeee:eeee:eeee:eeee:eeee:ff00::/104"),
+			mpp("eeee:eeee:eeee:eeee:eeee:eeee:eeff::/112"),
+			mpp("eeee:eeee:eeee:eeee:eeee:eeee:eeee:ff00/120"),
+			mpp("eeee:eeee:eeee:eeee:eeee:eeee:eeee:eeff/128"),
+		}
 
-			probe := mpa("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:ffff::/128")
-			for range b.N {
-				boolSink = tbl.Contains(probe)
-			}
-		})
+		tbl := new(Table[string])
+		for _, p := range pfxs {
+			tbl.Insert(p, p.String())
+		}
 
-		b.Run("miss  IP6", func(b *testing.B) {
-			pfxs := []netip.Prefix{
-				// mpp("fffe::/8"),
-				mpp("fffe:fffe::/16"),
-				mpp("fffe:fffe:fffe::/24"),
-				mpp("fffe:fffe:fffe:fffe::/32"),
-				mpp("fffe:fffe:fffe:fffe:fffe::/40"),
-				mpp("fffe:fffe:fffe:fffe:fffe:fffe::/48"),
-				mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe::/56"),
-				mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/64"),
-				mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/72"),
-				mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/80"),
-				mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/88"),
-				mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/96"),
-				mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/104"),
-				mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/112"),
-				mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/120"),
-				mpp("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe::/128"),
-			}
+		for range b.N {
+			boolSink = tbl.Contains(probe)
+		}
+	})
 
-			tbl := new(Table[string])
-			for _, p := range pfxs {
-				tbl.Insert(p, p.String())
-			}
+	b.Run("miss  IP6", func(b *testing.B) {
+		probe := mpa("eeee:eeee:eeee:eeee:eeee:eeee:eeee:eeee")
 
-			probe := mpa("fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:fffe:ffff::/128")
-			for range b.N {
-				boolSink = tbl.Contains(probe)
-			}
-		})
-	*/
+		pfxs := []netip.Prefix{
+			// mpp("ee00::/8"), // matching prefix
+			//
+			mpp("ff00::/8"),
+			mpp("eeff::/16"),
+			mpp("eeee:ff00::/24"),
+			mpp("eeee:eeff::/32"),
+			mpp("eeee:eeee:ff00::/40"),
+			mpp("eeee:eeee:eeff::/48"),
+			mpp("eeee:eeee:eeee:ff00::/56"),
+			mpp("eeee:eeee:eeee:eeff::/64"),
+			mpp("eeee:eeee:eeee:eeee:ff00::/72"),
+			mpp("eeee:eeee:eeee:eeee:eeff::/80"),
+			mpp("eeee:eeee:eeee:eeee:eeee:ff00::/88"),
+			mpp("eeee:eeee:eeee:eeee:eeee:eeff::/96"),
+			mpp("eeee:eeee:eeee:eeee:eeee:eeee:ff00::/104"),
+			mpp("eeee:eeee:eeee:eeee:eeee:eeee:eeff::/112"),
+			mpp("eeee:eeee:eeee:eeee:eeee:eeee:eeee:ff00/120"),
+			mpp("eeee:eeee:eeee:eeee:eeee:eeee:eeee:eeff/128"),
+		}
+		tbl := new(Table[string])
+		for _, p := range pfxs {
+			tbl.Insert(p, p.String())
+		}
+
+		for range b.N {
+			boolSink = tbl.Contains(probe)
+		}
+	})
 }
