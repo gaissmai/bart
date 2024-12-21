@@ -16,9 +16,9 @@
 BART is balanced in terms of memory consumption versus
 lookup time.
 
-The lookup time is by a factor of 2 slower on average as the
-routing algorithm ART but reduces the memory consumption by an
-order of magnitude in comparison.
+The lookup time is by a factor of 1,25 slower on average as the
+routing algorithm ART but reduces the memory consumption by more
+than an order of magnitude in comparison.
 
 BART is a multibit-trie with fixed stride length of 8 bits,
 using the _baseIndex_ function from the ART algorithm to
