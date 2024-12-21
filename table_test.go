@@ -1,8 +1,8 @@
 // Copyright (c) Tailscale Inc & AUTHORS
 // SPDX-License-Identifier: BSD-3-Clause
 //
-// some tests copied from github.com/tailscale/art
-// and modified for this implementation by:
+// some regression tests modified from github.com/tailscale/art
+// for this implementation by:
 //
 // Copyright (c) 2024 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
@@ -117,115 +117,6 @@ func TestInvalidPrefix(t *testing.T) {
 		}(testname)
 
 		tbl.OverlapsPrefix(zero)
-	})
-}
-
-func TestRegression(t *testing.T) {
-	t.Parallel()
-	// original comment by tailscale for ART,
-	//
-	// These tests are specific triggers for subtle correctness issues
-	// that came up during initial implementation. Even if they seem
-	// arbitrary, please do not clean them up. They are checking edge
-	// cases that are very easy to get wrong, and quite difficult for
-	// the other statistical tests to trigger promptly.
-	//
-	// ... but the BART implementation is different and has other edge cases.
-
-	t.Run("prefixes_aligned_on_stride_boundary", func(t *testing.T) {
-		t.Parallel()
-		fast := &Table[int]{}
-		gold := goldTable[int]{}
-
-		fast.Insert(mpp("226.205.197.0/24"), 1)
-		gold.insert(mpp("226.205.197.0/24"), 1)
-
-		fast.Insert(mpp("226.205.0.0/16"), 2)
-		gold.insert(mpp("226.205.0.0/16"), 2)
-
-		probe := mpa("226.205.121.152")
-		got, gotOK := fast.Lookup(probe)
-		want, wantOK := gold.lookup(probe)
-		if !getsEqual(got, gotOK, want, wantOK) {
-			t.Fatalf("got (%v, %v), want (%v, %v)", got, gotOK, want, wantOK)
-		}
-	})
-
-	t.Run("parent_prefix_inserted_in_different_orders", func(t *testing.T) {
-		t.Parallel()
-		t1, t2 := &Table[int]{}, &Table[int]{}
-
-		t1.Insert(mpp("136.20.0.0/16"), 1)
-		t1.Insert(mpp("136.20.201.62/32"), 2)
-
-		t2.Insert(mpp("136.20.201.62/32"), 2)
-		t2.Insert(mpp("136.20.0.0/16"), 1)
-
-		a := mpa("136.20.54.139")
-		got1, ok1 := t1.Lookup(a)
-		got2, ok2 := t2.Lookup(a)
-		if !getsEqual(got1, ok1, got2, ok2) {
-			t.Errorf("Lookup(%q) is insertion order dependent: t1=(%v, %v), t2=(%v, %v)", a, got1, ok1, got2, ok2)
-		}
-	})
-
-	t.Run("overlaps_divergent_children_with_parent_route_entry", func(t *testing.T) {
-		t.Parallel()
-		t1, t2 := Table[int]{}, Table[int]{}
-
-		t1.Insert(mpp("128.0.0.0/2"), 1)
-		t1.Insert(mpp("99.173.128.0/17"), 1)
-		t1.Insert(mpp("219.150.142.0/23"), 1)
-		t1.Insert(mpp("164.148.190.250/31"), 1)
-		t1.Insert(mpp("48.136.229.233/32"), 1)
-
-		t2.Insert(mpp("217.32.0.0/11"), 1)
-		t2.Insert(mpp("38.176.0.0/12"), 1)
-		t2.Insert(mpp("106.16.0.0/13"), 1)
-		t2.Insert(mpp("164.85.192.0/23"), 1)
-		t2.Insert(mpp("225.71.164.112/31"), 1)
-
-		if !t1.Overlaps(&t2) {
-			t.Fatalf("tables unexpectedly do not overlap")
-		}
-	})
-
-	t.Run("overlaps_parent_child_comparison_with_route_in_parent", func(t *testing.T) {
-		t.Parallel()
-		t1, t2 := Table[int]{}, Table[int]{}
-
-		t1.Insert(mpp("226.0.0.0/8"), 1)
-		t1.Insert(mpp("81.128.0.0/9"), 1)
-		t1.Insert(mpp("152.0.0.0/9"), 1)
-		t1.Insert(mpp("151.220.0.0/16"), 1)
-		t1.Insert(mpp("89.162.61.0/24"), 1)
-
-		t2.Insert(mpp("54.0.0.0/9"), 1)
-		t2.Insert(mpp("35.89.128.0/19"), 1)
-		t2.Insert(mpp("72.33.53.0/24"), 1)
-		t2.Insert(mpp("2.233.60.32/27"), 1)
-		t2.Insert(mpp("152.42.142.160/28"), 1)
-
-		if !t1.Overlaps(&t2) {
-			t.Fatalf("tables unexpectedly do not overlap")
-		}
-	})
-
-	t.Run("LookupPrefix, default route", func(t *testing.T) {
-		t.Parallel()
-		t1 := Table[int]{}
-		dg4 := mpp("0.0.0.0/0")
-		dg6 := mpp("::/0")
-
-		_, ok := t1.LookupPrefix(dg4)
-		if ok {
-			t.Fatalf("LookupPrefix(%s) should be false", dg4)
-		}
-
-		_, ok = t1.LookupPrefix(dg6)
-		if ok {
-			t.Fatalf("LookupPrefix(%s) should be false", dg6)
-		}
 	})
 }
 
@@ -1299,63 +1190,6 @@ func TestUpdate(t *testing.T) {
 				t.Errorf("%s: got=%v, expected: %v", tt.name, got, 1)
 			}
 		})
-	}
-}
-
-func TestOverlapsCompare(t *testing.T) {
-	t.Parallel()
-
-	// Empirically, between 5 and 6 routes per table results in ~50%
-	// of random pairs overlapping. Cool example of the birthday paradox!
-	const numEntries = 6
-
-	seen := map[bool]int{}
-	for range 10_000 {
-		pfxs := randomPrefixes(numEntries)
-		fast := Table[int]{}
-		gold := goldTable[int](pfxs)
-
-		for _, pfx := range pfxs {
-			fast.Insert(pfx.pfx, pfx.val)
-		}
-
-		inter := randomPrefixes(numEntries)
-		goldInter := goldTable[int](inter)
-		fastInter := Table[int]{}
-		for _, pfx := range inter {
-			fastInter.Insert(pfx.pfx, pfx.val)
-		}
-
-		gotGold := gold.overlaps(&goldInter)
-		gotFast := fast.Overlaps(&fastInter)
-
-		if gotGold != gotFast {
-			t.Fatalf("Overlaps(...) = %v, want %v\nTable1:\n%s\nTable:\n%v",
-				gotFast, gotGold, fast.String(), fastInter.String())
-		}
-
-		seen[gotFast]++
-	}
-}
-
-func TestOverlapsPrefixCompare(t *testing.T) {
-	t.Parallel()
-	pfxs := randomPrefixes(100_000)
-
-	fast := Table[int]{}
-	gold := goldTable[int](pfxs)
-
-	for _, pfx := range pfxs {
-		fast.Insert(pfx.pfx, pfx.val)
-	}
-
-	tests := randomPrefixes(10_000)
-	for _, tt := range tests {
-		gotGold := gold.overlapsPrefix(tt.pfx)
-		gotFast := fast.OverlapsPrefix(tt.pfx)
-		if gotGold != gotFast {
-			t.Fatalf("overlapsPrefix(%q) = %v, want %v", tt.pfx, gotFast, gotGold)
-		}
 	}
 }
 

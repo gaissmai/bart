@@ -225,6 +225,64 @@ func TestTest(t *testing.T) {
 	}
 }
 
+func TestFirstSet(t *testing.T) {
+	t.Parallel()
+	testCases := []struct {
+		name    string
+		set     []uint
+		wantIdx uint
+		wantOk  bool
+	}{
+		{
+			name:    "null",
+			set:     []uint{},
+			wantIdx: 0,
+			wantOk:  false,
+		},
+		{
+			name:    "zero",
+			set:     []uint{0},
+			wantIdx: 0,
+			wantOk:  true,
+		},
+		{
+			name:    "1,5",
+			set:     []uint{1, 5},
+			wantIdx: 1,
+			wantOk:  true,
+		},
+		{
+			name:    "5,7",
+			set:     []uint{5, 7},
+			wantIdx: 5,
+			wantOk:  true,
+		},
+		{
+			name:    "2. word",
+			set:     []uint{70, 777},
+			wantIdx: 70,
+			wantOk:  true,
+		},
+	}
+
+	for _, tc := range testCases {
+		var b BitSet
+		for _, u := range tc.set {
+			b = b.Set(u)
+		}
+
+		idx, ok := b.FirstSet()
+
+		if ok != tc.wantOk {
+			t.Errorf("FirstSet, %s: got ok: %v, want: %v", tc.name, ok, tc.wantOk)
+		}
+
+		if idx != tc.wantIdx {
+			t.Errorf("FirstSet, %s: got idx: %d, want: %d", tc.name, idx, tc.wantIdx)
+		}
+	}
+}
+
 func TestNextSet(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {

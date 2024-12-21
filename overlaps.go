@@ -169,8 +169,6 @@ func (n *node[V]) overlapsChildrenIn(o *node[V]) bool {
 	// make allot table with prefixes as bitsets, bitsets are precalculated
 	// just union the bitsets to one bitset (allot table) for all prefixes
 	// in this node
-
-	// gimmick, don't allocate, can't use bitset.New()
 	prefixRoutes := bitset.BitSet(make([]uint64, 8))
 
 	allIndices := n.prefixes.AsSlice(make([]uint, 0, maxNodePrefixes))
