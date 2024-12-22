@@ -13,12 +13,11 @@
 
 `package bart` provides a Balanced-Routing-Table (BART).
 
-BART is balanced in terms of memory consumption versus
-lookup time.
+BART is balanced in terms of memory usage and lookup time
+for the longest-prefix match.
 
-The lookup time is by a factor of 1,25 slower on average as the
-routing algorithm ART but reduces the memory consumption by more
-than an order of magnitude in comparison.
+The longest-prefix match is on average slower than the ART routing algorithm,
+but reduces memory usage by more than an order of magnitude.
 
 BART is a multibit-trie with fixed stride length of 8 bits,
 using the _baseIndex_ function from the ART algorithm to
@@ -114,6 +113,14 @@ PASS
 ok  	github.com/gaissmai/bart	18.153s
 ```
 
+## Compatibility Guarantees
+
+The package is currently released as a pre-v1 version, which gives the author the freedom to break
+backward compatibility to help improve the API as he learns which initial design decisions would need
+to be revisited to better support the use cases that the library solves for.
+
+These occurrences are expected to be rare in frequency and the API is already quite stable.
+
 ## CONTRIBUTION
 
 Please open an issue for discussion before sending a pull request.
@@ -125,7 +132,7 @@ Standing on the shoulders of giants.
 Credits for many inspirations go to
 
 - the clever guys at tailscale,
-- to Daniel Lemire and his blog, and
+- to Daniel Lemire, and
 - to Donald E. Knuth for the **ART** routing algorithm and
 
 all the rest of his *Art* and for keeping important algorithms
