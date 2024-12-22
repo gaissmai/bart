@@ -44,10 +44,10 @@ type Table[V any] struct {
 // rootNodeByVersion, root node getter for ip version.
 func (t *Table[V]) rootNodeByVersion(is4 bool) *node[V] {
 	if is4 {
-		return &(t.root4)
+		return &t.root4
 	}
 
-	return &(t.root6)
+	return &t.root6
 }
 
 // Cloner, if implemented by payload of type V the values are deeply copied
