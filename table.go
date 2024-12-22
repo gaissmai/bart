@@ -366,8 +366,7 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 		n := stack[depth]
 		octet = octets[depth]
 
-		// longest prefix match
-		// micro benchmarking: skip if node has no prefixes
+		// longest prefix match, skip if node has no prefixes
 		if n.prefixes.Len() != 0 {
 			if ok := n.lpmTest(hostIndex(octet)); ok {
 				return ok
@@ -423,8 +422,7 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 		n = stack[depth]
 		octet = octets[depth]
 
-		// longest prefix match
-		// micro benchmarking: skip if node has no prefixes
+		// longest prefix match, skip if node has no prefixes
 		if n.prefixes.Len() != 0 {
 			if _, val, ok = n.lpm(hostIndex(octet)); ok {
 				return val, ok
@@ -525,8 +523,7 @@ func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V, 
 		n = stack[depth]
 		octet = octets[depth]
 
-		// longest prefix match
-		// micro benchmarking: skip if node has no prefixes
+		// longest prefix match, skip if node has no prefixes
 		if n.prefixes.Len() != 0 {
 			// only the lastOctet may have a different prefix len
 			// all others are just host routes
