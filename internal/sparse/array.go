@@ -40,7 +40,7 @@ func (s *Array[T]) InsertAt(i uint, val T) (exists bool) {
 
 	// new, insert into bitset and slice
 	s.BitSet = s.Set(i)
-	s.Items = slicesInsert(s.Items, val, s.rank(i))
+	s.insertItem(val, s.rank(i))
 
 	return false
 }
@@ -55,8 +55,8 @@ func (s *Array[T]) DeleteAt(i uint) (T, bool) {
 	rnk := s.rank(i)
 	val := s.Items[rnk]
 
-	// delete from slice and compact it
-	s.Items = slicesDelete(s.Items, rnk)
+	// delete from slice and (maybe) compact it
+	s.deleteItem(rnk)
 
 	// delete from bitset, followed by Compact to reduce memory consumption
 	s.BitSet = s.Clear(i).Compact()
@@ -111,40 +111,41 @@ func (s *Array[T]) UpdateAt(i uint, cb func(T, bool) T) (newVal T, wasPresent bo
 	rnk = s.rank(i)
 
 	// ... and insert value into slice
-	s.Items = slicesInsert(s.Items, newVal, rnk)
+	s.insertItem(newVal, rnk)
 
 	return newVal, wasPresent
 }
 
-// slicesInsert inserts the element e at index i, returning the modified slice.
+// insertItem inserts the item at index i.
 //
-// slicesInsert panics if i is out of range.
-func slicesInsert[S ~[]E, E any](s S, e E, i int) S {
-	if len(s) < cap(s) {
-		s = s[:len(s)+1] // fast resize, no alloc
-		copy(s[i+1:], s[i:])
-		s[i] = e
-		return s
+// insertItem panics if i is out of range.
+func (s *Array[T]) insertItem(item T, i int) {
+	// in place resize, no alloc
+	if len(s.Items) < cap(s.Items) {
+		s.Items = s.Items[:len(s.Items)+1] // fast resize, no alloc
+		copy(s.Items[i+1:], s.Items[i:])
+		s.Items[i] = item
+		return
 	}
 
-	newSlice := make([]E, len(s)+1)
-	copy(newSlice, s[:i])
-	copy(newSlice[i+1:], s[i:])
-	newSlice[i] = e
-	return newSlice
+	// make new backing array
+	newSlice := make([]T, len(s.Items)+1)
+	copy(newSlice, s.Items[:i])
+	copy(newSlice[i+1:], s.Items[i:])
+	newSlice[i] = item
+	(*s).Items = newSlice
 }
 
-// slicesDelete deletes the element e at index i, returning the modified slice.
+// deleteItem deletes the item at index i.
 // It clears/zeroes the elements s[len(s):] and if cap() >= 2*len() compacts the slice.
 //
-// slicesDelete panics if i is out of range.
-func slicesDelete[S ~[]E, E any](s S, i int) S {
-	l := len(s) - 1      // new len
-	copy(s[i:], s[i+1:]) // overwrite s[i]
-	clear(s[l:])         // clear/zeroes the tail
-	s = s[:l]            // cut to new len
-	if cap(s) >= 2*l {   // compact to new len
-		s = s[:l:l]
+// deleteItem panics if i is out of range.
+func (s *Array[T]) deleteItem(i int) {
+	l := len(s.Items) - 1            // new len
+	copy(s.Items[i:], s.Items[i+1:]) // overwrite s[i]
+	clear(s.Items[l:])               // clear/zeroes the tail
+	s.Items = s.Items[:l]            // cut to new len
+	if cap(s.Items) >= 2*l {         // compact to new len
+		s.Items = s.Items[:l:l]
 	}
-	return s
 }
