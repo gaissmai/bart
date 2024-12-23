@@ -65,10 +65,10 @@ func (t *Table[V]) dump(w io.Writer) {
 		return
 	}
 
-	fmt.Fprint(w, "### IPv4:")
+	fmt.Fprintf(w, "### IPv4: size(%d)", t.Size4())
 	t.root4.dumpRec(w, zeroPath, 0, true)
 
-	fmt.Fprint(w, "### IPv6:")
+	fmt.Fprintf(w, "### IPv6: size(%d)", t.Size6())
 	t.root6.dumpRec(w, zeroPath, 0, false)
 }
 
@@ -139,6 +139,21 @@ func (n *node[V]) dump(w io.Writer, path [16]byte, depth int, is4 bool) {
 
 		fmt.Fprintln(w)
 	}
+
+	if pathcompCount := n.pathcomp.Len(); pathcompCount != 0 {
+		// print the pathcomp prefixes for this node
+		fmt.Fprintf(w, "%spathcs(#%d):", indent, pathcompCount)
+
+		// no heap allocs
+		allPathComps := n.pathcomp.AsSlice(make([]uint, 0, maxNodeChildren))
+
+		for _, addr := range allPathComps {
+			pc := n.pathcomp.MustGet(addr)
+			fmt.Fprintf(w, " %d:[%s, %v]", addr, pc.prefix, pc.value)
+		}
+
+		fmt.Fprintln(w)
+	}
 }
 
 // octetFmt, different format strings for IPv4 and IPv6, decimal versus hex.
@@ -200,22 +215,19 @@ func (nt nodeType) String() string {
 func (n *node[V]) hasType() nodeType {
 	prefixCount := n.prefixes.Len()
 	childCount := n.children.Len()
+	pathcompCount := n.pathcomp.Len()
 
-	if prefixCount == 0 && childCount != 0 {
+	// TODO with path compression we need different enums
+	switch {
+	case prefixCount == 0 && (childCount != 0 || pathcompCount != 0):
 		return intermediateNode
-	}
-
-	if prefixCount == 0 && childCount == 0 {
+	case prefixCount == 0 && childCount == 0 && pathcompCount == 0:
 		return nullNode
-	}
-
-	if prefixCount != 0 && childCount == 0 {
+	case prefixCount != 0 && childCount == 0 && pathcompCount == 0:
 		return leafNode
-	}
-
-	if prefixCount != 0 && childCount != 0 {
+	case prefixCount != 0 && childCount != 0:
 		return fullNode
+	default:
+		panic("unreachable")
 	}
-
-	panic("unreachable")
 }
