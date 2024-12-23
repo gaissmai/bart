@@ -108,15 +108,42 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	// find the proper trie node to insert prefix
 	for _, octet := range octets[:lastOctetIdx] {
 		// descend down to next trie level
-		c, ok := n.children.Get(uint(octet))
-		if !ok {
-			// create and insert missing intermediate child
-			c = new(node[V])
-			n.children.InsertAt(uint(octet), c)
+		if c, ok := n.children.Get(uint(octet)); ok {
+			// proceed with next level
+			n = c
+			continue
 		}
 
-		// proceed with next level
-		n = c
+		// look for path compressed item
+		if pc, ok := n.pathcomp.Get(uint(octet)); ok {
+
+			// override?
+			if pc.prefix == pfx {
+				n.pathcomp.InsertAt(uint(octet), pathItem[V]{pfx, val})
+				return
+			}
+
+			// insert intermediate child
+			c := new(node[V])
+			n.children.InsertAt(uint(octet), c)
+
+			// delete this pathcomp item
+			n.pathcomp.DeleteAt(uint(octet))
+			t.sizeUpdate(is4, -1)
+
+			// recursive call with path compressed item ...
+			t.Insert(pc.prefix, pc.value)
+
+			/// ... and original prefix
+			t.Insert(pfx, val)
+			return
+		}
+
+		// TODO, pfx not masked!
+		// insert as path compressed
+		n.pathcomp.InsertAt(uint(octet), pathItem[V]{pfx, val})
+		t.sizeUpdate(is4, 1)
+		return
 	}
 
 	// insert/override prefix/val into node
