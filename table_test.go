@@ -406,8 +406,8 @@ func TestDelete(t *testing.T) {
 	t.Parallel()
 
 	t.Run("table_is_empty", func(t *testing.T) {
-		// must not panic
 		t.Parallel()
+		// must not panic
 		rtbl := &Table[int]{}
 		rtbl.Delete(randomPrefix())
 	})
@@ -463,14 +463,15 @@ func TestDelete(t *testing.T) {
 			{"192.180.0.1", 2},
 			{"192.40.0.1", -1},
 		})
-		checkNumNodes(t, tbl, 6) // 1 root4, 3 intermediate, 2 leaves
+		t.Log(tbl.dumpString())
+		checkNumNodes(t, tbl, 2) // 1 root4, 1 imed with 2 pc
 		tbl.Delete(mpp("192.180.0.1/32"))
 		checkRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.180.0.1", -1},
 			{"192.40.0.1", -1},
 		})
-		checkNumNodes(t, tbl, 4) // 1 root4, 2 intermediates, 1 leaf
+		checkNumNodes(t, tbl, 2) // 1 root4, 1 imed with 1 pc
 	})
 
 	t.Run("intermediate_with_route", func(t *testing.T) {
@@ -487,7 +488,8 @@ func TestDelete(t *testing.T) {
 			{"192.40.0.1", 3},
 			{"192.255.0.1", -1},
 		})
-		checkNumNodes(t, rtbl, 6) // 1 root4, 2 intermediates, 2 leaves
+
+		checkNumNodes(t, rtbl, 2) // 1 root4, 1 intermediates with 2 pc
 		rtbl.Delete(mpp("192.180.0.1/32"))
 		checkRoutes(t, rtbl, []tableTest{
 			{"192.168.0.1", 1},
@@ -495,7 +497,7 @@ func TestDelete(t *testing.T) {
 			{"192.40.0.1", 3},
 			{"192.255.0.1", -1},
 		})
-		checkNumNodes(t, rtbl, 4) // 1 root4, 1 full, 1 intermediate, 1 leaf
+		checkNumNodes(t, rtbl, 2) // 1 root4, 1 intermediate, with 1 pc
 	})
 
 	t.Run("intermediate_many_leaves", func(t *testing.T) {
@@ -512,7 +514,7 @@ func TestDelete(t *testing.T) {
 			{"192.200.0.1", 3},
 			{"192.255.0.1", -1},
 		})
-		checkNumNodes(t, rtbl, 8) // 1 root4, 4 intermediate, 3 leaves
+		checkNumNodes(t, rtbl, 2) // 1 root4, 1 intermediate with 3 pc
 		rtbl.Delete(mpp("192.180.0.1/32"))
 		checkRoutes(t, rtbl, []tableTest{
 			{"192.168.0.1", 1},
@@ -520,7 +522,7 @@ func TestDelete(t *testing.T) {
 			{"192.200.0.1", 3},
 			{"192.255.0.1", -1},
 		})
-		checkNumNodes(t, rtbl, 6) // 1 root4, 3 intermediate, 2 leaves
+		checkNumNodes(t, rtbl, 2) // 1 root4, 1 intermediate with 2 pc
 	})
 
 	t.Run("nosuchprefix_missing_child", func(t *testing.T) {
@@ -533,13 +535,13 @@ func TestDelete(t *testing.T) {
 			{"192.168.0.1", 1},
 			{"192.255.0.1", -1},
 		})
-		checkNumNodes(t, rtbl, 4)        // 1 root4, 2 intermediate, 1 leaf
+		checkNumNodes(t, rtbl, 1)        // 1 root4 with 1 pc
 		rtbl.Delete(mpp("200.0.0.0/32")) // lookup miss in root
 		checkRoutes(t, rtbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.255.0.1", -1},
 		})
-		checkNumNodes(t, rtbl, 4) // 1 root4, 2 intermediate, 1 leaf
+		checkNumNodes(t, rtbl, 1) // 1 root4 with 1 pc
 	})
 
 	t.Run("nosuchprefix_not_in_leaf", func(t *testing.T) {
@@ -553,13 +555,13 @@ func TestDelete(t *testing.T) {
 			{"192.168.0.1", 1},
 			{"192.255.0.1", -1},
 		})
-		checkNumNodes(t, rtbl, 4)          // 1 root4, 2 intermediate, 1 leaf
+		checkNumNodes(t, rtbl, 1)          // 1 root4, path compressed
 		rtbl.Delete(mpp("192.168.0.5/32")) // right leaf, no route
 		checkRoutes(t, rtbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.255.0.1", -1},
 		})
-		checkNumNodes(t, rtbl, 4) // 1 root4, 2 intermediate, 1 leaf
+		checkNumNodes(t, rtbl, 1) // 1 root4, path compressed
 	})
 
 	t.Run("intermediate_with_deleted_route", func(t *testing.T) {
@@ -575,14 +577,14 @@ func TestDelete(t *testing.T) {
 			{"192.168.0.2", 2},
 			{"192.255.0.1", -1},
 		})
-		checkNumNodes(t, rtbl, 4) // 1 root4, 1 intermediate, 1 full, 1 leaf
+		checkNumNodes(t, rtbl, 3) // 1 root4, 2 imed, 2 path-compressed
 		rtbl.Delete(mpp("192.168.0.0/22"))
 		checkRoutes(t, rtbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.168.0.2", -1},
 			{"192.255.0.1", -1},
 		})
-		checkNumNodes(t, rtbl, 4) // 1 root4, 2 intermediate, 1 leaf
+		checkNumNodes(t, rtbl, 3) // 1 root4, 2 imed, 1 pc
 	})
 
 	t.Run("default_route", func(t *testing.T) {
@@ -1921,7 +1923,7 @@ func checkRoutes(t *testing.T, tbl *Table[int], tt []tableTest) {
 func checkNumNodes(t *testing.T, tbl *Table[int], want int) {
 	t.Helper()
 	if got := tbl.nodes(); got != want {
-		t.Errorf("wrong table size, got %d strides want %d", got, want)
+		t.Errorf("wrong table size, got %d nodes want %d", got, want)
 	}
 }
 
