@@ -30,6 +30,7 @@ func (s *Array[T]) rank(i uint) int {
 
 // InsertAt a value at i into the sparse array.
 // If the value already exists, overwrite it with val and return true.
+// The capacity is identical to the length after insertion.
 func (s *Array[T]) InsertAt(i uint, val T) (exists bool) {
 	// slot exists, overwrite val
 	if s.Len() != 0 && s.Test(i) {
@@ -38,14 +39,16 @@ func (s *Array[T]) InsertAt(i uint, val T) (exists bool) {
 		return true
 	}
 
-	// new, insert into bitset and slice
+	// new, insert into bitset ...
 	s.BitSet = s.Set(i)
+
+	// ... and slice
 	s.insertItem(val, s.rank(i))
 
 	return false
 }
 
-// DeleteAt, delete a value at i from the sparse array.
+// DeleteAt a value at i from the sparse array, zeroes the tail and compact the slice.
 func (s *Array[T]) DeleteAt(i uint) (T, bool) {
 	var zero T
 	if s.Len() == 0 || !s.Test(i) {
@@ -55,7 +58,7 @@ func (s *Array[T]) DeleteAt(i uint) (T, bool) {
 	rnk := s.rank(i)
 	val := s.Items[rnk]
 
-	// delete from slice and (maybe) compact it
+	// delete from slice, followed by clear and compact
 	s.deleteItem(rnk)
 
 	// delete from bitset, followed by Compact to reduce memory consumption
@@ -118,7 +121,7 @@ func (s *Array[T]) UpdateAt(i uint, cb func(T, bool) T) (newVal T, wasPresent bo
 
 // insertItem inserts the item at index i.
 //
-// insertItem panics if i is out of range.
+// It panics if i is out of range.
 func (s *Array[T]) insertItem(item T, i int) {
 	// in place resize, no alloc
 	if len(s.Items) < cap(s.Items) {
@@ -133,19 +136,16 @@ func (s *Array[T]) insertItem(item T, i int) {
 	copy(newSlice, s.Items[:i])
 	copy(newSlice[i+1:], s.Items[i:])
 	newSlice[i] = item
-	(*s).Items = newSlice
+	s.Items = newSlice
 }
 
 // deleteItem deletes the item at index i.
-// It clears/zeroes the elements s[len(s):] and if cap() >= 2*len() compacts the slice.
+// It clears/zeroes the tail elements and compacts the slice.
 //
-// deleteItem panics if i is out of range.
+// It panics if i is out of range.
 func (s *Array[T]) deleteItem(i int) {
 	l := len(s.Items) - 1            // new len
 	copy(s.Items[i:], s.Items[i+1:]) // overwrite s[i]
 	clear(s.Items[l:])               // clear/zeroes the tail
-	s.Items = s.Items[:l]            // cut to new len
-	if cap(s.Items) >= 2*l {         // compact to new len
-		s.Items = s.Items[:l:l]
-	}
+	s.Items = s.Items[:l:l]          // compact to new len
 }
