@@ -17,11 +17,6 @@ const (
 	maxNodePrefixes = 512 // 512
 )
 
-type pathItem[V any] struct {
-	prefix netip.Prefix
-	value  V
-}
-
 // a zero value, used manifold
 var zeroPath [16]byte
 
@@ -46,11 +41,16 @@ type node[V any] struct {
 	// children, recursively spans the trie with a branching factor of 256
 	children sparse.Array[*node[V]]
 
-	// pathcomp, path compressed items
-	pathcomp sparse.Array[pathItem[V]]
+	// path compressed items
+	pathcomp sparse.Array[*pathItem[V]]
 }
 
-// isEmpty returns true if node has neither prefixes nor children.
+type pathItem[V any] struct {
+	prefix netip.Prefix
+	value  V
+}
+
+// isEmpty returns true if node has neither prefixes nor children nor path compressed items.
 func (n *node[V]) isEmpty() bool {
 	return n.prefixes.Len() == 0 &&
 		n.children.Len() == 0 &&

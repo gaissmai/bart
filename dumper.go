@@ -17,6 +17,7 @@ const (
 	fullNode                         // prefixes and children
 	leafNode                         // only prefixes
 	intermediateNode                 // only children
+	UNKNOWN                          // TODO with path compression
 )
 
 // ##################################################
@@ -206,9 +207,9 @@ func (nt nodeType) String() string {
 		return "LEAF"
 	case intermediateNode:
 		return "IMED"
+	default:
+		return "TODO UNKNOWN"
 	}
-
-	panic("unreachable")
 }
 
 // hasType returns the nodeType.
@@ -228,6 +229,6 @@ func (n *node[V]) hasType() nodeType {
 	case prefixCount != 0 && childCount != 0:
 		return fullNode
 	default:
-		panic("unreachable")
+		return UNKNOWN
 	}
 }

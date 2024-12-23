@@ -119,7 +119,7 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 
 			// override?
 			if pc.prefix == pfx {
-				n.pathcomp.InsertAt(uint(octet), pathItem[V]{pfx, val})
+				n.pathcomp.InsertAt(uint(octet), &pathItem[V]{pfx, val})
 				return
 			}
 
@@ -141,7 +141,7 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 
 		// TODO, pfx not masked!
 		// insert as path compressed
-		n.pathcomp.InsertAt(uint(octet), pathItem[V]{pfx, val})
+		n.pathcomp.InsertAt(uint(octet), &pathItem[V]{pfx, val})
 		t.sizeUpdate(is4, 1)
 		return
 	}
@@ -247,11 +247,19 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 
 	// find the proper trie node in tight loop
 	for _, octet := range octets[:lastOctetIdx] {
-		n, ok = n.children.Get(uint(octet))
-
-		if !ok {
-			return zero, false
+		if c, ok := n.children.Get(uint(octet)); ok {
+			n = c
+			continue
 		}
+
+		if pc, ok := n.pathcomp.Get(uint(octet)); ok {
+			// TODO, pfx not masked!
+			if pc.prefix == pfx {
+				return pc.value, true
+			}
+		}
+
+		return zero, false
 	}
 
 	return n.prefixes.Get(pfxToIdx(lastOctet, lastOctetBits))
@@ -315,11 +323,22 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 		}
 
 		// descend down to next level in tight loop
-		n, ok = n.children.Get(uint(octets[i]))
-
-		if !ok {
-			return zero, false
+		if c, ok := n.children.Get(uint(octets[i])); ok {
+			n = c
+			continue
 		}
+
+		if pc, ok := n.pathcomp.Get(uint(octets[i])); ok {
+			// TODO, pfx not masked!
+			if pc.prefix == pfx {
+				n.pathcomp.DeleteAt(uint(octets[i]))
+				t.sizeUpdate(is4, -1)
+
+				return pc.value, true
+			}
+		}
+
+		return zero, false
 	}
 
 	// try to delete prefix in trie node
@@ -376,16 +395,25 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 
 	// find leaf node
 	for i, octet = range octets {
+		addr := uint(octet)
+
 		// push current node on stack for fast backtracking
 		stack[i] = n
 
 		// go down in tight loop to leaf node
-		var ok bool
-		n, ok = n.children.Get(uint(octet))
-
-		if !ok {
-			break
+		if c, ok := n.children.Get(addr); ok {
+			n = c
+			continue
 		}
+
+		if n.pathcomp.Test(addr) {
+			pc := n.pathcomp.MustGet(addr)
+			if pc.prefix.Contains(ip) {
+				return true
+			}
+		}
+
+		break
 	}
 
 	// start backtracking, unwind the stack
@@ -433,15 +461,25 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 
 	// find leaf node
 	for i, octet = range octets {
+		addr := uint(octet)
+
 		// push current node on stack for fast backtracking
 		stack[i] = n
 
 		// go down in tight loop to leaf node
-		n, ok = n.children.Get(uint(octet))
-
-		if !ok {
-			break
+		if c, ok := n.children.Get(addr); ok {
+			n = c
+			continue
 		}
+
+		if n.pathcomp.Test(addr) {
+			pc := n.pathcomp.MustGet(addr)
+			if pc.prefix.Contains(ip) {
+				return pc.value, true
+			}
+		}
+
+		break
 	}
 
 	// start backtracking, unwind the stack
@@ -469,7 +507,7 @@ func (t *Table[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
 		return zero, false
 	}
 
-	_, _, val, ok = t.lpmPrefix(pfx)
+	_, val, ok = t.lpmPrefix(pfx)
 
 	return val, ok
 }
@@ -487,21 +525,11 @@ func (t *Table[V]) LookupPrefixLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, o
 		return
 	}
 
-	depth, idx, val, ok := t.lpmPrefix(pfx)
-
-	if ok {
-		// calculate the bits from depth and idx
-		bits := depth*strideLen + int(baseIdxLookupTbl[idx].bits)
-
-		// calculate the lpm from incoming ip and new mask
-		lpm, _ = pfx.Addr().Prefix(bits)
-	}
-
-	return lpm, val, ok
+	return t.lpmPrefix(pfx)
 }
 
 // lpmPrefix, returns depth, baseIdx, val and ok for a lpm match.
-func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V, ok bool) {
+func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) {
 	// values derived from pfx
 	ip := pfx.Addr()
 	is4 := ip.Is4()
@@ -534,19 +562,30 @@ func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V, 
 
 	// find the node
 	for i, octet = range octets[:lastOctetIdx+1] {
+		addr := uint(octet)
+
 		// push current node on stack
 		stack[i] = n
 
-		// go down in tight loop
-		n, ok = n.children.Get(uint(octet))
-
-		if !ok {
-			break
+		// go down in tight loop to leaf node
+		if c, ok := n.children.Get(addr); ok {
+			n = c
+			continue
 		}
+
+		if n.pathcomp.Test(addr) {
+			pc := n.pathcomp.MustGet(addr)
+			// TODO
+			if pc.prefix.Contains(ip) && pc.prefix.Bits() <= bits {
+				return pc.prefix, pc.value, true
+			}
+		}
+
+		break
 	}
 
 	// start backtracking, unwind the stack
-	for depth = i; depth >= 0; depth-- {
+	for depth := i; depth >= 0; depth-- {
 		n = stack[depth]
 		octet = octets[depth]
 
@@ -561,14 +600,20 @@ func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (depth int, baseIdx uint, val V, 
 				idx = hostIndex(octet)
 			}
 
-			baseIdx, val, ok = n.lpm(idx)
-			if ok {
-				return depth, baseIdx, val, ok
+			if baseIdx, val, ok := n.lpm(idx); ok {
+				// calculate the bits from depth and idx
+				bits := depth*strideLen + int(baseIdxLookupTbl[baseIdx].bits)
+
+				// calculate the lpm from incoming ip and new mask
+				lpm, _ = ip.Prefix(bits)
+				return lpm, val, ok
 			}
+
 		}
 	}
 
-	return depth, baseIdx, val, ok
+	// false
+	return
 }
 
 // OverlapsPrefix reports whether any IP in pfx is matched by a route in the table or vice versa.
