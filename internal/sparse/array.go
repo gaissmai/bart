@@ -69,13 +69,11 @@ func (s *Array[T]) DeleteAt(i uint) (T, bool) {
 
 // Get the value at i from sparse array.
 func (s *Array[T]) Get(i uint) (val T, ok bool) {
-	var zero T
-
-	if s.Len() != 0 && s.Test(i) {
+	if s.Test(i) {
 		return s.Items[s.Rank(i)-1], true
 	}
 
-	return zero, false
+	return
 }
 
 // MustGet, use it only after a successful test

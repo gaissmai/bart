@@ -575,7 +575,6 @@ func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool
 
 		if n.pathcomp.Test(addr) {
 			pc := n.pathcomp.MustGet(addr)
-			// TODO
 			if pc.prefix.Contains(ip) && pc.prefix.Bits() <= bits {
 				return pc.prefix, pc.value, true
 			}
