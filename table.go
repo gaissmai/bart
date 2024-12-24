@@ -63,6 +63,9 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 		return
 	}
 
+	// canonicalize the prefix
+	pfx = pfx.Masked()
+
 	// values derived from pfx
 	ip := pfx.Addr()
 	is4 := ip.Is4()
@@ -102,36 +105,41 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	// 10.12.10.9/32 -> 8
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
-	// mask the prefix, this is faster than netip.Prefix.Masked()
-	lastOctet &= netMask(lastOctetBits)
-
 	// find the proper trie node to insert prefix
 	for _, octet := range octets[:lastOctetIdx] {
+		addr := uint(octet)
+
 		// descend down to next trie level
-		if c, ok := n.children.Get(uint(octet)); ok {
+		if c, ok := n.children.Get(addr); ok {
 			// proceed with next level
 			n = c
 			continue
 		}
 
-		// look for path compressed item
-		if pc, ok := n.pathcomp.Get(uint(octet)); ok {
+		// #######################################
+		//          path compression
+		// #######################################
 
-			// override?
+		// look for path compressed item in slot
+		if pc, ok := n.pathcomp.Get(addr); ok {
+
+			// slot is already occupied, override?
 			if pc.prefix == pfx {
-				n.pathcomp.InsertAt(uint(octet), &pathItem[V]{pfx, val})
+				n.pathcomp.InsertAt(addr, &pathItem[V]{pfx, val})
 				return
 			}
 
+			// nope, two different pfxs for this pathcomp slot
+
 			// insert intermediate child
 			c := new(node[V])
-			n.children.InsertAt(uint(octet), c)
+			n.children.InsertAt(addr, c)
 
-			// delete this pathcomp item
-			n.pathcomp.DeleteAt(uint(octet))
+			// free this pathcomp slot
+			n.pathcomp.DeleteAt(addr)
 			t.sizeUpdate(is4, -1)
 
-			// recursive call with path compressed item ...
+			// recursive insert call with path compressed item ...
 			t.Insert(pc.prefix, pc.value)
 
 			/// ... and original prefix
@@ -139,12 +147,15 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 			return
 		}
 
-		// TODO, pfx not masked!
 		// insert as path compressed
-		n.pathcomp.InsertAt(uint(octet), &pathItem[V]{pfx, val})
+		n.pathcomp.InsertAt(addr, &pathItem[V]{pfx, val})
 		t.sizeUpdate(is4, 1)
 		return
 	}
+
+	// #######################################
+	//          classic path
+	// #######################################
 
 	// insert/override prefix/val into node
 	override := n.prefixes.InsertAt(pfxToIdx(lastOctet, lastOctetBits), val)
@@ -164,6 +175,9 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 	if !pfx.IsValid() {
 		return zero
 	}
+
+	// canonicalize the prefix
+	pfx = pfx.Masked()
 
 	// values derived from pfx
 	ip := pfx.Addr()
@@ -185,22 +199,61 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 	lastOctet := octets[lastOctetIdx]
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
-	// mask the prefix
-	lastOctet &= netMask(lastOctetBits)
-
 	// find the proper trie node to update prefix
 	for _, octet := range octets[:lastOctetIdx] {
+		addr := uint(octet)
+
 		// descend down to next trie level
-		c, ok := n.children.Get(uint(octet))
-		if !ok {
-			// create and insert missing intermediate child
-			c = new(node[V])
-			n.children.InsertAt(uint(octet), c)
+		if c, ok := n.children.Get(addr); ok {
+			// proceed with next level
+			n = c
+			continue
 		}
 
-		// proceed with next level
-		n = c
+		// #######################################
+		//          path compression
+		// #######################################
+
+		// look for path compressed item in slot
+		if pc, ok := n.pathcomp.Get(addr); ok {
+
+			// slot is already occupied, update?
+			if pc.prefix == pfx {
+				newVal := cb(pc.value, true)
+				pc.value = newVal
+				return newVal
+			}
+
+			// nope, two different pfxs for this pathcomp slot
+
+			// insert intermediate child
+			c := new(node[V])
+			n.children.InsertAt(addr, c)
+
+			// free this pathcomp slot
+			n.pathcomp.DeleteAt(addr)
+			t.sizeUpdate(is4, -1)
+
+			// insert again path compressed item ...
+			t.Insert(pc.prefix, pc.value)
+
+			/// ... and update original call
+			return t.Update(pfx, cb)
+		}
+
+		// insert pfx path compressed
+		var oldVal V
+		newVal := cb(oldVal, false)
+
+		n.pathcomp.InsertAt(addr, &pathItem[V]{pfx, newVal})
+		t.sizeUpdate(is4, 1)
+
+		return newVal
 	}
+
+	// #######################################
+	//          classic path
+	// #######################################
 
 	// update/insert prefix into node
 	var wasPresent bool
@@ -252,8 +305,11 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 			continue
 		}
 
+		// #######################################
+		//          path compression
+		// #######################################
+
 		if pc, ok := n.pathcomp.Get(uint(octet)); ok {
-			// TODO, pfx not masked!
 			if pc.prefix == pfx {
 				return pc.value, true
 			}
@@ -261,6 +317,10 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 
 		return zero, false
 	}
+
+	// #######################################
+	//          classic path
+	// #######################################
 
 	return n.prefixes.Get(pfxToIdx(lastOctet, lastOctetBits))
 }
@@ -328,8 +388,11 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 			continue
 		}
 
+		// #######################################
+		//          path compression
+		// #######################################
+
 		if pc, ok := n.pathcomp.Get(uint(octets[i])); ok {
-			// TODO, pfx not masked!
 			if pc.prefix == pfx {
 				n.pathcomp.DeleteAt(uint(octets[i]))
 				t.sizeUpdate(is4, -1)
@@ -340,6 +403,10 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 
 		return zero, false
 	}
+
+	// #######################################
+	//          classic path
+	// #######################################
 
 	// try to delete prefix in trie node
 	if val, ok = n.prefixes.DeleteAt(pfxToIdx(lastOctet, lastOctetBits)); !ok {
@@ -406,6 +473,10 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 			continue
 		}
 
+		// #######################################
+		//          path compression
+		// #######################################
+
 		if n.pathcomp.Test(addr) {
 			pc := n.pathcomp.MustGet(addr)
 			if pc.prefix.Contains(ip) {
@@ -415,6 +486,10 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 
 		break
 	}
+
+	// #######################################
+	//          classic path
+	// #######################################
 
 	// start backtracking, unwind the stack
 	for depth := i; depth >= 0; depth-- {
@@ -472,6 +547,10 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 			continue
 		}
 
+		// #######################################
+		//          path compression
+		// #######################################
+
 		if n.pathcomp.Test(addr) {
 			pc := n.pathcomp.MustGet(addr)
 			if pc.prefix.Contains(ip) {
@@ -481,6 +560,10 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 
 		break
 	}
+
+	// #######################################
+	//          classic path
+	// #######################################
 
 	// start backtracking, unwind the stack
 	for depth := i; depth >= 0; depth-- {
@@ -573,6 +656,10 @@ func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool
 			continue
 		}
 
+		// #######################################
+		//          path compression
+		// #######################################
+
 		if n.pathcomp.Test(addr) {
 			pc := n.pathcomp.MustGet(addr)
 			if pc.prefix.Contains(ip) && pc.prefix.Bits() <= bits {
@@ -582,6 +669,10 @@ func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool
 
 		break
 	}
+
+	// #######################################
+	//          classic path
+	// #######################################
 
 	// start backtracking, unwind the stack
 	for depth := i; depth >= 0; depth-- {
