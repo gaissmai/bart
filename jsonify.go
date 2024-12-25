@@ -58,6 +58,11 @@ func (t *Table[V]) DumpList6() []DumpListNode[V] {
 }
 
 func (n *node[V]) dumpListRec(parentIdx uint, path [16]byte, depth int, is4 bool) []DumpListNode[V] {
+	// recursion stop condition
+	if n == nil {
+		return nil
+	}
+
 	directKids := n.getKidsRec(parentIdx, path, depth, is4)
 	slices.SortFunc(directKids, cmpKidByPrefix[V])
 

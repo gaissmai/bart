@@ -115,6 +115,11 @@ func (t *Table[V]) fprint(w io.Writer, is4 bool) error {
 
 // fprintRec, the output is a hierarchical CIDR tree starting with this kid.
 func (n *node[V]) fprintRec(w io.Writer, parent kid[V], pad string) error {
+	// recursion stop condition
+	if n == nil {
+		return nil
+	}
+
 	// get direct childs for this kid ...
 	directKids := n.getKidsRec(parent.idx, parent.path, parent.depth, parent.is4)
 
@@ -156,7 +161,12 @@ func (n *node[V]) fprintRec(w io.Writer, parent kid[V], pad string) error {
 // See the  artlookup.pdf paper in the doc folder,
 // the baseIndex function is the key.
 func (n *node[V]) getKidsRec(parentIdx uint, path [16]byte, depth int, is4 bool) []kid[V] {
-	directKids := []kid[V]{}
+	// recursion stop condition
+	if n == nil {
+		return nil
+	}
+
+	var directKids []kid[V]
 
 	// no heap allocs
 	allIndices := n.prefixes.AsSlice(make([]uint, 0, maxNodePrefixes))
@@ -187,6 +197,33 @@ func (n *node[V]) getKidsRec(parentIdx uint, path [16]byte, depth int, is4 bool)
 			directKids = append(directKids, kid)
 		}
 	}
+
+	// #######################################
+	//          path compression
+	// #######################################
+
+	// look for path compressed items in this node
+	allPathCompAddrs := n.pathcomp.AsSlice(make([]uint, 0, maxNodeChildren))
+	for i, addr := range allPathCompAddrs {
+		// do a longest-prefix-match
+		lpmIdx, _, _ := n.lpm(hostIndex(byte(addr)))
+		if lpmIdx == parentIdx {
+			item := n.pathcomp.Items[i]
+
+			kid := kid[V]{
+				n:    nil, // path compressed item, stop recursion
+				is4:  is4,
+				cidr: item.prefix,
+				val:  item.value,
+			}
+
+			directKids = append(directKids, kid)
+		}
+	}
+
+	// #######################################
+	//          classic path
+	// #######################################
 
 	// the node may have childs, the rec-descent monster starts
 
