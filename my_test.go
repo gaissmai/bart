@@ -16,8 +16,6 @@ func TestRandomTablePC(t *testing.T) {
 	for _, pfx := range randomPrefixes(1_000_000) {
 		rt.Insert(pfx.pfx, NULL)
 	}
-	fmt.Println(rt.String())
-	fmt.Println(rt.dumpString())
 }
 
 func TestFullTablePC(t *testing.T) {
@@ -25,8 +23,6 @@ func TestFullTablePC(t *testing.T) {
 	for _, route := range routes {
 		rt.Insert(route.CIDR, NULL)
 	}
-	fmt.Println(rt.String())
-	fmt.Println(rt.dumpString())
 }
 
 func BenchmarkTableInsertPC(b *testing.B) {

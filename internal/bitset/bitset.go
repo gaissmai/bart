@@ -125,6 +125,27 @@ func (b BitSet) NextSet(i uint) (uint, bool) {
 	return 0, false
 }
 
+// AsSet returns all set bits as a set of bool.
+// The capacity of buf must be >= b.Size and
+// all elements must be false (cleared) on input.
+//
+// It panics if the capacity of buf is < b.Size()
+func (b BitSet) AsSet(buf []bool) []bool {
+	buf = buf[:cap(buf)] // len = cap
+
+	for idx, word := range b {
+		for word != 0 {
+			// panics if capacity of buf is exceeded.
+			buf[idx<<6+bits.TrailingZeros64(word)] = true
+
+			// clear the rightmost set bit
+			word &= word - 1
+		}
+	}
+
+	return buf
+}
+
 // AsSlice returns all set bits as slice of uint without
 // heap allocations.
 //
