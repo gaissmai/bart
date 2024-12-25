@@ -13,11 +13,12 @@ import (
 type nodeType byte
 
 const (
-	nullNode         nodeType = iota // empty node
-	fullNode                         // prefixes and children
-	leafNode                         // only prefixes
-	intermediateNode                 // only children
-	UNKNOWN                          // TODO with path compression
+	nullNode           nodeType = iota // empty node
+	fullNode                           // prefixes and (children or PC)
+	leafNode                           // no children, only prefixes or PC
+	intermediateNode                   // only children, no prefix nor PC,
+	intermediatePCNode                 // no prefix, only children with PC
+	UNKNOWN                            // logic error
 )
 
 // ##################################################
@@ -207,8 +208,10 @@ func (nt nodeType) String() string {
 		return "LEAF"
 	case intermediateNode:
 		return "IMED"
+	case intermediatePCNode:
+		return "IMPC"
 	default:
-		return "TODO UNKNOWN"
+		return "unreachable"
 	}
 }
 
@@ -218,17 +221,18 @@ func (n *node[V]) hasType() nodeType {
 	childCount := n.children.Len()
 	pathcompCount := n.pathcomp.Len()
 
-	// TODO with path compression we need different enums
 	switch {
-	case prefixCount == 0 && (childCount != 0 || pathcompCount != 0):
-		return intermediateNode
 	case prefixCount == 0 && childCount == 0 && pathcompCount == 0:
 		return nullNode
-	case prefixCount != 0 && childCount == 0 && pathcompCount == 0:
-		return leafNode
 	case prefixCount != 0 && childCount != 0:
 		return fullNode
+	case prefixCount == 0 && pathcompCount == 0 && childCount != 0:
+		return intermediateNode
+	case prefixCount == 0 && pathcompCount != 0 && childCount != 0:
+		return intermediatePCNode
+	case childCount == 0:
+		return leafNode
 	default:
-		return UNKNOWN
+		panic(fmt.Sprintf("UNREACHABLE: pfx: %d, chld: %d, pc: %d", prefixCount, childCount, pathcompCount))
 	}
 }
