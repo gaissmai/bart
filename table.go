@@ -702,6 +702,9 @@ func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 		return false
 	}
 
+	// canonicalize the prefix
+	pfx = pfx.Masked()
+
 	// values derived from pfx
 	ip := pfx.Addr()
 	is4 := ip.Is4()
@@ -723,10 +726,6 @@ func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 	lastOctet := octets[lastOctetIdx]
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
-	// mask the prefix
-	lastOctet &= netMask(lastOctetBits)
-
-	var ok bool
 	for _, octet := range octets[:lastOctetIdx] {
 		// test if any route overlaps prefix´ so far
 		if n.prefixes.Len() != 0 && n.lpmTest(hostIndex(octet)) {
@@ -734,12 +733,24 @@ func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 		}
 
 		// no overlap so far, go down to next child
-		n, ok = n.children.Get(uint(octet))
-
-		if !ok {
-			return false
+		if c, ok := n.children.Get(uint(octet)); ok {
+			n = c
+			continue
 		}
+
+		// #######################################
+		//          path compression
+		// #######################################
+
+		if pc, ok := n.pathcomp.Get(uint(octet)); ok {
+			return pfx.Overlaps(pc.prefix)
+		}
+
+		return false
 	}
+	// #######################################
+	//          classic path
+	// #######################################
 
 	return n.overlapsPrefix(lastOctet, lastOctetBits)
 }

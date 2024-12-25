@@ -20,7 +20,7 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 	// special case, overlapsPrefix is faster
 	if nPfxCount == 1 && nChildCount == 0 {
 		// get the single prefix from n
-		idx, _ := n.prefixes.NextSet(0)
+		idx, _ := n.prefixes.FirstSet()
 
 		return o.overlapsPrefix(idxToPfx(idx))
 	}
@@ -28,7 +28,7 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 	// special case, overlapsPrefix is faster
 	if oPfxCount == 1 && oChildCount == 0 {
 		// get the single prefix from o
-		idx, _ := o.prefixes.NextSet(0)
+		idx, _ := o.prefixes.FirstSet()
 
 		return n.overlapsPrefix(idxToPfx(idx))
 	}
@@ -254,20 +254,30 @@ func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 		return true
 	}
 
+	// use bitset intersections instead of range loops
+
 	// 2. Test if prefix overlaps any route in this node
-	// use bitset intersection with alloted stride table instead of range loops
 
 	// copy pre alloted bitset for idx
 	a8 := idxToAllot(idx)
 	allotedPrefixRoutes := bitset.BitSet(a8[:])
 
-	// use bitset intersection instead of range loops
 	if allotedPrefixRoutes.IntersectionCardinality(n.prefixes.BitSet) != 0 {
 		return true
 	}
 
-	// 3. Test if prefix overlaps any child in this node
-	// use bitsets intersection instead of range loops
+	// 3. Test if prefix overlaps any pathcomp prefix
+
+	// shift-right pathcomp bitset by 256 (firstHostIndex)
+	pc8 := make([]uint64, 8)
+	copy(pc8[4:], n.pathcomp.BitSet) // 4*64= 256
+	pathcompRoutes := bitset.BitSet(pc8)
+
+	if allotedPrefixRoutes.IntersectionCardinality(pathcompRoutes) != 0 {
+		return true
+	}
+
+	// 4. Test if prefix overlaps any child in this node
 
 	// shift-right children bitset by 256 (firstHostIndex)
 	c8 := make([]uint64, 8)
