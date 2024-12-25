@@ -57,6 +57,17 @@ func (n *node[V]) isEmpty() bool {
 		n.pathcomp.Len() == 0
 }
 
+// purgeParents, dangling nodes after successful deletion
+func (n *node[V]) purgeParents(parentStack []*node[V], childPath []byte) {
+	for i := len(parentStack) - 1; i >= 0; i-- {
+		if n.isEmpty() {
+			parent := parentStack[i]
+			parent.children.DeleteAt(uint(childPath[i]))
+		}
+		n = parentStack[i]
+	}
+}
+
 // lpm does a route lookup for idx in the 8-bit (stride) routing table
 // at this depth and returns (baseIdx, value, true) if a matching
 // longest prefix exists, or ok=false otherwise.

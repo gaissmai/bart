@@ -395,7 +395,9 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 		if pc, ok := n.pathcomp.Get(uint(octets[i])); ok {
 			if pc.prefix == pfx {
 				n.pathcomp.DeleteAt(uint(octets[i]))
+
 				t.sizeUpdate(is4, -1)
+				n.purgeParents(stack[:i], octets)
 
 				return pc.value, true
 			}
@@ -414,19 +416,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 	}
 
 	t.sizeUpdate(is4, -1)
-
-	// purge dangling nodes after successful deletion
-	for i > 0 {
-		if n.isEmpty() {
-			// purge empty node from parents children
-			parent := stack[i-1]
-			parent.children.DeleteAt(uint(octets[i-1]))
-		}
-
-		// unwind the stack
-		i--
-		n = stack[i]
-	}
+	n.purgeParents(stack[:i], octets)
 
 	return val, ok
 }
