@@ -420,42 +420,44 @@ func (n *node[V]) allRecSorted(
 	is4 bool,
 	yield func(netip.Prefix, V) bool,
 ) bool {
-	// get slice of all child octets, sorted by addr
-	allChildAddrs := n.children.AsSlice(make([]uint, 0, maxNodeChildren))
-
 	// get slice of all indexes, sorted by idx
 	allIndices := n.prefixes.AsSlice(make([]uint, 0, maxNodePrefixes))
 
 	// sort indices in CIDR sort order
 	slices.SortFunc(allIndices, cmpIndexRank)
 
-	childCursor := 0
+	// yield indices, pathcomp prefixes and childs in CIDR sort order
+	var lower, upper uint
 
-	// yield indices and childs in CIDR sort order
 	for _, idx := range allIndices {
-		octet, _ := idxToPfx(idx)
+		pfxAddr, _ := idxToPfx(idx)
+		upper = uint(pfxAddr)
 
-		// yield all childs before idx
-		for j := childCursor; j < len(allChildAddrs); j++ {
-			addr := allChildAddrs[j]
+		// for all pathcomp and child items < pfxAddr
+		for addr := lower; addr < upper; addr++ {
+			// either pathcomp or children match this addr, but not both possible
 
-			if addr >= uint(octet) {
-				break
+			// yield this pathcompressed item, if matched
+			if pc, ok := n.pathcomp.Get(addr); ok {
+				if !yield(pc.prefix, pc.value) {
+					// early exit
+					return false
+				}
+				continue
 			}
 
-			// yield the child for this addr
-			c := n.children.Items[j]
+			// yield this child rec-descent, if matched
+			if c, ok := n.children.Get(addr); ok {
+				// add (set) this octet to path
+				path[depth] = byte(addr)
 
-			// add (set) this octet to path
-			path[depth] = byte(addr)
-
-			// all cidrs under this child are covered by pfx
-			if !c.allRecSorted(path, depth+1, is4, yield) {
-				// early exit
-				return false
+				// all cidrs under this child
+				if !c.allRecSorted(path, depth+1, is4, yield) {
+					return false
+				}
+				continue
 			}
 
-			childCursor++
 		}
 
 		// yield the prefix for this idx
@@ -464,17 +466,32 @@ func (n *node[V]) allRecSorted(
 			// early exit
 			return false
 		}
+
+		// forward lower bound for next round
+		lower = upper
 	}
 
-	// yield the rest of childs, if any
-	for j := childCursor; j < len(allChildAddrs); j++ {
-		addr := allChildAddrs[j]
-		c := n.children.Items[j]
+	// yield the rest of pathcomp items and childs, if any
+	for addr := lower; addr < maxNodeChildren; addr++ {
+		// yield this pathcompressed item, if matched
+		if pc, ok := n.pathcomp.Get(addr); ok {
+			if !yield(pc.prefix, pc.value) {
+				// early exit
+				return false
+			}
+			continue
+		}
 
-		path[depth] = byte(addr)
-		if !c.allRecSorted(path, depth+1, is4, yield) {
-			// early exit
-			return false
+		// yield this child rec-descent, if matched
+		if c, ok := n.children.Get(addr); ok {
+			// add (set) this octet to path
+			path[depth] = byte(addr)
+
+			// all cidrs under this child
+			if !c.allRecSorted(path, depth+1, is4, yield) {
+				return false
+			}
+			continue
 		}
 	}
 

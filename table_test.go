@@ -1628,25 +1628,25 @@ func TestSize(t *testing.T) {
 		rtbl.Delete(pfx.pfx)
 	}
 
-	var golden4 int
-	var golden6 int
+	var allInc4 int
+	var allInc6 int
 
 	rtbl.AllSorted4()(func(netip.Prefix, any) bool {
-		golden4++
+		allInc4++
 		return true
 	})
 
 	rtbl.AllSorted6()(func(netip.Prefix, any) bool {
-		golden6++
+		allInc6++
 		return true
 	})
 
-	if golden4 != rtbl.Size4() {
-		t.Errorf("Size4: want: %d, got: %d", golden4, rtbl.Size4())
+	if allInc4 != rtbl.Size4() {
+		t.Errorf("Size4: want: %d, got: %d", allInc4, rtbl.Size4())
 	}
 
-	if golden6 != rtbl.Size6() {
-		t.Errorf("Size6: want: %d, got: %d", golden6, rtbl.Size6())
+	if allInc6 != rtbl.Size6() {
+		t.Errorf("Size6: want: %d, got: %d", allInc6, rtbl.Size6())
 	}
 }
 
