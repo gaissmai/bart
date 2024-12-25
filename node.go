@@ -338,6 +338,24 @@ func (n *node[V]) cloneRec() *node[V] {
 		c.children.Items[i] = child.cloneRec()
 	}
 
+	// #######################################
+	//          path compression
+	// #######################################
+
+	c.pathcomp.BitSet = n.pathcomp.BitSet.Clone()     // deep
+	c.pathcomp.Items = slices.Clone(n.pathcomp.Items) // values, shallow copy
+
+	// deep copy
+	for i, pc := range c.pathcomp.Items {
+		item := *pc
+
+		// deep copy if V implements Cloner[V]
+		if v, ok := any(item.value).(Cloner[V]); ok {
+			item.value = v.Clone()
+		}
+		c.pathcomp.Items[i] = &item
+	}
+
 	return c
 }
 

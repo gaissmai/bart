@@ -780,7 +780,8 @@ func (t *Table[V]) Union(o *Table[V]) {
 }
 
 // Clone returns a copy of the routing table.
-// The payload of type V is shallow copied, but if type V implements the [Cloner] interface, the values are cloned.
+// The payload of type V is shallow copied, but if type V implements the [Cloner] interface,
+// the values are cloned.
 func (t *Table[V]) Clone() *Table[V] {
 	c := new(Table[V])
 
