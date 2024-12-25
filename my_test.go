@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net/netip"
+	"strings"
 	"testing"
 )
 
@@ -11,16 +12,136 @@ type NULLT struct{}
 
 var NULL NULLT
 
+func TestNodeTreePC(t *testing.T) {
+	w := new(strings.Builder)
+	is4 := true
+	depth := 0
+	got := ""
+	want := ""
+	pfx := netip.Prefix{}
+	n := new(node[string])
+
+	pfx = mpp("0.0.0.0/0")
+	n = n.pfxToNodeTree(pfx, "default route", 0)
+	n.dumpRec(w, zeroPath, depth, is4)
+	got = w.String()
+	w.Reset()
+	want = `
+[LEAF] depth:  0 path: [] / 0
+indexs(#1): [1]
+prefxs(#1): 0/0
+values(#1): default route
+`
+	if got != want {
+		t.Errorf("pfxToNodeTree, %s, got:\n%s\n\nwant:\n%s", pfx, got, want)
+	}
+
+	pfx = mpp("10.11.12.13/32")
+	n = n.pfxToNodeTree(pfx, "full /32", 0)
+	n.dumpRec(w, zeroPath, depth, is4)
+	got = w.String()
+	w.Reset()
+	want = `
+[IMED] depth:  0 path: [] / 0
+childs(#1): 10
+
+.[IMED] depth:  1 path: [10] / 8
+.childs(#1): 11
+
+..[IMED] depth:  2 path: [10.11] / 16
+..childs(#1): 12
+
+...[LEAF] depth:  3 path: [10.11.12] / 24
+...indexs(#1): [269]
+...prefxs(#1): 13/8
+...values(#1): full /32
+`
+	if got != want {
+		t.Errorf("pfxToNodeTree, %s, got:\n%s\n\nwant:\n%s", pfx, got, want)
+	}
+
+	is4 = false
+	pfx = mpp("::1/128")
+	n = n.pfxToNodeTree(pfx, "full /128", 0)
+	n.dumpRec(w, zeroPath, depth, is4)
+	got = w.String()
+	w.Reset()
+	want = `
+[IMED] depth:  0 path: [] / 0
+childs(#1): 0x00
+
+.[IMED] depth:  1 path: [00] / 8
+.childs(#1): 0x00
+
+..[IMED] depth:  2 path: [0000] / 16
+..childs(#1): 0x00
+
+...[IMED] depth:  3 path: [0000:00] / 24
+...childs(#1): 0x00
+
+....[IMED] depth:  4 path: [0000:0000] / 32
+....childs(#1): 0x00
+
+.....[IMED] depth:  5 path: [0000:0000:00] / 40
+.....childs(#1): 0x00
+
+......[IMED] depth:  6 path: [0000:0000:0000] / 48
+......childs(#1): 0x00
+
+.......[IMED] depth:  7 path: [0000:0000:0000:00] / 56
+.......childs(#1): 0x00
+
+........[IMED] depth:  8 path: [0000:0000:0000:0000] / 64
+........childs(#1): 0x00
+
+.........[IMED] depth:  9 path: [0000:0000:0000:0000:00] / 72
+.........childs(#1): 0x00
+
+..........[IMED] depth:  10 path: [0000:0000:0000:0000:0000] / 80
+..........childs(#1): 0x00
+
+...........[IMED] depth:  11 path: [0000:0000:0000:0000:0000:00] / 88
+...........childs(#1): 0x00
+
+............[IMED] depth:  12 path: [0000:0000:0000:0000:0000:0000] / 96
+............childs(#1): 0x00
+
+.............[IMED] depth:  13 path: [0000:0000:0000:0000:0000:0000:00] / 104
+.............childs(#1): 0x00
+
+..............[IMED] depth:  14 path: [0000:0000:0000:0000:0000:0000:0000] / 112
+..............childs(#1): 0x00
+
+...............[LEAF] depth:  15 path: [0000:0000:0000:0000:0000:0000:0000:00] / 120
+...............indexs(#1): [257]
+...............prefxs(#1): 0x01/8
+...............values(#1): full /128
+`
+
+	if got != want {
+		t.Errorf("pfxToNodeTree, %s, got:\n%s\n\nwant:\n%s", pfx, got, want)
+	}
+}
+
 func TestOverlapsPrefixPC(t *testing.T) {
 	tbl := &Table[int]{}
 
 	// default route
-	tbl.Insert(mpp("10.0.0.0/9"), 0)
+	tbl.Insert(mpp("10.0.0.0/9"), 1)
+	tbl.Insert(mpp("2001:db8::/32"), 2)
 
 	pfx := mpp("0.0.0.0/0")
 	got := tbl.OverlapsPrefix(pfx)
 
 	want := true
+	if got != want {
+		t.Errorf("OverlapsPrefix, %s, got: %v, want: %v", pfx, got, want)
+	}
+
+	pfx = mpp("::/0")
+	got = tbl.OverlapsPrefix(pfx)
+
+	want = true
 	if got != want {
 		t.Errorf("OverlapsPrefix, %s, got: %v, want: %v", pfx, got, want)
 	}
