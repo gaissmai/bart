@@ -602,6 +602,25 @@ func TestDelete(t *testing.T) {
 		})
 		checkNumNodes(t, rtbl, 1) // 1 root6
 	})
+
+	t.Run("path compressed purge", func(t *testing.T) {
+		t.Parallel()
+		rtbl := &Table[int]{}
+		checkNumNodes(t, rtbl, 0) // 0
+
+		rtbl.Insert(mpp("10.10.0.0/17"), 1)
+		rtbl.Insert(mpp("10.20.0.0/17"), 2)
+		checkNumNodes(t, rtbl, 2) // 1 root, 1 leaf
+		t.Error(rtbl.dumpString())
+
+		rtbl.Delete(mpp("10.20.0.0/17"))
+		checkNumNodes(t, rtbl, 2) // 1 root, 1 leaf
+		t.Error(rtbl.dumpString())
+
+		rtbl.Delete(mpp("10.10.0.0/17"))
+		t.Error(rtbl.dumpString())
+		checkNumNodes(t, rtbl, 0) // 0
+	})
 }
 
 func TestContainsCompare(t *testing.T) {
