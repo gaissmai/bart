@@ -35,6 +35,7 @@ type route struct {
 }
 
 func init() {
+	rand.Seed(42)
 	fillRouteTables()
 
 	randRoute4 = routes4[rand.Intn(len(routes4))]

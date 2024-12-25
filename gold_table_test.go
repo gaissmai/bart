@@ -5,7 +5,6 @@ package bart
 
 import (
 	"cmp"
-	crand "crypto/rand"
 	"math/rand"
 	"net/netip"
 	"slices"
@@ -224,7 +223,7 @@ func randomAddr() netip.Addr {
 // randomAddr4 returns a randomly generated IPv4 address.
 func randomAddr4() netip.Addr {
 	var b [4]byte
-	if _, err := crand.Read(b[:]); err != nil {
+	if _, err := rand.Read(b[:]); err != nil {
 		panic(err)
 	}
 	return netip.AddrFrom4(b)
@@ -233,7 +232,7 @@ func randomAddr4() netip.Addr {
 // randomAddr6 returns a randomly generated IPv6 address.
 func randomAddr6() netip.Addr {
 	var b [16]byte
-	if _, err := crand.Read(b[:]); err != nil {
+	if _, err := rand.Read(b[:]); err != nil {
 		panic(err)
 	}
 	return netip.AddrFrom16(b)
@@ -270,7 +269,7 @@ func randomPrefix6() netip.Prefix {
 
 func randomIP4() netip.Addr {
 	var b [4]byte
-	if _, err := crand.Read(b[:]); err != nil {
+	if _, err := rand.Read(b[:]); err != nil {
 		panic(err)
 	}
 	return netip.AddrFrom4(b)
@@ -278,7 +277,7 @@ func randomIP4() netip.Addr {
 
 func randomIP6() netip.Addr {
 	var b [16]byte
-	if _, err := crand.Read(b[:]); err != nil {
+	if _, err := rand.Read(b[:]); err != nil {
 		panic(err)
 	}
 	return netip.AddrFrom16(b)
