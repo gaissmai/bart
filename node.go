@@ -57,6 +57,30 @@ func (n *node[V]) isEmpty() bool {
 		n.pathcomp.Len() == 0
 }
 
+// pfxToNodeTree builds a node tree from prefix,
+// prefix must be valid and in canonical form.
+func (n *node[V]) pfxToNodeTree(pfx netip.Prefix, val V, depth int) *node[V] {
+	ip := pfx.Addr()
+	bits := pfx.Bits()
+	octets := ip.AsSlice()
+
+	// see comment in Table.Insert
+	lastOctetIdx := (bits - 1) / strideLen
+	lastOctet := octets[lastOctetIdx]
+	lastOctetBits := bits - (lastOctetIdx * strideLen)
+
+	result := new(node[V])
+	m := result
+	for _, octet := range octets[depth:lastOctetIdx] {
+		c := new(node[V])
+		m.children.InsertAt(uint(octet), c)
+		m = c
+	}
+
+	m.prefixes.InsertAt(pfxToIdx(lastOctet, lastOctetBits), val)
+	return result
+}
+
 // purgeParents, dangling nodes after successful deletion
 func (n *node[V]) purgeParents(parentStack []*node[V], childPath []byte) {
 	for i := len(parentStack) - 1; i >= 0; i-- {
@@ -272,7 +296,7 @@ func (n *node[V]) eachSubnet(
 // unionRec combines two nodes, changing the receiver node.
 // If there are duplicate entries, the value is taken from the other node.
 // Count duplicate entries to adjust the t.size struct members.
-func (n *node[V]) unionRec(o *node[V]) (duplicates int) {
+func (n *node[V]) unionRec(o *node[V], depth int) (duplicates int) {
 	// no heap allocs
 	allIndices := o.prefixes.AsSlice(make([]uint, 0, maxNodePrefixes))
 
@@ -304,7 +328,7 @@ func (n *node[V]) unionRec(o *node[V]) (duplicates int) {
 			n.children.InsertAt(uint(octet), oc.cloneRec())
 		} else {
 			// both nodes have child with octet, call union rec-descent
-			duplicates += nc.unionRec(oc)
+			duplicates += nc.unionRec(oc, depth+1)
 		}
 	}
 

@@ -783,8 +783,8 @@ func (t *Table[V]) Overlaps6(o *Table[V]) bool {
 // If there are duplicate entries, the payload of type V is shallow copied from the other table.
 // If type V implements the [Cloner] interface, the values are cloned, see also [Table.Clone].
 func (t *Table[V]) Union(o *Table[V]) {
-	dup4 := t.root4.unionRec(&o.root4)
-	dup6 := t.root6.unionRec(&o.root6)
+	dup4 := t.root4.unionRec(&o.root4, 0)
+	dup6 := t.root6.unionRec(&o.root6, 0)
 
 	t.size4 += o.size4 - dup4
 	t.size6 += o.size6 - dup6
