@@ -142,7 +142,7 @@ func (n *node[V]) dump(w io.Writer, path [16]byte, depth int, is4 bool) {
 
 	if pathcompCount := n.pathcomp.Len(); pathcompCount != 0 {
 		// print the pathcomp prefixes for this node
-		fmt.Fprintf(w, "%spathcs(#%d):", indent, pathcompCount)
+		fmt.Fprintf(w, "%spathcp(#%d):", indent, pathcompCount)
 
 		// no heap allocs
 		allPathComps := n.pathcomp.AsSlice(make([]uint, 0, maxNodeChildren))
