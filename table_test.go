@@ -1541,15 +1541,15 @@ func TestOverlapsPrefixEdgeCases(t *testing.T) {
 	tbl := &Table[int]{}
 
 	// empty table
-	checkOverlaps(t, tbl, []tableOverlapsTest{
+	checkOverlapsPrefix(t, tbl, []tableOverlapsTest{
 		{"0.0.0.0/0", false},
 		{"::/0", false},
 	})
 
 	// default route
-	tbl.Insert(mpp("10.0.0.0/8"), 0)
+	tbl.Insert(mpp("10.0.0.0/9"), 0)
 	tbl.Insert(mpp("2001:db8::/32"), 0)
-	checkOverlaps(t, tbl, []tableOverlapsTest{
+	checkOverlapsPrefix(t, tbl, []tableOverlapsTest{
 		{"0.0.0.0/0", true},
 		{"::/0", true},
 	})
@@ -1558,8 +1558,8 @@ func TestOverlapsPrefixEdgeCases(t *testing.T) {
 	tbl = &Table[int]{}
 	tbl.Insert(mpp("0.0.0.0/0"), 0)
 	tbl.Insert(mpp("::/0"), 0)
-	checkOverlaps(t, tbl, []tableOverlapsTest{
-		{"10.0.0.0/8", true},
+	checkOverlapsPrefix(t, tbl, []tableOverlapsTest{
+		{"10.0.0.0/9", true},
 		{"2001:db8::/32", true},
 	})
 
@@ -1567,16 +1567,16 @@ func TestOverlapsPrefixEdgeCases(t *testing.T) {
 	tbl = &Table[int]{}
 	tbl.Insert(mpp("10.0.0.0/7"), 0)
 	tbl.Insert(mpp("2001::/16"), 0)
-	checkOverlaps(t, tbl, []tableOverlapsTest{
+	checkOverlapsPrefix(t, tbl, []tableOverlapsTest{
 		{"10.1.2.3/32", true},
 		{"2001:db8:affe::cafe/128", true},
 	})
 
-	// single IPv
+	// single IP
 	tbl = &Table[int]{}
 	tbl.Insert(mpp("10.1.2.3/32"), 0)
 	tbl.Insert(mpp("2001:db8:affe::cafe/128"), 0)
-	checkOverlaps(t, tbl, []tableOverlapsTest{
+	checkOverlapsPrefix(t, tbl, []tableOverlapsTest{
 		{"10.0.0.0/7", true},
 		{"2001::/16", true},
 	})
@@ -1585,7 +1585,7 @@ func TestOverlapsPrefixEdgeCases(t *testing.T) {
 	tbl = &Table[int]{}
 	tbl.Insert(mpp("10.1.2.3/32"), 0)
 	tbl.Insert(mpp("2001:db8:affe::cafe/128"), 0)
-	checkOverlaps(t, tbl, []tableOverlapsTest{
+	checkOverlapsPrefix(t, tbl, []tableOverlapsTest{
 		{"10.1.2.3/32", true},
 		{"2001:db8:affe::cafe/128", true},
 	})
@@ -1902,9 +1902,9 @@ type tableOverlapsTest struct {
 	want   bool
 }
 
-// checkOverlaps verifies that the overlaps lookups in tt return the
+// checkOverlapsPrefix verifies that the overlaps lookups in tt return the
 // expected results on tbl.
-func checkOverlaps(t *testing.T, tbl *Table[int], tests []tableOverlapsTest) {
+func checkOverlapsPrefix(t *testing.T, tbl *Table[int], tests []tableOverlapsTest) {
 	t.Helper()
 	for _, tt := range tests {
 		got := tbl.OverlapsPrefix(mpp(tt.prefix))

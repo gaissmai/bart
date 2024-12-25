@@ -11,6 +11,21 @@ type NULLT struct{}
 
 var NULL NULLT
 
+func TestOverlapsPrefixPC(t *testing.T) {
+	tbl := &Table[int]{}
+
+	// default route
+	tbl.Insert(mpp("10.0.0.0/9"), 0)
+
+	pfx := mpp("0.0.0.0/0")
+	got := tbl.OverlapsPrefix(pfx)
+
+	want := true
+	if got != want {
+		t.Errorf("OverlapsPrefix, %s, got: %v, want: %v", pfx, got, want)
+	}
+}
+
 func TestRandomTablePC(t *testing.T) {
 	var rt Table[NULLT]
 	for _, pfx := range randomPrefixes(1_000_000) {
