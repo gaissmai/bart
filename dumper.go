@@ -147,8 +147,8 @@ func (n *node[V]) dump(w io.Writer, path [16]byte, depth int, is4 bool) {
 		// no heap allocs
 		allPathComps := n.pathcomp.AsSlice(make([]uint, 0, maxNodeChildren))
 
-		for _, addr := range allPathComps {
-			pc := n.pathcomp.MustGet(addr)
+		for i, addr := range allPathComps {
+			pc := n.pathcomp.Items[i]
 			fmt.Fprintf(w, " %d:[%s, %v]", addr, pc.prefix, pc.value)
 		}
 
