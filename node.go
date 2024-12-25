@@ -384,6 +384,15 @@ func (n *node[V]) allRec(
 		}
 	}
 
+	// for all path compressed items do ...
+	for _, pc := range n.pathcomp.Items {
+		// make the callback for this prefix
+		if !yield(pc.prefix, pc.value) {
+			// early exit
+			return false
+		}
+	}
+
 	allChildAddrs := n.children.AsSlice(make([]uint, 0, maxNodeChildren))
 	// for all children in this node do ...
 	for i, addr := range allChildAddrs {
