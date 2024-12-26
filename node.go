@@ -57,28 +57,37 @@ func (n *node[V]) isEmpty() bool {
 		n.pathcomp.Len() == 0
 }
 
-// pfxToNodeTree builds a node tree from prefix,
-// prefix must be valid and in canonical form.
-func (n *node[V]) pfxToNodeTree(pfx netip.Prefix, val V, depth int) *node[V] {
+// insertAtDepth insert a prefix/val into a node tree at depth.
+// n must not be nil, prefix must be valid and already in canonical form.
+func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) {
 	ip := pfx.Addr()
 	bits := pfx.Bits()
 	octets := ip.AsSlice()
 
-	// see comment in Table.Insert
 	lastOctetIdx := (bits - 1) / strideLen
 	lastOctet := octets[lastOctetIdx]
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
-	result := new(node[V])
-	m := result
-	for _, octet := range octets[depth:lastOctetIdx] {
-		c := new(node[V])
-		m.children.InsertAt(uint(octet), c)
-		m = c
+	for i := depth; i < lastOctetIdx; i++ {
+		addr := uint(octets[i])
+
+		// descend down to next trie level
+		if c, ok := n.children.Get(addr); ok {
+			n = c
+			continue
+		}
+
+		if n.pathcomp.Test(addr) {
+			panic("logic error in insertAdDepth")
+		}
+
+		// no child, insert patch compressed
+		n.pathcomp.InsertAt(addr, &pathItem[V]{pfx, val})
+		return
 	}
 
-	m.prefixes.InsertAt(pfxToIdx(lastOctet, lastOctetBits), val)
-	return result
+	// insert/override flattened prefix/val into node
+	n.prefixes.InsertAt(pfxToIdx(lastOctet, lastOctetBits), val)
 }
 
 // purgeParents, dangling nodes after successful deletion

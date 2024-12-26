@@ -58,6 +58,8 @@ type Cloner[V any] interface {
 
 // Insert adds pfx to the tree, with given val.
 // If pfx is already present in the tree, its value is set to val.
+//
+// This is the path compressed version of Insert.
 func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	if !pfx.IsValid() {
 		return
@@ -106,7 +108,7 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
 	// find the proper trie node to insert prefix
-	for _, octet := range octets[:lastOctetIdx] {
+	for depth, octet := range octets[:lastOctetIdx] {
 		addr := uint(octet)
 
 		// descend down to next trie level
@@ -116,46 +118,35 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 			continue
 		}
 
-		// #######################################
-		//          path compression
-		// #######################################
-
-		// look for path compressed item in slot
-		if pc, ok := n.pathcomp.Get(addr); ok {
-
-			// slot is already occupied, override?
-			if pc.prefix == pfx {
-				n.pathcomp.InsertAt(addr, &pathItem[V]{pfx, val})
-				return
-			}
-
-			// nope, two different pfxs for this pathcomp slot
-
-			// insert intermediate child
-			c := new(node[V])
-			n.children.InsertAt(addr, c)
-
-			// free this pathcomp slot
-			n.pathcomp.DeleteAt(addr)
-			t.sizeUpdate(is4, -1)
-
-			// recursive insert call with path compressed item ...
-			t.Insert(pc.prefix, pc.value)
-
-			/// ... and original prefix
-			t.Insert(pfx, val)
+		// no child found, look for path compressed item in slot
+		pc, ok := n.pathcomp.Get(addr)
+		if !ok {
+			// insert prefix path compressed
+			n.pathcomp.InsertAt(addr, &pathItem[V]{pfx, val})
+			t.sizeUpdate(is4, 1)
 			return
 		}
 
-		// insert as path compressed
-		n.pathcomp.InsertAt(addr, &pathItem[V]{pfx, val})
-		t.sizeUpdate(is4, 1)
-		return
-	}
+		// pathcomp slot is already occupied
 
-	// #######################################
-	//          classic path
-	// #######################################
+		// override prefix in slot if equal
+		if pc.prefix == pfx {
+			n.pathcomp.InsertAt(addr, &pathItem[V]{pfx, val})
+			return
+		}
+
+		// free this pathcomp slot ...
+		// insert new intermdiate child ...
+		// shuffle down existing path-compressed prefix
+		// loop to next octet
+		n.pathcomp.DeleteAt(addr)
+
+		c := new(node[V])
+		n.children.InsertAt(addr, c)
+
+		n = c
+		n.insertAtDepth(pc.prefix, pc.value, depth+1)
+	}
 
 	// insert/override prefix/val into node
 	override := n.prefixes.InsertAt(pfxToIdx(lastOctet, lastOctetBits), val)
@@ -169,6 +160,8 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 // The callback function is called with (value, ok) and returns a new value.
 //
 // If the pfx does not already exist, it is set with the new value.
+//
+// This is the path compressed version of Update.
 func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V) {
 	var zero V
 
@@ -200,7 +193,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
 	// find the proper trie node to update prefix
-	for _, octet := range octets[:lastOctetIdx] {
+	for depth, octet := range octets[:lastOctetIdx] {
 		addr := uint(octet)
 
 		// descend down to next trie level
@@ -210,56 +203,46 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 			continue
 		}
 
-		// #######################################
-		//          path compression
-		// #######################################
-
 		// look for path compressed item in slot
-		if pc, ok := n.pathcomp.Get(addr); ok {
+		pc, ok := n.pathcomp.Get(addr)
+		if !ok {
+			// insert pfx path compressed
+			var oldVal V
+			newVal := cb(oldVal, false)
 
-			// slot is already occupied, update?
-			if pc.prefix == pfx {
-				newVal := cb(pc.value, true)
-				pc.value = newVal
-				return newVal
-			}
+			n.pathcomp.InsertAt(addr, &pathItem[V]{pfx, newVal})
+			t.sizeUpdate(is4, 1)
 
-			// nope, two different pfxs for this pathcomp slot
-
-			// insert intermediate child
-			c := new(node[V])
-			n.children.InsertAt(addr, c)
-
-			// free this pathcomp slot
-			n.pathcomp.DeleteAt(addr)
-			t.sizeUpdate(is4, -1)
-
-			// insert again path compressed item ...
-			t.Insert(pc.prefix, pc.value)
-
-			/// ... and update original call
-			return t.Update(pfx, cb)
+			return newVal
 		}
 
-		// insert pfx path compressed
-		var oldVal V
-		newVal := cb(oldVal, false)
+		// pathcomp slot is already occupied
 
-		n.pathcomp.InsertAt(addr, &pathItem[V]{pfx, newVal})
-		t.sizeUpdate(is4, 1)
+		// update existing prefix if equal?
+		if pc.prefix == pfx {
+			newVal := cb(pc.value, true)
+			pc.value = newVal
+			return newVal
+		}
 
-		return newVal
+		// free this pathcomp slot ...
+		// and insert new intermdiate child ...
+		// and shuffle down existing path-compressed prefix
+		// loop to next octet
+		n.pathcomp.DeleteAt(addr)
+
+		c := new(node[V])
+		n.children.InsertAt(addr, c)
+
+		n = c
+		n.insertAtDepth(pc.prefix, pc.value, depth+1)
 	}
 
-	// #######################################
-	//          classic path
-	// #######################################
-
 	// update/insert prefix into node
-	var wasPresent bool
+	var exists bool
 
-	newVal, wasPresent = n.prefixes.UpdateAt(pfxToIdx(lastOctet, lastOctetBits), cb)
-	if !wasPresent {
+	newVal, exists = n.prefixes.UpdateAt(pfxToIdx(lastOctet, lastOctetBits), cb)
+	if !exists {
 		t.sizeUpdate(is4, 1)
 	}
 
