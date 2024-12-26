@@ -459,7 +459,7 @@ func (n *node[V]) allRecSorted(
 	// sort indices in CIDR sort order
 	slices.SortFunc(allIndices, cmpIndexRank)
 
-	// get all the bits in fast adressable form as a set of bool.
+	// get all the bits in fast addressable form as a set of bool.
 	allChildSet := n.children.AsSet(make([]bool, 0, maxNodeChildren))
 	allPathCompSet := n.pathcomp.AsSet(make([]bool, 0, maxNodeChildren))
 
