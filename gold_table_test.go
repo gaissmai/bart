@@ -5,7 +5,6 @@ package bart
 
 import (
 	"cmp"
-	"math/rand"
 	"net/netip"
 	"slices"
 )
@@ -172,9 +171,9 @@ func randomPrefixes4(n int) []goldTableItem[int] {
 	pfxs := map[netip.Prefix]bool{}
 
 	for len(pfxs) < n {
-		bits := rand.Intn(32)
+		bits := prng.IntN(32)
 		bits++
-		pfx, err := randomAddr4().Prefix(bits)
+		pfx, err := randomIP4().Prefix(bits)
 		if err != nil {
 			panic(err)
 		}
@@ -183,7 +182,7 @@ func randomPrefixes4(n int) []goldTableItem[int] {
 
 	ret := make([]goldTableItem[int], 0, len(pfxs))
 	for pfx := range pfxs {
-		ret = append(ret, goldTableItem[int]{pfx, rand.Int()})
+		ret = append(ret, goldTableItem[int]{pfx, prng.Int()})
 	}
 
 	return ret
@@ -195,9 +194,9 @@ func randomPrefixes6(n int) []goldTableItem[int] {
 	pfxs := map[netip.Prefix]bool{}
 
 	for len(pfxs) < n {
-		bits := rand.Intn(128)
+		bits := prng.IntN(128)
 		bits++
-		pfx, err := randomAddr6().Prefix(bits)
+		pfx, err := randomIP6().Prefix(bits)
 		if err != nil {
 			panic(err)
 		}
@@ -206,36 +205,10 @@ func randomPrefixes6(n int) []goldTableItem[int] {
 
 	ret := make([]goldTableItem[int], 0, len(pfxs))
 	for pfx := range pfxs {
-		ret = append(ret, goldTableItem[int]{pfx, rand.Int()})
+		ret = append(ret, goldTableItem[int]{pfx, prng.Int()})
 	}
 
 	return ret
-}
-
-// randomAddr returns a randomly generated IP address.
-func randomAddr() netip.Addr {
-	if rand.Intn(2) == 1 {
-		return randomAddr6()
-	}
-	return randomAddr4()
-}
-
-// randomAddr4 returns a randomly generated IPv4 address.
-func randomAddr4() netip.Addr {
-	var b [4]byte
-	if _, err := rand.Read(b[:]); err != nil {
-		panic(err)
-	}
-	return netip.AddrFrom4(b)
-}
-
-// randomAddr6 returns a randomly generated IPv6 address.
-func randomAddr6() netip.Addr {
-	var b [16]byte
-	if _, err := rand.Read(b[:]); err != nil {
-		panic(err)
-	}
-	return netip.AddrFrom16(b)
 }
 
 // #####################################################################
@@ -243,14 +216,14 @@ func randomAddr6() netip.Addr {
 // randomPrefixes returns n randomly generated prefixes and
 // associated values, distributed equally between IPv4 and IPv6.
 func randomPrefix() netip.Prefix {
-	if rand.Intn(2) == 1 {
+	if prng.IntN(2) == 1 {
 		return randomPrefix4()
 	}
 	return randomPrefix6()
 }
 
 func randomPrefix4() netip.Prefix {
-	bits := rand.Intn(33)
+	bits := prng.IntN(33)
 	pfx, err := randomIP4().Prefix(bits)
 	if err != nil {
 		panic(err)
@@ -259,7 +232,7 @@ func randomPrefix4() netip.Prefix {
 }
 
 func randomPrefix6() netip.Prefix {
-	bits := rand.Intn(129)
+	bits := prng.IntN(129)
 	pfx, err := randomIP6().Prefix(bits)
 	if err != nil {
 		panic(err)
@@ -269,16 +242,23 @@ func randomPrefix6() netip.Prefix {
 
 func randomIP4() netip.Addr {
 	var b [4]byte
-	if _, err := rand.Read(b[:]); err != nil {
-		panic(err)
+	for i := range b {
+		b[i] = byte(prng.Uint32() & 0xff)
 	}
 	return netip.AddrFrom4(b)
 }
 
 func randomIP6() netip.Addr {
 	var b [16]byte
-	if _, err := rand.Read(b[:]); err != nil {
-		panic(err)
+	for i := range b {
+		b[i] = byte(prng.Uint32() & 0xff)
 	}
 	return netip.AddrFrom16(b)
+}
+
+func randomAddr() netip.Addr {
+	if prng.IntN(2) == 1 {
+		return randomIP4()
+	}
+	return randomIP6()
 }

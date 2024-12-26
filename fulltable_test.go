@@ -8,7 +8,7 @@ import (
 	"compress/gzip"
 	"fmt"
 	"log"
-	"math/rand"
+	"math/rand/v2"
 	"net/netip"
 	"os"
 	"runtime"
@@ -16,6 +16,8 @@ import (
 	"strings"
 	"testing"
 )
+
+var prng = rand.New(rand.NewPCG(42, 42))
 
 // full internet prefix list, gzipped
 const prefixFile = "testdata/prefixes.txt.gz"
@@ -35,11 +37,10 @@ type route struct {
 }
 
 func init() {
-	rand.Seed(42)
 	fillRouteTables()
 
-	randRoute4 = routes4[rand.Intn(len(routes4))]
-	randRoute6 = routes6[rand.Intn(len(routes6))]
+	randRoute4 = routes4[prng.IntN(len(routes4))]
+	randRoute6 = routes6[prng.IntN(len(routes6))]
 }
 
 var (
