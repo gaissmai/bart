@@ -1668,45 +1668,46 @@ var benchRouteCount = []int{1, 2, 5, 10, 100, 1000, 10_000, 100_000, 1_000_000}
 
 func BenchmarkTableInsertRandom(b *testing.B) {
 	var startMem, endMem runtime.MemStats
-	randomPfxs4 := gimmeRandomPrefix4(500_000)
-	randomPfxs6 := gimmeRandomPrefix6(500_000)
-	randomPfxs := append(randomPfxs4, randomPfxs6...)
 
-	var rt Table[struct{}]
-	var rtPC Table[struct{}]
-	rtPC.WithPathCompression()
+	for _, n := range []int{10_000, 100_000, 1_000_000, 2_000_000} {
+		randomPfxs := gimmeRandomPrefixes(n)
 
-	runtime.GC()
-	runtime.ReadMemStats(&startMem)
-	b.ResetTimer()
-	b.Run("random Insert", func(b *testing.B) {
-		for range b.N {
-			for _, pfx := range randomPfxs {
-				rt.Insert(pfx, struct{}{})
-			}
-		}
+		var rt Table[struct{}]
+		var rtPC Table[struct{}]
+		rtPC.WithPathCompression()
+
 		runtime.GC()
-		runtime.ReadMemStats(&endMem)
-
-		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
-		b.ReportMetric(float64(rt.Size())/float64(rt.nodes()), "Prefix/Node")
-	})
-
-	runtime.GC()
-	runtime.ReadMemStats(&startMem)
-	b.ResetTimer()
-	b.Run("random InsertPC", func(b *testing.B) {
-		for range b.N {
-			for _, pfx := range randomPfxs {
-				rtPC.Insert(pfx, struct{}{})
+		runtime.ReadMemStats(&startMem)
+		b.ResetTimer()
+		b.Run(fmt.Sprintf("%d/plain", n), func(b *testing.B) {
+			for range b.N {
+				for _, pfx := range randomPfxs {
+					rt.Insert(pfx, struct{}{})
+				}
 			}
-		}
-		runtime.GC()
-		runtime.ReadMemStats(&endMem)
+			runtime.GC()
+			runtime.ReadMemStats(&endMem)
 
-		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
-		b.ReportMetric(float64(rtPC.Size())/float64(rtPC.nodes()), "Prefix/Node")
-	})
+			b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
+			b.ReportMetric(float64(rt.Size())/float64(rt.nodes()), "Prefix/Node")
+		})
+
+		runtime.GC()
+		runtime.ReadMemStats(&startMem)
+		b.ResetTimer()
+		b.Run(fmt.Sprintf("%d/pathcomp", n), func(b *testing.B) {
+			for range b.N {
+				for _, pfx := range randomPfxs {
+					rtPC.Insert(pfx, struct{}{})
+				}
+			}
+			runtime.GC()
+			runtime.ReadMemStats(&endMem)
+
+			b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
+			b.ReportMetric(float64(rtPC.Size())/float64(rtPC.nodes()), "Prefix/Node")
+		})
+	}
 }
 
 func BenchmarkTableDelete(b *testing.B) {
