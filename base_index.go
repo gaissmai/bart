@@ -30,8 +30,8 @@ func pfxToIdx(octet byte, prefixLen int) uint {
 }
 
 // hostIndex, just pfxToIdx(octet, 8) but faster.
-func hostIndex(octet byte) uint {
-	return uint(octet) + firstHostIdx
+func hostIndex(octet uint) uint {
+	return octet + firstHostIdx
 }
 
 // cmpIndexRank, sort indexes in prefix sort order.

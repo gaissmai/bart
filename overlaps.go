@@ -151,7 +151,7 @@ func (n *node[V]) overlapsChildrenIn(o *node[V]) bool {
 		for ok {
 			// does any route in o overlap this child from n
 			if oAddr, ok = o.children.NextSet(oAddr); ok {
-				if n.lpmTest(hostIndex(byte(oAddr))) {
+				if n.lpmTest(hostIndex(oAddr)) {
 					return true
 				}
 
