@@ -136,17 +136,20 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	// mask the prefix, this is faster than netip.Prefix.Masked()
 	lastOctet &= netMask(lastOctetBits)
 
+	var addr uint
 	// find the proper trie node to insert prefix
 	for _, octet := range octets[:lastOctetIdx] {
+		addr = uint(octet)
+
 		// descend down to next trie level
-		c, ok := n.children.Get(uint(octet))
-		if !ok {
-			// create and insert missing intermediate child
-			c = n.newNode()
-			n.children.InsertAt(uint(octet), c)
+		if n.children.Test(addr) {
+			n = n.children.MustGet(addr)
+			continue
 		}
 
-		// proceed with next level
+		// create and insert missing intermediate child
+		c := n.newNode()
+		n.children.InsertAt(addr, c)
 		n = c
 	}
 
@@ -189,15 +192,13 @@ func (t *Table[V]) insertPC(pfx netip.Prefix, val V) {
 		addr := uint(octet)
 
 		// descend down to next trie level
-		if c, ok := n.children.Get(addr); ok {
-			// proceed with next level
-			n = c
+		if n.children.Test(addr) {
+			n = n.children.MustGet(addr)
 			continue
 		}
 
 		// no child found, look for path compressed item in slot
-		pc, ok := n.pathcomp.Get(addr)
-		if !ok {
+		if !n.pathcomp.Test(addr) {
 			// insert prefix path compressed
 			n.pathcomp.InsertAt(addr, &pathItem[V]{pfx, val})
 			t.sizeUpdate(is4, 1)
@@ -205,7 +206,7 @@ func (t *Table[V]) insertPC(pfx netip.Prefix, val V) {
 		}
 
 		// pathcomp slot is already occupied
-
+		pc := n.pathcomp.MustGet(addr)
 		// override prefix in slot if equal
 		if pc.prefix == pfx {
 			n.pathcomp.InsertAt(addr, &pathItem[V]{pfx, val})
@@ -255,9 +256,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 
 	n := t.rootNodeByVersion(is4)
 
-	// do not allocate
 	a16 := ip.As16()
-
 	octets := a16[:]
 	if is4 {
 		octets = octets[12:]
@@ -271,25 +270,25 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 	// mask the prefix
 	lastOctet &= netMask(lastOctetBits)
 
+	var addr uint
 	// find the proper trie node to update prefix
 	for _, octet := range octets[:lastOctetIdx] {
+		addr = uint(octet)
 		// descend down to next trie level
-		c, ok := n.children.Get(uint(octet))
-		if !ok {
-			// create and insert missing intermediate child
-			c = n.newNode()
-			n.children.InsertAt(uint(octet), c)
+		if n.children.Test(addr) {
+			n = n.children.MustGet(addr)
+			continue
 		}
 
-		// proceed with next level
+		// create and insert missing intermediate child
+		c := n.newNode()
+		n.children.InsertAt(addr, c)
 		n = c
 	}
 
 	// update/insert prefix into node
-	var wasPresent bool
-
-	newVal, wasPresent = n.prefixes.UpdateAt(pfxToIdx(lastOctet, lastOctetBits), cb)
-	if !wasPresent {
+	newVal, exists := n.prefixes.UpdateAt(pfxToIdx(lastOctet, lastOctetBits), cb)
+	if !exists {
 		t.sizeUpdate(is4, 1)
 	}
 
@@ -328,20 +327,19 @@ func (t *Table[V]) updatePC(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal
 	lastOctet := octets[lastOctetIdx]
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
+	var addr uint
 	// find the proper trie node to update prefix
 	for depth, octet := range octets[:lastOctetIdx] {
-		addr := uint(octet)
+		addr = uint(octet)
 
 		// descend down to next trie level
-		if c, ok := n.children.Get(addr); ok {
-			// proceed with next level
-			n = c
+		if n.children.Test(addr) {
+			n = n.children.MustGet(addr)
 			continue
 		}
 
-		// look for path compressed item in slot
-		pc, ok := n.pathcomp.Get(addr)
-		if !ok {
+		// no child found, look for path compressed item in slot
+		if !n.pathcomp.Test(addr) {
 			// insert pfx path compressed
 			var oldVal V
 			newVal := cb(oldVal, false)
@@ -353,6 +351,7 @@ func (t *Table[V]) updatePC(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal
 		}
 
 		// pathcomp slot is already occupied
+		pc := n.pathcomp.MustGet(addr)
 
 		// update existing prefix if equal?
 		if pc.prefix == pfx {
@@ -375,9 +374,7 @@ func (t *Table[V]) updatePC(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal
 	}
 
 	// update/insert prefix into node
-	var exists bool
-
-	newVal, exists = n.prefixes.UpdateAt(pfxToIdx(lastOctet, lastOctetBits), cb)
+	newVal, exists := n.prefixes.UpdateAt(pfxToIdx(lastOctet, lastOctetBits), cb)
 	if !exists {
 		t.sizeUpdate(is4, 1)
 	}
@@ -416,18 +413,20 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 	// mask the prefix
 	lastOctet &= netMask(lastOctetBits)
 
+	var addr uint
 	// find the proper trie node in tight loop
 	for _, octet := range octets[:lastOctetIdx] {
-		if c, ok := n.children.Get(uint(octet)); ok {
-			n = c
+		addr = uint(octet)
+
+		if n.children.Test(addr) {
+			n = n.children.MustGet(addr)
 			continue
 		}
 
-		if t.pathCompressed {
-			if pc, ok := n.pathcomp.Get(uint(octet)); ok {
-				if pc.prefix == pfx {
-					return pc.value, true
-				}
+		if t.pathCompressed && n.pathcomp.Test(addr) {
+			pc := n.pathcomp.MustGet(addr)
+			if pc.prefix == pfx {
+				return pc.value, true
 			}
 		}
 
@@ -496,8 +495,8 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 		}
 
 		// descend down to next level in tight loop
-		if c, ok := n.children.Get(addr); ok {
-			n = c
+		if n.children.Test(addr) {
+			n = n.children.MustGet(addr)
 			continue
 		}
 
@@ -542,9 +541,7 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 	is4 := ip.Is4()
 	n := t.rootNodeByVersion(is4)
 
-	// do not allocate
 	a16 := ip.As16()
-
 	octets := a16[:]
 	if is4 {
 		octets = octets[12:]
@@ -555,7 +552,6 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 
 	// run variable, used after for loop
 	var i int
-	var ok bool
 	var octet byte
 	var addr uint
 
@@ -567,9 +563,10 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 		stack[i] = n
 
 		// go down in tight loop to leaf node
-		if n, ok = n.children.Get(addr); !ok {
+		if !n.children.Test(addr) {
 			break
 		}
+		n = n.children.MustGet(addr)
 	}
 
 	// start backtracking, unwind the stack
@@ -737,9 +734,10 @@ func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool
 		stack[i] = n
 
 		// go down in tight loop to leaf node
-		if n, ok = n.children.Get(addr); !ok {
+		if !n.children.Test(addr) {
 			break
 		}
+		n = n.children.MustGet(addr)
 	}
 
 	// start backtracking, unwind the stack
@@ -812,24 +810,28 @@ func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 	lastOctet := octets[lastOctetIdx]
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
+	var addr uint
 	for _, octet := range octets[:lastOctetIdx] {
+		addr = uint(octet)
+
 		// test if any route overlaps prefix´ so far
 		if n.prefixes.Len() != 0 && n.lpmTest(hostIndex(octet)) {
 			return true
 		}
 
 		// no overlap so far, go down to next child
-		if c, ok := n.children.Get(uint(octet)); ok {
-			n = c
+		if n.children.Test(addr) {
+			n = n.children.MustGet(addr)
 			continue
 		}
 
-		if t.pathCompressed {
-			if pc, ok := n.pathcomp.Get(uint(octet)); ok {
-				return pfx.Overlaps(pc.prefix)
-			}
+		// no child so far, look for path compressed item
+		if t.pathCompressed && n.pathcomp.Test(addr) {
+			pc := n.pathcomp.MustGet(addr)
+			return pfx.Overlaps(pc.prefix)
 		}
 
+		// nope, nothing
 		return false
 	}
 	return n.overlapsPrefix(lastOctet, lastOctetBits)
