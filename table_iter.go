@@ -168,7 +168,8 @@ func (t *Table[V]) All6() func(yield func(pfx netip.Prefix, val V) bool) {
 // AllSorted returns an iterator over key-value pairs from Table in natural CIDR sort order.
 func (t *Table[V]) AllSorted() func(yield func(pfx netip.Prefix, val V) bool) {
 	return func(yield func(netip.Prefix, V) bool) {
-		_ = t.root4.allRecSorted(zeroPath, 0, true, yield) && t.root6.allRecSorted(zeroPath, 0, false, yield)
+		_ = t.root4.allRecSorted(zeroPath, 0, true, yield) &&
+			t.root6.allRecSorted(zeroPath, 0, false, yield)
 	}
 }
 

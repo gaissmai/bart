@@ -1,4 +1,3 @@
-// Copyright (c) 2024 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
 // package bart provides a Balanced-Routing-Table (BART).
@@ -24,6 +23,8 @@ package bart
 
 import (
 	"net/netip"
+
+	"github.com/gaissmai/bart/internal/sparse"
 )
 
 // Table is an IPv4 and IPv6 routing table with payload V.
@@ -39,6 +40,21 @@ type Table[V any] struct {
 	// the number of prefixes in the routing table
 	size4 int
 	size6 int
+
+	// path compresseion flag
+	withPC bool
+}
+
+func (t *Table[V]) WithPC() {
+	t.withPC = true
+
+	// init pc in root nodes
+	if t.root4.pathcomp == nil {
+		t.root4.pathcomp = &sparse.Array[*pathItem[V]]{}
+	}
+	if t.root6.pathcomp == nil {
+		t.root6.pathcomp = &sparse.Array[*pathItem[V]]{}
+	}
 }
 
 // rootNodeByVersion, root node getter for ip version.
@@ -60,6 +76,12 @@ type Cloner[V any] interface {
 // If pfx is already present in the tree, its value is set to val.
 func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	if !pfx.IsValid() {
+		return
+	}
+
+	// insert with path compression
+	if t.withPC {
+		t.insertPC(pfx, val)
 		return
 	}
 
@@ -111,7 +133,7 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 		c, ok := n.children.Get(uint(octet))
 		if !ok {
 			// create and insert missing intermediate child
-			c = new(node[V])
+			c = n.newNode()
 			n.children.InsertAt(uint(octet), c)
 		}
 
@@ -127,32 +149,20 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	}
 }
 
-// InsertPC adds pfx to the tree, with given val.
+// insertPC adds pfx to the tree, with given val.
 // If pfx is already present in the tree, its value is set to val.
 //
 // This is the path compressed version of Insert.
-func (t *Table[V]) InsertPC(pfx netip.Prefix, val V) {
+func (t *Table[V]) insertPC(pfx netip.Prefix, val V) {
 	if !pfx.IsValid() {
 		return
 	}
 
-	// canonicalize the prefix
 	pfx = pfx.Masked()
-
-	// values derived from pfx
 	ip := pfx.Addr()
 	is4 := ip.Is4()
 	bits := pfx.Bits()
-
-	// get the root node of the routing table
 	n := t.rootNodeByVersion(is4)
-
-	// Do not allocate!
-	// As16() is inlined, the preferred AsSlice() is too complex for inlining.
-	// starting with go1.23 we can use AsSlice(),
-	// see https://github.com/golang/go/issues/56136
-	// octets := ip.AsSlice()
-
 	a16 := ip.As16()
 
 	octets := a16[:]
@@ -160,22 +170,9 @@ func (t *Table[V]) InsertPC(pfx netip.Prefix, val V) {
 		octets = octets[12:]
 	}
 
-	// 10.0.0.0/8    -> 0
-	// 10.12.0.0/15  -> 1
-	// 10.12.0.0/16  -> 1
-	// 10.12.10.9/32 -> 3
 	lastOctetIdx := (bits - 1) / strideLen
-
-	// 10.0.0.0/8    -> 10
-	// 10.12.0.0/15  -> 12
-	// 10.12.0.0/16  -> 12
-	// 10.12.10.9/32 -> 9
 	lastOctet := octets[lastOctetIdx]
 
-	// 10.0.0.0/8    -> 8
-	// 10.12.0.0/15  -> 7
-	// 10.12.0.0/16  -> 8
-	// 10.12.10.9/32 -> 8
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
 	// find the proper trie node to insert prefix
@@ -212,7 +209,7 @@ func (t *Table[V]) InsertPC(pfx netip.Prefix, val V) {
 		// loop to next octet
 		n.pathcomp.DeleteAt(addr)
 
-		c := new(node[V])
+		c := n.newNode()
 		n.children.InsertAt(addr, c)
 		n = c
 
@@ -238,7 +235,11 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 		return zero
 	}
 
-	// values derived from pfx
+	// insert with path compression
+	if t.withPC {
+		return t.updatePC(pfx, cb)
+	}
+
 	ip := pfx.Addr()
 	is4 := ip.Is4()
 	bits := pfx.Bits()
@@ -267,7 +268,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 		c, ok := n.children.Get(uint(octet))
 		if !ok {
 			// create and insert missing intermediate child
-			c = new(node[V])
+			c = n.newNode()
 			n.children.InsertAt(uint(octet), c)
 		}
 
@@ -286,38 +287,34 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 	return newVal
 }
 
-// UpdatePC or set the value at pfx with a callback function.
+// updatePC or set the value at pfx with a callback function.
 // The callback function is called with (value, ok) and returns a new value.
 //
 // If the pfx does not already exist, it is set with the new value.
 //
 // This is the path compressed version of Update.
-func (t *Table[V]) UpdatePC(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V) {
+func (t *Table[V]) updatePC(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V) {
 	var zero V
 
 	if !pfx.IsValid() {
 		return zero
 	}
 
-	// canonicalize the prefix
-	pfx = pfx.Masked()
+	// see comments in Insert()
 
-	// values derived from pfx
+	pfx = pfx.Masked()
 	ip := pfx.Addr()
 	is4 := ip.Is4()
 	bits := pfx.Bits()
 
 	n := t.rootNodeByVersion(is4)
 
-	// do not allocate
 	a16 := ip.As16()
-
 	octets := a16[:]
 	if is4 {
 		octets = octets[12:]
 	}
 
-	// see comment in Insert()
 	lastOctetIdx := (bits - 1) / strideLen
 	lastOctet := octets[lastOctetIdx]
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
@@ -361,7 +358,7 @@ func (t *Table[V]) UpdatePC(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal
 		// loop to next octet
 		n.pathcomp.DeleteAt(addr)
 
-		c := new(node[V])
+		c := n.newNode()
 		n.children.InsertAt(addr, c)
 
 		n = c
@@ -388,7 +385,6 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 		return zero, false
 	}
 
-	// values derived from pfx
 	ip := pfx.Addr()
 	is4 := ip.Is4()
 	bits := pfx.Bits()
@@ -418,22 +414,16 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 			continue
 		}
 
-		// #######################################
-		//          path compression
-		// #######################################
-
-		if pc, ok := n.pathcomp.Get(uint(octet)); ok {
-			if pc.prefix == pfx {
-				return pc.value, true
+		if t.withPC {
+			if pc, ok := n.pathcomp.Get(uint(octet)); ok {
+				if pc.prefix == pfx {
+					return pc.value, true
+				}
 			}
 		}
 
 		return zero, false
 	}
-
-	// #######################################
-	//          classic path
-	// #######################################
 
 	return n.prefixes.Get(pfxToIdx(lastOctet, lastOctetBits))
 }
@@ -505,7 +495,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 		}
 
 		// check path compressed prefix at this slot
-		if n.pathcomp.Test(addr) {
+		if t.withPC && n.pathcomp.Test(addr) {
 			pc := n.pathcomp.MustGet(addr)
 			if pc.prefix == pfx {
 				n.pathcomp.DeleteAt(addr)
@@ -582,7 +572,7 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 		addr = uint(octet)
 
 		// check path compressed prefix at this slot
-		if n.pathcomp.Test(addr) {
+		if t.withPC && n.pathcomp.Test(addr) {
 			pc := n.pathcomp.MustGet(addr)
 			if pc.prefix.Contains(ip) {
 				return true
@@ -648,7 +638,7 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 		addr = uint(octet)
 
 		// check path compressed prefix at this slot
-		if n.pathcomp.Test(addr) {
+		if t.withPC && n.pathcomp.Test(addr) {
 			pc := n.pathcomp.MustGet(addr)
 			if pc.prefix.Contains(ip) {
 				return pc.value, true
@@ -752,7 +742,7 @@ func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool
 		addr = uint(octet)
 
 		// check path compressed prefix at this slot
-		if n.pathcomp.Test(addr) {
+		if t.withPC && n.pathcomp.Test(addr) {
 			pc := n.pathcomp.MustGet(addr)
 			if pc.prefix.Contains(ip) && pc.prefix.Bits() <= bits {
 				return pc.prefix, pc.value, true
@@ -827,20 +817,14 @@ func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 			continue
 		}
 
-		// #######################################
-		//          path compression
-		// #######################################
-
-		if pc, ok := n.pathcomp.Get(uint(octet)); ok {
-			return pfx.Overlaps(pc.prefix)
+		if t.withPC {
+			if pc, ok := n.pathcomp.Get(uint(octet)); ok {
+				return pfx.Overlaps(pc.prefix)
+			}
 		}
 
 		return false
 	}
-	// #######################################
-	//          classic path
-	// #######################################
-
 	return n.overlapsPrefix(lastOctet, lastOctetBits)
 }
 

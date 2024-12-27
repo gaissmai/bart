@@ -435,6 +435,78 @@ func BenchmarkFullTableMemory(b *testing.B) {
 	})
 }
 
+func BenchmarkFullTableMemoryV4PC(b *testing.B) {
+	var startMem, endMem runtime.MemStats
+
+	rt := new(Table[struct{}])
+	rt.WithPC()
+	runtime.GC()
+	runtime.ReadMemStats(&startMem)
+
+	b.Run(strconv.Itoa(len(routes4)), func(b *testing.B) {
+		for range b.N {
+			for _, route := range routes4 {
+				rt.Insert(route.CIDR, struct{}{})
+			}
+		}
+
+		runtime.GC()
+		runtime.ReadMemStats(&endMem)
+
+		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
+		b.ReportMetric(float64(rt.Size())/float64(rt.nodes()), "Prefix/Node")
+		b.ReportMetric(0, "ns/op")
+	})
+}
+
+func BenchmarkFullTableMemoryV6PC(b *testing.B) {
+	var startMem, endMem runtime.MemStats
+
+	rt := new(Table[struct{}])
+	rt.WithPC()
+	runtime.GC()
+	runtime.ReadMemStats(&startMem)
+
+	b.Run(strconv.Itoa(len(routes6)), func(b *testing.B) {
+		for range b.N {
+			for _, route := range routes6 {
+				rt.Insert(route.CIDR, struct{}{})
+			}
+		}
+
+		runtime.GC()
+		runtime.ReadMemStats(&endMem)
+
+		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
+		b.ReportMetric(float64(rt.Size())/float64(rt.nodes()), "Prefix/Node")
+		b.ReportMetric(0, "ns/op")
+	})
+}
+
+func BenchmarkFullTableMemoryPC(b *testing.B) {
+	var startMem, endMem runtime.MemStats
+
+	rt := new(Table[struct{}])
+	rt.WithPC()
+	runtime.GC()
+	runtime.ReadMemStats(&startMem)
+
+	b.Run(strconv.Itoa(len(routes)), func(b *testing.B) {
+		for range b.N {
+			for _, route := range routes {
+				rt.Insert(route.CIDR, struct{}{})
+			}
+		}
+
+		runtime.GC()
+		runtime.ReadMemStats(&endMem)
+
+		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
+		b.ReportMetric(float64(rt.Size())/float64(rt.nodes()), "Prefix/Node")
+		b.ReportMetric(0, "ns/op")
+	})
+}
+
 func fillRouteTables() {
 	file, err := os.Open(prefixFile)
 	if err != nil {

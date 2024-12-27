@@ -416,9 +416,11 @@ func TestDelete(t *testing.T) {
 		t.Parallel()
 		// Add/remove prefix from root table.
 		rtbl := &Table[int]{}
+		rtbl.WithPC()
+
 		checkNumNodes(t, rtbl, 0)
 
-		rtbl.InsertPC(mpp("10.0.0.0/8"), 1)
+		rtbl.Insert(mpp("10.0.0.0/8"), 1)
 		checkRoutes(t, rtbl, []tableTest{
 			{"10.0.0.1", 1},
 			{"255.255.255.255", -1},
@@ -438,7 +440,7 @@ func TestDelete(t *testing.T) {
 		rtbl := &Table[int]{}
 		checkNumNodes(t, rtbl, 0)
 
-		rtbl.InsertPC(mpp("192.168.0.1/32"), 1)
+		rtbl.Insert(mpp("192.168.0.1/32"), 1)
 		checkRoutes(t, rtbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"255.255.255.255", -1},
@@ -455,15 +457,16 @@ func TestDelete(t *testing.T) {
 		t.Parallel()
 		// Create an intermediate with 2 children, then delete one leaf.
 		tbl := &Table[int]{}
+		tbl.WithPC()
+
 		checkNumNodes(t, tbl, 0)
-		tbl.InsertPC(mpp("192.168.0.1/32"), 1)
-		tbl.InsertPC(mpp("192.180.0.1/32"), 2)
+		tbl.Insert(mpp("192.168.0.1/32"), 1)
+		tbl.Insert(mpp("192.180.0.1/32"), 2)
 		checkRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.180.0.1", 2},
 			{"192.40.0.1", -1},
 		})
-		t.Log(tbl.dumpString())
 		checkNumNodes(t, tbl, 2) // 1 root4, 1 imed with 2 pc
 		tbl.Delete(mpp("192.180.0.1/32"))
 		checkRoutes(t, tbl, []tableTest{
@@ -478,10 +481,12 @@ func TestDelete(t *testing.T) {
 		t.Parallel()
 		// Same, but the intermediate carries a route as well.
 		rtbl := &Table[int]{}
+		rtbl.WithPC()
+
 		checkNumNodes(t, rtbl, 0)
-		rtbl.InsertPC(mpp("192.168.0.1/32"), 1)
-		rtbl.InsertPC(mpp("192.180.0.1/32"), 2)
-		rtbl.InsertPC(mpp("192.0.0.0/10"), 3)
+		rtbl.Insert(mpp("192.168.0.1/32"), 1)
+		rtbl.Insert(mpp("192.180.0.1/32"), 2)
+		rtbl.Insert(mpp("192.0.0.0/10"), 3)
 		checkRoutes(t, rtbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.180.0.1", 2},
@@ -504,10 +509,12 @@ func TestDelete(t *testing.T) {
 		t.Parallel()
 		// Intermediate with 3 leaves, then delete one leaf.
 		rtbl := &Table[int]{}
+		rtbl.WithPC()
+
 		checkNumNodes(t, rtbl, 0)
-		rtbl.InsertPC(mpp("192.168.0.1/32"), 1)
-		rtbl.InsertPC(mpp("192.180.0.1/32"), 2)
-		rtbl.InsertPC(mpp("192.200.0.1/32"), 3)
+		rtbl.Insert(mpp("192.168.0.1/32"), 1)
+		rtbl.Insert(mpp("192.180.0.1/32"), 2)
+		rtbl.Insert(mpp("192.200.0.1/32"), 3)
 		checkRoutes(t, rtbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.180.0.1", 2},
@@ -529,8 +536,10 @@ func TestDelete(t *testing.T) {
 		t.Parallel()
 		// Delete non-existent prefix, missing strideTable path.
 		rtbl := &Table[int]{}
+		rtbl.WithPC()
+
 		checkNumNodes(t, rtbl, 0)
-		rtbl.InsertPC(mpp("192.168.0.1/32"), 1)
+		rtbl.Insert(mpp("192.168.0.1/32"), 1)
 		checkRoutes(t, rtbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.255.0.1", -1},
@@ -549,8 +558,10 @@ func TestDelete(t *testing.T) {
 		// Delete non-existent prefix, strideTable path exists but
 		// leaf doesn't contain route.
 		rtbl := &Table[int]{}
+		rtbl.WithPC()
+
 		checkNumNodes(t, rtbl, 0)
-		rtbl.InsertPC(mpp("192.168.0.1/32"), 1)
+		rtbl.Insert(mpp("192.168.0.1/32"), 1)
 		checkRoutes(t, rtbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.255.0.1", -1},
@@ -569,9 +580,11 @@ func TestDelete(t *testing.T) {
 		// Intermediate table loses its last route and becomes
 		// compactable.
 		rtbl := &Table[int]{}
+		rtbl.WithPC()
+
 		checkNumNodes(t, rtbl, 0)
-		rtbl.InsertPC(mpp("192.168.0.1/32"), 1)
-		rtbl.InsertPC(mpp("192.168.0.0/22"), 2)
+		rtbl.Insert(mpp("192.168.0.1/32"), 1)
+		rtbl.Insert(mpp("192.168.0.0/22"), 2)
 		checkRoutes(t, rtbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.168.0.2", 2},
@@ -592,8 +605,8 @@ func TestDelete(t *testing.T) {
 		// Default routes have a special case in the code.
 		rtbl := &Table[int]{}
 
-		rtbl.InsertPC(mpp("0.0.0.0/0"), 1)
-		rtbl.InsertPC(mpp("::/0"), 1)
+		rtbl.Insert(mpp("0.0.0.0/0"), 1)
+		rtbl.Insert(mpp("::/0"), 1)
 		rtbl.Delete(mpp("0.0.0.0/0"))
 
 		checkRoutes(t, rtbl, []tableTest{
@@ -606,10 +619,12 @@ func TestDelete(t *testing.T) {
 	t.Run("path compressed purge", func(t *testing.T) {
 		t.Parallel()
 		rtbl := &Table[int]{}
+		rtbl.WithPC()
+
 		checkNumNodes(t, rtbl, 0) // 0
 
-		rtbl.InsertPC(mpp("10.10.0.0/17"), 1)
-		rtbl.InsertPC(mpp("10.20.0.0/17"), 2)
+		rtbl.Insert(mpp("10.10.0.0/17"), 1)
+		rtbl.Insert(mpp("10.20.0.0/17"), 2)
 		checkNumNodes(t, rtbl, 2) // 1 root, 1 leaf
 
 		rtbl.Delete(mpp("10.20.0.0/17"))
@@ -1866,28 +1881,33 @@ func BenchmarkMemory(b *testing.B) {
 
 		var startMem, endMem runtime.MemStats
 		for _, nroutes := range benchRouteCount {
-			rt := new(Table[any])
-
-			b.Run(fmt.Sprintf("%s/random/%d", fam, nroutes), func(b *testing.B) {
-				b.ResetTimer()
-
-				for range b.N {
-					rt = new(Table[any])
-					runtime.GC()
-					runtime.ReadMemStats(&startMem)
-
-					for _, route := range rng(nroutes) {
-						rt.Insert(route.pfx, struct{}{})
-					}
-
-					runtime.GC()
-					runtime.ReadMemStats(&endMem)
-
-					b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
-					b.ReportMetric(float64(nroutes)/float64(rt.nodes()), "Prefix/Node")
-					b.ReportMetric(0, "ns/op") // silence
+			for _, pc := range []bool{false, true} {
+				rt := new(Table[any])
+				if pc {
+					rt.WithPC()
 				}
-			})
+
+				b.Run(fmt.Sprintf("pc=%v/%s/random/%d", pc, fam, nroutes), func(b *testing.B) {
+					b.ResetTimer()
+
+					for range b.N {
+						rt = new(Table[any])
+						runtime.GC()
+						runtime.ReadMemStats(&startMem)
+
+						for _, route := range rng(nroutes) {
+							rt.Insert(route.pfx, struct{}{})
+						}
+
+						runtime.GC()
+						runtime.ReadMemStats(&endMem)
+
+						b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
+						b.ReportMetric(float64(nroutes)/float64(rt.nodes()), "Prefix/Node")
+						b.ReportMetric(0, "ns/op") // silence
+					}
+				})
+			}
 		}
 	}
 }
