@@ -59,7 +59,7 @@ func (n *node[V]) isEmpty() bool {
 
 // insertAtDepth insert a prefix/val into a node tree at depth.
 // n must not be nil, prefix must be valid and already in canonical form.
-func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) {
+func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool) {
 	ip := pfx.Addr()
 	bits := pfx.Bits()
 	octets := ip.AsSlice()
@@ -77,17 +77,38 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) {
 			continue
 		}
 
-		if n.pathcomp.Test(addr) {
-			panic("logic error in insertAdDepth")
+		// no child found, look for path compressed item in slot
+		pc, ok := n.pathcomp.Get(addr)
+		if !ok {
+			// insert prefix path compressed
+			return n.pathcomp.InsertAt(addr, &pathItem[V]{pfx, val})
 		}
 
-		// no child, insert patch compressed
-		n.pathcomp.InsertAt(addr, &pathItem[V]{pfx, val})
-		return
+		// pathcomp slot is already occupied
+
+		// override prefix in slot if equal
+		if pc.prefix == pfx {
+			pc.value = val
+			return true
+		}
+
+		// free this pathcomp slot ...
+		// insert new intermdiate child ...
+		// shuffle down existing path-compressed prefix
+		// shuffle down prefix
+		n.pathcomp.DeleteAt(addr)
+
+		c := new(node[V])
+		n.children.InsertAt(addr, c)
+		n = c
+
+		// shuffle down
+		_ = n.insertAtDepth(pc.prefix, pc.value, depth+1)
+		return n.insertAtDepth(pfx, val, depth+1)
 	}
 
 	// insert/override flattened prefix/val into node
-	n.prefixes.InsertAt(pfxToIdx(lastOctet, lastOctetBits), val)
+	return n.prefixes.InsertAt(pfxToIdx(lastOctet, lastOctetBits), val)
 }
 
 // purgeParents, dangling nodes after successful deletion
@@ -306,37 +327,95 @@ func (n *node[V]) eachSubnet(
 // If there are duplicate entries, the value is taken from the other node.
 // Count duplicate entries to adjust the t.size struct members.
 func (n *node[V]) unionRec(o *node[V], depth int) (duplicates int) {
-	// no heap allocs
 	allIndices := o.prefixes.AsSlice(make([]uint, 0, maxNodePrefixes))
 
 	// for all prefixes in other node do ...
 	for i, oIdx := range allIndices {
 		// insert/overwrite prefix/value from oNode to nNode
-		exists := n.prefixes.InsertAt(oIdx, o.prefixes.Items[i])
-
-		// this prefix is duplicate in n and o
-		if exists {
+		if exists := n.prefixes.InsertAt(oIdx, o.prefixes.Items[i]); exists {
+			// this prefix is duplicate in n and o
 			duplicates++
 		}
 	}
 
-	// no heap allocs
+	allPathCompAddrs := o.pathcomp.AsSlice(make([]uint, 0, maxNodeChildren))
+	// for all pathcomp items in other node do ...
+	for i, addr := range allPathCompAddrs {
+		oPCItem := o.pathcomp.Items[i]
+
+		// get n child with same addr, if exists insert prefix at depth
+		if nc, ok := n.children.Get(addr); ok {
+			if nc.insertAtDepth(oPCItem.prefix, oPCItem.value, depth+1) {
+				// this prefix is duplicate in n and o
+				duplicates++
+			}
+			continue
+		}
+
+		// no child found, look for path compressed item in slot
+		if nPCItem, ok := n.pathcomp.Get(addr); ok {
+			if nPCItem.prefix == oPCItem.prefix {
+				nPCItem.value = oPCItem.value
+				// this prefix is duplicate in n and o
+				duplicates++
+				continue
+			}
+
+			// free this pathcomp slot ...
+			// insert new intermdiate child ...
+			// shuffle down existing path-compressed prefix
+			// union other path-compressed prefix
+			n.pathcomp.DeleteAt(addr)
+
+			nc := new(node[V])
+			n.children.InsertAt(addr, nc)
+
+			// shuffle down
+			_ = nc.insertAtDepth(nPCItem.prefix, nPCItem.value, depth+1)
+
+			// union other
+			exists := nc.insertAtDepth(oPCItem.prefix, oPCItem.value, depth+1)
+			if exists {
+				duplicates++
+			}
+
+			continue
+		}
+
+		// no child nor pathcomp, insert as path compressed
+		n.pathcomp.InsertAt(addr, oPCItem)
+	}
+
 	allChildAddrs := o.children.AsSlice(make([]uint, 0, maxNodeChildren))
 
 	// for all children in other node do ...
-	for i, oOctet := range allChildAddrs {
-		octet := byte(oOctet)
-
-		// we know the slice index, faster as o.getChild(octet)
+	for i, addr := range allChildAddrs {
 		oc := o.children.Items[i]
 
-		// get n child with same octet,
-		// we don't know the slice index in n.children
-		if nc, ok := n.children.Get(uint(octet)); !ok {
+		// get n pathcomp with same addr
+		if nPCItem, ok := n.pathcomp.Get(addr); ok {
+			// free this pathcomp slot ...
+			// insert new intermdiate child ...
+			// shuffle down existing path-compressed prefix
+			// union other child
+			n.pathcomp.DeleteAt(addr)
+
+			nc := new(node[V])
+			n.children.InsertAt(addr, nc)
+
+			// shuffle down
+			_ = nc.insertAtDepth(nPCItem.prefix, nPCItem.value, depth+1)
+
+			duplicates += nc.unionRec(oc, depth+1)
+			continue
+		}
+
+		// get n child with same addr,
+		if nc, ok := n.children.Get(addr); !ok {
 			// insert cloned child from oNode into nNode
-			n.children.InsertAt(uint(octet), oc.cloneRec())
+			n.children.InsertAt(addr, oc.cloneRec())
 		} else {
-			// both nodes have child with octet, call union rec-descent
+			// both nodes have child with addr, call union rec-descent
 			duplicates += nc.unionRec(oc, depth+1)
 		}
 	}
