@@ -143,15 +143,15 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 
 		c := new(node[V])
 		n.children.InsertAt(addr, c)
-
 		n = c
-		n.insertAtDepth(pc.prefix, pc.value, depth+1)
+
+		_ = n.insertAtDepth(pc.prefix, pc.value, depth+1)
 	}
 
-	// insert/override prefix/val into node
-	override := n.prefixes.InsertAt(pfxToIdx(lastOctet, lastOctetBits), val)
+	// insert/exists prefix/val into node
+	exists := n.prefixes.InsertAt(pfxToIdx(lastOctet, lastOctetBits), val)
 
-	if !override {
+	if !exists {
 		t.sizeUpdate(is4, 1)
 	}
 }
@@ -235,7 +235,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 		n.children.InsertAt(addr, c)
 
 		n = c
-		n.insertAtDepth(pc.prefix, pc.value, depth+1)
+		_ = n.insertAtDepth(pc.prefix, pc.value, depth+1)
 	}
 
 	// update/insert prefix into node

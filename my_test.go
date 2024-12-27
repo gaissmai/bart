@@ -210,6 +210,16 @@ func TestInsertPC(t *testing.T) {
 			wantNodes: 5,
 			wantSize:  4,
 		},
+		{
+			name: "three prefix, one pc",
+			pfxs: []netip.Prefix{
+				mpp("73.77.182.0/24"),
+				mpp("197.160.0.0/21"),
+				mpp("197.224.0.0/12"),
+			},
+			wantNodes: 2,
+			wantSize:  3,
+		},
 	}
 
 	for _, tc := range tcs {
@@ -227,6 +237,5 @@ func TestInsertPC(t *testing.T) {
 		if gotSize != tc.wantSize {
 			t.Errorf("InsertPC, %s, size: got: %d, want: %d", tc.name, gotSize, tc.wantSize)
 		}
-
 	}
 }
