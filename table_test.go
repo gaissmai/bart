@@ -1666,29 +1666,47 @@ func TestSize(t *testing.T) {
 
 var benchRouteCount = []int{1, 2, 5, 10, 100, 1000, 10_000, 100_000, 1_000_000}
 
-func BenchmarkTableInsert(b *testing.B) {
-	for _, fam := range []string{"ipv4", "ipv6"} {
-		rng := randomPrefixes4
-		if fam == "ipv6" {
-			rng = randomPrefixes6
-		}
+func BenchmarkTableInsertRandom(b *testing.B) {
+	var startMem, endMem runtime.MemStats
+	randomPfxs4 := gimmeRandomPrefix4(500_000)
+	randomPfxs6 := gimmeRandomPrefix6(500_000)
+	randomPfxs := append(randomPfxs4, randomPfxs6...)
 
-		for _, nroutes := range benchRouteCount {
-			var rt Table[struct{}]
-			for _, route := range rng(nroutes) {
-				rt.Insert(route.pfx, struct{}{})
+	var rt Table[struct{}]
+	var rtPC Table[struct{}]
+	rtPC.WithPathCompression()
+
+	runtime.GC()
+	runtime.ReadMemStats(&startMem)
+	b.ResetTimer()
+	b.Run("random Insert", func(b *testing.B) {
+		for range b.N {
+			for _, pfx := range randomPfxs {
+				rt.Insert(pfx, struct{}{})
 			}
-
-			probe := rng(1)[0]
-
-			b.ResetTimer()
-			b.Run(fmt.Sprintf("%s/Into_%d", fam, nroutes), func(b *testing.B) {
-				for range b.N {
-					rt.Insert(probe.pfx, struct{}{})
-				}
-			})
 		}
-	}
+		runtime.GC()
+		runtime.ReadMemStats(&endMem)
+
+		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
+		b.ReportMetric(float64(rt.Size())/float64(rt.nodes()), "Prefix/Node")
+	})
+
+	runtime.GC()
+	runtime.ReadMemStats(&startMem)
+	b.ResetTimer()
+	b.Run("random InsertPC", func(b *testing.B) {
+		for range b.N {
+			for _, pfx := range randomPfxs {
+				rtPC.Insert(pfx, struct{}{})
+			}
+		}
+		runtime.GC()
+		runtime.ReadMemStats(&endMem)
+
+		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
+		b.ReportMetric(float64(rtPC.Size())/float64(rtPC.nodes()), "Prefix/Node")
+	})
 }
 
 func BenchmarkTableDelete(b *testing.B) {
