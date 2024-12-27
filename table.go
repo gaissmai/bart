@@ -841,7 +841,12 @@ func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 // other table or vice versa.
 //
 // panic's if the path compression of the two tables does not match.
+// TODO, path compression not yet implemented for this method.
 func (t *Table[V]) Overlaps(o *Table[V]) bool {
+	if t.pathCompressed || o.pathCompressed {
+		panic("TODO, path compression not yet implemented for this method")
+	}
+
 	if t.pathCompressed != o.pathCompressed {
 		panic("tables MUST NOT differ in path compressions")
 	}
