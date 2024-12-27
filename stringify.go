@@ -203,7 +203,7 @@ func (n *node[V]) getKidsRec(parentIdx uint, path [16]byte, depth int, is4 bool)
 		allPathCompAddrs := n.pathcomp.AsSlice(make([]uint, 0, maxNodeChildren))
 		for i, addr := range allPathCompAddrs {
 			// do a longest-prefix-match
-			lpmIdx, _, _ := n.lpm(hostIndex(byte(addr)))
+			lpmIdx, _, _ := n.lpm(hostIndex(addr))
 			if lpmIdx == parentIdx {
 				item := n.pathcomp.Items[i]
 
@@ -228,7 +228,7 @@ func (n *node[V]) getKidsRec(parentIdx uint, path [16]byte, depth int, is4 bool)
 		octet := byte(addr)
 
 		// do a longest-prefix-match
-		lpmIdx, _, _ := n.lpm(hostIndex(octet))
+		lpmIdx, _, _ := n.lpm(hostIndex(addr))
 		if lpmIdx == parentIdx {
 			c := n.children.Items[i]
 			path[depth] = octet

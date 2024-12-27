@@ -45,7 +45,7 @@ func TestInverseIndex(t *testing.T) {
 func TestFringeIndex(t *testing.T) {
 	t.Parallel()
 	for i := range maxNodeChildren {
-		got := hostIndex(byte(i))
+		got := hostIndex(uint(i))
 		want := pfxToIdx(byte(i), 8)
 		if got != want {
 			t.Errorf("fringeIndex(%d) = %d, want %d", i, got, want)
@@ -70,8 +70,9 @@ func TestPrefixInsert(t *testing.T) {
 
 	for i := range 256 {
 		octet := byte(i)
+		addr := uint(i)
 		goldVal, goldOK := gold.lpm(octet)
-		_, fastVal, fastOK := fast.lpm(hostIndex(octet))
+		_, fastVal, fastOK := fast.lpm(hostIndex(addr))
 		if !getsEqual(fastVal, fastOK, goldVal, goldOK) {
 			t.Fatalf("get(%d) = (%v, %v), want (%v, %v)", octet, fastVal, fastOK, goldVal, goldOK)
 		}
@@ -102,8 +103,9 @@ func TestPrefixDelete(t *testing.T) {
 
 	for i := range 256 {
 		octet := byte(i)
+		addr := uint(i)
 		goldVal, goldOK := gold.lpm(octet)
-		_, fastVal, fastOK := fast.lpm(hostIndex(octet))
+		_, fastVal, fastOK := fast.lpm(hostIndex(addr))
 		if !getsEqual(fastVal, fastOK, goldVal, goldOK) {
 			t.Fatalf("get(%d) = (%v, %v), want (%v, %v)", octet, fastVal, fastOK, goldVal, goldOK)
 		}

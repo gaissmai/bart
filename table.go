@@ -584,7 +584,7 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 		}
 
 		// longest prefix match, skip if node has no prefixes
-		if n.prefixes.Len() != 0 && n.lpmTest(hostIndex(octet)) {
+		if n.prefixes.Len() != 0 && n.lpmTest(hostIndex(addr)) {
 			return true
 		}
 	}
@@ -649,7 +649,7 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 
 		// longest prefix match, skip if node has no prefixes
 		if n.prefixes.Len() != 0 {
-			if _, val, ok = n.lpm(hostIndex(octet)); ok {
+			if _, val, ok = n.lpm(hostIndex(addr)); ok {
 				return val, ok
 			}
 		}
@@ -760,7 +760,7 @@ func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool
 			if depth == lastOctetIdx {
 				idx = pfxToIdx(octet, lastOctetBits)
 			} else {
-				idx = hostIndex(octet)
+				idx = hostIndex(addr)
 			}
 
 			if baseIdx, val, ok := n.lpm(idx); ok {
@@ -813,7 +813,7 @@ func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 		addr = uint(octet)
 
 		// test if any route overlaps prefix´ so far
-		if n.prefixes.Len() != 0 && n.lpmTest(hostIndex(octet)) {
+		if n.prefixes.Len() != 0 && n.lpmTest(hostIndex(addr)) {
 			return true
 		}
 
