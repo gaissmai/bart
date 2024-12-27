@@ -41,8 +41,19 @@ type node[V any] struct {
 	// children, recursively spans the trie with a branching factor of 256
 	children sparse.Array[*node[V]]
 
-	// path compressed items
-	pathcomp sparse.Array[*pathItem[V]]
+	// path compressed items, as pointer, without path compression only 8 bytes/node
+	pathcomp *sparse.Array[*pathItem[V]]
+}
+
+// newNode returns a *node. If n was path compressed, the new node
+// is it also.
+func (n node[V]) newNode() *node[V] {
+	c := new(node[V])
+	if n.pathcomp != nil {
+		// also make n.pathcomp != nil in new node
+		c.pathcomp = &sparse.Array[*pathItem[V]]{}
+	}
+	return c
 }
 
 type pathItem[V any] struct {
@@ -54,7 +65,7 @@ type pathItem[V any] struct {
 func (n *node[V]) isEmpty() bool {
 	return n.prefixes.Len() == 0 &&
 		n.children.Len() == 0 &&
-		n.pathcomp.Len() == 0
+		(n.pathcomp == nil || n.pathcomp.Len() == 0)
 }
 
 // insertAtDepth insert a prefix/val into a node tree at depth.
@@ -98,7 +109,7 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 		// shuffle down prefix
 		n.pathcomp.DeleteAt(addr)
 
-		c := new(node[V])
+		c := n.newNode()
 		n.children.InsertAt(addr, c)
 		n = c
 
@@ -338,52 +349,54 @@ func (n *node[V]) unionRec(o *node[V], depth int) (duplicates int) {
 		}
 	}
 
-	allPathCompAddrs := o.pathcomp.AsSlice(make([]uint, 0, maxNodeChildren))
-	// for all pathcomp items in other node do ...
-	for i, addr := range allPathCompAddrs {
-		oPCItem := o.pathcomp.Items[i]
+	if n.pathcomp != nil {
+		allPathCompAddrs := o.pathcomp.AsSlice(make([]uint, 0, maxNodeChildren))
+		// for all pathcomp items in other node do ...
+		for i, addr := range allPathCompAddrs {
+			oPCItem := o.pathcomp.Items[i]
 
-		// get n child with same addr, if exists insert prefix at depth
-		if nc, ok := n.children.Get(addr); ok {
-			if nc.insertAtDepth(oPCItem.prefix, oPCItem.value, depth+1) {
-				// this prefix is duplicate in n and o
-				duplicates++
-			}
-			continue
-		}
-
-		// no child found, look for path compressed item in slot
-		if nPCItem, ok := n.pathcomp.Get(addr); ok {
-			if nPCItem.prefix == oPCItem.prefix {
-				nPCItem.value = oPCItem.value
-				// this prefix is duplicate in n and o
-				duplicates++
+			// get n child with same addr, if exists insert prefix at depth
+			if nc, ok := n.children.Get(addr); ok {
+				if nc.insertAtDepth(oPCItem.prefix, oPCItem.value, depth+1) {
+					// this prefix is duplicate in n and o
+					duplicates++
+				}
 				continue
 			}
 
-			// free this pathcomp slot ...
-			// insert new intermdiate child ...
-			// shuffle down existing path-compressed prefix
-			// union other path-compressed prefix
-			n.pathcomp.DeleteAt(addr)
+			// no child found, look for path compressed item in slot
+			if nPCItem, ok := n.pathcomp.Get(addr); ok {
+				if nPCItem.prefix == oPCItem.prefix {
+					nPCItem.value = oPCItem.value
+					// this prefix is duplicate in n and o
+					duplicates++
+					continue
+				}
 
-			nc := new(node[V])
-			n.children.InsertAt(addr, nc)
+				// free this pathcomp slot ...
+				// insert new intermdiate child ...
+				// shuffle down existing path-compressed prefix
+				// union other path-compressed prefix
+				n.pathcomp.DeleteAt(addr)
 
-			// shuffle down
-			_ = nc.insertAtDepth(nPCItem.prefix, nPCItem.value, depth+1)
+				nc := n.newNode()
+				n.children.InsertAt(addr, nc)
 
-			// union other
-			exists := nc.insertAtDepth(oPCItem.prefix, oPCItem.value, depth+1)
-			if exists {
-				duplicates++
+				// shuffle down
+				_ = nc.insertAtDepth(nPCItem.prefix, nPCItem.value, depth+1)
+
+				// union other
+				exists := nc.insertAtDepth(oPCItem.prefix, oPCItem.value, depth+1)
+				if exists {
+					duplicates++
+				}
+
+				continue
 			}
 
-			continue
+			// no child nor pathcomp, insert as path compressed
+			n.pathcomp.InsertAt(addr, oPCItem)
 		}
-
-		// no child nor pathcomp, insert as path compressed
-		n.pathcomp.InsertAt(addr, oPCItem)
 	}
 
 	allChildAddrs := o.children.AsSlice(make([]uint, 0, maxNodeChildren))
@@ -392,22 +405,24 @@ func (n *node[V]) unionRec(o *node[V], depth int) (duplicates int) {
 	for i, addr := range allChildAddrs {
 		oc := o.children.Items[i]
 
-		// get n pathcomp with same addr
-		if nPCItem, ok := n.pathcomp.Get(addr); ok {
-			// free this pathcomp slot ...
-			// insert new intermdiate child ...
-			// shuffle down existing path-compressed prefix
-			// union other child
-			n.pathcomp.DeleteAt(addr)
+		if n.pathcomp != nil {
+			// get n pathcomp with same addr
+			if nPCItem, ok := n.pathcomp.Get(addr); ok {
+				// free this pathcomp slot ...
+				// insert new intermdiate child ...
+				// shuffle down existing path-compressed prefix
+				// union other child
+				n.pathcomp.DeleteAt(addr)
 
-			nc := new(node[V])
-			n.children.InsertAt(addr, nc)
+				nc := n.newNode()
+				n.children.InsertAt(addr, nc)
 
-			// shuffle down
-			_ = nc.insertAtDepth(nPCItem.prefix, nPCItem.value, depth+1)
+				// shuffle down
+				_ = nc.insertAtDepth(nPCItem.prefix, nPCItem.value, depth+1)
 
-			duplicates += nc.unionRec(oc, depth+1)
-			continue
+				duplicates += nc.unionRec(oc, depth+1)
+				continue
+			}
 		}
 
 		// get n child with same addr,
@@ -425,7 +440,7 @@ func (n *node[V]) unionRec(o *node[V], depth int) (duplicates int) {
 
 // cloneRec, clones the node recursive.
 func (n *node[V]) cloneRec() *node[V] {
-	c := new(node[V])
+	c := n.newNode()
 	if n.isEmpty() {
 		return c
 	}
@@ -450,22 +465,20 @@ func (n *node[V]) cloneRec() *node[V] {
 		c.children.Items[i] = child.cloneRec()
 	}
 
-	// #######################################
-	//          path compression
-	// #######################################
+	if n.pathcomp != nil {
+		c.pathcomp.BitSet = n.pathcomp.BitSet.Clone()     // deep
+		c.pathcomp.Items = slices.Clone(n.pathcomp.Items) // values, shallow copy
 
-	c.pathcomp.BitSet = n.pathcomp.BitSet.Clone()     // deep
-	c.pathcomp.Items = slices.Clone(n.pathcomp.Items) // values, shallow copy
+		// deep copy
+		for i, pc := range c.pathcomp.Items {
+			item := *pc
 
-	// deep copy
-	for i, pc := range c.pathcomp.Items {
-		item := *pc
-
-		// deep copy if V implements Cloner[V]
-		if v, ok := any(item.value).(Cloner[V]); ok {
-			item.value = v.Clone()
+			// deep copy if V implements Cloner[V]
+			if v, ok := any(item.value).(Cloner[V]); ok {
+				item.value = v.Clone()
+			}
+			c.pathcomp.Items[i] = &item
 		}
-		c.pathcomp.Items[i] = &item
 	}
 
 	return c
@@ -497,11 +510,13 @@ func (n *node[V]) allRec(
 	}
 
 	// for all path compressed items do ...
-	for _, pc := range n.pathcomp.Items {
-		// make the callback for this prefix
-		if !yield(pc.prefix, pc.value) {
-			// early exit
-			return false
+	if n.pathcomp != nil {
+		for _, pc := range n.pathcomp.Items {
+			// make the callback for this prefix
+			if !yield(pc.prefix, pc.value) {
+				// early exit
+				return false
+			}
 		}
 	}
 
@@ -540,7 +555,10 @@ func (n *node[V]) allRecSorted(
 
 	// get all the bits in fast addressable form as a set of bool.
 	allChildSet := n.children.AsSet(make([]bool, 0, maxNodeChildren))
-	allPathCompSet := n.pathcomp.AsSet(make([]bool, 0, maxNodeChildren))
+	allPathCompSet := []bool{}
+	if n.pathcomp != nil {
+		allPathCompSet = n.pathcomp.AsSet(make([]bool, 0, maxNodeChildren))
+	}
 
 	// yield indices, pathcomp prefixes and childs in CIDR sort order
 	var lower, upper uint
@@ -553,7 +571,7 @@ func (n *node[V]) allRecSorted(
 		for addr := lower; addr < upper; addr++ {
 			// either pathcomp or children match this addr, but not possible for both
 
-			if allPathCompSet[addr] {
+			if n.pathcomp != nil && allPathCompSet[addr] {
 				pc := n.pathcomp.MustGet(addr)
 				if !yield(pc.prefix, pc.value) {
 					return false
@@ -585,7 +603,7 @@ func (n *node[V]) allRecSorted(
 	for addr := lower; addr < maxNodeChildren; addr++ {
 		// either pathcomp or children match this addr, but not possible for both
 
-		if allPathCompSet[addr] {
+		if n.pathcomp != nil && allPathCompSet[addr] {
 			pc := n.pathcomp.MustGet(addr)
 			if !yield(pc.prefix, pc.value) {
 				return false

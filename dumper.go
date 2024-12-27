@@ -34,32 +34,6 @@ func (t *Table[V]) dumpString() string {
 }
 
 // dump the table structure and all the nodes to w.
-//
-//	 Output:
-//
-//		[FULL] depth:  0 path: [] / 0
-//		indexs(#6): 1 66 128 133 266 383
-//		prefxs(#6): 0/0 8/6 0/7 10/7 10/8 127/8
-//		childs(#3): 10 127 192
-//
-//		.[IMED] depth:  1 path: [10] / 8
-//		.childs(#1): 0
-//
-//		..[LEAF] depth:  2 path: [10.0] / 16
-//		..indexs(#2): 256 257
-//		..prefxs(#2): 0/8 1/8
-//
-//		.[IMED] depth:  1 path: [127] / 8
-//		.childs(#1): 0
-//
-//		..[IMED] depth:  2 path: [127.0] / 16
-//		..childs(#1): 0
-//
-//		...[LEAF] depth:  3 path: [127.0.0] / 24
-//		...indexs(#1): 257
-//		...prefxs(#1): 1/8
-//
-// ...
 func (t *Table[V]) dump(w io.Writer) {
 	if t == nil {
 		return
@@ -140,19 +114,21 @@ func (n *node[V]) dump(w io.Writer, path [16]byte, depth int, is4 bool) {
 		fmt.Fprintln(w)
 	}
 
-	if pathcompCount := n.pathcomp.Len(); pathcompCount != 0 {
-		// print the pathcomp prefixes for this node
-		fmt.Fprintf(w, "%spathcp(#%d):", indent, pathcompCount)
+	if n.pathcomp != nil {
+		if pathcompCount := n.pathcomp.Len(); pathcompCount != 0 {
+			// print the pathcomp prefixes for this node
+			fmt.Fprintf(w, "%spathcp(#%d):", indent, pathcompCount)
 
-		// no heap allocs
-		allPathComps := n.pathcomp.AsSlice(make([]uint, 0, maxNodeChildren))
+			// no heap allocs
+			allPathComps := n.pathcomp.AsSlice(make([]uint, 0, maxNodeChildren))
 
-		for i, addr := range allPathComps {
-			pc := n.pathcomp.Items[i]
-			fmt.Fprintf(w, " %d:[%s, %v]", addr, pc.prefix, pc.value)
+			for i, addr := range allPathComps {
+				pc := n.pathcomp.Items[i]
+				fmt.Fprintf(w, " %d:[%s, %v]", addr, pc.prefix, pc.value)
+			}
+
+			fmt.Fprintln(w)
 		}
-
-		fmt.Fprintln(w)
 	}
 }
 
@@ -217,7 +193,11 @@ func (nt nodeType) String() string {
 func (n *node[V]) hasType() nodeType {
 	prefixCount := n.prefixes.Len()
 	childCount := n.children.Len()
-	pathcompCount := n.pathcomp.Len()
+
+	pathcompCount := 0
+	if n.pathcomp != nil {
+		pathcompCount = n.pathcomp.Len()
+	}
 
 	switch {
 	case prefixCount == 0 && childCount == 0 && pathcompCount == 0:

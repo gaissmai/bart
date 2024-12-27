@@ -114,7 +114,7 @@ func TestWorstCasePC(t *testing.T) {
 
 		tbl := new(Table[string])
 		for _, p := range worstCasePfxsIP4 {
-			tbl.InsertPC(p, p.String())
+			tbl.Insert(p, p.String())
 		}
 
 		want := true
@@ -129,7 +129,7 @@ func TestWorstCasePC(t *testing.T) {
 
 		tbl := new(Table[string])
 		for _, p := range worstCasePfxsIP4 {
-			tbl.InsertPC(p, p.String())
+			tbl.Insert(p, p.String())
 		}
 
 		tbl.Delete(mpp("0.0.0.0/0")) // delete matching prefix
@@ -146,7 +146,7 @@ func TestWorstCasePC(t *testing.T) {
 
 		tbl := new(Table[string])
 		for _, p := range worstCasePfxsIP6 {
-			tbl.InsertPC(p, p.String())
+			tbl.Insert(p, p.String())
 		}
 
 		want := true
@@ -160,7 +160,7 @@ func TestWorstCasePC(t *testing.T) {
 
 		tbl := new(Table[string])
 		for _, p := range worstCasePfxsIP6 {
-			tbl.InsertPC(p, p.String())
+			tbl.Insert(p, p.String())
 		}
 
 		tbl.Delete(mpp("::/0")) // delete matching prefix
@@ -198,10 +198,12 @@ func BenchmarkWorstCase(b *testing.B) {
 }
 
 func BenchmarkWorstCasePC(b *testing.B) {
-	b.Run("WorstCase IP4", func(b *testing.B) {
+	b.Run("WorstCasePC IP4", func(b *testing.B) {
 		tbl := new(Table[string])
+		tbl.WithPC()
+
 		for _, p := range worstCasePfxsIP4 {
-			tbl.InsertPC(p, p.String())
+			tbl.Insert(p, p.String())
 		}
 
 		for range b.N {
@@ -209,10 +211,11 @@ func BenchmarkWorstCasePC(b *testing.B) {
 		}
 	})
 
-	b.Run("WorstCase IP6", func(b *testing.B) {
+	b.Run("WorstCasePC IP6", func(b *testing.B) {
 		tbl := new(Table[string])
+		tbl.WithPC()
 		for _, p := range worstCasePfxsIP6 {
-			tbl.InsertPC(p, p.String())
+			tbl.Insert(p, p.String())
 		}
 
 		for range b.N {

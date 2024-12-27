@@ -79,6 +79,8 @@ values(#1): <nil>
 func TestDumpSampleV4(t *testing.T) {
 	t.Parallel()
 	tbl := new(Table[any])
+	tbl.WithPC()
+
 	checkDump(t, tbl, dumpTest{
 		cidrs: []netip.Prefix{
 			mpp("172.16.0.0/12"),
@@ -121,6 +123,7 @@ pathcp(#3): 127:[127.0.0.1/32, <nil>] 169:[169.254.0.0/16, <nil>] 172:[172.16.0.
 func TestDumpSampleV6(t *testing.T) {
 	t.Parallel()
 	tbl := new(Table[any])
+	tbl.WithPC()
 	checkDump(t, tbl, dumpTest{
 		cidrs: []netip.Prefix{
 			mpp("fe80::/10"),
@@ -142,6 +145,8 @@ pathcp(#2): 32:[2001:db8::/32, <nil>] 254:[fe80::/10, <nil>]
 func TestDumpSample(t *testing.T) {
 	t.Parallel()
 	tbl := new(Table[any])
+	tbl.WithPC()
+
 	checkDump(t, tbl, dumpTest{
 		cidrs: []netip.Prefix{
 			mpp("fe80::/10"),
@@ -192,7 +197,7 @@ pathcp(#2): 32:[2001:db8::/32, <nil>] 254:[fe80::/10, <nil>]
 func checkDump(t *testing.T, tbl *Table[any], tt dumpTest) {
 	t.Helper()
 	for _, cidr := range tt.cidrs {
-		tbl.InsertPC(cidr, nil)
+		tbl.Insert(cidr, nil)
 	}
 	w := new(strings.Builder)
 	tbl.dump(w)

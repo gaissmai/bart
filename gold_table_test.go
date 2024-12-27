@@ -18,6 +18,7 @@ type goldTableItem[V any] struct {
 	val V
 }
 
+//nolint:unused
 func (t *goldTable[V]) insert(pfx netip.Prefix, val V) {
 	pfx = pfx.Masked()
 	for i, ent := range *t {

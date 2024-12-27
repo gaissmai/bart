@@ -267,14 +267,16 @@ func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 	}
 
 	// 3. Test if prefix overlaps any pathcomp prefix
+	if n.pathcomp != nil {
 
-	// shift-right pathcomp bitset by 256 (firstHostIndex)
-	pc8 := make([]uint64, 8)
-	copy(pc8[4:], n.pathcomp.BitSet) // 4*64= 256
-	pathcompRoutes := bitset.BitSet(pc8)
+		// shift-right pathcomp bitset by 256 (firstHostIndex)
+		pc8 := make([]uint64, 8)
+		copy(pc8[4:], n.pathcomp.BitSet) // 4*64= 256
+		pathcompRoutes := bitset.BitSet(pc8)
 
-	if allotedPrefixRoutes.IntersectionCardinality(pathcompRoutes) != 0 {
-		return true
+		if allotedPrefixRoutes.IntersectionCardinality(pathcompRoutes) != 0 {
+			return true
+		}
 	}
 
 	// 4. Test if prefix overlaps any child in this node

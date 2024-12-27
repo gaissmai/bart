@@ -198,32 +198,26 @@ func (n *node[V]) getKidsRec(parentIdx uint, path [16]byte, depth int, is4 bool)
 		}
 	}
 
-	// #######################################
-	//          path compression
-	// #######################################
-
 	// look for path compressed items in this node
-	allPathCompAddrs := n.pathcomp.AsSlice(make([]uint, 0, maxNodeChildren))
-	for i, addr := range allPathCompAddrs {
-		// do a longest-prefix-match
-		lpmIdx, _, _ := n.lpm(hostIndex(byte(addr)))
-		if lpmIdx == parentIdx {
-			item := n.pathcomp.Items[i]
+	if n.pathcomp != nil {
+		allPathCompAddrs := n.pathcomp.AsSlice(make([]uint, 0, maxNodeChildren))
+		for i, addr := range allPathCompAddrs {
+			// do a longest-prefix-match
+			lpmIdx, _, _ := n.lpm(hostIndex(byte(addr)))
+			if lpmIdx == parentIdx {
+				item := n.pathcomp.Items[i]
 
-			kid := kid[V]{
-				n:    nil, // path compressed item, stop recursion
-				is4:  is4,
-				cidr: item.prefix,
-				val:  item.value,
+				kid := kid[V]{
+					n:    nil, // path compressed item, stop recursion
+					is4:  is4,
+					cidr: item.prefix,
+					val:  item.value,
+				}
+
+				directKids = append(directKids, kid)
 			}
-
-			directKids = append(directKids, kid)
 		}
 	}
-
-	// #######################################
-	//          classic path
-	// #######################################
 
 	// the node may have childs, the rec-descent monster starts
 

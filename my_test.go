@@ -13,10 +13,11 @@ var NULL NULLT
 
 func TestOverlapsPrefixPC(t *testing.T) {
 	tbl := &Table[int]{}
+	tbl.WithPC()
 
 	// default route
-	tbl.InsertPC(mpp("10.0.0.0/9"), 1)
-	tbl.InsertPC(mpp("2001:db8::/32"), 2)
+	tbl.Insert(mpp("10.0.0.0/9"), 1)
+	tbl.Insert(mpp("2001:db8::/32"), 2)
 
 	pfx := mpp("0.0.0.0/0")
 	got := tbl.OverlapsPrefix(pfx)
@@ -37,15 +38,18 @@ func TestOverlapsPrefixPC(t *testing.T) {
 
 func TestRandomTablePC(t *testing.T) {
 	var rt Table[NULLT]
+	rt.WithPC()
+
 	for _, pfx := range randomPrefixes(1_000_000) {
-		rt.InsertPC(pfx.pfx, NULL)
+		rt.Insert(pfx.pfx, NULL)
 	}
 }
 
 func TestFullTablePC(t *testing.T) {
 	var rt Table[NULLT]
+	rt.WithPC()
 	for _, route := range routes {
-		rt.InsertPC(route.CIDR, NULL)
+		rt.Insert(route.CIDR, NULL)
 	}
 }
 
@@ -56,7 +60,7 @@ func BenchmarkTableInsertPC(b *testing.B) {
 			for range b.N {
 				var rt Table[netip.Prefix]
 				for _, route := range routes[:n] {
-					rt.InsertPC(route.CIDR, route.CIDR)
+					rt.Insert(route.CIDR, route.CIDR)
 				}
 			}
 		})
@@ -66,10 +70,12 @@ func BenchmarkTableInsertPC(b *testing.B) {
 func TestDeletePC(t *testing.T) {
 	t.Run("path compressed purge", func(t *testing.T) {
 		rtbl := &Table[int]{}
+		rtbl.WithPC()
+
 		checkNumNodes(t, rtbl, 0) // 0
 
-		rtbl.InsertPC(mpp("10.10.0.0/17"), 1)
-		rtbl.InsertPC(mpp("10.20.0.0/17"), 2)
+		rtbl.Insert(mpp("10.10.0.0/17"), 1)
+		rtbl.Insert(mpp("10.20.0.0/17"), 2)
 		checkNumNodes(t, rtbl, 2) // 1 root, 1 leaf
 
 		checkRoutes(t, rtbl, []tableTest{
@@ -99,11 +105,12 @@ func TestGetAndDeletePC(t *testing.T) {
 	const N = 10_000
 
 	tbl := new(Table[int])
+	tbl.WithPC()
 	prefixes := randomPrefixes(N)
 
 	// insert the prefixes
 	for _, p := range prefixes {
-		tbl.InsertPC(p.pfx, p.val)
+		tbl.Insert(p.pfx, p.val)
 	}
 
 	// shuffle the prefixes
@@ -211,8 +218,10 @@ func TestInsertPC(t *testing.T) {
 
 	for _, tc := range tcs {
 		tbl := new(Table[string])
+		tbl.WithPC()
+
 		for _, pfx := range tc.pfxs {
-			tbl.InsertPC(pfx, pfx.String())
+			tbl.Insert(pfx, pfx.String())
 		}
 
 		gotNodes := tbl.nodes()
