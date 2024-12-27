@@ -584,10 +584,8 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 		}
 
 		// longest prefix match, skip if node has no prefixes
-		if n.prefixes.Len() != 0 {
-			if ok := n.lpmTest(hostIndex(octet)); ok {
-				return ok
-			}
+		if n.prefixes.Len() != 0 && n.lpmTest(hostIndex(octet)) {
+			return true
 		}
 	}
 
