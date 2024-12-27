@@ -418,7 +418,7 @@ func TestDelete(t *testing.T) {
 		rtbl := &Table[int]{}
 		checkNumNodes(t, rtbl, 0)
 
-		rtbl.Insert(mpp("10.0.0.0/8"), 1)
+		rtbl.InsertPC(mpp("10.0.0.0/8"), 1)
 		checkRoutes(t, rtbl, []tableTest{
 			{"10.0.0.1", 1},
 			{"255.255.255.255", -1},
@@ -438,7 +438,7 @@ func TestDelete(t *testing.T) {
 		rtbl := &Table[int]{}
 		checkNumNodes(t, rtbl, 0)
 
-		rtbl.Insert(mpp("192.168.0.1/32"), 1)
+		rtbl.InsertPC(mpp("192.168.0.1/32"), 1)
 		checkRoutes(t, rtbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"255.255.255.255", -1},
@@ -456,8 +456,8 @@ func TestDelete(t *testing.T) {
 		// Create an intermediate with 2 children, then delete one leaf.
 		tbl := &Table[int]{}
 		checkNumNodes(t, tbl, 0)
-		tbl.Insert(mpp("192.168.0.1/32"), 1)
-		tbl.Insert(mpp("192.180.0.1/32"), 2)
+		tbl.InsertPC(mpp("192.168.0.1/32"), 1)
+		tbl.InsertPC(mpp("192.180.0.1/32"), 2)
 		checkRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.180.0.1", 2},
@@ -479,9 +479,9 @@ func TestDelete(t *testing.T) {
 		// Same, but the intermediate carries a route as well.
 		rtbl := &Table[int]{}
 		checkNumNodes(t, rtbl, 0)
-		rtbl.Insert(mpp("192.168.0.1/32"), 1)
-		rtbl.Insert(mpp("192.180.0.1/32"), 2)
-		rtbl.Insert(mpp("192.0.0.0/10"), 3)
+		rtbl.InsertPC(mpp("192.168.0.1/32"), 1)
+		rtbl.InsertPC(mpp("192.180.0.1/32"), 2)
+		rtbl.InsertPC(mpp("192.0.0.0/10"), 3)
 		checkRoutes(t, rtbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.180.0.1", 2},
@@ -505,9 +505,9 @@ func TestDelete(t *testing.T) {
 		// Intermediate with 3 leaves, then delete one leaf.
 		rtbl := &Table[int]{}
 		checkNumNodes(t, rtbl, 0)
-		rtbl.Insert(mpp("192.168.0.1/32"), 1)
-		rtbl.Insert(mpp("192.180.0.1/32"), 2)
-		rtbl.Insert(mpp("192.200.0.1/32"), 3)
+		rtbl.InsertPC(mpp("192.168.0.1/32"), 1)
+		rtbl.InsertPC(mpp("192.180.0.1/32"), 2)
+		rtbl.InsertPC(mpp("192.200.0.1/32"), 3)
 		checkRoutes(t, rtbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.180.0.1", 2},
@@ -530,7 +530,7 @@ func TestDelete(t *testing.T) {
 		// Delete non-existent prefix, missing strideTable path.
 		rtbl := &Table[int]{}
 		checkNumNodes(t, rtbl, 0)
-		rtbl.Insert(mpp("192.168.0.1/32"), 1)
+		rtbl.InsertPC(mpp("192.168.0.1/32"), 1)
 		checkRoutes(t, rtbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.255.0.1", -1},
@@ -550,7 +550,7 @@ func TestDelete(t *testing.T) {
 		// leaf doesn't contain route.
 		rtbl := &Table[int]{}
 		checkNumNodes(t, rtbl, 0)
-		rtbl.Insert(mpp("192.168.0.1/32"), 1)
+		rtbl.InsertPC(mpp("192.168.0.1/32"), 1)
 		checkRoutes(t, rtbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.255.0.1", -1},
@@ -570,8 +570,8 @@ func TestDelete(t *testing.T) {
 		// compactable.
 		rtbl := &Table[int]{}
 		checkNumNodes(t, rtbl, 0)
-		rtbl.Insert(mpp("192.168.0.1/32"), 1)
-		rtbl.Insert(mpp("192.168.0.0/22"), 2)
+		rtbl.InsertPC(mpp("192.168.0.1/32"), 1)
+		rtbl.InsertPC(mpp("192.168.0.0/22"), 2)
 		checkRoutes(t, rtbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.168.0.2", 2},
@@ -592,8 +592,8 @@ func TestDelete(t *testing.T) {
 		// Default routes have a special case in the code.
 		rtbl := &Table[int]{}
 
-		rtbl.Insert(mpp("0.0.0.0/0"), 1)
-		rtbl.Insert(mpp("::/0"), 1)
+		rtbl.InsertPC(mpp("0.0.0.0/0"), 1)
+		rtbl.InsertPC(mpp("::/0"), 1)
 		rtbl.Delete(mpp("0.0.0.0/0"))
 
 		checkRoutes(t, rtbl, []tableTest{
@@ -608,8 +608,8 @@ func TestDelete(t *testing.T) {
 		rtbl := &Table[int]{}
 		checkNumNodes(t, rtbl, 0) // 0
 
-		rtbl.Insert(mpp("10.10.0.0/17"), 1)
-		rtbl.Insert(mpp("10.20.0.0/17"), 2)
+		rtbl.InsertPC(mpp("10.10.0.0/17"), 1)
+		rtbl.InsertPC(mpp("10.20.0.0/17"), 2)
 		checkNumNodes(t, rtbl, 2) // 1 root, 1 leaf
 
 		rtbl.Delete(mpp("10.20.0.0/17"))
@@ -1939,7 +1939,7 @@ func checkRoutes(t *testing.T, tbl *Table[int], tt []tableTest) {
 func checkNumNodes(t *testing.T, tbl *Table[int], want int) {
 	t.Helper()
 	if got := tbl.nodes(); got != want {
-		t.Errorf("wrong table size, got %d nodes want %d", got, want)
+		t.Errorf("wrong table dump, got %d nodes want %d", got, want)
 	}
 }
 

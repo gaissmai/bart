@@ -18,7 +18,6 @@ type goldTableItem[V any] struct {
 	val V
 }
 
-/*
 func (t *goldTable[V]) insert(pfx netip.Prefix, val V) {
 	pfx = pfx.Masked()
 	for i, ent := range *t {
@@ -29,7 +28,6 @@ func (t *goldTable[V]) insert(pfx netip.Prefix, val V) {
 	}
 	*t = append(*t, goldTableItem[V]{pfx, val})
 }
-*/
 
 func (t *goldTable[V]) get(pfx netip.Prefix) (val V, ok bool) {
 	pfx = pfx.Masked()

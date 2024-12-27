@@ -106,6 +106,73 @@ func TestWorstCase(t *testing.T) {
 	})
 }
 
+func TestWorstCasePC(t *testing.T) {
+	t.Parallel()
+
+	t.Run("WorstCaseMatchIP4", func(t *testing.T) {
+		t.Parallel()
+
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.InsertPC(p, p.String())
+		}
+
+		want := true
+		ok := tbl.Contains(worstCaseProbeIP4)
+		if ok != want {
+			t.Errorf("Contains, worst case match IP4, expected OK: %v, got: %v", want, ok)
+		}
+	})
+
+	t.Run("WorstCaseMissIP4", func(t *testing.T) {
+		t.Parallel()
+
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.InsertPC(p, p.String())
+		}
+
+		tbl.Delete(mpp("0.0.0.0/0")) // delete matching prefix
+
+		want := false
+		ok := tbl.Contains(worstCaseProbeIP4)
+		if ok != want {
+			t.Errorf("Contains, worst case miss IP4, expected OK: %v, got: %v", want, ok)
+		}
+	})
+
+	t.Run("WorstCaseMatchIP6", func(t *testing.T) {
+		t.Parallel()
+
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.InsertPC(p, p.String())
+		}
+
+		want := true
+		ok := tbl.Contains(worstCaseProbeIP6)
+		if ok != want {
+			t.Errorf("Contains, worst case match IP6, expected OK: %v, got: %v", want, ok)
+		}
+	})
+	t.Run("WorstCaseMissIP6", func(t *testing.T) {
+		t.Parallel()
+
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.InsertPC(p, p.String())
+		}
+
+		tbl.Delete(mpp("::/0")) // delete matching prefix
+
+		want := false
+		ok := tbl.Contains(worstCaseProbeIP6)
+		if ok != want {
+			t.Errorf("Contains, worst case miss IP6, expected OK: %v, got: %v", want, ok)
+		}
+	})
+}
+
 func BenchmarkWorstCase(b *testing.B) {
 	b.Run("WorstCase IP4", func(b *testing.B) {
 		tbl := new(Table[string])
@@ -122,6 +189,30 @@ func BenchmarkWorstCase(b *testing.B) {
 		tbl := new(Table[string])
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())
+		}
+
+		for range b.N {
+			_ = tbl.Contains(worstCaseProbeIP6)
+		}
+	})
+}
+
+func BenchmarkWorstCasePC(b *testing.B) {
+	b.Run("WorstCase IP4", func(b *testing.B) {
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.InsertPC(p, p.String())
+		}
+
+		for range b.N {
+			_ = tbl.Contains(worstCaseProbeIP4)
+		}
+	})
+
+	b.Run("WorstCase IP6", func(b *testing.B) {
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.InsertPC(p, p.String())
 		}
 
 		for range b.N {
