@@ -723,26 +723,11 @@ func fillRouteTables() {
 	}
 }
 
-//nolint:unused
-func sliceRoutes(n int) []route {
-	if n > len(routes) {
-		panic("n too big")
-	}
-
-	clone := make([]route, 0, n)
-	clone = append(clone, routes...)
-
-	rand.Shuffle(len(clone), func(i, j int) {
-		clone[i], clone[j] = clone[j], clone[i]
-	})
-	return clone[:n]
-}
-
 // #########################################################
 
-//nolint:unused
-func gimmeRandomPrefix4(n int) (pfxs []netip.Prefix) {
+func gimmeRandomPrefixes4(n int) []netip.Prefix {
 	set := map[netip.Prefix]netip.Prefix{}
+	pfxs := make([]netip.Prefix, 0, n)
 
 	for {
 		pfx := randomPrefix4()
@@ -754,12 +739,12 @@ func gimmeRandomPrefix4(n int) (pfxs []netip.Prefix) {
 			break
 		}
 	}
-	return
+	return pfxs
 }
 
-//nolint:unused
-func gimmeRandomPrefix6(n int) (pfxs []netip.Prefix) {
+func gimmeRandomPrefixes6(n int) []netip.Prefix {
 	set := map[netip.Prefix]netip.Prefix{}
+	pfxs := make([]netip.Prefix, 0, n)
 
 	for {
 		pfx := randomPrefix6()
@@ -771,5 +756,17 @@ func gimmeRandomPrefix6(n int) (pfxs []netip.Prefix) {
 			break
 		}
 	}
-	return
+	return pfxs
+}
+
+func gimmeRandomPrefixes(n int) []netip.Prefix {
+	pfxs := make([]netip.Prefix, 0, n)
+	pfxs = append(pfxs, gimmeRandomPrefixes4(n/2)...)
+	pfxs = append(pfxs, gimmeRandomPrefixes6(n-len(pfxs))...)
+
+	prng.Shuffle(n, func(i, j int) {
+		pfxs[i], pfxs[j] = pfxs[j], pfxs[i]
+	})
+
+	return pfxs
 }
