@@ -192,7 +192,7 @@ pathcp(#2): 32:[2001:db8::/32, <nil>] 254:[fe80::/10, <nil>]
 func checkDump(t *testing.T, tbl *Table[any], tt dumpTest) {
 	t.Helper()
 	for _, cidr := range tt.cidrs {
-		tbl.Insert(cidr, nil)
+		tbl.InsertPC(cidr, nil)
 	}
 	w := new(strings.Builder)
 	tbl.dump(w)

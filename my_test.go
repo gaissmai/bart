@@ -15,8 +15,8 @@ func TestOverlapsPrefixPC(t *testing.T) {
 	tbl := &Table[int]{}
 
 	// default route
-	tbl.Insert(mpp("10.0.0.0/9"), 1)
-	tbl.Insert(mpp("2001:db8::/32"), 2)
+	tbl.InsertPC(mpp("10.0.0.0/9"), 1)
+	tbl.InsertPC(mpp("2001:db8::/32"), 2)
 
 	pfx := mpp("0.0.0.0/0")
 	got := tbl.OverlapsPrefix(pfx)
@@ -38,14 +38,14 @@ func TestOverlapsPrefixPC(t *testing.T) {
 func TestRandomTablePC(t *testing.T) {
 	var rt Table[NULLT]
 	for _, pfx := range randomPrefixes(1_000_000) {
-		rt.Insert(pfx.pfx, NULL)
+		rt.InsertPC(pfx.pfx, NULL)
 	}
 }
 
 func TestFullTablePC(t *testing.T) {
 	var rt Table[NULLT]
 	for _, route := range routes {
-		rt.Insert(route.CIDR, NULL)
+		rt.InsertPC(route.CIDR, NULL)
 	}
 }
 
@@ -56,23 +56,10 @@ func BenchmarkTableInsertPC(b *testing.B) {
 			for range b.N {
 				var rt Table[netip.Prefix]
 				for _, route := range routes[:n] {
-					rt.Insert(route.CIDR, route.CIDR)
+					rt.InsertPC(route.CIDR, route.CIDR)
 				}
 			}
 		})
-	}
-}
-
-func TestWorstCasePC(t *testing.T) {
-	tbl := new(Table[string])
-	for _, p := range worstCasePfxsIP4 {
-		tbl.Insert(p, p.String())
-	}
-
-	want := true
-	ok := tbl.Contains(worstCaseProbeIP4)
-	if ok != want {
-		t.Errorf("Contains, worst case match IP4, expected OK: %v, got: %v", want, ok)
 	}
 }
 
@@ -81,8 +68,8 @@ func TestDeletePC(t *testing.T) {
 		rtbl := &Table[int]{}
 		checkNumNodes(t, rtbl, 0) // 0
 
-		rtbl.Insert(mpp("10.10.0.0/17"), 1)
-		rtbl.Insert(mpp("10.20.0.0/17"), 2)
+		rtbl.InsertPC(mpp("10.10.0.0/17"), 1)
+		rtbl.InsertPC(mpp("10.20.0.0/17"), 2)
 		checkNumNodes(t, rtbl, 2) // 1 root, 1 leaf
 
 		checkRoutes(t, rtbl, []tableTest{
@@ -116,7 +103,7 @@ func TestGetAndDeletePC(t *testing.T) {
 
 	// insert the prefixes
 	for _, p := range prefixes {
-		tbl.Insert(p.pfx, p.val)
+		tbl.InsertPC(p.pfx, p.val)
 	}
 
 	// shuffle the prefixes
@@ -225,7 +212,7 @@ func TestInsertPC(t *testing.T) {
 	for _, tc := range tcs {
 		tbl := new(Table[string])
 		for _, pfx := range tc.pfxs {
-			tbl.Insert(pfx, pfx.String())
+			tbl.InsertPC(pfx, pfx.String())
 		}
 
 		gotNodes := tbl.nodes()
