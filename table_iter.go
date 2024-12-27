@@ -30,6 +30,7 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) func(yield func(netip.Prefix, V) 
 			octets = octets[12:]
 		}
 
+		// needed as argument below
 		copy(path[:], octets)
 
 		// see comment in Insert()
@@ -46,7 +47,7 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) func(yield func(netip.Prefix, V) 
 
 		// run variable, used after for loop
 		var i int
-
+		var ok bool
 		var octet byte
 
 		// find last node
@@ -55,12 +56,9 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) func(yield func(netip.Prefix, V) 
 			stack[i] = n
 
 			// go down in tight loop
-			c, ok := n.children.Get(uint(octet))
-			if !ok {
+			if n, ok = n.children.Get(uint(octet)); !ok {
 				break
 			}
-
-			n = c
 		}
 
 		// start backtracking, unwind the stack
