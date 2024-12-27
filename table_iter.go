@@ -9,7 +9,12 @@ import (
 
 // Supernets returns an iterator over all CIDRs covering pfx.
 // The iteration is in reverse CIDR sort order, from longest-prefix-match to shortest-prefix-match.
+// TODO, path compression not yet implemented for this method.
 func (t *Table[V]) Supernets(pfx netip.Prefix) func(yield func(netip.Prefix, V) bool) {
+	if t.pathCompressed {
+		panic("TODO, path compression not yet implemented for this method")
+	}
+
 	return func(yield func(netip.Prefix, V) bool) {
 		if !pfx.IsValid() {
 			return
@@ -91,7 +96,12 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) func(yield func(netip.Prefix, V) 
 
 // Subnets returns an iterator over all CIDRs covered by pfx.
 // The iteration is in natural CIDR sort order.
+// TODO, path compression not yet implemented for this method.
 func (t *Table[V]) Subnets(pfx netip.Prefix) func(yield func(netip.Prefix, V) bool) {
+	if t.pathCompressed {
+		panic("TODO, path compression not yet implemented for this method")
+	}
+
 	return func(yield func(netip.Prefix, V) bool) {
 		if !pfx.IsValid() {
 			return
