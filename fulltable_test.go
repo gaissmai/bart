@@ -439,7 +439,7 @@ func BenchmarkFullTableMemoryV4PC(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 
 	rt := new(Table[struct{}])
-	rt.WithPC()
+	rt.WithPathCompression()
 	runtime.GC()
 	runtime.ReadMemStats(&startMem)
 
@@ -463,7 +463,7 @@ func BenchmarkFullTableMemoryV6PC(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 
 	rt := new(Table[struct{}])
-	rt.WithPC()
+	rt.WithPathCompression()
 	runtime.GC()
 	runtime.ReadMemStats(&startMem)
 
@@ -487,7 +487,7 @@ func BenchmarkFullTableMemoryPC(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 
 	rt := new(Table[struct{}])
-	rt.WithPC()
+	rt.WithPathCompression()
 	runtime.GC()
 	runtime.ReadMemStats(&startMem)
 

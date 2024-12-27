@@ -416,7 +416,7 @@ func TestDelete(t *testing.T) {
 		t.Parallel()
 		// Add/remove prefix from root table.
 		rtbl := &Table[int]{}
-		rtbl.WithPC()
+		rtbl.WithPathCompression()
 
 		checkNumNodes(t, rtbl, 0)
 
@@ -457,7 +457,7 @@ func TestDelete(t *testing.T) {
 		t.Parallel()
 		// Create an intermediate with 2 children, then delete one leaf.
 		tbl := &Table[int]{}
-		tbl.WithPC()
+		tbl.WithPathCompression()
 
 		checkNumNodes(t, tbl, 0)
 		tbl.Insert(mpp("192.168.0.1/32"), 1)
@@ -481,7 +481,7 @@ func TestDelete(t *testing.T) {
 		t.Parallel()
 		// Same, but the intermediate carries a route as well.
 		rtbl := &Table[int]{}
-		rtbl.WithPC()
+		rtbl.WithPathCompression()
 
 		checkNumNodes(t, rtbl, 0)
 		rtbl.Insert(mpp("192.168.0.1/32"), 1)
@@ -509,7 +509,7 @@ func TestDelete(t *testing.T) {
 		t.Parallel()
 		// Intermediate with 3 leaves, then delete one leaf.
 		rtbl := &Table[int]{}
-		rtbl.WithPC()
+		rtbl.WithPathCompression()
 
 		checkNumNodes(t, rtbl, 0)
 		rtbl.Insert(mpp("192.168.0.1/32"), 1)
@@ -536,7 +536,7 @@ func TestDelete(t *testing.T) {
 		t.Parallel()
 		// Delete non-existent prefix, missing strideTable path.
 		rtbl := &Table[int]{}
-		rtbl.WithPC()
+		rtbl.WithPathCompression()
 
 		checkNumNodes(t, rtbl, 0)
 		rtbl.Insert(mpp("192.168.0.1/32"), 1)
@@ -558,7 +558,7 @@ func TestDelete(t *testing.T) {
 		// Delete non-existent prefix, strideTable path exists but
 		// leaf doesn't contain route.
 		rtbl := &Table[int]{}
-		rtbl.WithPC()
+		rtbl.WithPathCompression()
 
 		checkNumNodes(t, rtbl, 0)
 		rtbl.Insert(mpp("192.168.0.1/32"), 1)
@@ -580,7 +580,7 @@ func TestDelete(t *testing.T) {
 		// Intermediate table loses its last route and becomes
 		// compactable.
 		rtbl := &Table[int]{}
-		rtbl.WithPC()
+		rtbl.WithPathCompression()
 
 		checkNumNodes(t, rtbl, 0)
 		rtbl.Insert(mpp("192.168.0.1/32"), 1)
@@ -619,7 +619,7 @@ func TestDelete(t *testing.T) {
 	t.Run("path compressed purge", func(t *testing.T) {
 		t.Parallel()
 		rtbl := &Table[int]{}
-		rtbl.WithPC()
+		rtbl.WithPathCompression()
 
 		checkNumNodes(t, rtbl, 0) // 0
 
@@ -1884,7 +1884,7 @@ func BenchmarkMemory(b *testing.B) {
 			for _, pc := range []bool{false, true} {
 				rt := new(Table[any])
 				if pc {
-					rt.WithPC()
+					rt.WithPathCompression()
 				}
 
 				b.Run(fmt.Sprintf("pc=%v/%s/random/%d", pc, fam, nroutes), func(b *testing.B) {

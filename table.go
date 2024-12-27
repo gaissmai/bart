@@ -41,20 +41,29 @@ type Table[V any] struct {
 	size4 int
 	size6 int
 
-	// path compresseion flag
-	withPC bool
+	// path compression flag
+	pathCompressed bool
 }
 
-func (t *Table[V]) WithPC() {
-	t.withPC = true
+// WithPathCompression sets the Table in path compression mode.
+// Path compression reduces memory consumption by
+// almost an order of magnitude
+// Insert and Delete is more time consuming.
+// The lookup times remains almost the same.
+//
+// panic's if table isn't empty.
+func (t *Table[V]) WithPathCompression() *Table[V] {
+	if t.Size() != 0 {
+		panic("table is not empty")
+	}
 
-	// init pc in root nodes
-	if t.root4.pathcomp == nil {
-		t.root4.pathcomp = &sparse.Array[*pathItem[V]]{}
-	}
-	if t.root6.pathcomp == nil {
-		t.root6.pathcomp = &sparse.Array[*pathItem[V]]{}
-	}
+	t.pathCompressed = true
+
+	// init pathcomp data structure in root nodes
+	t.root4.pathcomp = &sparse.Array[*pathItem[V]]{}
+	t.root6.pathcomp = &sparse.Array[*pathItem[V]]{}
+
+	return t
 }
 
 // rootNodeByVersion, root node getter for ip version.
@@ -80,7 +89,7 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	}
 
 	// insert with path compression
-	if t.withPC {
+	if t.pathCompressed {
 		t.insertPC(pfx, val)
 		return
 	}
@@ -236,7 +245,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 	}
 
 	// insert with path compression
-	if t.withPC {
+	if t.pathCompressed {
 		return t.updatePC(pfx, cb)
 	}
 
@@ -414,7 +423,7 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 			continue
 		}
 
-		if t.withPC {
+		if t.pathCompressed {
 			if pc, ok := n.pathcomp.Get(uint(octet)); ok {
 				if pc.prefix == pfx {
 					return pc.value, true
@@ -453,9 +462,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 
 	n := t.rootNodeByVersion(is4)
 
-	// do not allocate
 	a16 := ip.As16()
-
 	octets := a16[:]
 	if is4 {
 		octets = octets[12:]
@@ -495,7 +502,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 		}
 
 		// check path compressed prefix at this slot
-		if t.withPC && n.pathcomp.Test(addr) {
+		if t.pathCompressed && n.pathcomp.Test(addr) {
 			pc := n.pathcomp.MustGet(addr)
 			if pc.prefix == pfx {
 				n.pathcomp.DeleteAt(addr)
@@ -572,7 +579,7 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 		addr = uint(octet)
 
 		// check path compressed prefix at this slot
-		if t.withPC && n.pathcomp.Test(addr) {
+		if t.pathCompressed && n.pathcomp.Test(addr) {
 			pc := n.pathcomp.MustGet(addr)
 			if pc.prefix.Contains(ip) {
 				return true
@@ -638,7 +645,7 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 		addr = uint(octet)
 
 		// check path compressed prefix at this slot
-		if t.withPC && n.pathcomp.Test(addr) {
+		if t.pathCompressed && n.pathcomp.Test(addr) {
 			pc := n.pathcomp.MustGet(addr)
 			if pc.prefix.Contains(ip) {
 				return pc.value, true
@@ -742,7 +749,7 @@ func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool
 		addr = uint(octet)
 
 		// check path compressed prefix at this slot
-		if t.withPC && n.pathcomp.Test(addr) {
+		if t.pathCompressed && n.pathcomp.Test(addr) {
 			pc := n.pathcomp.MustGet(addr)
 			if pc.prefix.Contains(ip) && pc.prefix.Bits() <= bits {
 				return pc.prefix, pc.value, true
@@ -817,7 +824,7 @@ func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 			continue
 		}
 
-		if t.withPC {
+		if t.pathCompressed {
 			if pc, ok := n.pathcomp.Get(uint(octet)); ok {
 				return pfx.Overlaps(pc.prefix)
 			}
@@ -830,13 +837,23 @@ func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 
 // Overlaps reports whether any IP in the table is matched by a route in the
 // other table or vice versa.
+//
+// panic's if the path compression of the two tables does not match.
 func (t *Table[V]) Overlaps(o *Table[V]) bool {
+	if t.pathCompressed != o.pathCompressed {
+		panic("tables MUST NOT differ in path compressions")
+	}
 	return t.Overlaps4(o) || t.Overlaps6(o)
 }
 
 // Overlaps4 reports whether any IPv4 in the table matches a route in the
 // other table or vice versa.
+//
+// panic's if the path compression of the two tables does not match.
 func (t *Table[V]) Overlaps4(o *Table[V]) bool {
+	if t.pathCompressed != o.pathCompressed {
+		panic("tables MUST NOT differ in path compressions")
+	}
 	if t.size4 == 0 || o.size4 == 0 {
 		return false
 	}
@@ -845,7 +862,12 @@ func (t *Table[V]) Overlaps4(o *Table[V]) bool {
 
 // Overlaps6 reports whether any IPv6 in the table matches a route in the
 // other table or vice versa.
+//
+// panic's if the path compression of the two tables does not match.
 func (t *Table[V]) Overlaps6(o *Table[V]) bool {
+	if t.pathCompressed != o.pathCompressed {
+		panic("tables MUST NOT differ in path compressions")
+	}
 	if t.size6 == 0 || o.size6 == 0 {
 		return false
 	}
@@ -855,7 +877,13 @@ func (t *Table[V]) Overlaps6(o *Table[V]) bool {
 // Union combines two tables, changing the receiver table.
 // If there are duplicate entries, the payload of type V is shallow copied from the other table.
 // If type V implements the [Cloner] interface, the values are cloned, see also [Table.Clone].
+//
+// panic's if the path compression of the two tables does not match.
 func (t *Table[V]) Union(o *Table[V]) {
+	if t.pathCompressed != o.pathCompressed {
+		panic("tables MUST NOT differ in path compressions")
+	}
+
 	dup4 := t.root4.unionRec(&o.root4, 0)
 	dup6 := t.root6.unionRec(&o.root6, 0)
 
