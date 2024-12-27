@@ -13,7 +13,7 @@ var NULL NULLT
 
 func TestOverlapsPrefixPC(t *testing.T) {
 	tbl := &Table[int]{}
-	tbl.WithPC()
+	tbl.WithPathCompression()
 
 	// default route
 	tbl.Insert(mpp("10.0.0.0/9"), 1)
@@ -38,7 +38,7 @@ func TestOverlapsPrefixPC(t *testing.T) {
 
 func TestRandomTablePC(t *testing.T) {
 	var rt Table[NULLT]
-	rt.WithPC()
+	rt.WithPathCompression()
 
 	for _, pfx := range randomPrefixes(1_000_000) {
 		rt.Insert(pfx.pfx, NULL)
@@ -47,7 +47,7 @@ func TestRandomTablePC(t *testing.T) {
 
 func TestFullTablePC(t *testing.T) {
 	var rt Table[NULLT]
-	rt.WithPC()
+	rt.WithPathCompression()
 	for _, route := range routes {
 		rt.Insert(route.CIDR, NULL)
 	}
@@ -70,7 +70,7 @@ func BenchmarkTableInsertPC(b *testing.B) {
 func TestDeletePC(t *testing.T) {
 	t.Run("path compressed purge", func(t *testing.T) {
 		rtbl := &Table[int]{}
-		rtbl.WithPC()
+		rtbl.WithPathCompression()
 
 		checkNumNodes(t, rtbl, 0) // 0
 
@@ -105,7 +105,7 @@ func TestGetAndDeletePC(t *testing.T) {
 	const N = 10_000
 
 	tbl := new(Table[int])
-	tbl.WithPC()
+	tbl.WithPathCompression()
 	prefixes := randomPrefixes(N)
 
 	// insert the prefixes
@@ -218,7 +218,7 @@ func TestInsertPC(t *testing.T) {
 
 	for _, tc := range tcs {
 		tbl := new(Table[string])
-		tbl.WithPC()
+		tbl.WithPathCompression()
 
 		for _, pfx := range tc.pfxs {
 			tbl.Insert(pfx, pfx.String())

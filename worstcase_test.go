@@ -200,7 +200,7 @@ func BenchmarkWorstCase(b *testing.B) {
 func BenchmarkWorstCasePC(b *testing.B) {
 	b.Run("WorstCasePC IP4", func(b *testing.B) {
 		tbl := new(Table[string])
-		tbl.WithPC()
+		tbl.WithPathCompression()
 
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
@@ -213,7 +213,7 @@ func BenchmarkWorstCasePC(b *testing.B) {
 
 	b.Run("WorstCasePC IP6", func(b *testing.B) {
 		tbl := new(Table[string])
-		tbl.WithPC()
+		tbl.WithPathCompression()
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())
 		}

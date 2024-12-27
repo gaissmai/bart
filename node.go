@@ -32,8 +32,12 @@ var zeroPath [16]byte
 // The array slots are also not pre-allocated (alloted) as described
 // in the ART algorithm, but backtracking is used for the longest-prefix-match.
 //
-// The lookup is then slower by a factor of about 2, but this is
-// the intended trade-off to prevent memory consumption from exploding.
+// The lookup is then slower, but this is the intended trade-off to prevent
+// memory consumption from exploding.
+//
+// The nodes can also be used in path compressd mode, this reduces the memory consumption
+// by almost an order of magnitude, but the updates (insert/delete) are slower,
+// but the search times remain comparable.
 type node[V any] struct {
 	// prefixes contains the routes with payload V
 	prefixes sparse.Array[V]
@@ -41,11 +45,13 @@ type node[V any] struct {
 	// children, recursively spans the trie with a branching factor of 256
 	children sparse.Array[*node[V]]
 
-	// path compressed items, as pointer, without path compression only 8 bytes/node
+	// path compressed items, just a nil pointer without path compression
+	// and additional 8 bytes per node wasted without compression.
 	pathcomp *sparse.Array[*pathItem[V]]
 }
 
-// newNode returns a *node. If n was path compressed, the new node
+// newNode returns a *node.
+// If n was path compressed, the new node
 // is it also.
 func (n node[V]) newNode() *node[V] {
 	c := new(node[V])
@@ -56,6 +62,7 @@ func (n node[V]) newNode() *node[V] {
 	return c
 }
 
+// pathItem is prefix and value together
 type pathItem[V any] struct {
 	prefix netip.Prefix
 	value  V
@@ -70,6 +77,10 @@ func (n *node[V]) isEmpty() bool {
 
 // insertAtDepth insert a prefix/val into a node tree at depth.
 // n must not be nil, prefix must be valid and already in canonical form.
+//
+// Required if a path compression has to be resolved because a new value
+// is added that collides with the compression. The prefix is then reinserted
+// further down at depth in the tree.
 func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool) {
 	ip := pfx.Addr()
 	bits := pfx.Bits()
@@ -79,6 +90,7 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 	lastOctet := octets[lastOctetIdx]
 	lastOctetBits := bits - (lastOctetIdx * strideLen)
 
+	// take the desired octets from prefix, starting at depth
 	for i := depth; i < lastOctetIdx; i++ {
 		addr := uint(octets[i])
 
