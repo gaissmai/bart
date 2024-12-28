@@ -30,8 +30,12 @@ import (
 // Table is an IPv4 and IPv6 routing table with payload V.
 // The zero value is ready to use.
 //
-// The Table is safe for concurrent readers but not for
-// concurrent readers and writers.
+// The Table is safe for concurrent readers but not for concurrent readers
+// and/or writers.
+//
+// The Table can be set in path compression mode, which reduces memory
+// consumption by almost an order of magnitude for IPv6 routes.
+// However, insertions become more time-consuming, while lookup times remain fast.
 type Table[V any] struct {
 	// the root nodes, implemented as popcount compressed multibit tries
 	root4 node[V]
