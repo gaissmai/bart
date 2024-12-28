@@ -96,16 +96,14 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) func(yield func(netip.Prefix, V) 
 
 // Subnets returns an iterator over all CIDRs covered by pfx.
 // The iteration is in natural CIDR sort order.
-// TODO, path compression not yet implemented for this method.
 func (t *Table[V]) Subnets(pfx netip.Prefix) func(yield func(netip.Prefix, V) bool) {
-	if t.pathCompressed {
-		panic("TODO, path compression not yet implemented for this method")
-	}
-
 	return func(yield func(netip.Prefix, V) bool) {
 		if !pfx.IsValid() {
 			return
 		}
+
+		// canonicalize the prefix
+		pfx = pfx.Masked()
 
 		// values derived from pfx
 		ip := pfx.Addr()
@@ -114,38 +112,48 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) func(yield func(netip.Prefix, V) bo
 
 		n := t.rootNodeByVersion(is4)
 
-		// do not allocate
 		path := ip.As16()
-
 		octets := path[:]
 		if is4 {
 			octets = octets[12:]
 		}
-
 		copy(path[:], octets)
 
 		// see comment in Insert()
 		lastOctetIdx := (bits - 1) / strideLen
 		lastOctet := octets[lastOctetIdx]
 		lastOctetBits := bits - (lastOctetIdx * strideLen)
-
-		// mask the prefix
-		lastOctet &= netMask(lastOctetBits)
 		octets[lastOctetIdx] = lastOctet
 
+		var addr uint
 		// find the trie node
 		for i, octet := range octets {
+			addr = uint(octet)
+
+			// already at last octet?
 			if i == lastOctetIdx {
-				_ = n.eachSubnet(path, i, is4, lastOctet, lastOctetBits, yield)
+				_ = n.eachSubnet(pfx, path, i, is4, lastOctet, lastOctetBits, yield)
 				return
 			}
 
-			c, ok := n.children.Get(uint(octet))
-			if !ok {
-				break
+			// check path compressed prefix at this slot
+			if n.pathcomp != nil && n.pathcomp.Test(addr) {
+				pc := n.pathcomp.MustGet(addr)
+				if pfx.Overlaps(pc.prefix) && pfx.Bits() <= pc.prefix.Bits() {
+					if !yield(pc.prefix, pc.value) {
+						return
+					}
+				}
 			}
 
-			n = c
+			// descend down to next level in tight loop
+			if n.children.Test(addr) {
+				n = n.children.MustGet(addr)
+				continue
+			}
+
+			// end of trie along this octets path
+			break
 		}
 	}
 }

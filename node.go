@@ -217,6 +217,7 @@ func (n *node[V]) eachLookupPrefix(
 
 // eachSubnet calls yield() for any covered CIDR by parent prefix in natural CIDR sort order.
 func (n *node[V]) eachSubnet(
+	pfx netip.Prefix,
 	path [16]byte,
 	depth int,
 	is4 bool,
@@ -239,7 +240,7 @@ func (n *node[V]) eachSubnet(
 			break
 		}
 
-		// idx is covered by prefix
+		// idx is covered by prefix?
 		thisOctet, thisPfxLen := idxToPfx(idx)
 
 		thisFirstAddr := uint(thisOctet)
@@ -255,11 +256,42 @@ func (n *node[V]) eachSubnet(
 	// sort indices in CIDR sort order
 	slices.SortFunc(allCoveredIndices, cmpIndexRank)
 
+	// ################################################################
+	// 2. collect all path compressed prefixes in n covered by prefix
+	// ################################################################
+
+	allCoveredPathCompSet := []bool{}
+	if n.pathcomp != nil {
+		allCoveredPathCompSet = make([]bool, maxNodeChildren)
+
+		var addr uint
+		for {
+			if addr, ok = n.pathcomp.NextSet(addr); !ok {
+				break
+			}
+
+			// pathcomp addrs are sorted in indexRank order
+			if addr > pfxLastAddr {
+				break
+			}
+
+			if addr >= pfxFirstAddr {
+				pc := n.pathcomp.MustGet(addr)
+				if pfx.Overlaps(pc.prefix) && pfx.Bits() <= pc.prefix.Bits() {
+					// pfx covers path compressed prefix
+					allCoveredPathCompSet[addr] = true
+				}
+			}
+
+			addr++
+		}
+	}
+
 	// ###############################################################
-	// 2. collect all children in n covered by prefix
+	// 3. collect all children in n covered by prefix
 	// ###############################################################
 
-	allCoveredAddrs := make([]uint, 0, maxNodeChildren)
+	allCoveredChildSet := make([]bool, maxNodeChildren)
 
 	var addr uint
 
@@ -274,72 +306,73 @@ func (n *node[V]) eachSubnet(
 		}
 
 		if addr >= pfxFirstAddr {
-			allCoveredAddrs = append(allCoveredAddrs, addr)
+			allCoveredChildSet[addr] = true
 		}
 
 		addr++
 	}
 
-	cursor := 0
+	// #########################################################################
+	// 4. yield covered indices, pathcomp prefixes and childs in CIDR sort order
+	// #########################################################################
 
-	// #####################################################
-	// 3. yield indices and childs in CIDR sort order
-	// #####################################################
+	// yield indices, pathcomp prefixes and childs in CIDR sort order
+	var lower, upper uint
 
 	for _, idx := range allCoveredIndices {
-		thisOctet, _ := idxToPfx(idx)
+		pfxAddr, _ := idxToPfx(idx)
+		upper = uint(pfxAddr)
 
-		// yield all childs before idx
-		for j := cursor; j < len(allCoveredAddrs); j++ {
-			addr = allCoveredAddrs[j]
+		// for all pathcomp and child items < pfxAddr
+		for addr := lower; addr < upper; addr++ {
+			// either pathcomp or children match this addr, but not possible for both
 
-			// yield prefix
-			if addr >= uint(thisOctet) {
-				break
+			if n.pathcomp != nil && allCoveredPathCompSet[addr] {
+				pc := n.pathcomp.MustGet(addr)
+				if !yield(pc.prefix, pc.value) {
+					return false
+				}
 			}
 
-			// yield child
-
-			octet = byte(addr)
-			c, _ := n.children.Get(uint(octet))
-
-			// add (set) this octet to path
-			path[depth] = octet
-
-			// all cidrs under this child are covered by pfx
-			if !c.allRecSorted(path, depth+1, is4, yield) {
-				// early exit
-				return false
+			if allCoveredChildSet[addr] {
+				// yield this child rec-descent, if matched
+				c := n.children.MustGet(addr)
+				path[depth] = byte(addr)
+				if !c.allRecSorted(path, depth+1, is4, yield) {
+					return false
+				}
 			}
-
-			cursor++
 		}
 
 		// yield the prefix for this idx
 		cidr, _ := cidrFromPath(path, depth, is4, idx)
 		if !yield(cidr, n.prefixes.MustGet(idx)) {
-			// early exit
 			return false
 		}
+
+		// forward lower bound for next round
+		lower = upper
 	}
 
-	// ###############################################
-	// 4. yield the rest of childs, if any
-	// ###############################################
+	// #####################################################
+	// 5. yield the rest of pathcomp and child items, if any
+	// #####################################################
 
-	for j := cursor; j < len(allCoveredAddrs); j++ {
-		addr = allCoveredAddrs[j]
+	// yield the rest of pathcomp and child items, if any
+	for addr := lower; addr < maxNodeChildren; addr++ {
+		if n.pathcomp != nil && allCoveredPathCompSet[addr] {
+			pc := n.pathcomp.MustGet(addr)
+			if !yield(pc.prefix, pc.value) {
+				return false
+			}
+		}
 
-		octet = byte(addr)
-		c, _ := n.children.Get(uint(octet))
-
-		// add (set) this octet to path
-		path[depth] = octet
-
-		// all cidrs under this child are covered by pfx
-		if !c.allRecSorted(path, depth+1, is4, yield) {
-			// early exit
-			return false
+		if allCoveredChildSet[addr] {
+			c := n.children.MustGet(addr)
+			path[depth] = byte(addr)
+			if !c.allRecSorted(path, depth+1, is4, yield) {
+				return false
+			}
 		}
 	}
 
