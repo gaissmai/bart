@@ -9,16 +9,14 @@ import (
 
 // Supernets returns an iterator over all CIDRs covering pfx.
 // The iteration is in reverse CIDR sort order, from longest-prefix-match to shortest-prefix-match.
-// TODO, path compression not yet implemented for this method.
 func (t *Table[V]) Supernets(pfx netip.Prefix) func(yield func(netip.Prefix, V) bool) {
-	if t.pathCompressed {
-		panic("TODO, path compression not yet implemented for this method")
-	}
-
 	return func(yield func(netip.Prefix, V) bool) {
 		if !pfx.IsValid() {
 			return
 		}
+
+		// canonicalize the prefix
+		pfx = pfx.Masked()
 
 		// values derived from pfx
 		ip := pfx.Addr()
@@ -42,9 +40,6 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) func(yield func(netip.Prefix, V) 
 		lastOctetIdx := (bits - 1) / strideLen
 		lastOctet := octets[lastOctetIdx]
 		lastOctetBits := bits - (lastOctetIdx * strideLen)
-
-		// mask the prefix
-		lastOctet &= netMask(lastOctetBits)
 		octets[lastOctetIdx] = lastOctet
 
 		// stack of the traversed nodes for reverse ordering of supernets
@@ -54,8 +49,9 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) func(yield func(netip.Prefix, V) 
 		var i int
 		var ok bool
 		var octet byte
+		var addr uint
 
-		// find last node
+		// find last node along this octet path
 		for i, octet = range octets[:lastOctetIdx+1] {
 			// push current node on stack
 			stack[i] = n
@@ -69,6 +65,19 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) func(yield func(netip.Prefix, V) 
 		// start backtracking, unwind the stack
 		for depth := i; depth >= 0; depth-- {
 			n = stack[depth]
+			octet = octets[depth]
+			addr = uint(octet)
+
+			// first check path compressed prefix at this level
+			if t.pathCompressed && n.pathcomp.Test(addr) {
+				pc := n.pathcomp.MustGet(addr)
+				if pc.prefix.Overlaps(pfx) && pc.prefix.Bits() <= pfx.Bits() {
+					if !yield(pc.prefix, pc.value) {
+						// early exit
+						return
+					}
+				}
+			}
 
 			// microbenchmarking
 			if n.prefixes.Len() == 0 {
@@ -76,17 +85,12 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) func(yield func(netip.Prefix, V) 
 			}
 
 			// only the lastOctet may have a different prefix len
-			if depth == lastOctetIdx {
-				if !n.eachLookupPrefix(path, depth, is4, lastOctet, lastOctetBits, yield) {
-					// early exit
-					return
-				}
-
-				continue
-			}
-
 			// all others are just host routes
-			if !n.eachLookupPrefix(path, depth, is4, octets[depth], strideLen, yield) {
+			pfxLen := strideLen
+			if depth == lastOctetIdx {
+				pfxLen = lastOctetBits
+			}
+			if !n.eachLookupPrefix(path, depth, is4, octet, pfxLen, yield) {
 				// early exit
 				return
 			}

@@ -124,6 +124,19 @@ func (t *goldTable[V]) subnets(pfx netip.Prefix) []netip.Prefix {
 	return result
 }
 
+func (t *goldTable[V]) supernets(pfx netip.Prefix) []netip.Prefix {
+	var result []netip.Prefix
+
+	for _, item := range *t {
+		if item.pfx.Overlaps(pfx) && item.pfx.Bits() <= pfx.Bits() {
+			result = append(result, item.pfx)
+		}
+	}
+	slices.SortFunc(result, cmpPrefix)
+	slices.Reverse(result)
+	return result
+}
+
 func (t *goldTable[V]) overlapsPrefix(pfx netip.Prefix) bool {
 	for _, p := range *t {
 		if p.pfx.Overlaps(pfx) {

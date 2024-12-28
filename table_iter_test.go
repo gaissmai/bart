@@ -7,7 +7,6 @@ package bart
 
 import (
 	"net/netip"
-	"reflect"
 	"slices"
 	"testing"
 )
@@ -318,57 +317,148 @@ func TestAllSortedRangeOverFunc(t *testing.T) {
 	})
 }
 
-func TestSupernets(t *testing.T) {
+func TestSupernetsEdgeCase(t *testing.T) {
 	t.Parallel()
 
-	pfxs := randomPrefixes(10_000)
+	var zeroPfx netip.Prefix
 
-	fast := Table[int]{}
-	gold := goldTable[int](pfxs)
+	t.Run("empty table", func(t *testing.T) {
+		rtbl := new(Table[any])
+		pfx := mpp("::1/128")
 
-	for _, pfx := range pfxs {
-		fast.Insert(pfx.pfx, pfx.val)
+		rtbl.Supernets(pfx)(func(_ netip.Prefix, _ any) bool {
+			t.Errorf("empty table, must not range over")
+			return false
+		})
+	})
+
+	t.Run("invalid prefix", func(t *testing.T) {
+		rtbl := new(Table[any])
+		pfx := mpp("::1/128")
+		val := "foo"
+		rtbl.Insert(pfx, val)
+
+		rtbl.Supernets(zeroPfx)(func(_ netip.Prefix, _ any) bool {
+			t.Errorf("invalid prefix, must not range over")
+			return false
+		})
+	})
+
+	t.Run("identity", func(t *testing.T) {
+		rtbl := new(Table[string])
+		pfx := mpp("::1/128")
+		val := "foo"
+		rtbl.Insert(pfx, val)
+
+		for p, v := range rtbl.Supernets(pfx) {
+			if p != pfx {
+				t.Errorf("Supernets(%v), got: %v, want: %v", pfx, p, pfx)
+			}
+
+			if v != val {
+				t.Errorf("Supernets(%v), got: %v, want: %v", pfx, v, val)
+			}
+		}
+	})
+}
+
+func TestSupernetsEdgeCasePC(t *testing.T) {
+	t.Parallel()
+
+	var zeroPfx netip.Prefix
+
+	t.Run("empty table", func(t *testing.T) {
+		rtbl := new(Table[any]).WithPathCompression()
+		pfx := mpp("::1/128")
+
+		rtbl.Supernets(pfx)(func(_ netip.Prefix, _ any) bool {
+			t.Errorf("empty table, must not range over")
+			return false
+		})
+	})
+
+	t.Run("invalid prefix", func(t *testing.T) {
+		rtbl := new(Table[any]).WithPathCompression()
+		pfx := mpp("::1/128")
+		val := "foo"
+		rtbl.Insert(pfx, val)
+
+		rtbl.Supernets(zeroPfx)(func(_ netip.Prefix, _ any) bool {
+			t.Errorf("invalid prefix, must not range over")
+			return false
+		})
+	})
+
+	t.Run("identity", func(t *testing.T) {
+		rtbl := new(Table[string]).WithPathCompression()
+		pfx := mpp("::1/128")
+		val := "foo"
+		rtbl.Insert(pfx, val)
+
+		for p, v := range rtbl.Supernets(pfx) {
+			if p != pfx {
+				t.Errorf("Supernets(%v), got: %v, want: %v", pfx, p, pfx)
+			}
+
+			if v != val {
+				t.Errorf("Supernets(%v), got: %v, want: %v", pfx, v, val)
+			}
+		}
+	})
+}
+
+func TestSupernetsCompare(t *testing.T) {
+	t.Parallel()
+
+	pfxs := gimmeRandomPrefixes(10_000)
+
+	fast := new(Table[int])
+	gold := goldTable[int]{}
+
+	for i, pfx := range pfxs {
+		fast.Insert(pfx, i)
+		gold.insert(pfx, i)
 	}
 
-	var fastPfxs []netip.Prefix
-	for range 10_000 {
-		pfx := randomPrefix()
+	tests := randomPrefixes(200)
+	for _, tt := range tests {
+		gotGold := gold.supernets(tt.pfx)
+		gotFast := []netip.Prefix{}
 
-		goldPfxs := gold.lookupPrefixReverse(pfx)
-
-		fastPfxs = nil
-		for p := range fast.Supernets(pfx) {
-			fastPfxs = append(fastPfxs, p)
+		for p := range fast.Supernets(tt.pfx) {
+			gotFast = append(gotFast, p)
 		}
 
-		if !reflect.DeepEqual(goldPfxs, fastPfxs) {
-			t.Fatalf("\nEachSupernet(%q):\ngot:  %v\nwant: %v", pfx, fastPfxs, goldPfxs)
+		if !slices.Equal(gotGold, gotFast) {
+			t.Fatalf("Supernets(%q) = %v, want %v", tt.pfx, gotFast, gotGold)
 		}
 	}
 }
 
-func TestSupernetsEdgeCase(t *testing.T) {
+func TestSupernetsComparePC(t *testing.T) {
 	t.Parallel()
 
-	rtbl := new(Table[any])
-	pfx := mpp("::1/128")
-	for range rtbl.Supernets(pfx) {
-		t.Errorf("empty table, must not range over")
+	pfxs := gimmeRandomPrefixes(10_000)
+
+	fast := new(Table[int]).WithPathCompression()
+	gold := goldTable[int]{}
+
+	for i, pfx := range pfxs {
+		fast.Insert(pfx, i)
+		gold.insert(pfx, i)
 	}
 
-	val := "foo"
-	rtbl.Insert(pfx, val)
-	for range rtbl.Supernets(netip.Prefix{}) {
-		t.Errorf("invalid prefix, must not range over")
-	}
+	tests := randomPrefixes(200)
+	for _, tt := range tests {
+		gotGold := gold.supernets(tt.pfx)
+		gotFast := []netip.Prefix{}
 
-	for p, v := range rtbl.Supernets(pfx) {
-		if p != pfx {
-			t.Errorf("Supernets(%v), got: %v, want: %v", pfx, p, pfx)
+		for p := range fast.Supernets(tt.pfx) {
+			gotFast = append(gotFast, p)
 		}
 
-		if v.(string) != val {
-			t.Errorf("Supernets(%v), got: %v, want: %v", pfx, v.(string), val)
+		if !slices.Equal(gotGold, gotFast) {
+			t.Fatalf("Supernets(%q) = %v, want %v", tt.pfx, gotFast, gotGold)
 		}
 	}
 }
@@ -577,6 +667,7 @@ func TestSubnetsComparePC(t *testing.T) {
 	}
 }
 
+//nolint:unused
 func (t *goldTable[V]) lookupPrefixReverse(pfx netip.Prefix) []netip.Prefix {
 	var result []netip.Prefix
 
