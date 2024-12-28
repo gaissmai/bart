@@ -38,34 +38,46 @@ func TestStringEmpty(t *testing.T) {
 
 func TestStringDefaultRouteV4(t *testing.T) {
 	t.Parallel()
-	tbl := new(Table[any])
-	checkString(t, tbl, stringTest{
+
+	tt := stringTest{
 		cidrs: []netip.Prefix{
 			mpp("0.0.0.0/0"),
 		},
 		want: `▼
 └─ 0.0.0.0/0 (<nil>)
 `,
-	})
+	}
+
+	tbl := new(Table[any])
+	checkString(t, tbl, tt)
+
+	tbl = new(Table[any]).WithPathCompression()
+	checkString(t, tbl, tt)
 }
 
 func TestStringDefaultRouteV6(t *testing.T) {
 	t.Parallel()
-	tbl := new(Table[any])
-	checkString(t, tbl, stringTest{
+
+	tt := stringTest{
 		cidrs: []netip.Prefix{
 			mpp("::/0"),
 		},
 		want: `▼
 └─ ::/0 (<nil>)
 `,
-	})
+	}
+
+	tbl := new(Table[any])
+	checkString(t, tbl, tt)
+
+	tbl = new(Table[any]).WithPathCompression()
+	checkString(t, tbl, tt)
 }
 
 func TestStringSampleV4(t *testing.T) {
 	t.Parallel()
-	tbl := new(Table[any])
-	checkString(t, tbl, stringTest{
+
+	tt := stringTest{
 		cidrs: []netip.Prefix{
 			mpp("172.16.0.0/12"),
 			mpp("10.0.0.0/24"),
@@ -88,13 +100,18 @@ func TestStringSampleV4(t *testing.T) {
 └─ 192.168.0.0/16 (<nil>)
    └─ 192.168.1.0/24 (<nil>)
 `,
-	})
+	}
+
+	tbl := new(Table[any])
+	checkString(t, tbl, tt)
+
+	tbl = new(Table[any]).WithPathCompression()
+	checkString(t, tbl, tt)
 }
 
 func TestStringSampleV6(t *testing.T) {
 	t.Parallel()
-	tbl := new(Table[any])
-	checkString(t, tbl, stringTest{
+	tt := stringTest{
 		cidrs: []netip.Prefix{
 			mpp("fe80::/10"),
 			mpp("::1/128"),
@@ -107,13 +124,19 @@ func TestStringSampleV6(t *testing.T) {
 │  └─ 2001:db8::/32 (<nil>)
 └─ fe80::/10 (<nil>)
 `,
-	})
+	}
+
+	tbl := new(Table[any])
+	checkString(t, tbl, tt)
+
+	tbl = new(Table[any]).WithPathCompression()
+	checkString(t, tbl, tt)
 }
 
 func TestStringSample(t *testing.T) {
 	t.Parallel()
-	tbl := new(Table[any])
-	checkString(t, tbl, stringTest{
+
+	tt := stringTest{
 		cidrs: []netip.Prefix{
 			mpp("fe80::/10"),
 			mpp("172.16.0.0/12"),
@@ -147,7 +170,13 @@ func TestStringSample(t *testing.T) {
    │  └─ 2001:db8::/32 (<nil>)
    └─ fe80::/10 (<nil>)
 `,
-	})
+	}
+
+	tbl := new(Table[any])
+	checkString(t, tbl, tt)
+
+	tbl = new(Table[any]).WithPathCompression()
+	checkString(t, tbl, tt)
 }
 
 func checkString(t *testing.T, tbl *Table[any], tt stringTest) {
