@@ -48,6 +48,12 @@ The API has changed in ..., v0.10.1, v0.11.0, v0.12.0, v0.12.6, v0.16.0
     The Table is safe for concurrent readers but not for concurrent readers
     and/or writers.
 
+    The Table can be set in path compression mode, which reduces memory
+    consumption by almost an order of magnitude for IPv6 routes.
+    However, insertions become more time-consuming, while lookup times remain fast.
+
+  func (t *Table[V]) WithPathCompression() *Table[V]
+
   func (t *Table[V]) Insert(pfx netip.Prefix, val V)
   func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V)
   func (t *Table[V]) Delete(pfx netip.Prefix)
