@@ -202,11 +202,11 @@ func (n *node[V]) eachLookupPrefix(
 ) bool {
 	// backtracking the CBT
 	for idx := pfxToIdx(octet, pfxLen); idx > 0; idx >>= 1 {
-		if val, ok := n.prefixes.Get(idx); ok {
+		if n.prefixes.Test(idx) {
+			val := n.prefixes.MustGet(idx)
 			cidr, _ := cidrFromPath(path, depth, is4, idx)
 
 			if !yield(cidr, val) {
-				// early exit
 				return false
 			}
 		}
