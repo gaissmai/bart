@@ -95,19 +95,20 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 		addr := uint(octets[i])
 
 		// descend down to next trie level
-		if c, ok := n.children.Get(addr); ok {
-			n = c
+		if n.children.Test(addr) {
+			n = n.children.MustGet(addr)
 			continue
 		}
 
 		// no child found, look for path compressed item in slot
-		pc, ok := n.pathcomp.Get(addr)
-		if !ok {
+
+		if !n.pathcomp.Test(addr) {
 			// insert prefix path compressed
 			return n.pathcomp.InsertAt(addr, &pathItem[V]{pfx, val})
 		}
 
 		// pathcomp slot is already occupied
+		pc := n.pathcomp.MustGet(addr)
 
 		// override prefix in slot if equal
 		if pc.prefix == pfx {
@@ -127,6 +128,8 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 
 		// shuffle down
 		_ = n.insertAtDepth(pc.prefix, pc.value, depth+1)
+
+		// rec-descent monster ...
 		return n.insertAtDepth(pfx, val, depth+1)
 	}
 
