@@ -141,7 +141,7 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) func(yield func(netip.Prefix, V) bo
 			}
 
 			// check path compressed prefix at this slot
-			if n.pathcomp != nil && n.pathcomp.Test(addr) {
+			if n.pathcomp.Test(addr) {
 				pc := n.pathcomp.MustGet(addr)
 				if pfx.Overlaps(pc.prefix) && pfx.Bits() <= pc.prefix.Bits() {
 					if !yield(pc.prefix, pc.value) {

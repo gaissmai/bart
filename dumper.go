@@ -114,21 +114,19 @@ func (n *node[V]) dump(w io.Writer, path [16]byte, depth int, is4 bool) {
 		fmt.Fprintln(w)
 	}
 
-	if n.pathcomp != nil {
-		if pathcompCount := n.pathcomp.Len(); pathcompCount != 0 {
-			// print the pathcomp prefixes for this node
-			fmt.Fprintf(w, "%spathcp(#%d):", indent, pathcompCount)
+	if pathcompCount := n.pathcomp.Len(); pathcompCount != 0 {
+		// print the pathcomp prefixes for this node
+		fmt.Fprintf(w, "%spathcp(#%d):", indent, pathcompCount)
 
-			// no heap allocs
-			allPathComps := n.pathcomp.AsSlice(make([]uint, 0, maxNodeChildren))
+		// no heap allocs
+		allPathComps := n.pathcomp.AsSlice(make([]uint, 0, maxNodeChildren))
 
-			for i, addr := range allPathComps {
-				pc := n.pathcomp.Items[i]
-				fmt.Fprintf(w, " %d:[%s, %v]", addr, pc.prefix, pc.value)
-			}
-
-			fmt.Fprintln(w)
+		for i, addr := range allPathComps {
+			pc := n.pathcomp.Items[i]
+			fmt.Fprintf(w, " %d:[%s, %v]", addr, pc.prefix, pc.value)
 		}
+
+		fmt.Fprintln(w)
 	}
 }
 
@@ -193,11 +191,7 @@ func (nt nodeType) String() string {
 func (n *node[V]) hasType() nodeType {
 	prefixCount := n.prefixes.Len()
 	childCount := n.children.Len()
-
-	pathcompCount := 0
-	if n.pathcomp != nil {
-		pathcompCount = n.pathcomp.Len()
-	}
+	pathcompCount := n.pathcomp.Len()
 
 	switch {
 	case prefixCount == 0 && childCount == 0 && pathcompCount == 0:

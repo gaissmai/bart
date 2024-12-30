@@ -23,8 +23,6 @@ package bart
 
 import (
 	"net/netip"
-
-	"github.com/gaissmai/bart/internal/sparse"
 )
 
 // Table is an IPv4 and IPv6 routing table with payload V.
@@ -64,8 +62,8 @@ func (t *Table[V]) WithPathCompression() *Table[V] {
 	t.pathCompressed = true
 
 	// init pathcomp data structure in root nodes
-	t.root4.pathcomp = &sparse.Array[*pathItem[V]]{}
-	t.root6.pathcomp = &sparse.Array[*pathItem[V]]{}
+	// t.root4.pathcomp = &sparse.Array[*pathItem[V]]{}
+	// t.root6.pathcomp = &sparse.Array[*pathItem[V]]{}
 
 	return t
 }
@@ -152,7 +150,7 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 		}
 
 		// create and insert missing intermediate child
-		c := n.newNode()
+		c := new(node[V])
 		n.children.InsertAt(addr, c)
 		n = c
 	}
@@ -223,7 +221,7 @@ func (t *Table[V]) insertPC(pfx netip.Prefix, val V) {
 		// loop to next octet
 		n.pathcomp.DeleteAt(addr)
 
-		c := n.newNode()
+		c := new(node[V])
 		n.children.InsertAt(addr, c)
 		n = c
 
@@ -285,7 +283,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 		}
 
 		// create and insert missing intermediate child
-		c := n.newNode()
+		c := new(node[V])
 		n.children.InsertAt(addr, c)
 		n = c
 	}
@@ -370,7 +368,7 @@ func (t *Table[V]) updatePC(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal
 		// loop to next octet
 		n.pathcomp.DeleteAt(addr)
 
-		c := n.newNode()
+		c := new(node[V])
 		n.children.InsertAt(addr, c)
 
 		n = c
