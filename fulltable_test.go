@@ -69,22 +69,6 @@ func BenchmarkFullTableInsert(b *testing.B) {
 		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
 		b.ReportMetric(float64(rt.Size())/float64(rt.nodes()), "Prefix/Node")
 	})
-
-	runtime.GC()
-	runtime.ReadMemStats(&startMem)
-	b.ResetTimer()
-	b.Run("Insert", func(b *testing.B) {
-		for range b.N {
-			for _, route := range routes {
-				rt.Insert(route.CIDR, struct{}{})
-			}
-		}
-		runtime.GC()
-		runtime.ReadMemStats(&endMem)
-
-		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
-		b.ReportMetric(float64(rt.Size())/float64(rt.nodes()), "Prefix/Node")
-	})
 }
 
 func BenchmarkFullMatchV4(b *testing.B) {
@@ -353,13 +337,10 @@ func BenchmarkFullTableOverlaps(b *testing.B) {
 }
 
 func BenchmarkFullTableClone(b *testing.B) {
-	var rt4 Table[int]
-	var rt4PC Table[int]
-	rt4PC.WithPathCompression()
+	var rt4 Table2[int]
 
 	for i, route := range routes4 {
 		rt4.Insert(route.CIDR, i)
-		rt4PC.Insert(route.CIDR, i)
 	}
 
 	b.ResetTimer()
@@ -369,20 +350,10 @@ func BenchmarkFullTableClone(b *testing.B) {
 		}
 	})
 
-	b.ResetTimer()
-	b.Run("CloneIP4PC", func(b *testing.B) {
-		for range b.N {
-			_ = rt4PC.Clone()
-		}
-	})
-
 	var rt6 Table[int]
-	var rt6PC Table[int]
-	rt6PC.WithPathCompression()
 
 	for i, route := range routes6 {
 		rt6.Insert(route.CIDR, i)
-		rt6PC.Insert(route.CIDR, i)
 	}
 
 	b.ResetTimer()
@@ -392,20 +363,10 @@ func BenchmarkFullTableClone(b *testing.B) {
 		}
 	})
 
-	b.ResetTimer()
-	b.Run("CloneIP6PC", func(b *testing.B) {
-		for range b.N {
-			_ = rt6PC.Clone()
-		}
-	})
-
-	var rt Table[int]
-	var rtPC Table[int]
-	rtPC.WithPathCompression()
+	var rt Table2[int]
 
 	for i, route := range routes {
 		rt.Insert(route.CIDR, i)
-		rtPC.Insert(route.CIDR, i)
 	}
 
 	b.ResetTimer()
@@ -414,19 +375,12 @@ func BenchmarkFullTableClone(b *testing.B) {
 			_ = rt.Clone()
 		}
 	})
-
-	b.ResetTimer()
-	b.Run("ClonePC", func(b *testing.B) {
-		for range b.N {
-			_ = rtPC.Clone()
-		}
-	})
 }
 
 func BenchmarkFullTableMemoryV4(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 
-	rt := new(Table[struct{}])
+	rt := new(Table2[struct{}])
 	runtime.GC()
 	runtime.ReadMemStats(&startMem)
 
@@ -449,7 +403,7 @@ func BenchmarkFullTableMemoryV4(b *testing.B) {
 func BenchmarkFullTableMemoryV6(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 
-	rt := new(Table[struct{}])
+	rt := new(Table2[struct{}])
 	runtime.GC()
 	runtime.ReadMemStats(&startMem)
 
@@ -470,75 +424,6 @@ func BenchmarkFullTableMemoryV6(b *testing.B) {
 }
 
 func BenchmarkFullTableMemory(b *testing.B) {
-	var startMem, endMem runtime.MemStats
-
-	rt := new(Table[struct{}])
-	runtime.GC()
-	runtime.ReadMemStats(&startMem)
-
-	b.Run(strconv.Itoa(len(routes)), func(b *testing.B) {
-		for range b.N {
-			for _, route := range routes {
-				rt.Insert(route.CIDR, struct{}{})
-			}
-		}
-
-		runtime.GC()
-		runtime.ReadMemStats(&endMem)
-
-		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
-		b.ReportMetric(float64(rt.Size())/float64(rt.nodes()), "Prefix/Node")
-		b.ReportMetric(0, "ns/op")
-	})
-}
-
-func BenchmarkFullTableMemoryV4PC(b *testing.B) {
-	var startMem, endMem runtime.MemStats
-
-	rt := new(Table2[struct{}])
-	runtime.GC()
-	runtime.ReadMemStats(&startMem)
-
-	b.Run(strconv.Itoa(len(routes4)), func(b *testing.B) {
-		for range b.N {
-			for _, route := range routes4 {
-				rt.Insert(route.CIDR, struct{}{})
-			}
-		}
-
-		runtime.GC()
-		runtime.ReadMemStats(&endMem)
-
-		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
-		b.ReportMetric(float64(rt.Size())/float64(rt.nodes()), "Prefix/Node")
-		b.ReportMetric(0, "ns/op")
-	})
-}
-
-func BenchmarkFullTableMemoryV6PC(b *testing.B) {
-	var startMem, endMem runtime.MemStats
-
-	rt := new(Table2[struct{}])
-	runtime.GC()
-	runtime.ReadMemStats(&startMem)
-
-	b.Run(strconv.Itoa(len(routes6)), func(b *testing.B) {
-		for range b.N {
-			for _, route := range routes6 {
-				rt.Insert(route.CIDR, struct{}{})
-			}
-		}
-
-		runtime.GC()
-		runtime.ReadMemStats(&endMem)
-
-		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
-		b.ReportMetric(float64(rt.Size())/float64(rt.nodes()), "Prefix/Node")
-		b.ReportMetric(0, "ns/op")
-	})
-}
-
-func BenchmarkFullTableMemoryPC(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 
 	rt := new(Table2[struct{}])
