@@ -28,12 +28,14 @@ func (t *Table2[V]) dump(w io.Writer) {
 	}
 
 	if t.Size4() > 0 {
-		fmt.Fprintf(w, "### IPv4: size(%d)", t.Size4())
+		fmt.Fprintln(w)
+		fmt.Fprintf(w, "### IPv4: size(%d), nodes(%d)", t.Size4(), t.nodes4())
 		t.root4.dumpRec(w, zeroPath, 0, true)
 	}
 
 	if t.Size6() > 0 {
-		fmt.Fprintf(w, "### IPv6: size(%d)", t.Size6())
+		fmt.Fprintln(w)
+		fmt.Fprintf(w, "### IPv6: size(%d), nodes(%d)", t.Size6(), t.nodes6())
 		t.root6.dumpRec(w, zeroPath, 0, false)
 	}
 }
@@ -142,19 +144,19 @@ func (n *node2[V]) dump(w io.Writer, path [16]byte, depth int, is4 bool) {
 func (n *node2[V]) hasType() nodeType {
 	prefixCount := n.prefixes.Len()
 	childCount := n.children.Len()
+	nodeCount, leafCount := n.nodeAndLeafCount()
 
 	switch {
 	case prefixCount == 0 && childCount == 0:
 		return nullNode
-	case prefixCount != 0 && childCount != 0:
-		return fullNode
-	case prefixCount == 0 && childCount != 0:
-		return intermediateNode
-	case prefixCount == 0 && childCount != 0:
-		return intermediatePCNode
-	case childCount == 0:
+	case nodeCount == 0:
 		return leafNode
+	case (prefixCount > 0 || leafCount > 0) && nodeCount > 0:
+		return fullNode
+	case (prefixCount == 0 && leafCount == 0) && nodeCount > 0:
+		return intermediateNode
 	default:
-		panic(fmt.Sprintf("UNREACHABLE: pfx: %d, chld: %d", prefixCount, childCount))
+		panic(fmt.Sprintf("UNREACHABLE: pfx: %d, chld: %d, node: %d, leaf: %d",
+			prefixCount, childCount, nodeCount, leafCount))
 	}
 }
