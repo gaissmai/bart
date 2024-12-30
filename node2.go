@@ -43,8 +43,21 @@ func (n *node2[V]) isEmpty() bool {
 	return n.prefixes.Len() == 0 && n.children.Len() == 0
 }
 
-// nodeAndLeafCount, calculate the number of nodes and leaves under n, rec-descent.
-func (n *node2[V]) nodeAndLeafCount() (int, int) {
+// nodeAndLeafCount
+func (n *node2[V]) nodeAndLeafCount() (nodes int, leaves int) {
+	for i := range n.children.AsSlice(make([]uint, 0, maxNodeChildren)) {
+		switch n.children.Items[i].(type) {
+		case *node2[V]:
+			nodes++
+		case *leaf[V]:
+			leaves++
+		}
+	}
+	return
+}
+
+// nodeAndLeafCountRec, calculate the number of nodes and leaves under n, rec-descent.
+func (n *node2[V]) nodeAndLeafCountRec() (int, int) {
 	if n == nil || n.isEmpty() {
 		return 0, 0
 	}
@@ -56,7 +69,7 @@ func (n *node2[V]) nodeAndLeafCount() (int, int) {
 		switch k := c.(type) {
 		case *node2[V]:
 			// rec-descent
-			ns, ls := k.nodeAndLeafCount()
+			ns, ls := k.nodeAndLeafCountRec()
 			nodes += ns
 			leaves += ls
 		case *leaf[V]:

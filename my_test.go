@@ -5,20 +5,6 @@ import (
 	"testing"
 )
 
-// count the nodes and leaves
-func (t *Table2[V]) nodeAndLeafCount() (int, int) {
-	n4, l4 := t.root4.nodeAndLeafCount()
-	n6, l6 := t.root6.nodeAndLeafCount()
-	return n4 + n6, l4 + l6
-}
-
-// nodes, count the nodes
-func (t *Table2[V]) nodes() int {
-	n4, _ := t.root4.nodeAndLeafCount()
-	n6, _ := t.root6.nodeAndLeafCount()
-	return n4 + n6
-}
-
 func BenchmarkFullTableInsertMy(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 

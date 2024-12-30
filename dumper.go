@@ -13,12 +13,11 @@ import (
 type nodeType byte
 
 const (
-	nullNode           nodeType = iota // empty node
-	fullNode                           // prefixes and (children or PC)
-	leafNode                           // no children, only prefixes or PC
-	intermediateNode                   // only children, no prefix nor PC,
-	intermediatePCNode                 // no prefix, only children with PC
-	UNKNOWN                            // logic error
+	nullNode         nodeType = iota // empty node
+	fullNode                         // prefixes and (children or PC)
+	leafNode                         // no children, only prefixes or PC
+	intermediateNode                 // only children, no prefix nor PC,
+	UNKNOWN                          // logic error
 )
 
 // ##################################################
@@ -180,8 +179,6 @@ func (nt nodeType) String() string {
 		return "LEAF"
 	case intermediateNode:
 		return "IMED"
-	case intermediatePCNode:
-		return "IMPC"
 	default:
 		return "unreachable"
 	}
@@ -200,8 +197,6 @@ func (n *node[V]) hasType() nodeType {
 		return fullNode
 	case prefixCount == 0 && pathcompCount == 0 && childCount != 0:
 		return intermediateNode
-	case prefixCount == 0 && pathcompCount != 0 && childCount != 0:
-		return intermediatePCNode
 	case childCount == 0:
 		return leafNode
 	default:
