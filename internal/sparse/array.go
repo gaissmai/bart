@@ -21,6 +21,26 @@ func (s *Array[T]) Len() int {
 	return len(s.Items)
 }
 
+// Clone returns a copy of the Array.
+// The elements are copied using assignment, so this is a shallow clone.
+func (s *Array[T]) Clone() *Array[T] {
+	if s == nil {
+		return nil
+	}
+
+	var items []T
+
+	if s.Items != nil {
+		items = make([]T, cap(s.Items))
+		copy(items, s.Items) // shallow
+	}
+
+	return &Array[T]{
+		s.BitSet.Clone(),
+		items,
+	}
+}
+
 // rank is the key of the popcount compression algorithm,
 // mapping between bitset index and slice index.
 func (s *Array[T]) rank(i uint) int {

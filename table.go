@@ -77,12 +77,6 @@ func (t *Table[V]) rootNodeByVersion(is4 bool) *node[V] {
 	return &t.root6
 }
 
-// Cloner, if implemented by payload of type V the values are deeply copied
-// during [Table.Clone] and [Table.Union].
-type Cloner[V any] interface {
-	Clone() V
-}
-
 // Insert adds pfx to the tree, with given val.
 // If pfx is already present in the tree, its value is set to val.
 func (t *Table[V]) Insert(pfx netip.Prefix, val V) {

@@ -38,6 +38,15 @@ type leaf[V any] struct {
 	value  V
 }
 
+// cloneLeaf returns a copy of the leaf.
+// If the value implements the Cloner interface, the values are deeply copied.
+func (l *leaf[V]) cloneLeaf() *leaf[V] {
+	if l == nil {
+		return nil
+	}
+	return &leaf[V]{l.prefix, cloneValue(l.value)}
+}
+
 // isEmpty returns true if node has neither prefixes nor children
 func (n *node2[V]) isEmpty() bool {
 	return n.prefixes.Len() == 0 && n.children.Len() == 0
@@ -135,7 +144,7 @@ func (n *node2[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists boo
 			}
 
 			// create new node
-			// push leaf down
+			// push the leaf down
 			// insert new child at cureent leaf position (addr)
 			// descend down, replace n with new child
 			c := new(node2[V])
@@ -203,4 +212,37 @@ func (n *node2[V]) lpmTest(idx uint) bool {
 	}
 
 	return false
+}
+
+// cloneRec, clones the node recursive.
+func (n *node2[V]) cloneRec() *node2[V] {
+	c := new(node2[V])
+	if n.isEmpty() {
+		return c
+	}
+
+	// shallow
+	c.prefixes = *(n.prefixes.Clone())
+
+	// deep copy if V implements Cloner[V]
+	for i, v := range c.prefixes.Items {
+		c.prefixes.Items[i] = cloneValue(v)
+	}
+
+	// shallow
+	c.children = *(n.children.Clone())
+
+	// deep copy of nodes and leaves
+	for i, k := range c.children.Items {
+		switch k := k.(type) {
+		case *node2[V]:
+			// clone the child node rec-descent
+			c.children.Items[i] = k.cloneRec()
+		case *leaf[V]:
+			// deep copy if V implements Cloner[V]
+			c.children.Items[i] = k.cloneLeaf()
+		}
+	}
+
+	return c
 }
