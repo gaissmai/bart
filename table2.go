@@ -129,17 +129,12 @@ func (t *Table2[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 	// record path to deleted node
 	stack := [maxTreeDepth]*node2[V]{}
 
-	// run variable as stackPointer, see below
-	var i int
-	var octet byte
-	var addr uint
-
 	// find the trie node
-	for i, octet = range octets[:sigOctetIdx] {
+	for i, octet := range octets[:sigOctetIdx] {
 		// push current node on stack for path recording
 		// needed fur purging nodes after deletion
 		stack[i] = n
-		addr = uint(octet)
+		addr := uint(octet)
 
 		if !n.children.Test(addr) {
 			return zero, false
@@ -151,6 +146,7 @@ func (t *Table2[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 			// descend down to next trie level
 			n = k
 		case *leaf[V]:
+			// reached a path compressed prefix, stop traversing
 			if k.prefix != pfx {
 				return zero, false
 			}
@@ -174,6 +170,54 @@ func (t *Table2[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 	}
 
 	return zero, false
+}
+
+func (t *Table2[V]) Get(pfx netip.Prefix) (val V, ok bool) {
+	var zero V
+
+	if !pfx.IsValid() {
+		return zero, false
+	}
+
+	// values derived from pfx
+	ip := pfx.Addr()
+	is4 := ip.Is4()
+	bits := pfx.Bits()
+
+	n := t.rootNodeByVersion(is4)
+
+	octets := ip.AsSlice()
+	sigOctetIdx := (bits - 1) / strideLen
+	sigOctet := octets[sigOctetIdx]
+	sigOctetBits := bits - (sigOctetIdx * strideLen)
+
+	// mask the prefix
+	sigOctet &= netMask(sigOctetBits)
+	octets[sigOctetIdx] = sigOctet
+
+	// find the trie node
+	for _, octet := range octets[:sigOctetIdx] {
+		addr := uint(octet)
+
+		if !n.children.Test(addr) {
+			return zero, false
+		}
+
+		// get the child: node or leaf
+		switch k := n.children.MustGet(addr).(type) {
+		case *node2[V]:
+			// descend down to next trie level
+			n = k
+		case *leaf[V]:
+			// reached a path compressed prefix, stop traversing
+			if k.prefix == pfx {
+				return k.value, true
+			}
+			return zero, false
+		}
+	}
+
+	return n.prefixes.Get(pfxToIdx(sigOctet, sigOctetBits))
 }
 
 // Contains does a route lookup (longest prefix match, lpm) for IP and
