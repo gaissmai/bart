@@ -16,9 +16,6 @@
 BART is balanced in terms of memory usage and lookup time
 for the longest-prefix match.
 
-The longest-prefix match is on average slower than the ART routing algorithm,
-but reduces memory usage by more than an order of magnitude.
-
 BART is a multibit-trie with fixed stride length of 8 bits,
 using the _baseIndex_ function from the ART algorithm to
 build the complete-binary-tree (CBT) of prefixes for each stride.
@@ -30,7 +27,10 @@ build the complete-binary-tree (CBT) of prefixes for each stride.
 The CBT is implemented as a bitvector, backtracking is just
 a matter of fast cache friendly bitmask operations.
 
-The prefix and child arrays at each stride level are popcount compressed sparse arrays.
+The Table is implemented with popcount compressed sparse arrays
+together with path compression. This reduces storage consumption
+by almost two orders of magnitude in comparison to ART with
+similar lookup times for the longest prefix match.
 
 ## API
 
@@ -47,12 +47,6 @@ The API has changed in ..., v0.10.1, v0.11.0, v0.12.0, v0.12.6, v0.16.0
 
     The Table is safe for concurrent readers but not for concurrent readers
     and/or writers.
-
-    The Table can be set in path compression mode, which reduces memory
-    consumption by almost an order of magnitude for IPv6 routes.
-    However, insertions become more time-consuming, while lookup times remain fast.
-
-  func (t *Table[V]) WithPathCompression() *Table[V]
 
   func (t *Table[V]) Insert(pfx netip.Prefix, val V)
   func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V)
@@ -106,17 +100,16 @@ Please see the extensive [benchmarks](https://github.com/gaissmai/iprbench) comp
 Just a teaser, LPM lookups against the full Internet routing table with random probes:
 
 ```
-$ go test -run=xxx -benchmem -cpu=1 -bench=Full/Contains
 goos: linux
 goarch: amd64
 pkg: github.com/gaissmai/bart
 cpu: Intel(R) Core(TM) i5-8250U CPU @ 1.60GHz
-BenchmarkFullMatchV4/Contains         	48157468	        22.14 ns/op	       0 B/op	       0 allocs/op
-BenchmarkFullMatchV6/Contains         	34797141	        31.83 ns/op	       0 B/op	       0 allocs/op
-BenchmarkFullMissV4/Contains          	46614062	        22.72 ns/op	       0 B/op	       0 allocs/op
-BenchmarkFullMissV6/Contains          	61439612	        16.79 ns/op	       0 B/op	       0 allocs/op
+BenchmarkFullMatchV4/Contains         	37375450	        29.71 ns/op
+BenchmarkFullMatchV6/Contains         	41348316	        26.85 ns/op
+BenchmarkFullMissV4/Contains          	38583682	        29.66 ns/op
+BenchmarkFullMissV6/Contains          	83315865	        12.64 ns/op
 PASS
-ok  	github.com/gaissmai/bart	18.153s
+ok  	github.com/gaissmai/bart	11.248s
 ```
 
 ## Compatibility Guarantees

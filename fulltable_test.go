@@ -52,9 +52,7 @@ var (
 func BenchmarkFullTableInsert(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 
-	var rt Table[struct{}]
-	var rtPC Table[struct{}]
-	rtPC.WithPathCompression()
+	var rt Table2[struct{}]
 
 	runtime.GC()
 	runtime.ReadMemStats(&startMem)
@@ -75,28 +73,25 @@ func BenchmarkFullTableInsert(b *testing.B) {
 	runtime.GC()
 	runtime.ReadMemStats(&startMem)
 	b.ResetTimer()
-	b.Run("InsertPC", func(b *testing.B) {
+	b.Run("Insert", func(b *testing.B) {
 		for range b.N {
 			for _, route := range routes {
-				rtPC.Insert(route.CIDR, struct{}{})
+				rt.Insert(route.CIDR, struct{}{})
 			}
 		}
 		runtime.GC()
 		runtime.ReadMemStats(&endMem)
 
 		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
-		b.ReportMetric(float64(rtPC.Size())/float64(rtPC.nodes()), "Prefix/Node")
+		b.ReportMetric(float64(rt.Size())/float64(rt.nodes()), "Prefix/Node")
 	})
 }
 
 func BenchmarkFullMatchV4(b *testing.B) {
-	var rt Table[int]
-	var rtPC Table[int]
-	rtPC.WithPathCompression()
+	var rt Table2[int]
 
 	for i, route := range routes {
 		rt.Insert(route.CIDR, i)
-		rtPC.Insert(route.CIDR, i)
 	}
 
 	var ip netip.Addr
@@ -119,24 +114,10 @@ func BenchmarkFullMatchV4(b *testing.B) {
 		}
 	})
 
-	b.Run("ContainsPC", func(b *testing.B) {
-		b.ResetTimer()
-		for range b.N {
-			okSink = rtPC.Contains(ip)
-		}
-	})
-
 	b.Run("Lookup", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
 			intSink, okSink = rt.Lookup(ip)
-		}
-	})
-
-	b.Run("LookupPC", func(b *testing.B) {
-		b.ResetTimer()
-		for range b.N {
-			intSink, okSink = rtPC.Lookup(ip)
 		}
 	})
 
@@ -147,36 +128,19 @@ func BenchmarkFullMatchV4(b *testing.B) {
 		}
 	})
 
-	b.Run("LookupPrefixPC", func(b *testing.B) {
-		b.ResetTimer()
-		for range b.N {
-			intSink, okSink = rtPC.LookupPrefix(ipAsPfx)
-		}
-	})
-
 	b.Run("LookupPrefixLPM", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
 			_, intSink, okSink = rt.LookupPrefixLPM(ipAsPfx)
-		}
-	})
-
-	b.Run("LookupPrefixLPMPC", func(b *testing.B) {
-		b.ResetTimer()
-		for range b.N {
-			_, intSink, okSink = rtPC.LookupPrefixLPM(ipAsPfx)
 		}
 	})
 }
 
 func BenchmarkFullMatchV6(b *testing.B) {
-	var rt Table[int]
-	var rtPC Table[int]
-	rtPC.WithPathCompression()
+	var rt Table2[int]
 
 	for i, route := range routes {
 		rt.Insert(route.CIDR, i)
-		rtPC.Insert(route.CIDR, i)
 	}
 
 	var ip netip.Addr
@@ -199,24 +163,10 @@ func BenchmarkFullMatchV6(b *testing.B) {
 		}
 	})
 
-	b.Run("ContainsPC", func(b *testing.B) {
-		b.ResetTimer()
-		for range b.N {
-			okSink = rtPC.Contains(ip)
-		}
-	})
-
 	b.Run("Lookup", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
 			intSink, okSink = rt.Lookup(ip)
-		}
-	})
-
-	b.Run("LookupPC", func(b *testing.B) {
-		b.ResetTimer()
-		for range b.N {
-			intSink, okSink = rtPC.Lookup(ip)
 		}
 	})
 
@@ -227,36 +177,19 @@ func BenchmarkFullMatchV6(b *testing.B) {
 		}
 	})
 
-	b.Run("LookupPrefixPC", func(b *testing.B) {
-		b.ResetTimer()
-		for range b.N {
-			intSink, okSink = rtPC.LookupPrefix(ipAsPfx)
-		}
-	})
-
 	b.Run("LookupPrefixLPM", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
 			_, intSink, okSink = rt.LookupPrefixLPM(ipAsPfx)
 		}
 	})
-
-	b.Run("LookupPrefixLPMPC", func(b *testing.B) {
-		b.ResetTimer()
-		for range b.N {
-			_, intSink, okSink = rtPC.LookupPrefixLPM(ipAsPfx)
-		}
-	})
 }
 
 func BenchmarkFullMissV4(b *testing.B) {
-	var rt Table[int]
-	var rtPC Table[int]
-	rtPC.WithPathCompression()
+	var rt Table2[int]
 
 	for i, route := range routes {
 		rt.Insert(route.CIDR, i)
-		rtPC.Insert(route.CIDR, i)
 	}
 
 	var ip netip.Addr
@@ -279,24 +212,10 @@ func BenchmarkFullMissV4(b *testing.B) {
 		}
 	})
 
-	b.Run("ContainsPC", func(b *testing.B) {
-		b.ResetTimer()
-		for range b.N {
-			okSink = rtPC.Contains(ip)
-		}
-	})
-
 	b.Run("Lookup", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
 			intSink, okSink = rt.Lookup(ip)
-		}
-	})
-
-	b.Run("LookupPC", func(b *testing.B) {
-		b.ResetTimer()
-		for range b.N {
-			intSink, okSink = rtPC.Lookup(ip)
 		}
 	})
 
@@ -307,36 +226,19 @@ func BenchmarkFullMissV4(b *testing.B) {
 		}
 	})
 
-	b.Run("LookupPrefixPC", func(b *testing.B) {
-		b.ResetTimer()
-		for range b.N {
-			intSink, okSink = rtPC.LookupPrefix(ipAsPfx)
-		}
-	})
-
 	b.Run("LookupPrefixLPM", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
 			_, intSink, okSink = rt.LookupPrefixLPM(ipAsPfx)
 		}
 	})
-
-	b.Run("LookupPrefixLPMPC", func(b *testing.B) {
-		b.ResetTimer()
-		for range b.N {
-			_, intSink, okSink = rtPC.LookupPrefixLPM(ipAsPfx)
-		}
-	})
 }
 
 func BenchmarkFullMissV6(b *testing.B) {
-	var rt Table[int]
-	var rtPC Table[int]
-	rtPC.WithPathCompression()
+	var rt Table2[int]
 
 	for i, route := range routes {
 		rt.Insert(route.CIDR, i)
-		rtPC.Insert(route.CIDR, i)
 	}
 
 	var ip netip.Addr
@@ -359,24 +261,10 @@ func BenchmarkFullMissV6(b *testing.B) {
 		}
 	})
 
-	b.Run("ContainsPC", func(b *testing.B) {
-		b.ResetTimer()
-		for range b.N {
-			okSink = rtPC.Contains(ip)
-		}
-	})
-
 	b.Run("Lookup", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
 			intSink, okSink = rt.Lookup(ip)
-		}
-	})
-
-	b.Run("LookupPC", func(b *testing.B) {
-		b.ResetTimer()
-		for range b.N {
-			intSink, okSink = rtPC.Lookup(ip)
 		}
 	})
 
@@ -387,24 +275,10 @@ func BenchmarkFullMissV6(b *testing.B) {
 		}
 	})
 
-	b.Run("LookupPrefixPC", func(b *testing.B) {
-		b.ResetTimer()
-		for range b.N {
-			intSink, okSink = rtPC.LookupPrefix(ipAsPfx)
-		}
-	})
-
 	b.Run("LookupPrefixLPM", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
 			_, intSink, okSink = rt.LookupPrefixLPM(ipAsPfx)
-		}
-	})
-
-	b.Run("LookupPrefixLPMPC", func(b *testing.B) {
-		b.ResetTimer()
-		for range b.N {
-			_, intSink, okSink = rtPC.LookupPrefixLPM(ipAsPfx)
 		}
 	})
 }
@@ -621,8 +495,7 @@ func BenchmarkFullTableMemory(b *testing.B) {
 func BenchmarkFullTableMemoryV4PC(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 
-	rt := new(Table[struct{}])
-	rt.WithPathCompression()
+	rt := new(Table2[struct{}])
 	runtime.GC()
 	runtime.ReadMemStats(&startMem)
 
@@ -645,8 +518,7 @@ func BenchmarkFullTableMemoryV4PC(b *testing.B) {
 func BenchmarkFullTableMemoryV6PC(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 
-	rt := new(Table[struct{}])
-	rt.WithPathCompression()
+	rt := new(Table2[struct{}])
 	runtime.GC()
 	runtime.ReadMemStats(&startMem)
 
@@ -669,8 +541,7 @@ func BenchmarkFullTableMemoryV6PC(b *testing.B) {
 func BenchmarkFullTableMemoryPC(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 
-	rt := new(Table[struct{}])
-	rt.WithPathCompression()
+	rt := new(Table2[struct{}])
 	runtime.GC()
 	runtime.ReadMemStats(&startMem)
 

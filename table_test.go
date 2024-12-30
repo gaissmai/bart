@@ -19,7 +19,13 @@ import (
 
 var mpa = netip.MustParseAddr
 
-var mpp = netip.MustParsePrefix
+var mpp = func(s string) netip.Prefix {
+	pfx := netip.MustParsePrefix(s)
+	if pfx == pfx.Masked() {
+		return pfx
+	}
+	panic(fmt.Sprintf("%s is not canonicalized as %s", s, pfx.Masked()))
+}
 
 // nodes, calculates the nodes.
 func (t *Table[V]) nodes() int {
@@ -2681,46 +2687,6 @@ func BenchmarkTableClone(b *testing.B) {
 					rt.Clone()
 				}
 			})
-		}
-	}
-}
-
-func BenchmarkMemory(b *testing.B) {
-	for _, fam := range []string{"ipv4", "ipv6"} {
-		rng := randomPrefixes4
-		if fam == "ipv6" {
-			rng = randomPrefixes6
-		}
-
-		var startMem, endMem runtime.MemStats
-		for _, nroutes := range benchRouteCount {
-			for _, pc := range []bool{false, true} {
-				rt := new(Table[any])
-				if pc {
-					rt.WithPathCompression()
-				}
-
-				b.Run(fmt.Sprintf("pc=%v/%s/random/%d", pc, fam, nroutes), func(b *testing.B) {
-					b.ResetTimer()
-
-					for range b.N {
-						rt = new(Table[any])
-						runtime.GC()
-						runtime.ReadMemStats(&startMem)
-
-						for _, route := range rng(nroutes) {
-							rt.Insert(route.pfx, struct{}{})
-						}
-
-						runtime.GC()
-						runtime.ReadMemStats(&endMem)
-
-						b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
-						b.ReportMetric(float64(nroutes)/float64(rt.nodes()), "Prefix/Node")
-						b.ReportMetric(0, "ns/op") // silence
-					}
-				})
-			}
 		}
 	}
 }

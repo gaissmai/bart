@@ -49,14 +49,13 @@ func (s *Array[T]) InsertAt(i uint, val T) (exists bool) {
 }
 
 // DeleteAt a value at i from the sparse array, zeroes the tail and compact the slice.
-func (s *Array[T]) DeleteAt(i uint) (T, bool) {
-	var zero T
+func (s *Array[T]) DeleteAt(i uint) (val T, exists bool) {
 	if s.Len() == 0 || !s.Test(i) {
-		return zero, false
+		return
 	}
 
 	rnk := s.rank(i)
-	val := s.Items[rnk]
+	val = s.Items[rnk]
 
 	// delete from slice, followed by clear and compact
 	s.deleteItem(rnk)
