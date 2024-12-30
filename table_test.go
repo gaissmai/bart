@@ -1371,45 +1371,7 @@ func TestGetAndDelete(t *testing.T) {
 	// order.
 	const N = 10_000
 
-	tbl := new(Table[int])
-	prefixes := randomPrefixes(N)
-
-	// insert the prefixes
-	for _, p := range prefixes {
-		tbl.Insert(p.pfx, p.val)
-	}
-
-	// shuffle the prefixes
-	rand.Shuffle(N, func(i, j int) {
-		prefixes[i], prefixes[j] = prefixes[j], prefixes[i]
-	})
-
-	for _, p := range prefixes {
-		want, _ := tbl.Get(p.pfx)
-		val, ok := tbl.GetAndDelete(p.pfx)
-
-		if !ok {
-			t.Errorf("GetAndDelete, expected true, got %v", ok)
-		}
-
-		if val != want {
-			t.Errorf("GetAndDelete, expected %v, got %v", want, val)
-		}
-
-		val, ok = tbl.GetAndDelete(p.pfx)
-		if ok {
-			t.Errorf("GetAndDelete, expected false, got (%v, %v)", val, ok)
-		}
-	}
-}
-
-func TestGetAndDeletePC(t *testing.T) {
-	t.Parallel()
-	// Insert N prefixes, then delete those same prefixes in shuffled
-	// order.
-	const N = 10_000
-
-	tbl := new(Table[int]).WithPathCompression()
+	tbl := new(Table2[int])
 	prefixes := randomPrefixes(N)
 
 	// insert the prefixes
@@ -1447,7 +1409,7 @@ func TestGet(t *testing.T) {
 	t.Run("empty table", func(t *testing.T) {
 		t.Parallel()
 
-		rt := new(Table[int])
+		rt := new(Table2[int])
 		pfx := randomPrefix()
 		_, ok := rt.Get(pfx)
 
@@ -1483,70 +1445,7 @@ func TestGet(t *testing.T) {
 		},
 	}
 
-	rt := new(Table[int])
-	for _, tt := range tests {
-		rt.Insert(tt.pfx, tt.val)
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			got, ok := rt.Get(tt.pfx)
-
-			if !ok {
-				t.Errorf("%s: ok=%v, expected: %v", tt.name, ok, true)
-			}
-
-			if got != tt.val {
-				t.Errorf("%s: val=%v, expected: %v", tt.name, got, tt.val)
-			}
-		})
-	}
-}
-
-func TestGetPC(t *testing.T) {
-	t.Parallel()
-
-	t.Run("empty table", func(t *testing.T) {
-		t.Parallel()
-
-		rt := new(Table[int]).WithPathCompression()
-		pfx := randomPrefix()
-		_, ok := rt.Get(pfx)
-
-		if ok {
-			t.Errorf("empty table: Get(%v), ok=%v, expected: %v", pfx, ok, false)
-		}
-	})
-
-	tests := []struct {
-		name string
-		pfx  netip.Prefix
-		val  int
-	}{
-		{
-			name: "default route v4",
-			pfx:  mpp("0.0.0.0/0"),
-			val:  0,
-		},
-		{
-			name: "default route v6",
-			pfx:  mpp("::/0"),
-			val:  0,
-		},
-		{
-			name: "set v4",
-			pfx:  mpp("1.2.3.4/32"),
-			val:  1234,
-		},
-		{
-			name: "set v6",
-			pfx:  mpp("2001:db8::/32"),
-			val:  2001,
-		},
-	}
-
-	rt := new(Table[int])
+	rt := new(Table2[int])
 	for _, tt := range tests {
 		rt.Insert(tt.pfx, tt.val)
 	}
@@ -1571,28 +1470,7 @@ func TestGetCompare(t *testing.T) {
 	t.Parallel()
 
 	pfxs := randomPrefixes(10_000)
-	fast := Table[int]{}
-	gold := goldTable[int](pfxs)
-
-	for _, pfx := range pfxs {
-		fast.Insert(pfx.pfx, pfx.val)
-	}
-
-	for _, pfx := range pfxs {
-		goldVal, goldOK := gold.get(pfx.pfx)
-		fastVal, fastOK := fast.Get(pfx.pfx)
-
-		if !getsEqual(goldVal, goldOK, fastVal, fastOK) {
-			t.Fatalf("Get(%q) = (%v, %v), want (%v, %v)", pfx.pfx, fastVal, fastOK, goldVal, goldOK)
-		}
-	}
-}
-
-func TestGetComparePC(t *testing.T) {
-	t.Parallel()
-
-	pfxs := randomPrefixes(10_000)
-	fast := new(Table[int]).WithPathCompression()
+	fast := new(Table2[int])
 	gold := goldTable[int](pfxs)
 
 	for _, pfx := range pfxs {
