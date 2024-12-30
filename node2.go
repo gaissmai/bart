@@ -126,6 +126,7 @@ func (n *node2[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists boo
 			// descend down to next trie level
 			n = k
 		case *leaf[V]:
+			// reached a path compressed prefix
 			// override value in slot if prefixes are equal
 			if k.prefix == pfx {
 				k.value = val
