@@ -5,6 +5,7 @@ package bart
 
 import (
 	"net/netip"
+	"slices"
 
 	"github.com/gaissmai/bart/internal/sparse"
 )
@@ -28,7 +29,7 @@ type node2[V any] struct {
 	prefixes sparse.Array[V]
 
 	// children, recursively spans the trie with a branching factor of 256
-	// the interface item (any) is a node (recursive) or a leaf (prefix and value).
+	// the generic item [any] is a node (recursive) or a leaf (prefix and value).
 	children sparse.Array[any]
 }
 
@@ -246,3 +247,171 @@ func (n *node2[V]) cloneRec() *node2[V] {
 
 	return c
 }
+
+// allRec runs recursive the trie, starting at this node and
+// the yield function is called for each route entry with prefix and value.
+// If the yield function returns false the recursion ends prematurely and the
+// false value is propagated.
+//
+// The iteration order is not defined, just the simplest and fastest recursive implementation.
+func (n *node2[V]) allRec(
+	path [16]byte,
+	depth int,
+	is4 bool,
+	yield func(netip.Prefix, V) bool,
+) bool {
+	// for all prefixes in this node do ...
+	allIndices := n.prefixes.AsSlice(make([]uint, 0, maxNodePrefixes))
+	for _, idx := range allIndices {
+		cidr, _ := cidrFromPath(path, depth, is4, idx)
+
+		// callback for this prefix and val
+		if !yield(cidr, n.prefixes.MustGet(idx)) {
+			// early exit
+			return false
+		}
+	}
+
+	// for all children (nodes and leaves) in this node do ...
+	allChildAddrs := n.children.AsSlice(make([]uint, 0, maxNodeChildren))
+	for i, addr := range allChildAddrs {
+		switch k := n.children.Items[i].(type) {
+		case *node2[V]:
+			// rec-descent with this node
+			path[depth] = byte(addr)
+			if !k.allRec(path, depth+1, is4, yield) {
+				// early exit
+				return false
+			}
+		case *leaf[V]:
+			// callback for this leaf
+			if !yield(k.prefix, k.value) {
+				// early exit
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
+// allRecSorted runs recursive the trie, starting at node and
+// the yield function is called for each route entry with prefix and value.
+// The iteration is in prefix sort order.
+//
+// If the yield function returns false the recursion ends prematurely and the
+// false value is propagated.
+func (n *node2[V]) allRecSorted(
+	path [16]byte,
+	depth int,
+	is4 bool,
+	yield func(netip.Prefix, V) bool,
+) bool {
+	// get slice of all child octets, sorted by addr
+	allChildAddrs := n.children.AsSlice(make([]uint, 0, maxNodeChildren))
+
+	// get slice of all indexes, sorted by idx
+	allIndices := n.prefixes.AsSlice(make([]uint, 0, maxNodePrefixes))
+
+	// sort indices in CIDR sort order
+	slices.SortFunc(allIndices, cmpIndexRank)
+
+	childCursor := 0
+
+	// yield indices and childs in CIDR sort order
+	for _, pfxIdx := range allIndices {
+		pfxOctet, _ := idxToPfx(pfxIdx)
+
+		// yield all childs before idx
+		for j := childCursor; j < len(allChildAddrs); j++ {
+			childAddr := allChildAddrs[j]
+
+			if childAddr >= uint(pfxOctet) {
+				break
+			}
+
+			// yield the node (rec-descent) or leaf
+			switch k := n.children.Items[j].(type) {
+			case *node2[V]:
+				// yield this child rec-descent, if matched
+				path[depth] = byte(childAddr)
+				if !k.allRecSorted(path, depth+1, is4, yield) {
+					// early exit
+					return false
+				}
+			case *leaf[V]:
+				if !yield(k.prefix, k.value) {
+					// early exit
+					return false
+				}
+			}
+
+			childCursor++
+		}
+
+		// yield the prefix for this idx
+		cidr, _ := cidrFromPath(path, depth, is4, pfxIdx)
+		if !yield(cidr, n.prefixes.MustGet(pfxIdx)) {
+			// early exit
+			return false
+		}
+	}
+
+	// yield the rest of leaves and nodes (rec-descent)
+	for j := childCursor; j < len(allChildAddrs); j++ {
+		addr := allChildAddrs[j]
+		switch k := n.children.Items[j].(type) {
+		case *node2[V]:
+			path[depth] = byte(addr)
+			if !k.allRecSorted(path, depth+1, is4, yield) {
+				return false
+			}
+		case *leaf[V]:
+			if !yield(k.prefix, k.value) {
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
+/*
+// unionRec combines two nodes, changing the receiver node.
+// If there are duplicate entries, the value is taken from the other node.
+// Count duplicate entries to adjust the t.size struct members.
+func (n *node2[V]) unionRec(o *node2[V]) (duplicates int) {
+	allIndices := o.prefixes.AsSlice(make([]uint, 0, maxNodePrefixes))
+	// for all prefixes in other node do ...
+	for i, oIdx := range allIndices {
+		// insert/overwrite prefix/value from oNode to nNode
+		exists := n.prefixes.InsertAt(oIdx, o.prefixes.Items[i])
+
+		// this prefix is duplicate in n and o
+		if exists {
+			duplicates++
+		}
+	}
+
+	allChildAddrs := o.children.AsSlice(make([]uint, 0, maxNodeChildren))
+	// for all children in other node do ...
+	for i, oAddr := range allChildAddrs {
+		oOctet := byte(oAddr)
+
+		// we know the slice index, faster as o.getChild(octet)
+		oc := o.children.Items[i]
+
+		// get n child with same octet,
+		// we don't know the slice index in n.children
+		if nc, ok := n.children.Get(uint(oOctet)); !ok {
+			// insert cloned child from oNode into nNode
+			n.children.InsertAt(uint(oOctet), oc.cloneRec())
+		} else {
+			// both nodes have child with octet, call union rec-descent
+			duplicates += nc.unionRec(oc)
+		}
+	}
+
+	return duplicates
+}
+*/
