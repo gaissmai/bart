@@ -98,7 +98,7 @@ func TestOverlapsPrefixCompare(t *testing.T) {
 	t.Parallel()
 	pfxs := randomPrefixes(100_000)
 
-	fast := Table[int]{}
+	fast := Table2[int]{}
 	gold := goldTable[int](pfxs)
 
 	for _, pfx := range pfxs {

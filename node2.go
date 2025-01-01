@@ -333,15 +333,12 @@ func (n *node2[V]) allRecSorted(
 			// yield the node (rec-descent) or leaf
 			switch k := n.children.Items[j].(type) {
 			case *node2[V]:
-				// yield this child rec-descent, if matched
 				path[depth] = byte(childAddr)
 				if !k.allRecSorted(path, depth+1, is4, yield) {
-					// early exit
 					return false
 				}
 			case *leaf[V]:
 				if !yield(k.prefix, k.value) {
-					// early exit
 					return false
 				}
 			}
@@ -351,8 +348,8 @@ func (n *node2[V]) allRecSorted(
 
 		// yield the prefix for this idx
 		cidr, _ := cidrFromPath(path, depth, is4, pfxIdx)
+		// n.prefixes.Items[i] not possible after sorting allIndices
 		if !yield(cidr, n.prefixes.MustGet(pfxIdx)) {
-			// early exit
 			return false
 		}
 	}
@@ -376,13 +373,12 @@ func (n *node2[V]) allRecSorted(
 	return true
 }
 
-/*
 // unionRec combines two nodes, changing the receiver node.
 // If there are duplicate entries, the value is taken from the other node.
 // Count duplicate entries to adjust the t.size struct members.
-func (n *node2[V]) unionRec(o *node2[V]) (duplicates int) {
-	allIndices := o.prefixes.AsSlice(make([]uint, 0, maxNodePrefixes))
+func (n *node2[V]) unionRec(o *node2[V], depth int) (duplicates int) {
 	// for all prefixes in other node do ...
+	allIndices := o.prefixes.AsSlice(make([]uint, 0, maxNodePrefixes))
 	for i, oIdx := range allIndices {
 		// insert/overwrite prefix/value from oNode to nNode
 		exists := n.prefixes.InsertAt(oIdx, o.prefixes.Items[i])
@@ -393,25 +389,93 @@ func (n *node2[V]) unionRec(o *node2[V]) (duplicates int) {
 		}
 	}
 
-	allChildAddrs := o.children.AsSlice(make([]uint, 0, maxNodeChildren))
-	// for all children in other node do ...
-	for i, oAddr := range allChildAddrs {
-		oOctet := byte(oAddr)
+	// for all child addrs in other node do ...
+	allOtherChildAddrs := o.children.AsSlice(make([]uint, 0, maxNodeChildren))
+	for i, addr := range allOtherChildAddrs {
+		//  6 possible combinations for this child and other child child
+		//
+		//  THIS, OTHER:
+		//  ----------
+		//  NULL, node  <-- easy,    insert at cloned node
+		//  NULL, leaf  <-- easy,    insert at cloned leaf
+		//  node, node  <-- easy,    union rec-descent
+		//  node, leaf  <-- easy,    insert other cloned leaf at depth+1
+		//  leaf, node  <-- complex, push this leaf down, union rec-descent
+		//  leaf, leaf  <-- complex, push this leaf down, insert other cloned leaf at depth+1
+		//
+		// try to get child at same addr from n
+		thisChild, thisExists := n.children.Get(addr)
+		if !thisExists {
+			switch otherChild := o.children.Items[i].(type) {
 
-		// we know the slice index, faster as o.getChild(octet)
-		oc := o.children.Items[i]
+			case *node2[V]: // NULL, node
+				if !thisExists {
+					n.children.InsertAt(addr, otherChild.cloneRec())
+					continue
+				}
 
-		// get n child with same octet,
-		// we don't know the slice index in n.children
-		if nc, ok := n.children.Get(uint(oOctet)); !ok {
-			// insert cloned child from oNode into nNode
-			n.children.InsertAt(uint(oOctet), oc.cloneRec())
-		} else {
-			// both nodes have child with octet, call union rec-descent
-			duplicates += nc.unionRec(oc)
+			case *leaf[V]: // NULL, leaf
+				if !thisExists {
+					n.children.InsertAt(addr, otherChild.cloneLeaf())
+					continue
+				}
+			}
+		}
+
+		switch otherChild := o.children.Items[i].(type) {
+
+		case *node2[V]:
+			switch this := thisChild.(type) {
+
+			case *node2[V]: // node, node
+				// both childs have node in octet, call union rec-descent on child nodes
+				duplicates += this.unionRec(otherChild, depth+1)
+				continue
+
+			case *leaf[V]: // leaf, node
+				// create new node
+				nc := new(node2[V])
+
+				// push this leaf down
+				nc.insertAtDepth(this.prefix, this.value, depth+1)
+
+				// insert new node at current addr
+				n.children.InsertAt(addr, nc)
+
+				// union rec-descent new node with other node
+				duplicates += nc.unionRec(otherChild, depth+1)
+				continue
+			}
+
+		case *leaf[V]:
+			switch this := thisChild.(type) {
+
+			case *node2[V]: // node, leaf
+				clonedLeaf := otherChild.cloneLeaf()
+				if this.insertAtDepth(clonedLeaf.prefix, clonedLeaf.value, depth+1) {
+					duplicates++
+				}
+				continue
+
+			case *leaf[V]: // leaf, leaf
+				// create new node
+				nc := new(node2[V])
+
+				// push this leaf down
+				nc.insertAtDepth(this.prefix, this.value, depth+1)
+
+				// insert at depth cloned leaf
+				clonedLeaf := otherChild.cloneLeaf()
+				if nc.insertAtDepth(clonedLeaf.prefix, clonedLeaf.value, depth+1) {
+					duplicates++
+				}
+
+				// insert the new node at current addr
+				n.children.InsertAt(addr, nc)
+				continue
+			}
 		}
 	}
 
 	return duplicates
 }
-*/
