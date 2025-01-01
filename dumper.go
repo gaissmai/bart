@@ -38,11 +38,17 @@ func (t *Table[V]) dump(w io.Writer) {
 		return
 	}
 
-	fmt.Fprintf(w, "### IPv4: size(%d)", t.Size4())
-	t.root4.dumpRec(w, zeroPath, 0, true)
+	if t.Size4() > 0 {
+		fmt.Fprintln(w)
+		fmt.Fprintf(w, "### IPv4: size(%d), nodes(%d)", t.Size4(), t.nodes4())
+		t.root4.dumpRec(w, zeroPath, 0, true)
+	}
 
-	fmt.Fprintf(w, "### IPv6: size(%d)", t.Size6())
-	t.root6.dumpRec(w, zeroPath, 0, false)
+	if t.Size6() > 0 {
+		fmt.Fprintln(w)
+		fmt.Fprintf(w, "### IPv6: size(%d), nodes(%d)", t.Size6(), t.nodes6())
+		t.root6.dumpRec(w, zeroPath, 0, false)
+	}
 }
 
 // dumpRec, rec-descent the trie.
@@ -55,10 +61,13 @@ func (n *node[V]) dumpRec(w io.Writer, path [16]byte, depth int, is4 bool) {
 	// the node may have childs, the rec-descent monster starts
 	for i, addr := range allChildAddrs {
 		octet := byte(addr)
-		child := n.children.Items[i]
 		path[depth] = octet
-
-		child.dumpRec(w, path, depth+1, is4)
+		switch child := n.children.Items[i].(type) {
+		case *leaf[V]:
+			continue
+		case *node[V]:
+			child.dumpRec(w, path, depth+1, is4)
+		}
 	}
 }
 
@@ -98,34 +107,68 @@ func (n *node[V]) dump(w io.Writer, path [16]byte, depth int, is4 bool) {
 		fmt.Fprintln(w)
 	}
 
-	if childCount := n.children.Len(); childCount != 0 {
-		// print the childs for this node
-		fmt.Fprintf(w, "%schilds(#%d):", indent, childCount)
+	if n.children.Len() != 0 {
 
-		// no heap allocs
-		allChildAddrs := n.children.AsSlice(make([]uint, 0, maxNodeChildren))
+		nodeAddrs := make([]uint, 0, maxNodeChildren)
+		leafAddrs := make([]uint, 0, maxNodeChildren)
 
-		for _, addr := range allChildAddrs {
-			octet := byte(addr)
-			fmt.Fprintf(w, " %s", octetFmt(octet, is4))
+		// the node has recursive child nodes or path-compressed leaves
+		for i, addr := range n.children.AsSlice(make([]uint, 0, maxNodeChildren)) {
+			switch n.children.Items[i].(type) {
+			case *node[V]:
+				nodeAddrs = append(nodeAddrs, addr)
+				continue
+			case *leaf[V]:
+				leafAddrs = append(leafAddrs, addr)
+			}
 		}
 
-		fmt.Fprintln(w)
+		if nodeCount := len(nodeAddrs); nodeCount > 0 {
+			// print the childs for this node
+			fmt.Fprintf(w, "%schilds(#%d):", indent, nodeCount)
+
+			for _, addr := range nodeAddrs {
+				octet := byte(addr)
+				fmt.Fprintf(w, " %s", octetFmt(octet, is4))
+			}
+
+			fmt.Fprintln(w)
+		}
+
+		if leafCount := len(leafAddrs); leafCount > 0 {
+			// print the pathcomp prefixes for this node
+			fmt.Fprintf(w, "%sleaves(#%d):", indent, leafCount)
+
+			for _, addr := range leafAddrs {
+				octet := byte(addr)
+				k := n.children.MustGet(addr)
+				pc := k.(*leaf[V])
+
+				fmt.Fprintf(w, " %s:{%s, %v}", octetFmt(octet, is4), pc.prefix, pc.value)
+			}
+			fmt.Fprintln(w)
+		}
 	}
+}
 
-	if pathcompCount := n.pathcomp.Len(); pathcompCount != 0 {
-		// print the pathcomp prefixes for this node
-		fmt.Fprintf(w, "%spathcp(#%d):", indent, pathcompCount)
+// hasType returns the nodeType.
+func (n *node[V]) hasType() nodeType {
+	prefixCount := n.prefixes.Len()
+	childCount := n.children.Len()
+	nodeCount, leafCount := n.nodeAndLeafCount()
 
-		// no heap allocs
-		allPathComps := n.pathcomp.AsSlice(make([]uint, 0, maxNodeChildren))
-
-		for i, addr := range allPathComps {
-			pc := n.pathcomp.Items[i]
-			fmt.Fprintf(w, " %d:[%s, %v]", addr, pc.prefix, pc.value)
-		}
-
-		fmt.Fprintln(w)
+	switch {
+	case prefixCount == 0 && childCount == 0:
+		return nullNode
+	case nodeCount == 0:
+		return leafNode
+	case (prefixCount > 0 || leafCount > 0) && nodeCount > 0:
+		return fullNode
+	case (prefixCount == 0 && leafCount == 0) && nodeCount > 0:
+		return intermediateNode
+	default:
+		panic(fmt.Sprintf("UNREACHABLE: pfx: %d, chld: %d, node: %d, leaf: %d",
+			prefixCount, childCount, nodeCount, leafCount))
 	}
 }
 
@@ -181,25 +224,5 @@ func (nt nodeType) String() string {
 		return "IMED"
 	default:
 		return "unreachable"
-	}
-}
-
-// hasType returns the nodeType.
-func (n *node[V]) hasType() nodeType {
-	prefixCount := n.prefixes.Len()
-	childCount := n.children.Len()
-	pathcompCount := n.pathcomp.Len()
-
-	switch {
-	case prefixCount == 0 && childCount == 0 && pathcompCount == 0:
-		return nullNode
-	case prefixCount != 0 && childCount != 0:
-		return fullNode
-	case prefixCount == 0 && pathcompCount == 0 && childCount != 0:
-		return intermediateNode
-	case childCount == 0:
-		return leafNode
-	default:
-		panic(fmt.Sprintf("UNREACHABLE: pfx: %d, chld: %d, pc: %d", prefixCount, childCount, pathcompCount))
 	}
 }

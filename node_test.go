@@ -112,7 +112,7 @@ func TestOverlapsPrefix(t *testing.T) {
 
 	for _, tt := range allStridePfxs() {
 		goldOK := gold.strideOverlapsPrefix(tt.octet, tt.bits)
-		fastOK := fast.overlapsPrefix(tt.octet, tt.bits)
+		fastOK := fast.overlapsIdx(tt.octet, tt.bits)
 		if goldOK != fastOK {
 			t.Fatalf("overlapsPrefix(%d, %d) = %v, want %v", tt.octet, tt.bits, fastOK, goldOK)
 		}
@@ -148,7 +148,7 @@ func TestOverlapsNode(t *testing.T) {
 		}
 
 		gotGold := gold.strideOverlaps(&goldInter)
-		gotFast := fast.overlapsRec(fastInter)
+		gotFast := fast.overlapsRec(fastInter, 0)
 		if gotGold != gotFast {
 			t.Fatalf("node.overlaps = %v, want %v", gotFast, gotGold)
 		}

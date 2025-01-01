@@ -49,30 +49,8 @@ var (
 	boolSink bool
 )
 
-func BenchmarkFullTableInsert(b *testing.B) {
-	var startMem, endMem runtime.MemStats
-
-	var rt Table2[struct{}]
-
-	runtime.GC()
-	runtime.ReadMemStats(&startMem)
-	b.ResetTimer()
-	b.Run("Insert", func(b *testing.B) {
-		for range b.N {
-			for _, route := range routes {
-				rt.Insert(route.CIDR, struct{}{})
-			}
-		}
-		runtime.GC()
-		runtime.ReadMemStats(&endMem)
-
-		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
-		b.ReportMetric(float64(rt.Size())/float64(rt.nodes()), "Prefix/Node")
-	})
-}
-
 func BenchmarkFullMatchV4(b *testing.B) {
-	var rt Table2[int]
+	var rt Table[int]
 
 	for i, route := range routes {
 		rt.Insert(route.CIDR, i)
@@ -121,7 +99,7 @@ func BenchmarkFullMatchV4(b *testing.B) {
 }
 
 func BenchmarkFullMatchV6(b *testing.B) {
-	var rt Table2[int]
+	var rt Table[int]
 
 	for i, route := range routes {
 		rt.Insert(route.CIDR, i)
@@ -170,7 +148,7 @@ func BenchmarkFullMatchV6(b *testing.B) {
 }
 
 func BenchmarkFullMissV4(b *testing.B) {
-	var rt Table2[int]
+	var rt Table[int]
 
 	for i, route := range routes {
 		rt.Insert(route.CIDR, i)
@@ -219,7 +197,7 @@ func BenchmarkFullMissV4(b *testing.B) {
 }
 
 func BenchmarkFullMissV6(b *testing.B) {
-	var rt Table2[int]
+	var rt Table[int]
 
 	for i, route := range routes {
 		rt.Insert(route.CIDR, i)
@@ -314,7 +292,7 @@ func BenchmarkFullTableOverlapsV6(b *testing.B) {
 }
 
 func BenchmarkFullTableOverlapsPrefix(b *testing.B) {
-	var rt Table2[int]
+	var rt Table[int]
 
 	for i, route := range routes {
 		rt.Insert(route.CIDR, i)
@@ -328,31 +306,8 @@ func BenchmarkFullTableOverlapsPrefix(b *testing.B) {
 	}
 }
 
-func BenchmarkFullTableOverlaps(b *testing.B) {
-	var rt Table[int]
-
-	for i, route := range routes {
-		rt.Insert(route.CIDR, i)
-	}
-
-	for i := 1; i <= 1024; i *= 2 {
-		inter := new(Table[int])
-		for j := 0; j <= i; j++ {
-			pfx := randomPrefix()
-			inter.Insert(pfx, j)
-		}
-
-		b.Run(fmt.Sprintf("With_%4d", i), func(b *testing.B) {
-			b.ResetTimer()
-			for range b.N {
-				boolSink = rt.Overlaps(inter)
-			}
-		})
-	}
-}
-
 func BenchmarkFullTableClone(b *testing.B) {
-	var rt4 Table2[int]
+	var rt4 Table[int]
 
 	for i, route := range routes4 {
 		rt4.Insert(route.CIDR, i)
@@ -378,7 +333,7 @@ func BenchmarkFullTableClone(b *testing.B) {
 		}
 	})
 
-	var rt Table2[int]
+	var rt Table[int]
 
 	for i, route := range routes {
 		rt.Insert(route.CIDR, i)
@@ -395,7 +350,7 @@ func BenchmarkFullTableClone(b *testing.B) {
 func BenchmarkFullTableMemoryV4(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 
-	rt := new(Table2[struct{}])
+	rt := new(Table[struct{}])
 	runtime.GC()
 	runtime.ReadMemStats(&startMem)
 
@@ -418,7 +373,7 @@ func BenchmarkFullTableMemoryV4(b *testing.B) {
 func BenchmarkFullTableMemoryV6(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 
-	rt := new(Table2[struct{}])
+	rt := new(Table[struct{}])
 	runtime.GC()
 	runtime.ReadMemStats(&startMem)
 
@@ -441,7 +396,7 @@ func BenchmarkFullTableMemoryV6(b *testing.B) {
 func BenchmarkFullTableMemory(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 
-	rt := new(Table2[struct{}])
+	rt := new(Table[struct{}])
 	runtime.GC()
 	runtime.ReadMemStats(&startMem)
 

@@ -6,6 +6,7 @@
 package bart
 
 import (
+	"fmt"
 	"net/netip"
 	"slices"
 	"testing"
@@ -18,7 +19,7 @@ func TestAll4RangeOverFunc(t *testing.T) {
 
 	t.Run("All4RangeOverFunc", func(t *testing.T) {
 		t.Parallel()
-		rtbl := new(Table2[int])
+		rtbl := new(Table[int])
 		for _, item := range pfxs {
 			rtbl.Insert(item.pfx, item.val)
 			seen[item.pfx] = item.val
@@ -41,7 +42,7 @@ func TestAll4RangeOverFunc(t *testing.T) {
 
 	t.Run("All4RangeOverFunc with premature exit", func(t *testing.T) {
 		t.Parallel()
-		rtbl := new(Table2[int])
+		rtbl := new(Table[int])
 		for _, item := range pfxs {
 			rtbl.Insert(item.pfx, item.val)
 		}
@@ -69,7 +70,7 @@ func TestAll6RangeOverFunc(t *testing.T) {
 
 	t.Run("All6RangeOverFunc", func(t *testing.T) {
 		t.Parallel()
-		rtbl := new(Table2[int])
+		rtbl := new(Table[int])
 		for _, item := range pfxs {
 			rtbl.Insert(item.pfx, item.val)
 			seen[item.pfx] = item.val
@@ -92,7 +93,7 @@ func TestAll6RangeOverFunc(t *testing.T) {
 
 	t.Run("All6RangeOverFunc with premature exit", func(t *testing.T) {
 		t.Parallel()
-		rtbl := new(Table2[int])
+		rtbl := new(Table[int])
 		for _, item := range pfxs {
 			rtbl.Insert(item.pfx, item.val)
 		}
@@ -120,7 +121,7 @@ func TestAllRangeOverFunc(t *testing.T) {
 
 	t.Run("AllRangeOverFunc", func(t *testing.T) {
 		t.Parallel()
-		rtbl := new(Table2[int])
+		rtbl := new(Table[int])
 		for _, item := range pfxs {
 			rtbl.Insert(item.pfx, item.val)
 			seen[item.pfx] = item.val
@@ -143,7 +144,7 @@ func TestAllRangeOverFunc(t *testing.T) {
 
 	t.Run("AllRangeOverFunc with premature exit", func(t *testing.T) {
 		t.Parallel()
-		rtbl := new(Table2[int])
+		rtbl := new(Table[int])
 		for _, item := range pfxs {
 			rtbl.Insert(item.pfx, item.val)
 		}
@@ -171,7 +172,7 @@ func TestAll4SortedIter(t *testing.T) {
 
 	t.Run("All4SortedRangeOverFunc", func(t *testing.T) {
 		t.Parallel()
-		rtbl := new(Table2[int])
+		rtbl := new(Table[int])
 		for _, item := range pfxs {
 			rtbl.Insert(item.pfx, item.val)
 			seen[item.pfx] = item.val
@@ -194,7 +195,7 @@ func TestAll4SortedIter(t *testing.T) {
 
 	t.Run("All4SortedRangeOverFunc with premature exit", func(t *testing.T) {
 		t.Parallel()
-		rtbl := new(Table2[int])
+		rtbl := new(Table[int])
 		for _, item := range pfxs {
 			rtbl.Insert(item.pfx, item.val)
 		}
@@ -222,7 +223,7 @@ func TestAll6SortedRangeOverFunc(t *testing.T) {
 
 	t.Run("All6SortedRangeOverFunc", func(t *testing.T) {
 		t.Parallel()
-		rtbl := new(Table2[int])
+		rtbl := new(Table[int])
 		for _, item := range pfxs {
 			rtbl.Insert(item.pfx, item.val)
 			seen[item.pfx] = item.val
@@ -245,7 +246,7 @@ func TestAll6SortedRangeOverFunc(t *testing.T) {
 
 	t.Run("All6SortedRangeOverFunc with premature exit", func(t *testing.T) {
 		t.Parallel()
-		rtbl := new(Table2[int])
+		rtbl := new(Table[int])
 		for _, item := range pfxs {
 			rtbl.Insert(item.pfx, item.val)
 		}
@@ -273,7 +274,7 @@ func TestAllSortedRangeOverFunc(t *testing.T) {
 
 	t.Run("AllSortedRangeOverFunc", func(t *testing.T) {
 		t.Parallel()
-		rtbl := new(Table2[int])
+		rtbl := new(Table[int])
 		for _, item := range pfxs {
 			rtbl.Insert(item.pfx, item.val)
 			seen[item.pfx] = item.val
@@ -296,7 +297,7 @@ func TestAllSortedRangeOverFunc(t *testing.T) {
 
 	t.Run("AllSortedRangeOverFunc with premature exit", func(t *testing.T) {
 		t.Parallel()
-		rtbl := new(Table2[int])
+		rtbl := new(Table[int])
 		for _, item := range pfxs {
 			rtbl.Insert(item.pfx, item.val)
 		}
@@ -323,7 +324,7 @@ func TestSupernetsEdgeCase(t *testing.T) {
 	var zeroPfx netip.Prefix
 
 	t.Run("empty table", func(t *testing.T) {
-		rtbl := new(Table2[any])
+		rtbl := new(Table[any])
 		pfx := mpp("::1/128")
 
 		rtbl.Supernets(pfx)(func(_ netip.Prefix, _ any) bool {
@@ -333,7 +334,7 @@ func TestSupernetsEdgeCase(t *testing.T) {
 	})
 
 	t.Run("invalid prefix", func(t *testing.T) {
-		rtbl := new(Table2[any])
+		rtbl := new(Table[any])
 		pfx := mpp("::1/128")
 		val := "foo"
 		rtbl.Insert(pfx, val)
@@ -345,7 +346,7 @@ func TestSupernetsEdgeCase(t *testing.T) {
 	})
 
 	t.Run("identity", func(t *testing.T) {
-		rtbl := new(Table2[string])
+		rtbl := new(Table[string])
 		pfx := mpp("::1/128")
 		val := "foo"
 		rtbl.Insert(pfx, val)
@@ -367,7 +368,7 @@ func TestSupernetsCompare(t *testing.T) {
 
 	pfxs := gimmeRandomPrefixes(10_000)
 
-	fast := new(Table2[int])
+	fast := new(Table[int])
 	gold := goldTable[int]{}
 
 	for i, pfx := range pfxs {
@@ -396,7 +397,7 @@ func TestSubnets(t *testing.T) {
 	var zeroPfx netip.Prefix
 
 	t.Run("empty table", func(t *testing.T) {
-		rtbl := new(Table2[string])
+		rtbl := new(Table[string])
 		pfx := mpp("::1/128")
 
 		for range rtbl.Subnets(pfx) {
@@ -405,7 +406,7 @@ func TestSubnets(t *testing.T) {
 	})
 
 	t.Run("invalid prefix", func(t *testing.T) {
-		rtbl := new(Table2[string])
+		rtbl := new(Table[string])
 		pfx := mpp("::1/128")
 		val := "foo"
 		rtbl.Insert(pfx, val)
@@ -415,7 +416,7 @@ func TestSubnets(t *testing.T) {
 	})
 
 	t.Run("identity", func(t *testing.T) {
-		rtbl := new(Table2[string])
+		rtbl := new(Table[string])
 		pfx := mpp("::1/128")
 		val := "foo"
 		rtbl.Insert(pfx, val)
@@ -435,7 +436,7 @@ func TestSubnets(t *testing.T) {
 		want4 := 95_555
 		want6 := 105_555
 
-		rtbl := new(Table2[int])
+		rtbl := new(Table[int])
 		for i, pfx := range gimmeRandomPrefixes4(want4) {
 			rtbl.Insert(pfx, i)
 		}
@@ -471,7 +472,7 @@ func TestSubnetsCompare(t *testing.T) {
 
 	pfxs := gimmeRandomPrefixes(10_000)
 
-	fast := new(Table2[int])
+	fast := new(Table[int])
 	gold := goldTable[int]{}
 
 	for i, pfx := range pfxs {
@@ -507,4 +508,42 @@ func (t *goldTable[V]) lookupPrefixReverse(pfx netip.Prefix) []netip.Prefix {
 		return cmpPrefix(b, a)
 	})
 	return result
+}
+
+func BenchmarkSubnets(b *testing.B) {
+	n := 1_000_000
+
+	rtbl := new(Table[int])
+	for i, pfx := range gimmeRandomPrefixes(n) {
+		rtbl.Insert(pfx, i)
+	}
+
+	probe := mpp("42.150.112.0/20")
+	b.Run(fmt.Sprintf("Subnets(%q) from %d random pfxs", probe, n), func(b *testing.B) {
+		b.ResetTimer()
+		for range b.N {
+			for range rtbl.Subnets(probe) {
+				continue
+			}
+		}
+	})
+}
+
+func BenchmarkSupernets(b *testing.B) {
+	n := 1_000_000
+
+	rtbl := new(Table[int])
+	for i, pfx := range gimmeRandomPrefixes(n) {
+		rtbl.Insert(pfx, i)
+	}
+
+	probe := mpp("42.150.112.0/20")
+	b.Run(fmt.Sprintf("Supernets(%q) from %d random pfxs", probe, n), func(b *testing.B) {
+		b.ResetTimer()
+		for range b.N {
+			for range rtbl.Supernets(probe) {
+				continue
+			}
+		}
+	})
 }
