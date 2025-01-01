@@ -479,3 +479,149 @@ func (n *node2[V]) unionRec(o *node2[V], depth int) (duplicates int) {
 
 	return duplicates
 }
+
+// eachLookupPrefix does an all prefix match in the 8-bit (stride) routing table
+// at this depth and calls yield() for any matching CIDR.
+func (n *node2[V]) eachLookupPrefix(octets []byte, depth int, is4 bool, pfxLen int, yield func(netip.Prefix, V) bool) (ok bool) {
+	var path [16]byte
+	copy(path[:], octets)
+
+	if n.prefixes.Len() == 0 {
+		return true
+	}
+
+	// backtracking the CBT
+	for idx := pfxToIdx(octets[depth], pfxLen); idx > 0; idx >>= 1 {
+		if n.prefixes.Test(idx) {
+			val := n.prefixes.MustGet(idx)
+			cidr, _ := cidrFromPath(path, depth, is4, idx)
+
+			if !yield(cidr, val) {
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
+// eachSubnet calls yield() for any covered CIDR by parent prefix in natural CIDR sort order.
+func (n *node2[V]) eachSubnet(
+	pfx netip.Prefix, octets []byte, depth int, is4 bool, pfxLen int, yield func(netip.Prefix, V) bool,
+) bool {
+	var path [16]byte
+	copy(path[:], octets)
+
+	// 1. collect all indices in n covered by prefix
+	pfxFirstAddr := uint(octets[depth])
+	pfxLastAddr := uint(octets[depth] | ^netMask(pfxLen))
+
+	allCoveredIndices := make([]uint, 0, maxNodePrefixes)
+
+	var idx uint
+	var ok bool
+	for {
+		if idx, ok = n.prefixes.NextSet(idx); !ok {
+			break
+		}
+
+		// idx is covered by prefix?
+		thisOctet, thisPfxLen := idxToPfx(idx)
+
+		thisFirstAddr := uint(thisOctet)
+		thisLastAddr := uint(thisOctet | ^netMask(thisPfxLen))
+
+		if thisFirstAddr >= pfxFirstAddr && thisLastAddr <= pfxLastAddr {
+			allCoveredIndices = append(allCoveredIndices, idx)
+		}
+
+		idx++
+	}
+
+	// sort indices in CIDR sort order
+	slices.SortFunc(allCoveredIndices, cmpIndexRank)
+
+	// 2. collect all covered child addrs by prefix
+	allCoveredChildAddrs := make([]uint, 0, maxNodeChildren)
+
+	var addr uint
+	for {
+		if addr, ok = n.children.NextSet(addr); !ok {
+			break
+		}
+
+		// child addrs are sorted in indexRank order
+		if addr > pfxLastAddr {
+			break
+		}
+
+		if addr >= pfxFirstAddr {
+			allCoveredChildAddrs = append(allCoveredChildAddrs, addr)
+		}
+
+		addr++
+	}
+
+	// 3. yield covered indices, pathcomp prefixes and childs in CIDR sort order
+
+	childCursor := 0
+
+	// yield indices and childs in CIDR sort order
+	for _, pfxIdx := range allCoveredIndices {
+		pfxOctet, _ := idxToPfx(pfxIdx)
+
+		// yield all childs before idx
+		for j := childCursor; j < len(allCoveredChildAddrs); j++ {
+			addr := allCoveredChildAddrs[j]
+			if addr >= uint(pfxOctet) {
+				break
+			}
+
+			// yield the node or leaf?
+			switch k := n.children.MustGet(addr).(type) {
+
+			case *node2[V]:
+				path[depth] = byte(addr)
+				if !k.allRecSorted(path, depth+1, is4, yield) {
+					return false
+				}
+
+			case *leaf[V]:
+				if !yield(k.prefix, k.value) {
+					return false
+				}
+			}
+
+			childCursor++
+		}
+
+		// yield the prefix for this idx
+		cidr, _ := cidrFromPath(path, depth, is4, pfxIdx)
+		// n.prefixes.Items[i] not possible after sorting allIndices
+		if !yield(cidr, n.prefixes.MustGet(pfxIdx)) {
+			return false
+		}
+	}
+
+	// yield the rest of leaves and nodes (rec-descent)
+	for j := childCursor; j < len(allCoveredChildAddrs); j++ {
+		addr := allCoveredChildAddrs[j]
+
+		// yield the node or leaf?
+		switch k := n.children.MustGet(addr).(type) {
+
+		case *node2[V]:
+			path[depth] = byte(addr)
+			if !k.allRecSorted(path, depth+1, is4, yield) {
+				return false
+			}
+
+		case *leaf[V]:
+			if !yield(k.prefix, k.value) {
+				return false
+			}
+		}
+	}
+
+	return true
+}

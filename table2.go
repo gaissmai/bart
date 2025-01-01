@@ -530,6 +530,138 @@ LOOP:
 	return zeroPfx, zeroVal, false
 }
 
+// Supernets returns an iterator over all CIDRs covering pfx.
+// The iteration is in reverse CIDR sort order, from longest-prefix-match to shortest-prefix-match.
+func (t *Table2[V]) Supernets(pfx netip.Prefix) func(yield func(netip.Prefix, V) bool) {
+	return func(yield func(netip.Prefix, V) bool) {
+		if !pfx.IsValid() {
+			return
+		}
+
+		// canonicalize the prefix
+		pfx = pfx.Masked()
+
+		// values derived from pfx
+		ip := pfx.Addr()
+		is4 := ip.Is4()
+		bits := pfx.Bits()
+
+		n := t.rootNodeByVersion(is4)
+
+		sigOctetIdx := (bits - 1) / strideLen
+		sigOctetBits := bits - (sigOctetIdx * strideLen)
+
+		octets := ip.AsSlice()
+		octets = octets[:sigOctetIdx+1]
+
+		// stack of the traversed nodes for reverse ordering of supernets
+		stack := [maxTreeDepth]*node2[V]{}
+
+		// run variable, used after for loop
+		var i int
+		var octet byte
+
+		// find last node along this octet path
+	LOOP:
+		for i, octet = range octets {
+			addr := uint(octet)
+
+			// push current node on stack
+			stack[i] = n
+
+			if !n.children.Test(addr) {
+				break LOOP
+			}
+
+			switch k := n.children.MustGet(addr).(type) {
+			case *node2[V]:
+				n = k
+				continue LOOP
+			case *leaf[V]:
+				if k.prefix.Overlaps(pfx) && k.prefix.Bits() <= pfx.Bits() {
+					if !yield(k.prefix, k.value) {
+						// early exit
+						return
+					}
+				}
+				// end of trie along this octets path
+				break LOOP
+			}
+		}
+
+		// start backtracking, unwind the stack
+		for depth := i; depth >= 0; depth-- {
+			n = stack[depth]
+
+			// micro benchmarking
+			if n.prefixes.Len() == 0 {
+				continue
+			}
+
+			// only the lastOctet may have a different prefix len
+			// all others are just host routes
+			pfxLen := strideLen
+			if depth == sigOctetIdx {
+				pfxLen = sigOctetBits
+			}
+
+			if !n.eachLookupPrefix(octets, depth, is4, pfxLen, yield) {
+				// early exit
+				return
+			}
+		}
+	}
+}
+
+// Subnets returns an iterator over all CIDRs covered by pfx.
+// The iteration is in natural CIDR sort order.
+func (t *Table2[V]) Subnets(pfx netip.Prefix) func(yield func(netip.Prefix, V) bool) {
+	return func(yield func(netip.Prefix, V) bool) {
+		if !pfx.IsValid() {
+			return
+		}
+
+		// canonicalize the prefix
+		pfx = pfx.Masked()
+
+		// values derived from pfx
+		ip := pfx.Addr()
+		is4 := ip.Is4()
+		bits := pfx.Bits()
+
+		n := t.rootNodeByVersion(is4)
+
+		octets := ip.AsSlice()
+
+		sigOctetIdx := (bits - 1) / strideLen
+		sigOctetBits := bits - (sigOctetIdx * strideLen)
+
+		// find the trie node
+		for _, octet := range octets[:sigOctetIdx] {
+			addr := uint(octet)
+
+			if !n.children.Test(addr) {
+				return
+			}
+
+			switch k := n.children.MustGet(addr).(type) {
+			case *node2[V]:
+				n = k
+				continue
+			case *leaf[V]:
+				if pfx.Overlaps(k.prefix) && pfx.Bits() <= k.prefix.Bits() {
+					_ = yield(k.prefix, k.value)
+				}
+				return
+			}
+		}
+
+		// at last significant octet of pfx
+		_ = n.eachSubnet(pfx, octets, sigOctetIdx, is4, sigOctetBits, yield)
+		return
+	}
+}
+
 // OverlapsPrefix reports whether any IP in pfx is matched by a route in the table or vice versa.
 func (t *Table2[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 	if !pfx.IsValid() {
