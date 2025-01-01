@@ -169,6 +169,31 @@ func (b BitSet) AsSlice(buf []uint) []uint {
 	return buf
 }
 
+// AsSliceFunc returns all set bits as slice of uint for which
+// filter returns true
+//
+// It panics if the capacity of buf isn't big enough.
+func (b BitSet) AsSliceFunc(buf []uint, filter func(uint) bool) []uint {
+	buf = buf[:cap(buf)] // len = cap
+
+	size := 0
+	for idx, word := range b {
+		for word != 0 {
+			// panics if capacity of buf is exceeded.
+			if k := uint(idx<<6 + bits.TrailingZeros64(word)); filter(k) {
+				buf[size] = k
+				size++
+			}
+
+			// clear the rightmost set bit
+			word &= word - 1
+		}
+	}
+
+	buf = buf[:size]
+	return buf
+}
+
 // AppendTo appends all set bits to buf and returns the (maybe extended) buf.
 // If the capacity of buf is < b.Size() new memory is allocated.
 func (b BitSet) AppendTo(buf []uint) []uint {

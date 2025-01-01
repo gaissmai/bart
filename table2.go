@@ -640,25 +640,28 @@ func (t *Table2[V]) Subnets(pfx netip.Prefix) func(yield func(netip.Prefix, V) b
 		for _, octet := range octets[:sigOctetIdx] {
 			addr := uint(octet)
 
+			// no octet path in trie to last significant octet
 			if !n.children.Test(addr) {
 				return
 			}
 
+			// node or leaf?
 			switch k := n.children.MustGet(addr).(type) {
 			case *node2[V]:
+				// drill down
 				n = k
 				continue
 			case *leaf[V]:
 				if pfx.Overlaps(k.prefix) && pfx.Bits() <= k.prefix.Bits() {
 					_ = yield(k.prefix, k.value)
 				}
+				// no more child nodes on octet path
 				return
 			}
 		}
 
-		// at last significant octet of pfx
-		_ = n.eachSubnet(pfx, octets, sigOctetIdx, is4, sigOctetBits, yield)
-		return
+		// now at last significant octet of pfx
+		_ = n.eachSubnet(octets, sigOctetIdx, is4, sigOctetBits, yield)
 	}
 }
 
