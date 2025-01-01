@@ -506,9 +506,7 @@ func (n *node2[V]) eachLookupPrefix(octets []byte, depth int, is4 bool, pfxLen i
 }
 
 // eachSubnet calls yield() for any covered CIDR by parent prefix in natural CIDR sort order.
-func (n *node2[V]) eachSubnet(
-	pfx netip.Prefix, octets []byte, depth int, is4 bool, pfxLen int, yield func(netip.Prefix, V) bool,
-) bool {
+func (n *node2[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxLen int, yield func(netip.Prefix, V) bool) bool {
 	var path [16]byte
 	copy(path[:], octets)
 
@@ -516,62 +514,33 @@ func (n *node2[V]) eachSubnet(
 	pfxFirstAddr := uint(octets[depth])
 	pfxLastAddr := uint(octets[depth] | ^netMask(pfxLen))
 
-	allCoveredIndices := make([]uint, 0, maxNodePrefixes)
-
-	var idx uint
-	var ok bool
-	for {
-		if idx, ok = n.prefixes.NextSet(idx); !ok {
-			break
-		}
-
-		// idx is covered by prefix?
+	allCoveredIndices := n.prefixes.AsSliceFunc(make([]uint, 0, maxNodePrefixes), func(idx uint) bool {
 		thisOctet, thisPfxLen := idxToPfx(idx)
 
 		thisFirstAddr := uint(thisOctet)
 		thisLastAddr := uint(thisOctet | ^netMask(thisPfxLen))
 
-		if thisFirstAddr >= pfxFirstAddr && thisLastAddr <= pfxLastAddr {
-			allCoveredIndices = append(allCoveredIndices, idx)
-		}
-
-		idx++
-	}
+		return thisFirstAddr >= pfxFirstAddr && thisLastAddr <= pfxLastAddr
+	})
 
 	// sort indices in CIDR sort order
 	slices.SortFunc(allCoveredIndices, cmpIndexRank)
 
 	// 2. collect all covered child addrs by prefix
-	allCoveredChildAddrs := make([]uint, 0, maxNodeChildren)
-
-	var addr uint
-	for {
-		if addr, ok = n.children.NextSet(addr); !ok {
-			break
-		}
-
-		// child addrs are sorted in indexRank order
-		if addr > pfxLastAddr {
-			break
-		}
-
-		if addr >= pfxFirstAddr {
-			allCoveredChildAddrs = append(allCoveredChildAddrs, addr)
-		}
-
-		addr++
-	}
+	allCoveredChildAddrs := n.children.AsSliceFunc(make([]uint, 0, maxNodeChildren), func(addr uint) bool {
+		return addr >= pfxFirstAddr && addr <= pfxLastAddr
+	})
 
 	// 3. yield covered indices, pathcomp prefixes and childs in CIDR sort order
 
-	childCursor := 0
+	addrCursor := 0
 
 	// yield indices and childs in CIDR sort order
 	for _, pfxIdx := range allCoveredIndices {
 		pfxOctet, _ := idxToPfx(pfxIdx)
 
 		// yield all childs before idx
-		for j := childCursor; j < len(allCoveredChildAddrs); j++ {
+		for j := addrCursor; j < len(allCoveredChildAddrs); j++ {
 			addr := allCoveredChildAddrs[j]
 			if addr >= uint(pfxOctet) {
 				break
@@ -592,7 +561,7 @@ func (n *node2[V]) eachSubnet(
 				}
 			}
 
-			childCursor++
+			addrCursor++
 		}
 
 		// yield the prefix for this idx
@@ -604,9 +573,7 @@ func (n *node2[V]) eachSubnet(
 	}
 
 	// yield the rest of leaves and nodes (rec-descent)
-	for j := childCursor; j < len(allCoveredChildAddrs); j++ {
-		addr := allCoveredChildAddrs[j]
-
+	for _, addr := range allCoveredChildAddrs[addrCursor:] {
 		// yield the node or leaf?
 		switch k := n.children.MustGet(addr).(type) {
 
