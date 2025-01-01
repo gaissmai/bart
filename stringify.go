@@ -16,7 +16,7 @@ import (
 // kid, a node has no path information about its predecessors,
 // we collect this during the recursive descent.
 // The path/depth/idx is needed to get the CIDR back.
-type kid[V any] struct {
+type kid2[V any] struct {
 	// for traversing
 	n     *node[V]
 	is4   bool
@@ -99,7 +99,7 @@ func (t *Table[V]) fprint(w io.Writer, is4 bool) error {
 		return err
 	}
 
-	startKid := kid[V]{
+	startKid := kid2[V]{
 		n:    nil,
 		idx:  0,
 		path: zeroPath,
@@ -114,7 +114,7 @@ func (t *Table[V]) fprint(w io.Writer, is4 bool) error {
 }
 
 // fprintRec, the output is a hierarchical CIDR tree starting with this kid.
-func (n *node[V]) fprintRec(w io.Writer, parent kid[V], pad string) error {
+func (n *node[V]) fprintRec(w io.Writer, parent kid2[V], pad string) error {
 	// recursion stop condition
 	if n == nil {
 		return nil
@@ -124,7 +124,7 @@ func (n *node[V]) fprintRec(w io.Writer, parent kid[V], pad string) error {
 	directKids := n.getKidsRec(parent.idx, parent.path, parent.depth, parent.is4)
 
 	// sort them by netip.Prefix, not by baseIndex
-	slices.SortFunc(directKids, cmpKidByPrefix[V])
+	slices.SortFunc(directKids, cmpKidByPrefix2[V])
 
 	// symbols used in tree
 	glyphe := "├─ "
@@ -160,15 +160,14 @@ func (n *node[V]) fprintRec(w io.Writer, parent kid[V], pad string) error {
 //
 // See the  artlookup.pdf paper in the doc folder,
 // the baseIndex function is the key.
-func (n *node[V]) getKidsRec(parentIdx uint, path [16]byte, depth int, is4 bool) []kid[V] {
+func (n *node[V]) getKidsRec(parentIdx uint, path [16]byte, depth int, is4 bool) []kid2[V] {
 	// recursion stop condition
 	if n == nil {
 		return nil
 	}
 
-	var directKids []kid[V]
+	var directKids []kid2[V]
 
-	// no heap allocs
 	allIndices := n.prefixes.AsSlice(make([]uint, 0, maxNodePrefixes))
 
 	for _, idx := range allIndices {
@@ -184,7 +183,7 @@ func (n *node[V]) getKidsRec(parentIdx uint, path [16]byte, depth int, is4 bool)
 		if lpmIdx == parentIdx {
 			cidr, _ := cidrFromPath(path, depth, is4, idx)
 
-			kid := kid[V]{
+			kid := kid2[V]{
 				n:     n,
 				is4:   is4,
 				path:  path,
@@ -198,45 +197,48 @@ func (n *node[V]) getKidsRec(parentIdx uint, path [16]byte, depth int, is4 bool)
 		}
 	}
 
-	// look for path compressed items in this node
-	allPathCompAddrs := n.pathcomp.AsSlice(make([]uint, 0, maxNodeChildren))
-	for i, addr := range allPathCompAddrs {
-		// do a longest-prefix-match
-		lpmIdx, _, _ := n.lpm(hostIndex(addr))
-		if lpmIdx == parentIdx {
-			item := n.pathcomp.Items[i]
+	// the node may have childs and leaves, the rec-descent monster starts
 
-			kid := kid[V]{
-				n:    nil, // path compressed item, stop recursion
-				is4:  is4,
-				cidr: item.prefix,
-				val:  item.value,
-			}
-
-			directKids = append(directKids, kid)
-		}
-	}
-
-	// the node may have childs, the rec-descent monster starts
-
-	// no heap allocs
 	allChildAddrs := n.children.AsSlice(make([]uint, 0, maxNodeChildren))
-
 	for i, addr := range allChildAddrs {
-		octet := byte(addr)
-
 		// do a longest-prefix-match
 		lpmIdx, _, _ := n.lpm(hostIndex(addr))
 		if lpmIdx == parentIdx {
-			c := n.children.Items[i]
-			path[depth] = octet
+			switch k := n.children.Items[i].(type) {
+			case *node[V]:
+				path[depth] = byte(addr)
 
-			// traverse, rec-descent call with next child node
-			directKids = append(directKids, c.getKidsRec(0, path, depth+1, is4)...)
+				// traverse, rec-descent call with next child node
+				directKids = append(directKids, k.getKidsRec(0, path, depth+1, is4)...)
+			case *leaf[V]:
+				kid := kid2[V]{
+					n:    nil, // path compressed item, stop recursion
+					is4:  is4,
+					cidr: k.prefix,
+					val:  k.value,
+				}
+
+				directKids = append(directKids, kid)
+			}
 		}
 	}
 
 	return directKids
+}
+
+// cmpKidByPrefix2, all prefixes are already normalized (Masked).
+func cmpKidByPrefix2[V any](a, b kid2[V]) int {
+	return cmpPrefix(a.cidr, b.cidr)
+}
+
+// cmpPrefix, compare func for prefix sort,
+// all cidrs are already normalized
+func cmpPrefix(a, b netip.Prefix) int {
+	if cmp := a.Addr().Compare(b.Addr()); cmp != 0 {
+		return cmp
+	}
+
+	return cmp.Compare(a.Bits(), b.Bits())
 }
 
 // cidrFromPath, get prefix back from byte path, depth, octet and pfxLen.
@@ -259,19 +261,4 @@ func cidrFromPath(path [16]byte, depth int, is4 bool, idx uint) (netip.Prefix, e
 
 	// make a normalized prefix from ip/bits
 	return ip.Prefix(bits)
-}
-
-// cmpKidByPrefix, all prefixes are already normalized (Masked).
-func cmpKidByPrefix[V any](a, b kid[V]) int {
-	return cmpPrefix(a.cidr, b.cidr)
-}
-
-// cmpPrefix, compare func for prefix sort,
-// all cidrs are already normalized
-func cmpPrefix(a, b netip.Prefix) int {
-	if cmp := a.Addr().Compare(b.Addr()); cmp != 0 {
-		return cmp
-	}
-
-	return cmp.Compare(a.Bits(), b.Bits())
 }

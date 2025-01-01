@@ -8,7 +8,9 @@
 // and rewrote it from scratch for the needs of this project.
 package bitset
 
-import "math/bits"
+import (
+	"math/bits"
+)
 
 // A BitSet is a slice of words. This is an internal package
 // with a wide open public API.
@@ -108,7 +110,7 @@ func (b BitSet) NextSet(i uint) (uint, bool) {
 		return 0, false
 	}
 
-	// process the first (maybe partial) first
+	// process the first (maybe partial) word
 	first := b[x] >> (i & 63) // i % 64
 	if first != 0 {
 		return i + uint(bits.TrailingZeros64(first)), true
@@ -125,27 +127,6 @@ func (b BitSet) NextSet(i uint) (uint, bool) {
 	return 0, false
 }
 
-// AsSet returns all set bits as a set of bool.
-// The capacity of buf must be >= b.Size and
-// all elements must be false (cleared) on input.
-//
-// It panics if the capacity of buf is < b.Size()
-func (b BitSet) AsSet(buf []bool) []bool {
-	buf = buf[:cap(buf)] // len = cap
-
-	for idx, word := range b {
-		for word != 0 {
-			// panics if capacity of buf is exceeded.
-			buf[idx<<6+bits.TrailingZeros64(word)] = true
-
-			// clear the rightmost set bit
-			word &= word - 1
-		}
-	}
-
-	return buf
-}
-
 // AsSlice returns all set bits as slice of uint without
 // heap allocations.
 //
@@ -159,31 +140,6 @@ func (b BitSet) AsSlice(buf []uint) []uint {
 		for ; word != 0; size++ {
 			// panics if capacity of buf is exceeded.
 			buf[size] = uint(idx<<6 + bits.TrailingZeros64(word))
-
-			// clear the rightmost set bit
-			word &= word - 1
-		}
-	}
-
-	buf = buf[:size]
-	return buf
-}
-
-// AsSliceFunc returns all set bits as slice of uint for which
-// filter returns true
-//
-// It panics if the capacity of buf isn't big enough.
-func (b BitSet) AsSliceFunc(buf []uint, filter func(uint) bool) []uint {
-	buf = buf[:cap(buf)] // len = cap
-
-	size := 0
-	for idx, word := range b {
-		for word != 0 {
-			// panics if capacity of buf is exceeded.
-			if k := uint(idx<<6 + bits.TrailingZeros64(word)); filter(k) {
-				buf[size] = k
-				size++
-			}
 
 			// clear the rightmost set bit
 			word &= word - 1

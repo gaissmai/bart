@@ -1,12 +1,13 @@
-// Copyright (c) 2024 Karl Gaissmaier
-// SPDX-License-Identifier: MIT
-
 package bart
 
-import "github.com/gaissmai/bart/internal/bitset"
+import (
+	"net/netip"
+
+	"github.com/gaissmai/bart/internal/bitset"
+)
 
 // overlapsRec returns true if any IP in the nodes n or o overlaps.
-func (n *node[V]) overlapsRec(o *node[V]) bool {
+func (n *node[V]) overlapsRec(o *node[V], depth int) bool {
 	nPfxCount := n.prefixes.Len()
 	oPfxCount := o.prefixes.Len()
 
@@ -16,22 +17,6 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 	// ##############################
 	// 1. Test if any routes overlaps
 	// ##############################
-
-	// special case, overlapsPrefix is faster
-	if nPfxCount == 1 && nChildCount == 0 {
-		// get the single prefix from n
-		idx, _ := n.prefixes.FirstSet()
-
-		return o.overlapsPrefix(idxToPfx(idx))
-	}
-
-	// special case, overlapsPrefix is faster
-	if oPfxCount == 1 && oChildCount == 0 {
-		// get the single prefix from o
-		idx, _ := o.prefixes.FirstSet()
-
-		return n.overlapsPrefix(idxToPfx(idx))
-	}
 
 	// full cross check
 	if nPfxCount > 0 && oPfxCount > 0 {
@@ -43,6 +28,19 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 	// ####################################
 	// 2. Test if routes overlaps any child
 	// ####################################
+
+	// swap nodes to help chance on its way,
+	// if the first call to expensive overlapsChildrenIn() is already true,
+	// if both orders are false it doesn't help either
+	if nChildCount > oChildCount {
+		n, o = o, n
+
+		nPfxCount = n.prefixes.Len()
+		oPfxCount = o.prefixes.Len()
+
+		nChildCount = n.children.Len()
+		oChildCount = o.children.Len()
+	}
 
 	if nPfxCount > 0 && oChildCount > 0 {
 		if n.overlapsChildrenIn(o) {
@@ -66,44 +64,32 @@ func (n *node[V]) overlapsRec(o *node[V]) bool {
 		return false
 	}
 
-	if oChildCount == 1 {
-		return n.overlapsOneChildIn(o)
-	}
-
-	if nChildCount == 1 {
-		return o.overlapsOneChildIn(n)
-	}
-
 	// stop condition, no child with identical octet in n and o
 	if n.children.IntersectionCardinality(o.children.BitSet) == 0 {
 		return false
 	}
 
-	return n.overlapsSameChildrenRec(o)
+	return n.overlapsSameChildrenRec(o, depth)
 }
 
 // overlapsRoutes, test if n overlaps o prefixes and vice versa
 func (n *node[V]) overlapsRoutes(o *node[V]) bool {
-	// one node has just one prefix, use bitset algo
-	if n.prefixes.Len() == 1 {
-		return o.overlapsOneRouteIn(n)
-	}
-
-	// one node has just one prefix, use bitset algo
-	if o.prefixes.Len() == 1 {
-		return n.overlapsOneRouteIn(o)
-	}
-
 	// some prefixes are identical, trivial overlap
 	if n.prefixes.IntersectionCardinality(o.prefixes.BitSet) > 0 {
 		return true
 	}
 
+	// get the lowest idx (biggest prefix)
+	nFirstIdx, _ := n.prefixes.FirstSet()
+	oFirstIdx, _ := o.prefixes.FirstSet()
+
+	// start with other min value, see ART algo
+	nIdx := oFirstIdx
+	oIdx := nFirstIdx
+
 	// make full cross check
 	nOK := true
 	oOK := true
-
-	var nIdx, oIdx uint
 
 	// zip, range over n and o together to help chance on its way
 	for nOK || oOK {
@@ -139,23 +125,20 @@ func (n *node[V]) overlapsChildrenIn(o *node[V]) bool {
 	childCount := o.children.Len()
 
 	// heuristic, compare benchmarks
-	// when will re range over the children and when will we do bitset calc?
+	// when will we range over the children and when will we do bitset calc?
 	magicNumber := 15
 	doRange := childCount < magicNumber || pfxCount > magicNumber
 
-	// do range over, not so many childs and maybe to many prefixes
+	// do range over, not so many childs and maybe to many prefixes for other algo below
 	if doRange {
-		var oAddr uint
-
-		ok := true
-		for ok {
-			// does any route in o overlap this child from n
-			if oAddr, ok = o.children.NextSet(oAddr); ok {
-				if n.lpmTest(hostIndex(oAddr)) {
-					return true
-				}
-
-				oAddr++
+		lowerBound, _ := n.prefixes.FirstSet()
+		for _, addr := range o.children.AsSlice(make([]uint, 0, maxNodeChildren)) {
+			idx := hostIndex(addr)
+			if idx < lowerBound { // lpm match impossible
+				continue
+			}
+			if n.lpmTest(idx) {
+				return true
 			}
 		}
 
@@ -163,7 +146,7 @@ func (n *node[V]) overlapsChildrenIn(o *node[V]) bool {
 	}
 
 	// do bitset intersection, alloted route table with child octets
-	// maybe to many childs ro range over or not so many prefixes to
+	// maybe to many childs for range over or not so many prefixes to
 	// build the alloted routing table from them
 
 	// make allot table with prefixes as bitsets, bitsets are precalculated
@@ -188,10 +171,7 @@ func (n *node[V]) overlapsChildrenIn(o *node[V]) bool {
 }
 
 // overlapsSameChildrenRec, find same octets with bitset intersection.
-// rec-descent with same child octet in n an o,
-func (n *node[V]) overlapsSameChildrenRec(o *node[V]) bool {
-	// gimmicks, clone a bitset without heap allocation
-	// 4*64=256, maxNodeChildren
+func (n *node[V]) overlapsSameChildrenRec(o *node[V], depth int) bool {
 	var nChildrenBitsetCloned bitset.BitSet = make([]uint64, 4)
 	copy(nChildrenBitsetCloned, n.children.BitSet)
 
@@ -202,11 +182,10 @@ func (n *node[V]) overlapsSameChildrenRec(o *node[V]) bool {
 
 	// range over all child addrs, common in n and o
 	for _, addr := range allCommonChildren {
-		oChild, _ := o.children.Get(addr)
-		nChild, _ := n.children.Get(addr)
+		nChild := n.children.MustGet(addr)
+		oChild := o.children.MustGet(addr)
 
-		// rec-descent with same child
-		if nChild.overlapsRec(oChild) {
+		if overlapsTwoChilds[V](nChild, oChild, depth+1) {
 			return true
 		}
 	}
@@ -214,50 +193,88 @@ func (n *node[V]) overlapsSameChildrenRec(o *node[V]) bool {
 	return false
 }
 
-func (n *node[V]) overlapsOneChildIn(o *node[V]) bool {
-	// get the single addr and child
-	addr, _ := o.children.NextSet(0)
-	oChild := o.children.Items[0]
+// overlapsTwoChilds, childs can be node or leaf.
+func overlapsTwoChilds[V any](nChild, oChild any, depth int) bool {
+	//  4 possible different combinations for n and o
+	//
+	//  node, node  --> overlapsRec, increment depth
+	//  node, leaf  --> overlapsPrefixAtDepth
+	//  leaf, node  --> overlapsPrefixAtDepth
+	//  leaf, leaf  --> netip.Prefix.Overlaps
+	//
+	switch nKind := nChild.(type) {
 
-	if nChild, ok := n.children.Get(addr); ok {
-		return nChild.overlapsRec(oChild)
+	case *node[V]:
+		switch oKind := oChild.(type) {
+		case *node[V]: // node, node
+			return nKind.overlapsRec(oKind, depth+1) // node, node
+		case *leaf[V]: // node, leaf
+			return nKind.overlapsPrefixAtDepth(oKind.prefix, depth) // node, node
+		}
+
+	case *leaf[V]:
+		switch oKind := oChild.(type) {
+		case *node[V]: // leaf, node
+			return oKind.overlapsPrefixAtDepth(nKind.prefix, depth)
+		case *leaf[V]: // leaf, leaf
+			return oKind.prefix.Overlaps(nKind.prefix)
+		}
 	}
 
 	return false
 }
 
-func (n *node[V]) overlapsOneRouteIn(o *node[V]) bool {
-	// get the single prefix from o
-	idx, _ := o.prefixes.NextSet(0)
+// overlapsPrefixAtDepth, returns true if node overlaps with prefix
+// starting with prefix octet at depth.
+//
+// Needed for path compressed prefix some level down in the node trie.
+func (n *node[V]) overlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
+	ip := pfx.Addr()
+	octets := ip.AsSlice()
+	bits := pfx.Bits()
 
-	// 1. Test if any route in this node overlaps prefix?
-	if n.lpmTest(idx) {
-		return true
+	sigOctetIdx := (bits - 1) / strideLen
+	sigOctetBits := bits - (sigOctetIdx * strideLen)
+
+	for i := depth; i < sigOctetIdx; i++ {
+		addr := uint(octets[i])
+
+		// test if any route overlaps prefix´ so far
+		// no best match needed, forward tests without backtracking
+		if n.prefixes.Len() != 0 && n.lpmTest(hostIndex(addr)) {
+			return true
+		}
+
+		if !n.children.Test(addr) {
+			// no full octet path in node trie
+			return false
+		}
+
+		// next child, node or leaf
+		switch k := n.children.MustGet(addr).(type) {
+		case *node[V]:
+			n = k
+			continue
+		case *leaf[V]:
+			return k.prefix.Overlaps(pfx)
+		}
 	}
 
-	// 2. Test if prefix overlaps any route in this node
-	// use bitset intersection with alloted stride table instead of range loops
-
-	// copy pre alloted bitset for idx
-	a8 := idxToAllot(idx)
-	allotedPrefixRoutes := bitset.BitSet(a8[:])
-
-	// use bitset intersection instead of range loops
-	return allotedPrefixRoutes.IntersectionCardinality(n.prefixes.BitSet) > 0
+	// full octet path in node trie, check overlap with last prefix octet
+	return n.overlapsIdx(octets[sigOctetIdx], sigOctetBits)
 }
 
-// overlapsPrefix returns true if node overlaps with prefix.
-func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
+// overlapsIdx returns true if node overlaps with prefix.
+func (n *node[V]) overlapsIdx(octet byte, pfxLen int) bool {
 	// 1. Test if any route in this node overlaps prefix?
 	idx := pfxToIdx(octet, pfxLen)
 	if n.lpmTest(idx) {
 		return true
 	}
 
-	// use bitset intersections instead of range loops
-
 	// 2. Test if prefix overlaps any route in this node
 
+	// use bitset intersections instead of range loops
 	// copy pre alloted bitset for idx
 	a8 := idxToAllot(idx)
 	allotedPrefixRoutes := bitset.BitSet(a8[:])
@@ -266,18 +283,7 @@ func (n *node[V]) overlapsPrefix(octet byte, pfxLen int) bool {
 		return true
 	}
 
-	// 3. Test if prefix overlaps any pathcomp prefix
-
-	// shift-right pathcomp bitset by 256 (firstHostIndex)
-	pc8 := make([]uint64, 8)
-	copy(pc8[4:], n.pathcomp.BitSet) // 4*64= 256
-	pathcompRoutes := bitset.BitSet(pc8)
-
-	if allotedPrefixRoutes.IntersectionCardinality(pathcompRoutes) != 0 {
-		return true
-	}
-
-	// 4. Test if prefix overlaps any child in this node
+	// 3. Test if prefix overlaps any child in this node
 
 	// shift-right children bitset by 256 (firstHostIndex)
 	c8 := make([]uint64, 8)

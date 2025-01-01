@@ -21,14 +21,14 @@ func TestStringPanic(t *testing.T) {
 		}
 	}()
 
-	tbl := new(Table2[any])
+	tbl := new(Table[any])
 	tbl.Insert(mpp("1.2.3.4/32"), nil)
 	tbl.Fprint(nil)
 }
 
 func TestStringEmpty(t *testing.T) {
 	t.Parallel()
-	tbl := new(Table2[any])
+	tbl := new(Table[any])
 	want := ""
 	got := tbl.String()
 	if got != want {
@@ -48,7 +48,7 @@ func TestStringDefaultRouteV4(t *testing.T) {
 `,
 	}
 
-	tbl := new(Table2[any])
+	tbl := new(Table[any])
 	checkString(t, tbl, tt)
 }
 
@@ -64,7 +64,7 @@ func TestStringDefaultRouteV6(t *testing.T) {
 `,
 	}
 
-	tbl := new(Table2[any])
+	tbl := new(Table[any])
 	checkString(t, tbl, tt)
 }
 
@@ -96,7 +96,7 @@ func TestStringSampleV4(t *testing.T) {
 `,
 	}
 
-	tbl := new(Table2[any])
+	tbl := new(Table[any])
 	checkString(t, tbl, tt)
 }
 
@@ -117,7 +117,7 @@ func TestStringSampleV6(t *testing.T) {
 `,
 	}
 
-	tbl := new(Table2[any])
+	tbl := new(Table[any])
 	checkString(t, tbl, tt)
 }
 
@@ -160,11 +160,11 @@ func TestStringSample(t *testing.T) {
 `,
 	}
 
-	tbl := new(Table2[any])
+	tbl := new(Table[any])
 	checkString(t, tbl, tt)
 }
 
-func checkString(t *testing.T, tbl *Table2[any], tt stringTest) {
+func checkString(t *testing.T, tbl *Table[any], tt stringTest) {
 	t.Helper()
 
 	for _, cidr := range tt.cidrs {

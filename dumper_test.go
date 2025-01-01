@@ -22,14 +22,14 @@ func TestDumperPanic(t *testing.T) {
 		}
 	}()
 
-	tbl := new(Table2[any])
+	tbl := new(Table[any])
 	tbl.Insert(mpp("1.2.3.4/32"), nil)
 	tbl.dump(nil)
 }
 
 func TestDumperEmpty(t *testing.T) {
 	t.Parallel()
-	tbl := new(Table2[any])
+	tbl := new(Table[any])
 	checkDump(t, tbl, dumpTest{
 		cidrs: nil,
 		want:  "",
@@ -38,7 +38,7 @@ func TestDumperEmpty(t *testing.T) {
 
 func TestDumpDefaultRouteV4(t *testing.T) {
 	t.Parallel()
-	tbl := new(Table2[any])
+	tbl := new(Table[any])
 	checkDump(t, tbl, dumpTest{
 		cidrs: []netip.Prefix{
 			mpp("0.0.0.0/0"),
@@ -55,7 +55,7 @@ values(#1): <nil>
 
 func TestDumpDefaultRouteV6(t *testing.T) {
 	t.Parallel()
-	tbl := new(Table2[any])
+	tbl := new(Table[any])
 	checkDump(t, tbl, dumpTest{
 		cidrs: []netip.Prefix{
 			mpp("::/0"),
@@ -72,7 +72,7 @@ values(#1): <nil>
 
 func TestDumpSampleV4(t *testing.T) {
 	t.Parallel()
-	tbl := new(Table2[any])
+	tbl := new(Table[any])
 
 	checkDump(t, tbl, dumpTest{
 		cidrs: []netip.Prefix{
@@ -114,7 +114,7 @@ leaves(#3): 127:{127.0.0.1/32, <nil>} 169:{169.254.0.0/16, <nil>} 172:{172.16.0.
 
 func TestDumpSampleV6(t *testing.T) {
 	t.Parallel()
-	tbl := new(Table2[any])
+	tbl := new(Table[any])
 	checkDump(t, tbl, dumpTest{
 		cidrs: []netip.Prefix{
 			mpp("fe80::/10"),
@@ -134,7 +134,7 @@ leaves(#2): 0x20:{2001:db8::/32, <nil>} 0xfe:{fe80::/10, <nil>}
 
 func TestDumpSample(t *testing.T) {
 	t.Parallel()
-	tbl := new(Table2[any])
+	tbl := new(Table[any])
 
 	checkDump(t, tbl, dumpTest{
 		cidrs: []netip.Prefix{
@@ -185,7 +185,7 @@ leaves(#2): 0x20:{2001:db8::/32, <nil>} 0xfe:{fe80::/10, <nil>}
 	})
 }
 
-func checkDump(t *testing.T, tbl *Table2[any], tt dumpTest) {
+func checkDump(t *testing.T, tbl *Table[any], tt dumpTest) {
 	t.Helper()
 	for _, cidr := range tt.cidrs {
 		tbl.Insert(cidr, nil)
