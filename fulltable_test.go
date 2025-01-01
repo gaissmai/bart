@@ -313,6 +313,21 @@ func BenchmarkFullTableOverlapsV6(b *testing.B) {
 	}
 }
 
+func BenchmarkFullTableOverlapsPrefix(b *testing.B) {
+	var rt Table2[int]
+
+	for i, route := range routes {
+		rt.Insert(route.CIDR, i)
+	}
+
+	pfx := randomPrefix()
+
+	b.ResetTimer()
+	for range b.N {
+		boolSink = rt.OverlapsPrefix(pfx)
+	}
+}
+
 func BenchmarkFullTableOverlaps(b *testing.B) {
 	var rt Table[int]
 

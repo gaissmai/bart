@@ -223,8 +223,7 @@ func randomPrefixes6(n int) []goldTableItem[int] {
 
 // #####################################################################
 
-// randomPrefixes returns n randomly generated prefixes and
-// associated values, distributed equally between IPv4 and IPv6.
+// randomPrefix returns a randomly generated prefix
 func randomPrefix() netip.Prefix {
 	if prng.IntN(2) == 1 {
 		return randomPrefix4()

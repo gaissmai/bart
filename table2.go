@@ -530,8 +530,6 @@ LOOP:
 	return zeroPfx, zeroVal, false
 }
 
-/*
-
 // OverlapsPrefix reports whether any IP in pfx is matched by a route in the table or vice versa.
 func (t *Table2[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 	if !pfx.IsValid() {
@@ -551,44 +549,42 @@ func (t *Table2[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 
 	// do not allocate
 	a16 := ip.As16()
-
 	octets := a16[:]
 	if is4 {
 		octets = octets[12:]
 	}
 
-	// see comment in Insert()
-	lastOctetIdx := (bits - 1) / strideLen
-	lastOctet := octets[lastOctetIdx]
-	lastOctetBits := bits - (lastOctetIdx * strideLen)
+	sigOctetIdx := (bits - 1) / strideLen
+	sigOctet := octets[sigOctetIdx]
+	sigOctetBits := bits - (sigOctetIdx * strideLen)
 
 	var addr uint
-	for _, octet := range octets[:lastOctetIdx] {
+	for _, octet := range octets[:sigOctetIdx] {
 		addr = uint(octet)
 
+		// no lpm needed, so forward tests without backtracking possible
 		// test if any route overlaps prefix´ so far
 		if n.prefixes.Len() != 0 && n.lpmTest(hostIndex(addr)) {
 			return true
 		}
 
-		// no overlap so far, go down to next child
-		if n.children.Test(addr) {
-			n = n.children.MustGet(addr)
-			continue
+		// no more trie node along the octet path
+		if !n.children.Test(addr) {
+			break
 		}
 
-		// no child so far, look for path compressed item
-		if t.pathCompressed && n.pathcomp.Test(addr) {
-			pc := n.pathcomp.MustGet(addr)
-			return pfx.Overlaps(pc.prefix)
+		// get the child: node or leaf
+		switch k := n.children.MustGet(addr).(type) {
+		case *node2[V]:
+			n = k
+		case *leaf[V]:
+			return k.prefix.Overlaps(pfx)
 		}
-
-		// nope, nothing
-		return false
 	}
-	return n.overlapsPrefix(lastOctet, lastOctetBits)
+	return n.overlapsPrefix(sigOctet, sigOctetBits)
 }
 
+/*
 // Overlaps reports whether any IP in the table is matched by a route in the
 // other table or vice versa.
 //
@@ -632,6 +628,7 @@ func (t *Table2[V]) Overlaps6(o *Table2[V]) bool {
 	}
 	return t.root6.overlapsRec(&o.root6)
 }
+*/
 
 // Union combines two tables, changing the receiver table.
 // If there are duplicate entries, the payload of type V is shallow copied from the other table.
@@ -639,18 +636,12 @@ func (t *Table2[V]) Overlaps6(o *Table2[V]) bool {
 //
 // panic's if the path compression of the two tables does not match.
 func (t *Table2[V]) Union(o *Table2[V]) {
-	if t.pathCompressed != o.pathCompressed {
-		panic("tables MUST NOT differ in path compressions")
-	}
-
 	dup4 := t.root4.unionRec(&o.root4, 0)
 	dup6 := t.root6.unionRec(&o.root6, 0)
 
 	t.size4 += o.size4 - dup4
 	t.size6 += o.size6 - dup6
 }
-
-*/
 
 // Cloner, if implemented by payload of type V the values are deeply copied
 // during [Table.Clone] and [Table.Union].

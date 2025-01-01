@@ -27,6 +27,15 @@ var mpp = func(s string) netip.Prefix {
 	panic(fmt.Sprintf("%s is not canonicalized as %s", s, pfx.Masked()))
 }
 
+// tests for deep copies with Cloner interface
+type MyInt int
+
+// implement the Cloner interface
+func (i *MyInt) Clone() *MyInt {
+	a := *i
+	return &a
+}
+
 // nodes, calculates the nodes.
 func (t *Table[V]) nodes() int {
 	return t.root4.numNodesRec() + t.root6.numNodesRec()
@@ -1307,8 +1316,8 @@ func TestUnionEdgeCases(t *testing.T) {
 
 	t.Run("empty", func(t *testing.T) {
 		t.Parallel()
-		aTbl := &Table[int]{}
-		bTbl := &Table[int]{}
+		aTbl := &Table2[int]{}
+		bTbl := &Table2[int]{}
 
 		// union empty tables
 		aTbl.Union(bTbl)
@@ -1422,13 +1431,14 @@ func TestUnionEdgeCases(t *testing.T) {
 	})
 }
 
+// TODO, uncomment Overlaps...
 // TestUnionMemoryAliasing tests that the Union method does not alias memory
 // between the two tables.
 func TestUnionMemoryAliasing(t *testing.T) {
 	t.Parallel()
 
-	newTable := func(pfx ...string) *Table[struct{}] {
-		t := new(Table[struct{}])
+	newTable := func(pfx ...string) *Table2[struct{}] {
+		t := new(Table2[struct{}])
 		for _, s := range pfx {
 			t.Insert(mpp(s), struct{}{})
 		}
@@ -1438,10 +1448,12 @@ func TestUnionMemoryAliasing(t *testing.T) {
 	stable := newTable("0.0.0.0/24")
 	temp := newTable("100.69.1.0/24")
 
-	// Verify that the tables are disjoint.
-	if stable.Overlaps(temp) {
-		t.Error("stable should not overlap temp")
-	}
+	/*
+		// Verify that the tables are disjoint.
+		if stable.Overlaps(temp) {
+			t.Error("stable should not overlap temp")
+		}
+	*/
 
 	// Now union them.
 	temp.Union(stable)
@@ -1454,9 +1466,11 @@ func TestUnionMemoryAliasing(t *testing.T) {
 	if ok {
 		t.Error("stable should not contain 0.0.1.1")
 	}
-	if stable.OverlapsPrefix(mpp("0.0.1.1/32")) {
-		t.Error("stable should not overlap 0.0.1.1/32")
-	}
+	/*
+		if stable.OverlapsPrefix(mpp("0.0.1.1/32")) {
+			t.Error("stable should not overlap 0.0.1.1/32")
+		}
+	*/
 }
 
 func TestUnionCompare(t *testing.T) {
@@ -1466,7 +1480,7 @@ func TestUnionCompare(t *testing.T) {
 
 	for range 100 {
 		pfxs := randomPrefixes(numEntries)
-		fast := Table[int]{}
+		fast := Table2[int]{}
 		gold := goldTable[int](pfxs)
 
 		for _, pfx := range pfxs {
@@ -1475,7 +1489,7 @@ func TestUnionCompare(t *testing.T) {
 
 		pfxs2 := randomPrefixes(numEntries)
 		gold2 := goldTable[int](pfxs2)
-		fast2 := Table[int]{}
+		fast2 := Table2[int]{}
 		for _, pfx := range pfxs2 {
 			fast2.Insert(pfx.pfx, pfx.val)
 		}
@@ -1582,15 +1596,6 @@ func TestCloneShallow(t *testing.T) {
 	}
 }
 
-// tests for deep copies with Cloner interface
-type MyInt int
-
-// implement the Cloner interface
-func (i *MyInt) Clone() *MyInt {
-	a := *i
-	return &a
-}
-
 func TestCloneDeep(t *testing.T) {
 	t.Parallel()
 
@@ -1609,13 +1614,69 @@ func TestCloneDeep(t *testing.T) {
 	got, _ := clone.Get(pfx)
 
 	if *got != *want || got == want {
-		t.Errorf("deep copy, values must be equal, pointers must be different:\nvalues(%d, %d)\n(ptr(%v, %v)", *got, *want, got, want)
+		t.Errorf("value with Cloner interface, pointers must be different:\nvalues(%d, %d)\n(ptr(%v, %v)", *got, *want, got, want)
 	}
 
 	// update value, deep copy of values, cloned value must now be different
 	val = 2
 	want, _ = tbl.Get(pfx)
 	got, _ = clone.Get(pfx)
+
+	if *got == *want {
+		t.Errorf("memory aliasing after deep copy, values must be different:\nvalues(%d, %d)", *got, *want)
+	}
+}
+
+func TestUnionShallow(t *testing.T) {
+	t.Parallel()
+
+	tbl1 := new(Table2[*int])
+	tbl2 := new(Table2[*int])
+
+	val := 1
+	pfx := mpp("10.0.0.1/32")
+	tbl2.Insert(pfx, &val)
+
+	tbl1.Union(tbl2)
+	got, _ := tbl1.Get(pfx)
+	want, _ := tbl2.Get(pfx)
+
+	if !(*got == *want && got == want) {
+		t.Errorf("shallow copy, values and pointers must be equal:\nvalues(%d, %d)\n(ptr(%v, %v)", *got, *want, got, want)
+	}
+
+	// update value, shallow copy of values, union must be equal
+	val = 2
+	got, _ = tbl1.Get(pfx)
+	want, _ = tbl2.Get(pfx)
+
+	if *got != *want {
+		t.Errorf("memory aliasing after shallow copy, values must be equal:\nvalues(%d, %d)", *got, *want)
+	}
+}
+
+func TestUnionDeep(t *testing.T) {
+	t.Parallel()
+
+	tbl1 := new(Table2[*MyInt])
+	tbl2 := new(Table2[*MyInt])
+
+	val := MyInt(1)
+	pfx := mpp("10.0.0.1/32")
+	tbl2.Insert(pfx, &val)
+
+	tbl1.Union(tbl2)
+	got, _ := tbl1.Get(pfx)
+	want, _ := tbl2.Get(pfx)
+
+	if *got != *want || got == want {
+		t.Errorf("value with Cloner interface, pointers must be different:\nvalues(%d, %d)\n(ptr(%v, %v)", *got, *want, got, want)
+	}
+
+	// update value, shallow copy of values, union must be equal
+	val = 2
+	got, _ = tbl1.Get(pfx)
+	want, _ = tbl2.Get(pfx)
 
 	if *got == *want {
 		t.Errorf("memory aliasing after deep copy, values must be different:\nvalues(%d, %d)", *got, *want)
@@ -1873,7 +1934,7 @@ func BenchmarkTableOverlapsPrefix(b *testing.B) {
 		}
 
 		for _, nroutes := range benchRouteCount {
-			var rt Table[int]
+			var rt Table2[int]
 			for _, route := range rng(nroutes) {
 				rt.Insert(route.pfx, route.val)
 			}
@@ -2002,7 +2063,7 @@ func checkNumNodes(t *testing.T, tbl *Table[int], want int) {
 }
 
 // dumpAsGoldTable, just a helper to compare with golden table.
-func (t *Table[V]) dumpAsGoldTable() goldTable[V] {
+func (t *Table2[V]) dumpAsGoldTable() goldTable[V] {
 	var tbl goldTable[V]
 
 	t.AllSorted()(func(pfx netip.Prefix, val V) bool {
