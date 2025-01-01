@@ -16,7 +16,7 @@ func TestSupernetsEdgeCaseCB(t *testing.T) {
 	var zeroPfx netip.Prefix
 
 	t.Run("empty table", func(t *testing.T) {
-		rtbl := new(Table[any])
+		rtbl := new(Table2[any])
 		pfx := mpp("::1/128")
 
 		rtbl.Supernets(pfx)(func(_ netip.Prefix, _ any) bool {
@@ -26,7 +26,7 @@ func TestSupernetsEdgeCaseCB(t *testing.T) {
 	})
 
 	t.Run("invalid prefix", func(t *testing.T) {
-		rtbl := new(Table[any])
+		rtbl := new(Table2[any])
 		pfx := mpp("::1/128")
 		val := "foo"
 		rtbl.Insert(pfx, val)
@@ -38,7 +38,7 @@ func TestSupernetsEdgeCaseCB(t *testing.T) {
 	})
 
 	t.Run("identity", func(t *testing.T) {
-		rtbl := new(Table[string])
+		rtbl := new(Table2[string])
 		pfx := mpp("::1/128")
 		val := "foo"
 		rtbl.Insert(pfx, val)
@@ -63,7 +63,7 @@ func TestSupernetsCompareCB(t *testing.T) {
 
 	pfxs := gimmeRandomPrefixes(10_000)
 
-	fast := new(Table[int])
+	fast := new(Table2[int])
 	gold := goldTable[int]{}
 
 	for i, pfx := range pfxs {
@@ -93,7 +93,7 @@ func TestSubnetsCB(t *testing.T) {
 	var zeroPfx netip.Prefix
 
 	t.Run("empty table", func(t *testing.T) {
-		rtbl := new(Table[string])
+		rtbl := new(Table2[string])
 		pfx := mpp("::1/128")
 
 		rtbl.Subnets(pfx)(func(_ netip.Prefix, _ string) bool {
@@ -103,7 +103,7 @@ func TestSubnetsCB(t *testing.T) {
 	})
 
 	t.Run("invalid prefix", func(t *testing.T) {
-		rtbl := new(Table[string])
+		rtbl := new(Table2[string])
 		pfx := mpp("::1/128")
 		val := "foo"
 		rtbl.Insert(pfx, val)
@@ -114,7 +114,7 @@ func TestSubnetsCB(t *testing.T) {
 	})
 
 	t.Run("identity", func(t *testing.T) {
-		rtbl := new(Table[string])
+		rtbl := new(Table2[string])
 		pfx := mpp("::1/128")
 		val := "foo"
 		rtbl.Insert(pfx, val)
@@ -135,7 +135,7 @@ func TestSubnetsCB(t *testing.T) {
 		want4 := 95_555
 		want6 := 105_555
 
-		rtbl := new(Table[int])
+		rtbl := new(Table2[int])
 		for i, pfx := range gimmeRandomPrefixes4(want4) {
 			rtbl.Insert(pfx, i)
 		}
@@ -173,7 +173,7 @@ func TestSubnetsCompareCB(t *testing.T) {
 
 	pfxs := gimmeRandomPrefixes(10_000)
 
-	fast := new(Table[int])
+	fast := new(Table2[int])
 	gold := goldTable[int]{}
 
 	for i, pfx := range pfxs {
