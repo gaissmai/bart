@@ -29,7 +29,7 @@ type kid[V any] struct {
 	val  V
 }
 
-// MarshalText implements the encoding.TextMarshaler interface,
+// MarshalText implements the [encoding.TextMarshaler] interface,
 // just a wrapper for [Table.Fprint].
 func (t *Table[V]) MarshalText() ([]byte, error) {
 	w := new(bytes.Buffer)
