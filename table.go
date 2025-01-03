@@ -208,7 +208,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 			n.children.DeleteAt(addr)
 
 			t.sizeUpdate(is4, -1)
-			n.purgeParents(stack[:i], octets)
+			n.purgeAndCompress(stack[:i], octets, is4)
 
 			return k.value, true
 		}
@@ -217,7 +217,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 	// try to delete prefix in trie node
 	if val, ok = n.prefixes.DeleteAt(pfxToIdx(sigOctet, sigOctetBits)); ok {
 		t.sizeUpdate(is4, -1)
-		n.purgeParents(stack[:sigOctetIdx], octets)
+		n.purgeAndCompress(stack[:sigOctetIdx], octets, is4)
 
 		return val, ok
 	}
