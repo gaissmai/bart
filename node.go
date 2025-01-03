@@ -271,6 +271,10 @@ func (n *node[V]) lpmTest(idx uint) bool {
 
 // cloneRec, clones the node recursive.
 func (n *node[V]) cloneRec() *node[V] {
+	if n == nil {
+		return nil
+	}
+
 	c := new(node[V])
 	if n.isEmpty() {
 		return c
@@ -308,12 +312,7 @@ func (n *node[V]) cloneRec() *node[V] {
 // false value is propagated.
 //
 // The iteration order is not defined, just the simplest and fastest recursive implementation.
-func (n *node[V]) allRec(
-	path [16]byte,
-	depth int,
-	is4 bool,
-	yield func(netip.Prefix, V) bool,
-) bool {
+func (n *node[V]) allRec(path [16]byte, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
 	// for all prefixes in this node do ...
 	allIndices := n.prefixes.AsSlice(make([]uint, 0, maxNodePrefixes))
 	for _, idx := range allIndices {
@@ -355,12 +354,7 @@ func (n *node[V]) allRec(
 //
 // If the yield function returns false the recursion ends prematurely and the
 // false value is propagated.
-func (n *node[V]) allRecSorted(
-	path [16]byte,
-	depth int,
-	is4 bool,
-	yield func(netip.Prefix, V) bool,
-) bool {
+func (n *node[V]) allRecSorted(path [16]byte, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
 	// get slice of all child octets, sorted by addr
 	allChildAddrs := n.children.AsSlice(make([]uint, 0, maxNodeChildren))
 
@@ -538,12 +532,13 @@ LOOP:
 // eachLookupPrefix does an all prefix match in the 8-bit (stride) routing table
 // at this depth and calls yield() for any matching CIDR.
 func (n *node[V]) eachLookupPrefix(octets []byte, depth int, is4 bool, pfxLen int, yield func(netip.Prefix, V) bool) (ok bool) {
-	var path [16]byte
-	copy(path[:], octets)
-
 	if n.prefixes.Len() == 0 {
 		return true
 	}
+
+	// octets as array, needed below more than once
+	var path [16]byte
+	copy(path[:], octets)
 
 	// backtracking the CBT
 	for idx := pfxToIdx(octets[depth], pfxLen); idx > 0; idx >>= 1 {
