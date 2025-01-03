@@ -343,16 +343,17 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	stack := [maxTreeDepth]*node[V]{}
 
 	// run variable, used after for loop
-	var i int
+	var depth int
 	var octet byte
+	var addr uint
 
 LOOP:
 	// find leaf node
-	for i, octet = range octets {
-		addr := uint(octet)
+	for depth, octet = range octets {
+		addr = uint(octet)
 
 		// push current node on stack for fast backtracking
-		stack[i] = n
+		stack[depth] = n
 
 		// go down in tight loop to last octet
 		if !n.children.Test(addr) {
@@ -376,12 +377,13 @@ LOOP:
 	}
 
 	// start backtracking, unwind the stack
-	for depth := i; depth >= 0; depth-- {
+	for ; depth >= 0; depth-- {
 		n = stack[depth]
 
 		// longest prefix match, skip if node has no prefixes
 		if n.prefixes.Len() != 0 {
-			if _, val, ok = n.lpm(hostIndex(uint(octets[depth]))); ok {
+			octet = octets[depth]
+			if _, val, ok = n.lpm(hostIndex(uint(octet))); ok {
 				return val, ok
 			}
 		}
@@ -486,18 +488,18 @@ LOOP:
 	// start backtracking, unwind the stack
 	for ; depth >= 0; depth-- {
 		n = stack[depth]
-		octet = octets[depth]
-		addr = uint(octet)
 
 		// longest prefix match, skip if node has no prefixes
 		if n.prefixes.Len() != 0 {
+			octet = octets[depth]
+
 			// only the lastOctet may have a different prefix len
 			// all others are just host routes
 			var idx uint
 			if depth == sigOctetIdx {
 				idx = pfxToIdx(octet, sigOctetBits)
 			} else {
-				idx = hostIndex(addr)
+				idx = hostIndex(uint(octet))
 			}
 
 			if baseIdx, val, ok := n.lpm(idx); ok {
