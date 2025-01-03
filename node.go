@@ -181,14 +181,43 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 	return n.prefixes.InsertAt(pfxToIdx(sigOctet, sigOctetBits), val)
 }
 
-// TODO, path compress after purging dangling leaves
-func (n *node[V]) purgeParents(parentStack []*node[V], childPath []byte) {
+// purgeAndCompress, purge empty nodes or compress nodes with single prefix or leaf.
+func (n *node[V]) purgeAndCompress(parentStack []*node[V], childPath []byte, is4 bool) {
+	// unwind the stack
 	for i := len(parentStack) - 1; i >= 0; i-- {
-		if n.isEmpty() {
-			parent := parentStack[i]
-			parent.children.DeleteAt(uint(childPath[i]))
+		parent := parentStack[i]
+		addr := uint(childPath[i])
+
+		pfxCount := n.prefixes.Len()
+		childCount := n.children.Len()
+
+		switch {
+		case n.isEmpty():
+			// purge empty node
+			parent.children.DeleteAt(addr)
+
+		case pfxCount == 1 && childCount == 0:
+			// make leaf from prefix idx, shift leaf one level up
+			// and override current node with new leaf
+			idx, _ := n.prefixes.FirstSet()
+			val := n.prefixes.Items[0]
+
+			path := [16]byte{}
+			copy(path[:], childPath)
+			pfx, _ := cidrFromPath(path, i+1, is4, idx)
+
+			parent.children.InsertAt(addr, &leaf[V]{pfx, val})
+
+		case pfxCount == 0 && childCount == 1:
+			// if single child is a leaf, shift it up one level
+			// and override current node with this leaf
+			child := n.children.Items[0]
+			if k, ok := child.(*leaf[V]); ok {
+				parent.children.InsertAt(addr, k)
+			}
 		}
-		n = parentStack[i]
+
+		n = parent
 	}
 }
 

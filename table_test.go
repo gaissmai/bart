@@ -435,7 +435,9 @@ func TestDelete(t *testing.T) {
 		t.Parallel()
 		// must not panic
 		tbl := &Table[int]{}
+		checkNumNodes(t, tbl, 0)
 		tbl.Delete(randomPrefix())
+		checkNumNodes(t, tbl, 0)
 	})
 
 	t.Run("prefix_in_root", func(t *testing.T) {
@@ -495,8 +497,7 @@ func TestDelete(t *testing.T) {
 		})
 
 		tbl.Delete(mpp("192.180.0.1/32"))
-		// TODO: rebalancing with path compression after delete
-		checkNumNodes(t, tbl, 2) // no re balancing with path compression afetr delete
+		checkNumNodes(t, tbl, 1)
 		checkRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.180.0.1", -1},
@@ -598,8 +599,7 @@ func TestDelete(t *testing.T) {
 		})
 
 		tbl.Delete(mpp("192.168.0.0/22"))
-		// TODO: rebalancing with path compression after delete
-		checkNumNodes(t, tbl, 3)
+		checkNumNodes(t, tbl, 1)
 		checkRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.168.0.2", -1},
@@ -633,7 +633,7 @@ func TestDelete(t *testing.T) {
 		checkNumNodes(t, tbl, 2)
 
 		tbl.Delete(mpp("10.20.0.0/17"))
-		checkNumNodes(t, tbl, 2)
+		checkNumNodes(t, tbl, 1)
 
 		tbl.Delete(mpp("10.10.0.0/17"))
 		checkNumNodes(t, tbl, 0)
