@@ -143,3 +143,34 @@ func TestSparseArrayCompact(t *testing.T) {
 		t.Errorf("cap, expected 3_000, got %d", c)
 	}
 }
+
+func TestSparseArrayCopy(t *testing.T) {
+	t.Parallel()
+	a := new(Array[int])
+
+	for i := range 10_000 {
+		a.InsertAt(uint(i), i)
+	}
+
+	// shallow copy
+	b := a.Copy()
+
+	// basic values identity
+	for i, v := range a.Items {
+		if b.Items[i] != v {
+			t.Errorf("Clone, expect value: %v, got: %v", v, b.Items[i])
+		}
+	}
+
+	// update array a
+	for i := range 10_000 {
+		a.UpdateAt(uint(i), func(u int, _ bool) int { return u + 1 })
+	}
+
+	// cloned array must now differ
+	for i, v := range a.Items {
+		if b.Items[i] == v {
+			t.Errorf("update a after Clone, b must now differ: aValue: %v, bValue: %v", b.Items[i], v)
+		}
+	}
+}

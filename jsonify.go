@@ -64,7 +64,7 @@ func (n *node[V]) dumpListRec(parentIdx uint, path [16]byte, depth int, is4 bool
 	}
 
 	directKids := n.getKidsRec(parentIdx, path, depth, is4)
-	slices.SortFunc(directKids, cmpKidByPrefix2[V])
+	slices.SortFunc(directKids, cmpKidByPrefix[V])
 
 	nodes := make([]DumpListNode[V], 0, len(directKids))
 	for _, kid := range directKids {
