@@ -133,7 +133,7 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 	// 10.12.0.0/15  -> 12
 	// 10.12.0.0/16  -> 12
 	// 10.12.10.9/32 -> 9
-	sigOctet := octets[sigOctetIdx]
+	// sigOctet := octets[sigOctetIdx]
 
 	// 10.0.0.0/8    -> 8
 	// 10.12.0.0/15  -> 7
@@ -143,8 +143,14 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 
 	// find the proper trie node to insert prefix
 	// start with prefix octet at depth
-	for ; depth < sigOctetIdx; depth++ {
-		addr := uint(octets[depth])
+	for ; depth <= sigOctetIdx; depth++ {
+		octet := octets[depth]
+		addr := uint(octet)
+
+		// last significant octet: insert/override prefix/val into node
+		if depth == sigOctetIdx {
+			return n.prefixes.InsertAt(pfxToIdx(octet, sigOctetBits), val)
+		}
 
 		if !n.children.Test(addr) {
 			// insert prefix path compressed
@@ -156,6 +162,7 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 		case *node[V]:
 			// descend down to next trie level
 			n = k
+			continue
 		case *leaf[V]:
 			// reached a path compressed prefix
 			// override value in slot if prefixes are equal
@@ -177,8 +184,7 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 		}
 	}
 
-	// last significant octet: insert/override prefix/val into node
-	return n.prefixes.InsertAt(pfxToIdx(sigOctet, sigOctetBits), val)
+	panic("unreachable")
 }
 
 // purgeAndCompress, purge empty nodes or compress nodes with single prefix or leaf.
@@ -211,9 +217,8 @@ func (n *node[V]) purgeAndCompress(parentStack []*node[V], childPath []byte, is4
 		case pfxCount == 0 && childCount == 1:
 			// if single child is a leaf, shift it up one level
 			// and override current node with this leaf
-			child := n.children.Items[0]
-			if k, ok := child.(*leaf[V]); ok {
-				parent.children.InsertAt(addr, k)
+			if leafPtr, ok := n.children.Items[0].(*leaf[V]); ok {
+				parent.children.InsertAt(addr, leafPtr)
 			}
 		}
 

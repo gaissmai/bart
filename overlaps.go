@@ -230,14 +230,21 @@ func overlapsTwoChilds[V any](nChild, oChild any, depth int) bool {
 // Needed for path compressed prefix some level down in the node trie.
 func (n *node[V]) overlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
 	ip := pfx.Addr()
-	octets := ip.AsSlice()
 	bits := pfx.Bits()
 
 	sigOctetIdx := (bits - 1) / strideLen
 	sigOctetBits := bits - (sigOctetIdx * strideLen)
 
-	for i := depth; i < sigOctetIdx; i++ {
-		addr := uint(octets[i])
+	octets := ip.AsSlice()
+
+	for ; depth <= sigOctetIdx; depth++ {
+		octet := octets[depth]
+		addr := uint(octet)
+
+		// full octet path in node trie, check overlap with last prefix octet
+		if depth == sigOctetIdx {
+			return n.overlapsIdx(octet, sigOctetBits)
+		}
 
 		// test if any route overlaps prefix´ so far
 		// no best match needed, forward tests without backtracking
@@ -246,7 +253,6 @@ func (n *node[V]) overlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
 		}
 
 		if !n.children.Test(addr) {
-			// no full octet path in node trie
 			return false
 		}
 
@@ -260,8 +266,7 @@ func (n *node[V]) overlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
 		}
 	}
 
-	// full octet path in node trie, check overlap with last prefix octet
-	return n.overlapsIdx(octets[sigOctetIdx], sigOctetBits)
+	panic("unreachable")
 }
 
 // overlapsIdx returns true if node overlaps with prefix.
