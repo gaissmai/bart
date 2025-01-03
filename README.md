@@ -24,7 +24,7 @@ build the complete-binary-tree (CBT) of prefixes for each stride.
 |:--:|
 | *example from artlookup.pdf for a 4bit stride* |
 
-The CBT is implemented as a bitvector, backtracking is just
+The CBT is implemented as a bit-vector, backtracking is just
 a matter of fast cache friendly bitmask operations.
 
 The Table is implemented with popcount compressed sparse arrays
@@ -97,19 +97,30 @@ The API has changed in ..., v0.10.1, v0.11.0, v0.12.0, v0.12.6, v0.16.0
 
 Please see the extensive [benchmarks](https://github.com/gaissmai/iprbench) comparing `bart` with other IP routing table implementations.
 
-Just a teaser, LPM lookups against the full Internet routing table with random probes:
+Just a teaser, Contains and Lookups against the full Internet routing table with random IP address probes:
 
 ```
 goos: linux
 goarch: amd64
 pkg: github.com/gaissmai/bart
 cpu: Intel(R) Core(TM) i5-8250U CPU @ 1.60GHz
-BenchmarkFullMatchV4/Contains         	37375450	        29.71 ns/op
-BenchmarkFullMatchV6/Contains         	41348316	        26.85 ns/op
-BenchmarkFullMissV4/Contains          	38583682	        29.66 ns/op
-BenchmarkFullMissV6/Contains          	83315865	        12.64 ns/op
+BenchmarkFullMatchV4/Contains         	38003740	        27.69 ns/op
+BenchmarkFullMatchV6/Contains         	49389355	        23.00 ns/op
+BenchmarkFullMissV4/Contains          	42902048	        26.57 ns/op
+BenchmarkFullMissV6/Contains          	128219610	         9.375 ns/op
 PASS
-ok  	github.com/gaissmai/bart	11.248s
+ok  	github.com/gaissmai/bart	12.195s
+
+goos: linux
+goarch: amd64
+pkg: github.com/gaissmai/bart
+cpu: Intel(R) Core(TM) i5-8250U CPU @ 1.60GHz
+BenchmarkFullMatchV4/Lookup         	37453425	        30.55 ns/op
+BenchmarkFullMatchV6/Lookup         	36819931	        30.48 ns/op
+BenchmarkFullMissV4/Lookup          	37223881	        30.70 ns/op
+BenchmarkFullMissV6/Lookup          	94333762	        12.32 ns/op
+PASS
+ok  	github.com/gaissmai/bart	11.215s
 ```
 
 ## Compatibility Guarantees

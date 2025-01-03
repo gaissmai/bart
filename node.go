@@ -30,10 +30,11 @@ var zeroPath [16]byte
 // (popcount-compressed slices) are used instead of fixed-size arrays.
 //
 // The array slots are also not pre-allocated (alloted) as described
-// in the ART algorithm, but backtracking is used for the longest-prefix-match.
+// in the ART algorithm, fast backtracking with a bitset vector is used
+// to get the longest-prefix-match.
 //
 // The sparse child array recursively spans the trie with a branching factor of 256
-// and also records path-compressed leaves in the free child slots.
+// and also records path-compressed leaves in the free node slots.
 type node[V any] struct {
 	// prefixes contains the routes as complete binary tree with payload V
 	prefixes sparse.Array[V]
@@ -44,17 +45,24 @@ type node[V any] struct {
 	children sparse.Array[interface{}]
 }
 
-// leaf is prefix and value together as path compressed child
+// isEmpty returns true if node has neither prefixes nor children
+func (n *node[V]) isEmpty() bool {
+	return n.prefixes.Len() == 0 && n.children.Len() == 0
+}
+
+// leaf is a prefix and value together, it's a path compressed child
 type leaf[V any] struct {
 	prefix netip.Prefix
 	value  V
 }
 
-// cloneValue, deep copy if v implements the Cloner interface.
-func cloneValue[V any](v V) V {
+// cloneOrCopyValue, helper function,
+// deep copy if v implements the Cloner interface.
+func cloneOrCopyValue[V any](v V) V {
 	if k, ok := any(v).(Cloner[V]); ok {
 		return k.Clone()
 	}
+	// just copy
 	return v
 }
 
@@ -64,15 +72,10 @@ func (l *leaf[V]) cloneLeaf() *leaf[V] {
 	if l == nil {
 		return nil
 	}
-	return &leaf[V]{l.prefix, cloneValue(l.value)}
+	return &leaf[V]{l.prefix, cloneOrCopyValue(l.value)}
 }
 
-// isEmpty returns true if node has neither prefixes nor children
-func (n *node[V]) isEmpty() bool {
-	return n.prefixes.Len() == 0 && n.children.Len() == 0
-}
-
-// nodeAndLeafCount
+// nodeAndLeafCount for this node
 func (n *node[V]) nodeAndLeafCount() (nodes int, leaves int) {
 	for i := range n.children.AsSlice(make([]uint, 0, maxNodeChildren)) {
 		switch n.children.Items[i].(type) {
@@ -240,15 +243,15 @@ func (n *node[V]) cloneRec() *node[V] {
 	}
 
 	// shallow
-	c.prefixes = *(n.prefixes.Clone())
+	c.prefixes = *(n.prefixes.Copy())
 
 	// deep copy if V implements Cloner[V]
 	for i, v := range c.prefixes.Items {
-		c.prefixes.Items[i] = cloneValue(v)
+		c.prefixes.Items[i] = cloneOrCopyValue(v)
 	}
 
 	// shallow
-	c.children = *(n.children.Clone())
+	c.children = *(n.children.Copy())
 
 	// deep copy of nodes and leaves
 	for i, k := range c.children.Items {

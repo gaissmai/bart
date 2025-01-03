@@ -21,9 +21,9 @@ func (s *Array[T]) Len() int {
 	return len(s.Items)
 }
 
-// Clone returns a copy of the Array.
-// The elements are copied using assignment, so this is a shallow clone.
-func (s *Array[T]) Clone() *Array[T] {
+// Copy returns a shallow copy of the Array.
+// The elements are copied using assignment, this is no deep clone.
+func (s *Array[T]) Copy() *Array[T] {
 	if s == nil {
 		return nil
 	}

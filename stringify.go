@@ -16,7 +16,7 @@ import (
 // kid, a node has no path information about its predecessors,
 // we collect this during the recursive descent.
 // The path/depth/idx is needed to get the CIDR back.
-type kid2[V any] struct {
+type kid[V any] struct {
 	// for traversing
 	n     *node[V]
 	is4   bool
@@ -99,7 +99,7 @@ func (t *Table[V]) fprint(w io.Writer, is4 bool) error {
 		return err
 	}
 
-	startKid := kid2[V]{
+	startKid := kid[V]{
 		n:    nil,
 		idx:  0,
 		path: zeroPath,
@@ -114,7 +114,7 @@ func (t *Table[V]) fprint(w io.Writer, is4 bool) error {
 }
 
 // fprintRec, the output is a hierarchical CIDR tree starting with this kid.
-func (n *node[V]) fprintRec(w io.Writer, parent kid2[V], pad string) error {
+func (n *node[V]) fprintRec(w io.Writer, parent kid[V], pad string) error {
 	// recursion stop condition
 	if n == nil {
 		return nil
@@ -124,7 +124,7 @@ func (n *node[V]) fprintRec(w io.Writer, parent kid2[V], pad string) error {
 	directKids := n.getKidsRec(parent.idx, parent.path, parent.depth, parent.is4)
 
 	// sort them by netip.Prefix, not by baseIndex
-	slices.SortFunc(directKids, cmpKidByPrefix2[V])
+	slices.SortFunc(directKids, cmpKidByPrefix[V])
 
 	// symbols used in tree
 	glyphe := "├─ "
@@ -160,13 +160,13 @@ func (n *node[V]) fprintRec(w io.Writer, parent kid2[V], pad string) error {
 //
 // See the  artlookup.pdf paper in the doc folder,
 // the baseIndex function is the key.
-func (n *node[V]) getKidsRec(parentIdx uint, path [16]byte, depth int, is4 bool) []kid2[V] {
+func (n *node[V]) getKidsRec(parentIdx uint, path [16]byte, depth int, is4 bool) []kid[V] {
 	// recursion stop condition
 	if n == nil {
 		return nil
 	}
 
-	var directKids []kid2[V]
+	var directKids []kid[V]
 
 	allIndices := n.prefixes.AsSlice(make([]uint, 0, maxNodePrefixes))
 
@@ -183,7 +183,7 @@ func (n *node[V]) getKidsRec(parentIdx uint, path [16]byte, depth int, is4 bool)
 		if lpmIdx == parentIdx {
 			cidr, _ := cidrFromPath(path, depth, is4, idx)
 
-			kid := kid2[V]{
+			kid := kid[V]{
 				n:     n,
 				is4:   is4,
 				path:  path,
@@ -211,7 +211,7 @@ func (n *node[V]) getKidsRec(parentIdx uint, path [16]byte, depth int, is4 bool)
 				// traverse, rec-descent call with next child node
 				directKids = append(directKids, k.getKidsRec(0, path, depth+1, is4)...)
 			case *leaf[V]:
-				kid := kid2[V]{
+				kid := kid[V]{
 					n:    nil, // path compressed item, stop recursion
 					is4:  is4,
 					cidr: k.prefix,
@@ -226,8 +226,8 @@ func (n *node[V]) getKidsRec(parentIdx uint, path [16]byte, depth int, is4 bool)
 	return directKids
 }
 
-// cmpKidByPrefix2, all prefixes are already normalized (Masked).
-func cmpKidByPrefix2[V any](a, b kid2[V]) int {
+// cmpKidByPrefix, all prefixes are already normalized (Masked).
+func cmpKidByPrefix[V any](a, b kid[V]) int {
 	return cmpPrefix(a.cidr, b.cidr)
 }
 

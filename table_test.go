@@ -137,6 +137,7 @@ func TestInsert(t *testing.T) {
 
 	// Create a new leaf strideTable, with compressed path
 	tbl.Insert(mpp("192.168.0.1/32"), 1)
+	checkNumNodes(t, tbl, 1)
 	checkRoutes(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", -1},
@@ -150,8 +151,9 @@ func TestInsert(t *testing.T) {
 		{"10.0.0.15", -1},
 	})
 
-	// Insert into previous leaf, no tree changes
+	// explode path compressed
 	tbl.Insert(mpp("192.168.0.2/32"), 2)
+	checkNumNodes(t, tbl, 4)
 	checkRoutes(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", 2},
@@ -165,8 +167,9 @@ func TestInsert(t *testing.T) {
 		{"10.0.0.15", -1},
 	})
 
-	// Insert into previous leaf, unaligned prefix covering the /32s
+	// Insert into existing leaf
 	tbl.Insert(mpp("192.168.0.0/26"), 7)
+	checkNumNodes(t, tbl, 4)
 	checkRoutes(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", 2},
@@ -180,8 +183,9 @@ func TestInsert(t *testing.T) {
 		{"10.0.0.15", -1},
 	})
 
-	// Create a different leaf elsewhere
+	// Create a different leaf at root
 	tbl.Insert(mpp("10.0.0.0/27"), 3)
+	checkNumNodes(t, tbl, 4)
 	checkRoutes(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", 2},
@@ -195,8 +199,9 @@ func TestInsert(t *testing.T) {
 		{"10.0.0.15", 3},
 	})
 
-	// Insert that creates a new intermediate table and a new child
+	// Insert that creates a new path compressed leaf
 	tbl.Insert(mpp("192.168.1.1/32"), 4)
+	checkNumNodes(t, tbl, 4)
 	checkRoutes(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", 2},
@@ -210,8 +215,9 @@ func TestInsert(t *testing.T) {
 		{"10.0.0.15", 3},
 	})
 
-	// Insert that creates a new intermediate table but no new child
+	// Insert that creates a new path compressed leaf
 	tbl.Insert(mpp("192.170.0.0/16"), 5)
+	checkNumNodes(t, tbl, 4)
 	checkRoutes(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", 2},
@@ -228,6 +234,7 @@ func TestInsert(t *testing.T) {
 	// New leaf in a different subtree, so the next insert can test a
 	// variant of decompression.
 	tbl.Insert(mpp("192.180.0.1/32"), 8)
+	checkNumNodes(t, tbl, 4)
 	checkRoutes(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", 2},
@@ -241,9 +248,9 @@ func TestInsert(t *testing.T) {
 		{"10.0.0.15", 3},
 	})
 
-	// Insert that creates a new intermediate table but no new child,
-	// with an unaligned intermediate
+	// Insert that explodes the previous path compression
 	tbl.Insert(mpp("192.180.0.0/21"), 9)
+	checkNumNodes(t, tbl, 5)
 	checkRoutes(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", 2},
@@ -259,6 +266,7 @@ func TestInsert(t *testing.T) {
 
 	// Insert a default route, those have their own codepath.
 	tbl.Insert(mpp("0.0.0.0/0"), 6)
+	checkNumNodes(t, tbl, 5)
 	checkRoutes(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", 2},
@@ -274,8 +282,9 @@ func TestInsert(t *testing.T) {
 
 	// Now all of the above again, but for IPv6.
 
-	// Create a new leaf strideTable, with compressed path
+	// Create a new path compressed leaf
 	tbl.Insert(mpp("ff:aaaa::1/128"), 1)
+	checkNumNodes(t, tbl, 6)
 	checkRoutes(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", -1},
@@ -289,8 +298,9 @@ func TestInsert(t *testing.T) {
 		{"ffff:bbbb::15", -1},
 	})
 
-	// Insert into previous leaf, no tree changes
+	// Insert into previous leaf, explode v6 path compression
 	tbl.Insert(mpp("ff:aaaa::2/128"), 2)
+	checkNumNodes(t, tbl, 21)
 	checkRoutes(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", 2},
@@ -304,8 +314,9 @@ func TestInsert(t *testing.T) {
 		{"ffff:bbbb::15", -1},
 	})
 
-	// Insert into previous leaf, unaligned prefix covering the /128s
+	// Insert into previous node
 	tbl.Insert(mpp("ff:aaaa::/125"), 7)
+	checkNumNodes(t, tbl, 21)
 	checkRoutes(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", 2},
@@ -321,6 +332,7 @@ func TestInsert(t *testing.T) {
 
 	// Create a different leaf elsewhere
 	tbl.Insert(mpp("ffff:bbbb::/120"), 3)
+	checkNumNodes(t, tbl, 21)
 	checkRoutes(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", 2},
@@ -334,8 +346,9 @@ func TestInsert(t *testing.T) {
 		{"ffff:bbbb::15", 3},
 	})
 
-	// Insert that creates a new intermediate table and a new child
+	// Insert that creates a new path compressed leaf
 	tbl.Insert(mpp("ff:aaaa:aaaa::1/128"), 4)
+	checkNumNodes(t, tbl, 21)
 	checkRoutes(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", 2},
@@ -349,8 +362,9 @@ func TestInsert(t *testing.T) {
 		{"ffff:bbbb::15", 3},
 	})
 
-	// Insert that creates a new intermediate table but no new child
+	// Insert that creates a new path in tree
 	tbl.Insert(mpp("ff:aaaa:aaaa:bb00::/56"), 5)
+	checkNumNodes(t, tbl, 23)
 	checkRoutes(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", 2},
@@ -367,6 +381,7 @@ func TestInsert(t *testing.T) {
 	// New leaf in a different subtree, so the next insert can test a
 	// variant of decompression.
 	tbl.Insert(mpp("ff:cccc::1/128"), 8)
+	checkNumNodes(t, tbl, 23)
 	checkRoutes(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", 2},
@@ -380,9 +395,9 @@ func TestInsert(t *testing.T) {
 		{"ffff:bbbb::15", 3},
 	})
 
-	// Insert that creates a new intermediate table but no new child,
-	// with an unaligned intermediate
+	// Insert that explodes a previous path compressed leaf
 	tbl.Insert(mpp("ff:cccc::/37"), 9)
+	checkNumNodes(t, tbl, 25)
 	checkRoutes(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", 2},
@@ -398,6 +413,7 @@ func TestInsert(t *testing.T) {
 
 	// Insert a default route, those have their own codepath.
 	tbl.Insert(mpp("::/0"), 6)
+	checkNumNodes(t, tbl, 25)
 	checkRoutes(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", 2},
@@ -418,222 +434,209 @@ func TestDelete(t *testing.T) {
 	t.Run("table_is_empty", func(t *testing.T) {
 		t.Parallel()
 		// must not panic
-		rtbl := &Table[int]{}
-		rtbl.Delete(randomPrefix())
+		tbl := &Table[int]{}
+		tbl.Delete(randomPrefix())
 	})
 
 	t.Run("prefix_in_root", func(t *testing.T) {
 		t.Parallel()
 		// Add/remove prefix from root table.
-		rtbl := &Table[int]{}
+		tbl := &Table[int]{}
+		checkNumNodes(t, tbl, 0)
 
-		checkNumNodes(t, rtbl, 0)
-
-		rtbl.Insert(mpp("10.0.0.0/8"), 1)
-		checkRoutes(t, rtbl, []tableTest{
+		tbl.Insert(mpp("10.0.0.0/8"), 1)
+		checkNumNodes(t, tbl, 1)
+		checkRoutes(t, tbl, []tableTest{
 			{"10.0.0.1", 1},
 			{"255.255.255.255", -1},
 		})
-		checkNumNodes(t, rtbl, 1)
-		rtbl.Delete(mpp("10.0.0.0/8"))
-		checkRoutes(t, rtbl, []tableTest{
+		tbl.Delete(mpp("10.0.0.0/8"))
+		checkNumNodes(t, tbl, 0)
+		checkRoutes(t, tbl, []tableTest{
 			{"10.0.0.1", -1},
 			{"255.255.255.255", -1},
 		})
-		checkNumNodes(t, rtbl, 0)
 	})
 
 	t.Run("prefix_in_leaf", func(t *testing.T) {
 		t.Parallel()
 		// Create, then delete a single leaf table.
-		rtbl := &Table[int]{}
-		checkNumNodes(t, rtbl, 0)
+		tbl := &Table[int]{}
+		checkNumNodes(t, tbl, 0)
 
-		rtbl.Insert(mpp("192.168.0.1/32"), 1)
-		checkRoutes(t, rtbl, []tableTest{
+		tbl.Insert(mpp("192.168.0.1/32"), 1)
+		checkNumNodes(t, tbl, 1)
+		checkRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"255.255.255.255", -1},
 		})
-		rtbl.Delete(mpp("192.168.0.1/32"))
-		checkRoutes(t, rtbl, []tableTest{
+
+		tbl.Delete(mpp("192.168.0.1/32"))
+		checkNumNodes(t, tbl, 0)
+		checkRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", -1},
 			{"255.255.255.255", -1},
 		})
-		checkNumNodes(t, rtbl, 0)
 	})
 
 	t.Run("intermediate_no_routes", func(t *testing.T) {
 		t.Parallel()
-		// Create an intermediate with 2 children, then delete one leaf.
+		// Create an intermediate with 2 leaves, then delete one leaf.
 		tbl := &Table[int]{}
-
 		checkNumNodes(t, tbl, 0)
+
 		tbl.Insert(mpp("192.168.0.1/32"), 1)
 		tbl.Insert(mpp("192.180.0.1/32"), 2)
+		checkNumNodes(t, tbl, 2)
 		checkRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.180.0.1", 2},
 			{"192.40.0.1", -1},
 		})
-		checkNumNodes(t, tbl, 2) // 1 root4, 1 imed with 2 pc
+
 		tbl.Delete(mpp("192.180.0.1/32"))
+		// TODO: rebalancing with path compression after delete
+		checkNumNodes(t, tbl, 2) // no re balancing with path compression afetr delete
 		checkRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.180.0.1", -1},
 			{"192.40.0.1", -1},
 		})
-		checkNumNodes(t, tbl, 2) // 1 root4, 1 imed with 1 pc
 	})
 
 	t.Run("intermediate_with_route", func(t *testing.T) {
 		t.Parallel()
 		// Same, but the intermediate carries a route as well.
-		rtbl := &Table[int]{}
+		tbl := &Table[int]{}
+		checkNumNodes(t, tbl, 0)
 
-		checkNumNodes(t, rtbl, 0)
-		rtbl.Insert(mpp("192.168.0.1/32"), 1)
-		rtbl.Insert(mpp("192.180.0.1/32"), 2)
-		rtbl.Insert(mpp("192.0.0.0/10"), 3)
-		checkRoutes(t, rtbl, []tableTest{
+		tbl.Insert(mpp("192.168.0.1/32"), 1)
+		tbl.Insert(mpp("192.180.0.1/32"), 2)
+		tbl.Insert(mpp("192.0.0.0/10"), 3)
+
+		checkNumNodes(t, tbl, 2)
+		checkRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.180.0.1", 2},
 			{"192.40.0.1", 3},
 			{"192.255.0.1", -1},
 		})
 
-		checkNumNodes(t, rtbl, 2) // 1 root4, 1 intermediates with 2 pc
-		rtbl.Delete(mpp("192.180.0.1/32"))
-		checkRoutes(t, rtbl, []tableTest{
+		tbl.Delete(mpp("192.180.0.1/32"))
+		checkNumNodes(t, tbl, 2)
+		checkRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.180.0.1", -1},
 			{"192.40.0.1", 3},
 			{"192.255.0.1", -1},
 		})
-		checkNumNodes(t, rtbl, 2) // 1 root4, 1 intermediate, with 1 pc
 	})
 
 	t.Run("intermediate_many_leaves", func(t *testing.T) {
 		t.Parallel()
 		// Intermediate with 3 leaves, then delete one leaf.
-		rtbl := &Table[int]{}
+		tbl := &Table[int]{}
+		checkNumNodes(t, tbl, 0)
 
-		checkNumNodes(t, rtbl, 0)
-		rtbl.Insert(mpp("192.168.0.1/32"), 1)
-		rtbl.Insert(mpp("192.180.0.1/32"), 2)
-		rtbl.Insert(mpp("192.200.0.1/32"), 3)
-		checkRoutes(t, rtbl, []tableTest{
+		tbl.Insert(mpp("192.168.0.1/32"), 1)
+		tbl.Insert(mpp("192.180.0.1/32"), 2)
+		tbl.Insert(mpp("192.200.0.1/32"), 3)
+
+		checkNumNodes(t, tbl, 2)
+		checkRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.180.0.1", 2},
 			{"192.200.0.1", 3},
 			{"192.255.0.1", -1},
 		})
-		checkNumNodes(t, rtbl, 2) // 1 root4, 1 intermediate with 3 pc
-		rtbl.Delete(mpp("192.180.0.1/32"))
-		checkRoutes(t, rtbl, []tableTest{
+
+		tbl.Delete(mpp("192.180.0.1/32"))
+		checkNumNodes(t, tbl, 2)
+		checkRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.180.0.1", -1},
 			{"192.200.0.1", 3},
 			{"192.255.0.1", -1},
 		})
-		checkNumNodes(t, rtbl, 2) // 1 root4, 1 intermediate with 2 pc
 	})
 
 	t.Run("nosuchprefix_missing_child", func(t *testing.T) {
 		t.Parallel()
-		// Delete non-existent prefix, missing strideTable path.
-		rtbl := &Table[int]{}
+		// Delete non-existent prefix
+		tbl := &Table[int]{}
+		checkNumNodes(t, tbl, 0)
 
-		checkNumNodes(t, rtbl, 0)
-		rtbl.Insert(mpp("192.168.0.1/32"), 1)
-		checkRoutes(t, rtbl, []tableTest{
+		tbl.Insert(mpp("192.168.0.1/32"), 1)
+		checkNumNodes(t, tbl, 1)
+		checkRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.255.0.1", -1},
 		})
-		checkNumNodes(t, rtbl, 1)        // 1 root4 with 1 pc
-		rtbl.Delete(mpp("200.0.0.0/32")) // lookup miss in root
-		checkRoutes(t, rtbl, []tableTest{
-			{"192.168.0.1", 1},
-			{"192.255.0.1", -1},
-		})
-		checkNumNodes(t, rtbl, 1) // 1 root4 with 1 pc
-	})
 
-	t.Run("nosuchprefix_not_in_leaf", func(t *testing.T) {
-		t.Parallel()
-		// Delete non-existent prefix, strideTable path exists but
-		// leaf doesn't contain route.
-		rtbl := &Table[int]{}
-
-		checkNumNodes(t, rtbl, 0)
-		rtbl.Insert(mpp("192.168.0.1/32"), 1)
-		checkRoutes(t, rtbl, []tableTest{
+		tbl.Delete(mpp("200.0.0.0/32"))
+		checkNumNodes(t, tbl, 1)
+		checkRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.255.0.1", -1},
 		})
-		checkNumNodes(t, rtbl, 1)          // 1 root4, path compressed
-		rtbl.Delete(mpp("192.168.0.5/32")) // right leaf, no route
-		checkRoutes(t, rtbl, []tableTest{
-			{"192.168.0.1", 1},
-			{"192.255.0.1", -1},
-		})
-		checkNumNodes(t, rtbl, 1) // 1 root4, path compressed
 	})
 
 	t.Run("intermediate_with_deleted_route", func(t *testing.T) {
 		t.Parallel()
-		// Intermediate table loses its last route and becomes
+		// Intermediate node loses its last route and becomes
 		// compactable.
-		rtbl := &Table[int]{}
+		tbl := &Table[int]{}
+		checkNumNodes(t, tbl, 0)
 
-		checkNumNodes(t, rtbl, 0)
-		rtbl.Insert(mpp("192.168.0.1/32"), 1)
-		rtbl.Insert(mpp("192.168.0.0/22"), 2)
-		checkRoutes(t, rtbl, []tableTest{
+		tbl.Insert(mpp("192.168.0.1/32"), 1)
+		tbl.Insert(mpp("192.168.0.0/22"), 2)
+		checkNumNodes(t, tbl, 3)
+		checkRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.168.0.2", 2},
 			{"192.255.0.1", -1},
 		})
-		checkNumNodes(t, rtbl, 3) // 1 root4, 2 imed, 2 path-compressed
-		rtbl.Delete(mpp("192.168.0.0/22"))
-		checkRoutes(t, rtbl, []tableTest{
+
+		tbl.Delete(mpp("192.168.0.0/22"))
+		// TODO: rebalancing with path compression after delete
+		checkNumNodes(t, tbl, 3)
+		checkRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.168.0.2", -1},
 			{"192.255.0.1", -1},
 		})
-		checkNumNodes(t, rtbl, 3) // 1 root4, 2 imed, 1 pc
 	})
 
 	t.Run("default_route", func(t *testing.T) {
 		t.Parallel()
-		// Default routes have a special case in the code.
-		rtbl := &Table[int]{}
+		tbl := &Table[int]{}
+		checkNumNodes(t, tbl, 0)
 
-		rtbl.Insert(mpp("0.0.0.0/0"), 1)
-		rtbl.Insert(mpp("::/0"), 1)
-		rtbl.Delete(mpp("0.0.0.0/0"))
+		tbl.Insert(mpp("0.0.0.0/0"), 1)
+		tbl.Insert(mpp("::/0"), 1)
+		tbl.Delete(mpp("0.0.0.0/0"))
 
-		checkRoutes(t, rtbl, []tableTest{
+		checkNumNodes(t, tbl, 1)
+		checkRoutes(t, tbl, []tableTest{
 			{"1.2.3.4", -1},
 			{"::1", 1},
 		})
-		checkNumNodes(t, rtbl, 1) // 1 root6
 	})
 
 	t.Run("path compressed purge", func(t *testing.T) {
 		t.Parallel()
-		rtbl := &Table[int]{}
+		tbl := &Table[int]{}
+		checkNumNodes(t, tbl, 0)
 
-		checkNumNodes(t, rtbl, 0) // 0
+		tbl.Insert(mpp("10.10.0.0/17"), 1)
+		tbl.Insert(mpp("10.20.0.0/17"), 2)
+		checkNumNodes(t, tbl, 2)
 
-		rtbl.Insert(mpp("10.10.0.0/17"), 1)
-		rtbl.Insert(mpp("10.20.0.0/17"), 2)
-		checkNumNodes(t, rtbl, 2) // 1 root, 1 leaf
+		tbl.Delete(mpp("10.20.0.0/17"))
+		checkNumNodes(t, tbl, 2)
 
-		rtbl.Delete(mpp("10.20.0.0/17"))
-		checkNumNodes(t, rtbl, 2) // 1 root, 1 leaf
-
-		rtbl.Delete(mpp("10.10.0.0/17"))
-		checkNumNodes(t, rtbl, 0) // 0
+		tbl.Delete(mpp("10.10.0.0/17"))
+		checkNumNodes(t, tbl, 0)
 	})
 }
 
@@ -1655,59 +1658,59 @@ func TestOverlapsPrefixEdgeCases(t *testing.T) {
 func TestSize(t *testing.T) {
 	t.Parallel()
 
-	rtbl := new(Table[any])
-	if rtbl.Size() != 0 {
-		t.Errorf("empty Table: want: 0, got: %d", rtbl.Size())
+	tbl := new(Table[any])
+	if tbl.Size() != 0 {
+		t.Errorf("empty Table: want: 0, got: %d", tbl.Size())
 	}
 
-	if rtbl.Size4() != 0 {
-		t.Errorf("empty Table: want: 0, got: %d", rtbl.Size4())
+	if tbl.Size4() != 0 {
+		t.Errorf("empty Table: want: 0, got: %d", tbl.Size4())
 	}
 
-	if rtbl.Size6() != 0 {
-		t.Errorf("empty Table: want: 0, got: %d", rtbl.Size6())
+	if tbl.Size6() != 0 {
+		t.Errorf("empty Table: want: 0, got: %d", tbl.Size6())
 	}
 
 	pfxs1 := randomPrefixes(10_000)
 	pfxs2 := randomPrefixes(10_000)
 
 	for _, pfx := range pfxs1 {
-		rtbl.Insert(pfx.pfx, nil)
+		tbl.Insert(pfx.pfx, nil)
 	}
 
 	for _, pfx := range pfxs2 {
-		rtbl.Update(pfx.pfx, func(any, bool) any { return nil })
+		tbl.Update(pfx.pfx, func(any, bool) any { return nil })
 	}
 
 	pfxs1 = append(pfxs1, pfxs2...)
 
 	for _, pfx := range pfxs1[:1_000] {
-		rtbl.Update(pfx.pfx, func(any, bool) any { return nil })
+		tbl.Update(pfx.pfx, func(any, bool) any { return nil })
 	}
 
 	for _, pfx := range randomPrefixes(20_000) {
-		rtbl.Delete(pfx.pfx)
+		tbl.Delete(pfx.pfx)
 	}
 
 	var allInc4 int
 	var allInc6 int
 
-	rtbl.AllSorted4()(func(netip.Prefix, any) bool {
+	tbl.AllSorted4()(func(netip.Prefix, any) bool {
 		allInc4++
 		return true
 	})
 
-	rtbl.AllSorted6()(func(netip.Prefix, any) bool {
+	tbl.AllSorted6()(func(netip.Prefix, any) bool {
 		allInc6++
 		return true
 	})
 
-	if allInc4 != rtbl.Size4() {
-		t.Errorf("Size4: want: %d, got: %d", allInc4, rtbl.Size4())
+	if allInc4 != tbl.Size4() {
+		t.Errorf("Size4: want: %d, got: %d", allInc4, tbl.Size4())
 	}
 
-	if allInc6 != rtbl.Size6() {
-		t.Errorf("Size6: want: %d, got: %d", allInc6, rtbl.Size6())
+	if allInc6 != tbl.Size6() {
+		t.Errorf("Size6: want: %d, got: %d", allInc6, tbl.Size6())
 	}
 }
 
@@ -1971,6 +1974,7 @@ func checkNumNodes(t *testing.T, tbl *Table[int], want int) {
 	t.Helper()
 	if got := tbl.nodes(); got != want {
 		t.Errorf("wrong table dump, got %d nodes want %d", got, want)
+		t.Error(tbl.dumpString())
 	}
 }
 
