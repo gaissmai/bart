@@ -63,7 +63,7 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 		return
 	}
 
-	// true insert, update siz
+	// true insert, update size
 	t.sizeUpdate(is4, 1)
 }
 
