@@ -271,6 +271,10 @@ func (n *node[V]) lpmTest(idx uint) bool {
 
 // cloneRec, clones the node recursive.
 func (n *node[V]) cloneRec() *node[V] {
+	if n == nil {
+		return nil
+	}
+
 	c := new(node[V])
 	if n.isEmpty() {
 		return c
