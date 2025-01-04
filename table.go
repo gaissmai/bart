@@ -382,7 +382,7 @@ LOOP:
 
 		// longest prefix match, skip if node has no prefixes
 		if n.prefixes.Len() != 0 {
-			if _, val, ok = n.lpm(hostIndex(uint(octets[depth]))); ok {
+			if _, val, ok = n.lpmGet(hostIndex(uint(octets[depth]))); ok {
 				return val, ok
 			}
 		}
@@ -500,7 +500,7 @@ LOOP:
 				idx = hostIndex(uint(octet))
 			}
 
-			if baseIdx, val, ok := n.lpm(idx); ok {
+			if baseIdx, val, ok := n.lpmGet(idx); ok {
 				// calculate the bits from depth and idx
 				bits := depth*strideLen + int(baseIdxLookupTbl[baseIdx].bits)
 

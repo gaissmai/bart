@@ -43,7 +43,7 @@ var (
 func TestWorstCase(t *testing.T) {
 	t.Parallel()
 
-	t.Run("WorstCaseMatchIP4", func(t *testing.T) {
+	t.Run("WorstCaseMatchIP4Contains", func(t *testing.T) {
 		t.Parallel()
 
 		tbl := new(Table[string])
@@ -55,6 +55,25 @@ func TestWorstCase(t *testing.T) {
 		ok := tbl.Contains(worstCaseProbeIP4)
 		if ok != want {
 			t.Errorf("Contains, worst case match IP4, expected OK: %v, got: %v", want, ok)
+		}
+	})
+
+	t.Run("WorstCaseMatchIP4Lookup", func(t *testing.T) {
+		t.Parallel()
+
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
+
+		wantVal := mpp("255.255.255.255/32").String()
+		want := true
+		val, ok := tbl.Lookup(worstCaseProbeIP4)
+		if ok != want {
+			t.Errorf("Lookup, worst case match IP4, expected OK: %v, got: %v", want, ok)
+		}
+		if val != wantVal {
+			t.Errorf("Lookup, worst case match IP4, expected: %v, got: %v", wantVal, val)
 		}
 	})
 
@@ -109,29 +128,51 @@ func TestWorstCase(t *testing.T) {
 }
 
 func BenchmarkWorstCase(b *testing.B) {
-	b.Run("WorstCaseMatchIP4", func(b *testing.B) {
+	b.Run("WorstCaseMatchIP4Contains", func(b *testing.B) {
 		tbl := new(Table[string])
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
 		}
 
 		for range b.N {
-			_ = tbl.Contains(worstCaseProbeIP4)
+			tbl.Contains(worstCaseProbeIP4)
 		}
 	})
 
-	b.Run("WorstCaseMatchIP6", func(b *testing.B) {
+	b.Run("WorstCaseMatchIP4Lookup", func(b *testing.B) {
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
+
+		for range b.N {
+			tbl.Lookup(worstCaseProbeIP4)
+		}
+	})
+
+	b.Run("WorstCaseMatchIP6Contains", func(b *testing.B) {
 		tbl := new(Table[string])
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())
 		}
 
 		for range b.N {
-			_ = tbl.Contains(worstCaseProbeIP6)
+			tbl.Contains(worstCaseProbeIP6)
 		}
 	})
 
-	b.Run("WorstCaseMissIP4", func(b *testing.B) {
+	b.Run("WorstCaseMatchIP6Lookup", func(b *testing.B) {
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
+
+		for range b.N {
+			tbl.Lookup(worstCaseProbeIP6)
+		}
+	})
+
+	b.Run("WorstCaseMissIP4Contains", func(b *testing.B) {
 		tbl := new(Table[string])
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
@@ -140,11 +181,24 @@ func BenchmarkWorstCase(b *testing.B) {
 		tbl.Delete(mpp("255.255.255.255/32")) // delete matching prefix
 
 		for range b.N {
-			_ = tbl.Contains(worstCaseProbeIP4)
+			tbl.Contains(worstCaseProbeIP4)
 		}
 	})
 
-	b.Run("WorstCaseMissIP6", func(b *testing.B) {
+	b.Run("WorstCaseMissIP4Lookup", func(b *testing.B) {
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
+
+		tbl.Delete(mpp("255.255.255.255/32")) // delete matching prefix
+
+		for range b.N {
+			tbl.Lookup(worstCaseProbeIP4)
+		}
+	})
+
+	b.Run("WorstCaseMissIP6Contains", func(b *testing.B) {
 		tbl := new(Table[string])
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())
@@ -153,7 +207,20 @@ func BenchmarkWorstCase(b *testing.B) {
 		tbl.Delete(mpp("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff/128")) // delete matching prefix
 
 		for range b.N {
-			_ = tbl.Contains(worstCaseProbeIP6)
+			tbl.Contains(worstCaseProbeIP6)
+		}
+	})
+
+	b.Run("WorstCaseMissIP6Lookup", func(b *testing.B) {
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
+
+		tbl.Delete(mpp("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff/128")) // delete matching prefix
+
+		for range b.N {
+			tbl.Lookup(worstCaseProbeIP6)
 		}
 	})
 }

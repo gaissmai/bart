@@ -91,7 +91,6 @@ func (s *Array[T]) Get(i uint) (val T, ok bool) {
 	if s.Test(i) {
 		return s.Items[s.Rank(i)-1], true
 	}
-
 	return
 }
 

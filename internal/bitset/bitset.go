@@ -56,11 +56,11 @@ func (b BitSet) Clear(i uint) BitSet {
 }
 
 // Test if bit i is set.
-func (b BitSet) Test(i uint) bool {
+func (b BitSet) Test(i uint) (ok bool) {
 	if x := int(i >> 6); x < len(b) {
 		return b[x]&(1<<(i&63)) != 0
 	}
-	return false
+	return
 }
 
 // Clone this BitSet, returning a new BitSet that has the same bits set.
@@ -226,9 +226,8 @@ func (b BitSet) Size() int {
 
 // Rank returns the number of set bits up to and including the index
 // that are set in the bitset.
-func (b BitSet) Rank(i uint) int {
-	// inlined popcount to make Rank inlineable
-	var rnk int
+func (b BitSet) Rank(i uint) (rnk int) {
+	// with inlined popcount to make Rank inlineable
 
 	i++ // Rank count is inclusive
 	wordIdx := i >> 6
@@ -239,7 +238,7 @@ func (b BitSet) Rank(i uint) int {
 		for _, x := range b {
 			rnk += bits.OnesCount64(x)
 		}
-		return rnk
+		return
 	}
 
 	// inlined popcount, partial slice
@@ -248,29 +247,28 @@ func (b BitSet) Rank(i uint) int {
 	}
 
 	if bitsIdx == 0 {
-		return rnk
+		return
 	}
 
 	// plus partial word
-	return rnk + bits.OnesCount64(b[wordIdx]<<(64-bitsIdx))
+	rnk += bits.OnesCount64(b[wordIdx] << (64 - bitsIdx))
+	return
 }
 
 // popcount
-func popcount(s []uint64) int {
-	var cnt int
+func popcount(s []uint64) (cnt int) {
 	for _, x := range s {
 		// count all the bits set in slice.
 		cnt += bits.OnesCount64(x)
 	}
-	return cnt
+	return
 }
 
 // popcountAnd
-func popcountAnd(s, m []uint64) int {
-	var cnt int
+func popcountAnd(s, m []uint64) (cnt int) {
 	for j := 0; j < len(s) && j < len(m); j++ {
 		// words are bitwise & followed by popcount.
 		cnt += bits.OnesCount64(s[j] & m[j])
 	}
-	return cnt
+	return
 }
