@@ -120,36 +120,38 @@ func (n *node[V]) nodeAndLeafCountRec() (int, int) {
 // that collides with a leaf, the compressed leaf is then reinserted
 // one depth down in the node trie.
 func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool) {
-	octets := pfx.Addr().AsSlice()
 	bits := pfx.Bits()
 
 	// 10.0.0.0/8    -> 0
 	// 10.12.0.0/15  -> 1
 	// 10.12.0.0/16  -> 1
 	// 10.12.10.9/32 -> 3
-	sigOctetIdx := (bits - 1) / strideLen
-
-	// 10.0.0.0/8    -> 10
-	// 10.12.0.0/15  -> 12
-	// 10.12.0.0/16  -> 12
-	// 10.12.10.9/32 -> 9
-	// sigOctet := octets[sigOctetIdx]
+	significantIdx := (bits - 1) / strideLen
 
 	// 10.0.0.0/8    -> 8
 	// 10.12.0.0/15  -> 7
 	// 10.12.0.0/16  -> 8
 	// 10.12.10.9/32 -> 8
-	sigOctetBits := bits - (sigOctetIdx * strideLen)
+	significantBits := bits - (significantIdx * strideLen)
+
+	// 10.0.0.0/8    -> 10
+	// 10.12.0.0/15  -> 12
+	// 10.12.0.0/16  -> 12
+	// 10.12.10.9/32 -> 9
+	// significantOctet := octets[significantIdx]
+
+	octets := pfx.Addr().AsSlice()
+	octets = octets[:significantIdx+1]
 
 	// find the proper trie node to insert prefix
 	// start with prefix octet at depth
-	for ; depth <= sigOctetIdx; depth++ {
+	for ; depth < len(octets); depth++ {
 		octet := octets[depth]
 		addr := uint(octet)
 
 		// last significant octet: insert/override prefix/val into node
-		if depth == sigOctetIdx {
-			return n.prefixes.InsertAt(pfxToIdx(octet, sigOctetBits), val)
+		if depth == significantIdx {
+			return n.prefixes.InsertAt(pfxToIdx(octet, significantBits), val)
 		}
 
 		if !n.children.Test(addr) {
