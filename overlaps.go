@@ -6,8 +6,8 @@ import (
 	"github.com/gaissmai/bart/internal/bitset"
 )
 
-// overlapsRec returns true if any IP in the nodes n or o overlaps.
-func (n *node[V]) overlapsRec(o *node[V], depth int) bool {
+// overlaps returns true if any IP in the nodes n or o overlaps.
+func (n *node[V]) overlaps(o *node[V], depth int) bool {
 	nPfxCount := n.prefixes.Len()
 	oPfxCount := o.prefixes.Len()
 
@@ -69,7 +69,7 @@ func (n *node[V]) overlapsRec(o *node[V], depth int) bool {
 		return false
 	}
 
-	return n.overlapsSameChildrenRec(o, depth)
+	return n.overlapsSameChildren(o, depth)
 }
 
 // overlapsRoutes, test if n overlaps o prefixes and vice versa
@@ -170,8 +170,8 @@ func (n *node[V]) overlapsChildrenIn(o *node[V]) bool {
 	return prefixRoutes.IntersectionCardinality(hostRoutes) > 0
 }
 
-// overlapsSameChildrenRec, find same octets with bitset intersection.
-func (n *node[V]) overlapsSameChildrenRec(o *node[V], depth int) bool {
+// overlapsSameChildren, find same octets with bitset intersection.
+func (n *node[V]) overlapsSameChildren(o *node[V], depth int) bool {
 	var nChildrenBitsetCloned bitset.BitSet = make([]uint64, 4)
 	copy(nChildrenBitsetCloned, n.children.BitSet)
 
@@ -207,7 +207,7 @@ func overlapsTwoChilds[V any](nChild, oChild any, depth int) bool {
 	case *node[V]:
 		switch oKind := oChild.(type) {
 		case *node[V]: // node, node
-			return nKind.overlapsRec(oKind, depth+1) // node, node
+			return nKind.overlaps(oKind, depth+1) // node, node
 		case *leaf[V]: // node, leaf
 			return nKind.overlapsPrefixAtDepth(oKind.prefix, depth) // node, node
 		}
@@ -236,8 +236,9 @@ func (n *node[V]) overlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
 	sigOctetBits := bits - (sigOctetIdx * strideLen)
 
 	octets := ip.AsSlice()
+	octets = octets[:sigOctetIdx+1]
 
-	for ; depth <= sigOctetIdx; depth++ {
+	for ; depth < len(octets); depth++ {
 		octet := octets[depth]
 		addr := uint(octet)
 

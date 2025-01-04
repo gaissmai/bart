@@ -89,14 +89,14 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 	n := t.rootNodeByVersion(is4)
 
 	octets := ip.AsSlice()
-	sigOctetIdx := (bits - 1) / strideLen
-	sigOctetBits := bits - (sigOctetIdx * strideLen)
+	significantIdx := (bits - 1) / strideLen
+	significantBits := bits - (significantIdx * strideLen)
 
 	// find the proper trie node to update prefix
 	for depth, octet := range octets {
 		// last octet from prefix, update/insert prefix into node
-		if depth == sigOctetIdx {
-			newVal, exists := n.prefixes.UpdateAt(pfxToIdx(octet, sigOctetBits), cb)
+		if depth == significantIdx {
+			newVal, exists := n.prefixes.UpdateAt(pfxToIdx(octet, significantBits), cb)
 			if !exists {
 				t.sizeUpdate(is4, 1)
 			}
@@ -170,8 +170,8 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 	n := t.rootNodeByVersion(is4)
 
 	octets := ip.AsSlice()
-	sigOctetIdx := (bits - 1) / strideLen
-	sigOctetBits := bits - (sigOctetIdx * strideLen)
+	significantIdx := (bits - 1) / strideLen
+	significantBits := bits - (significantIdx * strideLen)
 
 	// record path to deleted node
 	// needed to purge and/or path compress nodes after deletion
@@ -184,8 +184,8 @@ LOOP:
 		stack[depth] = n
 
 		// try to delete prefix in trie node
-		if depth == sigOctetIdx {
-			if val, ok = n.prefixes.DeleteAt(pfxToIdx(octet, sigOctetBits)); ok {
+		if depth == significantIdx {
+			if val, ok = n.prefixes.DeleteAt(pfxToIdx(octet, significantBits)); ok {
 				t.sizeUpdate(is4, -1)
 				n.purgeAndCompress(stack[:depth], octets, is4)
 				return val, ok
@@ -242,14 +242,14 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 	n := t.rootNodeByVersion(is4)
 
 	octets := ip.AsSlice()
-	sigOctetIdx := (bits - 1) / strideLen
-	sigOctetBits := bits - (sigOctetIdx * strideLen)
+	significantIdx := (bits - 1) / strideLen
+	significantBits := bits - (significantIdx * strideLen)
 
 	// find the trie node
 LOOP:
 	for depth, octet := range octets {
-		if depth == sigOctetIdx {
-			return n.prefixes.Get(pfxToIdx(octet, sigOctetBits))
+		if depth == significantIdx {
+			return n.prefixes.Get(pfxToIdx(octet, significantBits))
 		}
 
 		addr := uint(octet)
@@ -382,8 +382,7 @@ LOOP:
 
 		// longest prefix match, skip if node has no prefixes
 		if n.prefixes.Len() != 0 {
-			octet = octets[depth]
-			if _, val, ok = n.lpm(hostIndex(uint(octet))); ok {
+			if _, val, ok = n.lpm(hostIndex(uint(octets[depth]))); ok {
 				return val, ok
 			}
 		}
@@ -433,31 +432,30 @@ func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool
 
 	n := t.rootNodeByVersion(is4)
 
+	// see comment in insertAtDepth()
+	significantIdx := (bits - 1) / strideLen
+	significantBits := bits - (significantIdx * strideLen)
+
+	// do not allocate
 	a16 := ip.As16()
 	octets := a16[:]
 	if is4 {
 		octets = octets[12:]
 	}
+	octets = octets[:significantIdx+1]
 
-	// see comment in Insert()
-	sigOctetIdx := (bits - 1) / strideLen
-	sigOctet := octets[sigOctetIdx]
-	sigOctetBits := bits - (sigOctetIdx * strideLen)
+	// mask the prefix, pfx.Masked() is too complex and allocates
+	octets[significantIdx] &= netMask(significantBits)
 
-	// mask the prefix
-	sigOctet &= netMask(sigOctetBits)
-	octets[sigOctetIdx] = sigOctet
-	octets = octets[:sigOctetIdx+1]
+	// record path to leaf node
+	stack := [maxTreeDepth]*node[V]{}
 
 	var depth int
 	var octet byte
 	var addr uint
 
-	// record path to leaf node
-	stack := [maxTreeDepth]*node[V]{}
-
 LOOP:
-	// find the node
+	// find the last node on the octets path in the trie
 	for depth, octet = range octets {
 		addr = uint(octet)
 
@@ -485,7 +483,7 @@ LOOP:
 		}
 	}
 
-	// start backtracking, unwind the stack
+	// start backtracking, unwind the stack.
 	for ; depth >= 0; depth-- {
 		n = stack[depth]
 
@@ -496,8 +494,8 @@ LOOP:
 			// only the lastOctet may have a different prefix len
 			// all others are just host routes
 			var idx uint
-			if depth == sigOctetIdx {
-				idx = pfxToIdx(octet, sigOctetBits)
+			if depth == significantIdx {
+				idx = pfxToIdx(octet, significantBits)
 			} else {
 				idx = hostIndex(uint(octet))
 			}
@@ -534,11 +532,11 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) func(yield func(netip.Prefix, V) 
 
 		n := t.rootNodeByVersion(is4)
 
-		sigOctetIdx := (bits - 1) / strideLen
-		sigOctetBits := bits - (sigOctetIdx * strideLen)
+		significantIdx := (bits - 1) / strideLen
+		significantBits := bits - (significantIdx * strideLen)
 
 		octets := ip.AsSlice()
-		octets = octets[:sigOctetIdx+1]
+		octets = octets[:significantIdx+1]
 
 		// stack of the traversed nodes for reverse ordering of supernets
 		stack := [maxTreeDepth]*node[V]{}
@@ -587,8 +585,8 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) func(yield func(netip.Prefix, V) 
 			// only the lastOctet may have a different prefix len
 			// all others are just host routes
 			pfxLen := strideLen
-			if depth == sigOctetIdx {
-				pfxLen = sigOctetBits
+			if depth == significantIdx {
+				pfxLen = significantBits
 			}
 
 			if !n.eachLookupPrefix(octets, depth, is4, pfxLen, yield) {
@@ -617,16 +615,16 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) func(yield func(netip.Prefix, V) bo
 
 		n := t.rootNodeByVersion(is4)
 
-		sigOctetIdx := (bits - 1) / strideLen
-		sigOctetBits := bits - (sigOctetIdx * strideLen)
+		significantIdx := (bits - 1) / strideLen
+		significantBits := bits - (significantIdx * strideLen)
 
 		octets := ip.AsSlice()
-		octets = octets[:sigOctetIdx+1]
+		octets = octets[:significantIdx+1]
 
 		// find the trie node
 		for depth, octet := range octets {
-			if depth == sigOctetIdx {
-				_ = n.eachSubnet(octets, depth, is4, sigOctetBits, yield)
+			if depth == significantIdx {
+				_ = n.eachSubnet(octets, depth, is4, significantBits, yield)
 				return
 			}
 
@@ -677,7 +675,7 @@ func (t *Table[V]) Overlaps4(o *Table[V]) bool {
 	if t.size4 == 0 || o.size4 == 0 {
 		return false
 	}
-	return t.root4.overlapsRec(&o.root4, 0)
+	return t.root4.overlaps(&o.root4, 0)
 }
 
 // Overlaps6 reports whether any IPv6 in the table matches a route in the
@@ -686,7 +684,7 @@ func (t *Table[V]) Overlaps6(o *Table[V]) bool {
 	if t.size6 == 0 || o.size6 == 0 {
 		return false
 	}
-	return t.root6.overlapsRec(&o.root6, 0)
+	return t.root6.overlaps(&o.root6, 0)
 }
 
 // Union combines two tables, changing the receiver table.

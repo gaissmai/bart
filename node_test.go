@@ -148,7 +148,7 @@ func TestOverlapsNode(t *testing.T) {
 		}
 
 		gotGold := gold.strideOverlaps(&goldInter)
-		gotFast := fast.overlapsRec(fastInter, 0)
+		gotFast := fast.overlaps(fastInter, 0)
 		if gotGold != gotFast {
 			t.Fatalf("node.overlaps = %v, want %v", gotFast, gotGold)
 		}
