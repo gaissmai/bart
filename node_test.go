@@ -59,7 +59,7 @@ func TestPrefixInsert(t *testing.T) {
 		octet := byte(i)
 		addr := uint(i)
 		goldVal, goldOK := gold.lpm(octet)
-		_, fastVal, fastOK := fast.lpm(hostIndex(addr))
+		_, fastVal, fastOK := fast.lpmGet(hostIndex(addr))
 		if !getsEqual(fastVal, fastOK, goldVal, goldOK) {
 			t.Fatalf("get(%d) = (%v, %v), want (%v, %v)", octet, fastVal, fastOK, goldVal, goldOK)
 		}
@@ -92,7 +92,7 @@ func TestPrefixDelete(t *testing.T) {
 		octet := byte(i)
 		addr := uint(i)
 		goldVal, goldOK := gold.lpm(octet)
-		_, fastVal, fastOK := fast.lpm(hostIndex(addr))
+		_, fastVal, fastOK := fast.lpmGet(hostIndex(addr))
 		if !getsEqual(fastVal, fastOK, goldVal, goldOK) {
 			t.Fatalf("get(%d) = (%v, %v), want (%v, %v)", octet, fastVal, fastOK, goldVal, goldOK)
 		}
@@ -256,7 +256,7 @@ func BenchmarkNodePrefixLPM(b *testing.B) {
 
 			b.ResetTimer()
 			for range b.N {
-				_, writeSink, _ = this.lpm(pfxToIdx(route.octet, route.bits))
+				_, writeSink, _ = this.lpmGet(pfxToIdx(route.octet, route.bits))
 			}
 		})
 	}

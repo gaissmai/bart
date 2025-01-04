@@ -228,24 +228,24 @@ func (n *node[V]) purgeAndCompress(parentStack []*node[V], childPath []byte, is4
 	}
 }
 
-// lpm does a route lookup for idx in the 8-bit (stride) routing table
+// lpmGet does a route lookup for idx in the 8-bit (stride) routing table
 // at this depth and returns (baseIdx, value, true) if a matching
 // longest prefix exists, or ok=false otherwise.
 //
 // backtracking is fast, it's just a bitset test and, if found, one popcount.
 // max steps in backtracking is the stride length.
-func (n *node[V]) lpm(idx uint) (baseIdx uint, val V, ok bool) {
-	// shortcut optimization
+func (n *node[V]) lpmGet(idx uint) (baseIdx uint, val V, ok bool) {
+	// shortcut optimization, perhaps reduces the backtracking iterations
 	minIdx, ok := n.prefixes.FirstSet()
 	if !ok {
 		return 0, val, false
 	}
 
 	// backtracking the CBT
-	for baseIdx = idx; baseIdx >= minIdx; baseIdx >>= 1 {
+	for ; idx >= minIdx; idx >>= 1 {
 		// practically it's get, but get is not inlined
-		if n.prefixes.Test(baseIdx) {
-			return baseIdx, n.prefixes.MustGet(baseIdx), true
+		if n.prefixes.Test(idx) {
+			return idx, n.prefixes.MustGet(idx), true
 		}
 	}
 
@@ -253,21 +253,21 @@ func (n *node[V]) lpm(idx uint) (baseIdx uint, val V, ok bool) {
 	return 0, val, false
 }
 
-// lpmTest for faster lpm tests without value returns
+// lpmTest for faster lpm tests without value returns.
 func (n *node[V]) lpmTest(idx uint) bool {
-	// shortcut optimization
+	// shortcut optimization, perhaps reduces the backtracking iterations
 	minIdx, ok := n.prefixes.FirstSet()
 	if !ok {
 		return false
 	}
 
 	// backtracking the CBT
-	for idx := idx; idx >= minIdx; idx >>= 1 {
+	for ; idx >= minIdx; idx >>= 1 {
 		if n.prefixes.Test(idx) {
+			// no need for MustGet()
 			return true
 		}
 	}
-
 	return false
 }
 

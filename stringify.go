@@ -177,7 +177,7 @@ func (n *node[V]) getKidsRec(parentIdx uint, path [16]byte, depth int, is4 bool)
 		}
 
 		// check if lpmIdx for this idx' parent is equal to parentIdx
-		lpmIdx, _, _ := n.lpm(idx >> 1)
+		lpmIdx, _, _ := n.lpmGet(idx >> 1)
 
 		// if idx is directKid?
 		if lpmIdx == parentIdx {
@@ -202,7 +202,7 @@ func (n *node[V]) getKidsRec(parentIdx uint, path [16]byte, depth int, is4 bool)
 	allChildAddrs := n.children.AsSlice(make([]uint, 0, maxNodeChildren))
 	for i, addr := range allChildAddrs {
 		// do a longest-prefix-match
-		lpmIdx, _, _ := n.lpm(hostIndex(addr))
+		lpmIdx, _, _ := n.lpmGet(hostIndex(addr))
 		if lpmIdx == parentIdx {
 			switch k := n.children.Items[i].(type) {
 			case *node[V]:
