@@ -165,6 +165,31 @@ func (b BitSet) AppendTo(buf []uint) []uint {
 	return buf
 }
 
+// IntersectsAny returns true if the intersection of base set with the compare set
+// is not the empty set.
+func (b BitSet) IntersectsAny(c BitSet) bool {
+	// bounds check eliminated (BCE)
+	j := min(len(b), len(c)) - 1
+	for ; j >= 0 && j < len(b) && j < len(c); j-- {
+		if b[j]&c[j] != 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// IntersectionTop computes the intersection of base set with the compare set.
+// If the result set isn't empty, it returns the top most set bit and true.
+func (b BitSet) IntersectionTop(c BitSet) (top uint, ok bool) {
+	// bounds check eliminated (BCE)
+	for j := min(len(b), len(c)) - 1; j >= 0 && j < len(b) && j < len(c); j-- {
+		if word := b[j] & c[j]; word != 0 {
+			return uint(j<<6+bits.Len64(word)) - 1, true
+		}
+	}
+	return
+}
+
 // IntersectionCardinality computes the popcount of the intersection.
 func (b BitSet) IntersectionCardinality(c BitSet) int {
 	return popcountAnd(b, c)

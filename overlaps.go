@@ -65,7 +65,7 @@ func (n *node[V]) overlaps(o *node[V], depth int) bool {
 	}
 
 	// stop condition, no child with identical octet in n and o
-	if n.children.IntersectionCardinality(o.children.BitSet) == 0 {
+	if !n.children.IntersectsAny(o.children.BitSet) {
 		return false
 	}
 
@@ -75,7 +75,7 @@ func (n *node[V]) overlaps(o *node[V], depth int) bool {
 // overlapsRoutes, test if n overlaps o prefixes and vice versa
 func (n *node[V]) overlapsRoutes(o *node[V]) bool {
 	// some prefixes are identical, trivial overlap
-	if n.prefixes.IntersectionCardinality(o.prefixes.BitSet) > 0 {
+	if n.prefixes.IntersectsAny(o.prefixes.BitSet) {
 		return true
 	}
 
@@ -158,8 +158,7 @@ func (n *node[V]) overlapsChildrenIn(o *node[V]) bool {
 
 	for _, idx := range allIndices {
 		// get pre alloted bitset for idx
-		a8 := idxToAllot(idx)
-		prefixRoutes.InPlaceUnion(bitset.BitSet(a8[:]))
+		prefixRoutes.InPlaceUnion(allotLookupTbl[idx])
 	}
 
 	// shift-right children bitset by 256 (firstHostIndex)
@@ -167,7 +166,7 @@ func (n *node[V]) overlapsChildrenIn(o *node[V]) bool {
 	copy(c8[4:], o.children.BitSet) // 4*64= 256
 	hostRoutes := bitset.BitSet(c8)
 
-	return prefixRoutes.IntersectionCardinality(hostRoutes) > 0
+	return prefixRoutes.IntersectsAny(hostRoutes)
 }
 
 // overlapsSameChildren, find same octets with bitset intersection.
@@ -282,10 +281,8 @@ func (n *node[V]) overlapsIdx(octet byte, pfxLen int) bool {
 
 	// use bitset intersections instead of range loops
 	// copy pre alloted bitset for idx
-	a8 := idxToAllot(idx)
-	allotedPrefixRoutes := bitset.BitSet(a8[:])
-
-	if allotedPrefixRoutes.IntersectionCardinality(n.prefixes.BitSet) != 0 {
+	allotedPrefixRoutes := allotLookupTbl[idx]
+	if allotedPrefixRoutes.IntersectsAny(n.prefixes.BitSet) {
 		return true
 	}
 
@@ -297,5 +294,5 @@ func (n *node[V]) overlapsIdx(octet byte, pfxLen int) bool {
 	hostRoutes := bitset.BitSet(c8)
 
 	// use bitsets intersection instead of range loops
-	return allotedPrefixRoutes.IntersectionCardinality(hostRoutes) != 0
+	return allotedPrefixRoutes.IntersectsAny(hostRoutes)
 }

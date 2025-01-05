@@ -251,12 +251,23 @@ func BenchmarkNodePrefixLPM(b *testing.B) {
 			this.prefixes.InsertAt(pfxToIdx(route.octet, route.bits), 0)
 		}
 
-		b.Run(fmt.Sprintf("IN %d", nroutes), func(b *testing.B) {
+		b.Run(fmt.Sprintf("lpmGet  IN %d", nroutes), func(b *testing.B) {
 			route := routes[rand.Intn(len(routes))]
+			idx := pfxToIdx(route.octet, route.bits)
 
 			b.ResetTimer()
 			for range b.N {
-				_, writeSink, _ = this.lpmGet(pfxToIdx(route.octet, route.bits))
+				this.lpmGet(idx)
+			}
+		})
+
+		b.Run(fmt.Sprintf("lpmTest IN %d", nroutes), func(b *testing.B) {
+			route := routes[rand.Intn(len(routes))]
+			idx := pfxToIdx(route.octet, route.bits)
+
+			b.ResetTimer()
+			for range b.N {
+				this.lpmTest(idx)
 			}
 		})
 	}
