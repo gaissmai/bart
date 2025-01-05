@@ -235,18 +235,8 @@ func (n *node[V]) purgeAndCompress(parentStack []*node[V], childPath []byte, is4
 // backtracking is fast, it's just a bitset test and, if found, one popcount.
 // max steps in backtracking is the stride length.
 func (n *node[V]) lpmGet(idx uint) (baseIdx uint, val V, ok bool) {
-	// shortcut optimization, perhaps reduces the backtracking iterations
-	minIdx, ok := n.prefixes.FirstSet()
-	if !ok {
-		return 0, val, false
-	}
-
-	// backtracking the CBT
-	for ; idx >= minIdx; idx >>= 1 {
-		// practically it's get, but get is not inlined
-		if n.prefixes.Test(idx) {
-			return idx, n.prefixes.MustGet(idx), true
-		}
+	if top, ok := n.prefixes.IntersectionTop(lpmLookupTbl[idx]); ok {
+		return top, n.prefixes.MustGet(top), true
 	}
 
 	// not found (on this level)
@@ -255,20 +245,7 @@ func (n *node[V]) lpmGet(idx uint) (baseIdx uint, val V, ok bool) {
 
 // lpmTest for faster lpm tests without value returns.
 func (n *node[V]) lpmTest(idx uint) bool {
-	// shortcut optimization, perhaps reduces the backtracking iterations
-	minIdx, ok := n.prefixes.FirstSet()
-	if !ok {
-		return false
-	}
-
-	// backtracking the CBT
-	for ; idx >= minIdx; idx >>= 1 {
-		if n.prefixes.Test(idx) {
-			// no need for MustGet()
-			return true
-		}
-	}
-	return false
+	return n.prefixes.IntersectsAny(lpmLookupTbl[idx])
 }
 
 // cloneRec, clones the node recursive.

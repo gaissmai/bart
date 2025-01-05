@@ -57,7 +57,11 @@ func TestNil(t *testing.T) {
 
 	b = BitSet(nil)
 	c = BitSet(nil)
-	b.IntersectionCardinality(c)
+	b.IntersectsAny(c)
+
+	b = BitSet(nil)
+	c = BitSet(nil)
+	b.IntersectionTop(c)
 }
 
 func TestZeroValue(t *testing.T) {
@@ -108,7 +112,11 @@ func TestZeroValue(t *testing.T) {
 
 	b = BitSet{}
 	c = BitSet{}
-	b.IntersectionCardinality(c)
+	b.IntersectsAny(c)
+
+	b = BitSet{}
+	c = BitSet{}
+	b.IntersectionTop(c)
 }
 
 func TestBitSetUntil(t *testing.T) {
@@ -596,6 +604,67 @@ func TestInplaceIntersection(t *testing.T) {
 	}
 	if b.IntersectionCardinality(a) != c.Size() {
 		t.Error("Intersection and IntersectionCardinality differ")
+	}
+}
+
+func TestIntersects(t *testing.T) {
+	t.Parallel()
+	var a BitSet
+	var b BitSet
+
+	for i := uint(1); i < 100; i++ {
+		a = a.Set(i)
+	}
+	for i := uint(100); i < 200; i++ {
+		b = b.Set(i)
+	}
+
+	want := false
+	got := a.IntersectsAny(b)
+	if want != got {
+		t.Errorf("Intersection should be %v, but got: %v", want, got)
+	}
+
+	b = a.Clone()
+	want = true
+	got = a.IntersectsAny(b)
+	if want != got {
+		t.Errorf("Intersection should be %v, but got: %v", want, got)
+	}
+}
+
+func TestIntersectionTop(t *testing.T) {
+	t.Parallel()
+	var a BitSet
+	var b BitSet
+	for i := uint(1); i < 100; i += 2 {
+		a = a.Set(i)
+		b = b.Set(i - 1)
+		b = b.Set(i)
+	}
+	for i := uint(100); i < 200; i++ {
+		b = b.Set(i)
+	}
+
+	wantTop, wantOk := uint(99), true
+	gotTop, gotOk := a.IntersectionTop(b)
+
+	if wantOk != gotOk {
+		t.Errorf("IntersectionTop, want %v, got %v", wantOk, gotOk)
+	}
+	if wantTop != gotTop {
+		t.Errorf("IntersectionTop, want %v, got %v", wantTop, gotTop)
+	}
+
+	wantTop, wantOk = uint(99), true
+	gotTop, gotOk = b.IntersectionTop(a)
+
+	if wantOk != gotOk {
+		t.Errorf("IntersectionTop, want %v, got %v", wantOk, gotOk)
+	}
+
+	if wantTop != gotTop {
+		t.Errorf("IntersectionTop, want %v, got %v", wantTop, gotTop)
 	}
 }
 

@@ -77,7 +77,7 @@ func TestWorstCase(t *testing.T) {
 		}
 	})
 
-	t.Run("WorstCaseMissIP4", func(t *testing.T) {
+	t.Run("WorstCaseMissIP4Contains", func(t *testing.T) {
 		t.Parallel()
 
 		tbl := new(Table[string])
@@ -94,7 +94,24 @@ func TestWorstCase(t *testing.T) {
 		}
 	})
 
-	t.Run("WorstCaseMatchIP6", func(t *testing.T) {
+	t.Run("WorstCaseMissIP4Lookup", func(t *testing.T) {
+		t.Parallel()
+
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
+
+		tbl.Delete(mpp("255.255.255.255/32")) // delete matching prefix
+
+		want := false
+		_, ok := tbl.Lookup(worstCaseProbeIP4)
+		if ok != want {
+			t.Errorf("Lookup, worst case miss IP4, expected OK: %v, got: %v", want, ok)
+		}
+	})
+
+	t.Run("WorstCaseMatchIP6Contains", func(t *testing.T) {
 		t.Parallel()
 
 		tbl := new(Table[string])
@@ -109,7 +126,22 @@ func TestWorstCase(t *testing.T) {
 		}
 	})
 
-	t.Run("WorstCaseMissIP6", func(t *testing.T) {
+	t.Run("WorstCaseMatchIP6Lookup", func(t *testing.T) {
+		t.Parallel()
+
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
+
+		want := true
+		_, ok := tbl.Lookup(worstCaseProbeIP6)
+		if ok != want {
+			t.Errorf("Lookup, worst case match IP6, expected OK: %v, got: %v", want, ok)
+		}
+	})
+
+	t.Run("WorstCaseMissIP6Contains", func(t *testing.T) {
 		t.Parallel()
 
 		tbl := new(Table[string])
@@ -123,6 +155,23 @@ func TestWorstCase(t *testing.T) {
 		ok := tbl.Contains(worstCaseProbeIP6)
 		if ok != want {
 			t.Errorf("Contains, worst case miss IP6, expected OK: %v, got: %v", want, ok)
+		}
+	})
+
+	t.Run("WorstCaseMissIP6Lookup", func(t *testing.T) {
+		t.Parallel()
+
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
+
+		tbl.Delete(mpp("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff/128")) // delete matching prefix
+
+		want := false
+		_, ok := tbl.Lookup(worstCaseProbeIP6)
+		if ok != want {
+			t.Errorf("Lookup, worst case miss IP6, expected OK: %v, got: %v", want, ok)
 		}
 	})
 }
