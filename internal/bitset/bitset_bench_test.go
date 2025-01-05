@@ -150,3 +150,43 @@ func BenchmarkBitSetInPlace(b *testing.B) {
 		}
 	})
 }
+
+func BenchmarkWorstCaseBitSetLPM(b *testing.B) {
+	idx := BitSet{}
+	for _, i := range []uint{1, 3, 7, 15, 31, 62, 125, 511} {
+		idx = idx.Set(i)
+	}
+
+	b.Run("lpmTestWorstCase", func(b *testing.B) {
+		pfx := BitSet{}.Set(510)
+
+		b.ResetTimer()
+		for range b.N {
+			pfx.IntersectsAny(idx)
+		}
+	})
+
+	b.Run("lpmGetWorstCase", func(b *testing.B) {
+		pfx := BitSet{}.Set(510)
+
+		b.ResetTimer()
+		for range b.N {
+			pfx.IntersectionTop(idx)
+		}
+	})
+}
+
+func BenchmarkWorstCaseIterLPM(b *testing.B) {
+	b.Run("lpmTestWorstCase", func(b *testing.B) {
+		pfx := BitSet{}.Set(1)
+
+		b.ResetTimer()
+		for range b.N {
+			for idx := uint(511); idx > 0; idx >>= 1 {
+				if pfx.Test(idx) {
+					break
+				}
+			}
+		}
+	})
+}
