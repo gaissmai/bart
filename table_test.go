@@ -1738,8 +1738,12 @@ func BenchmarkTableInsertRandom(b *testing.B) {
 			runtime.GC()
 			runtime.ReadMemStats(&endMem)
 
+			s4 := rt.root4.nodeStatsRec()
+			s6 := rt.root6.nodeStatsRec()
+			stats := stats{s4.pfxs + s6.pfxs, s4.childs + s6.childs, s4.nodes + s6.nodes, s4.leaves + s6.leaves}
+
 			b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
-			b.ReportMetric(float64(rt.Size())/float64(rt.stats().nodes), "Prefix/Node")
+			b.ReportMetric(float64(rt.Size())/float64(stats.nodes), "Prefix/Node")
 		})
 
 	}
@@ -1972,7 +1976,12 @@ func checkRoutes(t *testing.T, tbl *Table[int], tt []tableTest) {
 
 func checkNumNodes(t *testing.T, tbl *Table[int], want int) {
 	t.Helper()
-	if got := tbl.stats().nodes; got != want {
+
+	s4 := tbl.root4.nodeStatsRec()
+	s6 := tbl.root6.nodeStatsRec()
+	nodes := s4.nodes + s6.nodes
+
+	if got := nodes; got != want {
 		t.Errorf("wrong table dump, got %d nodes want %d", got, want)
 		t.Error(tbl.dumpString())
 	}

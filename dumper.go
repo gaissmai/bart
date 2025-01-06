@@ -40,13 +40,13 @@ func (t *Table[V]) dump(w io.Writer) {
 
 	if t.Size4() > 0 {
 		fmt.Fprintln(w)
-		fmt.Fprintf(w, "### IPv4: size(%d), nodes(%d)", t.Size4(), t.stats4().nodes)
+		fmt.Fprintf(w, "### IPv4: size(%d), nodes(%d)", t.Size4(), t.root4.nodeStatsRec().nodes)
 		t.root4.dumpRec(w, zeroPath, 0, true)
 	}
 
 	if t.Size6() > 0 {
 		fmt.Fprintln(w)
-		fmt.Fprintf(w, "### IPv6: size(%d), nodes(%d)", t.Size6(), t.stats6().nodes)
+		fmt.Fprintf(w, "### IPv6: size(%d), nodes(%d)", t.Size6(), t.root6.nodeStatsRec().nodes)
 		t.root6.dumpRec(w, zeroPath, 0, false)
 	}
 }
@@ -153,20 +153,20 @@ func (n *node[V]) dump(w io.Writer, path [16]byte, depth int, is4 bool) {
 
 // hasType returns the nodeType.
 func (n *node[V]) hasType() nodeType {
-	prefixCount, childCount, nodeCount, leafCount := n.nodeStats()
+	s := n.nodeStats()
 
 	switch {
-	case prefixCount == 0 && childCount == 0:
+	case s.pfxs == 0 && s.childs == 0:
 		return nullNode
-	case nodeCount == 0:
+	case s.nodes == 0:
 		return leafNode
-	case (prefixCount > 0 || leafCount > 0) && nodeCount > 0:
+	case (s.pfxs > 0 || s.leaves > 0) && s.nodes > 0:
 		return fullNode
-	case (prefixCount == 0 && leafCount == 0) && nodeCount > 0:
+	case (s.pfxs == 0 && s.leaves == 0) && s.nodes > 0:
 		return intermediateNode
 	default:
 		panic(fmt.Sprintf("UNREACHABLE: pfx: %d, chld: %d, node: %d, leaf: %d",
-			prefixCount, childCount, nodeCount, leafCount))
+			s.pfxs, s.childs, s.nodes, s.leaves))
 	}
 }
 
@@ -223,4 +223,61 @@ func (nt nodeType) String() string {
 	default:
 		return "unreachable"
 	}
+}
+
+// stats, only used for dump, tests and benchmarks
+type stats struct {
+	pfxs   int
+	childs int
+	nodes  int
+	leaves int
+}
+
+// node statistics for this single node
+func (n *node[V]) nodeStats() stats {
+	var s stats
+
+	s.pfxs = n.prefixes.Len()
+	s.childs = n.children.Len()
+
+	for i := range n.children.AsSlice(make([]uint, 0, maxNodeChildren)) {
+		switch n.children.Items[i].(type) {
+		case *node[V]:
+			s.nodes++
+		case *leaf[V]:
+			s.leaves++
+		}
+	}
+	return s
+}
+
+// nodeStatsRec, calculate the number of pfxs, nodes and leaves under n, rec-descent.
+func (n *node[V]) nodeStatsRec() stats {
+	var s stats
+	if n == nil || n.isEmpty() {
+		return s
+	}
+
+	s.pfxs = n.prefixes.Len()
+	s.childs = n.children.Len()
+	s.nodes = 1 // this node
+	s.leaves = 0
+
+	for _, c := range n.children.Items {
+		switch k := c.(type) {
+		case *node[V]:
+			// rec-descent
+			rs := k.nodeStatsRec()
+
+			s.pfxs += rs.pfxs
+			s.childs += rs.childs
+			s.nodes += rs.nodes
+			s.leaves += rs.leaves
+
+		case *leaf[V]:
+			s.leaves++
+		}
+	}
+
+	return s
 }
