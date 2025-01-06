@@ -75,8 +75,11 @@ func (l *leaf[V]) cloneLeaf() *leaf[V] {
 	return &leaf[V]{l.prefix, cloneOrCopyValue(l.value)}
 }
 
-// nodeAndLeafCount for this node
-func (n *node[V]) nodeAndLeafCount() (nodes int, leaves int) {
+// node statistics for this single node
+func (n *node[V]) nodeStats() (pfxs, childs, nodes, leaves int) {
+	pfxs = n.prefixes.Len()
+	childs = n.children.Len()
+
 	for i := range n.children.AsSlice(make([]uint, 0, maxNodeChildren)) {
 		switch n.children.Items[i].(type) {
 		case *node[V]:
@@ -88,20 +91,22 @@ func (n *node[V]) nodeAndLeafCount() (nodes int, leaves int) {
 	return
 }
 
-// nodeAndLeafCountRec, calculate the number of nodes and leaves under n, rec-descent.
-func (n *node[V]) nodeAndLeafCountRec() (int, int) {
+// nodeStatsRec, calculate the number of pfxs, nodes and leaves under n, rec-descent.
+func (n *node[V]) nodeStatsRec() (pfxs, nodes, leaves int) {
 	if n == nil || n.isEmpty() {
-		return 0, 0
+		return
 	}
 
-	nodes := 1 // this node
-	leaves := 0
+	pfxs = n.prefixes.Len()
+	nodes = 1 // this node
+	leaves = 0
 
 	for _, c := range n.children.Items {
 		switch k := c.(type) {
 		case *node[V]:
 			// rec-descent
-			ns, ls := k.nodeAndLeafCountRec()
+			ps, ns, ls := k.nodeStatsRec()
+			pfxs += ps
 			nodes += ns
 			leaves += ls
 
@@ -110,7 +115,7 @@ func (n *node[V]) nodeAndLeafCountRec() (int, int) {
 		}
 	}
 
-	return nodes, leaves
+	return
 }
 
 // insertAtDepth insert a prefix/val into a node tree at depth.
