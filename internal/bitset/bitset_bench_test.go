@@ -151,38 +151,35 @@ func BenchmarkBitSetInPlace(b *testing.B) {
 	})
 }
 
-func BenchmarkWorstCaseBitSetLPM(b *testing.B) {
-	idx := BitSet{}
-	for _, i := range []uint{1, 3, 7, 15, 31, 62, 125, 511} {
-		idx = idx.Set(i)
-	}
+func BenchmarkWorstCaseLPM(b *testing.B) {
+	pfx := BitSet{}.Set(1).Set(510)
+	idx := BitSet{}.Set(511).Set(255).Set(127).Set(63).Set(31).Set(15).Set(7).Set(3).Set(1)
 
-	b.Run("lpmTestWorstCase", func(b *testing.B) {
-		pfx := BitSet{}.Set(510)
+	b.Run("IntersectionTop", func(b *testing.B) {
+		b.ResetTimer()
+		for range b.N {
+			pfx.IntersectionTop(idx)
+		}
+	})
 
+	b.Run("IntersectsAny", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
 			pfx.IntersectsAny(idx)
 		}
 	})
 
-	b.Run("lpmGetWorstCase", func(b *testing.B) {
-		pfx := BitSet{}.Set(510)
+	b.Run("IterBacktracking", func(b *testing.B) {
+		var ok bool
+		var firstPfx uint
 
 		b.ResetTimer()
 		for range b.N {
-			pfx.IntersectionTop(idx)
-		}
-	})
-}
+			if firstPfx, ok = pfx.FirstSet(); !ok {
+				firstPfx = 1
+			}
 
-func BenchmarkWorstCaseIterLPM(b *testing.B) {
-	b.Run("lpmTestWorstCase", func(b *testing.B) {
-		pfx := BitSet{}.Set(1)
-
-		b.ResetTimer()
-		for range b.N {
-			for idx := uint(511); idx > 0; idx >>= 1 {
+			for idx := uint(511); idx >= firstPfx; idx >>= 1 {
 				if pfx.Test(idx) {
 					break
 				}
