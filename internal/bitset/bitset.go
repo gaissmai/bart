@@ -257,7 +257,6 @@ func (b BitSet) Rank(i uint) (rnk int) {
 
 	i++ // Rank count is inclusive
 	wordIdx := i >> 6
-	bitsIdx := i & 63
 
 	if int(wordIdx) >= len(b) {
 		// inlined popcount, whole slice
@@ -272,12 +271,11 @@ func (b BitSet) Rank(i uint) (rnk int) {
 		rnk += bits.OnesCount64(x)
 	}
 
-	if bitsIdx == 0 {
-		return
+	if bitsIdx := i & 63; bitsIdx != 0 {
+		// plus partial word
+		rnk += bits.OnesCount64(b[wordIdx] << (64 - bitsIdx))
 	}
 
-	// plus partial word
-	rnk += bits.OnesCount64(b[wordIdx] << (64 - bitsIdx))
 	return
 }
 
