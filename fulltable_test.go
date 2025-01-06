@@ -364,7 +364,7 @@ func BenchmarkFullTableMemoryV4(b *testing.B) {
 		runtime.GC()
 		runtime.ReadMemStats(&endMem)
 
-		stats := rt.stats()
+		stats := rt.root4.nodeStatsRec()
 		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
 		b.ReportMetric(float64(rt.Size()), "size")
 		b.ReportMetric(float64(stats.pfxs), "pfxs")
@@ -391,7 +391,7 @@ func BenchmarkFullTableMemoryV6(b *testing.B) {
 		runtime.GC()
 		runtime.ReadMemStats(&endMem)
 
-		stats := rt.stats()
+		stats := rt.root6.nodeStatsRec()
 		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
 		b.ReportMetric(float64(rt.Size()), "size")
 		b.ReportMetric(float64(stats.pfxs), "pfxs")
@@ -418,7 +418,10 @@ func BenchmarkFullTableMemory(b *testing.B) {
 		runtime.GC()
 		runtime.ReadMemStats(&endMem)
 
-		stats := rt.stats()
+		s4 := rt.root4.nodeStatsRec()
+		s6 := rt.root6.nodeStatsRec()
+		stats := stats{s4.pfxs + s6.pfxs, s4.childs + s6.childs, s4.nodes + s6.nodes, s4.leaves + s6.leaves}
+
 		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
 		b.ReportMetric(float64(rt.Size()), "size")
 		b.ReportMetric(float64(stats.pfxs), "pfxs")

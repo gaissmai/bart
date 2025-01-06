@@ -790,32 +790,3 @@ func (t *Table[V]) AllSorted6() func(yield func(pfx netip.Prefix, val V) bool) {
 		_ = t.root6.allRecSorted(zeroPath, 0, false, yield)
 	}
 }
-
-// #########################################################
-
-// stats, only used for dump, tests and benchmarks
-type stats struct {
-	pfxs   int
-	nodes  int
-	leaves int
-}
-
-// stats, count the leaves, pfxs and nodes
-func (t *Table[V]) stats() stats {
-	s4 := t.stats4()
-	s6 := t.stats6()
-
-	return stats{s4.pfxs + s6.pfxs, s4.nodes + s6.nodes, s4.leaves + s6.leaves}
-}
-
-// stats4
-func (t *Table[V]) stats4() stats {
-	p4, n4, l4 := t.root4.nodeStatsRec()
-	return stats{p4, n4, l4}
-}
-
-// stats6
-func (t *Table[V]) stats6() stats {
-	p6, n6, l6 := t.root6.nodeStatsRec()
-	return stats{p6, n6, l6}
-}
