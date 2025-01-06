@@ -1739,7 +1739,7 @@ func BenchmarkTableInsertRandom(b *testing.B) {
 			runtime.ReadMemStats(&endMem)
 
 			b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
-			b.ReportMetric(float64(rt.Size())/float64(rt.nodes()), "Prefix/Node")
+			b.ReportMetric(float64(rt.Size())/float64(rt.stats().nodes), "Prefix/Node")
 		})
 
 	}
@@ -1972,7 +1972,7 @@ func checkRoutes(t *testing.T, tbl *Table[int], tt []tableTest) {
 
 func checkNumNodes(t *testing.T, tbl *Table[int], want int) {
 	t.Helper()
-	if got := tbl.nodes(); got != want {
+	if got := tbl.stats().nodes; got != want {
 		t.Errorf("wrong table dump, got %d nodes want %d", got, want)
 		t.Error(tbl.dumpString())
 	}

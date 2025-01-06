@@ -40,13 +40,13 @@ func (t *Table[V]) dump(w io.Writer) {
 
 	if t.Size4() > 0 {
 		fmt.Fprintln(w)
-		fmt.Fprintf(w, "### IPv4: size(%d), nodes(%d)", t.Size4(), t.nodes4())
+		fmt.Fprintf(w, "### IPv4: size(%d), nodes(%d)", t.Size4(), t.stats4().nodes)
 		t.root4.dumpRec(w, zeroPath, 0, true)
 	}
 
 	if t.Size6() > 0 {
 		fmt.Fprintln(w)
-		fmt.Fprintf(w, "### IPv6: size(%d), nodes(%d)", t.Size6(), t.nodes6())
+		fmt.Fprintf(w, "### IPv6: size(%d), nodes(%d)", t.Size6(), t.stats6().nodes)
 		t.root6.dumpRec(w, zeroPath, 0, false)
 	}
 }
@@ -153,9 +153,7 @@ func (n *node[V]) dump(w io.Writer, path [16]byte, depth int, is4 bool) {
 
 // hasType returns the nodeType.
 func (n *node[V]) hasType() nodeType {
-	prefixCount := n.prefixes.Len()
-	childCount := n.children.Len()
-	nodeCount, leafCount := n.nodeAndLeafCount()
+	prefixCount, childCount, nodeCount, leafCount := n.nodeStats()
 
 	switch {
 	case prefixCount == 0 && childCount == 0:
