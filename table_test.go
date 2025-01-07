@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net/netip"
+	"reflect"
 	"runtime"
 	"testing"
 )
@@ -1711,6 +1712,31 @@ func TestSize(t *testing.T) {
 
 	if allInc6 != tbl.Size6() {
 		t.Errorf("Size6: want: %d, got: %d", allInc6, tbl.Size6())
+	}
+}
+
+func TestIpAsOctets(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		ip   netip.Addr
+		want []byte
+	}{
+		{
+			ip:   mpa("10.11.12.13"),
+			want: []byte{10, 11, 12, 13},
+		},
+		{
+			ip:   mpa("2001:db8::1"),
+			want: []byte{0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},
+		},
+	}
+
+	for _, tc := range tests {
+		got := ipAsOctets(tc.ip, tc.ip.Is4())
+		if !reflect.DeepEqual(got, tc.want) {
+			t.Errorf("ipAsOctets, %s, got: %v, want: %v", tc.ip, got, tc.want)
+		}
 	}
 }
 

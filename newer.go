@@ -8,6 +8,6 @@ package bart
 import "net/netip"
 
 // netip.Addr.AsSlice for go1.23 does not allocate
-func ipAsOctets(ip netip.Addr) []byte {
+func ipAsOctets(ip netip.Addr, _ bool) []byte {
 	return ip.AsSlice()
 }

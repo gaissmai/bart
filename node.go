@@ -82,6 +82,7 @@ func (l *leaf[V]) cloneLeaf() *leaf[V] {
 // that collides with a leaf, the compressed leaf is then reinserted
 // one depth down in the node trie.
 func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool) {
+	ip := pfx.Addr()
 	bits := pfx.Bits()
 
 	// 10.0.0.0/8    -> 0
@@ -102,7 +103,7 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 	// 10.12.10.9/32 -> 9
 	// significantOctet := octets[significantIdx]
 
-	octets := ipAsOctets(pfx.Addr())
+	octets := ipAsOctets(ip, ip.Is4())
 	octets = octets[:significantIdx+1]
 
 	// find the proper trie node to insert prefix
