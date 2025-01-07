@@ -88,9 +88,11 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 
 	n := t.rootNodeByVersion(is4)
 
-	octets := ip.AsSlice()
 	significantIdx := (bits - 1) / strideLen
 	significantBits := bits - (significantIdx * strideLen)
+
+	octets := ipAsOctets(ip)
+	octets = octets[:significantIdx+1]
 
 	// find the proper trie node to update prefix
 	for depth, octet := range octets {
@@ -169,9 +171,11 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 
 	n := t.rootNodeByVersion(is4)
 
-	octets := ip.AsSlice()
 	significantIdx := (bits - 1) / strideLen
 	significantBits := bits - (significantIdx * strideLen)
+
+	octets := ipAsOctets(ip)
+	octets = octets[:significantIdx+1]
 
 	// record path to deleted node
 	// needed to purge and/or path compress nodes after deletion
@@ -241,9 +245,11 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 
 	n := t.rootNodeByVersion(is4)
 
-	octets := ip.AsSlice()
 	significantIdx := (bits - 1) / strideLen
 	significantBits := bits - (significantIdx * strideLen)
+
+	octets := ipAsOctets(ip)
+	octets = octets[:significantIdx+1]
 
 	// find the trie node
 LOOP:
@@ -289,11 +295,7 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 	is4 := ip.Is4()
 	n := t.rootNodeByVersion(is4)
 
-	a16 := ip.As16()
-	octets := a16[:]
-	if is4 {
-		octets = octets[12:]
-	}
+	octets := ipAsOctets(ip)
 
 	for _, octet := range octets {
 		addr := uint(octet)
@@ -332,12 +334,7 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	is4 := ip.Is4()
 	n := t.rootNodeByVersion(is4)
 
-	// do not allocate
-	a16 := ip.As16()
-	octets := a16[:]
-	if is4 {
-		octets = octets[12:]
-	}
+	octets := ipAsOctets(ip)
 
 	// stack of the traversed nodes for fast backtracking, if needed
 	stack := [maxTreeDepth]*node[V]{}
@@ -436,12 +433,7 @@ func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool
 	significantIdx := (bits - 1) / strideLen
 	significantBits := bits - (significantIdx * strideLen)
 
-	// do not allocate
-	a16 := ip.As16()
-	octets := a16[:]
-	if is4 {
-		octets = octets[12:]
-	}
+	octets := ipAsOctets(ip)
 	octets = octets[:significantIdx+1]
 
 	// mask the prefix, pfx.Masked() is too complex and allocates
@@ -535,7 +527,7 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) func(yield func(netip.Prefix, V) 
 		significantIdx := (bits - 1) / strideLen
 		significantBits := bits - (significantIdx * strideLen)
 
-		octets := ip.AsSlice()
+		octets := ipAsOctets(ip)
 		octets = octets[:significantIdx+1]
 
 		// stack of the traversed nodes for reverse ordering of supernets
@@ -618,7 +610,7 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) func(yield func(netip.Prefix, V) bo
 		significantIdx := (bits - 1) / strideLen
 		significantBits := bits - (significantIdx * strideLen)
 
-		octets := ip.AsSlice()
+		octets := ipAsOctets(ip)
 		octets = octets[:significantIdx+1]
 
 		// find the trie node

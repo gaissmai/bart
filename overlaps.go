@@ -231,13 +231,12 @@ func overlapsTwoChilds[V any](nChild, oChild any, depth int) bool {
 //
 // Needed for path compressed prefix some level down in the node trie.
 func (n *node[V]) overlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
-	ip := pfx.Addr()
 	bits := pfx.Bits()
 
 	sigOctetIdx := (bits - 1) / strideLen
 	sigOctetBits := bits - (sigOctetIdx * strideLen)
 
-	octets := ip.AsSlice()
+	octets := ipAsOctets(pfx.Addr())
 	octets = octets[:sigOctetIdx+1]
 
 	for ; depth < len(octets); depth++ {
