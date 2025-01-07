@@ -5,7 +5,10 @@
 // between non-negative integers and boolean values.
 //
 // Studied [github.com/bits-and-blooms/bitset] inside out
-// and rewrote it from scratch for the needs of this project.
+// and rewrote needed parts from scratch for this project.
+//
+// This implementation is smaller and faster as the more
+// general [github.com/bits-and-blooms/bitset].
 package bitset
 
 import (
@@ -16,15 +19,22 @@ import (
 // with a wide open public API.
 type BitSet []uint64
 
-// xIdx calculates the index of i in a []uint64
-// func wIdx(i uint) int {
-// 	return int(i >> 6) // like (i / 64) but faster
-// }
+//   xIdx calculates the index of i in a []uint64
+//   func wIdx(i uint) int {
+//   	return int(i >> 6) // like (i / 64) but faster
+//   }
 
-// bIdx calculates the index of i in a `uint64`
-// func bIdx(i uint) uint {
-// 	return i & 63 // like (i % 64) but faster
-// }
+//   bIdx calculates the index of i in a `uint64`
+//   func bIdx(i uint) uint {
+//   	return i & 63 // like (i % 64) but faster
+//   }
+//
+// just as an explanation of the expressions,
+//
+//   i>>6 or i<<6 and i&63
+//
+// not factored out as functions to make most of the methods
+// inlineable with minimal costs.
 
 // Set bit i to 1, the capacity of the bitset is increased accordingly.
 func (b BitSet) Set(i uint) BitSet {
@@ -252,28 +262,28 @@ func (b BitSet) Size() int {
 
 // Rank returns the number of set bits up to and including the index
 // that are set in the bitset.
+//
+// With inlined popcount to make Rank itself inlineable.
 func (b BitSet) Rank(i uint) (rnk int) {
-	// with inlined popcount to make Rank inlineable
+	// Rank count is inclusive
+	i++
 
-	i++ // Rank count is inclusive
-	wordIdx := i >> 6
-
-	if int(wordIdx) >= len(b) {
+	if wordIdx := int(i >> 6); wordIdx >= len(b) {
 		// inlined popcount, whole slice
 		for _, x := range b {
 			rnk += bits.OnesCount64(x)
 		}
-		return
-	}
+	} else {
+		// inlined popcount, partial slice
+		for _, x := range b[:wordIdx] {
+			rnk += bits.OnesCount64(x)
+		}
 
-	// inlined popcount, partial slice
-	for _, x := range b[:wordIdx] {
-		rnk += bits.OnesCount64(x)
-	}
+		// plus partial word?
+		if bitsIdx := i & 63; bitsIdx != 0 {
+			rnk += bits.OnesCount64(b[wordIdx] << (64 - bitsIdx))
+		}
 
-	if bitsIdx := i & 63; bitsIdx != 0 {
-		// plus partial word
-		rnk += bits.OnesCount64(b[wordIdx] << (64 - bitsIdx))
 	}
 
 	return
