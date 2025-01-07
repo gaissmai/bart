@@ -8,10 +8,10 @@ package bart
 import "net/netip"
 
 // netip.Addr.AsSlice for go < go1.23 allocates
-func ipAsOctets(ip netip.Addr) []byte {
+func ipAsOctets(ip netip.Addr, is4 bool) []byte {
 	a16 := ip.As16()
 	octets := a16[:]
-	if ip.Is4() {
+	if is4 {
 		octets = octets[12:]
 	}
 	return octets
