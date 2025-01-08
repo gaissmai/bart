@@ -374,7 +374,7 @@ LOOP:
 	}
 
 	// start backtracking, unwind the stack
-	for ; depth >= 0; depth-- {
+	for ; depth >= 0 && depth < len(stack) && depth < len(octets); depth-- {
 		n = stack[depth]
 
 		// longest prefix match, skip if node has no prefixes
@@ -480,7 +480,7 @@ LOOP:
 	}
 
 	// start backtracking, unwind the stack.
-	for ; depth >= 0; depth-- {
+	for ; depth >= 0 && depth < len(stack) && depth < len(octets); depth-- {
 		n = stack[depth]
 
 		// longest prefix match, skip if node has no prefixes
