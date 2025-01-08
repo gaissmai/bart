@@ -358,7 +358,7 @@ LOOP:
 			break LOOP
 		}
 
-		// get node or leaf for octet
+		// get the child: node or leaf
 		switch k := n.children.MustGet(addr).(type) {
 		case *node[V]:
 			// descend down to next trie level
@@ -379,9 +379,13 @@ LOOP:
 
 		// longest prefix match, skip if node has no prefixes
 		if n.prefixes.Len() != 0 {
-			if _, val, ok = n.lpmGet(hostIndex(uint(octets[depth]))); ok {
-				return val, ok
+			idx := hostIndex(uint(octets[depth]))
+			// lpmGet(idx), manually inlined
+			// --------------------------------------------------------------
+			if top, ok := n.prefixes.IntersectionTop(lpmLookupTbl[idx]); ok {
+				return n.prefixes.MustGet(top), true
 			}
+			// --------------------------------------------------------------
 		}
 	}
 
@@ -464,7 +468,7 @@ LOOP:
 		case *node[V]:
 			// descend down to next trie level
 			n = k
-			continue
+			continue LOOP
 		case *leaf[V]:
 			// reached a path compressed prefix, stop traversing
 			if k.prefix.Contains(ip) && k.prefix.Bits() <= bits {
@@ -492,9 +496,12 @@ LOOP:
 				idx = hostIndex(uint(octet))
 			}
 
-			if baseIdx, val, ok := n.lpmGet(idx); ok {
-				// calculate the bits from depth and idx
-				bits := depth*strideLen + int(baseIdxLookupTbl[baseIdx].bits)
+			// manually inlined lpmGet(idx)
+			if top, ok := n.prefixes.IntersectionTop(lpmLookupTbl[idx]); ok {
+				val = n.prefixes.MustGet(top)
+
+				// calculate the bits from depth and top idx
+				bits := depth*strideLen + int(baseIdxLookupTbl[top].bits)
 
 				// calculate the lpm from incoming ip and new mask
 				lpm, _ = ip.Prefix(bits)
