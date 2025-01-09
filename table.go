@@ -412,8 +412,13 @@ func (t *Table[V]) LookupPrefixLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, o
 
 // lpmPrefix, returns lpm, val and ok for a lpm match.
 func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) {
-	var zeroVal V
-	var zeroPfx netip.Prefix
+	if !pfx.IsValid() {
+		return lpm, val, false
+	}
+
+	// canonicalize the prefix
+	// the ip must be masked, see below in Contains()
+	pfx = pfx.Masked()
 
 	ip := pfx.Addr()
 	bits := pfx.Bits()
@@ -427,9 +432,6 @@ func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool
 
 	octets := ipAsOctets(ip, is4)
 	octets = octets[:significantIdx+1]
-
-	// mask the prefix, pfx.Masked() is too complex and allocates
-	octets[significantIdx] &= netMask(significantBits)
 
 	// record path to leaf node
 	stack := [maxTreeDepth]*node[V]{}
@@ -459,6 +461,7 @@ LOOP:
 			continue LOOP
 		case *leaf[V]:
 			// reached a path compressed prefix, stop traversing
+			// ip must be masked!
 			if k.prefix.Contains(ip) && k.prefix.Bits() <= bits {
 				return k.prefix, k.value, true
 			}
