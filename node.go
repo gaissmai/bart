@@ -175,7 +175,7 @@ func (n *node[V]) purgeAndCompress(parentStack []*node[V], childPath []byte, is4
 
 			path := [16]byte{}
 			copy(path[:], childPath)
-			pfx, _ := cidrFromPath(path, i+1, is4, idx)
+			pfx := cidrFromPath(path, i+1, is4, idx)
 
 			parent.children.InsertAt(addr, &leaf[V]{pfx, val})
 
@@ -258,7 +258,7 @@ func (n *node[V]) allRec(path [16]byte, depth int, is4 bool, yield func(netip.Pr
 	// for all prefixes in this node do ...
 	allIndices := n.prefixes.AsSlice(make([]uint, 0, maxNodePrefixes))
 	for _, idx := range allIndices {
-		cidr, _ := cidrFromPath(path, depth, is4, idx)
+		cidr := cidrFromPath(path, depth, is4, idx)
 
 		// callback for this prefix and val
 		if !yield(cidr, n.prefixes.MustGet(idx)) {
@@ -337,7 +337,7 @@ func (n *node[V]) allRecSorted(path [16]byte, depth int, is4 bool, yield func(ne
 		}
 
 		// yield the prefix for this idx
-		cidr, _ := cidrFromPath(path, depth, is4, pfxIdx)
+		cidr := cidrFromPath(path, depth, is4, pfxIdx)
 		// n.prefixes.Items[i] not possible after sorting allIndices
 		if !yield(cidr, n.prefixes.MustGet(pfxIdx)) {
 			return false
@@ -486,7 +486,7 @@ func (n *node[V]) eachLookupPrefix(octets []byte, depth int, is4 bool, pfxLen in
 	for idx := pfxToIdx(octets[depth], pfxLen); idx > 0; idx >>= 1 {
 		if n.prefixes.Test(idx) {
 			val := n.prefixes.MustGet(idx)
-			cidr, _ := cidrFromPath(path, depth, is4, idx)
+			cidr := cidrFromPath(path, depth, is4, idx)
 
 			if !yield(cidr, val) {
 				return false
@@ -566,7 +566,7 @@ func (n *node[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxLen int, yie
 		}
 
 		// yield the prefix for this idx
-		cidr, _ := cidrFromPath(path, depth, is4, pfxIdx)
+		cidr := cidrFromPath(path, depth, is4, pfxIdx)
 		// n.prefixes.Items[i] not possible after sorting allIndices
 		if !yield(cidr, n.prefixes.MustGet(pfxIdx)) {
 			return false
