@@ -470,7 +470,7 @@ LOOP:
 		}
 	}
 
-	// start backtracking, unwind the stack.
+	// start backtracking, unwind the stack, bounds check eliminated
 	for ; depth >= 0 && depth < len(stack) && depth < len(octets); depth-- {
 		n = stack[depth]
 
