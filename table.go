@@ -325,10 +325,8 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 // Lookup does a route lookup (longest prefix match) for IP and
 // returns the associated value and true, or false if no route matched.
 func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
-	var zero V
-
 	if !ip.IsValid() {
-		return zero, false
+		return val, false
 	}
 
 	is4 := ip.Is4()
@@ -373,7 +371,7 @@ LOOP:
 		}
 	}
 
-	// start backtracking, unwind the stack
+	// start backtracking, unwind the stack, bounds check eliminated
 	for ; depth >= 0 && depth < len(stack) && depth < len(octets); depth-- {
 		n = stack[depth]
 
@@ -382,25 +380,19 @@ LOOP:
 			idx := hostIndex(uint(octets[depth]))
 			// lpmGet(idx), manually inlined
 			// --------------------------------------------------------------
-			if top, ok := n.prefixes.IntersectionTop(lpmLookupTbl[idx]); ok {
-				return n.prefixes.MustGet(top), true
+			if topIdx, ok := n.prefixes.IntersectionTop(lpmLookupTbl[idx]); ok {
+				return n.prefixes.MustGet(topIdx), true
 			}
 			// --------------------------------------------------------------
 		}
 	}
 
-	return zero, false
+	return val, false
 }
 
 // LookupPrefix does a route lookup (longest prefix match) for pfx and
 // returns the associated value and true, or false if no route matched.
 func (t *Table[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
-	var zero V
-
-	if !pfx.IsValid() {
-		return zero, false
-	}
-
 	_, val, ok = t.lpmPrefix(pfx)
 
 	return val, ok
@@ -415,10 +407,6 @@ func (t *Table[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
 // If LookupPrefixLPM is to be used for IP address lookups,
 // they must be converted to /32 or /128 prefixes.
 func (t *Table[V]) LookupPrefixLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) {
-	if !pfx.IsValid() {
-		return
-	}
-
 	return t.lpmPrefix(pfx)
 }
 
@@ -428,8 +416,8 @@ func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool
 	var zeroPfx netip.Prefix
 
 	ip := pfx.Addr()
-	is4 := ip.Is4()
 	bits := pfx.Bits()
+	is4 := ip.Is4()
 
 	n := t.rootNodeByVersion(is4)
 
@@ -451,7 +439,7 @@ func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool
 	var addr uint
 
 LOOP:
-	// find the last node on the octets path in the trie
+	// find the last node on the octets path in the trie,
 	for depth, octet = range octets {
 		addr = uint(octet)
 
@@ -497,11 +485,11 @@ LOOP:
 			}
 
 			// manually inlined lpmGet(idx)
-			if top, ok := n.prefixes.IntersectionTop(lpmLookupTbl[idx]); ok {
-				val = n.prefixes.MustGet(top)
+			if topIdx, ok := n.prefixes.IntersectionTop(lpmLookupTbl[idx]); ok {
+				val = n.prefixes.MustGet(topIdx)
 
 				// calculate the bits from depth and top idx
-				bits := depth*strideLen + int(baseIdxLookupTbl[top].bits)
+				bits := depth*strideLen + int(baseIdxLookupTbl[topIdx].bits)
 
 				// calculate the lpm from incoming ip and new mask
 				lpm, _ = ip.Prefix(bits)
@@ -510,7 +498,7 @@ LOOP:
 		}
 	}
 
-	return zeroPfx, zeroVal, false
+	return lpm, val, false
 }
 
 // Supernets returns an iterator over all CIDRs covering pfx.
