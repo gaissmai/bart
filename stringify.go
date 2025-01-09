@@ -181,7 +181,7 @@ func (n *node[V]) getKidsRec(parentIdx uint, path [16]byte, depth int, is4 bool)
 
 		// if idx is directKid?
 		if lpmIdx == parentIdx {
-			cidr, _ := cidrFromPath(path, depth, is4, idx)
+			cidr := cidrFromPath(path, depth, is4, idx)
 
 			kid := kid[V]{
 				n:     n,
@@ -242,11 +242,14 @@ func cmpPrefix(a, b netip.Prefix) int {
 }
 
 // cidrFromPath, get prefix back from byte path, depth, octet and pfxLen.
-func cidrFromPath(path [16]byte, depth int, is4 bool, idx uint) (netip.Prefix, error) {
+func cidrFromPath(path [16]byte, depth int, is4 bool, idx uint) netip.Prefix {
 	octet, pfxLen := idxToPfx(idx)
 
-	// set (partially) masked byte in path at depth
+	// set masked byte in path at depth
 	path[depth] = octet
+
+	// zero/mask the bytes after prefix bits
+	copy(path[depth+1:], zeroPath[:])
 
 	// make ip addr from octets
 	var ip netip.Addr
@@ -259,6 +262,6 @@ func cidrFromPath(path [16]byte, depth int, is4 bool, idx uint) (netip.Prefix, e
 	// calc bits with pathLen and pfxLen
 	bits := depth*strideLen + pfxLen
 
-	// make a normalized prefix from ip/bits
-	return ip.Prefix(bits)
+	// return a normalized prefix from ip/bits
+	return netip.PrefixFrom(ip, bits)
 }
