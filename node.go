@@ -89,13 +89,16 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 	// 10.12.0.0/15  -> 1
 	// 10.12.0.0/16  -> 1
 	// 10.12.10.9/32 -> 3
-	significantIdx := (bits - 1) / strideLen
+	significantIdx := 0
+	if bits > 8 {
+		significantIdx = (bits - 1) >> 3
+	}
 
 	// 10.0.0.0/8    -> 8
 	// 10.12.0.0/15  -> 7
 	// 10.12.0.0/16  -> 8
 	// 10.12.10.9/32 -> 8
-	significantBits := bits - (significantIdx * strideLen)
+	significantBits := bits - (significantIdx << 3)
 
 	// 10.0.0.0/8    -> 10
 	// 10.12.0.0/15  -> 12
