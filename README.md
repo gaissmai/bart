@@ -103,24 +103,24 @@ Just a teaser, Contains and Lookups against the full Internet routing table with
 goos: linux
 goarch: amd64
 pkg: github.com/gaissmai/bart
-cpu: Intel(R) Core(TM) i5-8250U CPU @ 1.60GHz
-BenchmarkFullMatchV4/Contains         	38003740	        27.69 ns/op
-BenchmarkFullMatchV6/Contains         	49389355	        23.00 ns/op
-BenchmarkFullMissV4/Contains          	42902048	        26.57 ns/op
-BenchmarkFullMissV6/Contains          	128219610	         9.375 ns/op
+cpu: Intel(R) Core(TM) i5-7500T CPU @ 2.70GHz
+BenchmarkFullMatchV4/Contains    49814167        23.22  ns/op   0 B/op   0 allocs/op
+BenchmarkFullMatchV6/Contains    94662561        11.90  ns/op   0 B/op   0 allocs/op
+BenchmarkFullMissV4/Contains     46916434        24.32  ns/op   0 B/op   0 allocs/op
+BenchmarkFullMissV6/Contains     239470936        5.023 ns/op   0 B/op   0 allocs/op
 PASS
-ok  	github.com/gaissmai/bart	12.195s
+ok  	github.com/gaissmai/bart	15.343s
 
 goos: linux
 goarch: amd64
 pkg: github.com/gaissmai/bart
-cpu: Intel(R) Core(TM) i5-8250U CPU @ 1.60GHz
-BenchmarkFullMatchV4/Lookup         	37453425	        30.55 ns/op
-BenchmarkFullMatchV6/Lookup         	36819931	        30.48 ns/op
-BenchmarkFullMissV4/Lookup          	37223881	        30.70 ns/op
-BenchmarkFullMissV6/Lookup          	94333762	        12.32 ns/op
+cpu: Intel(R) Core(TM) i5-7500T CPU @ 2.70GHz
+BenchmarkFullMatchV4/Lookup      52110546        22.65  ns/op   0 B/op   0 allocs/op
+BenchmarkFullMatchV6/Lookup      52083624        22.09  ns/op   0 B/op   0 allocs/op
+BenchmarkFullMissV4/Lookup       40740790        27.80  ns/op   0 B/op   0 allocs/op
+BenchmarkFullMissV6/Lookup       148526529        8.076 ns/op   0 B/op   0 allocs/op
 PASS
-ok  	github.com/gaissmai/bart	11.215s
+ok  	github.com/gaissmai/bart	15.646s
 ```
 
 ## Compatibility Guarantees
