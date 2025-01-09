@@ -88,8 +88,11 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 
 	n := t.rootNodeByVersion(is4)
 
-	significantIdx := (bits - 1) / strideLen
-	significantBits := bits - (significantIdx * strideLen)
+	significantIdx := 0
+	if bits > 8 {
+		significantIdx = (bits - 1) >> 3
+	}
+	significantBits := bits - (significantIdx << 3)
 
 	octets := ipAsOctets(ip, is4)
 	octets = octets[:significantIdx+1]
@@ -171,8 +174,11 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 
 	n := t.rootNodeByVersion(is4)
 
-	significantIdx := (bits - 1) / strideLen
-	significantBits := bits - (significantIdx * strideLen)
+	significantIdx := 0
+	if bits > 8 {
+		significantIdx = (bits - 1) >> 3
+	}
+	significantBits := bits - (significantIdx << 3)
 
 	octets := ipAsOctets(ip, is4)
 	octets = octets[:significantIdx+1]
@@ -245,8 +251,11 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 
 	n := t.rootNodeByVersion(is4)
 
-	significantIdx := (bits - 1) / strideLen
-	significantBits := bits - (significantIdx * strideLen)
+	significantIdx := 0
+	if bits > 8 {
+		significantIdx = (bits - 1) >> 3
+	}
+	significantBits := bits - (significantIdx << 3)
 
 	octets := ipAsOctets(ip, is4)
 	octets = octets[:significantIdx+1]
@@ -427,8 +436,11 @@ func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool
 	n := t.rootNodeByVersion(is4)
 
 	// see comment in insertAtDepth()
-	significantIdx := (bits - 1) / strideLen
-	significantBits := bits - (significantIdx * strideLen)
+	significantIdx := 0
+	if bits > 8 {
+		significantIdx = (bits - 1) >> 3
+	}
+	significantBits := bits - (significantIdx << 3)
 
 	octets := ipAsOctets(ip, is4)
 	octets = octets[:significantIdx+1]
@@ -522,8 +534,11 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) func(yield func(netip.Prefix, V) 
 
 		n := t.rootNodeByVersion(is4)
 
-		significantIdx := (bits - 1) / strideLen
-		significantBits := bits - (significantIdx * strideLen)
+		significantIdx := 0
+		if bits > 8 {
+			significantIdx = (bits - 1) >> 3
+		}
+		significantBits := bits - (significantIdx << 3)
 
 		octets := ipAsOctets(ip, is4)
 		octets = octets[:significantIdx+1]
@@ -605,8 +620,11 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) func(yield func(netip.Prefix, V) bo
 
 		n := t.rootNodeByVersion(is4)
 
-		significantIdx := (bits - 1) / strideLen
-		significantBits := bits - (significantIdx * strideLen)
+		significantIdx := 0
+		if bits > 8 {
+			significantIdx = (bits - 1) >> 3
+		}
+		significantBits := bits - (significantIdx << 3)
 
 		octets := ipAsOctets(ip, is4)
 		octets = octets[:significantIdx+1]
