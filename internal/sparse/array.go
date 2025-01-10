@@ -155,13 +155,11 @@ func (s *Array[T]) insertItem(item T, i int) {
 	s.Items = newSlice
 }
 
-// deleteItem deletes the item at index i.
-// It clears/zeroes the tail elements and compacts the slice.
+// deleteItem deletes the item at index i and compacts the slice.
 //
 // It panics if i is out of range.
 func (s *Array[T]) deleteItem(i int) {
 	l := len(s.Items) - 1            // new len
 	copy(s.Items[i:], s.Items[i+1:]) // overwrite s[i]
-	clear(s.Items[l:])               // clear/zeroes the tail
 	s.Items = s.Items[:l:l]          // compact to new len
 }
