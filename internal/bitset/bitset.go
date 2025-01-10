@@ -47,9 +47,7 @@ func (b BitSet) Set(i uint) BitSet {
 		case cap(b) >= words:
 			b = b[:words]
 		default:
-			newset := make([]uint64, words)
-			copy(newset, b)
-			b = newset
+			b = append(b, make([]uint64, words-len(b))...)
 		}
 	}
 
@@ -78,7 +76,7 @@ func (b BitSet) Clone() BitSet {
 	if b == nil {
 		return nil
 	}
-	c := BitSet(make([]uint64, len(b)))
+	c := BitSet(make([]uint64, len(b), cap(b)))
 	copy(c, b)
 	return c
 }

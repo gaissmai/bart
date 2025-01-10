@@ -31,7 +31,7 @@ func (s *Array[T]) Copy() *Array[T] {
 	var items []T
 
 	if s.Items != nil {
-		items = make([]T, cap(s.Items))
+		items = make([]T, len(s.Items), cap(s.Items))
 		copy(items, s.Items) // shallow
 	}
 
@@ -68,7 +68,7 @@ func (s *Array[T]) InsertAt(i uint, val T) (exists bool) {
 	return false
 }
 
-// DeleteAt a value at i from the sparse array, zeroes the tail and compact the slice.
+// DeleteAt a value at i from the sparse array, zeroes the tail.
 func (s *Array[T]) DeleteAt(i uint) (val T, exists bool) {
 	if s.Len() == 0 || !s.Test(i) {
 		return
@@ -77,11 +77,11 @@ func (s *Array[T]) DeleteAt(i uint) (val T, exists bool) {
 	rnk := s.rank(i)
 	val = s.Items[rnk]
 
-	// delete from slice, followed by clear and compact
+	// delete from slice
 	s.deleteItem(rnk)
 
-	// delete from bitset, followed by Compact to reduce memory consumption
-	s.BitSet = s.Clear(i).Compact()
+	// delete from bitset
+	s.BitSet = s.Clear(i)
 
 	return val, true
 }
@@ -135,31 +135,28 @@ func (s *Array[T]) UpdateAt(i uint, cb func(T, bool) T) (newVal T, wasPresent bo
 	return newVal, wasPresent
 }
 
-// insertItem inserts the item at index i.
+// insertItem inserts the item at index i, shift the rest one pos right
 //
 // It panics if i is out of range.
 func (s *Array[T]) insertItem(item T, i int) {
-	// in place resize, no alloc
 	if len(s.Items) < cap(s.Items) {
 		s.Items = s.Items[:len(s.Items)+1] // fast resize, no alloc
-		copy(s.Items[i+1:], s.Items[i:])
-		s.Items[i] = item
-		return
+	} else {
+		var zero T
+		s.Items = append(s.Items, zero) // appends maybe more than just one item
 	}
-
-	// make new backing array
-	newSlice := make([]T, len(s.Items)+1)
-	copy(newSlice, s.Items[:i])
-	copy(newSlice[i+1:], s.Items[i:])
-	newSlice[i] = item
-	s.Items = newSlice
+	copy(s.Items[i+1:], s.Items[i:])
+	s.Items[i] = item
+	return
 }
 
-// deleteItem deletes the item at index i and compacts the slice.
+// deleteItem at index i, shift the rest one pos left and clears the tail item
 //
 // It panics if i is out of range.
 func (s *Array[T]) deleteItem(i int) {
+	var zero T
 	l := len(s.Items) - 1            // new len
 	copy(s.Items[i:], s.Items[i+1:]) // overwrite s[i]
-	s.Items = s.Items[:l:l]          // compact to new len
+	s.Items[l] = zero                // clear the tail item
+	s.Items = s.Items[:l]            // new len, cap is unchanged
 }
