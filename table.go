@@ -158,10 +158,8 @@ func (t *Table[V]) GetAndDelete(pfx netip.Prefix) (val V, ok bool) {
 }
 
 func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
-	var zero V
-
 	if !pfx.IsValid() {
-		return zero, false
+		return val, false
 	}
 
 	// canonicalize prefix
@@ -188,23 +186,25 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 	stack := [maxTreeDepth]*node[V]{}
 
 	// find the trie node
-LOOP:
 	for depth, octet := range octets {
 		// push current node on stack for path recording
 		stack[depth] = n
 
 		// try to delete prefix in trie node
 		if depth == lastIdx {
-			if val, ok = n.prefixes.DeleteAt(pfxToIdx(octet, lastBits)); ok {
-				t.sizeUpdate(is4, -1)
-				n.purgeAndCompress(stack[:depth], octets, is4)
-				return val, ok
+			val, ok = n.prefixes.DeleteAt(pfxToIdx(octet, lastBits))
+			if !ok {
+				return val, false
 			}
+
+			t.sizeUpdate(is4, -1)
+			n.purgeAndCompress(stack[:depth], octets, is4)
+			return val, ok
 		}
 
 		addr := uint(octet)
 		if !n.children.Test(addr) {
-			break LOOP
+			return val, false
 		}
 
 		// get the child: node or leaf
@@ -216,7 +216,7 @@ LOOP:
 		case *leaf[V]:
 			// reached a path compressed prefix, stop traversing
 			if k.prefix != pfx {
-				break LOOP
+				return val, false
 			}
 
 			// prefix is equal leaf, delete leaf
@@ -229,7 +229,7 @@ LOOP:
 		}
 	}
 
-	return zero, false
+	panic("unreachable")
 }
 
 // Get returns the associated payload for prefix and true, or false if
