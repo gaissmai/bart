@@ -249,7 +249,7 @@ func cidrFromPath(path [16]byte, depth int, is4 bool, idx uint) netip.Prefix {
 	path[depth] = octet
 
 	// zero/mask the bytes after prefix bits
-	copy(path[depth+1:], zeroPath[:])
+	clear(path[depth+1:])
 
 	// make ip addr from octets
 	var ip netip.Addr
