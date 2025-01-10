@@ -89,25 +89,25 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 	// 10.12.0.0/15  -> 1
 	// 10.12.0.0/16  -> 1
 	// 10.12.10.9/32 -> 3
-	significantIdx := 0
+	lastIdx := 0
 	if bits > 8 {
-		significantIdx = (bits - 1) >> 3
+		lastIdx = (bits - 1) >> 3
 	}
 
 	// 10.0.0.0/8    -> 8
 	// 10.12.0.0/15  -> 7
 	// 10.12.0.0/16  -> 8
 	// 10.12.10.9/32 -> 8
-	significantBits := bits - (significantIdx << 3)
+	lastBits := bits - (lastIdx << 3)
 
 	// 10.0.0.0/8    -> 10
 	// 10.12.0.0/15  -> 12
 	// 10.12.0.0/16  -> 12
 	// 10.12.10.9/32 -> 9
-	// significantOctet := octets[significantIdx]
+	// lastOctet := octets[lastIdx]
 
 	octets := ipAsOctets(ip, ip.Is4())
-	octets = octets[:significantIdx+1]
+	octets = octets[:lastIdx+1]
 
 	// find the proper trie node to insert prefix
 	// start with prefix octet at depth
@@ -116,8 +116,8 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 		addr := uint(octet)
 
 		// last significant octet: insert/override prefix/val into node
-		if depth == significantIdx {
-			return n.prefixes.InsertAt(pfxToIdx(octet, significantBits), val)
+		if depth == lastIdx {
+			return n.prefixes.InsertAt(pfxToIdx(octet, lastBits), val)
 		}
 
 		if !n.children.Test(addr) {

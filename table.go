@@ -88,20 +88,20 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 
 	n := t.rootNodeByVersion(is4)
 
-	significantIdx := 0
+	lastIdx := 0
 	if bits > 8 {
-		significantIdx = (bits - 1) >> 3
+		lastIdx = (bits - 1) >> 3
 	}
-	significantBits := bits - (significantIdx << 3)
+	lastBits := bits - (lastIdx << 3)
 
 	octets := ipAsOctets(ip, is4)
-	octets = octets[:significantIdx+1]
+	octets = octets[:lastIdx+1]
 
 	// find the proper trie node to update prefix
 	for depth, octet := range octets {
 		// last octet from prefix, update/insert prefix into node
-		if depth == significantIdx {
-			newVal, exists := n.prefixes.UpdateAt(pfxToIdx(octet, significantBits), cb)
+		if depth == lastIdx {
+			newVal, exists := n.prefixes.UpdateAt(pfxToIdx(octet, lastBits), cb)
 			if !exists {
 				t.sizeUpdate(is4, 1)
 			}
@@ -174,14 +174,14 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 
 	n := t.rootNodeByVersion(is4)
 
-	significantIdx := 0
+	lastIdx := 0
 	if bits > 8 {
-		significantIdx = (bits - 1) >> 3
+		lastIdx = (bits - 1) >> 3
 	}
-	significantBits := bits - (significantIdx << 3)
+	lastBits := bits - (lastIdx << 3)
 
 	octets := ipAsOctets(ip, is4)
-	octets = octets[:significantIdx+1]
+	octets = octets[:lastIdx+1]
 
 	// record path to deleted node
 	// needed to purge and/or path compress nodes after deletion
@@ -194,8 +194,8 @@ LOOP:
 		stack[depth] = n
 
 		// try to delete prefix in trie node
-		if depth == significantIdx {
-			if val, ok = n.prefixes.DeleteAt(pfxToIdx(octet, significantBits)); ok {
+		if depth == lastIdx {
+			if val, ok = n.prefixes.DeleteAt(pfxToIdx(octet, lastBits)); ok {
 				t.sizeUpdate(is4, -1)
 				n.purgeAndCompress(stack[:depth], octets, is4)
 				return val, ok
@@ -251,20 +251,20 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 
 	n := t.rootNodeByVersion(is4)
 
-	significantIdx := 0
+	lastIdx := 0
 	if bits > 8 {
-		significantIdx = (bits - 1) >> 3
+		lastIdx = (bits - 1) >> 3
 	}
-	significantBits := bits - (significantIdx << 3)
+	lastBits := bits - (lastIdx << 3)
 
 	octets := ipAsOctets(ip, is4)
-	octets = octets[:significantIdx+1]
+	octets = octets[:lastIdx+1]
 
 	// find the trie node
 LOOP:
 	for depth, octet := range octets {
-		if depth == significantIdx {
-			return n.prefixes.Get(pfxToIdx(octet, significantBits))
+		if depth == lastIdx {
+			return n.prefixes.Get(pfxToIdx(octet, lastBits))
 		}
 
 		addr := uint(octet)
@@ -436,14 +436,14 @@ func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool
 	n := t.rootNodeByVersion(is4)
 
 	// see comment in insertAtDepth()
-	significantIdx := 0
+	lastIdx := 0
 	if bits > 8 {
-		significantIdx = (bits - 1) >> 3
+		lastIdx = (bits - 1) >> 3
 	}
-	significantBits := bits - (significantIdx << 3)
+	lastBits := bits - (lastIdx << 3)
 
 	octets := ipAsOctets(ip, is4)
-	octets = octets[:significantIdx+1]
+	octets = octets[:lastIdx+1]
 
 	// record path to leaf node
 	stack := [maxTreeDepth]*node[V]{}
@@ -493,8 +493,8 @@ LOOP:
 			// only the lastOctet may have a different prefix len
 			// all others are just host routes
 			var idx uint
-			if depth == significantIdx {
-				idx = pfxToIdx(octet, significantBits)
+			if depth == lastIdx {
+				idx = pfxToIdx(octet, lastBits)
 			} else {
 				idx = hostIndex(uint(octet))
 			}
@@ -534,14 +534,14 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) func(yield func(netip.Prefix, V) 
 
 		n := t.rootNodeByVersion(is4)
 
-		significantIdx := 0
+		lastIdx := 0
 		if bits > 8 {
-			significantIdx = (bits - 1) >> 3
+			lastIdx = (bits - 1) >> 3
 		}
-		significantBits := bits - (significantIdx << 3)
+		lastBits := bits - (lastIdx << 3)
 
 		octets := ipAsOctets(ip, is4)
-		octets = octets[:significantIdx+1]
+		octets = octets[:lastIdx+1]
 
 		// stack of the traversed nodes for reverse ordering of supernets
 		stack := [maxTreeDepth]*node[V]{}
@@ -590,8 +590,8 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) func(yield func(netip.Prefix, V) 
 			// only the lastOctet may have a different prefix len
 			// all others are just host routes
 			pfxLen := strideLen
-			if depth == significantIdx {
-				pfxLen = significantBits
+			if depth == lastIdx {
+				pfxLen = lastBits
 			}
 
 			if !n.eachLookupPrefix(octets, depth, is4, pfxLen, yield) {
@@ -620,19 +620,19 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) func(yield func(netip.Prefix, V) bo
 
 		n := t.rootNodeByVersion(is4)
 
-		significantIdx := 0
+		lastIdx := 0
 		if bits > 8 {
-			significantIdx = (bits - 1) >> 3
+			lastIdx = (bits - 1) >> 3
 		}
-		significantBits := bits - (significantIdx << 3)
+		lastBits := bits - (lastIdx << 3)
 
 		octets := ipAsOctets(ip, is4)
-		octets = octets[:significantIdx+1]
+		octets = octets[:lastIdx+1]
 
 		// find the trie node
 		for depth, octet := range octets {
-			if depth == significantIdx {
-				_ = n.eachSubnet(octets, depth, is4, significantBits, yield)
+			if depth == lastIdx {
+				_ = n.eachSubnet(octets, depth, is4, lastBits, yield)
 				return
 			}
 
