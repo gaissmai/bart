@@ -84,16 +84,13 @@ func (b BitSet) Clone() BitSet {
 }
 
 // Compact, preserve all set bits, while minimizing memory usage.
-// A new slice is allocated to store the new bits.
 func (b BitSet) Compact() BitSet {
 	last := len(b) - 1
 
 	// find last word with at least one bit set.
 	for ; last >= 0; last-- {
 		if b[last] != 0 {
-			newset := make([]uint64, last+1)
-			copy(newset, b[:last+1])
-			b = newset
+			b = b[: last+1 : last+1]
 			return b
 		}
 	}

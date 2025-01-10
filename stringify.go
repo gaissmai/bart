@@ -260,7 +260,7 @@ func cidrFromPath(path [16]byte, depth int, is4 bool, idx uint) netip.Prefix {
 	}
 
 	// calc bits with pathLen and pfxLen
-	bits := depth*strideLen + pfxLen
+	bits := depth<<3 + pfxLen
 
 	// return a normalized prefix from ip/bits
 	return netip.PrefixFrom(ip, bits)
