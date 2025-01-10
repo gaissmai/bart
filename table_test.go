@@ -1466,7 +1466,7 @@ func TestCloneEdgeCases(t *testing.T) {
 func TestClone(t *testing.T) {
 	t.Parallel()
 
-	pfxs := randomPrefixes(1_000)
+	pfxs := randomPrefixes(100_000)
 
 	golden := new(Table[int])
 	tbl := new(Table[int])
@@ -1475,6 +1475,10 @@ func TestClone(t *testing.T) {
 		tbl.Insert(pfx.pfx, pfx.val)
 	}
 	clone := tbl.Clone()
+
+	if golden.dumpString() != clone.dumpString() {
+		t.Errorf("Clone: got:\n%swant:\n%s", clone.dumpString(), golden.dumpString())
+	}
 
 	if tbl.dumpString() != clone.dumpString() {
 		t.Errorf("Clone: got:\n%swant:\n%s", clone.dumpString(), tbl.dumpString())

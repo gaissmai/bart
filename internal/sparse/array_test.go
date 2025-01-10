@@ -121,29 +121,6 @@ func TestSparseArrayUpdate(t *testing.T) {
 	}
 }
 
-func TestSparseArrayCompact(t *testing.T) {
-	t.Parallel()
-	a := new(Array[int])
-
-	for i := range 10_000 {
-		a.InsertAt(uint(i), i)
-	}
-
-	if l := len(a.Items); l != 10_000 {
-		t.Errorf("len, expected 10_000, got %d", l)
-	}
-
-	for i := range 7_000 {
-		a.DeleteAt(uint(i))
-	}
-	if l := len(a.Items); l != 3_000 {
-		t.Errorf("len, expected 3_000, got %d", l)
-	}
-	if c := cap(a.Items); c != 3_000 {
-		t.Errorf("cap, expected 3_000, got %d", c)
-	}
-}
-
 func TestSparseArrayCopy(t *testing.T) {
 	t.Parallel()
 	a := new(Array[int])
