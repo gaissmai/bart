@@ -147,7 +147,6 @@ func (s *Array[T]) insertItem(item T, i int) {
 	}
 	copy(s.Items[i+1:], s.Items[i:])
 	s.Items[i] = item
-	return
 }
 
 // deleteItem at index i, shift the rest one pos left and clears the tail item
