@@ -85,26 +85,7 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 	ip := pfx.Addr()
 	bits := pfx.Bits()
 
-	// 10.0.0.0/8    -> 0
-	// 10.12.0.0/15  -> 1
-	// 10.12.0.0/16  -> 1
-	// 10.12.10.9/32 -> 3
-	lastIdx := 0
-	if bits > 8 {
-		lastIdx = (bits - 1) >> 3
-	}
-
-	// 10.0.0.0/8    -> 8
-	// 10.12.0.0/15  -> 7
-	// 10.12.0.0/16  -> 8
-	// 10.12.10.9/32 -> 8
-	lastBits := bits - (lastIdx << 3)
-
-	// 10.0.0.0/8    -> 10
-	// 10.12.0.0/15  -> 12
-	// 10.12.0.0/16  -> 12
-	// 10.12.10.9/32 -> 9
-	// lastOctet := octets[lastIdx]
+	lastIdx, lastBits := lastOctetIdxAndBits(bits)
 
 	octets := ipAsOctets(ip, ip.Is4())
 	octets = octets[:lastIdx+1]
