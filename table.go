@@ -88,11 +88,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 
 	n := t.rootNodeByVersion(is4)
 
-	lastIdx := 0
-	if bits > 8 {
-		lastIdx = (bits - 1) >> 3
-	}
-	lastBits := bits - (lastIdx << 3)
+	lastIdx, lastBits := lastOctetIdxAndBits(bits)
 
 	octets := ipAsOctets(ip, is4)
 	octets = octets[:lastIdx+1]
@@ -172,11 +168,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 
 	n := t.rootNodeByVersion(is4)
 
-	lastIdx := 0
-	if bits > 8 {
-		lastIdx = (bits - 1) >> 3
-	}
-	lastBits := bits - (lastIdx << 3)
+	lastIdx, lastBits := lastOctetIdxAndBits(bits)
 
 	octets := ipAsOctets(ip, is4)
 	octets = octets[:lastIdx+1]
@@ -251,11 +243,7 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 
 	n := t.rootNodeByVersion(is4)
 
-	lastIdx := 0
-	if bits > 8 {
-		lastIdx = (bits - 1) >> 3
-	}
-	lastBits := bits - (lastIdx << 3)
+	lastIdx, lastBits := lastOctetIdxAndBits(bits)
 
 	octets := ipAsOctets(ip, is4)
 	octets = octets[:lastIdx+1]
@@ -435,12 +423,7 @@ func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool
 
 	n := t.rootNodeByVersion(is4)
 
-	// see comment in insertAtDepth()
-	lastIdx := 0
-	if bits > 8 {
-		lastIdx = (bits - 1) >> 3
-	}
-	lastBits := bits - (lastIdx << 3)
+	lastIdx, lastBits := lastOctetIdxAndBits(bits)
 
 	octets := ipAsOctets(ip, is4)
 	octets = octets[:lastIdx+1]
@@ -534,11 +517,7 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) func(yield func(netip.Prefix, V) 
 
 		n := t.rootNodeByVersion(is4)
 
-		lastIdx := 0
-		if bits > 8 {
-			lastIdx = (bits - 1) >> 3
-		}
-		lastBits := bits - (lastIdx << 3)
+		lastIdx, lastBits := lastOctetIdxAndBits(bits)
 
 		octets := ipAsOctets(ip, is4)
 		octets = octets[:lastIdx+1]
@@ -620,11 +599,7 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) func(yield func(netip.Prefix, V) bo
 
 		n := t.rootNodeByVersion(is4)
 
-		lastIdx := 0
-		if bits > 8 {
-			lastIdx = (bits - 1) >> 3
-		}
-		lastBits := bits - (lastIdx << 3)
+		lastIdx, lastBits := lastOctetIdxAndBits(bits)
 
 		octets := ipAsOctets(ip, is4)
 		octets = octets[:lastIdx+1]
@@ -797,4 +772,37 @@ func (t *Table[V]) AllSorted6() func(yield func(pfx netip.Prefix, val V) bool) {
 	return func(yield func(netip.Prefix, V) bool) {
 		_ = t.root6.allRecSorted(zeroPath, 0, false, yield)
 	}
+}
+
+// lastOctetIdxAndBits, get last significant octet Idx and significant bits
+//
+// lastIdx:
+//
+//	10.0.0.0/8    -> 0
+//	10.12.0.0/15  -> 1
+//	10.12.0.0/16  -> 1
+//	10.12.10.9/32 -> 3
+//
+// lastBits:
+//
+//	10.0.0.0/8    -> 8
+//	10.12.0.0/15  -> 7
+//	10.12.0.0/16  -> 8
+//	10.12.10.9/32 -> 8
+//
+// lastOctet := octets[lastIdx]
+//
+//	10.0.0.0/8    -> 10
+//	10.12.0.0/15  -> 12
+//	10.12.0.0/16  -> 12
+//	10.12.10.9/32 -> 9
+func lastOctetIdxAndBits(bits int) (lastIdx, lastBits int) {
+	if bits == 0 {
+		return
+	}
+
+	lastIdx = (bits - 1) >> 3
+	lastBits = bits - (lastIdx << 3)
+
+	return
 }
