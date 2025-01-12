@@ -147,7 +147,7 @@ func TestInvalid(t *testing.T) {
 func TestInsert(t *testing.T) {
 	t.Parallel()
 
-	tbl := &Table[int]{}
+	tbl := new(Table[int])
 
 	// Create a new leaf strideTable, with compressed path
 	tbl.Insert(mpp("192.168.0.1/32"), 1)
@@ -448,7 +448,7 @@ func TestDelete(t *testing.T) {
 	t.Run("table_is_empty", func(t *testing.T) {
 		t.Parallel()
 		// must not panic
-		tbl := &Table[int]{}
+		tbl := new(Table[int])
 		checkNumNodes(t, tbl, 0)
 		tbl.Delete(randomPrefix())
 		checkNumNodes(t, tbl, 0)
@@ -457,7 +457,7 @@ func TestDelete(t *testing.T) {
 	t.Run("prefix_in_root", func(t *testing.T) {
 		t.Parallel()
 		// Add/remove prefix from root table.
-		tbl := &Table[int]{}
+		tbl := new(Table[int])
 		checkNumNodes(t, tbl, 0)
 
 		tbl.Insert(mpp("10.0.0.0/8"), 1)
@@ -477,7 +477,7 @@ func TestDelete(t *testing.T) {
 	t.Run("prefix_in_leaf", func(t *testing.T) {
 		t.Parallel()
 		// Create, then delete a single leaf table.
-		tbl := &Table[int]{}
+		tbl := new(Table[int])
 		checkNumNodes(t, tbl, 0)
 
 		tbl.Insert(mpp("192.168.0.1/32"), 1)
@@ -498,7 +498,7 @@ func TestDelete(t *testing.T) {
 	t.Run("intermediate_no_routes", func(t *testing.T) {
 		t.Parallel()
 		// Create an intermediate with 2 leaves, then delete one leaf.
-		tbl := &Table[int]{}
+		tbl := new(Table[int])
 		checkNumNodes(t, tbl, 0)
 
 		tbl.Insert(mpp("192.168.0.1/32"), 1)
@@ -522,7 +522,7 @@ func TestDelete(t *testing.T) {
 	t.Run("intermediate_with_route", func(t *testing.T) {
 		t.Parallel()
 		// Same, but the intermediate carries a route as well.
-		tbl := &Table[int]{}
+		tbl := new(Table[int])
 		checkNumNodes(t, tbl, 0)
 
 		tbl.Insert(mpp("192.168.0.1/32"), 1)
@@ -550,7 +550,7 @@ func TestDelete(t *testing.T) {
 	t.Run("intermediate_many_leaves", func(t *testing.T) {
 		t.Parallel()
 		// Intermediate with 3 leaves, then delete one leaf.
-		tbl := &Table[int]{}
+		tbl := new(Table[int])
 		checkNumNodes(t, tbl, 0)
 
 		tbl.Insert(mpp("192.168.0.1/32"), 1)
@@ -578,7 +578,7 @@ func TestDelete(t *testing.T) {
 	t.Run("nosuchprefix_missing_child", func(t *testing.T) {
 		t.Parallel()
 		// Delete non-existent prefix
-		tbl := &Table[int]{}
+		tbl := new(Table[int])
 		checkNumNodes(t, tbl, 0)
 
 		tbl.Insert(mpp("192.168.0.1/32"), 1)
@@ -600,7 +600,7 @@ func TestDelete(t *testing.T) {
 		t.Parallel()
 		// Intermediate node loses its last route and becomes
 		// compactable.
-		tbl := &Table[int]{}
+		tbl := new(Table[int])
 		checkNumNodes(t, tbl, 0)
 
 		tbl.Insert(mpp("192.168.0.1/32"), 1)
@@ -623,7 +623,7 @@ func TestDelete(t *testing.T) {
 
 	t.Run("default_route", func(t *testing.T) {
 		t.Parallel()
-		tbl := &Table[int]{}
+		tbl := new(Table[int])
 		checkNumNodes(t, tbl, 0)
 
 		tbl.Insert(mpp("0.0.0.0/0"), 1)
@@ -639,7 +639,7 @@ func TestDelete(t *testing.T) {
 
 	t.Run("path compressed purge", func(t *testing.T) {
 		t.Parallel()
-		tbl := &Table[int]{}
+		tbl := new(Table[int])
 		checkNumNodes(t, tbl, 0)
 
 		tbl.Insert(mpp("10.10.0.0/17"), 1)
@@ -660,8 +660,8 @@ func TestContainsCompare(t *testing.T) {
 	t.Parallel()
 	pfxs := randomPrefixes(10_000)
 
-	gold := goldTable[int](pfxs)
-	fast := Table[int]{}
+	gold := new(goldTable[int]).insertMany(pfxs)
+	fast := new(Table[int])
 
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx, pfx.val)
@@ -686,7 +686,7 @@ func TestLookupCompare(t *testing.T) {
 	pfxs := randomPrefixes(10_000)
 
 	fast := new(Table[int])
-	gold := goldTable[int](pfxs)
+	gold := new(goldTable[int]).insertMany(pfxs)
 
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx, pfx.val)
@@ -787,7 +787,7 @@ func TestLookupPrefixCompare(t *testing.T) {
 	pfxs := randomPrefixes(10_000)
 
 	fast := new(Table[int])
-	gold := goldTable[int](pfxs)
+	gold := new(goldTable[int]).insertMany(pfxs)
 
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx, pfx.val)
@@ -832,7 +832,7 @@ func TestLookupPrefixLPMCompare(t *testing.T) {
 	pfxs := randomPrefixes(10_000)
 
 	fast := new(Table[int])
-	gold := goldTable[int](pfxs)
+	gold := new(goldTable[int]).insertMany(pfxs)
 
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx, pfx.val)
@@ -936,7 +936,7 @@ func TestDeleteCompare(t *testing.T) {
 	toDelete = append(toDelete, all6[deleteCut:]...)
 
 	fast := new(Table[int])
-	gold := goldTable[int](pfxs)
+	gold := new(goldTable[int]).insertMany(pfxs)
 
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx, pfx.val)
@@ -1018,7 +1018,7 @@ func TestDeleteShuffled(t *testing.T) {
 		pfxs2 := append([]goldTableItem[int](nil), pfxs...)
 		toDelete2 := append([]goldTableItem[int](nil), toDelete...)
 		rand.Shuffle(len(toDelete2), func(i, j int) { toDelete2[i], toDelete2[j] = toDelete2[j], toDelete2[i] })
-		rt2 := Table[int]{}
+		rt2 := new(Table[int])
 		for _, pfx := range pfxs2 {
 			rt2.Insert(pfx.pfx, pfx.val)
 		}
@@ -1178,7 +1178,7 @@ func TestGetCompare(t *testing.T) {
 
 	pfxs := randomPrefixes(10_000)
 	fast := new(Table[int])
-	gold := goldTable[int](pfxs)
+	gold := new(goldTable[int]).insertMany(pfxs)
 
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx, pfx.val)
@@ -1199,7 +1199,7 @@ func TestUpdateCompare(t *testing.T) {
 
 	pfxs := randomPrefixes(10_000)
 	fast := new(Table[int])
-	gold := goldTable[int](pfxs)
+	gold := new(goldTable[int]).insertMany(pfxs)
 
 	// Update as insert
 	for _, pfx := range pfxs {
@@ -1306,8 +1306,8 @@ func TestUnionEdgeCases(t *testing.T) {
 
 	t.Run("empty", func(t *testing.T) {
 		t.Parallel()
-		aTbl := &Table[int]{}
-		bTbl := &Table[int]{}
+		aTbl := new(Table[int])
+		bTbl := new(Table[int])
 
 		// union empty tables
 		aTbl.Union(bTbl)
@@ -1321,8 +1321,8 @@ func TestUnionEdgeCases(t *testing.T) {
 
 	t.Run("other empty", func(t *testing.T) {
 		t.Parallel()
-		aTbl := &Table[int]{}
-		bTbl := &Table[int]{}
+		aTbl := new(Table[int])
+		bTbl := new(Table[int])
 
 		// one empty table, b
 		aTbl.Insert(mpp("0.0.0.0/0"), 0)
@@ -1339,8 +1339,8 @@ func TestUnionEdgeCases(t *testing.T) {
 
 	t.Run("other empty", func(t *testing.T) {
 		t.Parallel()
-		aTbl := &Table[int]{}
-		bTbl := &Table[int]{}
+		aTbl := new(Table[int])
+		bTbl := new(Table[int])
 
 		// one empty table, a
 		bTbl.Insert(mpp("0.0.0.0/0"), 0)
@@ -1357,8 +1357,8 @@ func TestUnionEdgeCases(t *testing.T) {
 
 	t.Run("duplicate prefix", func(t *testing.T) {
 		t.Parallel()
-		aTbl := &Table[string]{}
-		bTbl := &Table[string]{}
+		aTbl := new(Table[string])
+		bTbl := new(Table[string])
 
 		// one empty table
 		aTbl.Insert(mpp("::/0"), "orig value")
@@ -1376,8 +1376,8 @@ func TestUnionEdgeCases(t *testing.T) {
 
 	t.Run("different IP versions", func(t *testing.T) {
 		t.Parallel()
-		aTbl := &Table[int]{}
-		bTbl := &Table[int]{}
+		aTbl := new(Table[int])
+		bTbl := new(Table[int])
 
 		// one empty table
 		aTbl.Insert(mpp("0.0.0.0/0"), 1)
@@ -1397,8 +1397,8 @@ func TestUnionEdgeCases(t *testing.T) {
 
 	t.Run("same children", func(t *testing.T) {
 		t.Parallel()
-		aTbl := &Table[int]{}
-		bTbl := &Table[int]{}
+		aTbl := new(Table[int])
+		bTbl := new(Table[int])
 
 		aTbl.Insert(mpp("127.0.0.1/32"), 1)
 		aTbl.Insert(mpp("::1/128"), 1)
@@ -1465,22 +1465,22 @@ func TestUnionCompare(t *testing.T) {
 
 	for range 100 {
 		pfxs := randomPrefixes(numEntries)
-		fast := Table[int]{}
-		gold := goldTable[int](pfxs)
+		fast := new(Table[int])
+		gold := new(goldTable[int]).insertMany(pfxs)
 
 		for _, pfx := range pfxs {
 			fast.Insert(pfx.pfx, pfx.val)
 		}
 
 		pfxs2 := randomPrefixes(numEntries)
-		gold2 := goldTable[int](pfxs2)
-		fast2 := Table[int]{}
+		gold2 := new(goldTable[int]).insertMany(pfxs2)
+		fast2 := new(Table[int])
 		for _, pfx := range pfxs2 {
 			fast2.Insert(pfx.pfx, pfx.val)
 		}
 
-		gold.union(&gold2)
-		fast.Union(&fast2)
+		gold.union(gold2)
+		fast.Union(fast2)
 
 		// dump as slow table for comparison
 		fastAsGoldenTbl := fast.dumpAsGoldTable()
@@ -1489,8 +1489,8 @@ func TestUnionCompare(t *testing.T) {
 		gold.sort()
 		fastAsGoldenTbl.sort()
 
-		for i := range gold {
-			goldItem := gold[i]
+		for i := range *gold {
+			goldItem := (*gold)[i]
 			fastItem := fastAsGoldenTbl[i]
 			if goldItem != fastItem {
 				t.Fatalf("Union(...): items[%d] differ slow(%v) != fast(%v)", i, goldItem, fastItem)
@@ -1498,8 +1498,8 @@ func TestUnionCompare(t *testing.T) {
 		}
 
 		// check the size
-		if fast.Size() != len(gold) {
-			t.Errorf("sizes differ, got: %d, want: %d", fast.Size(), len(gold))
+		if fast.Size() != len(*gold) {
+			t.Errorf("sizes differ, got: %d, want: %d", fast.Size(), len(*gold))
 		}
 	}
 }
@@ -1676,7 +1676,7 @@ func TestUnionDeep(t *testing.T) {
 func TestOverlapsPrefixEdgeCases(t *testing.T) {
 	t.Parallel()
 
-	tbl := &Table[int]{}
+	tbl := new(Table[int])
 
 	// empty table
 	checkOverlapsPrefix(t, tbl, []tableOverlapsTest{
@@ -1693,7 +1693,7 @@ func TestOverlapsPrefixEdgeCases(t *testing.T) {
 	})
 
 	// default route
-	tbl = &Table[int]{}
+	tbl = new(Table[int])
 	tbl.Insert(mpp("0.0.0.0/0"), 0)
 	tbl.Insert(mpp("::/0"), 0)
 	checkOverlapsPrefix(t, tbl, []tableOverlapsTest{
@@ -1702,7 +1702,7 @@ func TestOverlapsPrefixEdgeCases(t *testing.T) {
 	})
 
 	// single IP
-	tbl = &Table[int]{}
+	tbl = new(Table[int])
 	tbl.Insert(mpp("10.0.0.0/7"), 0)
 	tbl.Insert(mpp("2001::/16"), 0)
 	checkOverlapsPrefix(t, tbl, []tableOverlapsTest{
@@ -1711,7 +1711,7 @@ func TestOverlapsPrefixEdgeCases(t *testing.T) {
 	})
 
 	// single IP
-	tbl = &Table[int]{}
+	tbl = new(Table[int])
 	tbl.Insert(mpp("10.1.2.3/32"), 0)
 	tbl.Insert(mpp("2001:db8:affe::cafe/128"), 0)
 	checkOverlapsPrefix(t, tbl, []tableOverlapsTest{
@@ -1720,7 +1720,7 @@ func TestOverlapsPrefixEdgeCases(t *testing.T) {
 	})
 
 	// same IPv
-	tbl = &Table[int]{}
+	tbl = new(Table[int])
 	tbl.Insert(mpp("10.1.2.3/32"), 0)
 	tbl.Insert(mpp("2001:db8:affe::cafe/128"), 0)
 	checkOverlapsPrefix(t, tbl, []tableOverlapsTest{
@@ -1989,7 +1989,7 @@ func BenchmarkTableOverlaps(b *testing.B) {
 
 			intersects := make([]*Table[int], numIntersects)
 			for i := range intersects {
-				inter := &Table[int]{}
+				inter := new(Table[int])
 				for _, route := range rng(intersectSize) {
 					inter.Insert(route.pfx, route.val)
 				}

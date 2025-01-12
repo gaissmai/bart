@@ -48,7 +48,7 @@ func TestPrefixInsert(t *testing.T) {
 	// easy to verify by inspection.
 
 	pfxs := shuffleStridePfxs(allStridePfxs())[:100]
-	gold := goldStrideTbl[int](pfxs)
+	gold := new(goldStrideTbl[int]).insertMany(pfxs)
 	fast := new(node[int])
 
 	for _, pfx := range pfxs {
@@ -70,7 +70,7 @@ func TestPrefixDelete(t *testing.T) {
 	t.Parallel()
 	// Compare route deletion to our reference table.
 	pfxs := shuffleStridePfxs(allStridePfxs())[:100]
-	gold := goldStrideTbl[int](pfxs)
+	gold := new(goldStrideTbl[int]).insertMany(pfxs)
 	fast := new(node[int])
 
 	for _, pfx := range pfxs {
@@ -84,7 +84,7 @@ func TestPrefixDelete(t *testing.T) {
 	}
 
 	// Sanity check that slow table seems to have done the right thing.
-	if cnt := len(gold); cnt != 50 {
+	if cnt := len(*gold); cnt != 50 {
 		t.Fatalf("goldenStride has %d entries after deletes, want 50", cnt)
 	}
 
@@ -103,7 +103,7 @@ func TestOverlapsPrefix(t *testing.T) {
 	t.Parallel()
 
 	pfxs := shuffleStridePfxs(allStridePfxs())[:100]
-	gold := goldStrideTbl[int](pfxs)
+	gold := new(goldStrideTbl[int]).insertMany(pfxs)
 	fast := new(node[int])
 
 	for _, pfx := range pfxs {
@@ -132,7 +132,7 @@ func TestOverlapsNode(t *testing.T) {
 		shuffleStridePfxs(all)
 		pfxs := all[:numEntries]
 
-		gold := goldStrideTbl[int](pfxs)
+		gold := new(goldStrideTbl[int]).insertMany(pfxs)
 		fast := new(node[int])
 
 		for _, pfx := range pfxs {
@@ -140,14 +140,14 @@ func TestOverlapsNode(t *testing.T) {
 		}
 
 		inter := all[numEntries : 2*numEntries]
-		goldInter := goldStrideTbl[int](inter)
+		goldInter := new(goldStrideTbl[int]).insertMany(inter)
 		fastInter := new(node[int])
 
 		for _, pfx := range inter {
 			fastInter.prefixes.InsertAt(pfxToIdx(pfx.octet, pfx.bits), pfx.val)
 		}
 
-		gotGold := gold.strideOverlaps(&goldInter)
+		gotGold := gold.strideOverlaps(goldInter)
 		gotFast := fast.overlaps(fastInter, 0)
 		if gotGold != gotFast {
 			t.Fatalf("node.overlaps = %v, want %v", gotFast, gotGold)

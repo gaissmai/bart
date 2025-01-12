@@ -17,6 +17,12 @@ type goldStrideItem[V any] struct {
 	val   V
 }
 
+func (t *goldStrideTbl[V]) insertMany(strides []goldStrideItem[V]) *goldStrideTbl[V] {
+	cast := goldStrideTbl[V](strides)
+	t = &cast
+	return t
+}
+
 // delete prefix
 func (t *goldStrideTbl[V]) delete(octet byte, prefixLen int) {
 	pfx := make([]goldStrideItem[V], 0, len(*t))

@@ -65,7 +65,7 @@ func TestSupernetsCompareCB(t *testing.T) {
 	pfxs := gimmeRandomPrefixes(10_000)
 
 	fast := new(Table[int])
-	gold := goldTable[int]{}
+	gold := new(goldTable[int])
 
 	for i, pfx := range pfxs {
 		fast.Insert(pfx, i)
@@ -175,7 +175,7 @@ func TestSubnetsCompareCB(t *testing.T) {
 	pfxs := gimmeRandomPrefixes(10_000)
 
 	fast := new(Table[int])
-	gold := goldTable[int]{}
+	gold := new(goldTable[int])
 
 	for i, pfx := range pfxs {
 		fast.Insert(pfx, i)
