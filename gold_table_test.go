@@ -30,6 +30,12 @@ func (t *goldTable[V]) insert(pfx netip.Prefix, val V) {
 	*t = append(*t, goldTableItem[V]{pfx, val})
 }
 
+func (t *goldTable[V]) insertMany(pfxs []goldTableItem[V]) *goldTable[V] {
+	cast := goldTable[V](pfxs)
+	t = &cast
+	return t
+}
+
 func (t *goldTable[V]) get(pfx netip.Prefix) (val V, ok bool) {
 	pfx = pfx.Masked()
 	for _, ent := range *t {

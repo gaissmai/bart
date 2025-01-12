@@ -17,7 +17,7 @@ import (
 func TestRegressionOverlaps(t *testing.T) {
 	t.Run("overlaps_divergent_children_with_parent_route_entry", func(t *testing.T) {
 		t.Parallel()
-		t1, t2 := Table[int]{}, Table[int]{}
+		t1, t2 := new(Table[int]), new(Table[int])
 
 		t1.Insert(mpp("128.0.0.0/2"), 1)
 		t1.Insert(mpp("99.173.128.0/17"), 1)
@@ -31,14 +31,14 @@ func TestRegressionOverlaps(t *testing.T) {
 		t2.Insert(mpp("164.85.192.0/23"), 1)
 		t2.Insert(mpp("225.71.164.112/31"), 1)
 
-		if !t1.Overlaps(&t2) {
+		if !t1.Overlaps(t2) {
 			t.Fatal("tables unexpectedly do not overlap")
 		}
 	})
 
 	t.Run("overlaps_parent_child_comparison_with_route_in_parent", func(t *testing.T) {
 		t.Parallel()
-		t1, t2 := Table[int]{}, Table[int]{}
+		t1, t2 := new(Table[int]), new(Table[int])
 
 		t1.Insert(mpp("226.0.0.0/8"), 1)
 		t1.Insert(mpp("81.128.0.0/9"), 1)
@@ -52,7 +52,7 @@ func TestRegressionOverlaps(t *testing.T) {
 		t2.Insert(mpp("2.233.60.32/27"), 1)
 		t2.Insert(mpp("152.42.142.160/28"), 1)
 
-		if !t1.Overlaps(&t2) {
+		if !t1.Overlaps(t2) {
 			t.Fatal("tables unexpectedly do not overlap")
 		}
 	})
@@ -68,22 +68,22 @@ func TestOverlapsCompare(t *testing.T) {
 	seen := map[bool]int{}
 	for range 10_000 {
 		pfxs := randomPrefixes(numEntries)
-		fast := Table[int]{}
-		gold := goldTable[int](pfxs)
+		fast := new(Table[int])
+		gold := new(goldTable[int]).insertMany(pfxs)
 
 		for _, pfx := range pfxs {
 			fast.Insert(pfx.pfx, pfx.val)
 		}
 
 		inter := randomPrefixes(numEntries)
-		goldInter := goldTable[int](inter)
-		fastInter := Table[int]{}
+		goldInter := new(goldTable[int]).insertMany(inter)
+		fastInter := new(Table[int])
 		for _, pfx := range inter {
 			fastInter.Insert(pfx.pfx, pfx.val)
 		}
 
-		gotGold := gold.overlaps(&goldInter)
-		gotFast := fast.Overlaps(&fastInter)
+		gotGold := gold.overlaps(goldInter)
+		gotFast := fast.Overlaps(fastInter)
 
 		if gotGold != gotFast {
 			t.Fatalf("Overlaps(...) = %v, want %v\nTable1:\n%s\nTable:\n%v",
@@ -98,8 +98,8 @@ func TestOverlapsPrefixCompare(t *testing.T) {
 	t.Parallel()
 	pfxs := randomPrefixes(100_000)
 
-	fast := Table[int]{}
-	gold := goldTable[int](pfxs)
+	fast := new(Table[int])
+	gold := new(goldTable[int]).insertMany(pfxs)
 
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx, pfx.val)
