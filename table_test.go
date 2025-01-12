@@ -39,11 +39,12 @@ func (i *MyInt) Clone() *MyInt {
 
 // ############ tests ################################
 
-func TestInvalidPrefix(t *testing.T) {
+func TestInvalid(t *testing.T) {
 	t.Parallel()
 
 	tbl := new(Table[any])
-	var zero netip.Prefix
+	var zeroPfx netip.Prefix
+	var zeroIP netip.Addr
 	var testname string
 
 	testname = "Insert"
@@ -55,7 +56,7 @@ func TestInvalidPrefix(t *testing.T) {
 			}
 		}(testname)
 
-		tbl.Insert(zero, nil)
+		tbl.Insert(zeroPfx, nil)
 	})
 
 	testname = "Delete"
@@ -67,7 +68,7 @@ func TestInvalidPrefix(t *testing.T) {
 			}
 		}(testname)
 
-		tbl.Delete(zero)
+		tbl.Delete(zeroPfx)
 	})
 
 	testname = "Update"
@@ -79,7 +80,7 @@ func TestInvalidPrefix(t *testing.T) {
 			}
 		}(testname)
 
-		tbl.Update(zero, func(v any, _ bool) any { return v })
+		tbl.Update(zeroPfx, func(v any, _ bool) any { return v })
 	})
 
 	testname = "Get"
@@ -91,7 +92,7 @@ func TestInvalidPrefix(t *testing.T) {
 			}
 		}(testname)
 
-		tbl.Get(zero)
+		tbl.Get(zeroPfx)
 	})
 
 	testname = "LookupPrefix"
@@ -103,7 +104,7 @@ func TestInvalidPrefix(t *testing.T) {
 			}
 		}(testname)
 
-		tbl.LookupPrefix(zero)
+		tbl.LookupPrefix(zeroPfx)
 	})
 
 	testname = "LookupPrefixLPM"
@@ -115,7 +116,7 @@ func TestInvalidPrefix(t *testing.T) {
 			}
 		}(testname)
 
-		tbl.LookupPrefixLPM(zero)
+		tbl.LookupPrefixLPM(zeroPfx)
 	})
 
 	testname = "OverlapsPrefix"
@@ -127,7 +128,19 @@ func TestInvalidPrefix(t *testing.T) {
 			}
 		}(testname)
 
-		tbl.OverlapsPrefix(zero)
+		tbl.OverlapsPrefix(zeroPfx)
+	})
+
+	testname = "Contains"
+	t.Run(testname, func(t *testing.T) {
+		t.Parallel()
+		defer func(testname string) {
+			if r := recover(); r != nil {
+				t.Fatalf("%s panics on invalid ip input", testname)
+			}
+		}(testname)
+
+		tbl.Contains(zeroIP)
 	})
 }
 
