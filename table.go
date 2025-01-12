@@ -390,8 +390,7 @@ LOOP:
 // LookupPrefix does a route lookup (longest prefix match) for pfx and
 // returns the associated value and true, or false if no route matched.
 func (t *Table[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
-	_, val, ok = t.lpmPrefix(pfx)
-
+	_, val, ok = t.lookupPrefixLPM(pfx, false)
 	return val, ok
 }
 
@@ -404,18 +403,13 @@ func (t *Table[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
 // If LookupPrefixLPM is to be used for IP address lookups,
 // they must be converted to /32 or /128 prefixes.
 func (t *Table[V]) LookupPrefixLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) {
-	return t.lpmPrefix(pfx)
+	return t.lookupPrefixLPM(pfx, true)
 }
 
-// lpmPrefix, returns lpm, val and ok for a lpm match.
-func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) {
+func (t *Table[V]) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpm netip.Prefix, val V, ok bool) {
 	if !pfx.IsValid() {
 		return lpm, val, false
 	}
-
-	// canonicalize the prefix
-	// the ip must be masked, see below in Contains()
-	pfx = pfx.Masked()
 
 	ip := pfx.Addr()
 	bits := pfx.Bits()
@@ -427,6 +421,9 @@ func (t *Table[V]) lpmPrefix(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool
 
 	octets := ipAsOctets(ip, is4)
 	octets = octets[:lastIdx+1]
+
+	// mask the last octet from IP
+	octets[lastIdx] &= netMask(lastBits)
 
 	// record path to leaf node
 	stack := [maxTreeDepth]*node[V]{}
@@ -456,7 +453,7 @@ LOOP:
 			continue LOOP
 		case *leaf[V]:
 			// reached a path compressed prefix, stop traversing
-			// ip must be masked!
+			// must not be masked for Contains(pfx.Addr)
 			if k.prefix.Contains(ip) && k.prefix.Bits() <= bits {
 				return k.prefix, k.value, true
 			}
@@ -470,29 +467,37 @@ LOOP:
 		n = stack[depth]
 
 		// longest prefix match, skip if node has no prefixes
-		if n.prefixes.Len() != 0 {
-			octet = octets[depth]
+		if n.prefixes.Len() == 0 {
+			continue
+		}
 
-			// only the lastOctet may have a different prefix len
-			// all others are just host routes
-			var idx uint
-			if depth == lastIdx {
-				idx = pfxToIdx(octet, lastBits)
-			} else {
-				idx = hostIndex(uint(octet))
+		// only the lastOctet may have a different prefix len
+		// all others are just host routes
+		var idx uint
+		octet = octets[depth]
+		if depth == lastIdx {
+			idx = pfxToIdx(octet, lastBits)
+		} else {
+			idx = hostIndex(uint(octet))
+		}
+
+		// manually inlined lpmGet(idx)
+		if topIdx, ok := n.prefixes.IntersectionTop(lpmLookupTbl[idx]); ok {
+			val = n.prefixes.MustGet(topIdx)
+
+			// called from LookupPrefix
+			if !withLPM {
+				return netip.Prefix{}, val, ok
 			}
 
-			// manually inlined lpmGet(idx)
-			if topIdx, ok := n.prefixes.IntersectionTop(lpmLookupTbl[idx]); ok {
-				val = n.prefixes.MustGet(topIdx)
+			// called from LookupPrefixLPM
 
-				// calculate the bits from depth and top idx
-				bits := depth*strideLen + int(baseIdxLookupTbl[topIdx].bits)
+			// calculate the bits from depth and top idx
+			bits := depth*strideLen + int(baseIdxLookupTbl[topIdx].bits)
 
-				// calculate the lpm from incoming ip and new mask
-				lpm, _ = ip.Prefix(bits)
-				return lpm, val, ok
-			}
+			// calculate the lpm from incoming ip and new mask
+			lpm, _ = ip.Prefix(bits)
+			return lpm, val, ok
 		}
 	}
 
