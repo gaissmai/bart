@@ -27,6 +27,8 @@ import (
 //
 // The Table is safe for concurrent readers but not for concurrent readers
 // and/or writers.
+//
+// A Table must not be copied by value, see [Table.Clone].
 type Table[V any] struct {
 	// the root nodes, implemented as popcount compressed multibit tries
 	root4 node[V]
@@ -35,6 +37,9 @@ type Table[V any] struct {
 	// the number of prefixes in the routing table
 	size4 int
 	size6 int
+
+	// used by -copylocks checker from `go vet`.
+	_ noCopy
 }
 
 // rootNodeByVersion, root node getter for ip version.
