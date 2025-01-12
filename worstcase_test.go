@@ -183,6 +183,7 @@ func BenchmarkWorstCase(b *testing.B) {
 			tbl.Insert(p, p.String())
 		}
 
+		b.ResetTimer()
 		for range b.N {
 			tbl.Contains(worstCaseProbeIP4)
 		}
@@ -194,6 +195,7 @@ func BenchmarkWorstCase(b *testing.B) {
 			tbl.Insert(p, p.String())
 		}
 
+		b.ResetTimer()
 		for range b.N {
 			tbl.Lookup(worstCaseProbeIP4)
 		}
@@ -205,6 +207,7 @@ func BenchmarkWorstCase(b *testing.B) {
 			tbl.Insert(p, p.String())
 		}
 
+		b.ResetTimer()
 		for range b.N {
 			tbl.Contains(worstCaseProbeIP6)
 		}
@@ -216,6 +219,7 @@ func BenchmarkWorstCase(b *testing.B) {
 			tbl.Insert(p, p.String())
 		}
 
+		b.ResetTimer()
 		for range b.N {
 			tbl.Lookup(worstCaseProbeIP6)
 		}
@@ -229,6 +233,7 @@ func BenchmarkWorstCase(b *testing.B) {
 
 		tbl.Delete(mpp("255.255.255.255/32")) // delete matching prefix
 
+		b.ResetTimer()
 		for range b.N {
 			tbl.Contains(worstCaseProbeIP4)
 		}
@@ -242,6 +247,7 @@ func BenchmarkWorstCase(b *testing.B) {
 
 		tbl.Delete(mpp("255.255.255.255/32")) // delete matching prefix
 
+		b.ResetTimer()
 		for range b.N {
 			tbl.Lookup(worstCaseProbeIP4)
 		}
@@ -255,6 +261,7 @@ func BenchmarkWorstCase(b *testing.B) {
 
 		tbl.Delete(mpp("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff/128")) // delete matching prefix
 
+		b.ResetTimer()
 		for range b.N {
 			tbl.Contains(worstCaseProbeIP6)
 		}
@@ -268,6 +275,7 @@ func BenchmarkWorstCase(b *testing.B) {
 
 		tbl.Delete(mpp("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff/128")) // delete matching prefix
 
+		b.ResetTimer()
 		for range b.N {
 			tbl.Lookup(worstCaseProbeIP6)
 		}
