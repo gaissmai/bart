@@ -142,9 +142,9 @@ Standing on the shoulders of giants.
 Credits for many inspirations go to
 
 - the clever guys at tailscale,
-- to Daniel Lemire, and
+- to Daniel Lemire for his inspiring blog,
 - to Donald E. Knuth for the **ART** routing algorithm and
-- Yoichi Hariguchi who deciphered it for us mere mortals
+- to Yoichi Hariguchi who deciphered it for us mere mortals
 
 And last but not least to the Go team who do a wonderful job!
 
