@@ -144,9 +144,7 @@ Credits for many inspirations go to
 - the clever guys at tailscale,
 - to Daniel Lemire, and
 - to Donald E. Knuth for the **ART** routing algorithm and
-
-all the rest of his *Art* and for keeping important algorithms
-in the public domain!
+- Yoichi Hariguchi who deciphered it for us mere mortals
 
 And last but not least to the Go team who do a wonderful job!
 
