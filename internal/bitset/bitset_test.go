@@ -33,7 +33,7 @@ func TestNil(t *testing.T) {
 	b.Size()
 
 	b = BitSet(nil)
-	b.Rank(100)
+	b.Rank0(100)
 
 	b = BitSet(nil)
 	b.Test(42)
@@ -88,7 +88,7 @@ func TestZeroValue(t *testing.T) {
 	b.Size()
 
 	b = BitSet{}
-	b.Rank(100)
+	b.Rank0(100)
 
 	b = BitSet{}
 	b.Test(42)
@@ -668,7 +668,8 @@ func TestIntersectionTop(t *testing.T) {
 	}
 }
 
-func TestRank(t *testing.T) {
+// Rank0 is popcount-1
+func TestRank0(t *testing.T) {
 	t.Parallel()
 	u := []uint{2, 3, 5, 7, 11, 70, 150}
 	var b BitSet
@@ -676,19 +677,19 @@ func TestRank(t *testing.T) {
 		b = b.Set(v)
 	}
 
-	if b.Rank(5) != 3 {
+	if b.Rank0(5) != 2 {
 		t.Error("Unexpected rank")
 		return
 	}
-	if b.Rank(6) != 3 {
+	if b.Rank0(6) != 2 {
 		t.Error("Unexpected rank")
 		return
 	}
-	if b.Rank(63) != 5 {
+	if b.Rank0(63) != 4 {
 		t.Error("Unexpected rank")
 		return
 	}
-	if b.Rank(1500) != 7 {
+	if b.Rank0(1500) != 6 {
 		t.Error("Unexpected rank")
 		return
 	}

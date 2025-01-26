@@ -497,11 +497,11 @@ LOOP:
 
 			// called from LookupPrefixLPM
 
-			// calculate the bits from depth and top idx
-			bits := depth*strideLen + int(baseIdxLookupTbl[topIdx].bits)
+			// calculate the pfxLen from depth and top idx
+			pfxLen := depth*strideLen + int(baseIdxLookupTbl[topIdx].pfxLen)
 
 			// calculate the lpm from incoming ip and new mask
-			lpm, _ = ip.Prefix(bits)
+			lpm, _ = ip.Prefix(pfxLen)
 			return lpm, val, ok
 		}
 	}

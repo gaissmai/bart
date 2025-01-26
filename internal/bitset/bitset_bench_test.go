@@ -33,7 +33,7 @@ func BenchmarkBitSetRankChild(b *testing.B) {
 	for _, r := range rands {
 		b.Run(fmt.Sprintf("%3d", r), func(b *testing.B) {
 			for range b.N {
-				_ = bs.Rank(uint(r))
+				_ = bs.Rank0(uint(r))
 			}
 		})
 	}
@@ -59,7 +59,7 @@ func BenchmarkBitSetRankPrefix(b *testing.B) {
 	for _, r := range rands {
 		b.Run(fmt.Sprintf("%3d", r), func(b *testing.B) {
 			for range b.N {
-				_ = bs.Rank(uint(r))
+				_ = bs.Rank0(uint(r))
 			}
 		})
 	}
