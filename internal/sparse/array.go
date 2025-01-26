@@ -11,6 +11,18 @@ import (
 
 // Array, a generic implementation of a sparse array
 // with popcount compression and payload T.
+//
+//	 example:
+//		                   |
+//		                   v
+//		BitSet: [0|0|1|0|0|1|0|...] <- two bits set
+//		Items:  [*|*]               <- two slots populated
+//		           ^
+//		           |
+//
+//		BitSet.Test(5):     true
+//		BitSet.popcount(5): 2, for interval [0,5]
+//		BitSet.Rank0(5):    1, equal popcount - 1
 type Array[T any] struct {
 	bitset.BitSet
 	Items []T
@@ -41,20 +53,13 @@ func (s *Array[T]) Copy() *Array[T] {
 	}
 }
 
-// rank is the key of the popcount compression algorithm,
-// mapping between bitset index and slice index.
-func (s *Array[T]) rank(i uint) int {
-	// adjust offset by one to slice index.
-	return s.Rank(i) - 1
-}
-
 // InsertAt a value at i into the sparse array.
 // If the value already exists, overwrite it with val and return true.
 // The capacity is identical to the length after insertion.
 func (s *Array[T]) InsertAt(i uint, val T) (exists bool) {
 	// slot exists, overwrite val
 	if s.Len() != 0 && s.Test(i) {
-		s.Items[s.rank(i)] = val
+		s.Items[s.Rank0(i)] = val
 
 		return true
 	}
@@ -63,7 +68,7 @@ func (s *Array[T]) InsertAt(i uint, val T) (exists bool) {
 	s.BitSet = s.Set(i)
 
 	// ... and slice
-	s.insertItem(val, s.rank(i))
+	s.insertItem(val, s.Rank0(i))
 
 	return false
 }
@@ -74,11 +79,11 @@ func (s *Array[T]) DeleteAt(i uint) (val T, exists bool) {
 		return
 	}
 
-	rnk := s.rank(i)
-	val = s.Items[rnk]
+	idx := s.Rank0(i)
+	val = s.Items[idx]
 
 	// delete from slice
-	s.deleteItem(rnk)
+	s.deleteItem(idx)
 
 	// delete from bitset
 	s.BitSet = s.Clear(i)
@@ -89,7 +94,7 @@ func (s *Array[T]) DeleteAt(i uint) (val T, exists bool) {
 // Get the value at i from sparse array.
 func (s *Array[T]) Get(i uint) (val T, ok bool) {
 	if s.Test(i) {
-		return s.Items[s.Rank(i)-1], true
+		return s.Items[s.Rank0(i)], true
 	}
 	return
 }
@@ -97,20 +102,20 @@ func (s *Array[T]) Get(i uint) (val T, ok bool) {
 // MustGet, use it only after a successful test
 // or the behavior is undefined, maybe it panics.
 func (s *Array[T]) MustGet(i uint) T {
-	return s.Items[s.Rank(i)-1]
+	return s.Items[s.Rank0(i)]
 }
 
 // UpdateAt or set the value at i via callback. The new value is returned
 // and true if the val was already present.
 func (s *Array[T]) UpdateAt(i uint, cb func(T, bool) T) (newVal T, wasPresent bool) {
-	var rnk int
+	var idx int
 
 	// if already set, get current value
 	var oldVal T
 
 	if wasPresent = s.Test(i); wasPresent {
-		rnk = s.rank(i)
-		oldVal = s.Items[rnk]
+		idx = s.Rank0(i)
+		oldVal = s.Items[idx]
 	}
 
 	// callback function to get updated or new value
@@ -118,7 +123,7 @@ func (s *Array[T]) UpdateAt(i uint, cb func(T, bool) T) (newVal T, wasPresent bo
 
 	// already set, update and return value
 	if wasPresent {
-		s.Items[rnk] = newVal
+		s.Items[idx] = newVal
 
 		return newVal, wasPresent
 	}
@@ -127,10 +132,10 @@ func (s *Array[T]) UpdateAt(i uint, cb func(T, bool) T) (newVal T, wasPresent bo
 	s.BitSet = s.Set(i)
 
 	// bitset has changed, recalc rank
-	rnk = s.rank(i)
+	idx = s.Rank0(i)
 
 	// ... and insert value into slice
-	s.insertItem(newVal, rnk)
+	s.insertItem(newVal, idx)
 
 	return newVal, wasPresent
 }

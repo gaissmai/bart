@@ -255,11 +255,10 @@ func (b BitSet) Size() int {
 	return popcount(b)
 }
 
-// Rank returns the number of set bits up to and including the index
-// that are set in the bitset.
+// Rank0 is equal to popcount() - 1
 //
-// With inlined popcount to make Rank itself inlineable.
-func (b BitSet) Rank(i uint) (rnk int) {
+// With inlined popcount to make Rank0 itself inlineable.
+func (b BitSet) Rank0(i uint) (rnk int) {
 	// Rank count is inclusive
 	i++
 
@@ -281,7 +280,8 @@ func (b BitSet) Rank(i uint) (rnk int) {
 
 	}
 
-	return
+	// correct for offset by one
+	return rnk - 1
 }
 
 // popcount
