@@ -18,16 +18,16 @@ type Array[T any] struct {
 
 // Get the value at i from sparse array.
 //
-//		 example: Array.Get(5) -> Array.Items[1]
+// example: Array.Get(5) -> Array.Items[1]
 //
-//	                       ⬇
-//			BitSet: [0|0|1|0|0|1|0|1|...] <- 3 bits set
-//			Items:  [*|*|*]               <- len(Items) = 3
-//			           ⬆
+//	                   ⬇
+//	BitSet: [0|0|1|0|0|1|0|1|...] <- 3 bits set
+//	Items:  [*|*|*]               <- len(Items) = 3
+//	           ⬆
 //
-//			BitSet.Test(5):     true
-//			BitSet.popcount(5): 2, for interval [0,5]
-//			BitSet.Rank0(5):    1, equal popcount(5)-1
+//	BitSet.Test(5):     true
+//	BitSet.popcount(5): 2, for interval [0,5]
+//	BitSet.Rank0(5):    1, equal popcount(5)-1
 func (s *Array[T]) Get(i uint) (value T, ok bool) {
 	if s.Test(i) {
 		return s.Items[s.Rank0(i)], true
