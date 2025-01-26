@@ -14,9 +14,9 @@ type nodeType byte
 
 const (
 	nullNode         nodeType = iota // empty node
-	fullNode                         // prefixes and (children or PC)
-	leafNode                         // no children, only prefixes or PC
-	intermediateNode                 // only children, no prefix nor PC,
+	fullNode                         // prefixes and children or path-compressed prefixes
+	leafNode                         // no children, only prefixes or path-compressed prefixes
+	intermediateNode                 // only children, no prefix nor path-compressed prefixes
 	UNKNOWN                          // logic error
 )
 
@@ -38,34 +38,30 @@ func (t *Table[V]) dump(w io.Writer) {
 		return
 	}
 
-	if t.Size4() > 0 {
+	if t.size4 > 0 {
 		fmt.Fprintln(w)
-		fmt.Fprintf(w, "### IPv4: size(%d), nodes(%d)", t.Size4(), t.root4.nodeStatsRec().nodes)
+		fmt.Fprintf(w, "### IPv4: size(%d), nodes(%d)", t.size4, t.root4.nodeStatsRec().nodes)
 		t.root4.dumpRec(w, zeroPath, 0, true)
 	}
 
-	if t.Size6() > 0 {
+	if t.size6 > 0 {
 		fmt.Fprintln(w)
-		fmt.Fprintf(w, "### IPv6: size(%d), nodes(%d)", t.Size6(), t.root6.nodeStatsRec().nodes)
+		fmt.Fprintf(w, "### IPv6: size(%d), nodes(%d)", t.size6, t.root6.nodeStatsRec().nodes)
 		t.root6.dumpRec(w, zeroPath, 0, false)
 	}
 }
 
 // dumpRec, rec-descent the trie.
 func (n *node[V]) dumpRec(w io.Writer, path [16]byte, depth int, is4 bool) {
+	// dump this node
 	n.dump(w, path, depth, is4)
 
-	// no heap allocs
-	allChildAddrs := n.children.AsSlice(make([]uint, 0, maxNodeChildren))
-
-	// the node may have childs, the rec-descent monster starts
-	for i, addr := range allChildAddrs {
+	// the node may have childs, rec-descent down
+	for i, addr := range n.children.All() {
 		octet := byte(addr)
 		path[depth] = octet
-		switch child := n.children.Items[i].(type) {
-		case *leaf[V]:
-			continue
-		case *node[V]:
+
+		if child, ok := n.children.Items[i].(*node[V]); ok {
 			child.dumpRec(w, path, depth+1, is4)
 		}
 	}
@@ -82,7 +78,7 @@ func (n *node[V]) dump(w io.Writer, path [16]byte, depth int, is4 bool) {
 
 	if nPfxCount := n.prefixes.Len(); nPfxCount != 0 {
 		// no heap allocs
-		allIndices := n.prefixes.AsSlice(make([]uint, 0, maxNodePrefixes))
+		allIndices := n.prefixes.All()
 
 		// print the baseIndices for this node.
 		fmt.Fprintf(w, "%sindexs(#%d): %v\n", indent, nPfxCount, allIndices)
@@ -113,7 +109,7 @@ func (n *node[V]) dump(w io.Writer, path [16]byte, depth int, is4 bool) {
 		leafAddrs := make([]uint, 0, maxNodeChildren)
 
 		// the node has recursive child nodes or path-compressed leaves
-		for i, addr := range n.children.AsSlice(make([]uint, 0, maxNodeChildren)) {
+		for i, addr := range n.children.All() {
 			switch n.children.Items[i].(type) {
 			case *node[V]:
 				nodeAddrs = append(nodeAddrs, addr)
@@ -240,7 +236,7 @@ func (n *node[V]) nodeStats() stats {
 	s.pfxs = n.prefixes.Len()
 	s.childs = n.children.Len()
 
-	for i := range n.children.AsSlice(make([]uint, 0, maxNodeChildren)) {
+	for i := range n.children.All() {
 		switch n.children.Items[i].(type) {
 		case *node[V]:
 			s.nodes++

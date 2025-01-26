@@ -168,9 +168,7 @@ func (n *node[V]) getKidsRec(parentIdx uint, path [16]byte, depth int, is4 bool)
 
 	var directKids []kid[V]
 
-	allIndices := n.prefixes.AsSlice(make([]uint, 0, maxNodePrefixes))
-
-	for _, idx := range allIndices {
+	for _, idx := range n.prefixes.All() {
 		// parent or self, handled alreday in an upper stack frame.
 		if idx <= parentIdx {
 			continue
@@ -198,9 +196,7 @@ func (n *node[V]) getKidsRec(parentIdx uint, path [16]byte, depth int, is4 bool)
 	}
 
 	// the node may have childs and leaves, the rec-descent monster starts
-
-	allChildAddrs := n.children.AsSlice(make([]uint, 0, maxNodeChildren))
-	for i, addr := range allChildAddrs {
+	for i, addr := range n.children.All() {
 		// do a longest-prefix-match
 		lpmIdx, _, _ := n.lpmGet(hostIndex(addr))
 		if lpmIdx == parentIdx {

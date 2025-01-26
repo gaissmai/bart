@@ -45,7 +45,7 @@ func TestNil(t *testing.T) {
 	b.AsSlice(nil)
 
 	b = BitSet(nil)
-	b.AppendTo(nil)
+	b.All()
 
 	b = BitSet(nil)
 	c := BitSet(nil)
@@ -100,7 +100,7 @@ func TestZeroValue(t *testing.T) {
 	b.AsSlice(nil)
 
 	b = BitSet{}
-	b.AppendTo(nil)
+	b.All()
 
 	b = BitSet{}
 	c := BitSet{}
@@ -383,7 +383,7 @@ func TestNextSet(t *testing.T) {
 	}
 }
 
-func TestAppendTo(t *testing.T) {
+func TestAll(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
 		name string
@@ -391,42 +391,36 @@ func TestAppendTo(t *testing.T) {
 		set []uint
 		del []uint
 		//
-		buf      []uint
 		wantData []uint
 	}{
 		{
 			name:     "null",
 			set:      []uint{},
 			del:      []uint{},
-			buf:      nil,
 			wantData: []uint{},
 		},
 		{
 			name:     "zero",
 			set:      []uint{0},
 			del:      []uint{},
-			buf:      nil,
 			wantData: []uint{0}, // bit #0 is set
 		},
 		{
 			name:     "1,5",
 			set:      []uint{1, 5},
 			del:      []uint{},
-			buf:      nil,
 			wantData: []uint{1, 5},
 		},
 		{
 			name:     "many",
 			set:      []uint{1, 65, 130, 190, 250, 300, 380, 420, 480, 511},
 			del:      []uint{},
-			buf:      nil,
 			wantData: []uint{1, 65, 130, 190, 250, 300, 380, 420, 480, 511},
 		},
 		{
 			name:     "special, last return",
 			set:      []uint{1},
 			del:      []uint{1}, // delete without compact
-			buf:      nil,
 			wantData: []uint{},
 		},
 	}
@@ -441,10 +435,10 @@ func TestAppendTo(t *testing.T) {
 			b = b.Clear(u) // without compact
 		}
 
-		buf := b.AppendTo(tc.buf)
+		buf := b.All()
 
 		if !slices.Equal(buf, tc.wantData) {
-			t.Errorf("AppendTo, %s: returned buf is not equal as expected:\ngot:  %v\nwant: %v",
+			t.Errorf("All, %s: returned buf is not equal as expected:\ngot:  %v\nwant: %v",
 				tc.name, buf, tc.wantData)
 		}
 	}

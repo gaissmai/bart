@@ -135,7 +135,7 @@ func (b BitSet) NextSet(i uint) (uint, bool) {
 // AsSlice returns all set bits as slice of uint without
 // heap allocations.
 //
-// This is faster than AppendTo, but also more dangerous,
+// This is faster than All, but also more dangerous,
 // it panics if the capacity of buf is < b.Size()
 func (b BitSet) AsSlice(buf []uint) []uint {
 	buf = buf[:cap(buf)] // len = cap
@@ -155,12 +155,15 @@ func (b BitSet) AsSlice(buf []uint) []uint {
 	return buf
 }
 
-// AppendTo appends all set bits to buf and returns the (maybe extended) buf.
-// If the capacity of buf is < b.Size() new memory is allocated.
-func (b BitSet) AppendTo(buf []uint) []uint {
+// All returns all set bits. This is simpler but slower than AsSlice.
+func (b BitSet) All() []uint {
+	buf := make([]uint, b.Size())
+
+	slot := 0
 	for idx, word := range b {
 		for word != 0 {
-			buf = append(buf, uint(idx<<6+bits.TrailingZeros64(word)))
+			buf[slot] = uint(idx<<6 + bits.TrailingZeros64(word))
+			slot++
 
 			// clear the rightmost set bit
 			word &= word - 1
