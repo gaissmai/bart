@@ -23,4 +23,5 @@
 # ...even if they are in subdirectories
 !*/
 
+!doc/*
 !testdata/*
