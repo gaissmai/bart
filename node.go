@@ -179,9 +179,12 @@ func (n *node[V]) purgeAndCompress(parentStack []*node[V], childPath []byte, is4
 // at this depth and returns (baseIdx, value, true) if a matching
 // longest prefix exists, or ok=false otherwise.
 //
-// backtracking is fast, it's just a bitset test and, if found, one popcount.
-// max steps in backtracking is the stride length.
+// The prefixes in the stride form a complete binary tree (CBT) using the baseIndex function.
+// In contrast to the ART algorithm, I do not use an allotment approach but map
+// the backtracking in the CBT by a bitset operation with a precalculated backtracking path
+// for the respective idx.
 func (n *node[V]) lpmGet(idx uint) (baseIdx uint, val V, ok bool) {
+	// top is the idx of the longest-prefix-match
 	if top, ok := n.prefixes.IntersectionTop(lpmLookupTbl[idx]); ok {
 		return top, n.prefixes.MustGet(top), true
 	}

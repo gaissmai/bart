@@ -2,17 +2,17 @@ package bart
 
 import "github.com/gaissmai/bart/internal/bitset"
 
-// lpmLookupTbl is the backtracking sequence as bitstring.
+// lpmLookupTbl is the backtracking sequence in the complete binary tree as bitstring.
 //
 //	for idx := 1; idx > 0; idx >>= 1 { b.Set(idx) }
 //
-// one shot bitset intersection algorithm:
+// allows a one shot bitset intersection algorithm:
 //
 //	func (n *node[V]) lpmTest(idx uint) bool {
 //		return n.prefixes.IntersectsAny(lpmLookupTbl[idx])
 //	}
 //
-// insted of a sequence of single bitset tests:
+// instead of a sequence of single bitset tests:
 //
 //	func (n *node[V]) lpmTest(idx uint) bool {
 //		for ; idx > 0; idx >>= 1 {
