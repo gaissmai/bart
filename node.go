@@ -36,12 +36,19 @@ var zeroPath [16]byte
 // The sparse child array recursively spans the trie with a branching factor of 256
 // and also records path-compressed leaves in the free node slots.
 type node[V any] struct {
-	// prefixes contains the routes as complete binary tree with payload V
+	// prefixes contains the routes indexed as a complete binary tree with payload V
+	// with the help of the baseIndex function from the ART algorithm.
 	prefixes sparse.Array[V]
 
 	// children, recursively spans the trie with a branching factor of 256
-	// the generic child with empty interface is a node (recursive) or
+	// the generic child as empty interface{} is a node (recursive) or
 	// a path compressed leaf (prefix and value).
+	//
+	// The empty interface{} is by intention instead of a e.g.
+	//   type noder interface { isLeaf() bool }
+	//
+	// The empty interface{} consumes less memory and type assertions are faster than
+	// indirect method calls e.g. node.isLeaf()
 	children sparse.Array[interface{}]
 }
 
