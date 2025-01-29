@@ -130,7 +130,7 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 
 			// create new node
 			// push the leaf down
-			// insert new child at cureent leaf position (addr)
+			// insert new child at current leaf position (addr)
 			// descend down, replace n with new child
 			c := new(node[V])
 			c.insertAtDepth(k.prefix, k.value, depth+1)
