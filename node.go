@@ -155,6 +155,73 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 	panic("unreachable")
 }
 
+// insertAtDepthPersist is the immutable version of insertAtDepth.
+// All visited nodes are cloned during insertion.
+func (n *node[V]) insertAtDepthPersist(pfx netip.Prefix, val V, depth int) (exists bool) {
+	ip := pfx.Addr()
+	bits := pfx.Bits()
+
+	lastIdx, lastBits := lastOctetIdxAndBits(bits)
+
+	octets := ipAsOctets(ip, ip.Is4())
+	octets = octets[:lastIdx+1]
+
+	// find the proper trie node to insert prefix
+	// start with prefix octet at depth
+	for ; depth < len(octets); depth++ {
+		// clone the insertion path
+		*n = *(n.cloneFlat())
+
+		octet := octets[depth]
+		addr := uint(octet)
+
+		// last significant octet: insert/override prefix/val into node
+		if depth == lastIdx {
+			return n.prefixes.InsertAt(pfxToIdx(octet, lastBits), val)
+		}
+
+		if !n.children.Test(addr) {
+			// insert prefix path compressed
+			return n.children.InsertAt(addr, &leaf[V]{pfx, val})
+		}
+
+		// get the child: node or leaf, but clone the path down
+		switch kid := n.children.MustGet(addr).(type) {
+		case *node[V]:
+			// descend down to next trie level
+			// clone the insertion path
+			kidCloned := kid.cloneFlat()
+
+			n.children.InsertAt(addr, kidCloned)
+
+			// proceed to next level
+			n = kidCloned
+			continue
+
+		case *leaf[V]:
+			// reached a path compressed prefix
+			// override value in slot if prefixes are equal
+			if kid.prefix == pfx {
+				// exists
+				n.children.InsertAt(addr, &leaf[V]{pfx, val})
+				return true
+			}
+
+			// create new node
+			// push the leaf down
+			// insert new child at current leaf position (addr)
+			// descend down, replace n with new child
+			newNode := new(node[V])
+			newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
+
+			n.children.InsertAt(addr, newNode)
+			n = newNode
+		}
+	}
+
+	panic("unreachable")
+}
+
 // purgeAndCompress, purge empty nodes or compress nodes with single prefix or leaf.
 func (n *node[V]) purgeAndCompress(parentStack []*node[V], childPath []uint8, is4 bool) {
 	// unwind the stack
@@ -255,6 +322,52 @@ func (n *node[V]) cloneRec() *node[V] {
 
 		default:
 			panic("logic error, wrong node type")
+		}
+	}
+
+	return c
+}
+
+// cloneFlat, clones the node NOT recursive.
+func (n *node[V]) cloneFlat() *node[V] {
+	var zero V
+	_, isCloner := any(zero).(Cloner[V])
+
+	if n == nil {
+		return nil
+	}
+
+	c := new(node[V])
+	if n.isEmpty() {
+		return c
+	}
+
+	// shallow
+	c.prefixes = *(n.prefixes.Copy())
+
+	// shallow
+	c.children = *(n.children.Copy())
+
+	// if V doesn't implement Cloner[V], return early
+	if !isCloner {
+		return c
+	}
+
+	// deep copy of values if V implements Cloner[V]
+
+	for i, val := range c.prefixes.Items {
+		// type assertion is safe, see above
+		val := any(val).(Cloner[V])
+		c.prefixes.Items[i] = val.Clone()
+	}
+
+	// cloneFlat,no recursion into node childs!
+	// deep copy of values in path compressed leaves
+	for i, k := range c.children.Items {
+		if k, ok := k.(*leaf[V]); ok {
+			// type assertion is safe, see above
+			val := any(k.value).(Cloner[V])
+			c.children.Items[i] = &leaf[V]{k.prefix, val.Clone()}
 		}
 	}
 

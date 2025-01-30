@@ -59,6 +59,18 @@ func TestInvalid(t *testing.T) {
 		tbl.Insert(zeroPfx, nil)
 	})
 
+	testname = "InsertPersist"
+	t.Run(testname, func(t *testing.T) {
+		t.Parallel()
+		defer func(testname string) {
+			if r := recover(); r != nil {
+				t.Fatalf("%s panics on invalid prefix input", testname)
+			}
+		}(testname)
+
+		_ = tbl.InsertPersist(zeroPfx, nil)
+	})
+
 	testname = "Delete"
 	t.Run(testname, func(t *testing.T) {
 		t.Parallel()
@@ -71,6 +83,18 @@ func TestInvalid(t *testing.T) {
 		tbl.Delete(zeroPfx)
 	})
 
+	testname = "DeletePersist"
+	t.Run(testname, func(t *testing.T) {
+		t.Parallel()
+		defer func(testname string) {
+			if r := recover(); r != nil {
+				t.Fatalf("%s panics on invalid prefix input", testname)
+			}
+		}(testname)
+
+		_ = tbl.DeletePersist(zeroPfx)
+	})
+
 	testname = "Update"
 	t.Run(testname, func(t *testing.T) {
 		t.Parallel()
@@ -80,7 +104,19 @@ func TestInvalid(t *testing.T) {
 			}
 		}(testname)
 
-		tbl.Update(zeroPfx, func(v any, _ bool) any { return v })
+		_ = tbl.Update(zeroPfx, func(v any, _ bool) any { return v })
+	})
+
+	testname = "UpdatePersist"
+	t.Run(testname, func(t *testing.T) {
+		t.Parallel()
+		defer func(testname string) {
+			if r := recover(); r != nil {
+				t.Fatalf("%s panics on invalid prefix input", testname)
+			}
+		}(testname)
+
+		_, _ = tbl.UpdatePersist(zeroPfx, func(v any, _ bool) any { return v })
 	})
 
 	testname = "Get"
@@ -92,7 +128,31 @@ func TestInvalid(t *testing.T) {
 			}
 		}(testname)
 
-		tbl.Get(zeroPfx)
+		_, _ = tbl.Get(zeroPfx)
+	})
+
+	testname = "GetAndDelete"
+	t.Run(testname, func(t *testing.T) {
+		t.Parallel()
+		defer func(testname string) {
+			if r := recover(); r != nil {
+				t.Fatalf("%s panics on invalid prefix input", testname)
+			}
+		}(testname)
+
+		_, _ = tbl.GetAndDelete(zeroPfx)
+	})
+
+	testname = "GetAndDeletePersist"
+	t.Run(testname, func(t *testing.T) {
+		t.Parallel()
+		defer func(testname string) {
+			if r := recover(); r != nil {
+				t.Fatalf("%s panics on invalid prefix input", testname)
+			}
+		}(testname)
+
+		_, _, _ = tbl.GetAndDeletePersist(zeroPfx)
 	})
 
 	testname = "LookupPrefix"
@@ -442,6 +502,304 @@ func TestInsert(t *testing.T) {
 	})
 }
 
+func TestInsertPersist(t *testing.T) {
+	t.Parallel()
+
+	tbl := new(Table[int])
+
+	// Create a new leaf strideTable, with compressed path
+	tbl = tbl.InsertPersist(mpp("192.168.0.1/32"), 1)
+	checkNumNodes(t, tbl, 1)
+	checkRoutes(t, tbl, []tableTest{
+		{"192.168.0.1", 1},
+		{"192.168.0.2", -1},
+		{"192.168.0.3", -1},
+		{"192.168.0.255", -1},
+		{"192.168.1.1", -1},
+		{"192.170.1.1", -1},
+		{"192.180.0.1", -1},
+		{"192.180.3.5", -1},
+		{"10.0.0.5", -1},
+		{"10.0.0.15", -1},
+	})
+
+	// explode path compressed
+	tbl = tbl.InsertPersist(mpp("192.168.0.2/32"), 2)
+	checkNumNodes(t, tbl, 4)
+	checkRoutes(t, tbl, []tableTest{
+		{"192.168.0.1", 1},
+		{"192.168.0.2", 2},
+		{"192.168.0.3", -1},
+		{"192.168.0.255", -1},
+		{"192.168.1.1", -1},
+		{"192.170.1.1", -1},
+		{"192.180.0.1", -1},
+		{"192.180.3.5", -1},
+		{"10.0.0.5", -1},
+		{"10.0.0.15", -1},
+	})
+
+	// Insert into existing leaf
+	tbl = tbl.InsertPersist(mpp("192.168.0.0/26"), 7)
+	checkNumNodes(t, tbl, 4)
+	checkRoutes(t, tbl, []tableTest{
+		{"192.168.0.1", 1},
+		{"192.168.0.2", 2},
+		{"192.168.0.3", 7},
+		{"192.168.0.255", -1},
+		{"192.168.1.1", -1},
+		{"192.170.1.1", -1},
+		{"192.180.0.1", -1},
+		{"192.180.3.5", -1},
+		{"10.0.0.5", -1},
+		{"10.0.0.15", -1},
+	})
+
+	// Create a different leaf at root
+	tbl = tbl.InsertPersist(mpp("10.0.0.0/27"), 3)
+	checkNumNodes(t, tbl, 4)
+	checkRoutes(t, tbl, []tableTest{
+		{"192.168.0.1", 1},
+		{"192.168.0.2", 2},
+		{"192.168.0.3", 7},
+		{"192.168.0.255", -1},
+		{"192.168.1.1", -1},
+		{"192.170.1.1", -1},
+		{"192.180.0.1", -1},
+		{"192.180.3.5", -1},
+		{"10.0.0.5", 3},
+		{"10.0.0.15", 3},
+	})
+
+	// Insert that creates a new path compressed leaf
+	tbl = tbl.InsertPersist(mpp("192.168.1.1/32"), 4)
+	checkNumNodes(t, tbl, 4)
+	checkRoutes(t, tbl, []tableTest{
+		{"192.168.0.1", 1},
+		{"192.168.0.2", 2},
+		{"192.168.0.3", 7},
+		{"192.168.0.255", -1},
+		{"192.168.1.1", 4},
+		{"192.170.1.1", -1},
+		{"192.180.0.1", -1},
+		{"192.180.3.5", -1},
+		{"10.0.0.5", 3},
+		{"10.0.0.15", 3},
+	})
+
+	// Insert that creates a new path compressed leaf
+	tbl = tbl.InsertPersist(mpp("192.170.0.0/16"), 5)
+	checkNumNodes(t, tbl, 4)
+	checkRoutes(t, tbl, []tableTest{
+		{"192.168.0.1", 1},
+		{"192.168.0.2", 2},
+		{"192.168.0.3", 7},
+		{"192.168.0.255", -1},
+		{"192.168.1.1", 4},
+		{"192.170.1.1", 5},
+		{"192.180.0.1", -1},
+		{"192.180.3.5", -1},
+		{"10.0.0.5", 3},
+		{"10.0.0.15", 3},
+	})
+
+	// New leaf in a different subtree, so the next insert can test a
+	// variant of decompression.
+	tbl = tbl.InsertPersist(mpp("192.180.0.1/32"), 8)
+	checkNumNodes(t, tbl, 4)
+	checkRoutes(t, tbl, []tableTest{
+		{"192.168.0.1", 1},
+		{"192.168.0.2", 2},
+		{"192.168.0.3", 7},
+		{"192.168.0.255", -1},
+		{"192.168.1.1", 4},
+		{"192.170.1.1", 5},
+		{"192.180.0.1", 8},
+		{"192.180.3.5", -1},
+		{"10.0.0.5", 3},
+		{"10.0.0.15", 3},
+	})
+
+	// Insert that explodes the previous path compression
+	tbl = tbl.InsertPersist(mpp("192.180.0.0/21"), 9)
+	checkNumNodes(t, tbl, 5)
+	checkRoutes(t, tbl, []tableTest{
+		{"192.168.0.1", 1},
+		{"192.168.0.2", 2},
+		{"192.168.0.3", 7},
+		{"192.168.0.255", -1},
+		{"192.168.1.1", 4},
+		{"192.170.1.1", 5},
+		{"192.180.0.1", 8},
+		{"192.180.3.5", 9},
+		{"10.0.0.5", 3},
+		{"10.0.0.15", 3},
+	})
+
+	// Insert a default route, those have their own codepath.
+	tbl = tbl.InsertPersist(mpp("0.0.0.0/0"), 6)
+	checkNumNodes(t, tbl, 5)
+	checkRoutes(t, tbl, []tableTest{
+		{"192.168.0.1", 1},
+		{"192.168.0.2", 2},
+		{"192.168.0.3", 7},
+		{"192.168.0.255", 6},
+		{"192.168.1.1", 4},
+		{"192.170.1.1", 5},
+		{"192.180.0.1", 8},
+		{"192.180.3.5", 9},
+		{"10.0.0.5", 3},
+		{"10.0.0.15", 3},
+	})
+
+	// Now all of the above again, but for IPv6.
+
+	// Create a new path compressed leaf
+	tbl = tbl.InsertPersist(mpp("ff:aaaa::1/128"), 1)
+	checkNumNodes(t, tbl, 6)
+	checkRoutes(t, tbl, []tableTest{
+		{"ff:aaaa::1", 1},
+		{"ff:aaaa::2", -1},
+		{"ff:aaaa::3", -1},
+		{"ff:aaaa::255", -1},
+		{"ff:aaaa:aaaa::1", -1},
+		{"ff:aaaa:aaaa:bbbb::1", -1},
+		{"ff:cccc::1", -1},
+		{"ff:cccc::ff", -1},
+		{"ffff:bbbb::5", -1},
+		{"ffff:bbbb::15", -1},
+	})
+
+	// Insert into previous leaf, explode v6 path compression
+	tbl = tbl.InsertPersist(mpp("ff:aaaa::2/128"), 2)
+	checkNumNodes(t, tbl, 21)
+	checkRoutes(t, tbl, []tableTest{
+		{"ff:aaaa::1", 1},
+		{"ff:aaaa::2", 2},
+		{"ff:aaaa::3", -1},
+		{"ff:aaaa::255", -1},
+		{"ff:aaaa:aaaa::1", -1},
+		{"ff:aaaa:aaaa:bbbb::1", -1},
+		{"ff:cccc::1", -1},
+		{"ff:cccc::ff", -1},
+		{"ffff:bbbb::5", -1},
+		{"ffff:bbbb::15", -1},
+	})
+
+	// Insert into previous node
+	tbl = tbl.InsertPersist(mpp("ff:aaaa::/125"), 7)
+	checkNumNodes(t, tbl, 21)
+	checkRoutes(t, tbl, []tableTest{
+		{"ff:aaaa::1", 1},
+		{"ff:aaaa::2", 2},
+		{"ff:aaaa::3", 7},
+		{"ff:aaaa::255", -1},
+		{"ff:aaaa:aaaa::1", -1},
+		{"ff:aaaa:aaaa:bbbb::1", -1},
+		{"ff:cccc::1", -1},
+		{"ff:cccc::ff", -1},
+		{"ffff:bbbb::5", -1},
+		{"ffff:bbbb::15", -1},
+	})
+
+	// Create a different leaf elsewhere
+	tbl = tbl.InsertPersist(mpp("ffff:bbbb::/120"), 3)
+	checkNumNodes(t, tbl, 21)
+	checkRoutes(t, tbl, []tableTest{
+		{"ff:aaaa::1", 1},
+		{"ff:aaaa::2", 2},
+		{"ff:aaaa::3", 7},
+		{"ff:aaaa::255", -1},
+		{"ff:aaaa:aaaa::1", -1},
+		{"ff:aaaa:aaaa:bbbb::1", -1},
+		{"ff:cccc::1", -1},
+		{"ff:cccc::ff", -1},
+		{"ffff:bbbb::5", 3},
+		{"ffff:bbbb::15", 3},
+	})
+
+	// Insert that creates a new path compressed leaf
+	tbl = tbl.InsertPersist(mpp("ff:aaaa:aaaa::1/128"), 4)
+	checkNumNodes(t, tbl, 21)
+	checkRoutes(t, tbl, []tableTest{
+		{"ff:aaaa::1", 1},
+		{"ff:aaaa::2", 2},
+		{"ff:aaaa::3", 7},
+		{"ff:aaaa::255", -1},
+		{"ff:aaaa:aaaa::1", 4},
+		{"ff:aaaa:aaaa:bbbb::1", -1},
+		{"ff:cccc::1", -1},
+		{"ff:cccc::ff", -1},
+		{"ffff:bbbb::5", 3},
+		{"ffff:bbbb::15", 3},
+	})
+
+	// Insert that creates a new path in tree
+	tbl = tbl.InsertPersist(mpp("ff:aaaa:aaaa:bb00::/56"), 5)
+	checkNumNodes(t, tbl, 23)
+	checkRoutes(t, tbl, []tableTest{
+		{"ff:aaaa::1", 1},
+		{"ff:aaaa::2", 2},
+		{"ff:aaaa::3", 7},
+		{"ff:aaaa::255", -1},
+		{"ff:aaaa:aaaa::1", 4},
+		{"ff:aaaa:aaaa:bbbb::1", 5},
+		{"ff:cccc::1", -1},
+		{"ff:cccc::ff", -1},
+		{"ffff:bbbb::5", 3},
+		{"ffff:bbbb::15", 3},
+	})
+
+	// New leaf in a different subtree, so the next insert can test a
+	// variant of decompression.
+	tbl = tbl.InsertPersist(mpp("ff:cccc::1/128"), 8)
+	checkNumNodes(t, tbl, 23)
+	checkRoutes(t, tbl, []tableTest{
+		{"ff:aaaa::1", 1},
+		{"ff:aaaa::2", 2},
+		{"ff:aaaa::3", 7},
+		{"ff:aaaa::255", -1},
+		{"ff:aaaa:aaaa::1", 4},
+		{"ff:aaaa:aaaa:bbbb::1", 5},
+		{"ff:cccc::1", 8},
+		{"ff:cccc::ff", -1},
+		{"ffff:bbbb::5", 3},
+		{"ffff:bbbb::15", 3},
+	})
+
+	// Insert that explodes a previous path compressed leaf
+	tbl = tbl.InsertPersist(mpp("ff:cccc::/37"), 9)
+	checkNumNodes(t, tbl, 25)
+	checkRoutes(t, tbl, []tableTest{
+		{"ff:aaaa::1", 1},
+		{"ff:aaaa::2", 2},
+		{"ff:aaaa::3", 7},
+		{"ff:aaaa::255", -1},
+		{"ff:aaaa:aaaa::1", 4},
+		{"ff:aaaa:aaaa:bbbb::1", 5},
+		{"ff:cccc::1", 8},
+		{"ff:cccc::ff", 9},
+		{"ffff:bbbb::5", 3},
+		{"ffff:bbbb::15", 3},
+	})
+
+	// Insert a default route, those have their own codepath.
+	tbl = tbl.InsertPersist(mpp("::/0"), 6)
+	checkNumNodes(t, tbl, 25)
+	checkRoutes(t, tbl, []tableTest{
+		{"ff:aaaa::1", 1},
+		{"ff:aaaa::2", 2},
+		{"ff:aaaa::3", 7},
+		{"ff:aaaa::255", 6},
+		{"ff:aaaa:aaaa::1", 4},
+		{"ff:aaaa:aaaa:bbbb::1", 5},
+		{"ff:cccc::1", 8},
+		{"ff:cccc::ff", 9},
+		{"ffff:bbbb::5", 3},
+		{"ffff:bbbb::15", 3},
+	})
+}
+
 func TestDelete(t *testing.T) {
 	t.Parallel()
 
@@ -650,6 +1008,218 @@ func TestDelete(t *testing.T) {
 		checkNumNodes(t, tbl, 1)
 
 		tbl.Delete(mpp("10.10.0.0/17"))
+		checkNumNodes(t, tbl, 0)
+	})
+}
+
+func TestDeletePersist(t *testing.T) {
+	t.Parallel()
+
+	t.Run("table_is_empty", func(t *testing.T) {
+		t.Parallel()
+		// must not panic
+		tbl := new(Table[int])
+		checkNumNodes(t, tbl, 0)
+		tbl = tbl.DeletePersist(randomPrefix())
+		checkNumNodes(t, tbl, 0)
+	})
+
+	t.Run("prefix_in_root", func(t *testing.T) {
+		t.Parallel()
+		// Add/remove prefix from root table.
+		tbl := new(Table[int])
+		checkNumNodes(t, tbl, 0)
+
+		tbl.Insert(mpp("10.0.0.0/8"), 1)
+		checkNumNodes(t, tbl, 1)
+		checkRoutes(t, tbl, []tableTest{
+			{"10.0.0.1", 1},
+			{"255.255.255.255", -1},
+		})
+		tbl = tbl.DeletePersist(mpp("10.0.0.0/8"))
+		checkNumNodes(t, tbl, 0)
+		checkRoutes(t, tbl, []tableTest{
+			{"10.0.0.1", -1},
+			{"255.255.255.255", -1},
+		})
+	})
+
+	t.Run("prefix_in_leaf", func(t *testing.T) {
+		t.Parallel()
+		// Create, then delete a single leaf table.
+		tbl := new(Table[int])
+		checkNumNodes(t, tbl, 0)
+
+		tbl.Insert(mpp("192.168.0.1/32"), 1)
+		checkNumNodes(t, tbl, 1)
+		checkRoutes(t, tbl, []tableTest{
+			{"192.168.0.1", 1},
+			{"255.255.255.255", -1},
+		})
+
+		tbl = tbl.DeletePersist(mpp("192.168.0.1/32"))
+		checkNumNodes(t, tbl, 0)
+		checkRoutes(t, tbl, []tableTest{
+			{"192.168.0.1", -1},
+			{"255.255.255.255", -1},
+		})
+	})
+
+	t.Run("intermediate_no_routes", func(t *testing.T) {
+		t.Parallel()
+		// Create an intermediate with 2 leaves, then delete one leaf.
+		tbl := new(Table[int])
+		checkNumNodes(t, tbl, 0)
+
+		tbl.Insert(mpp("192.168.0.1/32"), 1)
+		tbl.Insert(mpp("192.180.0.1/32"), 2)
+		checkNumNodes(t, tbl, 2)
+		checkRoutes(t, tbl, []tableTest{
+			{"192.168.0.1", 1},
+			{"192.180.0.1", 2},
+			{"192.40.0.1", -1},
+		})
+
+		tbl = tbl.DeletePersist(mpp("192.180.0.1/32"))
+		checkNumNodes(t, tbl, 1)
+		checkRoutes(t, tbl, []tableTest{
+			{"192.168.0.1", 1},
+			{"192.180.0.1", -1},
+			{"192.40.0.1", -1},
+		})
+	})
+
+	t.Run("intermediate_with_route", func(t *testing.T) {
+		t.Parallel()
+		// Same, but the intermediate carries a route as well.
+		tbl := new(Table[int])
+		checkNumNodes(t, tbl, 0)
+
+		tbl.Insert(mpp("192.168.0.1/32"), 1)
+		tbl.Insert(mpp("192.180.0.1/32"), 2)
+		tbl.Insert(mpp("192.0.0.0/10"), 3)
+
+		checkNumNodes(t, tbl, 2)
+		checkRoutes(t, tbl, []tableTest{
+			{"192.168.0.1", 1},
+			{"192.180.0.1", 2},
+			{"192.40.0.1", 3},
+			{"192.255.0.1", -1},
+		})
+
+		tbl = tbl.DeletePersist(mpp("192.180.0.1/32"))
+		checkNumNodes(t, tbl, 2)
+		checkRoutes(t, tbl, []tableTest{
+			{"192.168.0.1", 1},
+			{"192.180.0.1", -1},
+			{"192.40.0.1", 3},
+			{"192.255.0.1", -1},
+		})
+	})
+
+	t.Run("intermediate_many_leaves", func(t *testing.T) {
+		t.Parallel()
+		// Intermediate with 3 leaves, then delete one leaf.
+		tbl := new(Table[int])
+		checkNumNodes(t, tbl, 0)
+
+		tbl.Insert(mpp("192.168.0.1/32"), 1)
+		tbl.Insert(mpp("192.180.0.1/32"), 2)
+		tbl.Insert(mpp("192.200.0.1/32"), 3)
+
+		checkNumNodes(t, tbl, 2)
+		checkRoutes(t, tbl, []tableTest{
+			{"192.168.0.1", 1},
+			{"192.180.0.1", 2},
+			{"192.200.0.1", 3},
+			{"192.255.0.1", -1},
+		})
+
+		tbl = tbl.DeletePersist(mpp("192.180.0.1/32"))
+		checkNumNodes(t, tbl, 2)
+		checkRoutes(t, tbl, []tableTest{
+			{"192.168.0.1", 1},
+			{"192.180.0.1", -1},
+			{"192.200.0.1", 3},
+			{"192.255.0.1", -1},
+		})
+	})
+
+	t.Run("nosuchprefix_missing_child", func(t *testing.T) {
+		t.Parallel()
+		// Delete non-existent prefix
+		tbl := new(Table[int])
+		checkNumNodes(t, tbl, 0)
+
+		tbl.Insert(mpp("192.168.0.1/32"), 1)
+		checkNumNodes(t, tbl, 1)
+		checkRoutes(t, tbl, []tableTest{
+			{"192.168.0.1", 1},
+			{"192.255.0.1", -1},
+		})
+
+		tbl = tbl.DeletePersist(mpp("200.0.0.0/32"))
+		checkNumNodes(t, tbl, 1)
+		checkRoutes(t, tbl, []tableTest{
+			{"192.168.0.1", 1},
+			{"192.255.0.1", -1},
+		})
+	})
+
+	t.Run("intermediate_with_deleted_route", func(t *testing.T) {
+		t.Parallel()
+		// Intermediate node loses its last route and becomes
+		// compactable.
+		tbl := new(Table[int])
+		checkNumNodes(t, tbl, 0)
+
+		tbl.Insert(mpp("192.168.0.1/32"), 1)
+		tbl.Insert(mpp("192.168.0.0/22"), 2)
+		checkNumNodes(t, tbl, 3)
+		checkRoutes(t, tbl, []tableTest{
+			{"192.168.0.1", 1},
+			{"192.168.0.2", 2},
+			{"192.255.0.1", -1},
+		})
+
+		tbl = tbl.DeletePersist(mpp("192.168.0.0/22"))
+		checkNumNodes(t, tbl, 1)
+		checkRoutes(t, tbl, []tableTest{
+			{"192.168.0.1", 1},
+			{"192.168.0.2", -1},
+			{"192.255.0.1", -1},
+		})
+	})
+
+	t.Run("default_route", func(t *testing.T) {
+		t.Parallel()
+		tbl := new(Table[int])
+		checkNumNodes(t, tbl, 0)
+
+		tbl.Insert(mpp("0.0.0.0/0"), 1)
+		tbl.Insert(mpp("::/0"), 1)
+		tbl = tbl.DeletePersist(mpp("0.0.0.0/0"))
+
+		checkNumNodes(t, tbl, 1)
+		checkRoutes(t, tbl, []tableTest{
+			{"1.2.3.4", -1},
+			{"::1", 1},
+		})
+	})
+
+	t.Run("path compressed purge", func(t *testing.T) {
+		t.Parallel()
+		tbl := new(Table[int])
+		checkNumNodes(t, tbl, 0)
+
+		tbl.Insert(mpp("10.10.0.0/17"), 1)
+		tbl.Insert(mpp("10.20.0.0/17"), 2)
+		checkNumNodes(t, tbl, 2)
+
+		tbl = tbl.DeletePersist(mpp("10.20.0.0/17"))
+		checkNumNodes(t, tbl, 1)
+
+		tbl = tbl.DeletePersist(mpp("10.10.0.0/17"))
 		checkNumNodes(t, tbl, 0)
 	})
 }
@@ -912,6 +1482,55 @@ func TestInsertShuffled(t *testing.T) {
 	}
 }
 
+func TestInsertPersistShuffled(t *testing.T) {
+	// The order in which you insert prefixes into a route table
+	// should not matter, as long as you're inserting the same set of
+	// routes.
+	t.Parallel()
+
+	pfxs := randomPrefixes(1000)
+
+	for range 10 {
+		pfxs2 := append([]goldTableItem[int](nil), pfxs...)
+		rand.Shuffle(len(pfxs2), func(i, j int) { pfxs2[i], pfxs2[j] = pfxs2[j], pfxs2[i] })
+
+		addrs := make([]netip.Addr, 0, 10_000)
+		for range 10_000 {
+			addrs = append(addrs, randomAddr())
+		}
+
+		rt1 := new(Table[int])
+		rt2 := new(Table[int])
+
+		// rt1 is mutable
+		for _, pfx := range pfxs {
+			rt1.Insert(pfx.pfx, pfx.val)
+		}
+
+		// rt2 is persistent
+		for _, pfx := range pfxs2 {
+			rt2 = rt2.InsertPersist(pfx.pfx, pfx.val)
+		}
+
+		if rt1.String() != rt2.String() {
+			t.Fatal("mutable and immutable table have different string representation")
+		}
+
+		if rt1.dumpString() != rt2.dumpString() {
+			t.Fatal("mutable and immutable table have different dumpString representation")
+		}
+
+		for _, a := range addrs {
+			val1, ok1 := rt1.Lookup(a)
+			val2, ok2 := rt2.Lookup(a)
+
+			if !getsEqual(val1, ok1, val2, ok2) {
+				t.Fatalf("Lookup(%q) = (%v, %v), want (%v, %v)", a, val2, ok2, val1, ok1)
+			}
+		}
+	}
+}
+
 func TestDeleteCompare(t *testing.T) {
 	// Create large route tables repeatedly, delete half of their
 	// prefixes, and compare Table's behavior to a naive and slow but
@@ -1029,15 +1648,12 @@ func TestDeleteShuffled(t *testing.T) {
 			rt2.Delete(pfx.pfx)
 		}
 
-		// Diffing a deep tree of tables gives cmp.Diff a nervous breakdown, so
-		// test for equivalence statistically with random probes instead.
-		for range numProbes {
-			a := randomAddr()
-			val1, ok1 := rt1.Lookup(a)
-			val2, ok2 := rt2.Lookup(a)
-			if !getsEqual(val1, ok1, val2, ok2) {
-				t.Errorf("Lookup(%q) = (%v, %v), want (%v, %v)", a, val2, ok2, val1, ok1)
-			}
+		if rt1.String() != rt2.String() {
+			t.Fatal("shuffled table has different string representation")
+		}
+
+		if rt1.dumpString() != rt2.dumpString() {
+			t.Fatal("shuffled table has different dumpString representation")
 		}
 	}
 }
@@ -1229,6 +1845,44 @@ func TestUpdateCompare(t *testing.T) {
 
 		if !getsEqual(goldVal, goldOK, fastVal, fastOK) {
 			t.Fatalf("Get(%q) = (%v, %v), want (%v, %v)", pfx.pfx, fastVal, fastOK, goldVal, goldOK)
+		}
+	}
+}
+
+func TestUpdatePersistCompare(t *testing.T) {
+	pfxs := randomPrefixes(10_000)
+	immu := new(Table[int])
+	bart := new(Table[int])
+
+	// Update as insert
+	for _, pfx := range pfxs {
+		immu, _ = immu.UpdatePersist(pfx.pfx, func(int, bool) int { return pfx.val })
+		bart.Update(pfx.pfx, func(int, bool) int { return pfx.val })
+	}
+
+	for _, pfx := range pfxs {
+		immuVal, immuOK := immu.Get(pfx.pfx)
+		bartVal, bartOK := bart.Get(pfx.pfx)
+
+		if !getsEqual(bartVal, bartOK, immuVal, immuOK) {
+			t.Fatalf("Get(%q) = (%v, %v), want (%v, %v)", pfx.pfx, immuVal, immuOK, bartVal, bartOK)
+		}
+	}
+
+	cb := func(val int, _ bool) int { return val + 1 }
+
+	// Update as update
+	for _, pfx := range pfxs[:len(pfxs)/2] {
+		immu, _ = immu.UpdatePersist(pfx.pfx, cb)
+		bart.Update(pfx.pfx, cb)
+	}
+
+	for _, pfx := range pfxs {
+		bartVal, bartOK := bart.Get(pfx.pfx)
+		immuVal, immuOK := immu.Get(pfx.pfx)
+
+		if !getsEqual(bartVal, bartOK, immuVal, immuOK) {
+			t.Fatalf("Get(%q) = (%v, %v), want (%v, %v)", pfx.pfx, immuVal, immuOK, bartVal, bartOK)
 		}
 	}
 }
@@ -1585,6 +2239,66 @@ func TestCloneShallow(t *testing.T) {
 	}
 }
 
+func TestUpdatePersistDeep(t *testing.T) {
+	t.Parallel()
+
+	tbl := new(Table[*MyInt])
+	val1 := MyInt(1)
+	pfx := mpp("10.0.0.1/32")
+	tbl.Insert(pfx, &val1)
+
+	val2 := val1
+	immu, _ := tbl.UpdatePersist(pfx, func(*MyInt, bool) *MyInt { return &val2 })
+
+	want, _ := tbl.Get(pfx)
+	got, _ := immu.Get(pfx)
+
+	if *got != *want || got == want {
+		t.Errorf("value with Cloner interface, pointers must be different:\nvalues(%d, %d)\n(ptr(%v, %v)",
+			*got, *want, got, want)
+	}
+
+	// change val1, value after UpdatePersist must now be different
+	val1 = 2
+	want, _ = tbl.Get(pfx)
+	got, _ = immu.Get(pfx)
+
+	if *got == *want {
+		t.Errorf("memory aliasing after UpdatePersist, values must be different:\nvalues(%d, %d)", *got, *want)
+	}
+
+	pfxs := gimmeRandomPrefixes(100_000)
+	tbl = new(Table[*MyInt])
+	for i, pfx := range pfxs {
+		i := MyInt(i)
+		tbl.Insert(pfx, &i)
+	}
+	immu = tbl
+	for i, pfx := range pfxs {
+		// increment value by 1, no memory aliasing with tbl values
+		immu, _ = immu.UpdatePersist(pfx, func(oldVal *MyInt, ok bool) *MyInt {
+			if !ok {
+				t.Fatalf("UpdatePersist, expected old value at %d", i)
+			}
+			newVal := *oldVal + 1
+			return &newVal
+		})
+	}
+
+	for i, pfx := range pfxs {
+		got1, _ := tbl.Get(pfx)
+		got2, _ := immu.Get(pfx)
+
+		if int(*got1) != i {
+			t.Fatalf("UpdatePersist, want: %d, got: %d", i, *got1)
+		}
+
+		if int(*got2) != i+1 {
+			t.Fatalf("UpdatePersist, want: %d, got: %d", i+1, *got2)
+		}
+	}
+}
+
 func TestCloneDeep(t *testing.T) {
 	t.Parallel()
 
@@ -1823,7 +2537,7 @@ func BenchmarkTableInsertRandom(b *testing.B) {
 	for _, n := range []int{10_000, 100_000, 1_000_000, 2_000_000} {
 		randomPfxs := randomRealWorldPrefixes(n)
 
-		var rt Table[struct{}]
+		rt := new(Table[struct{}])
 
 		runtime.GC()
 		runtime.ReadMemStats(&startMem)
