@@ -93,14 +93,24 @@ The API has changed in ..., v0.10.1, v0.11.0, v0.12.0, v0.12.6, v0.16.0
     ready to use.
 
     The Table is safe for concurrent readers but not for concurrent readers
-    and/or writers.
+    and/or writers. Either the update operations must be protected by an
+    external lock mechanism or the various ...Persist functions must be used
+    which return a modified routing table by leaving the original unchanged
+
+    A Table must not be copied by value, see Table.Clone.
+
 
   func (t *Table[V]) Insert(pfx netip.Prefix, val V)
-  func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V)
   func (t *Table[V]) Delete(pfx netip.Prefix)
+  func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V)
+
+  func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V]
+  func (t *Table[V]) DeletePersist(pfx netip.Prefix) *Table[V]
+  func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (pt *Table[V], newVal V)
 
   func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool)
   func (t *Table[V]) GetAndDelete(pfx netip.Prefix) (val V, ok bool)
+  func (t *Table[V]) GetAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, ok bool)
 
   func (t *Table[V]) Union(o *Table[V])
   func (t *Table[V]) Clone() *Table[V]
