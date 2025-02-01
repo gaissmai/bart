@@ -88,9 +88,6 @@ func cloneOrCopyValue[V any](v V) V {
 // cloneLeaf returns a copy of the leaf.
 // If the value implements the Cloner interface, the values are deeply copied.
 func (l *leaf[V]) cloneLeaf() *leaf[V] {
-	if l == nil {
-		return nil
-	}
 	return &leaf[V]{l.prefix, cloneOrCopyValue(l.value)}
 }
 
@@ -219,6 +216,9 @@ func (n *node[V]) lpmTest(idx uint) bool {
 
 // cloneRec, clones the node recursive.
 func (n *node[V]) cloneRec() *node[V] {
+	var zero V
+	_, isCloner := any(zero).(Cloner[V])
+
 	if n == nil {
 		return nil
 	}
@@ -232,8 +232,11 @@ func (n *node[V]) cloneRec() *node[V] {
 	c.prefixes = *(n.prefixes.Copy())
 
 	// deep copy if V implements Cloner[V]
-	for i, v := range c.prefixes.Items {
-		c.prefixes.Items[i] = cloneOrCopyValue(v)
+	if isCloner {
+		for i, val := range c.prefixes.Items {
+			val := any(val).(Cloner[V])
+			c.prefixes.Items[i] = val.Clone()
+		}
 	}
 
 	// shallow
