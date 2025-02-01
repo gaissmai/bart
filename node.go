@@ -40,15 +40,27 @@ type node[V any] struct {
 	// with the help of the baseIndex function from the ART algorithm.
 	prefixes sparse.Array[V]
 
-	// children, recursively spans the trie with a branching factor of 256
-	// the generic child as empty interface{} is a node (recursive) or
+	// Sorry, here we have to use a mixture of generics and interfaces:
+	//
+	// children, recursively spans the trie with a branching factor of 256.
+	//
+	// Without path compression, the definition would naturally be:
+	//  children sparse.Array[*node[V]]
+	//
+	// ... but with path compression the child can now be a node (recursive) or
 	// a path compressed leaf (prefix and value).
 	//
-	// The empty interface{} is by intention instead of a e.g.
-	//   type noder interface { isLeaf() bool }
+	// With path compression we could define:
+	//   type noder[V any] interface {
+	//    	isLeaf[V]() bool
+	//    }
 	//
+	// and
+	//   children sparse.Array[noder[V]]
+	//
+	// But we use the empty interface{} instead, by intention!
 	// The empty interface{} consumes less memory and type assertions are faster than
-	// indirect method calls e.g. node.isLeaf()
+	// indirect method calls like node.isLeaf()
 	children sparse.Array[interface{}]
 }
 
