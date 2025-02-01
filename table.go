@@ -26,7 +26,9 @@ import (
 // The zero value is ready to use.
 //
 // The Table is safe for concurrent readers but not for concurrent readers
-// and/or writers.
+// and/or writers. Either the update operations must be protected by an
+// external lock mechanism or the various ...Persist functions must be used
+// which return a modified routing table by leaving the original unchanged
 //
 // A Table must not be copied by value, see [Table.Clone].
 type Table[V any] struct {
