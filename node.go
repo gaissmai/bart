@@ -179,30 +179,26 @@ func (n *node[V]) insertAtDepthPersist(pfx netip.Prefix, val V, depth int) (exis
 		}
 
 		if !n.children.Test(addr) {
-			// insert prefix path compressed
+			// insert new prefix path compressed
 			return n.children.InsertAt(addr, &leaf[V]{pfx, val})
 		}
 
 		// get the child: node or leaf, but clone the path down
 		switch kid := n.children.MustGet(addr).(type) {
 		case *node[V]:
-			// descend down to next trie level
-			// clone the insertion path
-			kidCloned := kid.copyNodeCloneVal()
-
-			n.children.InsertAt(addr, kidCloned)
-
 			// proceed to next level
-			n = kidCloned
-			continue
+			kid = kid.cloneFlat()
+			n.children.InsertAt(addr, kid)
+			n = kid
+			continue // descend down to next trie level
 
 		case *leaf[V]:
-			// reached a path compressed prefix
+			kid = kid.cloneLeaf()
+
 			// override value in slot if prefixes are equal
 			if kid.prefix == pfx {
 				// exists
-				n.children.InsertAt(addr, &leaf[V]{pfx, val})
-				return true
+				return n.children.InsertAt(addr, &leaf[V]{pfx, val})
 			}
 
 			// create new node
@@ -326,8 +322,9 @@ func (n *node[V]) cloneRec() *node[V] {
 	return c
 }
 
-// copyNodeCloneVal, copies the node and clone the vlaue if V implements Cloner
-func (n *node[V]) copyNodeCloneVal() *node[V] {
+// cloneFlat, copies the node and clone the values in prefixes and path compressed leaves
+// if V implements Cloner. Used in the various ...Persist functions.
+func (n *node[V]) cloneFlat() *node[V] {
 	if n == nil {
 		return nil
 	}
@@ -337,10 +334,8 @@ func (n *node[V]) copyNodeCloneVal() *node[V] {
 		return c
 	}
 
-	// shallow
+	// shallow copy
 	c.prefixes = *(n.prefixes.Copy())
-
-	// shallow
 	c.children = *(n.children.Copy())
 
 	if _, ok := any(*new(V)).(Cloner[V]); !ok {
@@ -348,21 +343,15 @@ func (n *node[V]) copyNodeCloneVal() *node[V] {
 		return c
 	}
 
-	// deep copy of values if V implements Cloner[V]
-
+	// deep copy of values in prefixes
 	for i, val := range c.prefixes.Items {
-		// type assertion is safe, see above
-		val := any(val).(Cloner[V])
-		c.prefixes.Items[i] = val.Clone()
+		c.prefixes.Items[i] = cloneOrCopy(val)
 	}
 
-	// clone flat, no recursion into node childs!
 	// deep copy of values in path compressed leaves
-	for i, k := range c.children.Items {
-		if k, ok := k.(*leaf[V]); ok {
-			// type assertion is safe, see above
-			val := any(k.value).(Cloner[V])
-			c.children.Items[i] = &leaf[V]{k.prefix, val.Clone()}
+	for i, kidAny := range c.children.Items {
+		if kidLeaf, ok := kidAny.(*leaf[V]); ok {
+			c.children.Items[i] = kidLeaf.cloneLeaf()
 		}
 	}
 

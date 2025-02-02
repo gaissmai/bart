@@ -14,7 +14,6 @@ import (
 	"math/rand"
 	"net/netip"
 	"reflect"
-	"runtime"
 	"testing"
 )
 
@@ -2273,6 +2272,7 @@ func TestUpdatePersistDeep(t *testing.T) {
 		i := MyInt(i)
 		tbl.Insert(pfx, &i)
 	}
+
 	immu = tbl
 	for i, pfx := range pfxs {
 		// increment value by 1, no memory aliasing with tbl values
@@ -2529,7 +2529,7 @@ func TestIpAsOctets(t *testing.T) {
 
 // ############ benchmarks ################################
 
-var benchRouteCount = []int{1, 2, 5, 10, 100, 1000, 10_000, 100_000, 1_000_000}
+var benchRouteCount = []int{1, 2, 5, 10, 100, 1000, 10_000, 100_000, 200_000}
 
 func BenchmarkTableInsertRandom(b *testing.B) {
 	var startMem, endMem runtime.MemStats
@@ -2537,25 +2537,40 @@ func BenchmarkTableInsertRandom(b *testing.B) {
 	for _, n := range []int{10_000, 100_000, 1_000_000, 2_000_000} {
 		randomPfxs := randomRealWorldPrefixes(n)
 
-		rt := new(Table[struct{}])
+		rt := new(Table[*MyInt])
+		for i, pfx := range randomPfxs {
+			myInt := MyInt(i)
+			rt.Insert(pfx, &myInt)
+		}
 
-		runtime.GC()
-		runtime.ReadMemStats(&startMem)
+		prt := rt
+
+		probe := randomPrefix()
+		myInt := MyInt(42)
+
 		b.ResetTimer()
-		b.Run(fmt.Sprintf("%d/plain", n), func(b *testing.B) {
+		b.Run(fmt.Sprintf("mutable into %d", n), func(b *testing.B) {
 			for range b.N {
-				for _, pfx := range randomPfxs {
-					rt.Insert(pfx, struct{}{})
-				}
+				rt.Insert(probe, &myInt)
 			}
-			runtime.GC()
-			runtime.ReadMemStats(&endMem)
 
 			s4 := rt.root4.nodeStatsRec()
 			s6 := rt.root6.nodeStatsRec()
 			stats := stats{s4.pfxs + s6.pfxs, s4.childs + s6.childs, s4.nodes + s6.nodes, s4.leaves + s6.leaves}
 
-			b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
+			b.ReportMetric(float64(rt.Size())/float64(stats.nodes), "Prefix/Node")
+		})
+
+		b.ResetTimer()
+		b.Run(fmt.Sprintf("persist into %d", n), func(b *testing.B) {
+			for range b.N {
+				_ = prt.InsertPersist(probe, &myInt)
+			}
+
+			s4 := rt.root4.nodeStatsRec()
+			s6 := rt.root6.nodeStatsRec()
+			stats := stats{s4.pfxs + s6.pfxs, s4.childs + s6.childs, s4.nodes + s6.nodes, s4.leaves + s6.leaves}
+
 			b.ReportMetric(float64(rt.Size())/float64(stats.nodes), "Prefix/Node")
 		})
 
@@ -2563,27 +2578,29 @@ func BenchmarkTableInsertRandom(b *testing.B) {
 }
 
 func BenchmarkTableDelete(b *testing.B) {
-	for _, fam := range []string{"ipv4", "ipv6"} {
-		rng := randomPrefixes4
-		if fam == "ipv6" {
-			rng = randomPrefixes6
+	for _, n := range benchRouteCount {
+		rt := new(Table[*MyInt])
+		for i, route := range randomPrefixes(n) {
+			myInt := MyInt(i)
+			rt.Insert(route.pfx, &myInt)
 		}
 
-		for _, nroutes := range benchRouteCount {
-			rt := new(Table[int])
-			for _, route := range rng(nroutes) {
-				rt.Insert(route.pfx, route.val)
+		prt := rt
+		probe := randomPrefix()
+
+		b.ResetTimer()
+		b.Run(fmt.Sprintf("mutable from_%d", n), func(b *testing.B) {
+			for range b.N {
+				rt.Delete(probe)
 			}
+		})
 
-			probe := rng(1)[0]
-
-			b.ResetTimer()
-			b.Run(fmt.Sprintf("%s/From_%d", fam, nroutes), func(b *testing.B) {
-				for range b.N {
-					rt.Delete(probe.pfx)
-				}
-			})
-		}
+		b.ResetTimer()
+		b.Run(fmt.Sprintf("persist from_%d", n), func(b *testing.B) {
+			for range b.N {
+				_ = prt.DeletePersist(probe)
+			}
+		})
 	}
 }
 

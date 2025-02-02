@@ -80,10 +80,13 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 // This is not a full [Table.Clone], all untouched nodes are still referenced
 // from both Tables.
 //
-// This is three orders of magnitude slower than Insert (μsec versus nsec).
+// If the payload V is a pointer or contains a pointer, it should
+// implement the cloner interface.
 //
-// The bulk load should be done with [Table.Insert] and use InsertPersist
-// for lock-free updates.
+// This is orders of magnitude slower than Insert (μsec versus nsec).
+//
+// The bulk table load should be done with [Table.Insert] and then you can
+// use InsertPersist, [Table.UpdatePersist] and [Table.DeletePersist] for lock-free updates.
 func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V] {
 	if !pfx.IsValid() {
 		return t
@@ -101,13 +104,13 @@ func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V] {
 
 	is4 := pfx.Addr().Is4()
 
-	modRoot := pt.rootNodeByVersion(is4)
+	n := pt.rootNodeByVersion(is4)
 
-	// clone the start of insertion path
-	*modRoot = *modRoot.copyNodeCloneVal()
+	// clone the root of insertion path
+	*n = *n.cloneFlat()
 
 	// clone nodes along the insertion path
-	if modRoot.insertAtDepthPersist(pfx, val, 0) {
+	if n.insertAtDepthPersist(pfx, val, 0) {
 		// prefix existed, no size increment
 		return pt
 	}
@@ -203,7 +206,10 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 // This is not a full [Table.Clone], all untouched nodes are still referenced
 // from both Tables.
 //
-// This is three orders of magnitude slower than Update (μsec versus nsec).
+// If the payload V is a pointer or contains a pointer, it should
+// implement the cloner interface.
+//
+// This is orders of magnitude slower than Update (μsec versus nsec).
 func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (pt *Table[V], newVal V) {
 	var zero V
 
@@ -228,8 +234,8 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 
 	n := pt.rootNodeByVersion(is4)
 
-	// clone the start of insertion path
-	*n = *(n.copyNodeCloneVal())
+	// clone the root of insertion path
+	*n = *(n.cloneFlat())
 
 	lastIdx, lastBits := lastOctetIdxAndBits(bits)
 
@@ -262,12 +268,15 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 		// get node or leaf for octet
 		switch kid := n.children.MustGet(addr).(type) {
 		case *node[V]:
-			kidCloned := kid.copyNodeCloneVal()
-			n.children.InsertAt(addr, kidCloned)
-			n = kidCloned
-			continue
+			// proceed to next level
+			kid = kid.cloneFlat()
+			n.children.InsertAt(addr, kid)
+			n = kid
+			continue // descend down to next trie level
 
 		case *leaf[V]:
+			kid = kid.cloneLeaf()
+
 			// update existing value if prefixes are equal
 			if kid.prefix == pfx {
 				newVal = cb(kid.value, true)
@@ -298,10 +307,10 @@ func (t *Table[V]) Delete(pfx netip.Prefix) {
 // DeletePersist is similar to Delete but the receiver isn't modified.
 // All nodes touched during delete are cloned and a new Table is returned.
 //
-// This is three orders of magnitude slower than Delete (μsec versus nsec).
+// This is orders of magnitude slower than Delete (μsec versus nsec).
 func (t *Table[V]) DeletePersist(pfx netip.Prefix) *Table[V] {
-	mod, _, _ := t.getAndDeletePersist(pfx)
-	return mod
+	pt, _, _ := t.getAndDeletePersist(pfx)
+	return pt
 }
 
 // GetAndDelete deletes the prefix and returns the associated payload for prefix and true,
@@ -313,7 +322,10 @@ func (t *Table[V]) GetAndDelete(pfx netip.Prefix) (val V, ok bool) {
 // GetAndDeletePersist is similar to GetAndDelete but the receiver isn't modified.
 // All nodes touched during delete are cloned and a new Table is returned.
 //
-// This is three orders of magnitude slower than GetAndDelete (μsec versus nsec).
+// If the payload V is a pointer or contains a pointer, it should
+// implement the cloner interface.
+//
+// This is orders of magnitude slower than GetAndDelete (μsec versus nsec).
 func (t *Table[V]) GetAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, ok bool) {
 	return t.getAndDeletePersist(pfx)
 }
@@ -415,8 +427,8 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, o
 
 	n := pt.rootNodeByVersion(is4)
 
-	// clone the start of insertion path
-	*n = *n.copyNodeCloneVal()
+	// clone the root of insertion path
+	*n = *n.cloneFlat()
 
 	lastIdx, lastBits := lastOctetIdxAndBits(bits)
 
@@ -436,8 +448,8 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, o
 		if depth == lastIdx {
 			val, ok = n.prefixes.DeleteAt(pfxToIdx(octet, lastBits))
 			if !ok {
-				// nothing to delete, no need to return mod table
-				return t, val, false
+				// nothing to delete
+				return pt, val, false
 			}
 
 			pt.sizeUpdate(is4, -1)
@@ -447,23 +459,26 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, o
 
 		addr := uint(octet)
 		if !n.children.Test(addr) {
-			// nothing to delete, no need to return mod table
-			return t, val, false
+			// nothing to delete
+			return pt, val, false
 		}
 
 		// get the child: node or leaf
 		switch kid := n.children.MustGet(addr).(type) {
 		case *node[V]:
-			kidCloned := kid.copyNodeCloneVal()
-			n.children.InsertAt(addr, kidCloned)
-			n = kidCloned
-			continue
+			// proceed to next level
+			kid = kid.cloneFlat()
+			n.children.InsertAt(addr, kid)
+			n = kid
+			continue // descend down to next trie level
 
 		case *leaf[V]:
+			kid = kid.cloneLeaf()
+
 			// reached a path compressed prefix, stop traversing
 			if kid.prefix != pfx {
-				// nothing to delete, no need to return mod table
-				return t, val, false
+				// nothing to delete
+				return pt, val, false
 			}
 
 			// prefix is equal leaf, delete leaf
@@ -472,6 +487,7 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, o
 			pt.sizeUpdate(is4, -1)
 			n.purgeAndCompress(stack[:depth], octets, is4)
 
+			// kid.value is cloned
 			return pt, kid.value, true
 		}
 	}
@@ -963,7 +979,7 @@ func (t *Table[V]) Union(o *Table[V]) {
 }
 
 // Cloner, if implemented by payload of type V the values are deeply copied
-// during [Table.Clone] and [Table.Union].
+// during [Table.UpdatePersist], [Table.DeletePersist], [Table.Clone] and [Table.Union].
 type Cloner[V any] interface {
 	Clone() V
 }
