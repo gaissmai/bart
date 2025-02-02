@@ -169,8 +169,6 @@ func (n *node[V]) insertAtDepthPersist(pfx netip.Prefix, val V, depth int) (exis
 	// find the proper trie node to insert prefix
 	// start with prefix octet at depth
 	for ; depth < len(octets); depth++ {
-		// clone the insertion path
-		*n = *(n.cloneFlat())
 
 		octet := octets[depth]
 		addr := uint(octet)
@@ -190,7 +188,7 @@ func (n *node[V]) insertAtDepthPersist(pfx netip.Prefix, val V, depth int) (exis
 		case *node[V]:
 			// descend down to next trie level
 			// clone the insertion path
-			kidCloned := kid.cloneFlat()
+			kidCloned := kid.copyNodeCloneVal()
 
 			n.children.InsertAt(addr, kidCloned)
 
@@ -328,11 +326,8 @@ func (n *node[V]) cloneRec() *node[V] {
 	return c
 }
 
-// cloneFlat, clones the node NOT recursive.
-func (n *node[V]) cloneFlat() *node[V] {
-	var zero V
-	_, isCloner := any(zero).(Cloner[V])
-
+// copyNodeCloneVal, copies the node and clone the vlaue if V implements Cloner
+func (n *node[V]) copyNodeCloneVal() *node[V] {
 	if n == nil {
 		return nil
 	}
@@ -348,8 +343,8 @@ func (n *node[V]) cloneFlat() *node[V] {
 	// shallow
 	c.children = *(n.children.Copy())
 
-	// if V doesn't implement Cloner[V], return early
-	if !isCloner {
+	if _, ok := any(*new(V)).(Cloner[V]); !ok {
+		// if V doesn't implement Cloner[V], return early
 		return c
 	}
 
@@ -361,7 +356,7 @@ func (n *node[V]) cloneFlat() *node[V] {
 		c.prefixes.Items[i] = val.Clone()
 	}
 
-	// cloneFlat,no recursion into node childs!
+	// clone flat, no recursion into node childs!
 	// deep copy of values in path compressed leaves
 	for i, k := range c.children.Items {
 		if k, ok := k.(*leaf[V]); ok {
