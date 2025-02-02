@@ -89,19 +89,22 @@ func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V] {
 		return t
 	}
 
-	pt := new(Table[V])
-
-	pt.root4 = t.root4
-	pt.root6 = t.root6
-
-	pt.size4 = t.size4
-	pt.size6 = t.size6
+	pt := &Table[V]{
+		root4: t.root4,
+		root6: t.root6,
+		size4: t.size4,
+		size6: t.size6,
+	}
 
 	// canonicalize prefix
 	pfx = pfx.Masked()
 
 	is4 := pfx.Addr().Is4()
+
 	modRoot := pt.rootNodeByVersion(is4)
+
+	// clone the start of insertion path
+	*modRoot = *modRoot.copyNodeCloneVal()
 
 	// clone nodes along the insertion path
 	if modRoot.insertAtDepthPersist(pfx, val, 0) {
@@ -216,15 +219,17 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 	is4 := ip.Is4()
 	bits := pfx.Bits()
 
-	pt = new(Table[V])
-
-	pt.root4 = t.root4
-	pt.root6 = t.root6
-
-	pt.size4 = t.size4
-	pt.size6 = t.size6
+	pt = &Table[V]{
+		root4: t.root4,
+		root6: t.root6,
+		size4: t.size4,
+		size6: t.size6,
+	}
 
 	n := pt.rootNodeByVersion(is4)
+
+	// clone the start of insertion path
+	*n = *(n.copyNodeCloneVal())
 
 	lastIdx, lastBits := lastOctetIdxAndBits(bits)
 
@@ -233,9 +238,6 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 
 	// find the proper trie node to update prefix
 	for depth, octet := range octets {
-		// clone the update path
-		*n = *(n.cloneFlat())
-
 		// last octet from prefix, update/insert prefix into node
 		if depth == lastIdx {
 			newVal, exists := n.prefixes.UpdateAt(pfxToIdx(octet, lastBits), cb)
@@ -260,7 +262,7 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 		// get node or leaf for octet
 		switch kid := n.children.MustGet(addr).(type) {
 		case *node[V]:
-			kidCloned := kid.cloneFlat()
+			kidCloned := kid.copyNodeCloneVal()
 			n.children.InsertAt(addr, kidCloned)
 			n = kidCloned
 			continue
@@ -404,15 +406,17 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, o
 	is4 := ip.Is4()
 	bits := pfx.Bits()
 
-	pt = new(Table[V])
-
-	pt.root4 = t.root4
-	pt.root6 = t.root6
-
-	pt.size4 = t.size4
-	pt.size6 = t.size6
+	pt = &Table[V]{
+		root4: t.root4,
+		root6: t.root6,
+		size4: t.size4,
+		size6: t.size6,
+	}
 
 	n := pt.rootNodeByVersion(is4)
+
+	// clone the start of insertion path
+	*n = *n.copyNodeCloneVal()
 
 	lastIdx, lastBits := lastOctetIdxAndBits(bits)
 
@@ -425,9 +429,6 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, o
 
 	// find the trie node
 	for depth, octet := range octets {
-		// clone the update path
-		*n = *(n.cloneFlat())
-
 		// push cloned node on stack for path recording
 		stack[depth] = n
 
@@ -453,7 +454,7 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, o
 		// get the child: node or leaf
 		switch kid := n.children.MustGet(addr).(type) {
 		case *node[V]:
-			kidCloned := kid.cloneFlat()
+			kidCloned := kid.copyNodeCloneVal()
 			n.children.InsertAt(addr, kidCloned)
 			n = kidCloned
 			continue
