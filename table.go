@@ -294,6 +294,9 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 
 			n.children.InsertAt(addr, newNode)
 			n = newNode
+
+		default:
+			panic("logic error, wrong node type")
 		}
 	}
 
@@ -490,6 +493,9 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, o
 
 			// kid.value is cloned
 			return pt, kid.value, true
+
+		default:
+			panic("logic error, wrong node type")
 		}
 	}
 
