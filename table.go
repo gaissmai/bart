@@ -19,6 +19,7 @@
 package bart
 
 import (
+	"iter"
 	"net/netip"
 )
 
@@ -144,7 +145,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 
 	lastIdx, lastBits := lastOctetIdxAndBits(bits)
 
-	octets := ipAsOctets(ip, is4)
+	octets := ip.AsSlice()
 	octets = octets[:lastIdx+1]
 
 	// find the proper trie node to update prefix
@@ -239,7 +240,7 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 
 	lastIdx, lastBits := lastOctetIdxAndBits(bits)
 
-	octets := ipAsOctets(ip, is4)
+	octets := ip.AsSlice()
 	octets = octets[:lastIdx+1]
 
 	// find the proper trie node to update prefix
@@ -347,7 +348,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 
 	lastIdx, lastBits := lastOctetIdxAndBits(bits)
 
-	octets := ipAsOctets(ip, is4)
+	octets := ip.AsSlice()
 	octets = octets[:lastIdx+1]
 
 	// record path to deleted node
@@ -432,7 +433,7 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, o
 
 	lastIdx, lastBits := lastOctetIdxAndBits(bits)
 
-	octets := ipAsOctets(ip, is4)
+	octets := ip.AsSlice()
 	octets = octets[:lastIdx+1]
 
 	// record path to deleted node
@@ -516,7 +517,7 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 
 	lastIdx, lastBits := lastOctetIdxAndBits(bits)
 
-	octets := ipAsOctets(ip, is4)
+	octets := ip.AsSlice()
 	octets = octets[:lastIdx+1]
 
 	// find the trie node
@@ -566,7 +567,7 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 	is4 := ip.Is4()
 	n := t.rootNodeByVersion(is4)
 
-	octets := ipAsOctets(ip, is4)
+	octets := ip.AsSlice()
 
 	for _, octet := range octets {
 		addr := uint(octet)
@@ -607,7 +608,7 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	is4 := ip.Is4()
 	n := t.rootNodeByVersion(is4)
 
-	octets := ipAsOctets(ip, is4)
+	octets := ip.AsSlice()
 
 	// stack of the traversed nodes for fast backtracking, if needed
 	stack := [maxTreeDepth]*node[V]{}
@@ -700,7 +701,7 @@ func (t *Table[V]) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpm netip.Pr
 
 	lastIdx, lastBits := lastOctetIdxAndBits(bits)
 
-	octets := ipAsOctets(ip, is4)
+	octets := ip.AsSlice()
 	octets = octets[:lastIdx+1]
 
 	// mask the last octet from IP
@@ -790,7 +791,7 @@ LOOP:
 
 // Supernets returns an iterator over all CIDRs covering pfx.
 // The iteration is in reverse CIDR sort order, from longest-prefix-match to shortest-prefix-match.
-func (t *Table[V]) Supernets(pfx netip.Prefix) func(yield func(netip.Prefix, V) bool) {
+func (t *Table[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
 		if !pfx.IsValid() {
 			return
@@ -808,7 +809,7 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) func(yield func(netip.Prefix, V) 
 
 		lastIdx, lastBits := lastOctetIdxAndBits(bits)
 
-		octets := ipAsOctets(ip, is4)
+		octets := ip.AsSlice()
 		octets = octets[:lastIdx+1]
 
 		// stack of the traversed nodes for reverse ordering of supernets
@@ -876,7 +877,7 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) func(yield func(netip.Prefix, V) 
 
 // Subnets returns an iterator over all CIDRs covered by pfx.
 // The iteration is in natural CIDR sort order.
-func (t *Table[V]) Subnets(pfx netip.Prefix) func(yield func(netip.Prefix, V) bool) {
+func (t *Table[V]) Subnets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
 		if !pfx.IsValid() {
 			return
@@ -894,7 +895,7 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) func(yield func(netip.Prefix, V) bo
 
 		lastIdx, lastBits := lastOctetIdxAndBits(bits)
 
-		octets := ipAsOctets(ip, is4)
+		octets := ip.AsSlice()
 		octets = octets[:lastIdx+1]
 
 		// find the trie node
@@ -1029,28 +1030,28 @@ func (t *Table[V]) Size6() int {
 // All returns an iterator over key-value pairs from Table. The iteration order
 // is not specified and is not guaranteed to be the same from one call to the
 // next.
-func (t *Table[V]) All() func(yield func(pfx netip.Prefix, val V) bool) {
+func (t *Table[V]) All() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
 		_ = t.root4.allRec(stridePath{}, 0, true, yield) && t.root6.allRec(stridePath{}, 0, false, yield)
 	}
 }
 
 // All4, like [Table.All] but only for the v4 routing table.
-func (t *Table[V]) All4() func(yield func(pfx netip.Prefix, val V) bool) {
+func (t *Table[V]) All4() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
 		_ = t.root4.allRec(stridePath{}, 0, true, yield)
 	}
 }
 
 // All6, like [Table.All] but only for the v6 routing table.
-func (t *Table[V]) All6() func(yield func(pfx netip.Prefix, val V) bool) {
+func (t *Table[V]) All6() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
 		_ = t.root6.allRec(stridePath{}, 0, false, yield)
 	}
 }
 
 // AllSorted returns an iterator over key-value pairs from Table2 in natural CIDR sort order.
-func (t *Table[V]) AllSorted() func(yield func(pfx netip.Prefix, val V) bool) {
+func (t *Table[V]) AllSorted() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
 		_ = t.root4.allRecSorted(stridePath{}, 0, true, yield) &&
 			t.root6.allRecSorted(stridePath{}, 0, false, yield)
@@ -1058,14 +1059,14 @@ func (t *Table[V]) AllSorted() func(yield func(pfx netip.Prefix, val V) bool) {
 }
 
 // AllSorted4, like [Table.AllSorted] but only for the v4 routing table.
-func (t *Table[V]) AllSorted4() func(yield func(pfx netip.Prefix, val V) bool) {
+func (t *Table[V]) AllSorted4() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
 		_ = t.root4.allRecSorted(stridePath{}, 0, true, yield)
 	}
 }
 
 // AllSorted6, like [Table.AllSorted] but only for the v6 routing table.
-func (t *Table[V]) AllSorted6() func(yield func(pfx netip.Prefix, val V) bool) {
+func (t *Table[V]) AllSorted6() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
 		_ = t.root6.allRecSorted(stridePath{}, 0, false, yield)
 	}

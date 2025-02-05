@@ -163,7 +163,7 @@ func (n *node[V]) insertAtDepthPersist(pfx netip.Prefix, val V, depth int) (exis
 
 	lastIdx, lastBits := lastOctetIdxAndBits(bits)
 
-	octets := ipAsOctets(ip, ip.Is4())
+	octets := ip.AsSlice()
 	octets = octets[:lastIdx+1]
 
 	// find the proper trie node to insert prefix
