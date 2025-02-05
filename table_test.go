@@ -2266,7 +2266,7 @@ func TestUpdatePersistDeep(t *testing.T) {
 		t.Errorf("memory aliasing after UpdatePersist, values must be different:\nvalues(%d, %d)", *got, *want)
 	}
 
-	pfxs := gimmeRandomPrefixes(100_000)
+	pfxs := randomRealWorldPrefixes(100_000)
 	tbl = new(Table[*MyInt])
 	for i, pfx := range pfxs {
 		i := MyInt(i)
@@ -2532,8 +2532,6 @@ func TestIpAsOctets(t *testing.T) {
 var benchRouteCount = []int{1, 2, 5, 10, 100, 1000, 10_000, 100_000, 200_000}
 
 func BenchmarkTableInsertRandom(b *testing.B) {
-	var startMem, endMem runtime.MemStats
-
 	for _, n := range []int{10_000, 100_000, 1_000_000, 2_000_000} {
 		randomPfxs := randomRealWorldPrefixes(n)
 
@@ -2713,24 +2711,15 @@ func BenchmarkTableOverlaps(b *testing.B) {
 				rt.Insert(route.pfx, route.val)
 			}
 
-			const (
-				intersectSize = 8
-				numIntersects = 1_000
-			)
-
-			intersects := make([]*Table[int], numIntersects)
-			for i := range intersects {
-				inter := new(Table[int])
-				for _, route := range rng(intersectSize) {
-					inter.Insert(route.pfx, route.val)
-				}
-				intersects[i] = inter
+			inter := new(Table[int])
+			for _, route := range rng(nroutes) {
+				inter.Insert(route.pfx, route.val)
 			}
 
 			b.ResetTimer()
-			b.Run(fmt.Sprintf("%s/%d_with_%d", fam, nroutes, intersectSize), func(b *testing.B) {
-				for i := range b.N {
-					boolSink = rt.Overlaps(intersects[i%numIntersects])
+			b.Run(fmt.Sprintf("%s/%d_with_%d", fam, nroutes, nroutes), func(b *testing.B) {
+				for range b.N {
+					boolSink = rt.Overlaps(inter)
 				}
 			})
 		}
