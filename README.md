@@ -81,7 +81,8 @@ func ExampleTable_Contains() {
 ```
 ## API
 
-The API has changed in ..., v0.10.1, v0.11.0, v0.12.0, v0.12.6, v0.16.0
+Release v0.18 requires at least go1.23 and we use the `iter.Seq2[netip.Prefix, V]` types for iterators.
+The lock-free versions of insert, update and delete are added, but still experimentell.
 
 ```golang
   import "github.com/gaissmai/bart"
@@ -98,7 +99,6 @@ The API has changed in ..., v0.10.1, v0.11.0, v0.12.0, v0.12.6, v0.16.0
     which return a modified routing table by leaving the original unchanged
 
     A Table must not be copied by value, see Table.Clone.
-
 
   func (t *Table[V]) Insert(pfx netip.Prefix, val V)
   func (t *Table[V]) Delete(pfx netip.Prefix)
@@ -126,18 +126,18 @@ The API has changed in ..., v0.10.1, v0.11.0, v0.12.0, v0.12.6, v0.16.0
   func (t *Table[V]) Overlaps4(o *Table[V]) bool
   func (t *Table[V]) Overlaps6(o *Table[V]) bool
 
-  func (t *Table[V]) Subnets(pfx netip.Prefix)   func(yield func(netip.Prefix, V) bool)
-  func (t *Table[V]) Supernets(pfx netip.Prefix) func(yield func(netip.Prefix, V) bool)
+  func (t *Table[V]) Subnets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V]
+  func (t *Table[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V]
 
-  func (t *Table[V]) All()  func(yield func(pfx netip.Prefix, val V) bool)
-  func (t *Table[V]) All4() func(yield func(pfx netip.Prefix, val V) bool)
-  func (t *Table[V]) All6() func(yield func(pfx netip.Prefix, val V) bool)
+  func (t *Table[V]) All() iter.Seq2[netip.Prefix, V]
+  func (t *Table[V]) All4() iter.Seq2[netip.Prefix, V]
+  func (t *Table[V]) All6() iter.Seq2[netip.Prefix, V]
 
-  func (t *Table[V]) AllSorted()  func(yield func(pfx netip.Prefix, val V) bool)
-  func (t *Table[V]) AllSorted4() func(yield func(pfx netip.Prefix, val V) bool)
-  func (t *Table[V]) AllSorted6() func(yield func(pfx netip.Prefix, val V) bool)
+  func (t *Table[V]) AllSorted() iter.Seq2[netip.Prefix, V]
+  func (t *Table[V]) AllSorted4() iter.Seq2[netip.Prefix, V]
+  func (t *Table[V]) AllSorted6() iter.Seq2[netip.Prefix, V]
 
-  func (t *Table[V]) Size()  int
+  func (t *Table[V]) Size() int
   func (t *Table[V]) Size4() int
   func (t *Table[V]) Size6() int
 

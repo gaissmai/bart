@@ -2520,7 +2520,7 @@ func TestIpAsOctets(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		got := ipAsOctets(tc.ip, tc.ip.Is4())
+		got := tc.ip.AsSlice()
 		if !reflect.DeepEqual(got, tc.want) {
 			t.Errorf("ipAsOctets, %s, got: %v, want: %v", tc.ip, got, tc.want)
 		}

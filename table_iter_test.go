@@ -1,5 +1,3 @@
-//go:build go1.23
-
 // Copyright (c) 2024 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
@@ -25,7 +23,7 @@ func TestAll4RangeOverFunc(t *testing.T) {
 			seen[item.pfx] = item.val
 		}
 
-		// rangefunc iterator
+		// range-func iterator
 		for pfx, val := range rtbl.All4() {
 			// check if pfx/val is as expected
 			if seen[pfx] != val {
@@ -76,7 +74,7 @@ func TestAll6RangeOverFunc(t *testing.T) {
 			seen[item.pfx] = item.val
 		}
 
-		// rangefunc iterator
+		// range-func iterator
 		for pfx, val := range rtbl.All6() {
 			// check if pfx/val is as expected
 			if seen[pfx] != val {
@@ -127,7 +125,7 @@ func TestAllRangeOverFunc(t *testing.T) {
 			seen[item.pfx] = item.val
 		}
 
-		// rangefunc iterator
+		// range-func iterator
 		for pfx, val := range rtbl.All() {
 			// check if pfx/val is as expected
 			if seen[pfx] != val {
@@ -178,7 +176,7 @@ func TestAll4SortedIter(t *testing.T) {
 			seen[item.pfx] = item.val
 		}
 
-		// rangefunc iterator
+		// range-func iterator
 		for pfx, val := range rtbl.AllSorted4() {
 			// check if pfx/val is as expected
 			if seen[pfx] != val {
@@ -229,7 +227,7 @@ func TestAll6SortedRangeOverFunc(t *testing.T) {
 			seen[item.pfx] = item.val
 		}
 
-		// rangefunc iterator
+		// range-func iterator
 		for pfx, val := range rtbl.AllSorted6() {
 			// check if pfx/val is as expected
 			if seen[pfx] != val {
@@ -280,7 +278,7 @@ func TestAllSortedRangeOverFunc(t *testing.T) {
 			seen[item.pfx] = item.val
 		}
 
-		// rangefunc iterator
+		// range-func iterator
 		for pfx, val := range rtbl.AllSorted() {
 			// check if pfx/val is as expected
 			if seen[pfx] != val {
