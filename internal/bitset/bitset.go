@@ -242,8 +242,10 @@ func (b *BitSet) InPlaceIntersection(c BitSet) {
 		return
 	}
 
-	// b < c, extend b to len(c)
-	*b = append(*b, make([]uint64, len(c)-len(*b))...)
+	// b < c
+	newset := make([]uint64, len(c))
+	copy(newset, *b)
+	*b = newset
 }
 
 // InPlaceUnion creates the destructive union of base set with compare set.
@@ -260,8 +262,10 @@ func (b *BitSet) InPlaceUnion(c BitSet) {
 		return
 	}
 
-	// b < c, extend b to len(c)
-	*b = append(*b, make([]uint64, len(c)-len(*b))...)
+	// b < c
+	newset := make([]uint64, len(c))
+	copy(newset, *b)
+	*b = newset
 
 	// bounds check eliminated
 	for i := 0; i < len(*b) && i < len(c); i++ {
