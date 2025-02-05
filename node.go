@@ -210,6 +210,9 @@ func (n *node[V]) insertAtDepthPersist(pfx netip.Prefix, val V, depth int) (exis
 
 			n.children.InsertAt(addr, newNode)
 			n = newNode
+
+		default:
+			panic("logic error, wrong node type")
 		}
 	}
 
