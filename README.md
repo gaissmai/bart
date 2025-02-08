@@ -151,24 +151,24 @@ Just a teaser, Contains and Lookups against the full Internet routing table with
 goos: linux
 goarch: amd64
 pkg: github.com/gaissmai/bart
-cpu: Intel(R) Core(TM) i5-7500T CPU @ 2.70GHz
-BenchmarkFullMatchV4/Contains    49814167        23.22  ns/op   0 B/op   0 allocs/op
-BenchmarkFullMatchV6/Contains    94662561        11.90  ns/op   0 B/op   0 allocs/op
-BenchmarkFullMissV4/Contains     46916434        24.32  ns/op   0 B/op   0 allocs/op
-BenchmarkFullMissV6/Contains     239470936        5.023 ns/op   0 B/op   0 allocs/op
+cpu: Intel(R) Core(TM) i5-8250U CPU @ 1.60GHz
+BenchmarkFullMatchV4/Contains           55906228        21.39  ns/op       0 B/op       0 allocs/op
+BenchmarkFullMatchV6/Contains           100000000       11.38  ns/op       0 B/op       0 allocs/op
+BenchmarkFullMissV4/Contains            52927538        22.69  ns/op       0 B/op       0 allocs/op
+BenchmarkFullMissV6/Contains            250386540        4.883 ns/op       0 B/op       0 allocs/op
 PASS
-ok  	github.com/gaissmai/bart	15.343s
+ok      github.com/gaissmai/bart    11.291s
 
 goos: linux
 goarch: amd64
 pkg: github.com/gaissmai/bart
-cpu: Intel(R) Core(TM) i5-7500T CPU @ 2.70GHz
-BenchmarkFullMatchV4/Lookup      52110546        22.65  ns/op   0 B/op   0 allocs/op
-BenchmarkFullMatchV6/Lookup      52083624        22.09  ns/op   0 B/op   0 allocs/op
-BenchmarkFullMissV4/Lookup       40740790        27.80  ns/op   0 B/op   0 allocs/op
-BenchmarkFullMissV6/Lookup       148526529        8.076 ns/op   0 B/op   0 allocs/op
+cpu: Intel(R) Core(TM) i5-8250U CPU @ 1.60GHz
+BenchmarkFullMatchV4/Lookup             53578766        21.77  ns/op       0 B/op       0 allocs/op
+BenchmarkFullMatchV6/Lookup             57054618        21.07  ns/op       0 B/op       0 allocs/op
+BenchmarkFullMissV4/Lookup              48289306        25.60  ns/op       0 B/op       0 allocs/op
+BenchmarkFullMissV6/Lookup              142917571        8.387 ns/op       0 B/op       0 allocs/op
 PASS
-ok  	github.com/gaissmai/bart	15.646s
+ok      github.com/gaissmai/bart    10.455s
 ```
 
 and Overlaps with randomly generated tables of different size:
