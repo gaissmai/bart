@@ -20,17 +20,17 @@ BART is a multibit-trie with fixed stride length of 8 bits,
 using the _baseIndex_ function from the ART algorithm to
 build the complete-binary-tree (CBT) of prefixes for each stride.
 
-| ![example 4bit stride](https://github.com/user-attachments/assets/3b9f22c1-cfcc-4e01-bb13-864713ce5ae8) |
-|:--:|
-| *example from artlookup.pdf for a 4bit stride* |
-
 The CBT is implemented as a bit-vector, backtracking is just
 a matter of fast cache friendly bitmask operations.
 
 The Table is implemented with popcount compressed sparse arrays
 together with path compression. This reduces storage consumption
 by almost two orders of magnitude in comparison to ART with
-similar lookup times for the longest prefix match.
+comparable or even better lookup times for longest prefix match.
+
+The algorithm is also excellent for determining whether two tables
+contain overlapping IP addresses.
+All this happens within nanoseconds without memory allocation.
 
 ## Example
 
