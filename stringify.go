@@ -20,7 +20,7 @@ type kid[V any] struct {
 	// for traversing
 	n     *node[V]
 	is4   bool
-	path  [16]byte
+	path  stridePath
 	depth int
 	idx   uint
 
@@ -102,7 +102,7 @@ func (t *Table[V]) fprint(w io.Writer, is4 bool) error {
 	startKid := kid[V]{
 		n:    nil,
 		idx:  0,
-		path: zeroPath,
+		path: stridePath{},
 		is4:  is4,
 	}
 
@@ -160,7 +160,7 @@ func (n *node[V]) fprintRec(w io.Writer, parent kid[V], pad string) error {
 //
 // See the  artlookup.pdf paper in the doc folder,
 // the baseIndex function is the key.
-func (n *node[V]) getKidsRec(parentIdx uint, path [16]byte, depth int, is4 bool) []kid[V] {
+func (n *node[V]) getKidsRec(parentIdx uint, path stridePath, depth int, is4 bool) []kid[V] {
 	// recursion stop condition
 	if n == nil {
 		return nil
@@ -238,7 +238,7 @@ func cmpPrefix(a, b netip.Prefix) int {
 }
 
 // cidrFromPath, get prefix back from byte path, depth, octet and pfxLen.
-func cidrFromPath(path [16]byte, depth int, is4 bool, idx uint) netip.Prefix {
+func cidrFromPath(path stridePath, depth int, is4 bool, idx uint) netip.Prefix {
 	octet, pfxLen := idxToPfx(idx)
 
 	// set masked byte in path at depth

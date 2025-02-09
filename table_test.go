@@ -1821,7 +1821,7 @@ func BenchmarkTableInsertRandom(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 
 	for _, n := range []int{10_000, 100_000, 1_000_000, 2_000_000} {
-		randomPfxs := gimmeRandomPrefixes(n)
+		randomPfxs := randomRealWorldPrefixes(n)
 
 		var rt Table[struct{}]
 

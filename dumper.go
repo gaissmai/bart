@@ -41,18 +41,18 @@ func (t *Table[V]) dump(w io.Writer) {
 	if t.size4 > 0 {
 		fmt.Fprintln(w)
 		fmt.Fprintf(w, "### IPv4: size(%d), nodes(%d)", t.size4, t.root4.nodeStatsRec().nodes)
-		t.root4.dumpRec(w, zeroPath, 0, true)
+		t.root4.dumpRec(w, stridePath{}, 0, true)
 	}
 
 	if t.size6 > 0 {
 		fmt.Fprintln(w)
 		fmt.Fprintf(w, "### IPv6: size(%d), nodes(%d)", t.size6, t.root6.nodeStatsRec().nodes)
-		t.root6.dumpRec(w, zeroPath, 0, false)
+		t.root6.dumpRec(w, stridePath{}, 0, false)
 	}
 }
 
 // dumpRec, rec-descent the trie.
-func (n *node[V]) dumpRec(w io.Writer, path [16]byte, depth int, is4 bool) {
+func (n *node[V]) dumpRec(w io.Writer, path stridePath, depth int, is4 bool) {
 	// dump this node
 	n.dump(w, path, depth, is4)
 
@@ -68,7 +68,7 @@ func (n *node[V]) dumpRec(w io.Writer, path [16]byte, depth int, is4 bool) {
 }
 
 // dump the node to w.
-func (n *node[V]) dump(w io.Writer, path [16]byte, depth int, is4 bool) {
+func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 	bits := depth * strideLen
 	indent := strings.Repeat(".", depth)
 
@@ -114,8 +114,12 @@ func (n *node[V]) dump(w io.Writer, path [16]byte, depth int, is4 bool) {
 			case *node[V]:
 				nodeAddrs = append(nodeAddrs, addr)
 				continue
+
 			case *leaf[V]:
 				leafAddrs = append(leafAddrs, addr)
+
+			default:
+				panic("logic error, wrong node type")
 			}
 		}
 
@@ -179,7 +183,7 @@ func octetFmt(octet byte, is4 bool) string {
 //
 //	127.0.0
 //	2001:0d
-func ipStridePath(path [16]byte, depth int, is4 bool) string {
+func ipStridePath(path stridePath, depth int, is4 bool) string {
 	buf := new(strings.Builder)
 
 	if is4 {
@@ -240,10 +244,15 @@ func (n *node[V]) nodeStats() stats {
 		switch n.children.Items[i].(type) {
 		case *node[V]:
 			s.nodes++
+
 		case *leaf[V]:
 			s.leaves++
+
+		default:
+			panic("logic error, wrong node type")
 		}
 	}
+
 	return s
 }
 
@@ -259,11 +268,11 @@ func (n *node[V]) nodeStatsRec() stats {
 	s.nodes = 1 // this node
 	s.leaves = 0
 
-	for _, c := range n.children.Items {
-		switch k := c.(type) {
+	for _, kidAny := range n.children.Items {
+		switch kid := kidAny.(type) {
 		case *node[V]:
 			// rec-descent
-			rs := k.nodeStatsRec()
+			rs := kid.nodeStatsRec()
 
 			s.pfxs += rs.pfxs
 			s.childs += rs.childs
@@ -272,6 +281,9 @@ func (n *node[V]) nodeStatsRec() stats {
 
 		case *leaf[V]:
 			s.leaves++
+
+		default:
+			panic("logic error, wrong node type")
 		}
 	}
 

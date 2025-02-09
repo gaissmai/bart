@@ -31,8 +31,8 @@ func (t *goldTable[V]) insert(pfx netip.Prefix, val V) {
 }
 
 func (t *goldTable[V]) insertMany(pfxs []goldTableItem[V]) *goldTable[V] {
-	cast := goldTable[V](pfxs)
-	t = &cast
+	conv := goldTable[V](pfxs)
+	t = &conv
 	return t
 }
 

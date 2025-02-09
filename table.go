@@ -121,26 +121,30 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 		}
 
 		// get node or leaf for octet
-		switch k := n.children.MustGet(addr).(type) {
+		switch kid := n.children.MustGet(addr).(type) {
 		case *node[V]:
-			n = k
-			continue
+			n = kid
+			continue // descend down to next trie level
+
 		case *leaf[V]:
 			// update existing value if prefixes are equal
-			if k.prefix == pfx {
-				k.value = cb(k.value, true)
-				return k.value
+			if kid.prefix == pfx {
+				kid.value = cb(kid.value, true)
+				return kid.value
 			}
 
 			// create new node
 			// push the leaf down
 			// insert new child at current leaf position (addr)
 			// descend down, replace n with new child
-			c := new(node[V])
-			c.insertAtDepth(k.prefix, k.value, depth+1)
+			newNode := new(node[V])
+			newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
 
-			n.children.InsertAt(addr, c)
-			n = c
+			n.children.InsertAt(addr, newNode)
+			n = newNode
+
+		default:
+			panic("logic error, wrong node type")
 		}
 	}
 
@@ -205,14 +209,14 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 		}
 
 		// get the child: node or leaf
-		switch k := n.children.MustGet(addr).(type) {
+		switch kid := n.children.MustGet(addr).(type) {
 		case *node[V]:
-			// descend down to next trie level
-			n = k
-			continue
+			n = kid
+			continue // descend down to next trie level
+
 		case *leaf[V]:
 			// reached a path compressed prefix, stop traversing
-			if k.prefix != pfx {
+			if kid.prefix != pfx {
 				return val, false
 			}
 
@@ -222,7 +226,10 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 			t.sizeUpdate(is4, -1)
 			n.purgeAndCompress(stack[:depth], octets, is4)
 
-			return k.value, true
+			return kid.value, true
+
+		default:
+			panic("logic error, wrong node type")
 		}
 	}
 
@@ -266,17 +273,20 @@ LOOP:
 		}
 
 		// get the child: node or leaf
-		switch k := n.children.MustGet(addr).(type) {
+		switch kid := n.children.MustGet(addr).(type) {
 		case *node[V]:
-			// descend down to next trie level
-			n = k
-			continue
+			n = kid
+			continue // descend down to next trie level
+
 		case *leaf[V]:
 			// reached a path compressed prefix, stop traversing
-			if k.prefix == pfx {
-				return k.value, true
+			if kid.prefix == pfx {
+				return kid.value, true
 			}
 			break LOOP
+
+		default:
+			panic("logic error, wrong node type")
 		}
 	}
 
@@ -312,12 +322,16 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 		}
 
 		// get node or leaf for octet
-		switch k := n.children.MustGet(addr).(type) {
+		switch kid := n.children.MustGet(addr).(type) {
 		case *node[V]:
-			n = k
-			continue
+			n = kid
+			continue // descend down to next trie level
+
 		case *leaf[V]:
-			return k.prefix.Contains(ip)
+			return kid.prefix.Contains(ip)
+
+		default:
+			panic("logic error, wrong node type")
 		}
 	}
 
@@ -359,17 +373,20 @@ LOOP:
 		}
 
 		// get the child: node or leaf
-		switch k := n.children.MustGet(addr).(type) {
+		switch kid := n.children.MustGet(addr).(type) {
 		case *node[V]:
-			// descend down to next trie level
-			n = k
-			continue
+			n = kid
+			continue // descend down to next trie level
+
 		case *leaf[V]:
 			// reached a path compressed prefix, stop traversing
-			if k.prefix.Contains(ip) {
-				return k.value, true
+			if kid.prefix.Contains(ip) {
+				return kid.value, true
 			}
 			break LOOP
+
+		default:
+			panic("logic error, wrong node type")
 		}
 	}
 
@@ -451,19 +468,22 @@ LOOP:
 		}
 
 		// get the child: node or leaf
-		switch k := n.children.MustGet(addr).(type) {
+		switch kid := n.children.MustGet(addr).(type) {
 		case *node[V]:
-			// descend down to next trie level
-			n = k
-			continue LOOP
+			n = kid
+			continue LOOP // descend down to next trie level
+
 		case *leaf[V]:
 			// reached a path compressed prefix, stop traversing
 			// must not be masked for Contains(pfx.Addr)
-			if k.prefix.Contains(ip) && k.prefix.Bits() <= bits {
-				return k.prefix, k.value, true
+			if kid.prefix.Contains(ip) && kid.prefix.Bits() <= bits {
+				return kid.prefix, kid.value, true
 			}
 
 			break LOOP
+
+		default:
+			panic("logic error, wrong node type")
 		}
 	}
 
@@ -551,19 +571,23 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) func(yield func(netip.Prefix, V) 
 				break LOOP
 			}
 
-			switch k := n.children.MustGet(addr).(type) {
+			switch kid := n.children.MustGet(addr).(type) {
 			case *node[V]:
-				n = k
-				continue LOOP
+				n = kid
+				continue LOOP // descend down to next trie level
+
 			case *leaf[V]:
-				if k.prefix.Overlaps(pfx) && k.prefix.Bits() <= pfx.Bits() {
-					if !yield(k.prefix, k.value) {
+				if kid.prefix.Overlaps(pfx) && kid.prefix.Bits() <= pfx.Bits() {
+					if !yield(kid.prefix, kid.value) {
 						// early exit
 						return
 					}
 				}
 				// end of trie along this octets path
 				break LOOP
+
+			default:
+				panic("logic error, wrong node type")
 			}
 		}
 
@@ -627,15 +651,19 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) func(yield func(netip.Prefix, V) bo
 			}
 
 			// node or leaf?
-			switch k := n.children.MustGet(addr).(type) {
+			switch kid := n.children.MustGet(addr).(type) {
 			case *node[V]:
-				n = k
-				continue
+				n = kid
+				continue // descend down to next trie level
+
 			case *leaf[V]:
-				if pfx.Overlaps(k.prefix) && pfx.Bits() <= k.prefix.Bits() {
-					_ = yield(k.prefix, k.value)
+				if pfx.Overlaps(kid.prefix) && pfx.Bits() <= kid.prefix.Bits() {
+					_ = yield(kid.prefix, kid.value)
 				}
 				return
+
+			default:
+				panic("logic error, wrong node type")
 			}
 		}
 	}
@@ -744,43 +772,43 @@ func (t *Table[V]) Size6() int {
 // next.
 func (t *Table[V]) All() func(yield func(pfx netip.Prefix, val V) bool) {
 	return func(yield func(netip.Prefix, V) bool) {
-		_ = t.root4.allRec(zeroPath, 0, true, yield) && t.root6.allRec(zeroPath, 0, false, yield)
+		_ = t.root4.allRec(stridePath{}, 0, true, yield) && t.root6.allRec(stridePath{}, 0, false, yield)
 	}
 }
 
 // All4, like [Table.All] but only for the v4 routing table.
 func (t *Table[V]) All4() func(yield func(pfx netip.Prefix, val V) bool) {
 	return func(yield func(netip.Prefix, V) bool) {
-		_ = t.root4.allRec(zeroPath, 0, true, yield)
+		_ = t.root4.allRec(stridePath{}, 0, true, yield)
 	}
 }
 
 // All6, like [Table.All] but only for the v6 routing table.
 func (t *Table[V]) All6() func(yield func(pfx netip.Prefix, val V) bool) {
 	return func(yield func(netip.Prefix, V) bool) {
-		_ = t.root6.allRec(zeroPath, 0, false, yield)
+		_ = t.root6.allRec(stridePath{}, 0, false, yield)
 	}
 }
 
 // AllSorted returns an iterator over key-value pairs from Table2 in natural CIDR sort order.
 func (t *Table[V]) AllSorted() func(yield func(pfx netip.Prefix, val V) bool) {
 	return func(yield func(netip.Prefix, V) bool) {
-		_ = t.root4.allRecSorted(zeroPath, 0, true, yield) &&
-			t.root6.allRecSorted(zeroPath, 0, false, yield)
+		_ = t.root4.allRecSorted(stridePath{}, 0, true, yield) &&
+			t.root6.allRecSorted(stridePath{}, 0, false, yield)
 	}
 }
 
 // AllSorted4, like [Table.AllSorted] but only for the v4 routing table.
 func (t *Table[V]) AllSorted4() func(yield func(pfx netip.Prefix, val V) bool) {
 	return func(yield func(netip.Prefix, V) bool) {
-		_ = t.root4.allRecSorted(zeroPath, 0, true, yield)
+		_ = t.root4.allRecSorted(stridePath{}, 0, true, yield)
 	}
 }
 
 // AllSorted6, like [Table.AllSorted] but only for the v6 routing table.
 func (t *Table[V]) AllSorted6() func(yield func(pfx netip.Prefix, val V) bool) {
 	return func(yield func(netip.Prefix, V) bool) {
-		_ = t.root6.allRecSorted(zeroPath, 0, false, yield)
+		_ = t.root6.allRecSorted(stridePath{}, 0, false, yield)
 	}
 }
 
@@ -816,3 +844,22 @@ func lastOctetIdxAndBits(bits int) (lastIdx, lastBits int) {
 
 	return
 }
+
+// noCopy may be added to structs which must not be copied
+// after the first use.
+//
+//	type My struct {
+//		_ noCopy
+//		A state
+//		b foo
+//	}
+//
+// See https://golang.org/issues/8005#issuecomment-190753527
+// for details.
+//
+// Note that it must not be embedded, due to the Lock and Unlock methods.
+type noCopy struct{}
+
+// Lock is a no-op used by -copylocks checker from `go vet`.
+func (*noCopy) Lock()   {}
+func (*noCopy) Unlock() {}
