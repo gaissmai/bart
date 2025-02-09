@@ -199,7 +199,7 @@ func (n *node[V]) overlapsSameChildren(o *node[V], depth int) bool {
 func overlapsTwoChilds[V any](nChild, oChild any, depth int) bool {
 	//  4 possible different combinations for n and o
 	//
-	//  node, node  --> overlapsRec, increment depth
+	//  node, node  --> overlapsRec
 	//  node, leaf  --> overlapsPrefixAtDepth
 	//  leaf, node  --> overlapsPrefixAtDepth
 	//  leaf, leaf  --> netip.Prefix.Overlaps
@@ -209,7 +209,7 @@ func overlapsTwoChilds[V any](nChild, oChild any, depth int) bool {
 	case *node[V]:
 		switch oKind := oChild.(type) {
 		case *node[V]: // node, node
-			return nKind.overlaps(oKind, depth+1)
+			return nKind.overlaps(oKind, depth)
 		case *leaf[V]: // node, leaf
 			return nKind.overlapsPrefixAtDepth(oKind.prefix, depth)
 		}
