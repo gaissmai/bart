@@ -30,7 +30,6 @@ comparable or even better lookup times for longest prefix match.
 
 The algorithm is also excellent for determining whether two tables
 contain overlapping IP addresses.
-All this happens within nanoseconds without memory allocation.
 
 ## Example
 
@@ -169,38 +168,6 @@ BenchmarkFullMissV4/Lookup              48289306        25.60  ns/op       0 B/o
 BenchmarkFullMissV6/Lookup              142917571        8.387 ns/op       0 B/op       0 allocs/op
 PASS
 ok      github.com/gaissmai/bart    10.455s
-```
-
-and Overlaps with randomly generated tables of different size:
-```
-goos: linux
-goarch: amd64
-pkg: github.com/gaissmai/bart
-cpu: Intel(R) Core(TM) i5-8250U CPU @ 1.60GHz
-BenchmarkFullTableOverlapsV4/With____1           9086344     123.5   ns/op    0 B/op    0 allocs/op
-BenchmarkFullTableOverlapsV4/With____2          68859405      17.27  ns/op    0 B/op    0 allocs/op
-BenchmarkFullTableOverlapsV4/With____4          68697332      17.29  ns/op    0 B/op    0 allocs/op
-BenchmarkFullTableOverlapsV4/With____8           6341209     189.8   ns/op    0 B/op    0 allocs/op
-BenchmarkFullTableOverlapsV4/With___16           5453186     221.0   ns/op    0 B/op    0 allocs/op
-BenchmarkFullTableOverlapsV4/With___32          58935297      20.47  ns/op    0 B/op    0 allocs/op
-BenchmarkFullTableOverlapsV4/With___64          43856942      27.76  ns/op    0 B/op    0 allocs/op
-BenchmarkFullTableOverlapsV4/With__128          42872038      27.63  ns/op    0 B/op    0 allocs/op
-BenchmarkFullTableOverlapsV4/With__256          42910443      27.62  ns/op    0 B/op    0 allocs/op
-BenchmarkFullTableOverlapsV4/With__512          126998767      9.362 ns/op    0 B/op    0 allocs/op
-BenchmarkFullTableOverlapsV4/With_1024          128460864      9.363 ns/op    0 B/op    0 allocs/op
-BenchmarkFullTableOverlapsV6/With____1          146886393      8.216 ns/op    0 B/op    0 allocs/op
-BenchmarkFullTableOverlapsV6/With____2          146285103      8.183 ns/op    0 B/op    0 allocs/op
-BenchmarkFullTableOverlapsV6/With____4          18488910      64.98  ns/op    0 B/op    0 allocs/op
-BenchmarkFullTableOverlapsV6/With____8          144183597      8.258 ns/op    0 B/op    0 allocs/op
-BenchmarkFullTableOverlapsV6/With___16          14775404      80.97  ns/op    0 B/op    0 allocs/op
-BenchmarkFullTableOverlapsV6/With___32          21450390      55.98  ns/op    0 B/op    0 allocs/op
-BenchmarkFullTableOverlapsV6/With___64          23702264      51.76  ns/op    0 B/op    0 allocs/op
-BenchmarkFullTableOverlapsV6/With__128          22386841      53.63  ns/op    0 B/op    0 allocs/op
-BenchmarkFullTableOverlapsV6/With__256          22390033      54.09  ns/op    0 B/op    0 allocs/op
-BenchmarkFullTableOverlapsV6/With__512          22338945      53.57  ns/op    0 B/op    0 allocs/op
-BenchmarkFullTableOverlapsV6/With_1024          22369528      53.67  ns/op    0 B/op    0 allocs/op
-PASS
-ok      github.com/gaissmai/bart    48.594s
 ```
 
 ## Compatibility Guarantees
