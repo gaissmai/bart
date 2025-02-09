@@ -17,7 +17,6 @@ const (
 	fullNode                         // prefixes and children or path-compressed prefixes
 	leafNode                         // no children, only prefixes or path-compressed prefixes
 	intermediateNode                 // only children, no prefix nor path-compressed prefixes
-	UNKNOWN                          // logic error
 )
 
 // ##################################################
