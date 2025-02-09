@@ -209,9 +209,9 @@ func overlapsTwoChilds[V any](nChild, oChild any, depth int) bool {
 	case *node[V]:
 		switch oKind := oChild.(type) {
 		case *node[V]: // node, node
-			return nKind.overlaps(oKind, depth+1) // node, node
+			return nKind.overlaps(oKind, depth+1)
 		case *leaf[V]: // node, leaf
-			return nKind.overlapsPrefixAtDepth(oKind.prefix, depth) // node, node
+			return nKind.overlapsPrefixAtDepth(oKind.prefix, depth)
 		}
 
 	case *leaf[V]:
@@ -221,6 +221,9 @@ func overlapsTwoChilds[V any](nChild, oChild any, depth int) bool {
 		case *leaf[V]: // leaf, leaf
 			return oKind.prefix.Overlaps(nKind.prefix)
 		}
+
+	default:
+		panic("logic error, wrong node type")
 	}
 
 	return false
@@ -234,19 +237,18 @@ func (n *node[V]) overlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
 	ip := pfx.Addr()
 	bits := pfx.Bits()
 
-	sigOctetIdx := (bits - 1) / strideLen
-	sigOctetBits := bits - (sigOctetIdx * strideLen)
+	lastIdx, lastBits := lastOctetIdxAndBits(bits)
 
-	octets := ipAsOctets(ip, ip.Is4())
-	octets = octets[:sigOctetIdx+1]
+	octets := ip.AsSlice()
+	octets = octets[:lastIdx+1]
 
 	for ; depth < len(octets); depth++ {
 		octet := octets[depth]
 		addr := uint(octet)
 
 		// full octet path in node trie, check overlap with last prefix octet
-		if depth == sigOctetIdx {
-			return n.overlapsIdx(octet, sigOctetBits)
+		if depth == lastIdx {
+			return n.overlapsIdx(pfxToIdx(octet, lastBits))
 		}
 
 		// test if any route overlaps prefix´ so far
@@ -260,22 +262,24 @@ func (n *node[V]) overlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
 		}
 
 		// next child, node or leaf
-		switch k := n.children.MustGet(addr).(type) {
+		switch kid := n.children.MustGet(addr).(type) {
 		case *node[V]:
-			n = k
+			n = kid
 			continue
 		case *leaf[V]:
-			return k.prefix.Overlaps(pfx)
+			return kid.prefix.Overlaps(pfx)
+
+		default:
+			panic("logic error, wrong node type")
 		}
 	}
 
-	panic("unreachable")
+	panic("unreachable: " + pfx.String())
 }
 
 // overlapsIdx returns true if node overlaps with prefix.
-func (n *node[V]) overlapsIdx(octet byte, pfxLen int) bool {
+func (n *node[V]) overlapsIdx(idx uint) bool {
 	// 1. Test if any route in this node overlaps prefix?
-	idx := pfxToIdx(octet, pfxLen)
 	if n.lpmTest(idx) {
 		return true
 	}

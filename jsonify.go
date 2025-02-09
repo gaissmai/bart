@@ -45,7 +45,7 @@ func (t *Table[V]) DumpList4() []DumpListNode[V] {
 	if t == nil {
 		return nil
 	}
-	return t.root4.dumpListRec(0, zeroPath, 0, true)
+	return t.root4.dumpListRec(0, stridePath{}, 0, true)
 }
 
 // DumpList6 dumps the ipv6 tree into a list of roots and their subnets.
@@ -54,10 +54,10 @@ func (t *Table[V]) DumpList6() []DumpListNode[V] {
 	if t == nil {
 		return nil
 	}
-	return t.root6.dumpListRec(0, zeroPath, 0, false)
+	return t.root6.dumpListRec(0, stridePath{}, 0, false)
 }
 
-func (n *node[V]) dumpListRec(parentIdx uint, path [16]byte, depth int, is4 bool) []DumpListNode[V] {
+func (n *node[V]) dumpListRec(parentIdx uint, path stridePath, depth int, is4 bool) []DumpListNode[V] {
 	// recursion stop condition
 	if n == nil {
 		return nil

@@ -252,17 +252,17 @@ func BenchmarkFullTableOverlapsV4(b *testing.B) {
 		rt.Insert(route.CIDR, i)
 	}
 
-	for i := 1; i <= 1024; i *= 2 {
-		inter := new(Table[int])
-		for j := 0; j <= i; j++ {
-			pfx := randomPrefix4()
-			inter.Insert(pfx, j)
+	for i := 1; i <= 1<<20; i *= 2 {
+		rt2 := new(Table[int])
+		for j, pfx := range randomRealWorldPrefixes4(i) {
+			rt2.Insert(pfx, j)
 		}
+		b.Log(rt2.String())
 
 		b.Run(fmt.Sprintf("With_%4d", i), func(b *testing.B) {
 			b.ResetTimer()
 			for range b.N {
-				boolSink = rt.Overlaps(inter)
+				boolSink = rt.Overlaps(rt2)
 			}
 		})
 	}
@@ -275,17 +275,17 @@ func BenchmarkFullTableOverlapsV6(b *testing.B) {
 		rt.Insert(route.CIDR, i)
 	}
 
-	for i := 1; i <= 1024; i *= 2 {
-		inter := new(Table[int])
-		for j := 0; j <= i; j++ {
-			pfx := randomPrefix6()
-			inter.Insert(pfx, j)
+	for i := 1; i <= 1<<20; i *= 2 {
+		rt2 := new(Table[int])
+		for j, pfx := range randomRealWorldPrefixes6(i) {
+			rt2.Insert(pfx, j)
 		}
+		b.Log(rt2.String())
 
 		b.Run(fmt.Sprintf("With_%4d", i), func(b *testing.B) {
 			b.ResetTimer()
 			for range b.N {
-				boolSink = rt.Overlaps(inter)
+				boolSink = rt.Overlaps(rt2)
 			}
 		})
 	}
@@ -298,7 +298,7 @@ func BenchmarkFullTableOverlapsPrefix(b *testing.B) {
 		rt.Insert(route.CIDR, i)
 	}
 
-	pfx := randomPrefix()
+	pfx := randomRealWorldPrefixes(1)[0]
 
 	b.ResetTimer()
 	for range b.N {
@@ -466,16 +466,28 @@ func fillRouteTables() {
 
 // #########################################################
 
-func gimmeRandomPrefixes4(n int) []netip.Prefix {
+func randomRealWorldPrefixes4(n int) []netip.Prefix {
 	set := map[netip.Prefix]netip.Prefix{}
 	pfxs := make([]netip.Prefix, 0, n)
 
 	for {
 		pfx := randomPrefix4()
+
+		// skip too small or too big masks
+		if pfx.Bits() < 8 && pfx.Bits() > 28 {
+			continue
+		}
+
+		// skip multicast ...
+		if pfx.Overlaps(mpp("240.0.0.0/8")) {
+			continue
+		}
+
 		if _, ok := set[pfx]; !ok {
 			set[pfx] = pfx
 			pfxs = append(pfxs, pfx)
 		}
+
 		if len(set) >= n {
 			break
 		}
@@ -483,12 +495,26 @@ func gimmeRandomPrefixes4(n int) []netip.Prefix {
 	return pfxs
 }
 
-func gimmeRandomPrefixes6(n int) []netip.Prefix {
+func randomRealWorldPrefixes6(n int) []netip.Prefix {
 	set := map[netip.Prefix]netip.Prefix{}
 	pfxs := make([]netip.Prefix, 0, n)
 
 	for {
 		pfx := randomPrefix6()
+
+		// skip too small or too big masks
+		if pfx.Bits() < 16 || pfx.Bits() > 56 {
+			continue
+		}
+
+		// skip non global routes seen in the real world
+		if !pfx.Overlaps(mpp("2000::/3")) {
+			continue
+		}
+		if pfx.Addr().Compare(mpp("2c0f::/16").Addr()) == 1 {
+			continue
+		}
+
 		if _, ok := set[pfx]; !ok {
 			set[pfx] = pfx
 			pfxs = append(pfxs, pfx)
@@ -500,10 +526,10 @@ func gimmeRandomPrefixes6(n int) []netip.Prefix {
 	return pfxs
 }
 
-func gimmeRandomPrefixes(n int) []netip.Prefix {
+func randomRealWorldPrefixes(n int) []netip.Prefix {
 	pfxs := make([]netip.Prefix, 0, n)
-	pfxs = append(pfxs, gimmeRandomPrefixes4(n/2)...)
-	pfxs = append(pfxs, gimmeRandomPrefixes6(n-len(pfxs))...)
+	pfxs = append(pfxs, randomRealWorldPrefixes4(n/2)...)
+	pfxs = append(pfxs, randomRealWorldPrefixes6(n-len(pfxs))...)
 
 	prng.Shuffle(n, func(i, j int) {
 		pfxs[i], pfxs[j] = pfxs[j], pfxs[i]

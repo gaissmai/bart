@@ -18,8 +18,8 @@ type goldStrideItem[V any] struct {
 }
 
 func (t *goldStrideTbl[V]) insertMany(strides []goldStrideItem[V]) *goldStrideTbl[V] {
-	cast := goldStrideTbl[V](strides)
-	t = &cast
+	conv := goldStrideTbl[V](strides)
+	t = &conv
 	return t
 }
 

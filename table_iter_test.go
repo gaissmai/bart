@@ -366,7 +366,7 @@ func TestSupernetsEdgeCase(t *testing.T) {
 func TestSupernetsCompare(t *testing.T) {
 	t.Parallel()
 
-	pfxs := gimmeRandomPrefixes(10_000)
+	pfxs := randomRealWorldPrefixes(10_000)
 
 	fast := new(Table[int])
 	gold := new(goldTable[int])
@@ -437,10 +437,10 @@ func TestSubnets(t *testing.T) {
 		want6 := 105_555
 
 		rtbl := new(Table[int])
-		for i, pfx := range gimmeRandomPrefixes4(want4) {
+		for i, pfx := range randomRealWorldPrefixes4(want4) {
 			rtbl.Insert(pfx, i)
 		}
-		for i, pfx := range gimmeRandomPrefixes6(want6) {
+		for i, pfx := range randomRealWorldPrefixes6(want6) {
 			rtbl.Insert(pfx, i)
 		}
 
@@ -470,7 +470,7 @@ func TestSubnets(t *testing.T) {
 func TestSubnetsCompare(t *testing.T) {
 	t.Parallel()
 
-	pfxs := gimmeRandomPrefixes(10_000)
+	pfxs := randomRealWorldPrefixes(10_000)
 
 	fast := new(Table[int])
 	gold := new(goldTable[int])
@@ -514,7 +514,7 @@ func BenchmarkSubnets(b *testing.B) {
 	n := 1_000_000
 
 	rtbl := new(Table[int])
-	for i, pfx := range gimmeRandomPrefixes(n) {
+	for i, pfx := range randomRealWorldPrefixes(n) {
 		rtbl.Insert(pfx, i)
 	}
 
@@ -533,7 +533,7 @@ func BenchmarkSupernets(b *testing.B) {
 	n := 1_000_000
 
 	rtbl := new(Table[int])
-	for i, pfx := range gimmeRandomPrefixes(n) {
+	for i, pfx := range randomRealWorldPrefixes(n) {
 		rtbl.Insert(pfx, i)
 	}
 

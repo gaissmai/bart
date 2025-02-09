@@ -62,7 +62,7 @@ func TestSupernetsEdgeCaseCB(t *testing.T) {
 func TestSupernetsCompareCB(t *testing.T) {
 	t.Parallel()
 
-	pfxs := gimmeRandomPrefixes(10_000)
+	pfxs := randomRealWorldPrefixes(10_000)
 
 	fast := new(Table[int])
 	gold := new(goldTable[int])
@@ -75,7 +75,7 @@ func TestSupernetsCompareCB(t *testing.T) {
 	tests := randomPrefixes(200)
 	for _, tt := range tests {
 		gotGold := gold.supernets(tt.pfx)
-		gotFast := []netip.Prefix{}
+		var gotFast []netip.Prefix
 
 		fast.Supernets(tt.pfx)(func(p netip.Prefix, _ int) bool {
 			gotFast = append(gotFast, p)
@@ -137,10 +137,10 @@ func TestSubnetsCB(t *testing.T) {
 		want6 := 105_555
 
 		rtbl := new(Table[int])
-		for i, pfx := range gimmeRandomPrefixes4(want4) {
+		for i, pfx := range randomRealWorldPrefixes4(want4) {
 			rtbl.Insert(pfx, i)
 		}
-		for i, pfx := range gimmeRandomPrefixes6(want6) {
+		for i, pfx := range randomRealWorldPrefixes6(want6) {
 			rtbl.Insert(pfx, i)
 		}
 
@@ -172,7 +172,7 @@ func TestSubnetsCB(t *testing.T) {
 func TestSubnetsCompareCB(t *testing.T) {
 	t.Parallel()
 
-	pfxs := gimmeRandomPrefixes(10_000)
+	pfxs := randomRealWorldPrefixes(10_000)
 
 	fast := new(Table[int])
 	gold := new(goldTable[int])
@@ -380,7 +380,7 @@ func BenchmarkSubnetsCB(b *testing.B) {
 	n := 1_000_000
 
 	rtbl := new(Table[int])
-	for i, pfx := range gimmeRandomPrefixes(n) {
+	for i, pfx := range randomRealWorldPrefixes(n) {
 		rtbl.Insert(pfx, i)
 	}
 
@@ -399,7 +399,7 @@ func BenchmarkSupernetsCB(b *testing.B) {
 	n := 1_000_000
 
 	rtbl := new(Table[int])
-	for i, pfx := range gimmeRandomPrefixes(n) {
+	for i, pfx := range randomRealWorldPrefixes(n) {
 		rtbl.Insert(pfx, i)
 	}
 

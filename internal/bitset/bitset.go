@@ -15,7 +15,7 @@
 //	can inline BitSet.Set with cost 60
 //	can inline BitSet.Test with cost 26
 //	can inline BitSet.Clear with cost 24
-//	can inline BitSet.Clone with cost 20
+//	can inline BitSet.Clone with cost 7
 //	can inline BitSet.Compact with cost 35
 //	can inline BitSet.FirstSet with cost 25
 //	can inline BitSet.NextSet with cost 71
@@ -94,12 +94,7 @@ func (b BitSet) Test(i uint) (ok bool) {
 
 // Clone this BitSet, returning a new BitSet that has the same bits set.
 func (b BitSet) Clone() BitSet {
-	if b == nil {
-		return nil
-	}
-	c := BitSet(make([]uint64, len(b), cap(b)))
-	copy(c, b)
-	return c
+	return append(b[:0:0], b...)
 }
 
 // Compact, preserve all set bits, while minimizing memory usage.

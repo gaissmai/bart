@@ -88,16 +88,9 @@ func (s *Array[T]) Copy() *Array[T] {
 		return nil
 	}
 
-	var items []T
-
-	if s.Items != nil {
-		items = make([]T, len(s.Items), cap(s.Items))
-		copy(items, s.Items) // shallow
-	}
-
 	return &Array[T]{
-		s.BitSet.Clone(),
-		items,
+		BitSet: s.BitSet.Clone(),
+		Items:  append(s.Items[:0:0], s.Items...),
 	}
 }
 
