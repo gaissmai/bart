@@ -12,9 +12,10 @@
 //
 // All functions can be inlined!
 //
-//	can inline BitSet.Set with cost 60
-//	can inline BitSet.Test with cost 26
+//	can inline BitSet.Set with cost 63
 //	can inline BitSet.Clear with cost 24
+//	can inline BitSet.Test with cost 26
+//	can inline BitSet.Rank0 with cost 66
 //	can inline BitSet.Clone with cost 7
 //	can inline BitSet.Compact with cost 35
 //	can inline BitSet.FirstSet with cost 25
@@ -24,9 +25,8 @@
 //	can inline BitSet.IntersectsAny with cost 42
 //	can inline BitSet.IntersectionTop with cost 56
 //	can inline BitSet.IntersectionCardinality with cost 35
-//	can inline BitSet.InPlaceIntersection with cost 71
-//	can inline BitSet.InPlaceUnion with cost 77
-//	can inline BitSet.Rank0 with cost 66
+//	can inline (*BitSet).InPlaceIntersection with cost 71
+//	can inline (*BitSet).InPlaceUnion with cost 77
 //	can inline BitSet.Size with cost 16
 //	can inline popcount with cost 12
 //	can inline popcountAnd with cost 30
@@ -68,7 +68,11 @@ func (b BitSet) Set(i uint) BitSet {
 		case cap(b) >= words:
 			b = b[:words]
 		default:
-			b = append(b, make([]uint64, words-len(b))...)
+			// be exact, don't use append!
+			// max 512 prefixes/node (8*uint64), and a cache line has 64 Bytes
+			newset := make([]uint64, words)
+			copy(newset, b)
+			b = newset
 		}
 	}
 
