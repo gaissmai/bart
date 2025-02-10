@@ -692,7 +692,7 @@ func TestRank0(t *testing.T) {
 func TestPopcntSlice(t *testing.T) {
 	t.Parallel()
 	s := []uint64{2, 3, 5, 7, 11, 13, 17, 19, 23, 29}
-	res := uint64(popcount(s))
+	res := uint64(popcntSlice(s))
 	const l uint64 = 27
 	if res != l {
 		t.Errorf("Wrong popcount %d != %d", res, l)
@@ -703,7 +703,7 @@ func TestPopcntAndSlice(t *testing.T) {
 	t.Parallel()
 	s := []uint64{2, 3, 5, 7, 11, 13, 17, 19, 23, 29}
 	m := []uint64{31, 37, 41, 43, 47, 53, 59, 61, 67, 71}
-	res := uint64(popcountAnd(s, m))
+	res := uint64(popcntAnd(s, m))
 	const l uint64 = 18
 	if res != l {
 		t.Errorf("Wrong And %d !=  %d", res, l)

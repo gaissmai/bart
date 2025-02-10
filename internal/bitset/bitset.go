@@ -221,7 +221,7 @@ func (b BitSet) IntersectionTop(c BitSet) (top uint, ok bool) {
 
 // IntersectionCardinality computes the popcount of the intersection.
 func (b BitSet) IntersectionCardinality(c BitSet) int {
-	return popcountAnd(b, c)
+	return popcntAnd(b, c)
 }
 
 // InPlaceIntersection overwrites and computes the intersection of
@@ -275,10 +275,10 @@ func (b *BitSet) InPlaceUnion(c BitSet) {
 
 // Size (number of set bits).
 func (b BitSet) Size() int {
-	return popcount(b)
+	return popcntSlice(b)
 }
 
-// Rank0 is equal to popcount() - 1
+// Rank0 is equal to Rank(i) - 1
 //
 // With inlined popcount to make Rank0 itself inlineable.
 func (b BitSet) Rank0(i uint) (rnk int) {
@@ -291,12 +291,12 @@ func (b BitSet) Rank0(i uint) (rnk int) {
 			rnk += bits.OnesCount64(x)
 		}
 	} else {
-		// inlined popcount, partial slice
+		// inlined popcount, partial slice ...
 		for _, x := range b[:wordIdx] {
 			rnk += bits.OnesCount64(x)
 		}
 
-		// plus partial word?
+		// ... plus partial word?
 		if bitsIdx := i & 63; bitsIdx != 0 {
 			rnk += bits.OnesCount64(b[wordIdx] << (64 - bitsIdx))
 		}
@@ -307,8 +307,8 @@ func (b BitSet) Rank0(i uint) (rnk int) {
 	return rnk - 1
 }
 
-// popcount
-func popcount(s []uint64) (cnt int) {
+// popcntSlice
+func popcntSlice(s []uint64) (cnt int) {
 	for _, x := range s {
 		// count all the bits set in slice.
 		cnt += bits.OnesCount64(x)
@@ -316,8 +316,8 @@ func popcount(s []uint64) (cnt int) {
 	return
 }
 
-// popcountAnd
-func popcountAnd(s, m []uint64) (cnt int) {
+// popcntAnd
+func popcntAnd(s, m []uint64) (cnt int) {
 	for j := 0; j < len(s) && j < len(m); j++ {
 		// words are bitwise & followed by popcount.
 		cnt += bits.OnesCount64(s[j] & m[j])
