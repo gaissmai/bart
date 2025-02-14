@@ -156,5 +156,5 @@ func (s *Array[T]) deleteItem(i int) {
 	copy(s.Items[i:], s.Items[i+1:]) // overwrite item at [i]
 
 	s.Items[nl] = zero     // clear the tail item
-	s.Items = s.Items[:nl] // new len, keep cap is unchanged
+	s.Items = s.Items[:nl] // new len, cap is unchanged
 }
