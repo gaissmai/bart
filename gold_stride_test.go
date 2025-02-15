@@ -5,6 +5,8 @@ package bart
 
 import (
 	"math/rand"
+
+	"github.com/gaissmai/bart/internal/art"
 )
 
 // goldStrideTbl, is an 8-bit slow routing table, implemented as a slice
@@ -86,7 +88,7 @@ func pfxMask(pfxLen int) byte {
 func allStridePfxs() []goldStrideItem[int] {
 	ret := make([]goldStrideItem[int], 0, maxNodePrefixes-1)
 	for idx := 1; idx < maxNodePrefixes; idx++ {
-		octet, bits := idxToPfx(uint(idx))
+		octet, bits := art.IdxToPfx(uint(idx))
 		ret = append(ret, goldStrideItem[int]{octet, bits, idx})
 	}
 	return ret

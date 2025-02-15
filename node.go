@@ -7,6 +7,8 @@ import (
 	"net/netip"
 	"slices"
 
+	"github.com/gaissmai/bart/internal/art"
+	"github.com/gaissmai/bart/internal/lpmbt"
 	"github.com/gaissmai/bart/internal/sparse"
 )
 
@@ -114,7 +116,7 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 
 		// last significant octet: insert/override prefix/val into node
 		if depth == lastIdx {
-			return n.prefixes.InsertAt(pfxToIdx(octet, lastBits), val)
+			return n.prefixes.InsertAt(art.PfxToIdx(octet, lastBits), val)
 		}
 
 		if !n.children.Test(addr) {
@@ -175,7 +177,7 @@ func (n *node[V]) insertAtDepthPersist(pfx netip.Prefix, val V, depth int) (exis
 
 		// last significant octet: insert/override prefix/val into node
 		if depth == lastIdx {
-			return n.prefixes.InsertAt(pfxToIdx(octet, lastBits), val)
+			return n.prefixes.InsertAt(art.PfxToIdx(octet, lastBits), val)
 		}
 
 		if !n.children.Test(addr) {
@@ -268,7 +270,7 @@ func (n *node[V]) purgeAndCompress(parentStack []*node[V], childPath []uint8, is
 // for the respective idx.
 func (n *node[V]) lpmGet(idx uint) (baseIdx uint, val V, ok bool) {
 	// top is the idx of the longest-prefix-match
-	if top, ok := n.prefixes.IntersectionTop(lpmLookupTbl[idx]); ok {
+	if top, ok := n.prefixes.IntersectionTop(lpmbt.LookupTbl[idx]); ok {
 		return top, n.prefixes.MustGet(top), true
 	}
 
@@ -278,7 +280,7 @@ func (n *node[V]) lpmGet(idx uint) (baseIdx uint, val V, ok bool) {
 
 // lpmTest for faster lpm tests without value returns.
 func (n *node[V]) lpmTest(idx uint) bool {
-	return n.prefixes.IntersectsAny(lpmLookupTbl[idx])
+	return n.prefixes.IntersectsAny(lpmbt.LookupTbl[idx])
 }
 
 // cloneRec, clones the node recursive.
@@ -424,7 +426,7 @@ func (n *node[V]) allRecSorted(path stridePath, depth int, is4 bool, yield func(
 
 	// yield indices and childs in CIDR sort order
 	for _, pfxIdx := range allIndices {
-		pfxOctet, _ := idxToPfx(pfxIdx)
+		pfxOctet, _ := art.IdxToPfx(pfxIdx)
 
 		// yield all childs before idx
 		for j := childCursor; j < len(allChildAddrs); j++ {
@@ -607,7 +609,7 @@ func (n *node[V]) eachLookupPrefix(octets []byte, depth int, is4 bool, pfxLen in
 	copy(path[:], octets)
 
 	// backtracking the CBT
-	for idx := pfxToIdx(octets[depth], pfxLen); idx > 0; idx >>= 1 {
+	for idx := art.PfxToIdx(octets[depth], pfxLen); idx > 0; idx >>= 1 {
 		if n.prefixes.Test(idx) {
 			val := n.prefixes.MustGet(idx)
 			cidr := cidrFromPath(path, depth, is4, idx)
@@ -634,7 +636,7 @@ func (n *node[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxLen int, yie
 
 	allCoveredIndices := make([]uint, 0, maxNodePrefixes)
 	for _, idx := range n.prefixes.All() {
-		thisOctet, thisPfxLen := idxToPfx(idx)
+		thisOctet, thisPfxLen := art.IdxToPfx(idx)
 
 		thisFirstAddr := uint(thisOctet)
 		thisLastAddr := uint(thisOctet | ^netMask(thisPfxLen))
@@ -662,7 +664,7 @@ func (n *node[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxLen int, yie
 
 	// yield indices and childs in CIDR sort order
 	for _, pfxIdx := range allCoveredIndices {
-		pfxOctet, _ := idxToPfx(pfxIdx)
+		pfxOctet, _ := art.IdxToPfx(pfxIdx)
 
 		// yield all childs before idx
 		for j := addrCursor; j < len(allCoveredChildAddrs); j++ {
@@ -722,4 +724,26 @@ func (n *node[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxLen int, yie
 	}
 
 	return true
+}
+
+// cmpIndexRank, sort indexes in prefix sort order.
+func cmpIndexRank(aIdx, bIdx uint) int {
+	// convert idx to prefix
+	aOctet, aBits := art.IdxToPfx(aIdx)
+	bOctet, bBits := art.IdxToPfx(bIdx)
+
+	// cmp the prefixes, first by address and then by bits
+	if aOctet == bOctet {
+		if aBits <= bBits {
+			return -1
+		}
+
+		return 1
+	}
+
+	if aOctet < bOctet {
+		return -1
+	}
+
+	return 1
 }

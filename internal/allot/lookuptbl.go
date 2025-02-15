@@ -1,11 +1,11 @@
 // Copyright (c) 2024 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
-package bart
+package allot
 
 import "github.com/gaissmai/bart/internal/bitset"
 
-// allotLookupTbl, as precalculated bitsets,
+// LookupTbl, as precalculated bitsets,
 // map the baseIndex to bitset with precomputed complete binary tree.
 //
 //	  // 1 <= idx <= 511
@@ -22,7 +22,7 @@ import "github.com/gaissmai/bart/internal/bitset"
 // range loops in table overlaps methods.
 //
 // Please read the ART paper ./doc/artlookup.pdf to understand the allotment algorithm.
-var allotLookupTbl = [512]bitset.BitSet{
+var LookupTbl = [512]bitset.BitSet{
 	/* idx:   0 */ {}, // idx is invalid
 	/* idx:   1 */ {0xfffffffffffffffe, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff},
 	/* idx:   2 */ {0xffff00ff0f34, 0xffffffff, 0xffffffffffffffff, 0x0, 0xffffffffffffffff, 0xffffffffffffffff},

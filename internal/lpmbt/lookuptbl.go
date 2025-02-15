@@ -1,15 +1,17 @@
-package bart
+// package lpmbt contains the backtracking lookup table for longest-prefix-match.
+package lpmbt
 
 import "github.com/gaissmai/bart/internal/bitset"
 
-// lpmLookupTbl is the backtracking sequence in the complete binary tree as bitstring.
+// LookupTbl is the backtracking sequence in the complete binary tree
+// of the prefixes (mapped by the base_index function) as bitstring.
 //
 //	for idx := 1; idx > 0; idx >>= 1 { b.Set(idx) }
 //
 // allows a one shot bitset intersection algorithm:
 //
 //	func (n *node[V]) lpmTest(idx uint) bool {
-//		return n.prefixes.IntersectsAny(lpmLookupTbl[idx])
+//		return n.prefixes.IntersectsAny(lpmbt.LookupTbl[idx])
 //	}
 //
 // instead of a sequence of single bitset tests:
@@ -22,7 +24,7 @@ import "github.com/gaissmai/bart/internal/bitset"
 //		}
 //		return false
 //	}
-var lpmLookupTbl = [512]bitset.BitSet{
+var LookupTbl = [512]bitset.BitSet{
 	/* idx:   0 */ {}, // invalid
 	/* idx:   1 */ {0x2}, // 0b0000_0010
 	/* idx:   2 */ {0x6}, // 0b0000_0110

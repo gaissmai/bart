@@ -21,6 +21,9 @@ package bart
 import (
 	"iter"
 	"net/netip"
+
+	"github.com/gaissmai/bart/internal/art"
+	"github.com/gaissmai/bart/internal/lpmbt"
 )
 
 // Table is an IPv4 and IPv6 routing table with payload V.
@@ -152,7 +155,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 	for depth, octet := range octets {
 		// last octet from prefix, update/insert prefix into node
 		if depth == lastIdx {
-			newVal, exists := n.prefixes.UpdateAt(pfxToIdx(octet, lastBits), cb)
+			newVal, exists := n.prefixes.UpdateAt(art.PfxToIdx(octet, lastBits), cb)
 			if !exists {
 				t.sizeUpdate(is4, 1)
 			}
@@ -247,7 +250,7 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 	for depth, octet := range octets {
 		// last octet from prefix, update/insert prefix into node
 		if depth == lastIdx {
-			newVal, exists := n.prefixes.UpdateAt(pfxToIdx(octet, lastBits), cb)
+			newVal, exists := n.prefixes.UpdateAt(art.PfxToIdx(octet, lastBits), cb)
 			if !exists {
 				pt.sizeUpdate(is4, 1)
 			}
@@ -365,7 +368,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 
 		// try to delete prefix in trie node
 		if depth == lastIdx {
-			val, ok = n.prefixes.DeleteAt(pfxToIdx(octet, lastBits))
+			val, ok = n.prefixes.DeleteAt(art.PfxToIdx(octet, lastBits))
 			if !ok {
 				return val, false
 			}
@@ -450,7 +453,7 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, o
 
 		// try to delete prefix in trie node
 		if depth == lastIdx {
-			val, ok = n.prefixes.DeleteAt(pfxToIdx(octet, lastBits))
+			val, ok = n.prefixes.DeleteAt(art.PfxToIdx(octet, lastBits))
 			if !ok {
 				// nothing to delete
 				return pt, val, false
@@ -530,7 +533,7 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 LOOP:
 	for depth, octet := range octets {
 		if depth == lastIdx {
-			return n.prefixes.Get(pfxToIdx(octet, lastBits))
+			return n.prefixes.Get(art.PfxToIdx(octet, lastBits))
 		}
 
 		addr := uint(octet)
@@ -579,7 +582,7 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 		addr := uint(octet)
 
 		// contains: any lpm match good enough, no backtracking needed
-		if n.prefixes.Len() != 0 && n.lpmTest(hostIndex(addr)) {
+		if n.prefixes.Len() != 0 && n.lpmTest(art.HostIdx(addr)) {
 			return true
 		}
 
@@ -662,10 +665,10 @@ LOOP:
 
 		// longest prefix match, skip if node has no prefixes
 		if n.prefixes.Len() != 0 {
-			idx := hostIndex(uint(octets[depth]))
+			idx := art.HostIdx(uint(octets[depth]))
 			// lpmGet(idx), manually inlined
 			// --------------------------------------------------------------
-			if topIdx, ok := n.prefixes.IntersectionTop(lpmLookupTbl[idx]); ok {
+			if topIdx, ok := n.prefixes.IntersectionTop(lpmbt.LookupTbl[idx]); ok {
 				return n.prefixes.MustGet(topIdx), true
 			}
 			// --------------------------------------------------------------
@@ -767,13 +770,13 @@ LOOP:
 		var idx uint
 		octet = octets[depth]
 		if depth == lastIdx {
-			idx = pfxToIdx(octet, lastBits)
+			idx = art.PfxToIdx(octet, lastBits)
 		} else {
-			idx = hostIndex(uint(octet))
+			idx = art.HostIdx(uint(octet))
 		}
 
 		// manually inlined lpmGet(idx)
-		if topIdx, ok := n.prefixes.IntersectionTop(lpmLookupTbl[idx]); ok {
+		if topIdx, ok := n.prefixes.IntersectionTop(lpmbt.LookupTbl[idx]); ok {
 			val = n.prefixes.MustGet(topIdx)
 
 			// called from LookupPrefix
@@ -783,8 +786,8 @@ LOOP:
 
 			// called from LookupPrefixLPM
 
-			// calculate the pfxLen from depth and top idx
-			pfxLen := depth*strideLen + int(baseIdxLookupTbl[topIdx].pfxLen)
+			// get the pfxLen from depth and top idx
+			pfxLen := art.PfxLen(depth, topIdx)
 
 			// calculate the lpm from incoming ip and new mask
 			lpm, _ = ip.Prefix(pfxLen)
@@ -1109,6 +1112,21 @@ func lastOctetIdxAndBits(bits int) (lastIdx, lastBits int) {
 	lastBits = bits - (lastIdx << 3)
 
 	return
+}
+
+// netmask for bits
+//
+//	0b0000_0000, // bits == 0
+//	0b1000_0000, // bits == 1
+//	0b1100_0000, // bits == 2
+//	0b1110_0000, // bits == 3
+//	0b1111_0000, // bits == 4
+//	0b1111_1000, // bits == 5
+//	0b1111_1100, // bits == 6
+//	0b1111_1110, // bits == 7
+//	0b1111_1111, // bits == 8
+func netMask(bits int) uint8 {
+	return 0b1111_1111 << (8 - bits)
 }
 
 // noCopy may be added to structs which must not be copied

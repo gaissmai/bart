@@ -4,62 +4,34 @@
 // Please read the ART paper ./doc/artlookup.pdf
 // to understand the baseIndex algorithm.
 
-package bart
+package art
 
-// netmask for bits
-//
-//	0b0000_0000, // bits == 0
-//	0b1000_0000, // bits == 1
-//	0b1100_0000, // bits == 2
-//	0b1110_0000, // bits == 3
-//	0b1111_0000, // bits == 4
-//	0b1111_1000, // bits == 5
-//	0b1111_1100, // bits == 6
-//	0b1111_1110, // bits == 7
-//	0b1111_1111, // bits == 8
-func netMask(bits int) uint8 {
-	return 0b1111_1111 << (8 - bits)
-}
+const (
+	strideLen = 8 // octet
 
-// baseIndex of the first host route 0/8: pfxToIdx(0,8)
-const firstHostIdx = 256
+	// baseIndex of the first host route 0/8: PfxToIdx(0,8)
+	firstHostIdx = 256
+)
 
-// pfxToIdx, maps a prefix table as a 'complete binary tree'.
-func pfxToIdx(octet byte, prefixLen int) uint {
-	return uint(octet>>(strideLen-prefixLen)) + (1 << prefixLen)
-}
-
-// hostIndex, just pfxToIdx(octet, 8) but faster.
-func hostIndex(octet uint) uint {
+// HostIdx, just PfxToIdx(octet, 8) but faster.
+func HostIdx(octet uint) uint {
 	return octet + firstHostIdx
 }
 
-// cmpIndexRank, sort indexes in prefix sort order.
-func cmpIndexRank(aIdx, bIdx uint) int {
-	// convert idx to prefix
-	aOctet, aBits := idxToPfx(aIdx)
-	bOctet, bBits := idxToPfx(bIdx)
-
-	// cmp the prefixes, first by address and then by bits
-	if aOctet == bOctet {
-		if aBits <= bBits {
-			return -1
-		}
-
-		return 1
-	}
-
-	if aOctet < bOctet {
-		return -1
-	}
-
-	return 1
+// PfxToIdx, maps a prefix table as a 'complete binary tree'.
+func PfxToIdx(octet byte, prefixLen int) uint {
+	return uint(octet>>(strideLen-prefixLen)) + (1 << prefixLen)
 }
 
-// idxToPfx returns the octet and prefix len of baseIdx.
+// IdxToPfx returns the octet and prefix len of baseIdx.
 // It's the inverse to pfxToIdx.
-func idxToPfx(idx uint) (octet byte, pfxLen int) {
+func IdxToPfx(idx uint) (octet byte, pfxLen int) {
 	return baseIdxLookupTbl[idx].octet, int(baseIdxLookupTbl[idx].pfxLen)
+}
+
+// PfxLen, based on depth and idx.
+func PfxLen(depth int, idx uint) int {
+	return depth*strideLen + int(baseIdxLookupTbl[idx].pfxLen)
 }
 
 // baseIdxLookupTbl, maps back from idx => octet/bits

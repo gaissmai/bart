@@ -3,6 +3,8 @@ package bart
 import (
 	"net/netip"
 
+	"github.com/gaissmai/bart/internal/allot"
+	"github.com/gaissmai/bart/internal/art"
 	"github.com/gaissmai/bart/internal/bitset"
 )
 
@@ -133,7 +135,7 @@ func (n *node[V]) overlapsChildrenIn(o *node[V]) bool {
 	if doRange {
 		lowerBound, _ := n.prefixes.FirstSet()
 		for _, addr := range o.children.AsSlice(make([]uint, 0, maxNodeChildren)) {
-			idx := hostIndex(addr)
+			idx := art.HostIdx(addr)
 			if idx < lowerBound { // lpm match impossible
 				continue
 			}
@@ -158,7 +160,7 @@ func (n *node[V]) overlapsChildrenIn(o *node[V]) bool {
 
 	for _, idx := range allIndices {
 		// get pre alloted bitset for idx
-		prefixRoutes.InPlaceUnion(allotLookupTbl[idx])
+		prefixRoutes.InPlaceUnion(allot.LookupTbl[idx])
 	}
 
 	// clone a bitset without heap allocation
@@ -248,12 +250,12 @@ func (n *node[V]) overlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
 
 		// full octet path in node trie, check overlap with last prefix octet
 		if depth == lastIdx {
-			return n.overlapsIdx(pfxToIdx(octet, lastBits))
+			return n.overlapsIdx(art.PfxToIdx(octet, lastBits))
 		}
 
 		// test if any route overlaps prefix´ so far
 		// no best match needed, forward tests without backtracking
-		if n.prefixes.Len() != 0 && n.lpmTest(hostIndex(addr)) {
+		if n.prefixes.Len() != 0 && n.lpmTest(art.HostIdx(addr)) {
 			return true
 		}
 
@@ -288,7 +290,7 @@ func (n *node[V]) overlapsIdx(idx uint) bool {
 
 	// use bitset intersections instead of range loops
 	// shallow copy pre alloted bitset for idx
-	allotedPrefixRoutes := allotLookupTbl[idx]
+	allotedPrefixRoutes := allot.LookupTbl[idx]
 	if allotedPrefixRoutes.IntersectsAny(n.prefixes.BitSet) {
 		return true
 	}
