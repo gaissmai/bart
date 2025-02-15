@@ -21,7 +21,7 @@
 //	can inline BitSet.FirstSet with cost 25
 //	can inline BitSet.NextSet with cost 71
 //	can inline BitSet.AsSlice with cost 50
-//	can inline BitSet.All with cost 62
+//	can inline BitSet.All with cost 70
 //	can inline BitSet.IntersectsAny with cost 42
 //	can inline BitSet.IntersectionTop with cost 56
 //	can inline BitSet.IntersectionCardinality with cost 35
@@ -175,22 +175,9 @@ func (b BitSet) AsSlice(buf []uint) []uint {
 	return buf
 }
 
-// All returns all set bits. This is simpler but slower than AsSlice.
+// All returns all set bits. This has a simpler API but is slower than AsSlice.
 func (b BitSet) All() []uint {
-	buf := make([]uint, b.Size())
-
-	slot := 0
-	for idx, word := range b {
-		for word != 0 {
-			buf[slot] = uint(idx<<6 + bits.TrailingZeros64(word))
-			slot++
-
-			// clear the rightmost set bit
-			word &= word - 1
-		}
-	}
-
-	return buf
+	return b.AsSlice(make([]uint, 0, popcntSlice(b)))
 }
 
 // IntersectsAny returns true if the intersection of base set with the compare set
