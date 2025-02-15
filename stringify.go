@@ -11,6 +11,8 @@ import (
 	"net/netip"
 	"slices"
 	"strings"
+
+	"github.com/gaissmai/bart/internal/art"
 )
 
 // kid, a node has no path information about its predecessors,
@@ -198,7 +200,7 @@ func (n *node[V]) getKidsRec(parentIdx uint, path stridePath, depth int, is4 boo
 	// the node may have childs and leaves, the rec-descent monster starts
 	for i, addr := range n.children.All() {
 		// do a longest-prefix-match
-		lpmIdx, _, _ := n.lpmGet(hostIndex(addr))
+		lpmIdx, _, _ := n.lpmGet(art.HostIdx(addr))
 		if lpmIdx == parentIdx {
 			switch k := n.children.Items[i].(type) {
 			case *node[V]:
@@ -239,7 +241,7 @@ func cmpPrefix(a, b netip.Prefix) int {
 
 // cidrFromPath, get prefix back from byte path, depth, octet and pfxLen.
 func cidrFromPath(path stridePath, depth int, is4 bool, idx uint) netip.Prefix {
-	octet, pfxLen := idxToPfx(idx)
+	octet, pfxLen := art.IdxToPfx(idx)
 
 	// set masked byte in path at depth
 	path[depth] = octet

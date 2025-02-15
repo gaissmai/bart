@@ -10,6 +10,7 @@ import (
 )
 
 // DumpListNode contains CIDR, value and list of subnets (tree childrens).
+// Only used for marshalling.
 type DumpListNode[V any] struct {
 	CIDR    netip.Prefix      `json:"cidr"`
 	Value   V                 `json:"value"`

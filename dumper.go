@@ -8,6 +8,8 @@ import (
 	"io"
 	"strconv"
 	"strings"
+
+	"github.com/gaissmai/bart/internal/art"
 )
 
 type nodeType byte
@@ -86,7 +88,7 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 		fmt.Fprintf(w, "%sprefxs(#%d):", indent, nPfxCount)
 
 		for _, idx := range allIndices {
-			octet, pfxLen := idxToPfx(idx)
+			octet, pfxLen := art.IdxToPfx(idx)
 			fmt.Fprintf(w, " %s/%d", octetFmt(octet, is4), pfxLen)
 		}
 
