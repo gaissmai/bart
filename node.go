@@ -747,3 +747,29 @@ func cmpIndexRank(aIdx, bIdx uint) int {
 
 	return 1
 }
+
+// cidrFromPath, helper function,
+// get prefix back from stride path, depth and idx.
+func cidrFromPath(path stridePath, depth int, is4 bool, idx uint) netip.Prefix {
+	octet, pfxLen := art.IdxToPfx(idx)
+
+	// set masked byte in path at depth
+	path[depth] = octet
+
+	// zero/mask the bytes after prefix bits
+	clear(path[depth+1:])
+
+	// make ip addr from octets
+	var ip netip.Addr
+	if is4 {
+		ip = netip.AddrFrom4([4]byte(path[:4]))
+	} else {
+		ip = netip.AddrFrom16(path)
+	}
+
+	// calc bits with pathLen and pfxLen
+	bits := depth<<3 + pfxLen
+
+	// return a normalized prefix from ip/bits
+	return netip.PrefixFrom(ip, bits)
+}
