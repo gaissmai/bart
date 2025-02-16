@@ -180,6 +180,11 @@ PASS
 ok      github.com/gaissmai/bart    10.455s
 ```
 
+## Future Improvements
+
+The BitSet methods Rank0, IntersectsAny and IntersectionTop are crucial for performance
+and could probably be made even faster by SIMD instructions.
+
 ## Compatibility Guarantees
 
 The package is currently released as a pre-v1 version, which gives the author the freedom to break
