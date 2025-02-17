@@ -199,17 +199,20 @@ func (n *node[V]) directItemsRec(parentIdx uint, path stridePath, depth int, is4
 	// for all idx's (prefixes mapped by baseIndex) in this node
 	// do a longest-prefix-match
 	for i, idx := range n.prefixes.AsSlice(make([]uint, 0, maxNodePrefixes)) {
-		// parent or self, handled alreday in an upper stack frame
-		if idx <= parentIdx {
+		// tricky part, skip self, test with next possible lpm (idx>>1), it's a complete binary tree
+		nextIdx := idx >> 1
+
+		// fast skip, lpm not possible
+		if nextIdx < parentIdx {
 			continue
 		}
 
-		// tricky part, skip self, find the next lpm, it's a complete binary tree
-		lpm, _, _ := n.lpmGet(idx >> 1)
+		// do a longest-prefix-match
+		lpm, _, _ := n.lpmGet(nextIdx)
 
-		// be aware, 0 is here a possible value for parentIdx and lpm, if not found
+		// be aware, 0 is here a possible value for parentIdx and lpm (if not found)
 		if lpm == parentIdx {
-			// idx is directly covered by parent
+			// prefix is directly covered by parent
 
 			item := trieItem[V]{
 				n:     n,
@@ -228,12 +231,19 @@ func (n *node[V]) directItemsRec(parentIdx uint, path stridePath, depth int, is4
 
 	// children:
 	for i, addr := range n.children.AsSlice(make([]uint, 0, maxNodeChildren)) {
-		// do a longest-prefix-match, see above for an explanation
-		lpm, _, _ := n.lpmGet(art.HostIdx(addr))
+		hostIdx := art.HostIdx(addr)
 
-		// be aware, 0 is here a possible value for parentIdx
+		// fast skip, lpm not possible
+		if hostIdx < parentIdx {
+			continue
+		}
+
+		// do a longest-prefix-match
+		lpm, _, _ := n.lpmGet(hostIdx)
+
+		// be aware, 0 is here a possible value for parentIdx and lpm (if not found)
 		if lpm == parentIdx {
-			//
+			// child is directly covered by parent
 			switch kid := n.children.Items[i].(type) {
 			case *node[V]: // traverse rec-descent, call with next child node,
 				// next trie level, set parentIdx to 0, adjust path and depth
