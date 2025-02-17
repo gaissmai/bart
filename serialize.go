@@ -78,24 +78,74 @@ func (t *Table[V]) Fprint(w io.Writer) error {
 		return nil
 	}
 
-	if t.size4 != 0 {
-		if _, err := fmt.Fprint(w, "▼\n"); err != nil {
-			return err
-		}
-
-		start4 := DumpListNode[V]{Subnets: t.DumpList4()}
-		if err := start4.printNodeRec(w, ""); err != nil {
-			return err
-		}
+	// v4
+	if err := t.fprint(w, true); err != nil {
+		return err
 	}
 
-	if t.size6 != 0 {
-		if _, err := fmt.Fprint(w, "▼\n"); err != nil {
+	// v6
+	if err := t.fprint(w, false); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// fprint is the version dependent adapter to fprintRec.
+func (t *Table[V]) fprint(w io.Writer, is4 bool) error {
+	n := t.rootNodeByVersion(is4)
+	if n.isEmpty() {
+		return nil
+	}
+
+	if _, err := fmt.Fprint(w, "▼\n"); err != nil {
+		return err
+	}
+
+	startParent := trieItem[V]{
+		n:    nil,
+		idx:  0,
+		path: stridePath{},
+		is4:  is4,
+	}
+
+	return n.fprintRec(w, startParent, "")
+}
+
+// fprintRec, the output is a hierarchical CIDR tree covered starting with this node
+func (n *node[V]) fprintRec(w io.Writer, parent trieItem[V], pad string) error {
+	// recursion stop condition
+	if n == nil {
+		return nil
+	}
+
+	// get direct covered childs for this parent ...
+	directItems := n.directItemsRec(parent.idx, parent.path, parent.depth, parent.is4)
+
+	// sort them by netip.Prefix, not by baseIndex
+	slices.SortFunc(directItems, func(a, b trieItem[V]) int {
+		return cmpPrefix(a.cidr, b.cidr)
+	})
+
+	// symbols used in tree
+	glyphe := "├─ "
+	spacer := "│  "
+
+	// for all direct item under this node ...
+	for i, item := range directItems {
+		// ... treat last kid special
+		if i == len(directItems)-1 {
+			glyphe = "└─ "
+			spacer = "   "
+		}
+
+		// print prefix and val, padded with glyphe
+		if _, err := fmt.Fprintf(w, "%s%s (%v)\n", pad+glyphe, item.cidr, item.val); err != nil {
 			return err
 		}
 
-		start6 := DumpListNode[V]{Subnets: t.DumpList6()}
-		if err := start6.printNodeRec(w, ""); err != nil {
+		// rec-descent with this item as parent
+		if err := item.n.fprintRec(w, item, pad+spacer); err != nil {
 			return err
 		}
 	}
@@ -264,34 +314,6 @@ func (n *node[V]) directItemsRec(parentIdx uint, path stridePath, depth int, is4
 	}
 
 	return directItems
-}
-
-// printNodeRec, the rec-descent tree printer.
-func (dln *DumpListNode[V]) printNodeRec(w io.Writer, pad string) error {
-	// symbols used in tree
-	glyphe := "├─ "
-	spacer := "│  "
-
-	// range over all dumplist-nodes on this level
-	for i, dumpListNode := range dln.Subnets {
-		// ... treat last kid special
-		if i == len(dln.Subnets)-1 {
-			glyphe = "└─ "
-			spacer = "   "
-		}
-
-		// print prefix and val, padded with glyphe
-		if _, err := fmt.Fprintf(w, "%s%s (%v)\n", pad+glyphe, dumpListNode.CIDR, dumpListNode.Value); err != nil {
-			return err
-		}
-
-		// rec-descent with this node
-		if err := dumpListNode.printNodeRec(w, pad+spacer); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 // cmpPrefix, helper function, compare func for prefix sort,
