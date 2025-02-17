@@ -195,14 +195,15 @@ func (n *node[V]) directItemsRec(parentIdx uint, path stridePath, depth int, is4
 		return nil
 	}
 
-	// for all idx's (mapped prefixes by baseIndex) in this node ...
+	// prefixes:
+	// for all idx's (prefixes mapped by baseIndex) in this node ...
 	for i, idx := range n.prefixes.All() {
-		// tricky part, skip self, find the next lpm
+		// tricky part, skip self, find the next lpm, it's a complete binary tree
 		lpm, _, _ := n.lpmGet(idx >> 1)
 
-		// be aware, 0 is here a possible value for parentIdx
+		// be aware, 0 is here a possible value for parentIdx and lpm, if not found
 		if lpm == parentIdx {
-			// idx is direct covered
+			// idx is directly covered by parent
 
 			item := trieItem[V]{
 				n:     n,
@@ -219,9 +220,9 @@ func (n *node[V]) directItemsRec(parentIdx uint, path stridePath, depth int, is4
 		}
 	}
 
-	// the node may have childs and path-compressed leaves
+	// children:
 	for i, addr := range n.children.All() {
-		// do a longest-prefix-match, not found returns 0
+		// do a longest-prefix-match, see above for an explanation
 		lpm, _, _ := n.lpmGet(art.HostIdx(addr))
 
 		// be aware, 0 is here a possible value for parentIdx
@@ -229,10 +230,8 @@ func (n *node[V]) directItemsRec(parentIdx uint, path stridePath, depth int, is4
 			//
 			switch kid := n.children.Items[i].(type) {
 			case *node[V]: // traverse rec-descent, call with next child node,
-				// record stride path
+				// next trie level, set parentIdx to 0, adjust path and depth
 				path[depth] = byte(addr)
-
-				// tricky part, set new parentIdx to 0
 				directItems = append(directItems, kid.directItemsRec(0, path, depth+1, is4)...)
 
 			case *leaf[V]: // path-compressed child, stop's recursion for this child
