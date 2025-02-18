@@ -21,8 +21,12 @@ func BenchmarkBitSetRankChild(b *testing.B) {
 
 	// make unique random numbers
 	randsUnique := map[int]bool{}
-	for range 10 {
-		randsUnique[rand.IntN(256)] = true
+	for range 20 {
+		bit := rand.IntN(500)
+		if bit > 255 {
+			continue
+		}
+		randsUnique[bit] = true
 	}
 
 	// sort them ascending
@@ -42,13 +46,21 @@ func BenchmarkBitSetRankChild(b *testing.B) {
 func BenchmarkBitSetRankPrefix(b *testing.B) {
 	var bs BitSet
 	for range 200 {
-		bs = bs.Set(uint(rand.IntN(512)))
+		bit := rand.IntN(1_000)
+		if bit > 511 {
+			continue
+		}
+		bs = bs.Set(uint(bit))
 	}
 
 	// make uniques random numbers
 	randsUnique := map[int]bool{}
-	for range 10 {
-		randsUnique[rand.IntN(512)] = true
+	for range 20 {
+		bit := rand.IntN(1_000)
+		if bit > 511 {
+			continue
+		}
+		randsUnique[bit] = true
 	}
 
 	// sort them ascending

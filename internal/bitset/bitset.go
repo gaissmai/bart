@@ -15,7 +15,7 @@
 //	can inline BitSet.Set with cost 63
 //	can inline BitSet.Clear with cost 24
 //	can inline BitSet.Test with cost 26
-//	can inline BitSet.Rank0 with cost 66
+//	can inline BitSet.Rank0 with cost 57
 //	can inline BitSet.Clone with cost 7
 //	can inline BitSet.Compact with cost 35
 //	can inline BitSet.FirstSet with cost 25
@@ -275,19 +275,22 @@ func (b BitSet) Rank0(i uint) (rnk int) {
 	if wordIdx := int(i >> 6); wordIdx >= len(b) {
 		// inlined popcount, whole slice
 		for _, x := range b {
+			// don't test for x != 0,
+			// simpler and faster, most of the time
 			rnk += bits.OnesCount64(x)
 		}
 	} else {
 		// inlined popcount, partial slice ...
+		// don't test for x != 0,
+		// simpler and faster, most of the time
 		for _, x := range b[:wordIdx] {
 			rnk += bits.OnesCount64(x)
 		}
 
-		// ... plus partial word?
-		if bitsIdx := i & 63; bitsIdx != 0 {
-			rnk += bits.OnesCount64(b[wordIdx] << (64 - bitsIdx))
-		}
-
+		// ... plus partial word,
+		// make it unconditional, don't test i&63 != 0,
+		// simpler and faster, most of the time
+		rnk += bits.OnesCount64(b[wordIdx] << (64 - i&63))
 	}
 
 	// correct for offset by one
@@ -298,6 +301,8 @@ func (b BitSet) Rank0(i uint) (rnk int) {
 func popcntSlice(s []uint64) (cnt int) {
 	for _, x := range s {
 		// count all the bits set in slice.
+		// don't test for x != 0,
+		// simpler and faster, most of the time
 		cnt += bits.OnesCount64(x)
 	}
 	return
@@ -307,6 +312,8 @@ func popcntSlice(s []uint64) (cnt int) {
 func popcntAnd(s, m []uint64) (cnt int) {
 	for j := 0; j < len(s) && j < len(m); j++ {
 		// words are bitwise & followed by popcount.
+		// don't test for x != 0,
+		// simpler and faster, most of the time
 		cnt += bits.OnesCount64(s[j] & m[j])
 	}
 	return
