@@ -275,21 +275,17 @@ func (b BitSet) Rank0(i uint) (rnk int) {
 	if wordIdx := int(i >> 6); wordIdx >= len(b) {
 		// inlined popcount, whole slice
 		for _, x := range b {
-			// don't test for x != 0,
-			// simpler and faster, most of the time
+			// don't test for x != 0, less branches
 			rnk += bits.OnesCount64(x)
 		}
 	} else {
 		// inlined popcount, partial slice ...
-		// don't test for x != 0,
-		// simpler and faster, most of the time
 		for _, x := range b[:wordIdx] {
 			rnk += bits.OnesCount64(x)
 		}
 
-		// ... plus partial word,
-		// make it unconditional, don't test i&63 != 0,
-		// simpler and faster, most of the time
+		// ... plus partial word, unconditional
+		// don't test i&63 != 0, less branches
 		rnk += bits.OnesCount64(b[wordIdx] << (64 - i&63))
 	}
 
@@ -297,12 +293,26 @@ func (b BitSet) Rank0(i uint) (rnk int) {
 	return rnk - 1
 }
 
-// popcntSlice
+// popcntSlice, see generated assembler with GOAMD64='v2'
+//
+//	00000 PREAMBLE
+//	.....
+//	00005 XORL    CX, CX
+//	00007 XORL    DX, DX
+//	00009 JMP 26
+//	00011 MOVQ    (AX)(CX*8), SI
+//	00015 POPCNTQ SI, SI
+//	00020 INCQ    CX
+//	00023 ADDQ    SI, DX
+//	00026 CMPQ    BX, CX
+//	00029 JGT 11
+//	00031 MOVQ    DX, AX
+//	00034 RET
 func popcntSlice(s []uint64) (cnt int) {
 	for _, x := range s {
 		// count all the bits set in slice.
 		// don't test for x != 0,
-		// simpler and faster, most of the time
+		// simpler and faster, most of the time, less branches
 		cnt += bits.OnesCount64(x)
 	}
 	return
@@ -313,7 +323,7 @@ func popcntAnd(s, m []uint64) (cnt int) {
 	for j := 0; j < len(s) && j < len(m); j++ {
 		// words are bitwise & followed by popcount.
 		// don't test for x != 0,
-		// simpler and faster, most of the time
+		// simpler and faster, most of the time, less branches
 		cnt += bits.OnesCount64(s[j] & m[j])
 	}
 	return
