@@ -100,6 +100,12 @@ The lock-free versions of insert, update and delete are added, but still experim
 
     A Table must not be copied by value, see Table.Clone.
 
+  func (t *Table[V]) Contains(ip netip.Addr) bool
+  func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool)
+
+  func (t *Table[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool)
+  func (t *Table[V]) LookupPrefixLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool)
+
   func (t *Table[V]) Insert(pfx netip.Prefix, val V)
   func (t *Table[V]) Delete(pfx netip.Prefix)
   func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V)
@@ -115,29 +121,24 @@ The lock-free versions of insert, update and delete are added, but still experim
   func (t *Table[V]) Union(o *Table[V])
   func (t *Table[V]) Clone() *Table[V]
 
-  func (t *Table[V]) Contains(ip netip.Addr) bool
-  func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool)
-  func (t *Table[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool)
-  func (t *Table[V]) LookupPrefixLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool)
-
   func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool
 
   func (t *Table[V]) Overlaps(o *Table[V])  bool
   func (t *Table[V]) Overlaps4(o *Table[V]) bool
   func (t *Table[V]) Overlaps6(o *Table[V]) bool
 
-  func (t *Table[V]) Subnets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V]
+  func (t *Table[V]) Subnets(pfx netip.Prefix)   iter.Seq2[netip.Prefix, V]
   func (t *Table[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V]
 
-  func (t *Table[V]) All() iter.Seq2[netip.Prefix, V]
+  func (t *Table[V]) All()  iter.Seq2[netip.Prefix, V]
   func (t *Table[V]) All4() iter.Seq2[netip.Prefix, V]
   func (t *Table[V]) All6() iter.Seq2[netip.Prefix, V]
 
-  func (t *Table[V]) AllSorted() iter.Seq2[netip.Prefix, V]
+  func (t *Table[V]) AllSorted()  iter.Seq2[netip.Prefix, V]
   func (t *Table[V]) AllSorted4() iter.Seq2[netip.Prefix, V]
   func (t *Table[V]) AllSorted6() iter.Seq2[netip.Prefix, V]
 
-  func (t *Table[V]) Size() int
+  func (t *Table[V]) Size()  int
   func (t *Table[V]) Size4() int
   func (t *Table[V]) Size6() int
 
@@ -179,11 +180,6 @@ BenchmarkFullMissV6/Lookup              142917571        8.387 ns/op       0 B/o
 PASS
 ok      github.com/gaissmai/bart    10.455s
 ```
-
-## Future Improvements
-
-The BitSet methods Rank0, IntersectsAny and IntersectionTop are crucial for performance
-and could probably be made even faster by SIMD instructions.
 
 ## Compatibility Guarantees
 
