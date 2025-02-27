@@ -383,6 +383,67 @@ func TestNextSet(t *testing.T) {
 	}
 }
 
+func TestIsEmpty(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name string
+		//
+		set []uint
+		del []uint
+		//
+		want bool
+	}{
+		{
+			name: "null",
+			set:  []uint{},
+			del:  []uint{},
+			want: true,
+		},
+		{
+			name: "zero",
+			set:  []uint{0},
+			del:  []uint{},
+			want: false,
+		},
+		{
+			name: "1,5",
+			set:  []uint{1, 5},
+			del:  []uint{},
+			want: false,
+		},
+		{
+			name: "many",
+			set:  []uint{1, 65, 130, 190, 250, 300, 380, 420, 480, 511},
+			del:  []uint{},
+			want: false,
+		},
+		{
+			name: "set clear",
+			set:  []uint{1},
+			del:  []uint{1},
+			want: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		var b BitSet
+		for _, u := range tc.set {
+			b = b.Set(u)
+		}
+
+		for _, u := range tc.del {
+			b = b.Clear(u) // without compact
+		}
+
+		got := b.IsEmpty()
+
+		if got != tc.want {
+			t.Errorf("IsEmpty, %s: got: %v, want: %v", tc.name, got, tc.want)
+		}
+	}
+}
+
 func TestAll(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {

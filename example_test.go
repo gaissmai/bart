@@ -11,9 +11,8 @@ import (
 	"github.com/gaissmai/bart"
 )
 
-func ExampleTable_Contains() {
-	// Create a new routing table
-	table := new(bart.Table[struct{}])
+func ExampleLite_Contains() {
+	lite := new(bart.Lite)
 
 	// Insert some prefixes
 	prefixes := []string{
@@ -26,7 +25,7 @@ func ExampleTable_Contains() {
 
 	for _, s := range prefixes {
 		pfx := netip.MustParsePrefix(s)
-		table.Insert(pfx, struct{}{})
+		lite.Insert(pfx)
 	}
 
 	// Test some IP addresses for black/whitelist containment
@@ -43,7 +42,8 @@ func ExampleTable_Contains() {
 
 	for _, s := range ips {
 		ip := netip.MustParseAddr(s)
-		fmt.Printf("%-20s is contained: %t\n", ip, table.Contains(ip))
+		ok := lite.Contains(ip)
+		fmt.Printf("%-20s is contained: %t\n", ip, ok)
 	}
 
 	// Output:

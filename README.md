@@ -31,12 +31,17 @@ comparable or even better lookup times for longest prefix match.
 The algorithm is also excellent for determining whether two tables
 contain overlapping IP addresses.
 
+A Lite version is also included, this is ideal for simple IP
+access-control-lists, a.k.a. longest-prefix matches with plain true/false
+results.
+
+For all other tasks the much more powerful Table must be used.
+
 ## Example
 
 ```golang
-func ExampleTable_Contains() {
-	// Create a new routing table
-	table := new(bart.Table[struct{}])
+func ExampleLite_Contains() {
+	lite := new(bart.Lite)
 
 	// Insert some prefixes
 	prefixes := []string{
@@ -49,7 +54,7 @@ func ExampleTable_Contains() {
 
 	for _, s := range prefixes {
 		pfx := netip.MustParsePrefix(s)
-		table.Insert(pfx, struct{}{})
+		lite.Insert(pfx)
 	}
 
 	// Test some IP addresses for black/whitelist containment
@@ -66,7 +71,8 @@ func ExampleTable_Contains() {
 
 	for _, s := range ips {
 		ip := netip.MustParseAddr(s)
-		fmt.Printf("%-20s is contained: %t\n", ip, table.Contains(ip))
+		ok := lite.Contains(ip)
+		fmt.Printf("%-20s is contained: %t\n", ip, ok)
 	}
 
 	// Output:
@@ -90,15 +96,15 @@ The lock-free versions of insert, update and delete are added, but still experim
   type Table[V any] struct {
   	// Has unexported fields.
   }
-    Table is an IPv4 and IPv6 routing table with payload V. The zero value is
-    ready to use.
+    // Table is an IPv4 and IPv6 routing table with payload V. The zero value is
+    // ready to use.
 
-    The Table is safe for concurrent readers but not for concurrent readers
-    and/or writers. Either the update operations must be protected by an
-    external lock mechanism or the various ...Persist functions must be used
-    which return a modified routing table by leaving the original unchanged
+    // The Table is safe for concurrent readers but not for concurrent readers
+    // and/or writers. Either the update operations must be protected by an
+    // external lock mechanism or the various ...Persist functions must be used
+    // which return a modified routing table by leaving the original unchanged
 
-    A Table must not be copied by value, see Table.Clone.
+    // A Table must not be copied by value, see Table.Clone.
 
   func (t *Table[V]) Contains(ip netip.Addr) bool
   func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool)
@@ -149,6 +155,21 @@ The lock-free versions of insert, update and delete are added, but still experim
 
   func (t *Table[V]) DumpList4() []DumpListNode[V]
   func (t *Table[V]) DumpList6() []DumpListNode[V]
+```
+
+```golang
+  type Lite struct {
+  	// Has unexported fields.
+  }
+  //  Lite is the little sister of Table. Lite is ideal for simple IP
+  //  access-control-lists, a.k.a. longest-prefix matches with plain
+  //  true/false results.
+  //
+  //  For all other tasks, the much more powerful Table must be used.
+  
+  func (l *Lite) Insert(pfx netip.Prefix)
+  func (l *Lite) Delete(pfx netip.Prefix)
+  func (l *Lite) Contains(ip netip.Addr) bool
 ```
 
 ## benchmarks

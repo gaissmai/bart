@@ -57,6 +57,16 @@ type BitSet []uint64
 // not factored out as functions to make most of the methods
 // inlineable with minimal costs.
 
+// IsEmpty returns true if no bit is set.
+func (b BitSet) IsEmpty() bool {
+	for _, w := range b {
+		if w != 0 {
+			return false
+		}
+	}
+	return true
+}
+
 // Set bit i to 1, the capacity of the bitset is increased accordingly.
 func (b BitSet) Set(i uint) BitSet {
 	// grow?
