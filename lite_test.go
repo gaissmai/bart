@@ -16,6 +16,12 @@ func TestLiteInsert(t *testing.T) {
 		want bool
 	}{
 		{
+			name: "invalid IP",
+			ins:  []netip.Prefix{mpp("0.0.0.0/0"), mpp("::/0")},
+			ip:   netip.Addr{},
+			want: false,
+		},
+		{
 			name: "zero",
 			ip:   randomAddr(),
 			want: false,

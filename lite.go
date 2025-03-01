@@ -121,16 +121,11 @@ func (l *Lite) Delete(pfx netip.Prefix) {
 // Contains performs a longest-prefix match for the IP address
 // and returns true if any route matches, otherwise false.
 func (l *Lite) Contains(ip netip.Addr) bool {
-	if !ip.IsValid() {
-		return false
-	}
-
+	// if ip is invalid, Is4() returns false and AsSlice() returns nil
 	is4 := ip.Is4()
 	n := l.rootNodeByVersion(is4)
 
-	octets := ip.AsSlice()
-
-	for _, octet := range octets {
+	for _, octet := range ip.AsSlice() {
 		addr := uint(octet)
 
 		// for contains, any lpm match is good enough, no backtracking needed
@@ -149,6 +144,7 @@ func (l *Lite) Contains(ip netip.Addr) bool {
 			continue // descend down to next trie level
 
 		case netip.Prefix:
+			// kid is a path-compressed prefix
 			return kid.Contains(ip)
 
 		default:
@@ -156,7 +152,8 @@ func (l *Lite) Contains(ip netip.Addr) bool {
 		}
 	}
 
-	panic("unreachable")
+	// invalid IP
+	return false
 }
 
 // ###################################################################

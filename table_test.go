@@ -154,6 +154,35 @@ func TestInvalid(t *testing.T) {
 		_, _, _ = tbl.GetAndDeletePersist(zeroPfx)
 	})
 
+	testname = "Contains"
+	t.Run(testname, func(t *testing.T) {
+		t.Parallel()
+		defer func(testname string) {
+			if r := recover(); r != nil {
+				t.Fatalf("%s panics on invalid IP input", testname)
+			}
+		}(testname)
+
+		if tbl.Contains(zeroIP) != false {
+			t.Errorf("%s returns true on invalid IP input, expected false", testname)
+		}
+	})
+
+	testname = "Lookup"
+	t.Run(testname, func(t *testing.T) {
+		t.Parallel()
+		defer func(testname string) {
+			if r := recover(); r != nil {
+				t.Fatalf("%s panics on invalid IP input", testname)
+			}
+		}(testname)
+
+		_, got := tbl.Lookup(zeroIP)
+		if got != false {
+			t.Errorf("%s returns true on invalid IP input, expected false", testname)
+		}
+	})
+
 	testname = "LookupPrefix"
 	t.Run(testname, func(t *testing.T) {
 		t.Parallel()
