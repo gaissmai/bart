@@ -12,24 +12,25 @@
 //
 // All functions can be inlined!
 //
-//	can inline BitSet.Set with cost 63
+//	can inline BitSet.All with cost 70
+//	can inline BitSet.AsSlice with cost 50
 //	can inline BitSet.Clear with cost 24
-//	can inline BitSet.Test with cost 26
-//	can inline BitSet.Rank0 with cost 57
 //	can inline BitSet.Clone with cost 7
 //	can inline BitSet.Compact with cost 35
 //	can inline BitSet.FirstSet with cost 25
-//	can inline BitSet.NextSet with cost 71
-//	can inline BitSet.AsSlice with cost 50
-//	can inline BitSet.All with cost 70
-//	can inline BitSet.IntersectsAny with cost 42
-//	can inline BitSet.IntersectionTop with cost 56
-//	can inline BitSet.IntersectionCardinality with cost 35
 //	can inline (*BitSet).InPlaceIntersection with cost 71
 //	can inline (*BitSet).InPlaceUnion with cost 77
+//	can inline BitSet.IntersectionCardinality with cost 35
+//	can inline BitSet.IntersectionTop with cost 56
+//	can inline BitSet.IntersectsAny with cost 42
+//	can inline BitSet.IsEmpty with cost 14
+//	can inline BitSet.NextSet with cost 71
+//	can inline BitSet.Rank0 with cost 57
+//	can inline BitSet.Set with cost 63
 //	can inline BitSet.Size with cost 16
-//	can inline popcount with cost 12
-//	can inline popcountAnd with cost 30
+//	can inline BitSet.Test with cost 26
+//	can inline popcntAnd with cost 30
+//	can inline popcntSlice with cost 12
 package bitset
 
 import (
