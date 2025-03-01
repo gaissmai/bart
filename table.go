@@ -577,10 +577,11 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 		addr := uint(octet)
 
 		// for contains, any lpm match is good enough, no backtracking needed
-		if n.prefixes.IntersectsAny(lpmbt.LookupTbl[art.HostIdx(addr)]) {
+		if n.prefixes.Len() != 0 && n.lpmTest(art.HostIdx(addr)) {
 			return true
 		}
 
+		// stop traversing?
 		if !n.children.Test(addr) {
 			return false
 		}

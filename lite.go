@@ -129,10 +129,11 @@ func (l *Lite) Contains(ip netip.Addr) bool {
 		addr := uint(octet)
 
 		// for contains, any lpm match is good enough, no backtracking needed
-		if n.prefixes.IntersectsAny(lpmbt.LookupTbl[art.HostIdx(addr)]) {
+		if n.lpmTest(art.HostIdx(addr)) {
 			return true
 		}
 
+		// stop traversing?
 		if !n.children.Test(addr) {
 			return false
 		}
@@ -163,6 +164,11 @@ func (l *Lite) Contains(ip netip.Addr) bool {
 type liteNode struct {
 	prefixes bitset.BitSet
 	children sparse.Array[any]
+}
+
+// lpmTest, any longest prefix match
+func (n *liteNode) lpmTest(idx uint) bool {
+	return n.prefixes.IntersectsAny(lpmbt.LookupTbl[idx])
 }
 
 // insertAtDepth, see the similar method for node, but now simpler without payload V.
