@@ -569,20 +569,15 @@ LOOP:
 // but as a test against a black- or whitelist it's often sufficient
 // and even few nanoseconds faster than [Table.Lookup].
 func (t *Table[V]) Contains(ip netip.Addr) bool {
-	if !ip.IsValid() {
-		return false
-	}
-
+	// if ip is invalid, Is4() returns false and AsSlice() returns nil
 	is4 := ip.Is4()
 	n := t.rootNodeByVersion(is4)
 
-	octets := ip.AsSlice()
-
-	for _, octet := range octets {
+	for _, octet := range ip.AsSlice() {
 		addr := uint(octet)
 
-		// contains: any lpm match good enough, no backtracking needed
-		if n.prefixes.Len() != 0 && n.lpmTest(art.HostIdx(addr)) {
+		// for contains, any lpm match is good enough, no backtracking needed
+		if n.prefixes.IntersectsAny(lpmbt.LookupTbl[art.HostIdx(addr)]) {
 			return true
 		}
 
@@ -604,16 +599,14 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 		}
 	}
 
-	panic("unreachable")
+	// invalid IP
+	return false
 }
 
 // Lookup does a route lookup (longest prefix match) for IP and
 // returns the associated value and true, or false if no route matched.
 func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
-	if !ip.IsValid() {
-		return val, false
-	}
-
+	// if ip is invalid, Is4() returns false and AsSlice() returns nil
 	is4 := ip.Is4()
 	n := t.rootNodeByVersion(is4)
 
@@ -675,6 +668,7 @@ LOOP:
 		}
 	}
 
+	// invalid IP
 	return val, false
 }
 
