@@ -172,9 +172,10 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 			t.sizeUpdate(is4, 1)
 			return newVal
 		}
+		kid := n.children.MustGet(addr)
 
-		// get node or leaf for octet
-		switch kid := n.children.MustGet(addr).(type) {
+		// kid is node or leaf at addr
+		switch kid := kid.(type) {
 		case *node[V]:
 			n = kid
 			continue // descend down to next trie level
@@ -268,9 +269,10 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 			pt.sizeUpdate(is4, 1)
 			return pt, newVal
 		}
+		kid := n.children.MustGet(addr)
 
-		// get node or leaf for octet
-		switch kid := n.children.MustGet(addr).(type) {
+		// kid is node or leaf at addr
+		switch kid := kid.(type) {
 		case *node[V]:
 			// proceed to next level
 			kid = kid.cloneFlat()
@@ -382,9 +384,10 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 		if !n.children.Test(addr) {
 			return val, false
 		}
+		kid := n.children.MustGet(addr)
 
-		// get the child: node or leaf
-		switch kid := n.children.MustGet(addr).(type) {
+		// kid is node or leaf at addr
+		switch kid := kid.(type) {
 		case *node[V]:
 			n = kid
 			continue // descend down to next trie level
@@ -469,9 +472,10 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, o
 			// nothing to delete
 			return pt, val, false
 		}
+		kid := n.children.MustGet(addr)
 
-		// get the child: node or leaf
-		switch kid := n.children.MustGet(addr).(type) {
+		// kid is node or leaf at addr
+		switch kid := kid.(type) {
 		case *node[V]:
 			// proceed to next level
 			kid = kid.cloneFlat()
@@ -540,9 +544,10 @@ LOOP:
 		if !n.children.Test(addr) {
 			break LOOP
 		}
+		kid := n.children.MustGet(addr)
 
-		// get the child: node or leaf
-		switch kid := n.children.MustGet(addr).(type) {
+		// kid is node or leaf at addr
+		switch kid := kid.(type) {
 		case *node[V]:
 			n = kid
 			continue // descend down to next trie level
@@ -585,9 +590,10 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 		if !n.children.Test(addr) {
 			return false
 		}
+		kid := n.children.MustGet(addr)
 
-		// get node or leaf for octet
-		switch kid := n.children.MustGet(addr).(type) {
+		// kid is node or leaf at addr
+		switch kid := kid.(type) {
 		case *node[V]:
 			n = kid
 			continue // descend down to next trie level
@@ -634,9 +640,10 @@ LOOP:
 			// no more nodes below octet
 			break LOOP
 		}
+		kid := n.children.MustGet(addr)
 
-		// get the child: node or leaf
-		switch kid := n.children.MustGet(addr).(type) {
+		// kid is node or leaf at addr
+		switch kid := kid.(type) {
 		case *node[V]:
 			n = kid
 			continue // descend down to next trie level
@@ -730,9 +737,10 @@ LOOP:
 		if !n.children.Test(addr) {
 			break LOOP
 		}
+		kid := n.children.MustGet(addr)
 
-		// get the child: node or leaf
-		switch kid := n.children.MustGet(addr).(type) {
+		// kid is node or leaf at addr
+		switch kid := kid.(type) {
 		case *node[V]:
 			n = kid
 			continue LOOP // descend down to next trie level
@@ -834,8 +842,10 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 			if !n.children.Test(addr) {
 				break LOOP
 			}
+			kid := n.children.MustGet(addr)
 
-			switch kid := n.children.MustGet(addr).(type) {
+			// kid is node or leaf at addr
+			switch kid := kid.(type) {
 			case *node[V]:
 				n = kid
 				continue LOOP // descend down to next trie level
@@ -913,9 +923,10 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 			if !n.children.Test(addr) {
 				return
 			}
+			kid := n.children.MustGet(addr)
 
-			// node or leaf?
-			switch kid := n.children.MustGet(addr).(type) {
+			// kid is node or leaf at addr
+			switch kid := kid.(type) {
 			case *node[V]:
 				n = kid
 				continue // descend down to next trie level

@@ -207,7 +207,6 @@ func overlapsTwoChilds[V any](nChild, oChild any, depth int) bool {
 	//  leaf, leaf  --> netip.Prefix.Overlaps
 	//
 	switch nKind := nChild.(type) {
-
 	case *node[V]:
 		switch oKind := oChild.(type) {
 		case *node[V]: // node, node

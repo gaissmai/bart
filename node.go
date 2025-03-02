@@ -123,9 +123,10 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 			// insert prefix path compressed
 			return n.children.InsertAt(addr, &leaf[V]{pfx, val})
 		}
+		kid := n.children.MustGet(addr)
 
-		// get the child: node or leaf
-		switch kid := n.children.MustGet(addr).(type) {
+		// kid is node or leaf at addr
+		switch kid := kid.(type) {
 		case *node[V]:
 			n = kid
 			continue // descend down to next trie level
@@ -184,9 +185,10 @@ func (n *node[V]) insertAtDepthPersist(pfx netip.Prefix, val V, depth int) (exis
 			// insert new prefix path compressed
 			return n.children.InsertAt(addr, &leaf[V]{pfx, val})
 		}
+		kid := n.children.MustGet(addr)
 
-		// get the child: node or leaf, but clone the path down
-		switch kid := n.children.MustGet(addr).(type) {
+		// kid is node or leaf at addr
+		switch kid := kid.(type) {
 		case *node[V]:
 			// proceed to next level
 			kid = kid.cloneFlat()
@@ -517,7 +519,6 @@ LOOP:
 		thisChild, thisExists := n.children.Get(addr)
 		if !thisExists {
 			switch otherChild := o.children.Items[i].(type) {
-
 			case *node[V]: // NULL, node
 				if !thisExists {
 					n.children.InsertAt(addr, otherChild.cloneRec())
@@ -536,10 +537,8 @@ LOOP:
 		}
 
 		switch otherChild := o.children.Items[i].(type) {
-
 		case *node[V]:
 			switch this := thisChild.(type) {
-
 			case *node[V]: // node, node
 				// both childs have node in octet, call union rec-descent on child nodes
 				duplicates += this.unionRec(otherChild, depth+1)
@@ -562,7 +561,6 @@ LOOP:
 
 		case *leaf[V]:
 			switch this := thisChild.(type) {
-
 			case *node[V]: // node, leaf
 				clonedLeaf := otherChild.cloneLeaf()
 				if this.insertAtDepth(clonedLeaf.prefix, clonedLeaf.value, depth+1) {
@@ -674,7 +672,6 @@ func (n *node[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxLen int, yie
 
 			// yield the node or leaf?
 			switch kid := n.children.MustGet(addr).(type) {
-
 			case *node[V]:
 				path[depth] = byte(addr)
 				if !kid.allRecSorted(path, depth+1, is4, yield) {
@@ -705,7 +702,6 @@ func (n *node[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxLen int, yie
 	for _, addr := range allCoveredChildAddrs[addrCursor:] {
 		// yield the node or leaf?
 		switch kid := n.children.MustGet(addr).(type) {
-
 		case *node[V]:
 			path[depth] = byte(addr)
 			if !kid.allRecSorted(path, depth+1, is4, yield) {
