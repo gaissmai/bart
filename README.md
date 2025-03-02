@@ -183,23 +183,23 @@ goos: linux
 goarch: amd64
 pkg: github.com/gaissmai/bart
 cpu: Intel(R) Core(TM) i5-8250U CPU @ 1.60GHz
-BenchmarkFullMatchV4/Contains           55906228        21.39  ns/op       0 B/op       0 allocs/op
-BenchmarkFullMatchV6/Contains           100000000       11.38  ns/op       0 B/op       0 allocs/op
-BenchmarkFullMissV4/Contains            52927538        22.69  ns/op       0 B/op       0 allocs/op
-BenchmarkFullMissV6/Contains            250386540        4.883 ns/op       0 B/op       0 allocs/op
+BenchmarkLiteFullMatchV4/Contains         	84611632	        14.20 ns/op
+BenchmarkLiteFullMatchV6/Contains         	100000000	        10.18 ns/op
+BenchmarkLiteFullMissV4/Contains          	70983298	        16.55 ns/op
+BenchmarkLiteFullMissV6/Contains          	232826182	         5.145 ns/op
 PASS
-ok      github.com/gaissmai/bart    11.291s
+ok  	github.com/gaissmai/bart	10.340s
 
 goos: linux
 goarch: amd64
 pkg: github.com/gaissmai/bart
 cpu: Intel(R) Core(TM) i5-8250U CPU @ 1.60GHz
-BenchmarkFullMatchV4/Lookup             53578766        21.77  ns/op       0 B/op       0 allocs/op
-BenchmarkFullMatchV6/Lookup             57054618        21.07  ns/op       0 B/op       0 allocs/op
-BenchmarkFullMissV4/Lookup              48289306        25.60  ns/op       0 B/op       0 allocs/op
-BenchmarkFullMissV6/Lookup              142917571        8.387 ns/op       0 B/op       0 allocs/op
+BenchmarkFullMatchV4/Lookup         	61518438	        18.87 ns/op
+BenchmarkFullMatchV6/Lookup         	64018471	        18.77 ns/op
+BenchmarkFullMissV4/Lookup          	50967507	        23.96 ns/op
+BenchmarkFullMissV6/Lookup          	167023722	         7.233 ns/op
 PASS
-ok      github.com/gaissmai/bart    10.455s
+ok  	github.com/gaissmai/bart	10.962s
 ```
 
 ## Compatibility Guarantees
