@@ -258,7 +258,7 @@ func randomPrefix6() netip.Prefix {
 func randomIP4() netip.Addr {
 	var b [4]byte
 	for i := range b {
-		b[i] = byte(prng.Uint32() & 0xff)
+		b[i] = byte(prng.UintN(256))
 	}
 	return netip.AddrFrom4(b)
 }
@@ -266,7 +266,7 @@ func randomIP4() netip.Addr {
 func randomIP6() netip.Addr {
 	var b [16]byte
 	for i := range b {
-		b[i] = byte(prng.Uint32() & 0xff)
+		b[i] = byte(prng.UintN(256))
 	}
 	return netip.AddrFrom16(b)
 }
