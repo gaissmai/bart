@@ -23,7 +23,7 @@ build the complete-binary-tree (CBT) of prefixes for each stride.
 The CBT is implemented as a bit-vector, backtracking is just
 a matter of fast cache friendly bitmask operations.
 
-The Table is implemented with popcount compressed sparse arrays
+The `bart.Table` is implemented with popcount compressed sparse arrays
 together with path compression. This reduces storage consumption
 by almost two orders of magnitude in comparison to ART with
 comparable or even better lookup times for longest prefix match.
@@ -31,11 +31,11 @@ comparable or even better lookup times for longest prefix match.
 The algorithm is also excellent for determining whether two tables
 contain overlapping IP addresses.
 
-A Lite version is also included, this is ideal for simple IP
+A `bart.Lite` version is also included, this is ideal for simple IP
 access-control-lists, a.k.a. longest-prefix matches with plain true/false
 results.
 
-For all other tasks the much more powerful Table must be used.
+For all more complex tasks, the powerful `bart.Table` must be used.
 
 ## Example
 
