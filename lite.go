@@ -90,9 +90,10 @@ func (l *Lite) Delete(pfx netip.Prefix) {
 		if !n.children.Test(addr) {
 			return
 		}
+		kid := n.children.MustGet(addr)
 
-		// get the child: node or leaf
-		switch kid := n.children.MustGet(addr).(type) {
+		// kid is node or leaf at addr
+		switch kid := kid.(type) {
 		case *liteNode:
 			n = kid
 			continue // descend down to next trie level
@@ -137,9 +138,10 @@ func (l *Lite) Contains(ip netip.Addr) bool {
 		if !n.children.Test(addr) {
 			return false
 		}
+		kid := n.children.MustGet(addr)
 
-		// get node or leaf for octet
-		switch kid := n.children.MustGet(addr).(type) {
+		// kid is node or leaf at addr
+		switch kid := kid.(type) {
 		case *liteNode:
 			n = kid
 			continue // descend down to next trie level
@@ -163,7 +165,7 @@ func (l *Lite) Contains(ip netip.Addr) bool {
 // Needs less memory and insert and delete is also a bit faster.
 type liteNode struct {
 	prefixes bitset.BitSet
-	children sparse.Array[any]
+	children sparse.Array[any] // [any] is a *liteNode or a netip.Prefix
 }
 
 // lpmTest, any longest prefix match
@@ -199,9 +201,10 @@ func (n *liteNode) insertAtDepth(pfx netip.Prefix, depth int) {
 			n.children.InsertAt(addr, pfx)
 			return
 		}
+		kid := n.children.MustGet(addr)
 
-		// get the child: node or leaf
-		switch kid := n.children.MustGet(addr).(type) {
+		// kid is node or leaf at addr
+		switch kid := kid.(type) {
 		case *liteNode:
 			n = kid
 			continue // descend down to next trie level
