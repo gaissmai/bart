@@ -178,9 +178,6 @@ type prefixNode struct {
 	netip.Prefix
 }
 
-// fringeNode TODO
-type fringeNode struct{}
-
 func (n *liteNode) isEmpty() bool {
 	return len(n.children.Items) == 0 && n.prefixes.Size() == 0
 }
