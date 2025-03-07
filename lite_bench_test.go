@@ -124,7 +124,11 @@ func BenchmarkLiteFullTableMemoryV4(b *testing.B) {
 		runtime.GC()
 		runtime.ReadMemStats(&endMem)
 
+		stats := lite.root4.nodeStatsRec()
 		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
+		b.ReportMetric(float64(stats.pfxs), "pfxs")
+		b.ReportMetric(float64(stats.nodes), "nodes")
+		b.ReportMetric(float64(stats.leaves), "leaves")
 		b.ReportMetric(0, "ns/op")
 	})
 }
@@ -132,21 +136,25 @@ func BenchmarkLiteFullTableMemoryV4(b *testing.B) {
 func BenchmarkLiteFullTableMemoryV6(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 
-	rt := new(Lite)
+	lite := new(Lite)
 	runtime.GC()
 	runtime.ReadMemStats(&startMem)
 
 	b.Run(strconv.Itoa(len(routes6)), func(b *testing.B) {
 		for range b.N {
 			for _, route := range routes6 {
-				rt.Insert(route.CIDR)
+				lite.Insert(route.CIDR)
 			}
 		}
 
 		runtime.GC()
 		runtime.ReadMemStats(&endMem)
 
+		stats := lite.root6.nodeStatsRec()
 		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
+		b.ReportMetric(float64(stats.pfxs), "pfxs")
+		b.ReportMetric(float64(stats.nodes), "nodes")
+		b.ReportMetric(float64(stats.leaves), "leaves")
 		b.ReportMetric(0, "ns/op")
 	})
 }
@@ -154,21 +162,28 @@ func BenchmarkLiteFullTableMemoryV6(b *testing.B) {
 func BenchmarkLiteFullTableMemory(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 
-	rt := new(Lite)
+	lite := new(Lite)
 	runtime.GC()
 	runtime.ReadMemStats(&startMem)
 
 	b.Run(strconv.Itoa(len(routes)), func(b *testing.B) {
 		for range b.N {
 			for _, route := range routes {
-				rt.Insert(route.CIDR)
+				lite.Insert(route.CIDR)
 			}
 		}
 
 		runtime.GC()
 		runtime.ReadMemStats(&endMem)
 
+		s4 := lite.root4.nodeStatsRec()
+		s6 := lite.root6.nodeStatsRec()
+		stats := stats{s4.pfxs + s6.pfxs, s4.childs + s6.childs, s4.nodes + s6.nodes, s4.leaves + s6.leaves}
+
 		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
+		b.ReportMetric(float64(stats.pfxs), "pfxs")
+		b.ReportMetric(float64(stats.nodes), "nodes")
+		b.ReportMetric(float64(stats.leaves), "leaves")
 		b.ReportMetric(0, "ns/op")
 	})
 }
