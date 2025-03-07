@@ -142,8 +142,9 @@ func (s *Array[T]) insertItem(i int, item T) {
 		s.Items = append(s.Items, zero) // append one item, mostly enlarge cap by more than one item
 	}
 
-	copy(s.Items[i+1:], s.Items[i:])
-	s.Items[i] = item
+	_ = s.Items[i]                   // bounds check
+	copy(s.Items[i+1:], s.Items[i:]) // shift one slot right, starting at [i]
+	s.Items[i] = item                // insert new item at [i]
 }
 
 // deleteItem at index i, shift the rest one pos left and clears the tail item
@@ -152,9 +153,10 @@ func (s *Array[T]) insertItem(i int, item T) {
 func (s *Array[T]) deleteItem(i int) {
 	var zero T
 
-	nl := len(s.Items) - 1           // new len
-	copy(s.Items[i:], s.Items[i+1:]) // overwrite item at [i]
+	_ = s.Items[i]                   // bounds check
+	copy(s.Items[i:], s.Items[i+1:]) // shift left, overwrite item at [i]
 
+	nl := len(s.Items) - 1 // new len
 	s.Items[nl] = zero     // clear the tail item
 	s.Items = s.Items[:nl] // new len, cap is unchanged
 }
