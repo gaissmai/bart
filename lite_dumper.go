@@ -32,14 +32,14 @@ func (t *Lite) dump(w io.Writer) {
 	stats := t.root4.nodeStatsRec()
 	if stats.nodes != 0 {
 		fmt.Fprintln(w)
-		fmt.Fprintf(w, "### IPv4: nodes(%d)", t.root4.nodeStatsRec().nodes)
+		fmt.Fprintf(w, "### IPv4: size(%d), nodes(%d), pfxs(%d), leaves(%d)", stats.pfxs+stats.leaves, stats.nodes, stats.pfxs, stats.leaves)
 		t.root4.dumpRec(w, stridePath{}, 0, true)
 	}
 
 	stats = t.root6.nodeStatsRec()
 	if stats.nodes != 0 {
 		fmt.Fprintln(w)
-		fmt.Fprintf(w, "### IPv6: nodes(%d)", t.root6.nodeStatsRec().nodes)
+		fmt.Fprintf(w, "### IPv4: size(%d), nodes(%d), pfxs(%d), leaves(%d)", stats.pfxs+stats.leaves, stats.nodes, stats.pfxs, stats.leaves)
 		t.root6.dumpRec(w, stridePath{}, 0, false)
 	}
 }
