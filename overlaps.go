@@ -241,7 +241,7 @@ func (n *node[V]) overlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
 	lastIdx, lastBits := lastOctetIdxAndBits(bits)
 
 	octets := ip.AsSlice()
-	octets = octets[:lastIdx+1]
+	// octets = octets[:lastIdx+1]
 
 	for ; depth < len(octets); depth++ {
 		octet := octets[depth]

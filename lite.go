@@ -65,7 +65,7 @@ func (l *Lite) Delete(pfx netip.Prefix) {
 
 	n := l.rootNodeByVersion(is4)
 
-	lastIdx, lastBits := liteLastOctetIdxAndBits(bits)
+	lastIdx, lastBits := lastOctetIdxAndBits(bits)
 
 	octets := ip.AsSlice()
 
@@ -163,8 +163,8 @@ func (l *Lite) Contains(ip netip.Addr) bool {
 // liteNode, see the node struct, but without payload V.
 // Needs less memory and insert and delete is also a bit faster.
 type liteNode struct {
-	prefixes bitset.BitSetArray
-	children sparse.Array[any] // [any] is a *liteNode or a *prefixNode TODO
+	prefixes bitset.BitSetFringe
+	children sparse.ArrayFringe[any] // [any] is a *liteNode or a *prefixNode
 }
 
 // prefixNode, just a path compressed prefix.
@@ -186,7 +186,7 @@ func (n *liteNode) insertAtDepth(pfx netip.Prefix, depth int) {
 	ip := pfx.Addr()
 	bits := pfx.Bits()
 
-	lastIdx, lastBits := liteLastOctetIdxAndBits(bits)
+	lastIdx, lastBits := lastOctetIdxAndBits(bits)
 	octets := ip.AsSlice()
 
 	// find the proper trie node to insert prefix
@@ -277,25 +277,4 @@ func (n *liteNode) purgeAndCompress(parentStack []*liteNode, childPath []uint8, 
 
 		n = parent
 	}
-}
-
-// liteLastOctetIdxAndBits, get last significant octet Idx and significant bits
-//
-// lastIdx:
-//
-//	0.0.0.0/7     -> 0
-//	0.0.0.0/8     -> 1
-//	10.0.0.0/8    -> 1
-//	10.12.0.0/15  -> 1
-//	10.12.0.0/16  -> 2
-//	10.12.10.9/32 -> 4
-//
-// lastBits:
-//
-//	10.0.0.0/8    -> 0
-//	10.12.0.0/15  -> 7
-//	10.12.0.0/16  -> 0
-//	10.12.10.9/32 -> 0
-func liteLastOctetIdxAndBits(bits int) (lastIdx, lastBits int) {
-	return bits / 8, bits % 8
 }

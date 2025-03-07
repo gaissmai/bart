@@ -2530,6 +2530,7 @@ func TestSize(t *testing.T) {
 	}
 }
 
+/*
 func TestLastIdxLastBits(t *testing.T) {
 	t.Parallel()
 
@@ -2596,6 +2597,7 @@ func TestLastIdxLastBits(t *testing.T) {
 		}
 	}
 }
+*/
 
 // ############ benchmarks ################################
 

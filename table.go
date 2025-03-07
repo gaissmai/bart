@@ -149,7 +149,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 	lastIdx, lastBits := lastOctetIdxAndBits(bits)
 
 	octets := ip.AsSlice()
-	octets = octets[:lastIdx+1]
+	// octets = octets[:lastIdx+1]
 
 	// find the proper trie node to update prefix
 	for depth, octet := range octets {
@@ -245,7 +245,7 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 	lastIdx, lastBits := lastOctetIdxAndBits(bits)
 
 	octets := ip.AsSlice()
-	octets = octets[:lastIdx+1]
+	// octets = octets[:lastIdx+1]
 
 	// find the proper trie node to update prefix
 	for depth, octet := range octets {
@@ -357,7 +357,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 	lastIdx, lastBits := lastOctetIdxAndBits(bits)
 
 	octets := ip.AsSlice()
-	octets = octets[:lastIdx+1]
+	// octets = octets[:lastIdx+1]
 
 	// record path to deleted node
 	// needed to purge and/or path compress nodes after deletion
@@ -443,7 +443,7 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, o
 	lastIdx, lastBits := lastOctetIdxAndBits(bits)
 
 	octets := ip.AsSlice()
-	octets = octets[:lastIdx+1]
+	// octets = octets[:lastIdx+1]
 
 	// record path to deleted node
 	// needed to purge and/or path compress nodes after deletion
@@ -531,7 +531,7 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 	lastIdx, lastBits := lastOctetIdxAndBits(bits)
 
 	octets := ip.AsSlice()
-	octets = octets[:lastIdx+1]
+	// octets = octets[:lastIdx+1]
 
 	// find the trie node
 LOOP:
@@ -703,6 +703,7 @@ func (t *Table[V]) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpm netip.Pr
 	if !pfx.IsValid() {
 		return lpm, val, false
 	}
+	pfx = pfx.Masked()
 
 	ip := pfx.Addr()
 	bits := pfx.Bits()
@@ -713,10 +714,12 @@ func (t *Table[V]) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpm netip.Pr
 	lastIdx, lastBits := lastOctetIdxAndBits(bits)
 
 	octets := ip.AsSlice()
-	octets = octets[:lastIdx+1]
+	// octets = octets[:lastIdx+1]
 
-	// mask the last octet from IP
-	octets[lastIdx] &= netMask(lastBits)
+	/*
+		// mask the last octet from IP
+		octets[lastIdx] &= netMask(lastBits)
+	*/
 
 	// record path to leaf node
 	stack := [maxTreeDepth]*node[V]{}
@@ -822,7 +825,7 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 		lastIdx, lastBits := lastOctetIdxAndBits(bits)
 
 		octets := ip.AsSlice()
-		octets = octets[:lastIdx+1]
+		// octets = octets[:lastIdx+1]
 
 		// stack of the traversed nodes for reverse ordering of supernets
 		stack := [maxTreeDepth]*node[V]{}
@@ -910,7 +913,7 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 		lastIdx, lastBits := lastOctetIdxAndBits(bits)
 
 		octets := ip.AsSlice()
-		octets = octets[:lastIdx+1]
+		// octets = octets[:lastIdx+1]
 
 		// find the trie node
 		for depth, octet := range octets {
@@ -1091,31 +1094,21 @@ func (t *Table[V]) AllSorted6() iter.Seq2[netip.Prefix, V] {
 //
 // lastIdx:
 //
-//	10.0.0.0/8    -> 0
+//	0.0.0.0/7     -> 0
+//	0.0.0.0/8     -> 1
+//	10.0.0.0/8    -> 1
 //	10.12.0.0/15  -> 1
-//	10.12.0.0/16  -> 1
-//	10.12.10.9/32 -> 3
+//	10.12.0.0/16  -> 2
+//	10.12.10.9/32 -> 4
 //
 // lastBits:
 //
-//	10.0.0.0/8    -> 8
+//	10.0.0.0/8    -> 0
 //	10.12.0.0/15  -> 7
-//	10.12.0.0/16  -> 8
-//	10.12.10.9/32 -> 8
-//
-// lastOctet := octets[lastIdx]
-//
-//	10.0.0.0/8    -> 10
-//	10.12.0.0/15  -> 12
-//	10.12.0.0/16  -> 12
-//	10.12.10.9/32 -> 9
+//	10.12.0.0/16  -> 0
+//	10.12.10.9/32 -> 0
 func lastOctetIdxAndBits(bits int) (lastIdx, lastBits int) {
-	bits--
-	if bits < 0 {
-		return 0, 0
-	}
-
-	return bits >> 3, bits%8 + 1
+	return bits / 8, bits % 8
 }
 
 // netmask for bits
