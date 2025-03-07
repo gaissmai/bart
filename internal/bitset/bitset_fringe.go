@@ -9,10 +9,10 @@ import (
 
 const words = 4
 
-type BitSetArray [words]uint64
+type BitSetFringe [words]uint64
 
 // IsEmpty returns true if no bit is set.
-func (b BitSetArray) IsEmpty() bool {
+func (b BitSetFringe) IsEmpty() bool {
 	for _, w := range b {
 		if w != 0 {
 			return false
@@ -23,13 +23,13 @@ func (b BitSetArray) IsEmpty() bool {
 
 // Set bit i to 1, the capacity of the bitset is increased accordingly.
 // panics if i is > 255
-func (b BitSetArray) Set(i uint) BitSetArray {
+func (b BitSetFringe) Set(i uint) BitSetFringe {
 	b[i>>6] |= 1 << (i & 63)
 	return b
 }
 
 // Clear bit i to 0.
-func (b BitSetArray) Clear(i uint) BitSetArray {
+func (b BitSetFringe) Clear(i uint) BitSetFringe {
 	if x := int(i >> 6); x < len(b) {
 		b[x] &^= 1 << (i & 63)
 	}
@@ -37,7 +37,7 @@ func (b BitSetArray) Clear(i uint) BitSetArray {
 }
 
 // Test if bit i is set.
-func (b BitSetArray) Test(i uint) (ok bool) {
+func (b BitSetFringe) Test(i uint) (ok bool) {
 	if x := int(i >> 6); x < len(b) {
 		return b[x]&(1<<(i&63)) != 0
 	}
@@ -45,12 +45,12 @@ func (b BitSetArray) Test(i uint) (ok bool) {
 }
 
 // Clone this BitSet, returning a new BitSet that has the same bits set.
-func (b BitSetArray) Clone() BitSetArray {
+func (b BitSetFringe) Clone() BitSetFringe {
 	return b
 }
 
 // FirstSet returns the first bit set along with an ok code.
-func (b BitSetArray) FirstSet() (uint, bool) {
+func (b BitSetFringe) FirstSet() (uint, bool) {
 	for x, word := range b {
 		if word != 0 {
 			return uint(x<<6 + bits.TrailingZeros64(word)), true
@@ -61,7 +61,7 @@ func (b BitSetArray) FirstSet() (uint, bool) {
 
 // NextSet returns the next bit set from the specified index,
 // including possibly the current index along with an ok code.
-func (b BitSetArray) NextSet(i uint) (uint, bool) {
+func (b BitSetFringe) NextSet(i uint) (uint, bool) {
 	x := int(i >> 6)
 	if x >= len(b) {
 		return 0, false
@@ -89,7 +89,7 @@ func (b BitSetArray) NextSet(i uint) (uint, bool) {
 //
 // This is faster than All, but also more dangerous,
 // it panics if the capacity of buf is < b.Size()
-func (b BitSetArray) AsSlice(buf []uint) []uint {
+func (b BitSetFringe) AsSlice(buf []uint) []uint {
 	buf = buf[:cap(buf)] // len = cap
 
 	size := 0
@@ -108,13 +108,13 @@ func (b BitSetArray) AsSlice(buf []uint) []uint {
 }
 
 // All returns all set bits. This has a simpler API but is slower than AsSlice.
-func (b BitSetArray) All() []uint {
+func (b BitSetFringe) All() []uint {
 	return b.AsSlice(make([]uint, 0, popcntSlice(b[:])))
 }
 
 // IntersectsAny returns true if the intersection of base set with the compare set
 // is not the empty set.
-func (b BitSetArray) IntersectsAny(c BitSetArray) bool {
+func (b BitSetFringe) IntersectsAny(c BitSetFringe) bool {
 	for i := words - 1; i >= 0; i-- {
 		if b[i]&c[i] != 0 {
 			return true
@@ -125,7 +125,7 @@ func (b BitSetArray) IntersectsAny(c BitSetArray) bool {
 
 // IntersectionTop computes the intersection of base set with the compare set.
 // If the result set isn't empty, it returns the top most set bit and true.
-func (b BitSetArray) IntersectionTop(c BitSetArray) (top uint, ok bool) {
+func (b BitSetFringe) IntersectionTop(c BitSetFringe) (top uint, ok bool) {
 	for i := words - 1; i >= 0; i-- {
 		if word := b[i] & c[i]; word != 0 {
 			return uint(i<<6+bits.Len64(word)) - 1, true
@@ -135,14 +135,14 @@ func (b BitSetArray) IntersectionTop(c BitSetArray) (top uint, ok bool) {
 }
 
 // IntersectionCardinality computes the popcount of the intersection.
-func (b BitSetArray) IntersectionCardinality(c BitSetArray) int {
+func (b BitSetFringe) IntersectionCardinality(c BitSetFringe) int {
 	return popcntAnd(b[:], c[:])
 }
 
 // InPlaceIntersection overwrites and computes the intersection of
 // base set with the compare set. This is the BitSet equivalent of & (and).
 // If len(c) > len(b), new memory is allocated.
-func (b *BitSetArray) InPlaceIntersection(c BitSetArray) {
+func (b *BitSetFringe) InPlaceIntersection(c BitSetFringe) {
 	// bounds check eliminated, range until minLen(b,c)
 	for i := words - 1; i >= 0; i-- {
 		(*b)[i] &= c[i]
@@ -152,22 +152,21 @@ func (b *BitSetArray) InPlaceIntersection(c BitSetArray) {
 // InPlaceUnion creates the destructive union of base set with compare set.
 // This is the BitSet equivalent of | (or).
 // If len(c) > len(b), new memory is allocated.
-func (b *BitSetArray) InPlaceUnion(c BitSetArray) {
+func (b *BitSetFringe) InPlaceUnion(c BitSetFringe) {
 	for i := words - 1; i >= 0; i-- {
 		(*b)[i] |= c[i]
 	}
-	return
 }
 
 // Size (number of set bits).
-func (b BitSetArray) Size() int {
+func (b BitSetFringe) Size() int {
 	return popcntSlice(b[:])
 }
 
 // Rank0 is equal to Rank(i) - 1
 //
 // With inlined popcount to make Rank0 itself inlineable.
-func (b BitSetArray) Rank0(i uint) (rnk int) {
+func (b BitSetFringe) Rank0(i uint) (rnk int) {
 	// Rank count is inclusive
 	i++
 

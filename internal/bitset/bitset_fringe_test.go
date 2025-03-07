@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-func TestArrayZeroValue(t *testing.T) {
+func TestFringeZeroValue(t *testing.T) {
 	t.Parallel()
 	defer func() {
 		if r := recover(); r != nil {
@@ -17,56 +17,56 @@ func TestArrayZeroValue(t *testing.T) {
 		}
 	}()
 
-	b := BitSetArray{}
+	b := BitSetFringe{}
 	b.Set(0)
 
-	b = BitSetArray{}
+	b = BitSetFringe{}
 	_ = b.Clear(1000)
 
-	b = BitSetArray{}
+	b = BitSetFringe{}
 	b.Clone()
 
-	b = BitSetArray{}
+	b = BitSetFringe{}
 	b.Size()
 
-	b = BitSetArray{}
+	b = BitSetFringe{}
 	b.Rank0(100)
 
-	b = BitSetArray{}
+	b = BitSetFringe{}
 	b.Test(42)
 
-	b = BitSetArray{}
+	b = BitSetFringe{}
 	b.NextSet(0)
 
-	b = BitSetArray{}
+	b = BitSetFringe{}
 	b.AsSlice(nil)
 
-	b = BitSetArray{}
+	b = BitSetFringe{}
 	b.All()
 
-	b = BitSetArray{}
-	c := BitSetArray{}
+	b = BitSetFringe{}
+	c := BitSetFringe{}
 	b.InPlaceIntersection(c)
 
-	b = BitSetArray{}
-	c = BitSetArray{}
+	b = BitSetFringe{}
+	c = BitSetFringe{}
 	b.InPlaceUnion(c)
 
-	b = BitSetArray{}
-	c = BitSetArray{}
+	b = BitSetFringe{}
+	c = BitSetFringe{}
 	b.IntersectsAny(c)
 
-	b = BitSetArray{}
-	c = BitSetArray{}
+	b = BitSetFringe{}
+	c = BitSetFringe{}
 	b.IntersectionTop(c)
 }
 
-func TestArrayClone(t *testing.T) {
+func TestFringeClone(t *testing.T) {
 	t.Parallel()
-	var b BitSetArray
+	var b BitSetFringe
 	c := b.Clone()
 
-	if b != b {
+	if c != b {
 		t.Error("clone of nil BitSetArray should also be nil")
 	}
 
@@ -84,16 +84,16 @@ func TestArrayClone(t *testing.T) {
 	}
 }
 
-func TestArrayTest(t *testing.T) {
+func TestFringeTest(t *testing.T) {
 	t.Parallel()
-	var b BitSetArray
+	var b BitSetFringe
 	b = b.Set(100)
 	if !b.Test(100) {
 		t.Errorf("Bit %d is clear, and it shouldn't be.", 100)
 	}
 }
 
-func TestArrayFirstSet(t *testing.T) {
+func TestFringeFirstSet(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
 		name    string
@@ -134,7 +134,7 @@ func TestArrayFirstSet(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		var b BitSetArray
+		var b BitSetFringe
 		for _, u := range tc.set {
 			b = b.Set(u)
 		}
@@ -151,7 +151,7 @@ func TestArrayFirstSet(t *testing.T) {
 	}
 }
 
-func TestArrayNextSet(t *testing.T) {
+func TestFringeNextSet(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
 		name string
@@ -222,7 +222,7 @@ func TestArrayNextSet(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		var b BitSetArray
+		var b BitSetFringe
 		for _, u := range tc.set {
 			b = b.Set(u)
 		}
@@ -243,7 +243,7 @@ func TestArrayNextSet(t *testing.T) {
 	}
 }
 
-func TestArrayIsEmpty(t *testing.T) {
+func TestFringeIsEmpty(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
@@ -287,7 +287,7 @@ func TestArrayIsEmpty(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		var b BitSetArray
+		var b BitSetFringe
 		for _, u := range tc.set {
 			b = b.Set(u)
 		}
@@ -304,7 +304,7 @@ func TestArrayIsEmpty(t *testing.T) {
 	}
 }
 
-func TestArrayAll(t *testing.T) {
+func TestFringeAll(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
 		name string
@@ -347,7 +347,7 @@ func TestArrayAll(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		var b BitSetArray
+		var b BitSetFringe
 		for _, u := range tc.set {
 			b = b.Set(u)
 		}
@@ -365,7 +365,7 @@ func TestArrayAll(t *testing.T) {
 	}
 }
 
-func TestArrayAsSlice(t *testing.T) {
+func TestFringeAsSlice(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
 		name string
@@ -414,7 +414,7 @@ func TestArrayAsSlice(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		var b BitSetArray
+		var b BitSetFringe
 		for _, u := range tc.set {
 			b = b.Set(u)
 		}
@@ -432,9 +432,9 @@ func TestArrayAsSlice(t *testing.T) {
 	}
 }
 
-func TestArrayCount(t *testing.T) {
+func TestFringeCount(t *testing.T) {
 	t.Parallel()
-	var b BitSetArray
+	var b BitSetFringe
 	tot := uint(64*3 + 11) // just an unmagic number
 	checkLast := true
 	for i := range tot {
@@ -455,9 +455,9 @@ func TestArrayCount(t *testing.T) {
 }
 
 // test setting every 3rd bit, just in case something odd is happening
-func TestArrayCount2(t *testing.T) {
+func TestFringeCount2(t *testing.T) {
 	t.Parallel()
-	var b BitSetArray
+	var b BitSetFringe
 	tot := uint(64*3 + 11)
 	for i := uint(0); i < tot; i += 3 {
 		sz := uint(b.Size())
@@ -469,10 +469,10 @@ func TestArrayCount2(t *testing.T) {
 	}
 }
 
-func TestArrayInPlaceUnion(t *testing.T) {
+func TestFringeInPlaceUnion(t *testing.T) {
 	t.Parallel()
-	var a BitSetArray
-	var b BitSetArray
+	var a BitSetFringe
+	var b BitSetFringe
 	for i := uint(1); i < 100; i += 2 {
 		a = a.Set(i)
 		b = b.Set(i - 1)
@@ -492,10 +492,10 @@ func TestArrayInPlaceUnion(t *testing.T) {
 	}
 }
 
-func TestArrayInplaceIntersection(t *testing.T) {
+func TestFringeInplaceIntersection(t *testing.T) {
 	t.Parallel()
-	var a BitSetArray
-	var b BitSetArray
+	var a BitSetFringe
+	var b BitSetFringe
 	for i := uint(1); i < 100; i += 2 {
 		a = a.Set(i)
 		b = b.Set(i - 1)
@@ -522,10 +522,10 @@ func TestArrayInplaceIntersection(t *testing.T) {
 	}
 }
 
-func TestArrayIntersects(t *testing.T) {
+func TestFringeIntersects(t *testing.T) {
 	t.Parallel()
-	var a BitSetArray
-	var b BitSetArray
+	var a BitSetFringe
+	var b BitSetFringe
 
 	for i := uint(1); i < 100; i++ {
 		a = a.Set(i)
@@ -548,10 +548,10 @@ func TestArrayIntersects(t *testing.T) {
 	}
 }
 
-func TestArrayIntersectionTop(t *testing.T) {
+func TestFringeIntersectionTop(t *testing.T) {
 	t.Parallel()
-	var a BitSetArray
-	var b BitSetArray
+	var a BitSetFringe
+	var b BitSetFringe
 	for i := uint(1); i < 100; i += 2 {
 		a = a.Set(i)
 		b = b.Set(i - 1)
@@ -584,10 +584,10 @@ func TestArrayIntersectionTop(t *testing.T) {
 }
 
 // Rank0 is popcount-1
-func TestArrayRank0(t *testing.T) {
+func TestFringeRank0(t *testing.T) {
 	t.Parallel()
 	u := []uint{2, 3, 5, 7, 11, 70, 150}
-	var b BitSetArray
+	var b BitSetFringe
 	for _, v := range u {
 		b = b.Set(v)
 	}
@@ -610,7 +610,7 @@ func TestArrayRank0(t *testing.T) {
 	}
 }
 
-func TestArrayPopcntSlice(t *testing.T) {
+func TestFringePopcntSlice(t *testing.T) {
 	t.Parallel()
 	s := []uint64{2, 3, 5, 7, 11, 13, 17, 19, 23, 29}
 	res := uint64(popcntSlice(s))
@@ -620,7 +620,7 @@ func TestArrayPopcntSlice(t *testing.T) {
 	}
 }
 
-func TestArrayPopcntAndSlice(t *testing.T) {
+func TestFringePopcntAndSlice(t *testing.T) {
 	t.Parallel()
 	s := []uint64{2, 3, 5, 7, 11, 13, 17, 19, 23, 29}
 	m := []uint64{31, 37, 41, 43, 47, 53, 59, 61, 67, 71}
