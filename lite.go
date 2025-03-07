@@ -65,10 +65,9 @@ func (l *Lite) Delete(pfx netip.Prefix) {
 
 	n := l.rootNodeByVersion(is4)
 
-	lastIdx, lastBits := lastOctetIdxAndBits(bits)
+	lastIdx, lastBits := liteLastOctetIdxAndBits(bits)
 
 	octets := ip.AsSlice()
-	octets = octets[:lastIdx+1]
 
 	// record path to deleted node
 	// needed to purge and/or path compress nodes after deletion
@@ -80,7 +79,7 @@ func (l *Lite) Delete(pfx netip.Prefix) {
 		stack[depth] = n
 
 		// delete prefix in trie node
-		if depth == lastIdx && lastBits != strideLen {
+		if depth == lastIdx {
 			n.prefixes = n.prefixes.Clear(art.PfxToIdx(octet, lastBits))
 			n.purgeAndCompress(stack[:depth], octets, is4)
 			return
@@ -96,11 +95,6 @@ func (l *Lite) Delete(pfx netip.Prefix) {
 		switch kid := kid.(type) {
 		case *liteNode:
 			n = kid
-			if depth == lastIdx && lastBits == strideLen {
-				n.prefixes = n.prefixes.Clear(1)
-				n.purgeAndCompress(stack[:depth], octets, is4)
-				return
-			}
 			continue // descend down to next trie level
 
 		case *prefixNode:
@@ -192,7 +186,7 @@ func (n *liteNode) insertAtDepth(pfx netip.Prefix, depth int) {
 	ip := pfx.Addr()
 	bits := pfx.Bits()
 
-	lastIdx, lastBits := lastOctetIdxAndBits(bits)
+	lastIdx, lastBits := liteLastOctetIdxAndBits(bits)
 	octets := ip.AsSlice()
 
 	// find the proper trie node to insert prefix
@@ -202,16 +196,9 @@ func (n *liteNode) insertAtDepth(pfx netip.Prefix, depth int) {
 		addr := uint(octet)
 
 		// last significant octet: insert/override prefix into node
-		// handle fringes extra (/8, /16, /24, /32, /48, ...)
-		if depth == lastIdx && lastBits != strideLen {
+		if depth == lastIdx {
 			// just set a bit, no payload to insert
 			n.prefixes = n.prefixes.Set(art.PfxToIdx(octet, lastBits))
-			return
-		}
-
-		if depth == lastIdx+1 && lastBits == strideLen {
-			// just set a bit, no payload to insert
-			n.prefixes = n.prefixes.Set(1)
 			return
 		}
 
@@ -290,4 +277,25 @@ func (n *liteNode) purgeAndCompress(parentStack []*liteNode, childPath []uint8, 
 
 		n = parent
 	}
+}
+
+// liteLastOctetIdxAndBits, get last significant octet Idx and significant bits
+//
+// lastIdx:
+//
+//	0.0.0.0/7     -> 0
+//	0.0.0.0/8     -> 1
+//	10.0.0.0/8    -> 1
+//	10.12.0.0/15  -> 1
+//	10.12.0.0/16  -> 2
+//	10.12.10.9/32 -> 4
+//
+// lastBits:
+//
+//	10.0.0.0/8    -> 0
+//	10.12.0.0/15  -> 7
+//	10.12.0.0/16  -> 0
+//	10.12.10.9/32 -> 0
+func liteLastOctetIdxAndBits(bits int) (lastIdx, lastBits int) {
+	return bits / 8, bits % 8
 }
