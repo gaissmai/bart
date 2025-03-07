@@ -80,7 +80,7 @@ func (l *Lite) Delete(pfx netip.Prefix) {
 		stack[depth] = n
 
 		// delete prefix in trie node
-		if depth == lastIdx {
+		if depth == lastIdx && lastBits != strideLen {
 			n.prefixes = n.prefixes.Clear(art.PfxToIdx(octet, lastBits))
 			n.purgeAndCompress(stack[:depth], octets, is4)
 			return
@@ -96,6 +96,11 @@ func (l *Lite) Delete(pfx netip.Prefix) {
 		switch kid := kid.(type) {
 		case *liteNode:
 			n = kid
+			if depth == lastIdx && lastBits == strideLen {
+				n.prefixes = n.prefixes.Clear(1)
+				n.purgeAndCompress(stack[:depth], octets, is4)
+				return
+			}
 			continue // descend down to next trie level
 
 		case *prefixNode:
@@ -164,8 +169,8 @@ func (l *Lite) Contains(ip netip.Addr) bool {
 // liteNode, see the node struct, but without payload V.
 // Needs less memory and insert and delete is also a bit faster.
 type liteNode struct {
-	prefixes bitset.BitSet
-	children sparse.Array[any] // [any] is a *liteNode or a *prefixNode
+	prefixes bitset.BitSetArray
+	children sparse.Array[any] // [any] is a *liteNode or a *prefixNode TODO
 }
 
 // prefixNode, just a path compressed prefix.
@@ -173,9 +178,16 @@ type prefixNode struct {
 	netip.Prefix
 }
 
+// fringeNode TODO
+type fringeNode struct{}
+
+func (n *liteNode) isEmpty() bool {
+	return len(n.children.Items) == 0 && n.prefixes.Size() == 0
+}
+
 // lpmTest, any longest prefix match
 func (n *liteNode) lpmTest(idx uint) bool {
-	return n.prefixes.IntersectsAny(lpmbt.LookupTbl[idx])
+	return n.prefixes.IntersectsAny(lpmbt.LookupTblArray[idx])
 }
 
 // insertAtDepth, see the similar method for node, but now simpler without payload V.
@@ -184,9 +196,7 @@ func (n *liteNode) insertAtDepth(pfx netip.Prefix, depth int) {
 	bits := pfx.Bits()
 
 	lastIdx, lastBits := lastOctetIdxAndBits(bits)
-
 	octets := ip.AsSlice()
-	octets = octets[:lastIdx+1]
 
 	// find the proper trie node to insert prefix
 	// start with prefix octet at depth
@@ -195,9 +205,16 @@ func (n *liteNode) insertAtDepth(pfx netip.Prefix, depth int) {
 		addr := uint(octet)
 
 		// last significant octet: insert/override prefix into node
-		if depth == lastIdx {
+		// handle fringes extra (/8, /16, /24, /32, /48, ...)
+		if depth == lastIdx && lastBits != strideLen {
 			// just set a bit, no payload to insert
 			n.prefixes = n.prefixes.Set(art.PfxToIdx(octet, lastBits))
+			return
+		}
+
+		if depth == lastIdx+1 && lastBits == strideLen {
+			// just set a bit, no payload to insert
+			n.prefixes = n.prefixes.Set(1)
 			return
 		}
 
