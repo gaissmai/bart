@@ -22,6 +22,7 @@ func (b BitSetArray) IsEmpty() bool {
 }
 
 // Set bit i to 1, the capacity of the bitset is increased accordingly.
+// panics if i is > 255
 func (b BitSetArray) Set(i uint) BitSetArray {
 	b[i>>6] |= 1 << (i & 63)
 	return b
