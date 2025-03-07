@@ -98,9 +98,9 @@ func (l *Lite) Delete(pfx netip.Prefix) {
 			n = kid
 			continue // descend down to next trie level
 
-		case netip.Prefix:
+		case *prefixNode:
 			// reached a path compressed prefix, stop traversing
-			if kid != pfx {
+			if kid.Prefix != pfx {
 				// nothing to delete
 				return
 			}
@@ -146,7 +146,7 @@ func (l *Lite) Contains(ip netip.Addr) bool {
 			n = kid
 			continue // descend down to next trie level
 
-		case netip.Prefix:
+		case *prefixNode:
 			// kid is a path-compressed prefix
 			return kid.Contains(ip)
 
@@ -165,7 +165,12 @@ func (l *Lite) Contains(ip netip.Addr) bool {
 // Needs less memory and insert and delete is also a bit faster.
 type liteNode struct {
 	prefixes bitset.BitSet
-	children sparse.Array[any] // [any] is a *liteNode or a netip.Prefix
+	children sparse.Array[any] // [any] is a *liteNode or a *prefixNode
+}
+
+// prefixNode, just a path compressed prefix.
+type prefixNode struct {
+	netip.Prefix
 }
 
 // lpmTest, any longest prefix match
@@ -198,7 +203,7 @@ func (n *liteNode) insertAtDepth(pfx netip.Prefix, depth int) {
 
 		if !n.children.Test(addr) {
 			// insert prefix as path-compressed leaf
-			n.children.InsertAt(addr, pfx)
+			n.children.InsertAt(addr, &prefixNode{pfx})
 			return
 		}
 		kid := n.children.MustGet(addr)
@@ -209,9 +214,9 @@ func (n *liteNode) insertAtDepth(pfx netip.Prefix, depth int) {
 			n = kid
 			continue // descend down to next trie level
 
-		case netip.Prefix:
+		case *prefixNode:
 			// reached a path-compressed leaf, just a netip.Prefix
-			if kid == pfx {
+			if kid.Prefix == pfx {
 				// already exists, nothing to do
 				return
 			}
@@ -221,7 +226,7 @@ func (n *liteNode) insertAtDepth(pfx netip.Prefix, depth int) {
 			// insert new child at current leaf position (addr)
 			// descend down, replace n with new child
 			newNode := new(liteNode)
-			newNode.insertAtDepth(kid, depth+1)
+			newNode.insertAtDepth(kid.Prefix, depth+1)
 
 			n.children.InsertAt(addr, newNode)
 			n = newNode
@@ -254,7 +259,7 @@ func (n *liteNode) purgeAndCompress(parentStack []*liteNode, childPath []uint8, 
 			// if single child is a path-compressed leaf, shift it up one level
 			// and override current node with this leaf
 			if pfx, ok := n.children.Items[0].(netip.Prefix); ok {
-				parent.children.InsertAt(addr, pfx)
+				parent.children.InsertAt(addr, &prefixNode{pfx})
 			}
 
 		case prefixCount == 1 && childCount == 0:
@@ -266,7 +271,7 @@ func (n *liteNode) purgeAndCompress(parentStack []*liteNode, childPath []uint8, 
 			copy(path[:], childPath)
 			pfx := cidrFromPath(path, i+1, is4, idx)
 
-			parent.children.InsertAt(addr, pfx)
+			parent.children.InsertAt(addr, &prefixNode{pfx})
 		}
 
 		n = parent
