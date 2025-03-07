@@ -1110,14 +1110,12 @@ func (t *Table[V]) AllSorted6() iter.Seq2[netip.Prefix, V] {
 //	10.12.0.0/16  -> 12
 //	10.12.10.9/32 -> 9
 func lastOctetIdxAndBits(bits int) (lastIdx, lastBits int) {
-	if bits == 0 {
-		return
+	bits--
+	if bits < 0 {
+		return 0, 0
 	}
 
-	lastIdx = (bits - 1) >> 3
-	lastBits = bits - (lastIdx << 3)
-
-	return
+	return bits >> 3, bits%8 + 1
 }
 
 // netmask for bits

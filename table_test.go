@@ -13,7 +13,6 @@ import (
 	"fmt"
 	"math/rand"
 	"net/netip"
-	"reflect"
 	"testing"
 )
 
@@ -2531,27 +2530,69 @@ func TestSize(t *testing.T) {
 	}
 }
 
-func TestIpAsOctets(t *testing.T) {
+func TestLastIdxLastBits(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		ip   netip.Addr
-		want []byte
+		pfx      netip.Prefix
+		wantIdx  int
+		wantBits int
 	}{
 		{
-			ip:   mpa("10.11.12.13"),
-			want: []byte{10, 11, 12, 13},
+			pfx:      mpp("0.0.0.0/0"),
+			wantIdx:  0,
+			wantBits: 0,
 		},
 		{
-			ip:   mpa("2001:db8::1"),
-			want: []byte{0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},
+			pfx:      mpp("0.0.0.0/32"),
+			wantIdx:  3,
+			wantBits: 8,
+		},
+		{
+			pfx:      mpp("10.0.0.0/7"),
+			wantIdx:  0,
+			wantBits: 7,
+		},
+		{
+			pfx:      mpp("10.20.0.0/14"),
+			wantIdx:  1,
+			wantBits: 6,
+		},
+		{
+			pfx:      mpp("10.20.30.0/24"),
+			wantIdx:  2,
+			wantBits: 8,
+		},
+		{
+			pfx:      mpp("10.20.30.40/31"),
+			wantIdx:  3,
+			wantBits: 7,
+		},
+		//
+		{
+			pfx:      mpp("::/0"),
+			wantIdx:  0,
+			wantBits: 0,
+		},
+		{
+			pfx:      mpp("::/128"),
+			wantIdx:  15,
+			wantBits: 8,
+		},
+		{
+			pfx:      mpp("2001:db8::/31"),
+			wantIdx:  3,
+			wantBits: 7,
 		},
 	}
 
 	for _, tc := range tests {
-		got := tc.ip.AsSlice()
-		if !reflect.DeepEqual(got, tc.want) {
-			t.Errorf("ipAsOctets, %s, got: %v, want: %v", tc.ip, got, tc.want)
+		gotIdx, gotBits := lastOctetIdxAndBits(tc.pfx.Bits())
+		if gotIdx != tc.wantIdx {
+			t.Errorf("lastOctetIdxAndBits(%d), lastIdx got: %d, want: %d", tc.pfx.Bits(), gotIdx, tc.wantIdx)
+		}
+		if gotBits != tc.wantBits {
+			t.Errorf("lastOctetIdxAndBits(%d), lastBits got: %d, want: %d", tc.pfx.Bits(), gotBits, tc.wantBits)
 		}
 	}
 }
