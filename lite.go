@@ -65,7 +65,13 @@ func (l *Lite) Delete(pfx netip.Prefix) {
 
 	n := l.rootNodeByVersion(is4)
 
-	lastIdx, lastBits := lastOctetIdxAndBits(bits)
+	// handle default route upfront
+	if bits == 0 {
+		n.prefixes = n.prefixes.Clear(1)
+		return
+	}
+
+	lastIdx, lastBits := liteOctetIdxAndBits(bits)
 
 	octets := ip.AsSlice()
 
@@ -79,7 +85,7 @@ func (l *Lite) Delete(pfx netip.Prefix) {
 		stack[depth] = n
 
 		// delete prefix in trie node
-		if depth == lastIdx {
+		if depth == lastIdx && lastBits != 0 {
 			n.prefixes = n.prefixes.Clear(art.PfxToIdx(octet, lastBits))
 			n.purgeAndCompress(stack[:depth], octets, is4)
 			return
@@ -95,7 +101,19 @@ func (l *Lite) Delete(pfx netip.Prefix) {
 		switch kid := kid.(type) {
 		case *liteNode:
 			n = kid
+			if depth == lastIdx && lastBits == 0 {
+				n.prefixes = n.prefixes.Clear(1)
+				n.purgeAndCompress(stack[:depth], octets, is4)
+				return
+			}
 			continue // descend down to next trie level
+
+		case *fringeNode:
+			if depth == lastIdx && lastBits == 0 {
+				n.children.DeleteAt(addr)
+				n.purgeAndCompress(stack[:depth], octets, is4)
+			}
+			return
 
 		case *prefixNode:
 			// reached a path compressed prefix, stop traversing
@@ -145,6 +163,10 @@ func (l *Lite) Contains(ip netip.Addr) bool {
 			n = kid
 			continue // descend down to next trie level
 
+		case *fringeNode:
+			// kid is a addr/8 fringe
+			return true
+
 		case *prefixNode:
 			// kid is a path-compressed prefix
 			return kid.Contains(ip)
@@ -172,6 +194,9 @@ type prefixNode struct {
 	netip.Prefix
 }
 
+// fringeNode, just a TODO
+type fringeNode struct{}
+
 func (n *liteNode) isEmpty() bool {
 	return len(n.children.Items) == 0 && n.prefixes.Size() == 0
 }
@@ -186,7 +211,14 @@ func (n *liteNode) insertAtDepth(pfx netip.Prefix, depth int) {
 	ip := pfx.Addr()
 	bits := pfx.Bits()
 
-	lastIdx, lastBits := lastOctetIdxAndBits(bits)
+	// handle default route upfront
+	if bits == 0 {
+		n.prefixes = n.prefixes.Set(1)
+		return
+	}
+
+	lastIdx, lastBits := liteOctetIdxAndBits(bits)
+
 	octets := ip.AsSlice()
 
 	// find the proper trie node to insert prefix
@@ -196,13 +228,19 @@ func (n *liteNode) insertAtDepth(pfx netip.Prefix, depth int) {
 		addr := uint(octet)
 
 		// last significant octet: insert/override prefix into node
-		if depth == lastIdx {
+		if depth == lastIdx && lastBits != 0 {
 			// just set a bit, no payload to insert
 			n.prefixes = n.prefixes.Set(art.PfxToIdx(octet, lastBits))
 			return
 		}
 
 		if !n.children.Test(addr) {
+			// insert fringe node in existing node
+			if depth == lastIdx && lastBits == 0 {
+				n.children.InsertAt(addr, &fringeNode{})
+				return
+			}
+
 			// insert prefix as path-compressed leaf
 			n.children.InsertAt(addr, &prefixNode{pfx})
 			return
@@ -213,7 +251,29 @@ func (n *liteNode) insertAtDepth(pfx netip.Prefix, depth int) {
 		switch kid := kid.(type) {
 		case *liteNode:
 			n = kid
+			if depth == lastIdx && lastBits == 0 {
+				// insert fringe prefix in already existing node
+				n.prefixes = n.prefixes.Set(1)
+				return
+			}
 			continue // descend down to next trie level
+
+		case *fringeNode:
+			// same fringe node, do nothing
+			if depth == lastIdx && lastBits == 0 {
+				return
+			}
+
+			// create new node
+			// convert fringeNode to fringe prefix addr/8
+			// insert new child at current leaf position (addr)
+			// descend down, replace n with new child
+			newNode := new(liteNode)
+			newNode.prefixes = newNode.prefixes.Set(1)
+
+			n.children.InsertAt(addr, newNode)
+			n = newNode
+			continue
 
 		case *prefixNode:
 			// reached a path-compressed leaf, just a netip.Prefix
@@ -232,6 +292,13 @@ func (n *liteNode) insertAtDepth(pfx netip.Prefix, depth int) {
 			n.children.InsertAt(addr, newNode)
 			n = newNode
 
+			// insert fringe prefix addr/8
+			if depth == lastIdx && lastBits == 0 {
+				n.prefixes = n.prefixes.Set(1)
+				return
+			}
+			continue
+
 		default:
 			panic("logic error, wrong node type")
 		}
@@ -244,9 +311,10 @@ func (n *liteNode) insertAtDepth(pfx netip.Prefix, depth int) {
 // similar to the same helper method for node, but without payload V.
 func (n *liteNode) purgeAndCompress(parentStack []*liteNode, childPath []uint8, is4 bool) {
 	// unwind the stack
-	for i := len(parentStack) - 1; i >= 0; i-- {
-		parent := parentStack[i]
-		addr := uint(childPath[i])
+LOOP:
+	for depth := len(parentStack) - 1; depth >= 0; depth-- {
+		parent := parentStack[depth]
+		addr := uint(childPath[depth])
 
 		prefixCount := n.prefixes.Size()
 		childCount := n.children.Len()
@@ -258,9 +326,22 @@ func (n *liteNode) purgeAndCompress(parentStack []*liteNode, childPath []uint8, 
 
 		case prefixCount == 0 && childCount == 1:
 			// if single child is a path-compressed leaf, shift it up one level
-			// and override current node with this leaf
-			if pfx, ok := n.children.Items[0].(netip.Prefix); ok {
-				parent.children.InsertAt(addr, &prefixNode{pfx})
+			// and delete current node with this leaf
+			if pfx, ok := n.children.Items[0].(*prefixNode); ok {
+				parent.children.DeleteAt(addr)
+				parent.insertAtDepth(pfx.Prefix, depth)
+				continue LOOP
+			}
+
+			// if single child is a fringeNode, shift it up one level
+			// and delete current node with this fringe
+			if _, ok := n.children.Items[0].(*fringeNode); ok {
+				path := stridePath{}
+				copy(path[:], childPath)
+				pfx := cidrFromPath(path, depth+1, is4, 1)
+
+				parent.insertAtDepth(pfx, depth)
+				continue LOOP
 			}
 
 		case prefixCount == 1 && childCount == 0:
@@ -270,11 +351,20 @@ func (n *liteNode) purgeAndCompress(parentStack []*liteNode, childPath []uint8, 
 
 			path := stridePath{}
 			copy(path[:], childPath)
-			pfx := cidrFromPath(path, i+1, is4, idx)
+			pfx := cidrFromPath(path, depth+1, is4, idx)
 
-			parent.children.InsertAt(addr, &prefixNode{pfx})
+			// parent.children.InsertAt(addr, &prefixNode{pfx})
+			parent.children.DeleteAt(addr)
+			parent.insertAtDepth(pfx, depth)
 		}
 
 		n = parent
 	}
+}
+
+func liteOctetIdxAndBits(bits int) (lastIdx, lastBits int) {
+	if bits == 0 {
+		return 0, 0
+	}
+	return (bits - 1) >> 3, bits % 8
 }
