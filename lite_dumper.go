@@ -16,31 +16,31 @@ import (
 // ##################################################
 
 // dumpString is just a wrapper for dump.
-func (t *Lite) dumpString() string {
+func (l *Lite) dumpString() string {
 	w := new(strings.Builder)
-	t.dump(w)
+	l.dump(w)
 
 	return w.String()
 }
 
 // dump the table structure and all the nodes to w.
-func (t *Lite) dump(w io.Writer) {
-	if t == nil {
+func (l *Lite) dump(w io.Writer) {
+	if l == nil {
 		return
 	}
 
-	stats := t.root4.nodeStatsRec()
+	stats := l.root4.nodeStatsRec()
 	if stats.nodes != 0 {
 		fmt.Fprintln(w)
 		fmt.Fprintf(w, "### IPv4: size(%d), nodes(%d), pfxs(%d), leaves(%d)", stats.pfxs+stats.leaves, stats.nodes, stats.pfxs, stats.leaves)
-		t.root4.dumpRec(w, stridePath{}, 0, true)
+		l.root4.dumpRec(w, stridePath{}, 0, true)
 	}
 
-	stats = t.root6.nodeStatsRec()
+	stats = l.root6.nodeStatsRec()
 	if stats.nodes != 0 {
 		fmt.Fprintln(w)
 		fmt.Fprintf(w, "### IPv4: size(%d), nodes(%d), pfxs(%d), leaves(%d)", stats.pfxs+stats.leaves, stats.nodes, stats.pfxs, stats.leaves)
-		t.root6.dumpRec(w, stridePath{}, 0, false)
+		l.root6.dumpRec(w, stridePath{}, 0, false)
 	}
 }
 
