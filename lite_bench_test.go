@@ -178,7 +178,13 @@ func BenchmarkLiteFullTableMemory(b *testing.B) {
 
 		s4 := lite.root4.nodeStatsRec()
 		s6 := lite.root6.nodeStatsRec()
-		stats := stats{s4.pfxs + s6.pfxs, s4.childs + s6.childs, s4.nodes + s6.nodes, s4.leaves + s6.leaves}
+		stats := stats{
+			s4.pfxs + s6.pfxs,
+			s4.childs + s6.childs,
+			s4.nodes + s6.nodes,
+			s4.leaves + s6.leaves,
+			s4.fringes + s6.fringes,
+		}
 
 		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
 		b.ReportMetric(float64(stats.pfxs), "pfxs")
