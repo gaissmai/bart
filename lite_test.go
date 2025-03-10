@@ -149,8 +149,10 @@ func TestFringeToCIDR(t *testing.T) {
 		for i := range 5 {
 			pfx := netip.PrefixFrom(ip, i*8).Masked()
 			octets := ip.AsSlice()
+			path := stridePath{}
+			copy(path[:], octets)
 
-			got := fringeToCIDR(octets, i, true)
+			got := cidrFromFringe(path, i, true)
 			if pfx != got {
 				t.Errorf("fringeToCidr: octets: %v, depth: %d, is4: %v, want: %s, got: %s", octets, i, true, pfx, got)
 			}
@@ -160,8 +162,10 @@ func TestFringeToCIDR(t *testing.T) {
 		for i := range 17 {
 			pfx := netip.PrefixFrom(ip, i*8).Masked()
 			octets := ip.AsSlice()
+			path := stridePath{}
+			copy(path[:], octets)
 
-			got := fringeToCIDR(octets, i, false)
+			got := cidrFromFringe(path, i, false)
 			if pfx != got {
 				t.Errorf("fringeToCidr: octets: %v, depth: %d, is4: %v, want: %s, got: %s", octets, i, false, pfx, got)
 			}

@@ -297,7 +297,7 @@ func (n *node[V]) directItemsRec(parentIdx uint, path stridePath, depth int, is4
 			switch kid := n.children.Items[i].(type) {
 			case *node[V]: // traverse rec-descent, call with next child node,
 				// next trie level, set parentIdx to 0, adjust path and depth
-				path[depth] = byte(addr)
+				path[depth&15] = byte(addr)
 				directItems = append(directItems, kid.directItemsRec(0, path, depth+1, is4)...)
 
 			case *leaf[V]: // path-compressed child, stop's recursion for this child

@@ -54,7 +54,7 @@ func (n *liteNode) dumpRec(w io.Writer, path stridePath, depth int, is4 bool) {
 	// the node may have childs, rec-descent down
 	for i, addr := range n.children.All() {
 		octet := byte(addr)
-		path[depth] = octet
+		path[depth&15] = octet
 
 		if child, ok := n.children.Items[i].(*liteNode); ok {
 			child.dumpRec(w, path, depth+1, is4)
@@ -144,10 +144,13 @@ func (n *liteNode) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 
 			for _, addr := range fringeAddrs {
 				octet := byte(addr)
-				kid := n.children.MustGet(addr)
-				fringe := kid.(*fringeNode)
+				// copy path, set current octet at depth, get prefix back
+				path := path
+				path[depth&15] = octet
+				pfx := cidrFromFringe(path, depth+1, is4)
 
-				fmt.Fprintf(w, " %s:{%s}", octetFmt(octet, is4), fringe.prefix)
+				// fmt.Fprintf(w, " %s:{%s}", octetFmt(octet, is4), fringe.prefix)
+				fmt.Fprintf(w, " %s:{%s}", octetFmt(octet, is4), pfx)
 			}
 			fmt.Fprintln(w)
 		}

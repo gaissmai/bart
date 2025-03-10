@@ -74,7 +74,7 @@ func (l *Lite) Delete(pfx netip.Prefix) {
 	// find the trie node
 	for depth, octet := range octets {
 		// push current node on stack for path recording
-		stack[depth] = n
+		stack[depth&15] = n
 
 		// delete prefix in trie node
 		if depth == lastIdx {
@@ -182,13 +182,12 @@ type liteNode struct {
 // prefixNode, just a path compressed prefix.
 type prefixNode struct {
 	prefix netip.Prefix
-	value  struct{} // would be the value slot for the node[V] in Table[V]
+	// value  struct{} // would be the value slot for the node[V] in Table[V]
 }
 
 // fringeNode, a addr/0 default route for all addrs below this children slot
 type fringeNode struct {
-	prefix netip.Prefix
-	value  struct{} // would be the value slot for the node[V] in Table[V]
+	// value  struct{} // would be the value slot for the node[V] in Table[V]
 }
 
 // isEmpty returns true if node has no prefixes and no children.
@@ -211,7 +210,7 @@ func (n *liteNode) insertAtDepth(pfx netip.Prefix, depth int) {
 	// find the proper trie node to insert prefix
 	// start with prefix octet at depth
 	for ; depth < len(octets); depth++ {
-		octet := octets[depth]
+		octet := octets[depth&15]
 		addr := uint(octet)
 
 		// last significant octet: insert/override prefix into node
@@ -225,7 +224,7 @@ func (n *liteNode) insertAtDepth(pfx netip.Prefix, depth int) {
 		// insert prefix as path-compressed prefixNode or fringeNode
 		if !n.children.Test(addr) {
 			if isFringe(depth, bits) {
-				n.children.InsertAt(addr, &fringeNode{prefix: pfx})
+				n.children.InsertAt(addr, &fringeNode{})
 				return
 			}
 			n.children.InsertAt(addr, &prefixNode{prefix: pfx})
@@ -260,7 +259,7 @@ func (n *liteNode) insertAtDepth(pfx netip.Prefix, depth int) {
 
 		case *fringeNode:
 			// reached a fringe
-			if kid.prefix == pfx {
+			if isFringe(depth, bits) {
 				// already exists, nothing to do
 				return
 			}
@@ -287,9 +286,9 @@ func (n *liteNode) insertAtDepth(pfx netip.Prefix, depth int) {
 // similar to the same helper method for node, but without payload V.
 func (n *liteNode) purgeAndCompress(parentStack []*liteNode, childPath []uint8, is4 bool) {
 	// unwind the stack
-	for i := len(parentStack) - 1; i >= 0; i-- {
-		parent := parentStack[i]
-		addr := uint(childPath[i])
+	for depth := len(parentStack) - 1; depth >= 0; depth-- {
+		parent := parentStack[depth&15]
+		addr := uint(childPath[depth&15])
 
 		prefixCount := n.prefixes.Size()
 		childCount := n.children.Len()
@@ -301,10 +300,33 @@ func (n *liteNode) purgeAndCompress(parentStack []*liteNode, childPath []uint8, 
 
 		case prefixCount == 0 && childCount == 1:
 			// single child is a leaf or fringe node?
-			// shift the content up one level as path-compreessed leave
-			// a fringeNode mutates to a normal prefixNode
-			if pfx, ok := n.children.Items[0].(netip.Prefix); ok {
+			// shift the prefix up one level as path-compreessed leave
+			if kid, ok := n.children.Items[0].(*prefixNode); ok {
+				// and override current node with this leaf
+				parent.children.InsertAt(addr, &prefixNode{prefix: kid.prefix})
+				break
+			}
+
+			// a fringeNode mutates to a normal prefixNode one level above
+			if _, ok := n.children.Items[0].(*fringeNode); ok {
+				// make a copy
+				path := stridePath{}
+				copy(path[:], childPath)
+
+				// get the prefix back, sorry it's contrived
+				// we have a single child, get the octet from the children bitset
+				octet, _ := n.children.FirstSet()
+
+				// replace the octet at depth+1 with this child addr
+				path[depth+1] = uint8(octet)
+
+				// generate the prefix from path, we know it's a fringe
+				// has always idx==1 => 0/0 as addr/pfxLen
+				pfx := cidrFromFringe(path, depth+2, is4)
+
+				// and override current node with new leaf
 				parent.children.InsertAt(addr, &prefixNode{prefix: pfx})
+				break
 			}
 
 		case prefixCount == 1 && childCount == 0:
@@ -314,12 +336,12 @@ func (n *liteNode) purgeAndCompress(parentStack []*liteNode, childPath []uint8, 
 
 			path := stridePath{}
 			copy(path[:], childPath)
-			pfx := cidrFromPath(path, i+1, is4, idx)
+			pfx := cidrFromPath(path, depth+1, is4, idx)
 
 			// if idx == 1, this is the default route in this node
 			// make a fringe node from this prefix one level above
 			if idx == 1 {
-				parent.children.InsertAt(addr, &fringeNode{prefix: pfx})
+				parent.children.InsertAt(addr, &fringeNode{})
 			} else {
 				// insert current prefix as leave one level up
 				parent.children.InsertAt(addr, &prefixNode{prefix: pfx})
@@ -340,12 +362,9 @@ func isFringe(depth, bits int) bool {
 	return lastIdx == depth+1 && lastBits == 0
 }
 
-// fringeToCIDR, helper function,
-// get prefix back from stride path, depth and IP version.
-func fringeToCIDR(octets []uint8, depth int, is4 bool) netip.Prefix {
-	path := stridePath{}
-	copy(path[:], octets)
-
+// cidrFromFringe, helper function,
+// get prefix back from octet path, depth and IP version.
+func cidrFromFringe(path stridePath, depth int, is4 bool) netip.Prefix {
 	// zero/mask the bytes after prefix bits
 	clear(path[depth:])
 
