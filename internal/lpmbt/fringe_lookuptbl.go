@@ -2,7 +2,7 @@ package lpmbt
 
 import "github.com/gaissmai/bart/internal/bitset"
 
-var LookupTblArray = [512]*bitset.BitSetFringe{
+var LookupTblFringe = [512]*bitset.BitSetFringe{
 	/* idx:   0 */ {}, // invalid
 	/* idx:   1 */ {0x2}, // 0b0000_0010
 	/* idx:   2 */ {0x6}, // 0b0000_0110

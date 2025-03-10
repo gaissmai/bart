@@ -228,11 +228,10 @@ func (nt nodeType) String() string {
 
 // stats, only used for dump, tests and benchmarks
 type stats struct {
-	pfxs    int
-	childs  int
-	nodes   int
-	leaves  int
-	fringes int
+	pfxs   int
+	childs int
+	nodes  int
+	leaves int
 }
 
 // node statistics for this single node
