@@ -1,3 +1,6 @@
+// Copyright (c) 2025 Karl Gaissmaier
+// SPDX-License-Identifier: MIT
+
 package lpmbt
 
 import "github.com/gaissmai/bart/internal/bitset"
