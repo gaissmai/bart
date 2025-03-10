@@ -30,18 +30,16 @@ func (l *Lite) dump(w io.Writer) {
 	}
 
 	stats := l.root4.nodeStatsRec()
-	if stats.nodes != 0 {
-		fmt.Fprintf(w, "\n### IPv4: size(%d), nodes(%d), pfxs(%d), leaves(%d), fringes(%d)",
-			stats.pfxs+stats.leaves, stats.nodes, stats.pfxs, stats.leaves, stats.fringes)
-
+	if stats.nodes > 0 {
+		fmt.Fprintln(w)
+		fmt.Fprintf(w, "### IPv4: size(%d), nodes(%d)", stats.pfxs+stats.leaves, stats.nodes)
 		l.root4.dumpRec(w, stridePath{}, 0, true)
 	}
 
 	stats = l.root6.nodeStatsRec()
-	if stats.nodes != 0 {
-		fmt.Fprintf(w, "\n### IPv6: size(%d), nodes(%d), pfxs(%d), leaves(%d), fringes(%d)",
-			stats.pfxs+stats.leaves, stats.nodes, stats.pfxs, stats.leaves, stats.fringes)
-
+	if stats.nodes > 0 {
+		fmt.Fprintln(w)
+		fmt.Fprintf(w, "### IPv6: size(%d), nodes(%d)", stats.pfxs+stats.leaves, stats.nodes)
 		l.root6.dumpRec(w, stridePath{}, 0, false)
 	}
 }
@@ -93,7 +91,6 @@ func (n *liteNode) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 
 		nodeAddrs := make([]uint, 0, maxNodeChildren)
 		leafAddrs := make([]uint, 0, maxNodeChildren)
-		fringeAddrs := make([]uint, 0, maxNodeChildren)
 
 		// the node has recursive child nodes or path-compressed leaves
 		for i, addr := range n.children.All() {
@@ -105,9 +102,6 @@ func (n *liteNode) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 			case *prefixNode:
 				leafAddrs = append(leafAddrs, addr)
 
-			case *fringeNode:
-				fringeAddrs = append(fringeAddrs, addr)
-
 			default:
 				panic("logic error, wrong node type")
 			}
@@ -118,18 +112,6 @@ func (n *liteNode) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 			fmt.Fprintf(w, "%schilds(#%d):", indent, nodeCount)
 
 			for _, addr := range nodeAddrs {
-				octet := byte(addr)
-				fmt.Fprintf(w, " %s", octetFmt(octet, is4))
-			}
-
-			fmt.Fprintln(w)
-		}
-
-		if fringeCount := len(fringeAddrs); fringeCount > 0 {
-			// print the fringe for this node
-			fmt.Fprintf(w, "%sfringe(#%d):", indent, fringeCount)
-
-			for _, addr := range fringeAddrs {
 				octet := byte(addr)
 				fmt.Fprintf(w, " %s", octetFmt(octet, is4))
 			}
@@ -184,9 +166,6 @@ func (n *liteNode) nodeStats() stats {
 		case *liteNode:
 			s.nodes++
 
-		case *fringeNode:
-			s.fringes++
-
 		case *prefixNode:
 			s.leaves++
 
@@ -208,8 +187,6 @@ func (n *liteNode) nodeStatsRec() stats {
 	s.pfxs = n.prefixes.Size()
 	s.childs = n.children.Len()
 	s.nodes = 1 // this node
-	s.leaves = 0
-	s.fringes = 0
 
 	for _, kidAny := range n.children.Items {
 		switch kid := kidAny.(type) {
@@ -221,9 +198,6 @@ func (n *liteNode) nodeStatsRec() stats {
 			s.childs += rs.childs
 			s.nodes += rs.nodes
 			s.leaves += rs.leaves
-
-		case *fringeNode:
-			s.fringes++
 
 		case *prefixNode:
 			s.leaves++
