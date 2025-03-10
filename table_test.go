@@ -2631,6 +2631,7 @@ func BenchmarkTableInsertRandom(b *testing.B) {
 				s4.childs + s6.childs,
 				s4.nodes + s6.nodes,
 				s4.leaves + s6.leaves,
+				s4.fringes + s6.fringes,
 			}
 
 			b.ReportMetric(float64(rt.Size())/float64(stats.nodes), "Prefix/Node")
@@ -2649,6 +2650,7 @@ func BenchmarkTableInsertRandom(b *testing.B) {
 				s4.childs + s6.childs,
 				s4.nodes + s6.nodes,
 				s4.leaves + s6.leaves,
+				s4.fringes + s6.fringes,
 			}
 
 			b.ReportMetric(float64(rt.Size())/float64(stats.nodes), "Prefix/Node")

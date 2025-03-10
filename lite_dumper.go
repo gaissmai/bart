@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Karl Gaissmaier
+// Copyright (c) 2025 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
 package bart
@@ -32,14 +32,16 @@ func (l *Lite) dump(w io.Writer) {
 	stats := l.root4.nodeStatsRec()
 	if stats.nodes > 0 {
 		fmt.Fprintln(w)
-		fmt.Fprintf(w, "### IPv4: size(%d), nodes(%d)", stats.pfxs+stats.leaves, stats.nodes)
+		fmt.Fprintf(w, "### IPv4: size(%d), nodes(%d), leaves(%d), fringes(%d)",
+			stats.pfxs+stats.leaves, stats.nodes, stats.leaves, stats.fringes)
 		l.root4.dumpRec(w, stridePath{}, 0, true)
 	}
 
 	stats = l.root6.nodeStatsRec()
 	if stats.nodes > 0 {
 		fmt.Fprintln(w)
-		fmt.Fprintf(w, "### IPv6: size(%d), nodes(%d)", stats.pfxs+stats.leaves, stats.nodes)
+		fmt.Fprintf(w, "### IPv6: size(%d), nodes(%d), leaves(%d), fringes(%d)",
+			stats.pfxs+stats.leaves, stats.nodes, stats.leaves, stats.fringes)
 		l.root6.dumpRec(w, stridePath{}, 0, false)
 	}
 }
@@ -91,16 +93,19 @@ func (n *liteNode) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 
 		nodeAddrs := make([]uint, 0, maxNodeChildren)
 		leafAddrs := make([]uint, 0, maxNodeChildren)
+		fringeAddrs := make([]uint, 0, maxNodeChildren)
 
 		// the node has recursive child nodes or path-compressed leaves
 		for i, addr := range n.children.All() {
 			switch n.children.Items[i].(type) {
 			case *liteNode:
 				nodeAddrs = append(nodeAddrs, addr)
-				continue
 
 			case *prefixNode:
 				leafAddrs = append(leafAddrs, addr)
+
+			case *fringeNode:
+				fringeAddrs = append(fringeAddrs, addr)
 
 			default:
 				panic("logic error, wrong node type")
@@ -125,13 +130,28 @@ func (n *liteNode) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 
 			for _, addr := range leafAddrs {
 				octet := byte(addr)
-				k := n.children.MustGet(addr)
-				pc := k.(*prefixNode)
+				kid := n.children.MustGet(addr)
+				leaf := kid.(*prefixNode)
 
-				fmt.Fprintf(w, " %s:{%s}", octetFmt(octet, is4), pc)
+				fmt.Fprintf(w, " %s:{%s}", octetFmt(octet, is4), leaf.prefix)
 			}
 			fmt.Fprintln(w)
 		}
+
+		if fringeCount := len(fringeAddrs); fringeCount > 0 {
+			// print the pathcomp prefixes for this node
+			fmt.Fprintf(w, "%sfringes(#%d):", indent, fringeCount)
+
+			for _, addr := range fringeAddrs {
+				octet := byte(addr)
+				kid := n.children.MustGet(addr)
+				fringe := kid.(*fringeNode)
+
+				fmt.Fprintf(w, " %s:{%s}", octetFmt(octet, is4), fringe.prefix)
+			}
+			fmt.Fprintln(w)
+		}
+
 	}
 }
 
@@ -169,6 +189,9 @@ func (n *liteNode) nodeStats() stats {
 		case *prefixNode:
 			s.leaves++
 
+		case *fringeNode:
+			s.fringes++
+
 		default:
 			panic("logic error, wrong node type")
 		}
@@ -187,6 +210,8 @@ func (n *liteNode) nodeStatsRec() stats {
 	s.pfxs = n.prefixes.Size()
 	s.childs = n.children.Len()
 	s.nodes = 1 // this node
+	s.leaves = 0
+	s.fringes = 0
 
 	for _, kidAny := range n.children.Items {
 		switch kid := kidAny.(type) {
@@ -198,9 +223,13 @@ func (n *liteNode) nodeStatsRec() stats {
 			s.childs += rs.childs
 			s.nodes += rs.nodes
 			s.leaves += rs.leaves
+			s.fringes += rs.fringes
 
 		case *prefixNode:
 			s.leaves++
+
+		case *fringeNode:
+			s.fringes++
 
 		default:
 			panic("logic error, wrong node type")

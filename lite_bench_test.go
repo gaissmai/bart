@@ -172,3 +172,94 @@ func BenchmarkLiteFullTableMemory(b *testing.B) {
 		b.ReportMetric(0, "ns/op")
 	})
 }
+
+func BenchmarkLiteRealWorldRandomPfxsMemoryV4(b *testing.B) {
+	for _, k := range []int{1_000, 10_000, 100_000, 1_000_000} {
+		var startMem, endMem runtime.MemStats
+
+		runtime.GC()
+		runtime.ReadMemStats(&startMem)
+
+		b.Run(strconv.Itoa(k), func(b *testing.B) {
+			lite := new(Lite)
+			for range b.N {
+				lite = new(Lite)
+				for _, pfx := range randomRealWorldPrefixes4(k) {
+					lite.Insert(pfx)
+				}
+			}
+
+			runtime.GC()
+			runtime.ReadMemStats(&endMem)
+
+			stats := lite.root4.nodeStatsRec()
+			b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
+			b.ReportMetric(float64(stats.nodes), "nodes")
+			b.ReportMetric(float64(stats.pfxs), "pfxs")
+			b.ReportMetric(float64(stats.leaves), "leaves")
+			b.ReportMetric(float64(stats.fringes), "fringes")
+			b.ReportMetric(0, "ns/op")
+		})
+	}
+}
+
+func BenchmarkLiteRealWorldRandomPfxsMemoryV6(b *testing.B) {
+	for _, k := range []int{1_000, 10_000, 100_000, 1_000_000} {
+		var startMem, endMem runtime.MemStats
+
+		runtime.GC()
+		runtime.ReadMemStats(&startMem)
+
+		b.Run(strconv.Itoa(k), func(b *testing.B) {
+			lite := new(Lite)
+			for range b.N {
+				lite = new(Lite)
+				for _, pfx := range randomRealWorldPrefixes6(k) {
+					lite.Insert(pfx)
+				}
+			}
+
+			runtime.GC()
+			runtime.ReadMemStats(&endMem)
+
+			stats := lite.root6.nodeStatsRec()
+			b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
+			b.ReportMetric(float64(stats.nodes), "nodes")
+			b.ReportMetric(float64(stats.pfxs), "pfxs")
+			b.ReportMetric(float64(stats.leaves), "leaves")
+			b.ReportMetric(float64(stats.fringes), "fringes")
+			b.ReportMetric(0, "ns/op")
+		})
+	}
+}
+
+func BenchmarkLiteRealWorldRandomPfxsMemory(b *testing.B) {
+	for _, k := range []int{1_000, 10_000, 100_000, 1_000_000} {
+		var startMem, endMem runtime.MemStats
+
+		runtime.GC()
+		runtime.ReadMemStats(&startMem)
+
+		b.Run(strconv.Itoa(k), func(b *testing.B) {
+			lite := new(Lite)
+			for range b.N {
+				lite = new(Lite)
+				for _, pfx := range randomRealWorldPrefixes(k) {
+					lite.Insert(pfx)
+				}
+			}
+
+			runtime.GC()
+			runtime.ReadMemStats(&endMem)
+
+			stats4 := lite.root4.nodeStatsRec()
+			stats6 := lite.root6.nodeStatsRec()
+			b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
+			b.ReportMetric(float64(stats4.nodes+stats6.nodes), "nodes")
+			b.ReportMetric(float64(stats4.pfxs+stats6.pfxs), "pfxs")
+			b.ReportMetric(float64(stats4.leaves+stats6.leaves), "leaves")
+			b.ReportMetric(float64(stats4.fringes+stats6.fringes), "fringes")
+			b.ReportMetric(0, "ns/op")
+		})
+	}
+}
