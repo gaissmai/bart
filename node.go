@@ -102,16 +102,13 @@ func (l *leaf[V]) cloneLeaf() *leaf[V] {
 func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool) {
 	ip := pfx.Addr()
 	bits := pfx.Bits()
-
-	lastIdx, lastBits := lastOctetIdxAndBits(bits)
-
 	octets := ip.AsSlice()
-	octets = octets[:lastIdx+1]
+	lastIdx, lastBits := lastOctetIdxAndBits(bits)
 
 	// find the proper trie node to insert prefix
 	// start with prefix octet at depth
 	for ; depth < len(octets); depth++ {
-		octet := octets[depth]
+		octet := octets[depth&15]
 		addr := uint(octet)
 
 		// last significant octet: insert/override prefix/val into node
@@ -163,17 +160,14 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 func (n *node[V]) insertAtDepthPersist(pfx netip.Prefix, val V, depth int) (exists bool) {
 	ip := pfx.Addr()
 	bits := pfx.Bits()
-
-	lastIdx, lastBits := lastOctetIdxAndBits(bits)
-
 	octets := ip.AsSlice()
-	octets = octets[:lastIdx+1]
+	lastIdx, lastBits := lastOctetIdxAndBits(bits)
 
 	// find the proper trie node to insert prefix
 	// start with prefix octet at depth
 	for ; depth < len(octets); depth++ {
 
-		octet := octets[depth]
+		octet := octets[depth&15]
 		addr := uint(octet)
 
 		// last significant octet: insert/override prefix/val into node
@@ -226,9 +220,9 @@ func (n *node[V]) insertAtDepthPersist(pfx netip.Prefix, val V, depth int) (exis
 // purgeAndCompress, purge empty nodes or compress nodes with single prefix or leaf.
 func (n *node[V]) purgeAndCompress(parentStack []*node[V], childPath []uint8, is4 bool) {
 	// unwind the stack
-	for i := len(parentStack) - 1; i >= 0; i-- {
-		parent := parentStack[i]
-		addr := uint(childPath[i])
+	for depth := len(parentStack) - 1; depth >= 0; depth-- {
+		parent := parentStack[depth&15] // BCE
+		addr := uint(childPath[depth&15])
 
 		pfxCount := n.prefixes.Len()
 		childCount := n.children.Len()
@@ -246,7 +240,7 @@ func (n *node[V]) purgeAndCompress(parentStack []*node[V], childPath []uint8, is
 
 			path := stridePath{}
 			copy(path[:], childPath)
-			pfx := cidrFromPath(path, i+1, is4, idx)
+			pfx := cidrFromPath(path, depth+1, is4, idx)
 
 			parent.children.InsertAt(addr, &leaf[V]{pfx, val})
 
@@ -387,7 +381,7 @@ func (n *node[V]) allRec(path stridePath, depth int, is4 bool, yield func(netip.
 		switch kid := n.children.Items[i].(type) {
 		case *node[V]:
 			// rec-descent with this node
-			path[depth] = byte(addr)
+			path[depth&15] = byte(addr)
 			if !kid.allRec(path, depth+1, is4, yield) {
 				// early exit
 				return false
@@ -440,7 +434,7 @@ func (n *node[V]) allRecSorted(path stridePath, depth int, is4 bool, yield func(
 			// yield the node (rec-descent) or leaf
 			switch kid := n.children.Items[j].(type) {
 			case *node[V]:
-				path[depth] = byte(childAddr)
+				path[depth&15] = byte(childAddr)
 				if !kid.allRecSorted(path, depth+1, is4, yield) {
 					return false
 				}
@@ -469,7 +463,7 @@ func (n *node[V]) allRecSorted(path stridePath, depth int, is4 bool, yield func(
 		addr := allChildAddrs[j]
 		switch kid := n.children.Items[j].(type) {
 		case *node[V]:
-			path[depth] = byte(addr)
+			path[depth&15] = byte(addr)
 			if !kid.allRecSorted(path, depth+1, is4, yield) {
 				return false
 			}
@@ -606,7 +600,7 @@ func (n *node[V]) eachLookupPrefix(octets []byte, depth int, is4 bool, pfxLen in
 	copy(path[:], octets)
 
 	// backtracking the CBT
-	for idx := art.PfxToIdx(octets[depth], pfxLen); idx > 0; idx >>= 1 {
+	for idx := art.PfxToIdx(octets[depth&15], pfxLen); idx > 0; idx >>= 1 {
 		if n.prefixes.Test(idx) {
 			val := n.prefixes.MustGet(idx)
 			cidr := cidrFromPath(path, depth, is4, idx)
@@ -626,8 +620,8 @@ func (n *node[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxLen int, yie
 	var path stridePath
 	copy(path[:], octets)
 
-	pfxFirstAddr := uint(octets[depth])
-	pfxLastAddr := uint(octets[depth] | ^netMask(pfxLen))
+	pfxFirstAddr := uint(octets[depth&15])
+	pfxLastAddr := uint(octets[depth&15] | ^netMask(pfxLen))
 
 	// 1. collect all indices in n covered by prefix
 
@@ -673,7 +667,7 @@ func (n *node[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxLen int, yie
 			// yield the node or leaf?
 			switch kid := n.children.MustGet(addr).(type) {
 			case *node[V]:
-				path[depth] = byte(addr)
+				path[depth&15] = byte(addr)
 				if !kid.allRecSorted(path, depth+1, is4, yield) {
 					return false
 				}
@@ -703,7 +697,7 @@ func (n *node[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxLen int, yie
 		// yield the node or leaf?
 		switch kid := n.children.MustGet(addr).(type) {
 		case *node[V]:
-			path[depth] = byte(addr)
+			path[depth&15] = byte(addr)
 			if !kid.allRecSorted(path, depth+1, is4, yield) {
 				return false
 			}
@@ -749,7 +743,7 @@ func cidrFromPath(path stridePath, depth int, is4 bool, idx uint) netip.Prefix {
 	octet, pfxLen := art.IdxToPfx(idx)
 
 	// set masked byte in path at depth
-	path[depth] = octet
+	path[depth&15] = octet
 
 	// zero/mask the bytes after prefix bits
 	clear(path[depth+1:])

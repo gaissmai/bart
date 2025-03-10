@@ -60,7 +60,7 @@ func (n *node[V]) dumpRec(w io.Writer, path stridePath, depth int, is4 bool) {
 	// the node may have childs, rec-descent down
 	for i, addr := range n.children.All() {
 		octet := byte(addr)
-		path[depth] = octet
+		path[depth&15] = octet
 
 		if child, ok := n.children.Items[i].(*node[V]); ok {
 			child.dumpRec(w, path, depth+1, is4)

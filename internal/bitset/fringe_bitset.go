@@ -18,7 +18,7 @@ package bitset
 //  can inline (*BitSetFringe).InPlaceIntersection with cost 21
 //  can inline (*BitSetFringe).InPlaceUnion with cost 21
 //  can inline (*BitSetFringe).Size with cost 36
-//  can inline (*BitSetFringe).Rank0 with cost 48
+//  can inline (*BitSetFringe).Rank0 with cost 51
 //  can inline (*BitSetFringe).popcntAnd with cost 53
 
 import (
@@ -173,18 +173,18 @@ func (b *BitSetFringe) Size() int {
 // Rank0 is equal to Rank(i) - 1
 func (b *BitSetFringe) Rank0(i uint) (rnk int) {
 	i++ // Rank count is inclusive
-	wordIdx := min(int(i>>6), length)
+	wordIdx := min(int(i>>6), len(b))
 
 	// sum up the popcounts until wordIdx ...
 	// don't test x == 0, just add, less branches
 	for j := range wordIdx {
-		rnk += bits.OnesCount64(b[j])
+		rnk += bits.OnesCount64(b[j&3]) // [j&3] is BCE
 	}
 
 	// ... plus partial word at wordIdx,
 	// don't test i&63 != 0, just add, less branches
-	if wordIdx < length {
-		rnk += bits.OnesCount64(b[wordIdx] << (64 - i&63))
+	if wordIdx < len(b) {
+		rnk += bits.OnesCount64(b[wordIdx&3] << (64 - i&63)) // [x&3] is BCE
 	}
 
 	// decrement for offset by one
