@@ -1,3 +1,6 @@
+// Copyright (c) 2025 Karl Gaissmaier
+// SPDX-License-Identifier: MIT
+
 package bart
 
 import (
@@ -133,6 +136,35 @@ func TestLiteContains(t *testing.T) {
 			miss4 > must &&
 			miss6 > must {
 			break
+		}
+	}
+}
+
+func TestFringeToCIDR(t *testing.T) {
+	t.Parallel()
+	var ip netip.Addr
+
+	for range 10_000 {
+		ip = randomIP4()
+		for i := range 5 {
+			pfx := netip.PrefixFrom(ip, i*8).Masked()
+			octets := ip.AsSlice()
+
+			got := fringeToCIDR(octets, i, true)
+			if pfx != got {
+				t.Errorf("fringeToCidr: octets: %v, depth: %d, is4: %v, want: %s, got: %s", octets, i, true, pfx, got)
+			}
+		}
+
+		ip = randomIP6()
+		for i := range 17 {
+			pfx := netip.PrefixFrom(ip, i*8).Masked()
+			octets := ip.AsSlice()
+
+			got := fringeToCIDR(octets, i, false)
+			if pfx != got {
+				t.Errorf("fringeToCidr: octets: %v, depth: %d, is4: %v, want: %s, got: %s", octets, i, false, pfx, got)
+			}
 		}
 	}
 }
