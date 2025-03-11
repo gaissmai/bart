@@ -17,11 +17,13 @@ func TestZeroValue(t *testing.T) {
 		}
 	}()
 
-	b := BitSet256{}
+	var b BitSet256
+
+	b = BitSet256{}
 	b.Set(0)
 
 	b = BitSet256{}
-	b.Clear(1000)
+	b.Clear(100)
 
 	b = BitSet256{}
 	b.Size()
@@ -51,11 +53,35 @@ func TestZeroValue(t *testing.T) {
 
 	b = BitSet256{}
 	c = BitSet256{}
-	b.IntersectsAny(&c)
+	b.Intersects(&c)
 
 	b = BitSet256{}
 	c = BitSet256{}
 	b.IntersectionTop(&c)
+}
+
+func TestBitsetSetOutOfBounds(t *testing.T) {
+	t.Parallel()
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("A Set() out of bounds MUST panic")
+		}
+	}()
+
+	b := BitSet256{}
+	b.Set(256)
+}
+
+func TestBitsetClearOutOfBounds(t *testing.T) {
+	t.Parallel()
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("A Clear() out of bounds MUST panic")
+		}
+	}()
+
+	b := BitSet256{}
+	b.Clear(256)
 }
 
 func TestTest(t *testing.T) {
@@ -513,14 +539,14 @@ func TestIntersects(t *testing.T) {
 	}
 
 	want := false
-	got := a.IntersectsAny(&b)
+	got := a.Intersects(&b)
 	if want != got {
 		t.Errorf("Intersection should be %v, but got: %v", want, got)
 	}
 
 	b = a
 	want = true
-	got = a.IntersectsAny(&b)
+	got = a.Intersects(&b)
 	if want != got {
 		t.Errorf("Intersection should be %v, but got: %v", want, got)
 	}
@@ -613,7 +639,7 @@ func BenchmarkIntersectsAny(b *testing.B) {
 		b.Run(fmt.Sprintf("IntersectsAnyGo at %d", i), func(b *testing.B) {
 			b.ResetTimer()
 			for range b.N {
-				_ = aa.IntersectsAny(&bb)
+				_ = aa.Intersects(&bb)
 			}
 		})
 	}
