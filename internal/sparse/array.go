@@ -1,8 +1,8 @@
 // Copyright (c) 2025 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
-// package sparse implements a generic sparse array
-// with popcount compression.
+// package sparse implements a special sparse array
+// with popcount compression for max. 256 items.
 package sparse
 
 import (
@@ -18,10 +18,10 @@ type Array[T any] struct {
 
 // Get the value at i from sparse array.
 //
-// example: ArrayLite.Get(5) -> ArrayLite.Items[1]
+// example: Array.Get(5) -> Array.Items[1]
 //
-//	                   ⬇
-//	BitSetArray: [0|0|1|0|0|1|0|1|...] <- 3 bits set
+//	                        ⬇
+//	BitSetArray: [0|0|1|0|0|1|0|...|1] <- 3 bits set
 //	Items:       [*|*|*]               <- len(Items) = 3
 //	                ⬆
 //
@@ -81,13 +81,14 @@ func (s *Array[T]) Len() int {
 	return len(s.Items)
 }
 
-// Copy returns a shallow copy of the ArrayLite.
+// Copy returns a shallow copy of the Array.
 // The elements are copied using assignment, this is no deep clone.
 func (s *Array[T]) Copy() *Array[T] {
 	if s == nil {
 		return nil
 	}
 
+	// copy the fields
 	return &Array[T]{
 		BitSet256: s.BitSet256,
 		Items:     append(s.Items[:0:0], s.Items...),
@@ -98,9 +99,8 @@ func (s *Array[T]) Copy() *Array[T] {
 // If the value already exists, overwrite it with val and return true.
 func (s *Array[T]) InsertAt(i uint, value T) (exists bool) {
 	// slot exists, overwrite value
-	if s.Len() != 0 && s.Test(i) {
+	if s.Test(i) {
 		s.Items[s.Rank0(i)] = value
-
 		return true
 	}
 
@@ -142,7 +142,7 @@ func (s *Array[T]) insertItem(i int, item T) {
 		s.Items = append(s.Items, zero) // append one item, mostly enlarge cap by more than one item
 	}
 
-	_ = s.Items[i]                   // bounds check
+	_ = s.Items[i]                   // BCE
 	copy(s.Items[i+1:], s.Items[i:]) // shift one slot right, starting at [i]
 	s.Items[i] = item                // insert new item at [i]
 }
@@ -153,10 +153,11 @@ func (s *Array[T]) insertItem(i int, item T) {
 func (s *Array[T]) deleteItem(i int) {
 	var zero T
 
-	_ = s.Items[i]                   // bounds check
+	_ = s.Items[i]                   // BCE
 	copy(s.Items[i:], s.Items[i+1:]) // shift left, overwrite item at [i]
 
 	nl := len(s.Items) - 1 // new len
+
 	s.Items[nl] = zero     // clear the tail item
 	s.Items = s.Items[:nl] // new len, cap is unchanged
 }
