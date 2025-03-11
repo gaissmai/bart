@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Karl Gaissmaier
+// Copyright (c) 2025 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
 package sparse
@@ -21,20 +21,20 @@ func TestSparseArrayCount(t *testing.T) {
 	t.Parallel()
 	a := new(Array[int])
 
-	for i := range 10_000 {
+	for i := range 255 {
 		a.InsertAt(uint(i), i)
 		a.InsertAt(uint(i), i)
 	}
-	if c := a.Len(); c != 10_000 {
-		t.Errorf("Count, expected 10_000, got %d", c)
+	if c := a.Len(); c != 255 {
+		t.Errorf("Count, expected 255, got %d", c)
 	}
 
-	for i := range 5_000 {
+	for i := range 128 {
 		a.DeleteAt(uint(i))
 		a.DeleteAt(uint(i))
 	}
-	if c := a.Len(); c != 5_000 {
-		t.Errorf("Count, expected 5_000, got %d", c)
+	if c := a.Len(); c != 127 {
+		t.Errorf("Count, expected 127, got %d", c)
 	}
 }
 
@@ -42,12 +42,12 @@ func TestSparseArrayGet(t *testing.T) {
 	t.Parallel()
 	a := new(Array[int])
 
-	for i := range 10_000 {
+	for i := range 255 {
 		a.InsertAt(uint(i), i)
 	}
 
 	for range 100 {
-		i := rand.IntN(10_000)
+		i := rand.IntN(100)
 		v, ok := a.Get(uint(i))
 		if !ok {
 			t.Errorf("Get, expected true, got %v", ok)
@@ -91,12 +91,12 @@ func TestSparseArrayUpdate(t *testing.T) {
 	t.Parallel()
 	a := new(Array[int])
 
-	for i := range 10_000 {
+	for i := range 100 {
 		a.InsertAt(uint(i), i)
 	}
 
 	// mult all values * 2
-	for i := 15_000; i >= 0; i-- {
+	for i := 150; i >= 0; i-- {
 		a.UpdateAt(uint(i), func(oldVal int, existsOld bool) int {
 			newVal := i * 3
 			if existsOld {
@@ -106,14 +106,14 @@ func TestSparseArrayUpdate(t *testing.T) {
 		})
 	}
 
-	for i := range 10_000 {
+	for i := range 100 {
 		v, _ := a.Get(uint(i))
 		if v != 2*i {
 			t.Errorf("UpdateAt, expected %d, got %d", 2*i, v)
 		}
 	}
 
-	for i := 10_000; i <= 15_000; i++ {
+	for i := 100; i <= 150; i++ {
 		v, _ := a.Get(uint(i))
 		if v != 3*i {
 			t.Errorf("UpdateAt, expected %d, got %d", 3*i, v)
@@ -125,7 +125,7 @@ func TestSparseArrayCopy(t *testing.T) {
 	t.Parallel()
 	a := new(Array[int])
 
-	for i := range 10_000 {
+	for i := range 255 {
 		a.InsertAt(uint(i), i)
 	}
 
@@ -140,7 +140,7 @@ func TestSparseArrayCopy(t *testing.T) {
 	}
 
 	// update array a
-	for i := range 10_000 {
+	for i := range 255 {
 		a.UpdateAt(uint(i), func(u int, _ bool) int { return u + 1 })
 	}
 

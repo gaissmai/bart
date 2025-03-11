@@ -16,7 +16,7 @@ const (
 	strideLen       = 8   // octet
 	maxTreeDepth    = 16  // 16 for IPv6
 	maxNodeChildren = 256 // 256
-	maxNodePrefixes = 512 // 512
+	maxNodePrefixes = 256 // 256
 )
 
 // stridePath, max 16 octets deep
@@ -40,7 +40,7 @@ type stridePath [maxTreeDepth]uint8
 type node[V any] struct {
 	// prefixes contains the routes indexed as a complete binary tree with payload V
 	// with the help of the baseIndex function from the ART algorithm.
-	prefixes sparse.ArrayFringe[V]
+	prefixes sparse.Array[V]
 
 	// children, recursively spans the trie with a branching factor of 256.
 	//
@@ -63,7 +63,7 @@ type node[V any] struct {
 	//
 	// The empty interface{} consumes less memory and type assertions are faster than
 	// indirect method calls like node.isLeaf()
-	children sparse.ArrayFringe[interface{}]
+	children sparse.Array[interface{}]
 }
 
 // isEmpty returns true if node has neither prefixes nor children
@@ -76,6 +76,10 @@ type leaf[V any] struct {
 	prefix netip.Prefix
 	value  V
 }
+
+// fringe is a leaf with bits /0, /8, /16, /24, /32, /40, /48 ... /128
+// a leaf mutates to a fringe at the deepest possible position in the trie.
+type fringe[V any] leaf[V]
 
 // cloneOrCopy, helper function,
 // deep copy if v implements the Cloner interface.
@@ -116,13 +120,20 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 			return n.prefixes.InsertAt(art.PfxToIdx(octet, lastBits), val)
 		}
 
+		// reached end of trie path ...
 		if !n.children.Test(addr) {
-			// insert prefix path compressed
-			return n.children.InsertAt(addr, &leaf[V]{pfx, val})
+			// insert prefix path compressed as leaf or fringe
+			if isFringe(depth, bits) {
+				return n.children.InsertAt(addr, &fringe[V]{pfx, val})
+			} else {
+				return n.children.InsertAt(addr, &leaf[V]{pfx, val})
+			}
 		}
+
+		// ... or decend down the trie
 		kid := n.children.MustGet(addr)
 
-		// kid is node or leaf at addr
+		// kid is recursive node, leaf or fringe at addr
 		switch kid := kid.(type) {
 		case *node[V]:
 			n = kid
@@ -147,6 +158,26 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 			n.children.InsertAt(addr, newNode)
 			n = newNode
 
+		case *fringe[V]:
+			// reached a fringe
+			// override value in slot if prefixes are equal
+			if kid.prefix == pfx {
+				kid.value = val
+				// exists
+				return true
+			}
+
+			// create new node
+			// push fringe down, mutate it to a prefix:
+			//  set idx == 1, a 0/0 default route in next level node
+			// insert new child at current leaf position (addr)
+			// descend down, replace n with new child
+			newNode := new(node[V])
+			newNode.prefixes.InsertAt(1, kid.value)
+
+			n.children.InsertAt(addr, newNode)
+			n = newNode
+
 		default:
 			panic("logic error, wrong node type")
 		}
@@ -155,6 +186,7 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 	panic("unreachable")
 }
 
+// TODO: fringe
 // insertAtDepthPersist is the immutable version of insertAtDepth.
 // All visited nodes are cloned during insertion.
 func (n *node[V]) insertAtDepthPersist(pfx netip.Prefix, val V, depth int) (exists bool) {
@@ -242,14 +274,16 @@ func (n *node[V]) purgeAndCompress(parentStack []*node[V], childPath []uint8, is
 			copy(path[:], childPath)
 			pfx := cidrFromPath(path, depth+1, is4, idx)
 
-			parent.children.InsertAt(addr, &leaf[V]{pfx, val})
+			// a default route 0/0 in thei node (idx == 1) is a fringe one level above
+			if idx == 1 {
+				parent.children.InsertAt(addr, &fringe[V]{pfx, val})
+			} else {
+				parent.children.InsertAt(addr, &leaf[V]{pfx, val})
+			}
 
 		case pfxCount == 0 && childCount == 1:
-			// if single child is a leaf, shift it up one level
-			// and override current node with this leaf
-			if leafPtr, ok := n.children.Items[0].(*leaf[V]); ok {
-				parent.children.InsertAt(addr, leafPtr)
-			}
+			// leaf or fringe, push it one level up
+			parent.children.InsertAt(addr, n.children.Items[0])
 		}
 
 		n = parent
@@ -266,7 +300,7 @@ func (n *node[V]) purgeAndCompress(parentStack []*node[V], childPath []uint8, is
 // for the respective idx.
 func (n *node[V]) lpmGet(idx uint) (baseIdx uint, val V, ok bool) {
 	// top is the idx of the longest-prefix-match
-	if top, ok := n.prefixes.IntersectionTop(lpmbt.LookupTblFringe[idx]); ok {
+	if top, ok := n.prefixes.IntersectionTop(lpmbt.LookupTbl[idx]); ok {
 		return top, n.prefixes.MustGet(top), true
 	}
 
@@ -276,7 +310,7 @@ func (n *node[V]) lpmGet(idx uint) (baseIdx uint, val V, ok bool) {
 
 // lpmTest for faster lpm tests without value returns.
 func (n *node[V]) lpmTest(idx uint) bool {
-	return n.prefixes.IntersectsAny(lpmbt.LookupTblFringe[idx])
+	return n.prefixes.IntersectsAny(lpmbt.LookupTbl[idx])
 }
 
 // cloneRec, clones the node recursive.
@@ -761,4 +795,9 @@ func cidrFromPath(path stridePath, depth int, is4 bool, idx uint) netip.Prefix {
 
 	// return a normalized prefix from ip/bits
 	return netip.PrefixFrom(ip, bits)
+}
+
+func isFringe(depth, bits int) bool {
+	lastIdx, lastBits := lastOctetIdxAndBits(bits)
+	return lastIdx == depth+1 && lastBits == 0
 }

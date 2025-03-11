@@ -16,7 +16,7 @@ import (
 // ##################################################
 
 // dumpString is just a wrapper for dump.
-func (l *Lite) dumpString() string {
+func (l *LitePoC) dumpString() string {
 	w := new(strings.Builder)
 	l.dump(w)
 
@@ -24,7 +24,7 @@ func (l *Lite) dumpString() string {
 }
 
 // dump the table structure and all the nodes to w.
-func (l *Lite) dump(w io.Writer) {
+func (l *LitePoC) dump(w io.Writer) {
 	if l == nil {
 		return
 	}

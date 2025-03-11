@@ -108,6 +108,7 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 
 		nodeAddrs := make([]uint, 0, maxNodeChildren)
 		leafAddrs := make([]uint, 0, maxNodeChildren)
+		fringeAddrs := make([]uint, 0, maxNodeChildren)
 
 		// the node has recursive child nodes or path-compressed leaves
 		for i, addr := range n.children.All() {
@@ -118,6 +119,9 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 
 			case *leaf[V]:
 				leafAddrs = append(leafAddrs, addr)
+
+			case *fringe[V]:
+				fringeAddrs = append(fringeAddrs, addr)
 
 			default:
 				panic("logic error, wrong node type")
@@ -161,13 +165,13 @@ func (n *node[V]) hasType() nodeType {
 		return nullNode
 	case s.nodes == 0:
 		return leafNode
-	case (s.pfxs > 0 || s.leaves > 0) && s.nodes > 0:
+	case (s.pfxs > 0 || s.leaves > 0 || s.fringes > 0) && s.nodes > 0:
 		return fullNode
-	case (s.pfxs == 0 && s.leaves == 0) && s.nodes > 0:
+	case (s.pfxs == 0 && s.leaves == 0 && s.fringes == 0) && s.nodes > 0:
 		return intermediateNode
 	default:
-		panic(fmt.Sprintf("UNREACHABLE: pfx: %d, chld: %d, node: %d, leaf: %d",
-			s.pfxs, s.childs, s.nodes, s.leaves))
+		panic(fmt.Sprintf("UNREACHABLE: pfx: %d, chld: %d, node: %d, leaf: %d, fringe: %d",
+			s.pfxs, s.childs, s.nodes, s.leaves, s.fringes))
 	}
 }
 
@@ -250,6 +254,9 @@ func (n *node[V]) nodeStats() stats {
 		case *leaf[V]:
 			s.leaves++
 
+		case *fringe[V]:
+			s.fringes++
+
 		default:
 			panic("logic error, wrong node type")
 		}
@@ -269,6 +276,7 @@ func (n *node[V]) nodeStatsRec() stats {
 	s.childs = n.children.Len()
 	s.nodes = 1 // this node
 	s.leaves = 0
+	s.fringes = 0
 
 	for _, kidAny := range n.children.Items {
 		switch kid := kidAny.(type) {
@@ -280,9 +288,13 @@ func (n *node[V]) nodeStatsRec() stats {
 			s.childs += rs.childs
 			s.nodes += rs.nodes
 			s.leaves += rs.leaves
+			s.fringes += rs.fringes
 
 		case *leaf[V]:
 			s.leaves++
+
+		case *fringe[V]:
+			s.fringes++
 
 		default:
 			panic("logic error, wrong node type")

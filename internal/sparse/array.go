@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Karl Gaissmaier
+// Copyright (c) 2025 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
 // package sparse implements a generic sparse array
@@ -12,22 +12,22 @@ import (
 // Array, a generic implementation of a sparse array
 // with popcount compression and payload T.
 type Array[T any] struct {
-	bitset.BitSet
+	bitset.BitSet256
 	Items []T
 }
 
 // Get the value at i from sparse array.
 //
-// example: Array.Get(5) -> Array.Items[1]
+// example: ArrayLite.Get(5) -> ArrayLite.Items[1]
 //
 //	                   ⬇
-//	BitSet: [0|0|1|0|0|1|0|1|...] <- 3 bits set
-//	Items:  [*|*|*]               <- len(Items) = 3
-//	           ⬆
+//	BitSetArray: [0|0|1|0|0|1|0|1|...] <- 3 bits set
+//	Items:       [*|*|*]               <- len(Items) = 3
+//	                ⬆
 //
-//	BitSet.Test(5):     true
-//	BitSet.popcount(5): 2, for interval [0,5]
-//	BitSet.Rank0(5):    1, equal popcount(5)-1
+//	BitSetArray.Test(5):     true
+//	BitSetArray.popcount(5): 2, for interval [0,5]
+//	BitSetArray.Rank0(5):    1, equal popcount(5)-1
 func (s *Array[T]) Get(i uint) (value T, ok bool) {
 	if s.Test(i) {
 		return s.Items[s.Rank0(i)], true
@@ -65,7 +65,7 @@ func (s *Array[T]) UpdateAt(i uint, cb func(T, bool) T) (newValue T, wasPresent 
 	}
 
 	// new value, insert into bitset ...
-	s.BitSet = s.Set(i)
+	s.BitSet256.Set(i)
 
 	// bitset has changed, recalc rank
 	rank0 = s.Rank0(i)
@@ -81,7 +81,7 @@ func (s *Array[T]) Len() int {
 	return len(s.Items)
 }
 
-// Copy returns a shallow copy of the Array.
+// Copy returns a shallow copy of the ArrayLite.
 // The elements are copied using assignment, this is no deep clone.
 func (s *Array[T]) Copy() *Array[T] {
 	if s == nil {
@@ -89,8 +89,8 @@ func (s *Array[T]) Copy() *Array[T] {
 	}
 
 	return &Array[T]{
-		BitSet: s.BitSet.Clone(),
-		Items:  append(s.Items[:0:0], s.Items...),
+		BitSet256: s.BitSet256,
+		Items:     append(s.Items[:0:0], s.Items...),
 	}
 }
 
@@ -105,7 +105,7 @@ func (s *Array[T]) InsertAt(i uint, value T) (exists bool) {
 	}
 
 	// new, insert into bitset ...
-	s.BitSet = s.Set(i)
+	s.BitSet256.Set(i)
 
 	// ... and slice
 	s.insertItem(s.Rank0(i), value)
@@ -126,7 +126,7 @@ func (s *Array[T]) DeleteAt(i uint) (value T, exists bool) {
 	s.deleteItem(rank0)
 
 	// delete from bitset
-	s.BitSet = s.Clear(i)
+	s.BitSet256.Clear(i)
 
 	return value, true
 }
