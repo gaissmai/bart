@@ -72,7 +72,6 @@ values(#1): <nil>
 
 func TestDumpSampleV4(t *testing.T) {
 	t.Parallel()
-	t.Skip("TODO: rewrite to fringe")
 	tbl := new(Table[any])
 
 	checkDump(t, tbl, dumpTest{
@@ -88,27 +87,34 @@ func TestDumpSampleV4(t *testing.T) {
 			mpp("192.168.1.0/24"),
 		},
 		want: `
-### IPv4: size(9), nodes(4)
+### IPv4: size(9), nodes(6)
 [FULL] depth:  0 path: [] / 0
-indexs(#2): [266 383]
-prefxs(#2): 10/8 127/8
-values(#2): <nil> <nil>
-childs(#2): 10 192
-leaves(#3): 127:{127.0.0.1/32, <nil>} 169:{169.254.0.0/16, <nil>} 172:{172.16.0.0/12, <nil>}
+childs(#3): 10 127 192
+leaves(#2): 169:{169.254.0.0/16, <nil>} 172:{172.16.0.0/12, <nil>}
 
-.[IMED] depth:  1 path: [10] / 8
+.[FULL] depth:  1 path: [10] / 8
+.indexs(#1): [1]
+.prefxs(#1): 0/0
+.values(#1): <nil>
 .childs(#1): 0
 
 ..[LEAF] depth:  2 path: [10.0] / 16
-..indexs(#2): [256 257]
-..prefxs(#2): 0/8 1/8
-..values(#2): <nil> <nil>
+..leaves(#2): 0:{10.0.0.0/24, <nil>} 1:{10.0.1.0/24, <nil>}
 
-.[LEAF] depth:  1 path: [192] / 8
-.indexs(#1): [424]
-.prefxs(#1): 168/8
+.[LEAF] depth:  1 path: [127] / 8
+.indexs(#1): [1]
+.prefxs(#1): 0/0
 .values(#1): <nil>
-.leaves(#1): 168:{192.168.1.0/24, <nil>}
+.leaves(#1): 0:{127.0.0.1/32, <nil>}
+
+.[IMED] depth:  1 path: [192] / 8
+.childs(#1): 168
+
+..[LEAF] depth:  2 path: [192.168] / 16
+..indexs(#1): [1]
+..prefxs(#1): 0/0
+..values(#1): <nil>
+..leaves(#1): 1:{192.168.1.0/24, <nil>}
 `,
 	})
 }
@@ -135,7 +141,6 @@ leaves(#2): 0x20:{2001:db8::/32, <nil>} 0xfe:{fe80::/10, <nil>}
 
 func TestDumpSample(t *testing.T) {
 	t.Parallel()
-	t.Skip("TODO: rewrite to fringe")
 	tbl := new(Table[any])
 
 	checkDump(t, tbl, dumpTest{
@@ -155,27 +160,34 @@ func TestDumpSample(t *testing.T) {
 			mpp("192.168.1.0/24"),
 		},
 		want: `
-### IPv4: size(9), nodes(4)
+### IPv4: size(9), nodes(6)
 [FULL] depth:  0 path: [] / 0
-indexs(#2): [266 383]
-prefxs(#2): 10/8 127/8
-values(#2): <nil> <nil>
-childs(#2): 10 192
-leaves(#3): 127:{127.0.0.1/32, <nil>} 169:{169.254.0.0/16, <nil>} 172:{172.16.0.0/12, <nil>}
+childs(#3): 10 127 192
+leaves(#2): 169:{169.254.0.0/16, <nil>} 172:{172.16.0.0/12, <nil>}
 
-.[IMED] depth:  1 path: [10] / 8
+.[FULL] depth:  1 path: [10] / 8
+.indexs(#1): [1]
+.prefxs(#1): 0/0
+.values(#1): <nil>
 .childs(#1): 0
 
 ..[LEAF] depth:  2 path: [10.0] / 16
-..indexs(#2): [256 257]
-..prefxs(#2): 0/8 1/8
-..values(#2): <nil> <nil>
+..leaves(#2): 0:{10.0.0.0/24, <nil>} 1:{10.0.1.0/24, <nil>}
 
-.[LEAF] depth:  1 path: [192] / 8
-.indexs(#1): [424]
-.prefxs(#1): 168/8
+.[LEAF] depth:  1 path: [127] / 8
+.indexs(#1): [1]
+.prefxs(#1): 0/0
 .values(#1): <nil>
-.leaves(#1): 168:{192.168.1.0/24, <nil>}
+.leaves(#1): 0:{127.0.0.1/32, <nil>}
+
+.[IMED] depth:  1 path: [192] / 8
+.childs(#1): 168
+
+..[LEAF] depth:  2 path: [192.168] / 16
+..indexs(#1): [1]
+..prefxs(#1): 0/0
+..values(#1): <nil>
+..leaves(#1): 1:{192.168.1.0/24, <nil>}
 
 ### IPv6: size(4), nodes(1)
 [LEAF] depth:  0 path: [] / 0

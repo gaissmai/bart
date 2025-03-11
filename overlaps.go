@@ -67,7 +67,7 @@ func (n *node[V]) overlaps(o *node[V], depth int) bool {
 	}
 
 	// stop condition, no child with identical octet in n and o
-	if !n.children.IntersectsAny(o.children.BitSet) {
+	if !n.children.IntersectsAny(&o.children.BitSetFringe) {
 		return false
 	}
 
@@ -77,7 +77,7 @@ func (n *node[V]) overlaps(o *node[V], depth int) bool {
 // overlapsRoutes, test if n overlaps o prefixes and vice versa
 func (n *node[V]) overlapsRoutes(o *node[V]) bool {
 	// some prefixes are identical, trivial overlap
-	if n.prefixes.IntersectsAny(o.prefixes.BitSet) {
+	if n.prefixes.IntersectsAny(&o.prefixes.BitSetFringe) {
 		return true
 	}
 
@@ -154,33 +154,24 @@ func (n *node[V]) overlapsChildrenIn(o *node[V]) bool {
 	// make allot table with prefixes as bitsets, bitsets are precalculated
 	// just union the bitsets to one bitset (allot table) for all prefixes
 	// in this node
-	prefixRoutes := bitset.BitSet(make([]uint64, 8))
+	prefixRoutes := bitset.BitSetFringe{}
 
 	allIndices := n.prefixes.AsSlice(make([]uint, 0, maxNodePrefixes))
 
 	for _, idx := range allIndices {
 		// get pre alloted bitset for idx
-		prefixRoutes.InPlaceUnion(allot.LookupTbl[idx])
+		prefixRoutes.InPlaceUnion(allot.LookupTblFringe[idx])
 	}
 
-	// clone a bitset without heap allocation
-	// shift-right children bitset by 256 (firstHostIndex)
-	c8 := make([]uint64, 8)
-	copy(c8[4:], o.children.BitSet) // 4*64= 256
-	hostRoutes := bitset.BitSet(c8)
-
-	return prefixRoutes.IntersectsAny(hostRoutes)
+	return prefixRoutes.IntersectsAny(&o.children.BitSetFringe)
 }
 
 // overlapsSameChildren, find same octets with bitset intersection.
 func (n *node[V]) overlapsSameChildren(o *node[V], depth int) bool {
-	// clone a bitset without heap allocation
-	c4 := [4]uint64{}
-	copy(c4[:], n.children.BitSet)
-	nChildrenBitsetCloned := bitset.BitSet(c4[:])
+	nChildrenBitsetCloned := n.children.BitSetFringe
 
 	// intersect in place the cloned child bitset from n with o
-	nChildrenBitsetCloned.InPlaceIntersection(o.children.BitSet)
+	nChildrenBitsetCloned.InPlaceIntersection(&o.children.BitSetFringe)
 
 	allCommonChildren := nChildrenBitsetCloned.AsSlice(make([]uint, 0, maxNodeChildren))
 
@@ -241,7 +232,7 @@ func (n *node[V]) overlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
 	lastIdx, lastBits := lastOctetIdxAndBits(bits)
 
 	for ; depth < len(octets); depth++ {
-		octet := octets[depth&15]
+		octet := octets[depth&0xf]
 		addr := uint(octet)
 
 		// full octet path in node trie, check overlap with last prefix octet
@@ -286,18 +277,13 @@ func (n *node[V]) overlapsIdx(idx uint) bool {
 
 	// use bitset intersections instead of range loops
 	// shallow copy pre alloted bitset for idx
-	allotedPrefixRoutes := allot.LookupTbl[idx]
-	if allotedPrefixRoutes.IntersectsAny(n.prefixes.BitSet) {
+	allotedPrefixRoutes := allot.LookupTblFringe[idx]
+	if allotedPrefixRoutes.IntersectsAny(&n.prefixes.BitSetFringe) {
 		return true
 	}
 
 	// 3. Test if prefix overlaps any child in this node
 
-	// shift-right children bitset by 256 (firstHostIndex)
-	c8 := [8]uint64{}
-	copy(c8[4:], n.children.BitSet) // 4*64= 256
-	hostRoutes := bitset.BitSet(c8[:])
-
 	// use bitsets intersection instead of range loops
-	return allotedPrefixRoutes.IntersectsAny(hostRoutes)
+	return allotedPrefixRoutes.IntersectsAny(&n.children.BitSetFringe)
 }
