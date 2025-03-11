@@ -13,6 +13,11 @@ const (
 	firstHostIdx = 256
 )
 
+//  can inline PfxLen with cost 10
+//  can inline HostIdx with cost 4
+//  can inline IdxToPfx with cost 10
+//  can inline PfxToIdx with cost 11
+
 // HostIdx, just PfxToIdx(octet, 8) but faster.
 func HostIdx(octet uint) uint {
 	return octet + firstHostIdx
