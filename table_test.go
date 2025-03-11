@@ -13,6 +13,8 @@ import (
 	"fmt"
 	"math/rand"
 	"net/netip"
+	"runtime"
+	"strconv"
 	"testing"
 )
 
@@ -2830,6 +2832,105 @@ func BenchmarkTableClone(b *testing.B) {
 				}
 			})
 		}
+	}
+}
+
+func BenchmarkMemIP4(b *testing.B) {
+	for _, k := range []int{1_000, 10_000, 100_000, 1_000_000} {
+		var startMem, endMem runtime.MemStats
+
+		runtime.GC()
+		runtime.ReadMemStats(&startMem)
+
+		b.Run(strconv.Itoa(k), func(b *testing.B) {
+			rt := new(Table[struct{}])
+			for range b.N {
+				rt = new(Table[struct{}])
+				for _, pfx := range randomRealWorldPrefixes4(k) {
+					rt.Insert(pfx, struct{}{})
+				}
+			}
+
+			runtime.GC()
+			runtime.ReadMemStats(&endMem)
+
+			stats := rt.root4.nodeStatsRec()
+			b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc)/1024, "KByte")
+			b.ReportMetric(float64(stats.nodes), "node")
+			b.ReportMetric(float64(stats.pfxs), "pfxs")
+			b.ReportMetric(float64(stats.leaves), "leaf")
+			b.ReportMetric(float64(stats.fringes), "fringe")
+			b.ReportMetric(0, "ns/op")
+		})
+	}
+}
+
+func BenchmarkMemIP6(b *testing.B) {
+	for _, k := range []int{1_000, 10_000, 100_000, 1_000_000} {
+		var startMem, endMem runtime.MemStats
+
+		runtime.GC()
+		runtime.ReadMemStats(&startMem)
+
+		b.Run(strconv.Itoa(k), func(b *testing.B) {
+			rt := new(Table[struct{}])
+			for range b.N {
+				rt = new(Table[struct{}])
+				for _, pfx := range randomRealWorldPrefixes6(k) {
+					rt.Insert(pfx, struct{}{})
+				}
+			}
+
+			runtime.GC()
+			runtime.ReadMemStats(&endMem)
+
+			stats := rt.root6.nodeStatsRec()
+			b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc)/1024, "KByte")
+			b.ReportMetric(float64(stats.nodes), "node")
+			b.ReportMetric(float64(stats.pfxs), "pfxs")
+			b.ReportMetric(float64(stats.leaves), "leaf")
+			b.ReportMetric(float64(stats.fringes), "fringe")
+			b.ReportMetric(0, "ns/op")
+		})
+	}
+}
+
+func BenchmarkMem(b *testing.B) {
+	for _, k := range []int{1_000, 10_000, 100_000, 1_000_000} {
+		var startMem, endMem runtime.MemStats
+
+		runtime.GC()
+		runtime.ReadMemStats(&startMem)
+
+		b.Run(strconv.Itoa(k), func(b *testing.B) {
+			rt := new(Table[struct{}])
+			for range b.N {
+				rt = new(Table[struct{}])
+				for _, pfx := range randomRealWorldPrefixes(k) {
+					rt.Insert(pfx, struct{}{})
+				}
+			}
+
+			runtime.GC()
+			runtime.ReadMemStats(&endMem)
+
+			s4 := rt.root4.nodeStatsRec()
+			s6 := rt.root6.nodeStatsRec()
+			stats := stats{
+				s4.pfxs + s6.pfxs,
+				s4.childs + s6.childs,
+				s4.nodes + s6.nodes,
+				s4.leaves + s6.leaves,
+				s4.fringes + s6.fringes,
+			}
+
+			b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc)/1024, "KByte")
+			b.ReportMetric(float64(stats.nodes), "node")
+			b.ReportMetric(float64(stats.pfxs), "pfxs")
+			b.ReportMetric(float64(stats.leaves), "leaf")
+			b.ReportMetric(float64(stats.fringes), "fringe")
+			b.ReportMetric(0, "ns/op")
+		})
 	}
 }
 

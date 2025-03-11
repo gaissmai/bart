@@ -7,27 +7,25 @@
 // Studied [github.com/bits-and-blooms/bitset] inside out
 // and rewrote needed parts from scratch for this project.
 //
-// This implementation is smaller and faster as the
-// general [github.com/bits-and-blooms/bitset].
+// This implementation is optimized for the needed use case.
 package bitset
 
 //  can inline (*BitSet256).All with cost 56
 //  can inline (*BitSet256).AsSlice with cost 50
 //  can inline (*BitSet256).Clear with cost 12
 //  can inline (*BitSet256).FirstSet with cost 79
-//  can inline (*BitSet256).InPlaceIntersection with cost 36
-//  can inline (*BitSet256).InPlaceUnion with cost 36
 //  can inline (*BitSet256).IntersectionCardinality with cost 57
 //  can inline (*BitSet256).IntersectionTop with cost 42
-//  can inline (*BitSet256).Intersects with cost 48
+//  can inline (*BitSet256).Intersection with cost 53
+//  can inline (*BitSet256).IntersectsAny with cost 48
 //  can inline (*BitSet256).IsEmpty with cost 28
 //  can inline (*BitSet256).NextSet with cost 73
-//  can inline (*BitSet256).popcntAnd with cost 53
 //  can inline (*BitSet256).popcnt with cost 33
 //  can inline (*BitSet256).Rank0 with cost 50
 //  can inline (*BitSet256).Set with cost 12
 //  can inline (*BitSet256).Size with cost 36
 //  can inline (*BitSet256).Test with cost 28
+//  can inline (*BitSet256).Union with cost 53
 
 import (
 	"math/bits"
@@ -69,19 +67,6 @@ func (b *BitSet256) Test(bit uint) (ok bool) {
 		return b[x&3]&(1<<(bit&63)) != 0 // [x&3] is bounds check elimination (BCE)
 	}
 	return
-}
-
-// IsEmpty returns true if no bit is set.
-func (b *BitSet256) IsEmpty() bool {
-	return b[0] == 0 &&
-		b[1] == 0 &&
-		b[2] == 0 &&
-		b[3] == 0
-}
-
-// Size is the number of set bits (popcount).
-func (b *BitSet256) Size() int {
-	return b.popcnt()
 }
 
 // FirstSet returns the first bit set along with an ok code.
@@ -152,15 +137,6 @@ func (b *BitSet256) All() []uint {
 	return b.AsSlice(make([]uint, 0, 256))
 }
 
-// Intersects returns true if the intersection of base set with the compare set
-// is not the empty set.
-func (b *BitSet256) Intersects(c *BitSet256) bool {
-	return b[0]&c[0] != 0 ||
-		b[1]&c[1] != 0 ||
-		b[2]&c[2] != 0 ||
-		b[3]&c[3] != 0
-}
-
 // IntersectionTop computes the intersection of base set with the compare set.
 // If the result set isn't empty, it returns the top most set bit and true.
 func (b *BitSet256) IntersectionTop(c *BitSet256) (top uint, ok bool) {
@@ -170,29 +146,6 @@ func (b *BitSet256) IntersectionTop(c *BitSet256) (top uint, ok bool) {
 		}
 	}
 	return
-}
-
-// IntersectionCardinality computes the popcount of the intersection.
-func (b *BitSet256) IntersectionCardinality(c *BitSet256) int {
-	return b.popcntAnd(c)
-}
-
-// InPlaceIntersection overwrites and computes the intersection of
-// base set with the compare set. This is the BitSet equivalent of & (and).
-func (b *BitSet256) InPlaceIntersection(c *BitSet256) {
-	b[0] &= c[0]
-	b[1] &= c[1]
-	b[2] &= c[2]
-	b[3] &= c[3]
-}
-
-// InPlaceUnion creates the destructive union of base set with compare set.
-// This is the BitSet equivalent of | (or).
-func (b *BitSet256) InPlaceUnion(c *BitSet256) {
-	b[0] |= c[0]
-	b[1] |= c[1]
-	b[2] |= c[2]
-	b[3] |= c[3]
 }
 
 // Rank0 is equal to Rank(idx) - 1
@@ -207,7 +160,6 @@ func (b *BitSet256) Rank0(idx uint) (rnk int) {
 	}
 
 	// ... plus partial word at wIdx,
-	// don't test i&63 != 0, just add, less branches
 	if wIdx < 4 {
 		rnk += bits.OnesCount64(b[wIdx&3] << (64 - idx&63)) // with BCE
 	}
@@ -217,18 +169,62 @@ func (b *BitSet256) Rank0(idx uint) (rnk int) {
 	return
 }
 
+// IsEmpty returns true if no bit is set.
+func (b *BitSet256) IsEmpty() bool {
+	return b[0] == 0 &&
+		b[1] == 0 &&
+		b[2] == 0 &&
+		b[3] == 0
+}
+
+// IntersectsAny returns true if the intersection of base set with the compare set
+// is not the empty set.
+func (b *BitSet256) IntersectsAny(c *BitSet256) bool {
+	return b[0]&c[0] != 0 ||
+		b[1]&c[1] != 0 ||
+		b[2]&c[2] != 0 ||
+		b[3]&c[3] != 0
+}
+
+// Intersection computes the intersection of base set with the compare set.
+// This is the BitSet equivalent of & (and).
+func (b *BitSet256) Intersection(c *BitSet256) (bs BitSet256) {
+	bs[0] = b[0] & c[0]
+	bs[1] = b[1] & c[1]
+	bs[2] = b[2] & c[2]
+	bs[3] = b[3] & c[3]
+	return
+}
+
+// Union creates the union of base set with compare set.
+// This is the BitSet equivalent of | (or).
+func (b *BitSet256) Union(c *BitSet256) (bs BitSet256) {
+	bs[0] = b[0] | c[0]
+	bs[1] = b[1] | c[1]
+	bs[2] = b[2] | c[2]
+	bs[3] = b[3] | c[3]
+	return
+}
+
+// IntersectionCardinality computes the popcount of the intersection.
+func (b *BitSet256) IntersectionCardinality(c *BitSet256) (cnt int) {
+	cnt += bits.OnesCount64(b[0] & c[0])
+	cnt += bits.OnesCount64(b[1] & c[1])
+	cnt += bits.OnesCount64(b[2] & c[2])
+	cnt += bits.OnesCount64(b[3] & c[3])
+	return
+}
+
+// Size is the number of set bits (popcount).
+func (b *BitSet256) Size() int {
+	return b.popcnt()
+}
+
+// popcnt, count all the set bits
 func (b *BitSet256) popcnt() (cnt int) {
 	cnt += bits.OnesCount64(b[0])
 	cnt += bits.OnesCount64(b[1])
 	cnt += bits.OnesCount64(b[2])
 	cnt += bits.OnesCount64(b[3])
-	return
-}
-
-func (b *BitSet256) popcntAnd(c *BitSet256) (cnt int) {
-	cnt += bits.OnesCount64(b[0] & c[0])
-	cnt += bits.OnesCount64(b[1] & c[1])
-	cnt += bits.OnesCount64(b[2] & c[2])
-	cnt += bits.OnesCount64(b[3] & c[3])
 	return
 }

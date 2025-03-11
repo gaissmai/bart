@@ -197,7 +197,7 @@ func (n *liteNode) isEmpty() bool {
 
 // lpmTest, any longest prefix match
 func (n *liteNode) lpmTest(idx uint) bool {
-	return n.prefixes.IntersectsAny(lpmbt.LookupTbl[idx])
+	return n.prefixes.Intersects(lpmbt.LookupTbl[idx])
 }
 
 // insertAtDepth, see the similar method for node, but now simpler without payload V.
