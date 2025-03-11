@@ -359,12 +359,11 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 	// find the trie node
 	for depth, octet := range octets {
 		if depth > lastIdx {
-			depth--
 			break
 		}
 
 		// push current node on stack for path recording
-		stack[depth&15] = n // [depth&15] for BCE
+		stack[depth&0xf] = n // [depth&0xf] for BCE
 
 		// try to delete prefix in trie node
 		if depth == lastIdx {
@@ -374,7 +373,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 			}
 
 			t.sizeUpdate(is4, -1)
-			n.purgeAndCompress(stack[:depth&15], octets, is4)
+			n.purgeAndCompress(stack[:depth&0xf], octets, is4)
 			return val, ok
 		}
 
@@ -400,7 +399,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 			n.children.DeleteAt(addr)
 
 			t.sizeUpdate(is4, -1)
-			n.purgeAndCompress(stack[:depth&15], octets, is4)
+			n.purgeAndCompress(stack[:depth&0xf], octets, is4)
 
 			return kid.value, true
 
@@ -449,7 +448,7 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, o
 	// find the trie node
 	for depth, octet := range octets {
 		// push cloned node on stack for path recording
-		stack[depth&15] = n
+		stack[depth&0xf] = n
 
 		// try to delete prefix in trie node
 		if depth == lastIdx {
@@ -460,7 +459,7 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, o
 			}
 
 			pt.sizeUpdate(is4, -1)
-			n.purgeAndCompress(stack[:depth&15], octets, is4)
+			n.purgeAndCompress(stack[:depth&0xf], octets, is4)
 			return pt, val, ok
 		}
 
@@ -493,7 +492,7 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, o
 			n.children.DeleteAt(addr)
 
 			pt.sizeUpdate(is4, -1)
-			n.purgeAndCompress(stack[:depth&15], octets, is4)
+			n.purgeAndCompress(stack[:depth&0xf], octets, is4)
 
 			// kid.value is cloned
 			return pt, kid.value, true
@@ -632,7 +631,7 @@ LOOP:
 		addr = uint(octet)
 
 		// push current node on stack for fast backtracking
-		stack[depth&15] = n
+		stack[depth&0xf] = n
 
 		// go down in tight loop to last octet
 		if !n.children.Test(addr) {
@@ -661,14 +660,14 @@ LOOP:
 
 	// start backtracking, unwind the stack, bounds check eliminated
 	for ; depth >= 0; depth-- {
-		n = stack[depth&15]
+		n = stack[depth&0xf]
 
 		// longest prefix match, skip if node has no prefixes
 		if n.prefixes.Len() != 0 {
-			idx := art.HostIdx(uint(octets[depth&15]))
+			idx := art.HostIdx(uint(octets[depth&0xf]))
 			// lpmGet(idx), manually inlined
 			// --------------------------------------------------------------
-			if topIdx, ok := n.prefixes.IntersectionTop(lpmbt.LookupTbl[idx]); ok {
+			if topIdx, ok := n.prefixes.IntersectionTop(lpmbt.LookupTblFringe[idx]); ok {
 				return n.prefixes.MustGet(topIdx), true
 			}
 			// --------------------------------------------------------------
@@ -727,7 +726,7 @@ LOOP:
 			break
 		}
 		// push current node on stack
-		stack[depth&15] = n
+		stack[depth&0xf] = n
 
 		addr = uint(octet)
 
@@ -759,7 +758,7 @@ LOOP:
 
 	// start backtracking, unwind the stack
 	for ; depth >= 0; depth-- {
-		n = stack[depth&15]
+		n = stack[depth&0xf]
 
 		// longest prefix match, skip if node has no prefixes
 		if n.prefixes.Len() == 0 {
@@ -769,7 +768,7 @@ LOOP:
 		// only the lastOctet may have a different prefix len
 		// all others are just host routes
 		var idx uint
-		octet = octets[depth&15]
+		octet = octets[depth&0xf]
 		if depth == lastIdx {
 			idx = art.PfxToIdx(octet, lastBits)
 		} else {
@@ -777,7 +776,7 @@ LOOP:
 		}
 
 		// manually inlined lpmGet(idx)
-		if topIdx, ok := n.prefixes.IntersectionTop(lpmbt.LookupTbl[idx]); ok {
+		if topIdx, ok := n.prefixes.IntersectionTop(lpmbt.LookupTblFringe[idx]); ok {
 			val = n.prefixes.MustGet(topIdx)
 
 			// called from LookupPrefix
@@ -833,7 +832,7 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 				break
 			}
 			// push current node on stack
-			stack[depth&15] = n
+			stack[depth&0xf] = n
 
 			addr := uint(octet)
 
@@ -866,7 +865,7 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 
 		// start backtracking, unwind the stack
 		for ; depth >= 0; depth-- {
-			n = stack[depth&15]
+			n = stack[depth&0xf]
 
 			// micro benchmarking
 			if n.prefixes.Len() == 0 {
