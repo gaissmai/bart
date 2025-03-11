@@ -56,7 +56,7 @@ func TestLiteInsert(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		lt := new(Lite)
+		lt := new(LitePoC)
 		for _, p := range tc.ins {
 			lt.Insert(p)
 		}
@@ -73,7 +73,7 @@ func TestLiteInsert(t *testing.T) {
 func TestLiteInsertDelete(t *testing.T) {
 	t.Parallel()
 
-	lt := new(Lite)
+	lt := new(LitePoC)
 
 	pfxs := randomRealWorldPrefixes(100_000)
 	for _, pfx := range pfxs {
@@ -103,7 +103,7 @@ func TestLiteContains(t *testing.T) {
 	var match4, match6 int
 	var miss4, miss6 int
 
-	lt := new(Lite)
+	lt := new(LitePoC)
 	tb := new(Table[any])
 
 	for _, pfx := range randomRealWorldPrefixes(100_000) {

@@ -1,233 +1,67 @@
-// Copyright (c) 2024 Karl Gaissmaier
+// Copyright (c) 2025 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
 package bitset
 
 import (
-	"math/rand/v2"
+	"fmt"
 	"slices"
 	"testing"
 )
-
-func TestNil(t *testing.T) {
-	t.Parallel()
-	defer func() {
-		if r := recover(); r != nil {
-			t.Error("A nil bitset must not panic")
-		}
-	}()
-
-	b := BitSet(nil)
-	b.Set(0)
-
-	b = BitSet(nil)
-	_ = b.Clear(1000)
-
-	b = BitSet(nil)
-	b.Compact()
-
-	b = BitSet(nil)
-	_ = b.Clone()
-
-	b = BitSet(nil)
-	b.Size()
-
-	b = BitSet(nil)
-	b.Rank0(100)
-
-	b = BitSet(nil)
-	b.Test(42)
-
-	b = BitSet(nil)
-	b.NextSet(0)
-
-	b = BitSet(nil)
-	b.AsSlice(nil)
-
-	b = BitSet(nil)
-	b.All()
-
-	b = BitSet(nil)
-	c := BitSet(nil)
-	b.InPlaceIntersection(c)
-
-	b = BitSet(nil)
-	c = BitSet(nil)
-	b.InPlaceUnion(c)
-
-	b = BitSet(nil)
-	c = BitSet(nil)
-	b.IntersectsAny(c)
-
-	b = BitSet(nil)
-	c = BitSet(nil)
-	b.IntersectionTop(c)
-}
 
 func TestZeroValue(t *testing.T) {
 	t.Parallel()
 	defer func() {
 		if r := recover(); r != nil {
-			t.Error("A zero value bitset must not panic")
+			t.Errorf("A zero value bitset must not panic: %v", r)
 		}
 	}()
 
-	b := BitSet{}
+	b := BitSet256{}
 	b.Set(0)
 
-	b = BitSet{}
-	_ = b.Clear(1000)
+	b = BitSet256{}
+	b.Clear(1000)
 
-	b = BitSet{}
-	b.Compact()
-
-	b = BitSet{}
-	b.Clone()
-
-	b = BitSet{}
+	b = BitSet256{}
 	b.Size()
 
-	b = BitSet{}
+	b = BitSet256{}
 	b.Rank0(100)
 
-	b = BitSet{}
+	b = BitSet256{}
 	b.Test(42)
 
-	b = BitSet{}
+	b = BitSet256{}
 	b.NextSet(0)
 
-	b = BitSet{}
+	b = BitSet256{}
 	b.AsSlice(nil)
 
-	b = BitSet{}
+	b = BitSet256{}
 	b.All()
 
-	b = BitSet{}
-	c := BitSet{}
-	b.InPlaceIntersection(c)
+	b = BitSet256{}
+	c := BitSet256{}
+	b.InPlaceIntersection(&c)
 
-	b = BitSet{}
-	c = BitSet{}
-	b.InPlaceUnion(c)
+	b = BitSet256{}
+	c = BitSet256{}
+	b.InPlaceUnion(&c)
 
-	b = BitSet{}
-	c = BitSet{}
-	b.IntersectsAny(c)
+	b = BitSet256{}
+	c = BitSet256{}
+	b.IntersectsAny(&c)
 
-	b = BitSet{}
-	c = BitSet{}
-	b.IntersectionTop(c)
-}
-
-func TestBitSetUntil(t *testing.T) {
-	t.Parallel()
-	var b BitSet
-	var last uint = 900
-	b = b.Set(last)
-	for i := range last {
-		if b.Test(i) {
-			t.Errorf("Bit %d is set, and it shouldn't be.", i)
-		}
-	}
-}
-
-func TestExpand(t *testing.T) {
-	t.Parallel()
-	var b BitSet
-	for i := range 512 {
-		b = b.Set(uint(i))
-	}
-	want := 8
-	if len(b) != want {
-		t.Errorf("Set(511), want len: %d, got: %d", want, len(b))
-	}
-	if cap(b) != want {
-		t.Errorf("Set(511), want cap: %d, got: %d", want, cap(b))
-	}
-
-	b = make([]uint64, 0, 4)
-	b = b.Set(250)
-	want = 4
-	if len(b) != want {
-		t.Errorf("Set(250), want len: %d, got: %d", want, len(b))
-	}
-	if cap(b) != want {
-		t.Errorf("Set(250), want cap: %d, got: %d", want, cap(b))
-	}
-}
-
-func TestClone(t *testing.T) {
-	t.Parallel()
-	var b BitSet
-	c := b.Clone()
-
-	if !slices.Equal(b, c) {
-		t.Error("clone of nil BitSet should also be nil")
-	}
-
-	// make random numbers
-	var rands []uint64
-	for range 8 {
-		rands = append(rands, rand.Uint64())
-	}
-
-	b = rands
-	c = b.Clone()
-
-	if !slices.Equal(b, c) {
-		t.Error("cloned random BitSet is not equal")
-	}
-}
-
-func TestCompact(t *testing.T) {
-	t.Parallel()
-	var b BitSet
-	for _, i := range []uint{1, 2, 5, 10, 20, 50, 100, 200, 500, 1023} {
-		b = b.Set(i)
-	}
-
-	want := 16
-	if len(b) != want {
-		t.Errorf("Set(...), want len: %d, got: %d", want, len(b))
-	}
-	if cap(b) != want {
-		t.Errorf("Set(...), want cap: %d, got: %d", want, cap(b))
-	}
-
-	b = b.Clear(1023)
-	if len(b) != want {
-		t.Errorf("Set(...), want len: %d, got: %d", want, len(b))
-	}
-	if cap(b) != want {
-		t.Errorf("Set(...), want cap: %d, got: %d", want, cap(b))
-	}
-
-	b = b.Compact()
-	want = 8
-	if len(b) != want {
-		t.Errorf("Compact(), want len: %d, got: %d", want, len(b))
-	}
-	if cap(b) != want {
-		t.Errorf("Compact(), want cap: %d, got: %d", want, cap(b))
-	}
-
-	b = b.Set(10_000)
-	b = b.Clear(10_000)
-	b = b.Compact()
-
-	want = 8
-	if len(b) != want {
-		t.Errorf("Compact(), want len: %d, got: %d", want, len(b))
-	}
-	if cap(b) != want {
-		t.Errorf("Compact(), want cap: %d, got: %d", want, cap(b))
-	}
+	b = BitSet256{}
+	c = BitSet256{}
+	b.IntersectionTop(&c)
 }
 
 func TestTest(t *testing.T) {
 	t.Parallel()
-	var b BitSet
-	b = b.Set(100)
+	var b BitSet256
+	b.Set(100)
 	if !b.Test(100) {
 		t.Errorf("Bit %d is clear, and it shouldn't be.", 100)
 	}
@@ -267,16 +101,16 @@ func TestFirstSet(t *testing.T) {
 		},
 		{
 			name:    "2. word",
-			set:     []uint{70, 777},
+			set:     []uint{70, 255},
 			wantIdx: 70,
 			wantOk:  true,
 		},
 	}
 
 	for _, tc := range testCases {
-		var b BitSet
+		var b BitSet256
 		for _, u := range tc.set {
-			b = b.Set(u)
+			b.Set(u)
 		}
 
 		idx, ok := b.FirstSet()
@@ -353,7 +187,7 @@ func TestNextSet(t *testing.T) {
 		},
 		{
 			name:    "2. word",
-			set:     []uint{1, 70, 777},
+			set:     []uint{1, 70, 255},
 			del:     []uint{},
 			start:   2,
 			wantIdx: 70,
@@ -362,13 +196,13 @@ func TestNextSet(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		var b BitSet
+		var b BitSet256
 		for _, u := range tc.set {
-			b = b.Set(u)
+			b.Set(u)
 		}
 
 		for _, u := range tc.del {
-			b = b.Clear(u) // without compact
+			b.Clear(u) // without compact
 		}
 
 		idx, ok := b.NextSet(tc.start)
@@ -414,7 +248,7 @@ func TestIsEmpty(t *testing.T) {
 		},
 		{
 			name: "many",
-			set:  []uint{1, 65, 130, 190, 250, 300, 380, 420, 480, 511},
+			set:  []uint{1, 65, 130, 190, 250},
 			del:  []uint{},
 			want: false,
 		},
@@ -427,13 +261,13 @@ func TestIsEmpty(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		var b BitSet
+		var b BitSet256
 		for _, u := range tc.set {
-			b = b.Set(u)
+			b.Set(u)
 		}
 
 		for _, u := range tc.del {
-			b = b.Clear(u) // without compact
+			b.Clear(u) // without compact
 		}
 
 		got := b.IsEmpty()
@@ -474,9 +308,9 @@ func TestAll(t *testing.T) {
 		},
 		{
 			name:     "many",
-			set:      []uint{1, 65, 130, 190, 250, 300, 380, 420, 480, 511},
+			set:      []uint{1, 65, 130, 190, 250},
 			del:      []uint{},
-			wantData: []uint{1, 65, 130, 190, 250, 300, 380, 420, 480, 511},
+			wantData: []uint{1, 65, 130, 190, 250},
 		},
 		{
 			name:     "special, last return",
@@ -487,13 +321,13 @@ func TestAll(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		var b BitSet
+		var b BitSet256
 		for _, u := range tc.set {
-			b = b.Set(u)
+			b.Set(u)
 		}
 
 		for _, u := range tc.del {
-			b = b.Clear(u) // without compact
+			b.Clear(u) // without compact
 		}
 
 		buf := b.All()
@@ -539,10 +373,10 @@ func TestAsSlice(t *testing.T) {
 		},
 		{
 			name:     "many",
-			set:      []uint{1, 65, 130, 190, 250, 300, 380, 420, 480, 511},
+			set:      []uint{1, 65, 130, 190, 250},
 			del:      []uint{},
 			buf:      make([]uint, 0, 512),
-			wantData: []uint{1, 65, 130, 190, 250, 300, 380, 420, 480, 511},
+			wantData: []uint{1, 65, 130, 190, 250},
 		},
 		{
 			name:     "special, last return",
@@ -554,13 +388,13 @@ func TestAsSlice(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		var b BitSet
+		var b BitSet256
 		for _, u := range tc.set {
-			b = b.Set(u)
+			b.Set(u)
 		}
 
 		for _, u := range tc.del {
-			b = b.Clear(u) // without compact
+			b.Clear(u) // without compact
 		}
 
 		buf := b.AsSlice(tc.buf)
@@ -574,18 +408,22 @@ func TestAsSlice(t *testing.T) {
 
 func TestCount(t *testing.T) {
 	t.Parallel()
-	var b BitSet
-	tot := uint(64*4 + 11) // just an unmagic number
+	var b BitSet256
+
+	tot := uint(255)
 	checkLast := true
+
 	for i := range tot {
 		sz := uint(b.Size())
 		if sz != i {
+			t.Logf("%v", b)
 			t.Errorf("Count reported as %d, but it should be %d", sz, i)
 			checkLast = false
 			break
 		}
-		b = b.Set(i)
+		b.Set(i)
 	}
+
 	if checkLast {
 		sz := uint(b.Size())
 		if sz != tot {
@@ -597,33 +435,33 @@ func TestCount(t *testing.T) {
 // test setting every 3rd bit, just in case something odd is happening
 func TestCount2(t *testing.T) {
 	t.Parallel()
-	var b BitSet
-	tot := uint(64*4 + 11)
+	var b BitSet256
+	tot := uint(64*3 + 11)
 	for i := uint(0); i < tot; i += 3 {
 		sz := uint(b.Size())
 		if sz != i/3 {
 			t.Errorf("Count reported as %d, but it should be %d", sz, i)
 			break
 		}
-		b = b.Set(i)
+		b.Set(i)
 	}
 }
 
 func TestInPlaceUnion(t *testing.T) {
 	t.Parallel()
-	var a BitSet
-	var b BitSet
+	var a BitSet256
+	var b BitSet256
 	for i := uint(1); i < 100; i += 2 {
-		a = a.Set(i)
-		b = b.Set(i - 1)
+		a.Set(i)
+		b.Set(i - 1)
 	}
 	for i := uint(100); i < 200; i++ {
-		b = b.Set(i)
+		b.Set(i)
 	}
-	c := a.Clone()
-	c.InPlaceUnion(b)
-	d := b.Clone()
-	d.InPlaceUnion(a)
+	c := a
+	c.InPlaceUnion(&b)
+	d := b
+	d.InPlaceUnion(&a)
 	if c.Size() != 200 {
 		t.Errorf("Union should have 200 bits set, but had %d", c.Size())
 	}
@@ -634,55 +472,55 @@ func TestInPlaceUnion(t *testing.T) {
 
 func TestInplaceIntersection(t *testing.T) {
 	t.Parallel()
-	var a BitSet
-	var b BitSet
+	var a BitSet256
+	var b BitSet256
 	for i := uint(1); i < 100; i += 2 {
-		a = a.Set(i)
-		b = b.Set(i - 1)
-		b = b.Set(i)
+		a.Set(i)
+		b.Set(i - 1)
+		b.Set(i)
 	}
 	for i := uint(100); i < 200; i++ {
-		b = b.Set(i)
+		b.Set(i)
 	}
-	c := a.Clone()
-	c.InPlaceIntersection(b)
-	d := b.Clone()
-	d.InPlaceIntersection(a)
+	c := a
+	c.InPlaceIntersection(&b)
+	d := b
+	d.InPlaceIntersection(&a)
 	if c.Size() != 50 {
 		t.Errorf("Intersection should have 50 bits set, but had %d", c.Size())
 	}
 	if d.Size() != 50 {
 		t.Errorf("Intersection should have 50 bits set, but had %d", d.Size())
 	}
-	if a.IntersectionCardinality(b) != c.Size() {
+	if a.IntersectionCardinality(&b) != c.Size() {
 		t.Error("Intersection and IntersectionCardinality differ")
 	}
-	if b.IntersectionCardinality(a) != c.Size() {
+	if b.IntersectionCardinality(&a) != c.Size() {
 		t.Error("Intersection and IntersectionCardinality differ")
 	}
 }
 
 func TestIntersects(t *testing.T) {
 	t.Parallel()
-	var a BitSet
-	var b BitSet
+	var a BitSet256
+	var b BitSet256
 
 	for i := uint(1); i < 100; i++ {
-		a = a.Set(i)
+		a.Set(i)
 	}
 	for i := uint(100); i < 200; i++ {
-		b = b.Set(i)
+		b.Set(i)
 	}
 
 	want := false
-	got := a.IntersectsAny(b)
+	got := a.IntersectsAny(&b)
 	if want != got {
 		t.Errorf("Intersection should be %v, but got: %v", want, got)
 	}
 
-	b = a.Clone()
+	b = a
 	want = true
-	got = a.IntersectsAny(b)
+	got = a.IntersectsAny(&b)
 	if want != got {
 		t.Errorf("Intersection should be %v, but got: %v", want, got)
 	}
@@ -690,19 +528,19 @@ func TestIntersects(t *testing.T) {
 
 func TestIntersectionTop(t *testing.T) {
 	t.Parallel()
-	var a BitSet
-	var b BitSet
+	var a BitSet256
+	var b BitSet256
 	for i := uint(1); i < 100; i += 2 {
-		a = a.Set(i)
-		b = b.Set(i - 1)
-		b = b.Set(i)
+		a.Set(i)
+		b.Set(i - 1)
+		b.Set(i)
 	}
 	for i := uint(100); i < 200; i++ {
-		b = b.Set(i)
+		b.Set(i)
 	}
 
 	wantTop, wantOk := uint(99), true
-	gotTop, gotOk := a.IntersectionTop(b)
+	gotTop, gotOk := a.IntersectionTop(&b)
 
 	if wantOk != gotOk {
 		t.Errorf("IntersectionTop, want %v, got %v", wantOk, gotOk)
@@ -712,7 +550,7 @@ func TestIntersectionTop(t *testing.T) {
 	}
 
 	wantTop, wantOk = uint(99), true
-	gotTop, gotOk = b.IntersectionTop(a)
+	gotTop, gotOk = b.IntersectionTop(&a)
 
 	if wantOk != gotOk {
 		t.Errorf("IntersectionTop, want %v, got %v", wantOk, gotOk)
@@ -727,9 +565,9 @@ func TestIntersectionTop(t *testing.T) {
 func TestRank0(t *testing.T) {
 	t.Parallel()
 	u := []uint{2, 3, 5, 7, 11, 70, 150}
-	var b BitSet
+	var b BitSet256
 	for _, v := range u {
-		b = b.Set(v)
+		b.Set(v)
 	}
 
 	if b.Rank0(5) != 2 {
@@ -750,23 +588,118 @@ func TestRank0(t *testing.T) {
 	}
 }
 
-func TestPopcntSlice(t *testing.T) {
+func TestPopcntAnd(t *testing.T) {
 	t.Parallel()
-	s := []uint64{2, 3, 5, 7, 11, 13, 17, 19, 23, 29}
-	res := uint64(popcntSlice(s))
-	const l uint64 = 27
-	if res != l {
-		t.Errorf("Wrong popcount %d != %d", res, l)
+	s := BitSet256{0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010}
+	m := BitSet256{0b1111_1111_1111, 0b1111_1111_1111, 0b1111_1111_1111, 0b1111_1111_1111}
+
+	want := 16
+	got := s.popcntAnd(&m)
+	if got != want {
+		t.Errorf("Wrong And %d !=  %d", got, want)
 	}
 }
 
-func TestPopcntAndSlice(t *testing.T) {
-	t.Parallel()
-	s := []uint64{2, 3, 5, 7, 11, 13, 17, 19, 23, 29}
-	m := []uint64{31, 37, 41, 43, 47, 53, 59, 61, 67, 71}
-	res := uint64(popcntAnd(s, m))
-	const l uint64 = 18
-	if res != l {
-		t.Errorf("Wrong And %d !=  %d", res, l)
+func BenchmarkIntersectsAny(b *testing.B) {
+	aa := BitSet256{1, 1, 1, 1}
+
+	for i, bb := range []BitSet256{
+		{1},
+		{0, 1},
+		{0, 0, 1},
+		{0, 0, 0, 1},
+		{},
+	} {
+		b.Run(fmt.Sprintf("IntersectsAnyGo at %d", i), func(b *testing.B) {
+			b.ResetTimer()
+			for range b.N {
+				_ = aa.IntersectsAny(&bb)
+			}
+		})
+	}
+}
+
+func BenchmarkPopcount(b *testing.B) {
+	aa := BitSet256{0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010}
+	bb := BitSet256{0b1111_1111_1111, 0b1111_1111_1111, 0b1111_1111_1111, 0b1111_1111_1111}
+
+	b.Run("Popcount", func(b *testing.B) {
+		b.ResetTimer()
+		for range b.N {
+			_ = aa.popcnt()
+		}
+	})
+
+	b.Run("PopcountAnd", func(b *testing.B) {
+		b.ResetTimer()
+		for range b.N {
+			_ = aa.popcntAnd(&bb)
+		}
+	})
+}
+
+func BenchmarkRank0(b *testing.B) {
+	aa := BitSet256{0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010}
+	for _, i := range []uint{10_000, 64*4 - 11, 64*3 - 11, 64*2 - 11, 64*1 - 11} {
+		b.Run(fmt.Sprintf("Rank0(%d)", i), func(b *testing.B) {
+			b.ResetTimer()
+			for range b.N {
+				_ = aa.Rank0(i)
+			}
+		})
+	}
+}
+
+func BenchmarkIsEmpty(b *testing.B) {
+	for i, bb := range []BitSet256{
+		{1},
+		{0, 1},
+		{0, 0, 1},
+		{0, 0, 0, 1},
+		{},
+	} {
+		b.Run(fmt.Sprintf("IsEmpty at %d", i), func(b *testing.B) {
+			b.ResetTimer()
+			for range b.N {
+				_ = bb.IsEmpty()
+			}
+		})
+	}
+}
+
+func BenchmarkFirstSet(b *testing.B) {
+	for i, bb := range []BitSet256{
+		{1},
+		{0, 1},
+		{0, 0, 1},
+		{0, 0, 0, 1},
+		{},
+	} {
+		b.Run(fmt.Sprintf("FirstSet at %d", i), func(b *testing.B) {
+			b.ResetTimer()
+			for range b.N {
+				_, _ = bb.FirstSet()
+			}
+		})
+	}
+}
+
+func BenchmarkIntersectionTop(b *testing.B) {
+	for i, aa := range []BitSet256{
+		{1},
+		{0, 1},
+		{0, 0, 1},
+		{0, 0, 0, 1},
+		{0},
+		{0},
+		{0},
+		{0},
+	} {
+		b.Run(fmt.Sprintf("Top at %d", i), func(b *testing.B) {
+			b.ResetTimer()
+			for range b.N {
+				_, _ = aa.IntersectionTop(&aa)
+			}
+		})
 	}
 }

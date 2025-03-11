@@ -66,7 +66,7 @@ func TestWorstCaseMatch4(t *testing.T) {
 	t.Run("Lite.Contains", func(t *testing.T) {
 		t.Parallel()
 
-		lite := new(Lite)
+		lite := new(LitePoC)
 		for _, p := range worstCasePfxsIP4 {
 			lite.Insert(p)
 		}
@@ -161,7 +161,7 @@ func TestWorstCaseMiss4(t *testing.T) {
 	t.Run("Lite.Contains", func(t *testing.T) {
 		t.Parallel()
 
-		lite := new(Lite)
+		lite := new(LitePoC)
 		for _, p := range worstCasePfxsIP4 {
 			lite.Insert(p)
 		}
@@ -250,7 +250,7 @@ func TestWorstCaseMatch6(t *testing.T) {
 	t.Run("Lite.Contains", func(t *testing.T) {
 		t.Parallel()
 
-		lite := new(Lite)
+		lite := new(LitePoC)
 		for _, p := range worstCasePfxsIP6 {
 			lite.Insert(p)
 		}
@@ -341,7 +341,7 @@ func TestWorstCaseMiss6(t *testing.T) {
 	t.Run("Lite.Contains", func(t *testing.T) {
 		t.Parallel()
 
-		lite := new(Lite)
+		lite := new(LitePoC)
 		for _, p := range worstCasePfxsIP6 {
 			lite.Insert(p)
 		}

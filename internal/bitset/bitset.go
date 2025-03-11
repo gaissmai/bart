@@ -1,148 +1,78 @@
-// Copyright (c) 2024 Karl Gaissmaier
+// Copyright (c) 2025 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
-// Package bitset implements bitsets, a mapping
-// between non-negative integers and boolean values.
-//
-// Studied [github.com/bits-and-blooms/bitset] inside out
-// and rewrote needed parts from scratch for this project.
-//
-// This implementation is smaller and faster as the more
-// general [github.com/bits-and-blooms/bitset].
-//
-// All functions can be inlined!
-//
-//	can inline BitSet.All with cost 70
-//	can inline BitSet.AsSlice with cost 50
-//	can inline BitSet.Clear with cost 24
-//	can inline BitSet.Clone with cost 7
-//	can inline BitSet.Compact with cost 35
-//	can inline BitSet.FirstSet with cost 25
-//	can inline (*BitSet).InPlaceIntersection with cost 71
-//	can inline (*BitSet).InPlaceUnion with cost 77
-//	can inline BitSet.IntersectionCardinality with cost 35
-//	can inline BitSet.IntersectionTop with cost 56
-//	can inline BitSet.IntersectsAny with cost 42
-//	can inline BitSet.IsEmpty with cost 14
-//	can inline BitSet.NextSet with cost 71
-//	can inline BitSet.Rank0 with cost 57
-//	can inline BitSet.Set with cost 63
-//	can inline BitSet.Size with cost 16
-//	can inline BitSet.Test with cost 26
-//	can inline popcntAnd with cost 30
-//	can inline popcntSlice with cost 12
 package bitset
+
+//  can inline (*BitSet256).IsEmpty with cost 28
+//  can inline (*BitSet256).Set with cost 12
+//  can inline (*BitSet256).Clear with cost 22
+//  can inline (*BitSet256).Test with cost 26
+//  can inline (*BitSet256).FirstSet with cost 79
+//  can inline (*BitSet256).NextSet with cost 71
+//  can inline (*BitSet256).AsSlice with cost 50
+//  can inline (*BitSet256).All with cost 56
+//  can inline (*BitSet256).IntersectsAny with cost 48
+//  can inline (*BitSet256).IntersectionTop with cost 42
+//  can inline (*BitSet256).popcntAnd with cost 53
+//  can inline (*BitSet256).IntersectionCardinality with cost 57
+//  can inline (*BitSet256).InPlaceIntersection with cost 36
+//  can inline (*BitSet256).InPlaceUnion with cost 36
+//  can inline (*BitSet256).popcnt with cost 33
+//  can inline (*BitSet256).Size with cost 36
+//  can inline (*BitSet256).Rank0 with cost 52
 
 import (
 	"math/bits"
 )
 
-// A BitSet is a slice of words. This is an internal package
-// with a wide open public API.
-type BitSet []uint64
-
-//   xIdx calculates the index of i in a []uint64
-//   func wIdx(i uint) int {
-//   	return int(i >> 6) // like (i / 64) but faster
-//   }
-
-//   bIdx calculates the index of i in a `uint64`
-//   func bIdx(i uint) uint {
-//   	return i & 63 // like (i % 64) but faster
-//   }
-//
-// just as an explanation of the expressions,
-//
-//   i>>6 or i<<6 and i&63
-//
-// not factored out as functions to make most of the methods
-// inlineable with minimal costs.
+type BitSet256 [4]uint64
 
 // IsEmpty returns true if no bit is set.
-func (b BitSet) IsEmpty() bool {
-	for _, w := range b {
-		if w != 0 {
-			return false
-		}
-	}
-	return true
+func (b *BitSet256) IsEmpty() bool {
+	return b[0] == 0 && b[1] == 0 && b[2] == 0 && b[3] == 0
 }
 
 // Set bit i to 1, the capacity of the bitset is increased accordingly.
-func (b BitSet) Set(i uint) BitSet {
-	// grow?
-	if i >= uint(len(b)<<6) {
-		words := int((i + 64) >> 6)
-		switch {
-		case b == nil:
-			b = make([]uint64, words)
-		case cap(b) >= words:
-			b = b[:words]
-		default:
-			// be exact, don't use append!
-			// max 512 prefixes/node (8*uint64), and a cache line has 64 Bytes
-			newset := make([]uint64, words)
-			copy(newset, b)
-			b = newset
-		}
-	}
-
+// panics if i is > 255
+func (b *BitSet256) Set(i uint) {
 	b[i>>6] |= 1 << (i & 63)
-	return b
 }
 
 // Clear bit i to 0.
-func (b BitSet) Clear(i uint) BitSet {
-	if x := int(i >> 6); x < len(b) {
+func (b *BitSet256) Clear(i uint) {
+	if x := int(i >> 6); x < 4 {
 		b[x] &^= 1 << (i & 63)
 	}
-	return b
 }
 
 // Test if bit i is set.
-func (b BitSet) Test(i uint) (ok bool) {
-	if x := int(i >> 6); x < len(b) {
+func (b *BitSet256) Test(i uint) (ok bool) {
+	if x := int(i >> 6); x < 4 {
 		return b[x]&(1<<(i&63)) != 0
 	}
 	return
 }
 
-// Clone this BitSet, returning a new BitSet that has the same bits set.
-func (b BitSet) Clone() BitSet {
-	return append(b[:0:0], b...)
-}
-
-// Compact, preserve all set bits, while minimizing memory usage.
-func (b BitSet) Compact() BitSet {
-	last := len(b) - 1
-
-	// find last word with at least one bit set.
-	for ; last >= 0; last-- {
-		if b[last] != 0 {
-			b = b[: last+1 : last+1]
-			return b
-		}
-	}
-
-	// BitSet was empty, shrink to nil
-	return nil
-}
-
 // FirstSet returns the first bit set along with an ok code.
-func (b BitSet) FirstSet() (uint, bool) {
-	for x, word := range b {
-		if word != 0 {
-			return uint(x<<6 + bits.TrailingZeros64(word)), true
-		}
+func (b *BitSet256) FirstSet() (first uint, ok bool) {
+	// optimized for pipelining, can still inline with cost 79
+	if x := bits.TrailingZeros64(b[0]); x != 64 {
+		return uint(x), true
+	} else if x := bits.TrailingZeros64(b[1]); x != 64 {
+		return uint(x + 64), true
+	} else if x := bits.TrailingZeros64(b[2]); x != 64 {
+		return uint(x + 128), true
+	} else if x := bits.TrailingZeros64(b[3]); x != 64 {
+		return uint(x + 192), true
 	}
-	return 0, false
+	return
 }
 
 // NextSet returns the next bit set from the specified index,
 // including possibly the current index along with an ok code.
-func (b BitSet) NextSet(i uint) (uint, bool) {
+func (b *BitSet256) NextSet(i uint) (uint, bool) {
 	x := int(i >> 6)
-	if x >= len(b) {
+	if x >= 4 {
 		return 0, false
 	}
 
@@ -168,8 +98,8 @@ func (b BitSet) NextSet(i uint) (uint, bool) {
 //
 // This is faster than All, but also more dangerous,
 // it panics if the capacity of buf is < b.Size()
-func (b BitSet) AsSlice(buf []uint) []uint {
-	buf = buf[:cap(buf)] // len = cap
+func (b *BitSet256) AsSlice(buf []uint) []uint {
+	buf = buf[:cap(buf)] // use cap as max len
 
 	size := 0
 	for idx, word := range b {
@@ -187,29 +117,23 @@ func (b BitSet) AsSlice(buf []uint) []uint {
 }
 
 // All returns all set bits. This has a simpler API but is slower than AsSlice.
-func (b BitSet) All() []uint {
-	return b.AsSlice(make([]uint, 0, popcntSlice(b)))
+func (b *BitSet256) All() []uint {
+	return b.AsSlice(make([]uint, 0, 256))
 }
 
 // IntersectsAny returns true if the intersection of base set with the compare set
 // is not the empty set.
-func (b BitSet) IntersectsAny(c BitSet) bool {
-	i := min(len(b), len(c)) - 1
-	// bounds check eliminated (BCE)
-	for ; i >= 0 && i < len(b) && i < len(c); i-- {
-		if b[i]&c[i] != 0 {
-			return true
-		}
-	}
-	return false
+func (b *BitSet256) IntersectsAny(c *BitSet256) bool {
+	return b[0]&c[0] != 0 ||
+		b[1]&c[1] != 0 ||
+		b[2]&c[2] != 0 ||
+		b[3]&c[3] != 0
 }
 
 // IntersectionTop computes the intersection of base set with the compare set.
 // If the result set isn't empty, it returns the top most set bit and true.
-func (b BitSet) IntersectionTop(c BitSet) (top uint, ok bool) {
-	i := min(len(b), len(c)) - 1
-	// bounds check eliminated (BCE)
-	for ; i >= 0 && i < len(b) && i < len(c); i-- {
+func (b *BitSet256) IntersectionTop(c *BitSet256) (top uint, ok bool) {
+	for i := 4 - 1; i >= 0; i-- {
 		if word := b[i] & c[i]; word != 0 {
 			return uint(i<<6+bits.Len64(word)) - 1, true
 		}
@@ -218,124 +142,67 @@ func (b BitSet) IntersectionTop(c BitSet) (top uint, ok bool) {
 }
 
 // IntersectionCardinality computes the popcount of the intersection.
-func (b BitSet) IntersectionCardinality(c BitSet) int {
-	return popcntAnd(b, c)
+func (b *BitSet256) IntersectionCardinality(c *BitSet256) int {
+	return b.popcntAnd(c)
 }
 
 // InPlaceIntersection overwrites and computes the intersection of
 // base set with the compare set. This is the BitSet equivalent of & (and).
-// If len(c) > len(b), new memory is allocated.
-func (b *BitSet) InPlaceIntersection(c BitSet) {
-	// bounds check eliminated, range until minLen(b,c)
-	for i := 0; i < len(*b) && i < len(c); i++ {
-		(*b)[i] &= c[i]
-	}
-
-	// b >= c
-	if len(*b) >= len(c) {
-		// bounds check eliminated
-		for i := len(c); i < len(*b); i++ {
-			(*b)[i] = 0
-		}
-		return
-	}
-
-	// b < c
-	newset := make([]uint64, len(c))
-	copy(newset, *b)
-	*b = newset
+func (b *BitSet256) InPlaceIntersection(c *BitSet256) {
+	b[0] &= c[0]
+	b[1] &= c[1]
+	b[2] &= c[2]
+	b[3] &= c[3]
 }
 
 // InPlaceUnion creates the destructive union of base set with compare set.
 // This is the BitSet equivalent of | (or).
-// If len(c) > len(b), new memory is allocated.
-func (b *BitSet) InPlaceUnion(c BitSet) {
-	// b >= c
-	if len(*b) >= len(c) {
-		// bounds check eliminated
-		for i := 0; i < len(*b) && i < len(c); i++ {
-			(*b)[i] |= c[i]
-		}
-
-		return
-	}
-
-	// b < c
-	newset := make([]uint64, len(c))
-	copy(newset, *b)
-	*b = newset
-
-	// bounds check eliminated
-	for i := 0; i < len(*b) && i < len(c); i++ {
-		(*b)[i] |= c[i]
-	}
+func (b *BitSet256) InPlaceUnion(c *BitSet256) {
+	b[0] |= c[0]
+	b[1] |= c[1]
+	b[2] |= c[2]
+	b[3] |= c[3]
 }
 
 // Size (number of set bits).
-func (b BitSet) Size() int {
-	return popcntSlice(b)
+func (b *BitSet256) Size() int {
+	return b.popcnt()
 }
 
 // Rank0 is equal to Rank(i) - 1
-//
-// With inlined popcount to make Rank0 itself inlineable.
-func (b BitSet) Rank0(i uint) (rnk int) {
-	// Rank count is inclusive
-	i++
+func (b *BitSet256) Rank0(i uint) (rnk int) {
+	i++ // Rank count is inclusive
+	wordIdx := min(int(i>>6), len(b))
 
-	if wordIdx := int(i >> 6); wordIdx >= len(b) {
-		// inlined popcount, whole slice
-		for _, x := range b {
-			// don't test for x != 0, less branches
-			rnk += bits.OnesCount64(x)
-		}
-	} else {
-		// inlined popcount, partial slice ...
-		for _, x := range b[:wordIdx] {
-			rnk += bits.OnesCount64(x)
-		}
-
-		// ... plus partial word, unconditional
-		// don't test i&63 != 0, less branches
-		rnk += bits.OnesCount64(b[wordIdx] << (64 - i&63))
+	// sum up the popcounts until wordIdx ...
+	// don't test x == 0, just add, less branches
+	for j := range wordIdx {
+		rnk += bits.OnesCount64(b[j&3]) // [j&3] is BCE
 	}
 
-	// correct for offset by one
-	return rnk - 1
-}
-
-// popcntSlice, see generated assembler with GOAMD64='v2'
-//
-//	00000 PREAMBLE
-//	.....
-//	00005 XORL    CX, CX
-//	00007 XORL    DX, DX
-//	00009 JMP 26
-//	00011 MOVQ    (AX)(CX*8), SI
-//	00015 POPCNTQ SI, SI
-//	00020 INCQ    CX
-//	00023 ADDQ    SI, DX
-//	00026 CMPQ    BX, CX
-//	00029 JGT 11
-//	00031 MOVQ    DX, AX
-//	00034 RET
-func popcntSlice(s []uint64) (cnt int) {
-	for _, x := range s {
-		// count all the bits set in slice.
-		// don't test for x != 0,
-		// simpler and faster, most of the time, less branches
-		cnt += bits.OnesCount64(x)
+	// ... plus partial word at wordIdx,
+	// don't test i&63 != 0, just add, less branches
+	if wordIdx < len(b) {
+		rnk += bits.OnesCount64(b[wordIdx&3] << (64 - i&63)) // [x&3] is BCE
 	}
+
+	// decrement for offset by one
+	rnk--
 	return
 }
 
-// popcntAnd
-func popcntAnd(s, m []uint64) (cnt int) {
-	for j := 0; j < len(s) && j < len(m); j++ {
-		// words are bitwise & followed by popcount.
-		// don't test for x != 0,
-		// simpler and faster, most of the time, less branches
-		cnt += bits.OnesCount64(s[j] & m[j])
-	}
+func (b *BitSet256) popcnt() (cnt int) {
+	cnt += bits.OnesCount64(b[0])
+	cnt += bits.OnesCount64(b[1])
+	cnt += bits.OnesCount64(b[2])
+	cnt += bits.OnesCount64(b[3])
+	return
+}
+
+func (b *BitSet256) popcntAnd(c *BitSet256) (cnt int) {
+	cnt += bits.OnesCount64(b[0] & c[0])
+	cnt += bits.OnesCount64(b[1] & c[1])
+	cnt += bits.OnesCount64(b[2] & c[2])
+	cnt += bits.OnesCount64(b[3] & c[3])
 	return
 }

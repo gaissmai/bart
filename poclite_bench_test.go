@@ -11,7 +11,7 @@ import (
 )
 
 func BenchmarkLiteFullMatchV4(b *testing.B) {
-	lt := new(Lite)
+	lt := new(LitePoC)
 
 	for _, route := range routes {
 		lt.Insert(route.CIDR)
@@ -36,7 +36,7 @@ func BenchmarkLiteFullMatchV4(b *testing.B) {
 }
 
 func BenchmarkLiteFullMatchV6(b *testing.B) {
-	lt := new(Lite)
+	lt := new(LitePoC)
 
 	for _, route := range routes {
 		lt.Insert(route.CIDR)
@@ -61,7 +61,7 @@ func BenchmarkLiteFullMatchV6(b *testing.B) {
 }
 
 func BenchmarkLiteFullMissV4(b *testing.B) {
-	lt := new(Lite)
+	lt := new(LitePoC)
 
 	for _, route := range routes {
 		lt.Insert(route.CIDR)
@@ -86,7 +86,7 @@ func BenchmarkLiteFullMissV4(b *testing.B) {
 }
 
 func BenchmarkLiteFullMissV6(b *testing.B) {
-	lt := new(Lite)
+	lt := new(LitePoC)
 
 	for _, route := range routes {
 		lt.Insert(route.CIDR)
@@ -113,7 +113,7 @@ func BenchmarkLiteFullMissV6(b *testing.B) {
 func BenchmarkLiteFullTableMemoryV4(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 
-	lite := new(Lite)
+	lite := new(LitePoC)
 	runtime.GC()
 	runtime.ReadMemStats(&startMem)
 
@@ -135,7 +135,7 @@ func BenchmarkLiteFullTableMemoryV4(b *testing.B) {
 func BenchmarkLiteFullTableMemoryV6(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 
-	lite := new(Lite)
+	lite := new(LitePoC)
 	runtime.GC()
 	runtime.ReadMemStats(&startMem)
 
@@ -157,7 +157,7 @@ func BenchmarkLiteFullTableMemoryV6(b *testing.B) {
 func BenchmarkLiteFullTableMemory(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 
-	lite := new(Lite)
+	lite := new(LitePoC)
 	runtime.GC()
 	runtime.ReadMemStats(&startMem)
 
@@ -184,9 +184,9 @@ func BenchmarkLiteRealWorldRandomPfxsMemoryV4(b *testing.B) {
 		runtime.ReadMemStats(&startMem)
 
 		b.Run(strconv.Itoa(k), func(b *testing.B) {
-			lite := new(Lite)
+			lite := new(LitePoC)
 			for range b.N {
-				lite = new(Lite)
+				lite = new(LitePoC)
 				for _, pfx := range randomRealWorldPrefixes4(k) {
 					lite.Insert(pfx)
 				}
@@ -214,9 +214,9 @@ func BenchmarkLiteRealWorldRandomPfxsMemoryV6(b *testing.B) {
 		runtime.ReadMemStats(&startMem)
 
 		b.Run(strconv.Itoa(k), func(b *testing.B) {
-			lite := new(Lite)
+			lite := new(LitePoC)
 			for range b.N {
-				lite = new(Lite)
+				lite = new(LitePoC)
 				for _, pfx := range randomRealWorldPrefixes6(k) {
 					lite.Insert(pfx)
 				}
@@ -244,9 +244,9 @@ func BenchmarkLiteRealWorldRandomPfxsMemory(b *testing.B) {
 		runtime.ReadMemStats(&startMem)
 
 		b.Run(strconv.Itoa(k), func(b *testing.B) {
-			lite := new(Lite)
+			lite := new(LitePoC)
 			for range b.N {
-				lite = new(Lite)
+				lite = new(LitePoC)
 				for _, pfx := range randomRealWorldPrefixes(k) {
 					lite.Insert(pfx)
 				}

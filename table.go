@@ -57,6 +57,12 @@ func (t *Table[V]) rootNodeByVersion(is4 bool) *node[V] {
 	return &t.root6
 }
 
+// lastOctetIdxAndBits, get last significant octet Idx and significant bits
+// for a given netip.Prefix
+func lastOctetIdxAndBits(bits int) (lastIdx, lastBits int) {
+	return bits >> 3, bits % 8
+}
+
 // Insert adds pfx to the tree, with given val.
 // If pfx is already present in the tree, its value is set to val.
 func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
@@ -363,7 +369,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 		}
 
 		// push current node on stack for path recording
-		stack[depth&0xf] = n // [depth&0xf] for BCE
+		stack[depth&0xf] = n // [depth & 0xf] for bounds check elimination (BCE)
 
 		// try to delete prefix in trie node
 		if depth == lastIdx {
@@ -383,7 +389,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 		}
 		kid := n.children.MustGet(addr)
 
-		// kid is node or leaf at addr
+		// kid is node, leaf or fringe at addr
 		switch kid := kid.(type) {
 		case *node[V]:
 			n = kid
@@ -391,6 +397,20 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 
 		case *leaf[V]:
 			// reached a path compressed prefix, stop traversing
+			if kid.prefix != pfx {
+				return val, false
+			}
+
+			// prefix is equal leaf, delete leaf
+			n.children.DeleteAt(addr)
+
+			t.sizeUpdate(is4, -1)
+			n.purgeAndCompress(stack[:depth&0xf], octets, is4)
+
+			return kid.value, true
+
+		case *fringe[V]:
+			// reached a fringe, stop traversing
 			if kid.prefix != pfx {
 				return val, false
 			}
@@ -596,6 +616,10 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 		case *leaf[V]:
 			return kid.prefix.Contains(ip)
 
+		case *fringe[V]:
+			// fringe is the default-route for all nodes below
+			return true
+
 		default:
 			panic("logic error, wrong node type")
 		}
@@ -653,6 +677,10 @@ LOOP:
 			}
 			break LOOP
 
+		case *fringe[V]:
+			// fringe is the default-route for all nodes below
+			return kid.value, true
+
 		default:
 			panic("logic error, wrong node type")
 		}
@@ -667,7 +695,7 @@ LOOP:
 			idx := art.HostIdx(uint(octets[depth&0xf]))
 			// lpmGet(idx), manually inlined
 			// --------------------------------------------------------------
-			if topIdx, ok := n.prefixes.IntersectionTop(lpmbt.LookupTblFringe[idx]); ok {
+			if topIdx, ok := n.prefixes.IntersectionTop(lpmbt.LookupTbl[idx]); ok {
 				return n.prefixes.MustGet(topIdx), true
 			}
 			// --------------------------------------------------------------
@@ -751,6 +779,10 @@ LOOP:
 
 			break LOOP
 
+		case *fringe[V]:
+			// fringe is the default-route for all nodes below
+			return kid.prefix, kid.value, true
+
 		default:
 			panic("logic error, wrong node type")
 		}
@@ -776,7 +808,7 @@ LOOP:
 		}
 
 		// manually inlined lpmGet(idx)
-		if topIdx, ok := n.prefixes.IntersectionTop(lpmbt.LookupTblFringe[idx]); ok {
+		if topIdx, ok := n.prefixes.IntersectionTop(lpmbt.LookupTbl[idx]); ok {
 			val = n.prefixes.MustGet(topIdx)
 
 			// called from LookupPrefix
@@ -1082,11 +1114,6 @@ func (t *Table[V]) AllSorted6() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
 		_ = t.root6.allRecSorted(stridePath{}, 0, false, yield)
 	}
-}
-
-// lastOctetIdxAndBits, get last significant octet Idx and significant bits
-func lastOctetIdxAndBits(bits int) (lastIdx, lastBits int) {
-	return liteLastOctetIdxAndBits(bits)
 }
 
 // netmask for bits
