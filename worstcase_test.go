@@ -66,13 +66,13 @@ func TestWorstCaseMatch4(t *testing.T) {
 	t.Run("Lite.Contains", func(t *testing.T) {
 		t.Parallel()
 
-		lite := new(LitePoC)
+		tbl := new(Lite)
 		for _, p := range worstCasePfxsIP4 {
-			lite.Insert(p)
+			tbl.Insert(p)
 		}
 
 		want := true
-		ok := lite.Contains(worstCaseProbeIP4)
+		ok := tbl.Contains(worstCaseProbeIP4)
 		if ok != want {
 			t.Errorf("Contains, worst case match IP4, expected OK: %v, got: %v", want, ok)
 		}
@@ -161,15 +161,15 @@ func TestWorstCaseMiss4(t *testing.T) {
 	t.Run("Lite.Contains", func(t *testing.T) {
 		t.Parallel()
 
-		lite := new(LitePoC)
+		tbl := new(Lite)
 		for _, p := range worstCasePfxsIP4 {
-			lite.Insert(p)
+			tbl.Insert(p)
 		}
 
-		lite.Delete(mpp("255.255.255.255/32")) // delete matching prefix
+		tbl.Delete(mpp("255.255.255.255/32")) // delete matching prefix
 
 		want := false
-		ok := lite.Contains(worstCaseProbeIP4)
+		ok := tbl.Contains(worstCaseProbeIP4)
 		if ok != want {
 			t.Errorf("Contains, worst case miss IP4, expected OK: %v, got: %v", want, ok)
 		}
@@ -250,13 +250,13 @@ func TestWorstCaseMatch6(t *testing.T) {
 	t.Run("Lite.Contains", func(t *testing.T) {
 		t.Parallel()
 
-		lite := new(LitePoC)
+		tbl := new(Lite)
 		for _, p := range worstCasePfxsIP6 {
-			lite.Insert(p)
+			tbl.Insert(p)
 		}
 
 		want := true
-		ok := lite.Contains(worstCaseProbeIP6)
+		ok := tbl.Contains(worstCaseProbeIP6)
 		if ok != want {
 			t.Errorf("Contains, worst case match IP6, expected OK: %v, got: %v", want, ok)
 		}
@@ -341,15 +341,15 @@ func TestWorstCaseMiss6(t *testing.T) {
 	t.Run("Lite.Contains", func(t *testing.T) {
 		t.Parallel()
 
-		lite := new(LitePoC)
+		tbl := new(Lite)
 		for _, p := range worstCasePfxsIP6 {
-			lite.Insert(p)
+			tbl.Insert(p)
 		}
 
-		lite.Delete(mpp("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff/128")) // delete matching prefix
+		tbl.Delete(mpp("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff/128")) // delete matching prefix
 
 		want := false
-		ok := lite.Contains(worstCaseProbeIP6)
+		ok := tbl.Contains(worstCaseProbeIP6)
 		if ok != want {
 			t.Errorf("Contains, worst case miss IP6, expected OK: %v, got: %v", want, ok)
 		}
@@ -428,12 +428,12 @@ func BenchmarkWorstCaseMatch4(b *testing.B) {
 	b.Run("Lite.Contains", func(b *testing.B) {
 		lite := new(Lite)
 		for _, p := range worstCasePfxsIP4 {
-			lite.Insert(p)
+			tbl.Insert(p)
 		}
 
 		b.ResetTimer()
 		for range b.N {
-			lite.Contains(worstCaseProbeIP4)
+			tbl.Contains(worstCaseProbeIP4)
 		}
 	})
 
@@ -490,14 +490,14 @@ func BenchmarkWorstCaseMiss4(b *testing.B) {
 	b.Run("Lite.Contains", func(b *testing.B) {
 		lite := new(Lite)
 		for _, p := range worstCasePfxsIP4 {
-			lite.Insert(p)
+			tbl.Insert(p)
 		}
 
-		lite.Delete(mpp("255.255.255.255/32")) // delete matching prefix
+		tbl.Delete(mpp("255.255.255.255/32")) // delete matching prefix
 
 		b.ResetTimer()
 		for range b.N {
-			lite.Contains(worstCaseProbeIP4)
+			tbl.Contains(worstCaseProbeIP4)
 		}
 	})
 
@@ -562,12 +562,12 @@ func BenchmarkWorstCaseMatch6(b *testing.B) {
 	b.Run("Lite.Contains", func(b *testing.B) {
 		lite := new(Lite)
 		for _, p := range worstCasePfxsIP6 {
-			lite.Insert(p)
+			tbl.Insert(p)
 		}
 
 		b.ResetTimer()
 		for range b.N {
-			lite.Contains(worstCaseProbeIP6)
+			tbl.Contains(worstCaseProbeIP6)
 		}
 	})
 
@@ -624,14 +624,14 @@ func BenchmarkWorstCaseMiss6(b *testing.B) {
 	b.Run("Lite.Contains", func(b *testing.B) {
 		lite := new(Lite)
 		for _, p := range worstCasePfxsIP6 {
-			lite.Insert(p)
+			tbl.Insert(p)
 		}
 
-		lite.Delete(mpp("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff/128")) // delete matching prefix
+		tbl.Delete(mpp("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff/128")) // delete matching prefix
 
 		b.ResetTimer()
 		for range b.N {
-			lite.Contains(worstCaseProbeIP6)
+			tbl.Contains(worstCaseProbeIP6)
 		}
 	})
 

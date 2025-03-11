@@ -40,14 +40,18 @@ func (t *Table[V]) dump(w io.Writer) {
 	}
 
 	if t.size4 > 0 {
+		stats := t.root4.nodeStatsRec()
 		fmt.Fprintln(w)
-		fmt.Fprintf(w, "### IPv4: size(%d), nodes(%d)", t.size4, t.root4.nodeStatsRec().nodes)
+		fmt.Fprintf(w, "### IPv4: size(%d), nodes(%d), pfxs(%d), leaves(%d), fringes(%d),",
+			t.size4, stats.nodes, stats.pfxs, stats.leaves, stats.fringes)
 		t.root4.dumpRec(w, stridePath{}, 0, true)
 	}
 
 	if t.size6 > 0 {
+		stats := t.root6.nodeStatsRec()
 		fmt.Fprintln(w)
-		fmt.Fprintf(w, "### IPv6: size(%d), nodes(%d)", t.size6, t.root6.nodeStatsRec().nodes)
+		fmt.Fprintf(w, "### IPv6: size(%d), nodes(%d), pfxs(%d), leaves(%d), fringes(%d),",
+			t.size6, stats.nodes, stats.pfxs, stats.leaves, stats.fringes)
 		t.root6.dumpRec(w, stridePath{}, 0, false)
 	}
 }
@@ -112,16 +116,17 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 
 		// the node has recursive child nodes or path-compressed leaves
 		for i, addr := range n.children.All() {
-			switch n.children.Items[i].(type) {
+			switch kid := n.children.Items[i].(type) {
 			case *node[V]:
 				nodeAddrs = append(nodeAddrs, addr)
 				continue
 
 			case *leaf[V]:
-				leafAddrs = append(leafAddrs, addr)
-
-			case *fringe[V]:
-				fringeAddrs = append(fringeAddrs, addr)
+				if kid.fringe {
+					fringeAddrs = append(fringeAddrs, addr)
+				} else {
+					leafAddrs = append(leafAddrs, addr)
+				}
 
 			default:
 				panic("logic error, wrong node type")
@@ -145,6 +150,20 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 			fmt.Fprintf(w, "%sleaves(#%d):", indent, leafCount)
 
 			for _, addr := range leafAddrs {
+				octet := byte(addr)
+				k := n.children.MustGet(addr)
+				pc := k.(*leaf[V])
+
+				fmt.Fprintf(w, " %s:{%s, %v}", octetFmt(octet, is4), pc.prefix, pc.value)
+			}
+			fmt.Fprintln(w)
+		}
+
+		if fringeCount := len(fringeAddrs); fringeCount > 0 {
+			// print the pathcomp prefixes for this node
+			fmt.Fprintf(w, "%sfringe(#%d):", indent, fringeCount)
+
+			for _, addr := range fringeAddrs {
 				octet := byte(addr)
 				k := n.children.MustGet(addr)
 				pc := k.(*leaf[V])
@@ -247,15 +266,16 @@ func (n *node[V]) nodeStats() stats {
 	s.childs = n.children.Len()
 
 	for i := range n.children.All() {
-		switch n.children.Items[i].(type) {
+		switch kid := n.children.Items[i].(type) {
 		case *node[V]:
 			s.nodes++
 
 		case *leaf[V]:
-			s.leaves++
-
-		case *fringe[V]:
-			s.fringes++
+			if kid.fringe {
+				s.fringes++
+			} else {
+				s.leaves++
+			}
 
 		default:
 			panic("logic error, wrong node type")
@@ -291,10 +311,11 @@ func (n *node[V]) nodeStatsRec() stats {
 			s.fringes += rs.fringes
 
 		case *leaf[V]:
-			s.leaves++
-
-		case *fringe[V]:
-			s.fringes++
+			if kid.fringe {
+				s.fringes++
+			} else {
+				s.leaves++
+			}
 
 		default:
 			panic("logic error, wrong node type")

@@ -5,8 +5,6 @@ package bart
 
 import (
 	"net/netip"
-	"runtime"
-	"strconv"
 	"testing"
 )
 

@@ -39,6 +39,28 @@ func PfxLen(depth int, idx uint) int {
 	return depth*strideLen + int(baseIdxLookupTbl[idx].pfxLen)
 }
 
+// IdxToPfx returns the first and last octet of prefix idx.
+func IdxToRange(idx uint) (first, last uint8) {
+	first, pfxLen := IdxToPfx(idx)
+	last = first | ^netMask(pfxLen)
+	return
+}
+
+// netmask for bits
+//
+//	0b0000_0000, // bits == 0
+//	0b1000_0000, // bits == 1
+//	0b1100_0000, // bits == 2
+//	0b1110_0000, // bits == 3
+//	0b1111_0000, // bits == 4
+//	0b1111_1000, // bits == 5
+//	0b1111_1100, // bits == 6
+//	0b1111_1110, // bits == 7
+//	0b1111_1111, // bits == 8
+func netMask(bits int) uint8 {
+	return 0b1111_1111 << (8 - bits)
+}
+
 // baseIdxLookupTbl, maps back from idx => octet/bits
 //
 // Use the pre computed lookup table, the func baseIndexToPrefix is too slow
