@@ -391,7 +391,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 		}
 		kid := n.children.MustGet(addr)
 
-		// kid is node, leaf or fringe at addr
+		// kid is node or leaf at addr
 		switch kid := kid.(type) {
 		case *node[V]:
 			n = kid
@@ -604,6 +604,7 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 			continue // descend down to next trie level
 
 		case *leaf[V]:
+			// fringe is the default-route for all nodes below
 			return kid.fringe || kid.prefix.Contains(ip)
 
 		default:
@@ -768,6 +769,7 @@ LOOP:
 		case *leaf[V]:
 			// reached a path compressed prefix, stop traversing
 			if kid.prefix.Bits() <= bits {
+				// fringe is the default-route for all nodes below
 				if kid.fringe || kid.prefix.Contains(ip) {
 					return kid.prefix, kid.value, true
 				}
@@ -1112,21 +1114,6 @@ func (t *Table[V]) AllSorted6() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
 		_ = t.root6.allRecSorted(stridePath{}, 0, false, yield)
 	}
-}
-
-// netmask for bits
-//
-//	0b0000_0000, // bits == 0
-//	0b1000_0000, // bits == 1
-//	0b1100_0000, // bits == 2
-//	0b1110_0000, // bits == 3
-//	0b1111_0000, // bits == 4
-//	0b1111_1000, // bits == 5
-//	0b1111_1100, // bits == 6
-//	0b1111_1110, // bits == 7
-//	0b1111_1111, // bits == 8
-func netMask(bits int) uint8 {
-	return 0b1111_1111 << (8 - bits)
 }
 
 // noCopy may be added to structs which must not be copied

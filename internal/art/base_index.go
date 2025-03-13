@@ -42,11 +42,11 @@ func PfxLen(depth int, idx uint) int {
 // IdxToPfx returns the first and last octet of prefix idx.
 func IdxToRange(idx uint) (first, last uint8) {
 	first, pfxLen := IdxToPfx(idx)
-	last = first | ^netMask(pfxLen)
+	last = first | ^NetMask(pfxLen)
 	return
 }
 
-// netmask for bits
+// Netmask for bits
 //
 //	0b0000_0000, // bits == 0
 //	0b1000_0000, // bits == 1
@@ -57,7 +57,7 @@ func IdxToRange(idx uint) (first, last uint8) {
 //	0b1111_1100, // bits == 6
 //	0b1111_1110, // bits == 7
 //	0b1111_1111, // bits == 8
-func netMask(bits int) uint8 {
+func NetMask(bits int) uint8 {
 	return 0b1111_1111 << (8 - bits)
 }
 
