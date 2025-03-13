@@ -474,7 +474,7 @@ func randomRealWorldPrefixes4(n int) []netip.Prefix {
 		pfx := randomPrefix4()
 
 		// skip too small or too big masks
-		if pfx.Bits() < 8 && pfx.Bits() > 28 {
+		if pfx.Bits() < 8 || pfx.Bits() > 28 {
 			continue
 		}
 
