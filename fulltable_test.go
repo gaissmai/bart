@@ -257,7 +257,6 @@ func BenchmarkFullTableOverlapsV4(b *testing.B) {
 		for j, pfx := range randomRealWorldPrefixes4(i) {
 			rt2.Insert(pfx, j)
 		}
-		b.Log(rt2.String())
 
 		b.Run(fmt.Sprintf("With_%4d", i), func(b *testing.B) {
 			b.ResetTimer()
@@ -280,7 +279,6 @@ func BenchmarkFullTableOverlapsV6(b *testing.B) {
 		for j, pfx := range randomRealWorldPrefixes6(i) {
 			rt2.Insert(pfx, j)
 		}
-		b.Log(rt2.String())
 
 		b.Run(fmt.Sprintf("With_%4d", i), func(b *testing.B) {
 			b.ResetTimer()

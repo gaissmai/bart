@@ -126,7 +126,7 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 		// ... or decend down the trie
 		kid := n.children.MustGet(addr)
 
-		// kid is recursive node, leaf or fringe at addr
+		// kid is node or leaf at addr
 		switch kid := kid.(type) {
 		case *node[V]:
 			n = kid
@@ -290,7 +290,7 @@ func (n *node[V]) lpmGet(idx uint) (baseIdx uint, val V, ok bool) {
 
 // lpmTest for faster lpm tests without value returns.
 func (n *node[V]) lpmTest(idx uint) bool {
-	return n.prefixes.Intersects(lpmbt.LookupTbl[idx])
+	return n.prefixes.IntersectsAny(lpmbt.LookupTbl[idx])
 }
 
 // cloneRec, clones the node recursive.
@@ -634,17 +634,11 @@ func (n *node[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxLen int, yie
 	var path stridePath
 	copy(path[:], octets)
 
-	pfxFirstAddr := uint(octets[depth])
-	pfxLastAddr := uint(octets[depth] | ^netMask(pfxLen))
-
-	// 1. collect all indices in n covered by prefix
+	pfxFirstAddr, pfxLastAddr := art.IdxToRange(art.PfxToIdx(octets[depth], pfxLen))
 
 	allCoveredIndices := make([]uint, 0, maxNodePrefixes)
 	for _, idx := range n.prefixes.AsSlice(make([]uint, 0, maxNodePrefixes)) {
-		thisOctet, thisPfxLen := art.IdxToPfx(idx)
-
-		thisFirstAddr := uint(thisOctet)
-		thisLastAddr := uint(thisOctet | ^netMask(thisPfxLen))
+		thisFirstAddr, thisLastAddr := art.IdxToRange(idx)
 
 		if thisFirstAddr >= pfxFirstAddr && thisLastAddr <= pfxLastAddr {
 			allCoveredIndices = append(allCoveredIndices, idx)
@@ -658,7 +652,8 @@ func (n *node[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxLen int, yie
 
 	allCoveredChildAddrs := make([]uint, 0, maxNodeChildren)
 	for _, addr := range n.children.AsSlice(make([]uint, 0, maxNodeChildren)) {
-		if addr >= pfxFirstAddr && addr <= pfxLastAddr {
+		octet := uint8(addr)
+		if octet >= pfxFirstAddr && octet <= pfxLastAddr {
 			allCoveredChildAddrs = append(allCoveredChildAddrs, addr)
 		}
 	}
@@ -777,7 +772,11 @@ func cidrFromPath(path stridePath, depth int, is4 bool, idx uint) netip.Prefix {
 	return netip.PrefixFrom(ip, bits)
 }
 
+// isFringe, prefixes with /0, /8, /16, ... /128 bits
+// and inserted path-compressed at last possible level (depth == lastIdx-1).
+//
+// A leaf being a fringe is the default-route for all nodes below this slot.
 func isFringe(depth, bits int) bool {
 	lastIdx, lastBits := lastOctetIdxAndBits(bits)
-	return lastIdx == depth+1 && lastBits == 0
+	return depth == lastIdx-1 && lastBits == 0
 }
