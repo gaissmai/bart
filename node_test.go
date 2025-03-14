@@ -19,7 +19,7 @@ import (
 
 func TestInverseIndex(t *testing.T) {
 	t.Parallel()
-	for i := range maxNodeChildren {
+	for i := range maxItems {
 		for bits := 0; bits <= strideLen; bits++ {
 			octet := byte(i & (0xFF << (strideLen - bits)))
 			idx := art.PfxToIdx(octet, bits)
@@ -33,7 +33,7 @@ func TestInverseIndex(t *testing.T) {
 
 func TestFringeIndex(t *testing.T) {
 	t.Parallel()
-	for i := range maxNodeChildren {
+	for i := range maxItems {
 		got := art.HostIdx(uint(i))
 		want := art.PfxToIdx(byte(i), 8)
 		if got != want {
@@ -291,7 +291,7 @@ func BenchmarkNodePrefixesAsSlice(b *testing.B) {
 		b.Run(fmt.Sprintf("Set %d", nroutes), func(b *testing.B) {
 			b.ResetTimer()
 			for range b.N {
-				this.prefixes.AsSlice(make([]uint, 0, maxNodePrefixes))
+				this.prefixes.AsSlice(make([]uint, 0, maxItems))
 			}
 		})
 	}
@@ -355,12 +355,12 @@ func BenchmarkNodeChildInsert(b *testing.B) {
 		this := new(node[int])
 
 		for range nchilds {
-			octet := rand.Intn(maxNodeChildren)
+			octet := rand.Intn(maxItems)
 			this.children.InsertAt(uint(octet), nil)
 		}
 
 		b.Run(fmt.Sprintf("Into %d", nchilds), func(b *testing.B) {
-			octet := rand.Intn(maxNodeChildren)
+			octet := rand.Intn(maxItems)
 
 			b.ResetTimer()
 			for range b.N {
@@ -375,12 +375,12 @@ func BenchmarkNodeChildDelete(b *testing.B) {
 		this := new(node[int])
 
 		for range nchilds {
-			octet := rand.Intn(maxNodeChildren)
+			octet := rand.Intn(maxItems)
 			this.children.InsertAt(uint(octet), nil)
 		}
 
 		b.Run(fmt.Sprintf("From %d", nchilds), func(b *testing.B) {
-			octet := rand.Intn(maxNodeChildren)
+			octet := rand.Intn(maxItems)
 
 			b.ResetTimer()
 			for range b.N {
@@ -395,14 +395,14 @@ func BenchmarkNodeChildrenAsSlice(b *testing.B) {
 		this := new(node[int])
 
 		for range nchilds {
-			octet := byte(rand.Intn(maxNodeChildren))
+			octet := byte(rand.Intn(maxItems))
 			this.children.InsertAt(uint(octet), nil)
 		}
 
 		b.Run(fmt.Sprintf("Set %d", nchilds), func(b *testing.B) {
 			b.ResetTimer()
 			for range b.N {
-				this.children.AsSlice(make([]uint, 0, maxNodeChildren))
+				this.children.AsSlice(make([]uint, 0, maxItems))
 			}
 		})
 	}
@@ -413,7 +413,7 @@ func BenchmarkNodeChildrenAll(b *testing.B) {
 		this := new(node[int])
 
 		for range nchilds {
-			octet := byte(rand.Intn(maxNodeChildren))
+			octet := byte(rand.Intn(maxItems))
 			this.children.InsertAt(uint(octet), nil)
 		}
 
@@ -432,10 +432,10 @@ func BenchmarkNodeChildIntersectionCardinality(b *testing.B) {
 		other := new(node[int])
 
 		for range nchilds {
-			octet := byte(rand.Intn(maxNodeChildren))
+			octet := byte(rand.Intn(maxItems))
 			this.children.InsertAt(uint(octet), nil)
 
-			octet = byte(rand.Intn(maxNodeChildren))
+			octet = byte(rand.Intn(maxItems))
 			other.children.InsertAt(uint(octet), nil)
 		}
 

@@ -134,7 +134,7 @@ func (n *node[V]) overlapsChildrenIn(o *node[V]) bool {
 	// do range over, not so many childs and maybe to many prefixes for other algo below
 	if doRange {
 		lowerBound, _ := n.prefixes.FirstSet()
-		for _, addr := range o.children.AsSlice(make([]uint, 0, maxNodeChildren)) {
+		for _, addr := range o.children.AsSlice(make([]uint, 0, maxItems)) {
 			idx := art.HostIdx(addr)
 			if idx < lowerBound { // lpm match impossible
 				continue
@@ -155,7 +155,7 @@ func (n *node[V]) overlapsChildrenIn(o *node[V]) bool {
 	// in this node
 	hostRoutes := bitset.BitSet256{}
 
-	allIndices := n.prefixes.AsSlice(make([]uint, 0, maxNodePrefixes))
+	allIndices := n.prefixes.AsSlice(make([]uint, 0, maxItems))
 
 	// union all pre alloted bitsets
 	for _, idx := range allIndices {

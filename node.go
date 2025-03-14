@@ -13,10 +13,9 @@ import (
 )
 
 const (
-	strideLen       = 8   // octet
-	maxTreeDepth    = 16  // 16 for IPv6
-	maxNodeChildren = 256 // 256
-	maxNodePrefixes = 256 // 256
+	strideLen    = 8   // byte, a multibit trie with stride len 8
+	maxTreeDepth = 16  // max 16 bytes for IPv6
+	maxItems     = 256 // max 256 prefixes or children in node
 )
 
 // stridePath, max 16 octets deep
@@ -25,45 +24,27 @@ type stridePath [maxTreeDepth]uint8
 // node is a level node in the multibit-trie.
 // A node has prefixes and children, forming the multibit trie.
 //
-// The prefixes form a complete binary tree, see the artlookup.pdf
-// paper in the doc folder to understand the data structure.
+// The prefixes, mapped by the baseIndex() function from the ART algorithm,
+// form a complete binary tree.
+// See the artlookup.pdf paper in the doc folder to understand the mapping function
+// and the binary tree of prefixes.
 //
-// In contrast to the ART algorithm, sparse arrays
-// (popcount-compressed slices) are used instead of fixed-size arrays.
+// In contrast to the ART algorithm, sparse arrays (popcount-compressed slices)
+// are used instead of fixed-size arrays.
 //
 // The array slots are also not pre-allocated (alloted) as described
-// in the ART algorithm, fast backtracking with a bitset vector is used
-// to get the longest-prefix-match.
+// in the ART algorithm, fast bitset operations are used to find the
+// longest-prefix-match.
 //
-// The sparse child array recursively spans the trie with a branching factor of 256
+// The child array recursively spans the trie with a branching factor of 256
 // and also records path-compressed leaves in the free node slots.
 type node[V any] struct {
-	// prefixes contains the routes indexed as a complete binary tree with payload V
-	// with the help of the baseIndex function from the ART algorithm.
+	// prefixes contains the routes, indexed as a complete binary tree with payload V
+	// with the help of the baseIndex mapping function from the ART algorithm.
 	prefixes sparse.Array[V]
 
 	// children, recursively spans the trie with a branching factor of 256.
-	//
-	// Sorry, here we have to use a mixture of generics and interfaces:
-	//
-	// Without path compression, the definition would naturally be:
-	//  children sparse.Array[*node[V]]
-	//
-	// ... but with path compression the child can now be a node or a path compressed leaf.
-	//
-	// With path compression we could define:
-	//   type noder[V any] interface {
-	//    	isLeaf[V]() bool
-	//    }
-	//
-	// and:
-	//   children sparse.Array[noder[V]]
-	//
-	// But we use the empty interface{} instead, by intention, see below!
-	//
-	// The empty interface{} consumes less memory and type assertions are faster than
-	// indirect method calls like node.isLeaf()
-	children sparse.Array[interface{}]
+	children sparse.Array[any] // [any] is a *node or a *leaf
 }
 
 // isEmpty returns true if node has neither prefixes nor children
@@ -71,11 +52,27 @@ func (n *node[V]) isEmpty() bool {
 	return n.prefixes.Len() == 0 && n.children.Len() == 0
 }
 
-// leaf is a prefix with value, used as a path compressed child with a fringe flag.
+// leaf is a prefix with value, used as a path compressed child, with a fringe flag.
 type leaf[V any] struct {
 	prefix netip.Prefix
 	value  V
 	fringe bool
+}
+
+// isFringe, prefixes with /8, /16, ... /128 bits
+//
+// A leaf inserted at the last possible level (depth == lastIdx-1)
+// before becoming a prefix in the next level down (depth == lastIdx).
+//
+// A leaf being a fringe is the default-route for all nodes below this slot.
+//
+//	e.g. prefix is addr/8, or addr/16, or ... addr/128
+//	depth <  lastIdx-1 : a leaf, path-compressed
+//	depth == lastIdx-1 : a fringe leaf, path-compressed
+//	depth == lastIdx   : a prefix with octet/0 => idx == 1, a default route
+func isFringe(depth, bits int) bool {
+	lastIdx, lastBits := lastOctetIdxAndBits(bits)
+	return depth == lastIdx-1 && lastBits == 0
 }
 
 // cloneOrCopy, helper function,
@@ -287,7 +284,8 @@ func (n *node[V]) lpmGet(idx uint) (baseIdx uint, val V, ok bool) {
 	return 0, val, false
 }
 
-// lpmTest for faster lpm tests without value returns.
+// lpmTest, true if idx has a (any) longest-prefix-match in node.
+// this is a contains test, faster as lookup and without value returns.
 func (n *node[V]) lpmTest(idx uint) bool {
 	return n.prefixes.IntersectsAny(lpmbt.LookupTbl[idx])
 }
@@ -379,7 +377,7 @@ func (n *node[V]) cloneFlat() *node[V] {
 //
 // The iteration order is not defined, just the simplest and fastest recursive implementation.
 func (n *node[V]) allRec(path stridePath, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
-	for _, idx := range n.prefixes.AsSlice(make([]uint, 0, maxNodePrefixes)) {
+	for _, idx := range n.prefixes.AsSlice(make([]uint, 0, maxItems)) {
 		cidr := cidrFromPath(path, depth, is4, idx)
 
 		// callback for this prefix and val
@@ -390,7 +388,7 @@ func (n *node[V]) allRec(path stridePath, depth int, is4 bool, yield func(netip.
 	}
 
 	// for all children (nodes and leaves) in this node do ...
-	for i, addr := range n.children.AsSlice(make([]uint, 0, maxNodeChildren)) {
+	for i, addr := range n.children.AsSlice(make([]uint, 0, maxItems)) {
 		switch kid := n.children.Items[i].(type) {
 		case *node[V]:
 			// rec-descent with this node
@@ -422,10 +420,10 @@ func (n *node[V]) allRec(path stridePath, depth int, is4 bool, yield func(netip.
 // false value is propagated.
 func (n *node[V]) allRecSorted(path stridePath, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
 	// get slice of all child octets, sorted by addr
-	allChildAddrs := n.children.AsSlice(make([]uint, 0, maxNodeChildren))
+	allChildAddrs := n.children.AsSlice(make([]uint, 0, maxItems))
 
 	// get slice of all indexes, sorted by idx
-	allIndices := n.prefixes.AsSlice(make([]uint, 0, maxNodePrefixes))
+	allIndices := n.prefixes.AsSlice(make([]uint, 0, maxItems))
 
 	// sort indices in CIDR sort order
 	slices.SortFunc(allIndices, cmpIndexRank)
@@ -498,7 +496,7 @@ func (n *node[V]) allRecSorted(path stridePath, depth int, is4 bool, yield func(
 // Count duplicate entries to adjust the t.size struct members.
 func (n *node[V]) unionRec(o *node[V], depth int) (duplicates int) {
 	// for all prefixes in other node do ...
-	for i, oIdx := range o.prefixes.AsSlice(make([]uint, 0, maxNodePrefixes)) {
+	for i, oIdx := range o.prefixes.AsSlice(make([]uint, 0, maxItems)) {
 		// insert/overwrite prefix/value from oNode to nNode
 		exists := n.prefixes.InsertAt(oIdx, o.prefixes.Items[i])
 
@@ -510,7 +508,7 @@ func (n *node[V]) unionRec(o *node[V], depth int) (duplicates int) {
 
 LOOP:
 	// for all child addrs in other node do ...
-	for i, addr := range o.children.AsSlice(make([]uint, 0, maxNodeChildren)) {
+	for i, addr := range o.children.AsSlice(make([]uint, 0, maxItems)) {
 		//  6 possible combinations for this child and other child child
 		//
 		//  THIS, OTHER:
@@ -635,8 +633,8 @@ func (n *node[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxLen int, yie
 
 	pfxFirstAddr, pfxLastAddr := art.IdxToRange(art.PfxToIdx(octets[depth], pfxLen))
 
-	allCoveredIndices := make([]uint, 0, maxNodePrefixes)
-	for _, idx := range n.prefixes.AsSlice(make([]uint, 0, maxNodePrefixes)) {
+	allCoveredIndices := make([]uint, 0, maxItems)
+	for _, idx := range n.prefixes.AsSlice(make([]uint, 0, maxItems)) {
 		thisFirstAddr, thisLastAddr := art.IdxToRange(idx)
 
 		if thisFirstAddr >= pfxFirstAddr && thisLastAddr <= pfxLastAddr {
@@ -649,8 +647,8 @@ func (n *node[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxLen int, yie
 
 	// 2. collect all covered child addrs by prefix
 
-	allCoveredChildAddrs := make([]uint, 0, maxNodeChildren)
-	for _, addr := range n.children.AsSlice(make([]uint, 0, maxNodeChildren)) {
+	allCoveredChildAddrs := make([]uint, 0, maxItems)
+	for _, addr := range n.children.AsSlice(make([]uint, 0, maxItems)) {
 		octet := uint8(addr)
 		if octet >= pfxFirstAddr && octet <= pfxLastAddr {
 			allCoveredChildAddrs = append(allCoveredChildAddrs, addr)
@@ -769,13 +767,4 @@ func cidrFromPath(path stridePath, depth int, is4 bool, idx uint) netip.Prefix {
 
 	// return a normalized prefix from ip/bits
 	return netip.PrefixFrom(ip, bits)
-}
-
-// isFringe, prefixes with /0, /8, /16, ... /128 bits
-// and inserted path-compressed at last possible level (depth == lastIdx-1).
-//
-// A leaf being a fringe is the default-route for all nodes below this slot.
-func isFringe(depth, bits int) bool {
-	lastIdx, lastBits := lastOctetIdxAndBits(bits)
-	return depth == lastIdx-1 && lastBits == 0
 }

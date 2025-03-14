@@ -86,8 +86,8 @@ func pfxMask(pfxLen int) byte {
 }
 
 func allStridePfxs() []goldStrideItem[int] {
-	ret := make([]goldStrideItem[int], 0, maxNodePrefixes-1)
-	for idx := 1; idx < maxNodePrefixes; idx++ {
+	ret := make([]goldStrideItem[int], 0, maxItems-1)
+	for idx := 1; idx < maxItems; idx++ {
 		octet, bits := art.IdxToPfx(uint(idx))
 		ret = append(ret, goldStrideItem[int]{octet, bits, idx})
 	}

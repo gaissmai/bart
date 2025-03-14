@@ -110,9 +110,9 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 
 	if n.children.Len() != 0 {
 
-		nodeAddrs := make([]uint, 0, maxNodeChildren)
-		leafAddrs := make([]uint, 0, maxNodeChildren)
-		fringeAddrs := make([]uint, 0, maxNodeChildren)
+		nodeAddrs := make([]uint, 0, maxItems)
+		leafAddrs := make([]uint, 0, maxItems)
+		fringeAddrs := make([]uint, 0, maxItems)
 
 		// the node has recursive child nodes or path-compressed leaves
 		for i, addr := range n.children.All() {
