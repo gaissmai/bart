@@ -15,7 +15,7 @@
 // The routing table is implemented with popcount compressed sparse arrays
 // together with path compression. This reduces storage consumption
 // by almost two orders of magnitude in comparison to ART with
-// similar lookup times for the longest prefix match.
+// even better lookup times for the longest prefix match.
 package bart
 
 import (
@@ -362,7 +362,7 @@ func (t *Table[V]) GetAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, o
 	return t.getAndDeletePersist(pfx)
 }
 
-func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
+func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 	if !pfx.IsValid() {
 		return val, false
 	}
@@ -394,16 +394,16 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 		// push current node on stack for path recording
 		stack[depth] = n
 
-		// try to delete prefix in trie node
 		if depth == lastIdx {
-			val, ok = n.prefixes.DeleteAt(art.PfxToIdx(octet, lastBits))
-			if !ok {
+			// try to delete prefix in trie node
+			val, exists = n.prefixes.DeleteAt(art.PfxToIdx(octet, lastBits))
+			if !exists {
 				return val, false
 			}
 
 			t.sizeUpdate(is4, -1)
 			n.purgeAndCompress(stack[:depth], octets, is4)
-			return val, ok
+			return val, exists
 		}
 
 		addr := uint(octet)
@@ -441,7 +441,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, ok bool) {
 }
 
 // getAndDeletePersist is similar to getAndDelete but the receiver isn't modified.
-func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, ok bool) {
+func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, exists bool) {
 	if !pfx.IsValid() {
 		return t, val, false
 	}
@@ -481,17 +481,17 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, o
 		// push cloned node on stack for path recording
 		stack[depth] = n
 
-		// try to delete prefix in trie node
 		if depth == lastIdx {
-			val, ok = n.prefixes.DeleteAt(art.PfxToIdx(octet, lastBits))
-			if !ok {
+			// try to delete prefix in trie node
+			val, exists = n.prefixes.DeleteAt(art.PfxToIdx(octet, lastBits))
+			if !exists {
 				// nothing to delete
 				return pt, val, false
 			}
 
 			pt.sizeUpdate(is4, -1)
 			n.purgeAndCompress(stack[:depth], octets, is4)
-			return pt, val, ok
+			return pt, val, exists
 		}
 
 		addr := uint(octet)
