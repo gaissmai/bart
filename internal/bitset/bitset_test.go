@@ -600,27 +600,67 @@ func TestIntersectionTop(t *testing.T) {
 // Rank0 is popcount-1
 func TestRank0(t *testing.T) {
 	t.Parallel()
-	u := []uint{2, 3, 5, 7, 11, 70, 150}
+	u := []uint{0, 3, 5, 7, 11, 62, 63, 64, 70, 150, 255}
+
+	tests := []struct {
+		idx  uint
+		want int
+	}{
+		{
+			idx:  0,
+			want: 0,
+		},
+		{
+			idx:  1,
+			want: 0,
+		},
+		{
+			idx:  2,
+			want: 0,
+		},
+		{
+			idx:  3,
+			want: 1,
+		},
+		{
+			idx:  4,
+			want: 1,
+		},
+		{
+			idx:  62,
+			want: 5,
+		},
+		{
+			idx:  63,
+			want: 6,
+		},
+		{
+			idx:  64,
+			want: 7,
+		},
+		{
+			idx:  150,
+			want: 9,
+		},
+		{
+			idx:  254,
+			want: 9,
+		},
+		{
+			idx:  255,
+			want: 10,
+		},
+	}
+
 	var b BitSet256
 	for _, v := range u {
 		b.Set(v)
 	}
 
-	if b.Rank0(5) != 2 {
-		t.Error("Unexpected rank")
-		return
-	}
-	if b.Rank0(6) != 2 {
-		t.Error("Unexpected rank")
-		return
-	}
-	if b.Rank0(63) != 4 {
-		t.Error("Unexpected rank")
-		return
-	}
-	if b.Rank0(1500) != 6 {
-		t.Error("Unexpected rank")
-		return
+	for _, tc := range tests {
+		if got := b.Rank0(tc.idx); got != tc.want {
+			t.Errorf("Rank0(%d): want: %d, got: %d", tc.idx, tc.want, got)
+		}
 	}
 }
 
@@ -696,7 +736,7 @@ func BenchmarkIntersectionCardinality(b *testing.B) {
 
 func BenchmarkRank0(b *testing.B) {
 	aa := BitSet256{0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010}
-	for _, i := range []uint{10_000, 64*4 - 11, 64*3 - 11, 64*2 - 11, 64*1 - 11} {
+	for _, i := range []uint{64*4 - 1, 64*3 - 11, 64*2 - 11, 64*1 - 11, 1, 0} {
 		b.Run(fmt.Sprintf("for %d", i), func(b *testing.B) {
 			b.ResetTimer()
 			for range b.N {
