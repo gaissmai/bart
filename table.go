@@ -57,8 +57,29 @@ func (t *Table[V]) rootNodeByVersion(is4 bool) *node[V] {
 	return &t.root6
 }
 
-// lastOctetIdxAndBits, get last significant octet Idx and significant bits
-// for a given netip.Prefix
+// lastOctetIdxAndBits, get last significant octet Idx and remaining bits
+// for a given netip.Prefix.
+//
+// Split the IP prefixes at stride borders.
+//
+//		  IPv4: [0-7],[8-15],[16-23],[24-31].[32]
+//		  IPv6: [0-7],[8-15],[16-23],[24-31],[32-39],[40-47],[48-55],[56-63],...,[120-127],[128]
+//
+//			 0.0.0.0/0         => lastIdx:  0, lastBits: 0 (default route)
+//			 0.0.0.0/7         => lastIdx:  0, lastBits: 7
+//			 0.0.0.0/8         => lastIdx:  1, lastBits: 0 (possible fringe)
+//			10.0.0.0/8         => lastIdx:  1, lastBits: 0 (possible fringe)
+//			10.0.0.0/22        => lastIdx:  2, lastBits: 6
+//			10.0.0.0/29        => lastIdx:  3, lastBits: 5
+//			10.0.0.0/32        => lastIdx:  4, lastBits: 0 (possible fringe)
+//
+//			::/0               => lastIdx:  0, lastBits: 0 (default route)
+//			::1/128            => lastIdx: 17, lastBits: 0 (possible fringe)
+//			2001:db8::/42      => lastIdx:  5, lastBits: 2
+//			2001:db8::/56      => lastIdx:  7, lastBits: 0 (possible fringe)
+//
+//	 /32 and /128 are special, they never form a new node, they are always inserted
+//	 as path-compressed leaf, so the max-depth of the trie is still 4 and 16
 func lastOctetIdxAndBits(bits int) (lastIdx, lastBits int) {
 	return bits >> 3, bits % 8
 }

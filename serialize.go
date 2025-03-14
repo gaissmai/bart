@@ -248,7 +248,7 @@ func (n *node[V]) directItemsRec(parentIdx uint, path stridePath, depth int, is4
 	// prefixes:
 	// for all idx's (prefixes mapped by baseIndex) in this node
 	// do a longest-prefix-match
-	for i, idx := range n.prefixes.AsSlice(make([]uint, 0, maxNodePrefixes)) {
+	for i, idx := range n.prefixes.AsSlice(make([]uint, 0, maxItems)) {
 		// tricky part, skip self, test with next possible lpm (idx>>1), it's a complete binary tree
 		nextIdx := idx >> 1
 
@@ -280,7 +280,7 @@ func (n *node[V]) directItemsRec(parentIdx uint, path stridePath, depth int, is4
 	}
 
 	// children:
-	for i, addr := range n.children.AsSlice(make([]uint, 0, maxNodeChildren)) {
+	for i, addr := range n.children.AsSlice(make([]uint, 0, maxItems)) {
 		hostIdx := art.HostIdx(addr)
 
 		// fast skip, lpm not possible
