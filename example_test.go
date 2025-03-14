@@ -12,7 +12,7 @@ import (
 )
 
 func ExampleLite_Contains() {
-	lite := new(bart.LitePoC)
+	lite := new(bart.Lite)
 
 	// Insert some prefixes
 	prefixes := []string{

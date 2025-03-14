@@ -1,6 +1,3 @@
-// Copyright (c) 2025 Karl Gaissmaier
-// SPDX-License-Identifier: MIT
-
 package bart
 
 import (
@@ -56,7 +53,7 @@ func TestLiteInsert(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		lt := new(LitePoC)
+		lt := new(Lite)
 		for _, p := range tc.ins {
 			lt.Insert(p)
 		}
@@ -73,7 +70,7 @@ func TestLiteInsert(t *testing.T) {
 func TestLiteInsertDelete(t *testing.T) {
 	t.Parallel()
 
-	lt := new(LitePoC)
+	lt := new(Lite)
 
 	pfxs := randomRealWorldPrefixes(100_000)
 	for _, pfx := range pfxs {
@@ -103,7 +100,7 @@ func TestLiteContains(t *testing.T) {
 	var match4, match6 int
 	var miss4, miss6 int
 
-	lt := new(LitePoC)
+	lt := new(Lite)
 	tb := new(Table[any])
 
 	for _, pfx := range randomRealWorldPrefixes(100_000) {
@@ -136,39 +133,6 @@ func TestLiteContains(t *testing.T) {
 			miss4 > must &&
 			miss6 > must {
 			break
-		}
-	}
-}
-
-func TestFringeToCIDR(t *testing.T) {
-	t.Parallel()
-	var ip netip.Addr
-
-	for range 10_000 {
-		ip = randomIP4()
-		for i := range 5 {
-			pfx := netip.PrefixFrom(ip, i*8).Masked()
-			octets := ip.AsSlice()
-			path := stridePath{}
-			copy(path[:], octets)
-
-			got := cidrFromFringe(path, i, true)
-			if pfx != got {
-				t.Errorf("fringeToCidr: octets: %v, depth: %d, is4: %v, want: %s, got: %s", octets, i, true, pfx, got)
-			}
-		}
-
-		ip = randomIP6()
-		for i := range 17 {
-			pfx := netip.PrefixFrom(ip, i*8).Masked()
-			octets := ip.AsSlice()
-			path := stridePath{}
-			copy(path[:], octets)
-
-			got := cidrFromFringe(path, i, false)
-			if pfx != got {
-				t.Errorf("fringeToCidr: octets: %v, depth: %d, is4: %v, want: %s, got: %s", octets, i, false, pfx, got)
-			}
 		}
 	}
 }

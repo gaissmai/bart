@@ -234,8 +234,18 @@ func (n *node[V]) purgeAndCompress(parentStack []*node[V], childPath []uint8, is
 
 		switch {
 		case n.isEmpty():
-			// purge empty node
+			// just delete this empty node
 			parent.children.DeleteAt(addr)
+
+		case pfxCount == 0 && childCount == 1:
+			// if child is a leaf (not a node), shift it up one level
+			if kid, ok := n.children.Items[0].(*leaf[V]); ok {
+				// delete this node
+				parent.children.DeleteAt(addr)
+
+				// ... insert prefix/value at parents depth
+				parent.insertAtDepth(kid.prefix, kid.value, depth)
+			}
 
 		case pfxCount == 1 && childCount == 0:
 			// get prefix back from idx
@@ -252,17 +262,6 @@ func (n *node[V]) purgeAndCompress(parentStack []*node[V], childPath []uint8, is
 
 			// ... insert prefix/value at parents depth
 			parent.insertAtDepth(pfx, val, depth)
-
-		case pfxCount == 0 && childCount == 1:
-			// if child is a leaf (not a node), shift it up one level
-			if kid, ok := n.children.Items[0].(*leaf[V]); ok {
-				// delete this node
-				parent.children.DeleteAt(addr)
-
-				// ... insert prefix/value at parents depth
-				parent.insertAtDepth(kid.prefix, kid.value, depth)
-
-			}
 		}
 
 		// climb up the stack
