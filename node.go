@@ -71,7 +71,7 @@ func (n *node[V]) isEmpty() bool {
 	return n.prefixes.Len() == 0 && n.children.Len() == 0
 }
 
-// leaf is a prefix with value, used as a path compressed child
+// leaf is a prefix with value, used as a path compressed child with a fringe flag.
 type leaf[V any] struct {
 	prefix netip.Prefix
 	value  V

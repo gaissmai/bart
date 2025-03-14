@@ -164,14 +164,14 @@ func (l *Lite) Contains(ip netip.Addr) bool {
 
 // ###################################################################
 
-// liteNode, see the node struct, but without payload V.
+// liteNode, see the similar node struct, but now without payload V.
 // Needs less memory and insert and delete is also a bit faster.
 type liteNode struct {
 	prefixes bitset.BitSet256
-	children sparse.Array[any] // [any] is a *liteNode or a *prefixNode
+	children sparse.Array[any] // [any] is a *liteNode or a *liteLeaf
 }
 
-// liteLeaf, just a path compressed prefix.
+// liteLeaf, just a path compressed prefix and a fringe flag.
 type liteLeaf struct {
 	prefix netip.Prefix
 	fringe bool

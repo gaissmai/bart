@@ -661,12 +661,8 @@ LOOP:
 
 		case *leaf[V]:
 			// reached a path compressed prefix, stop traversing
-			if kid.fringe {
-				// fringe is the default-route for all nodes below
-				return kid.value, true
-			}
-
-			if kid.prefix.Contains(ip) {
+			// fringe is the default-route for all nodes below
+			if kid.fringe || kid.prefix.Contains(ip) {
 				return kid.value, true
 			}
 			break LOOP
@@ -768,11 +764,13 @@ LOOP:
 
 		case *leaf[V]:
 			// reached a path compressed prefix, stop traversing
-			if kid.prefix.Bits() <= bits {
-				// fringe is the default-route for all nodes below
-				if kid.fringe || kid.prefix.Contains(ip) {
-					return kid.prefix, kid.value, true
-				}
+			if kid.prefix.Bits() > bits {
+				break LOOP
+			}
+
+			// fringe is the default-route for all nodes below
+			if kid.fringe || kid.prefix.Contains(ip) {
+				return kid.prefix, kid.value, true
 			}
 
 			break LOOP
@@ -803,7 +801,7 @@ LOOP:
 			idx = art.HostIdx(uint(octet))
 		}
 
-		// manually inlined lpmGet(idx)
+		// manually inlined: lpmGet(idx)
 		if topIdx, ok := n.prefixes.IntersectionTop(lpmbt.LookupTbl[idx]); ok {
 			val = n.prefixes.MustGet(topIdx)
 
@@ -879,7 +877,11 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 				continue LOOP // descend down to next trie level
 
 			case *leaf[V]:
-				if kid.prefix.Overlaps(pfx) && kid.prefix.Bits() <= pfx.Bits() {
+				if kid.prefix.Bits() > pfx.Bits() {
+					break LOOP
+				}
+				// fringe is the default-route for all nodes below
+				if kid.fringe || kid.prefix.Overlaps(pfx) {
 					if !yield(kid.prefix, kid.value) {
 						// early exit
 						return
@@ -934,12 +936,10 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 		ip := pfx.Addr()
 		is4 := ip.Is4()
 		bits := pfx.Bits()
-
-		n := t.rootNodeByVersion(is4)
-
+		octets := ip.AsSlice()
 		lastIdx, lastBits := lastOctetIdxAndBits(bits)
 
-		octets := ip.AsSlice()
+		n := t.rootNodeByVersion(is4)
 
 		// find the trie node
 		for depth, octet := range octets {
@@ -961,7 +961,7 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 				continue // descend down to next trie level
 
 			case *leaf[V]:
-				if pfx.Overlaps(kid.prefix) && pfx.Bits() <= kid.prefix.Bits() {
+				if pfx.Bits() <= kid.prefix.Bits() && pfx.Overlaps(kid.prefix) {
 					_ = yield(kid.prefix, kid.value)
 				}
 				return
