@@ -124,7 +124,7 @@ func BenchmarkLiteFullTableMemoryV4(b *testing.B) {
 		runtime.GC()
 		runtime.ReadMemStats(&endMem)
 
-		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
+		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc)/1024, "KByte")
 		b.ReportMetric(0, "ns/op")
 	})
 }
@@ -146,7 +146,7 @@ func BenchmarkLiteFullTableMemoryV6(b *testing.B) {
 		runtime.GC()
 		runtime.ReadMemStats(&endMem)
 
-		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
+		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc)/1024, "KByte")
 		b.ReportMetric(0, "ns/op")
 	})
 }
@@ -168,7 +168,7 @@ func BenchmarkLiteFullTableMemory(b *testing.B) {
 		runtime.GC()
 		runtime.ReadMemStats(&endMem)
 
-		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc), "Bytes")
+		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc)/1024, "KByte")
 		b.ReportMetric(0, "ns/op")
 	})
 }
