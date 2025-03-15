@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 // Package bitset implements bitsets, a mapping
-// between non-negative integers up to 255 and boolean values.
+// between non-negative integers and boolean values.
 //
 // Studied [github.com/bits-and-blooms/bitset] inside out
 // and rewrote needed parts from scratch for this project.

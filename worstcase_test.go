@@ -131,7 +131,7 @@ func TestWorstCaseMatch4(t *testing.T) {
 		}
 	})
 
-	t.Run("LookupPrefixLPM", func(t *testing.T) {
+	t.Run("LookupPfxLPM", func(t *testing.T) {
 		t.Parallel()
 
 		tbl := new(Table[string])
@@ -226,7 +226,7 @@ func TestWorstCaseMiss4(t *testing.T) {
 		}
 	})
 
-	t.Run("LookupPrefixLPM", func(t *testing.T) {
+	t.Run("LookupPfxLPM", func(t *testing.T) {
 		t.Parallel()
 
 		tbl := new(Table[string])
@@ -311,7 +311,7 @@ func TestWorstCaseMatch6(t *testing.T) {
 		}
 	})
 
-	t.Run("LookupPrefixLPM", func(t *testing.T) {
+	t.Run("LookupPfxLPM", func(t *testing.T) {
 		t.Parallel()
 
 		tbl := new(Table[string])
@@ -406,7 +406,7 @@ func TestWorstCaseMiss6(t *testing.T) {
 		}
 	})
 
-	t.Run("LookupPrefixLPM", func(t *testing.T) {
+	t.Run("LookupPfxLPM", func(t *testing.T) {
 		t.Parallel()
 
 		tbl := new(Table[string])
@@ -473,7 +473,7 @@ func BenchmarkWorstCaseMatch4(b *testing.B) {
 		}
 	})
 
-	b.Run("LookupPrefixLPM", func(b *testing.B) {
+	b.Run("LookupPfxLPM", func(b *testing.B) {
 		tbl := new(Table[string])
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
@@ -543,7 +543,7 @@ func BenchmarkWorstCaseMiss4(b *testing.B) {
 		}
 	})
 
-	b.Run("LookupPrefixLPM", func(b *testing.B) {
+	b.Run("LookupPfxLPM", func(b *testing.B) {
 		tbl := new(Table[string])
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
@@ -607,7 +607,7 @@ func BenchmarkWorstCaseMatch6(b *testing.B) {
 		}
 	})
 
-	b.Run("LookupPrefixLPM", func(b *testing.B) {
+	b.Run("LookupPfxLPM", func(b *testing.B) {
 		tbl := new(Table[string])
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())
@@ -677,7 +677,7 @@ func BenchmarkWorstCaseMiss6(b *testing.B) {
 		}
 	})
 
-	b.Run("LookupPrefixLPM", func(b *testing.B) {
+	b.Run("LookupPfxLPM", func(b *testing.B) {
 		tbl := new(Table[string])
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())
