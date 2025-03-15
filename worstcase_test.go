@@ -78,7 +78,7 @@ func TestWorstCaseMatch4(t *testing.T) {
 		}
 	})
 
-	t.Run("Table.Contains", func(t *testing.T) {
+	t.Run("Contains", func(t *testing.T) {
 		t.Parallel()
 
 		tbl := new(Table[string])
@@ -175,7 +175,7 @@ func TestWorstCaseMiss4(t *testing.T) {
 		}
 	})
 
-	t.Run("Table.Contains", func(t *testing.T) {
+	t.Run("Contains", func(t *testing.T) {
 		t.Parallel()
 
 		tbl := new(Table[string])
@@ -262,7 +262,7 @@ func TestWorstCaseMatch6(t *testing.T) {
 		}
 	})
 
-	t.Run("Table.Contains", func(t *testing.T) {
+	t.Run("Contains", func(t *testing.T) {
 		t.Parallel()
 
 		tbl := new(Table[string])
@@ -355,7 +355,7 @@ func TestWorstCaseMiss6(t *testing.T) {
 		}
 	})
 
-	t.Run("Table.Contains", func(t *testing.T) {
+	t.Run("Contains", func(t *testing.T) {
 		t.Parallel()
 
 		tbl := new(Table[string])
@@ -426,7 +426,7 @@ func TestWorstCaseMiss6(t *testing.T) {
 
 func BenchmarkWorstCaseMatch4(b *testing.B) {
 	b.Run("Lite.Contains", func(b *testing.B) {
-		lite := new(Lite)
+		tbl := new(Lite)
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p)
 		}
@@ -437,7 +437,7 @@ func BenchmarkWorstCaseMatch4(b *testing.B) {
 		}
 	})
 
-	b.Run("Table.Contains", func(b *testing.B) {
+	b.Run("Contains", func(b *testing.B) {
 		tbl := new(Table[string])
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
@@ -488,7 +488,7 @@ func BenchmarkWorstCaseMatch4(b *testing.B) {
 
 func BenchmarkWorstCaseMiss4(b *testing.B) {
 	b.Run("Lite.Contains", func(b *testing.B) {
-		lite := new(Lite)
+		tbl := new(Lite)
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p)
 		}
@@ -501,7 +501,7 @@ func BenchmarkWorstCaseMiss4(b *testing.B) {
 		}
 	})
 
-	b.Run("Table.Contains", func(b *testing.B) {
+	b.Run("Contains", func(b *testing.B) {
 		tbl := new(Table[string])
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
@@ -560,7 +560,7 @@ func BenchmarkWorstCaseMiss4(b *testing.B) {
 
 func BenchmarkWorstCaseMatch6(b *testing.B) {
 	b.Run("Lite.Contains", func(b *testing.B) {
-		lite := new(Lite)
+		tbl := new(Lite)
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p)
 		}
@@ -571,7 +571,7 @@ func BenchmarkWorstCaseMatch6(b *testing.B) {
 		}
 	})
 
-	b.Run("Table.Contains", func(b *testing.B) {
+	b.Run("Contains", func(b *testing.B) {
 		tbl := new(Table[string])
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())
@@ -622,7 +622,7 @@ func BenchmarkWorstCaseMatch6(b *testing.B) {
 
 func BenchmarkWorstCaseMiss6(b *testing.B) {
 	b.Run("Lite.Contains", func(b *testing.B) {
-		lite := new(Lite)
+		tbl := new(Lite)
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p)
 		}
@@ -635,7 +635,7 @@ func BenchmarkWorstCaseMiss6(b *testing.B) {
 		}
 	})
 
-	b.Run("Table.Contains", func(b *testing.B) {
+	b.Run("Contains", func(b *testing.B) {
 		tbl := new(Table[string])
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())
