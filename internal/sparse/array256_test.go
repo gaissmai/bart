@@ -10,7 +10,7 @@ import (
 
 func TestNewArray(t *testing.T) {
 	t.Parallel()
-	a := new(Array[int])
+	a := new(Array256[int])
 
 	if c := a.Len(); c != 0 {
 		t.Errorf("Count, expected 0, got %d", c)
@@ -19,7 +19,7 @@ func TestNewArray(t *testing.T) {
 
 func TestSparseArrayCount(t *testing.T) {
 	t.Parallel()
-	a := new(Array[int])
+	a := new(Array256[int])
 
 	for i := range 255 {
 		a.InsertAt(uint(i), i)
@@ -40,7 +40,7 @@ func TestSparseArrayCount(t *testing.T) {
 
 func TestSparseArrayGet(t *testing.T) {
 	t.Parallel()
-	a := new(Array[int])
+	a := new(Array256[int])
 
 	for i := range 255 {
 		a.InsertAt(uint(i), i)
@@ -77,7 +77,7 @@ func TestSparseArrayMustGetPanic(t *testing.T) {
 		}
 	}()
 
-	a := new(Array[int])
+	a := new(Array256[int])
 
 	for i := 5; i <= 10; i++ {
 		a.InsertAt(uint(i), i)
@@ -89,7 +89,7 @@ func TestSparseArrayMustGetPanic(t *testing.T) {
 
 func TestSparseArrayUpdate(t *testing.T) {
 	t.Parallel()
-	a := new(Array[int])
+	a := new(Array256[int])
 
 	for i := range 100 {
 		a.InsertAt(uint(i), i)
@@ -123,7 +123,7 @@ func TestSparseArrayUpdate(t *testing.T) {
 
 func TestSparseArrayCopy(t *testing.T) {
 	t.Parallel()
-	a := new(Array[int])
+	a := new(Array256[int])
 
 	for i := range 255 {
 		a.InsertAt(uint(i), i)

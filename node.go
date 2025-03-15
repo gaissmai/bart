@@ -41,10 +41,10 @@ type stridePath [maxTreeDepth]uint8
 type node[V any] struct {
 	// prefixes contains the routes, indexed as a complete binary tree with payload V
 	// with the help of the baseIndex mapping function from the ART algorithm.
-	prefixes sparse.Array[V]
+	prefixes sparse.Array256[V]
 
 	// children, recursively spans the trie with a branching factor of 256.
-	children sparse.Array[any] // [any] is a *node or a *leaf
+	children sparse.Array256[any] // [any] is a *node or a *leaf
 }
 
 // isEmpty returns true if node has neither prefixes nor children
