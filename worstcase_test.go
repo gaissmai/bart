@@ -60,10 +60,10 @@ var (
 	}
 )
 
-func TestWorstCaseIP4Match(t *testing.T) {
+func TestWorstCaseMatch4(t *testing.T) {
 	t.Parallel()
 
-	t.Run("WorstCaseLiteMatchIP4Contains", func(t *testing.T) {
+	t.Run("Lite.Contains", func(t *testing.T) {
 		t.Parallel()
 
 		lite := new(Lite)
@@ -78,7 +78,7 @@ func TestWorstCaseIP4Match(t *testing.T) {
 		}
 	})
 
-	t.Run("WorstCaseMatchIP4Contains", func(t *testing.T) {
+	t.Run("Table.Contains", func(t *testing.T) {
 		t.Parallel()
 
 		tbl := new(Table[string])
@@ -93,7 +93,7 @@ func TestWorstCaseIP4Match(t *testing.T) {
 		}
 	})
 
-	t.Run("WorstCaseMatchIP4Lookup", func(t *testing.T) {
+	t.Run("Lookup", func(t *testing.T) {
 		t.Parallel()
 
 		tbl := new(Table[string])
@@ -112,7 +112,7 @@ func TestWorstCaseIP4Match(t *testing.T) {
 		}
 	})
 
-	t.Run("WorstCaseMatchIP4LookupPrefix", func(t *testing.T) {
+	t.Run("LookupPrefix", func(t *testing.T) {
 		t.Parallel()
 
 		tbl := new(Table[string])
@@ -131,7 +131,7 @@ func TestWorstCaseIP4Match(t *testing.T) {
 		}
 	})
 
-	t.Run("WorstCaseMatchIP4LookupPrefixLPM", func(t *testing.T) {
+	t.Run("LookupPrefixLPM", func(t *testing.T) {
 		t.Parallel()
 
 		tbl := new(Table[string])
@@ -155,10 +155,10 @@ func TestWorstCaseIP4Match(t *testing.T) {
 	})
 }
 
-func TestWorstCaseIP4Miss(t *testing.T) {
+func TestWorstCaseMiss4(t *testing.T) {
 	t.Parallel()
 
-	t.Run("WorstCaseLiteMissIP4Contains", func(t *testing.T) {
+	t.Run("Lite.Contains", func(t *testing.T) {
 		t.Parallel()
 
 		lite := new(Lite)
@@ -175,7 +175,7 @@ func TestWorstCaseIP4Miss(t *testing.T) {
 		}
 	})
 
-	t.Run("WorstCaseMissIP4Contains", func(t *testing.T) {
+	t.Run("Table.Contains", func(t *testing.T) {
 		t.Parallel()
 
 		tbl := new(Table[string])
@@ -192,7 +192,7 @@ func TestWorstCaseIP4Miss(t *testing.T) {
 		}
 	})
 
-	t.Run("WorstCaseMissIP4Lookup", func(t *testing.T) {
+	t.Run("Lookup", func(t *testing.T) {
 		t.Parallel()
 
 		tbl := new(Table[string])
@@ -209,7 +209,7 @@ func TestWorstCaseIP4Miss(t *testing.T) {
 		}
 	})
 
-	t.Run("WorstCaseMissIP4LookupPrefix", func(t *testing.T) {
+	t.Run("LookupPrefix", func(t *testing.T) {
 		t.Parallel()
 
 		tbl := new(Table[string])
@@ -226,7 +226,7 @@ func TestWorstCaseIP4Miss(t *testing.T) {
 		}
 	})
 
-	t.Run("WorstCaseMissIP4LookupPrefixLPM", func(t *testing.T) {
+	t.Run("LookupPrefixLPM", func(t *testing.T) {
 		t.Parallel()
 
 		tbl := new(Table[string])
@@ -244,10 +244,10 @@ func TestWorstCaseIP4Miss(t *testing.T) {
 	})
 }
 
-func TestWorstCaseIP6Match(t *testing.T) {
+func TestWorstCaseMatch6(t *testing.T) {
 	t.Parallel()
 
-	t.Run("WorstCaseLiteMatchIP6Contains", func(t *testing.T) {
+	t.Run("Lite.Contains", func(t *testing.T) {
 		t.Parallel()
 
 		lite := new(Lite)
@@ -262,7 +262,7 @@ func TestWorstCaseIP6Match(t *testing.T) {
 		}
 	})
 
-	t.Run("WorstCaseMatchIP6Contains", func(t *testing.T) {
+	t.Run("Table.Contains", func(t *testing.T) {
 		t.Parallel()
 
 		tbl := new(Table[string])
@@ -277,7 +277,7 @@ func TestWorstCaseIP6Match(t *testing.T) {
 		}
 	})
 
-	t.Run("WorstCaseMatchIP6Lookup", func(t *testing.T) {
+	t.Run("Lookup", func(t *testing.T) {
 		t.Parallel()
 
 		tbl := new(Table[string])
@@ -292,7 +292,7 @@ func TestWorstCaseIP6Match(t *testing.T) {
 		}
 	})
 
-	t.Run("WorstCaseMatchIP6LookupPrefix", func(t *testing.T) {
+	t.Run("LookupPrefix", func(t *testing.T) {
 		t.Parallel()
 
 		tbl := new(Table[string])
@@ -311,7 +311,7 @@ func TestWorstCaseIP6Match(t *testing.T) {
 		}
 	})
 
-	t.Run("WorstCaseMatchIP6LookupPrefixLPM", func(t *testing.T) {
+	t.Run("LookupPrefixLPM", func(t *testing.T) {
 		t.Parallel()
 
 		tbl := new(Table[string])
@@ -335,10 +335,10 @@ func TestWorstCaseIP6Match(t *testing.T) {
 	})
 }
 
-func TestWorstCaseIP6Miss(t *testing.T) {
+func TestWorstCaseMiss6(t *testing.T) {
 	t.Parallel()
 
-	t.Run("WorstCaseLiteMissIP6Contains", func(t *testing.T) {
+	t.Run("Lite.Contains", func(t *testing.T) {
 		t.Parallel()
 
 		lite := new(Lite)
@@ -355,7 +355,7 @@ func TestWorstCaseIP6Miss(t *testing.T) {
 		}
 	})
 
-	t.Run("WorstCaseMissIP6Contains", func(t *testing.T) {
+	t.Run("Table.Contains", func(t *testing.T) {
 		t.Parallel()
 
 		tbl := new(Table[string])
@@ -372,7 +372,7 @@ func TestWorstCaseIP6Miss(t *testing.T) {
 		}
 	})
 
-	t.Run("WorstCaseMissIP6Lookup", func(t *testing.T) {
+	t.Run("Lookup", func(t *testing.T) {
 		t.Parallel()
 
 		tbl := new(Table[string])
@@ -389,7 +389,7 @@ func TestWorstCaseIP6Miss(t *testing.T) {
 		}
 	})
 
-	t.Run("WorstCaseMissIP6LookupPrefix", func(t *testing.T) {
+	t.Run("LookupPrefix", func(t *testing.T) {
 		t.Parallel()
 
 		tbl := new(Table[string])
@@ -406,7 +406,7 @@ func TestWorstCaseIP6Miss(t *testing.T) {
 		}
 	})
 
-	t.Run("WorstCaseMissIP6LookupPrefixLPM", func(t *testing.T) {
+	t.Run("LookupPrefixLPM", func(t *testing.T) {
 		t.Parallel()
 
 		tbl := new(Table[string])
@@ -424,8 +424,8 @@ func TestWorstCaseIP6Miss(t *testing.T) {
 	})
 }
 
-func BenchmarkWorstCaseIP4Match(b *testing.B) {
-	b.Run("WorstCaseLiteMatchIP4Contains", func(b *testing.B) {
+func BenchmarkWorstCaseMatch4(b *testing.B) {
+	b.Run("Lite.Contains", func(b *testing.B) {
 		lite := new(Lite)
 		for _, p := range worstCasePfxsIP4 {
 			lite.Insert(p)
@@ -437,7 +437,7 @@ func BenchmarkWorstCaseIP4Match(b *testing.B) {
 		}
 	})
 
-	b.Run("WorstCaseMatchIP4Contains", func(b *testing.B) {
+	b.Run("Table.Contains", func(b *testing.B) {
 		tbl := new(Table[string])
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
@@ -449,7 +449,7 @@ func BenchmarkWorstCaseIP4Match(b *testing.B) {
 		}
 	})
 
-	b.Run("WorstCaseMatchIP4Lookup", func(b *testing.B) {
+	b.Run("Lookup", func(b *testing.B) {
 		tbl := new(Table[string])
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
@@ -461,7 +461,7 @@ func BenchmarkWorstCaseIP4Match(b *testing.B) {
 		}
 	})
 
-	b.Run("WorstCaseMatchIP4LookupPrefix", func(b *testing.B) {
+	b.Run("LookupPrefix", func(b *testing.B) {
 		tbl := new(Table[string])
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
@@ -473,7 +473,7 @@ func BenchmarkWorstCaseIP4Match(b *testing.B) {
 		}
 	})
 
-	b.Run("WorstCaseMatchIP4LookupPrefixLPM", func(b *testing.B) {
+	b.Run("LookupPrefixLPM", func(b *testing.B) {
 		tbl := new(Table[string])
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
@@ -486,8 +486,8 @@ func BenchmarkWorstCaseIP4Match(b *testing.B) {
 	})
 }
 
-func BenchmarkWorstCaseIP4Miss(b *testing.B) {
-	b.Run("WorstCaseLiteMissIP4Contains", func(b *testing.B) {
+func BenchmarkWorstCaseMiss4(b *testing.B) {
+	b.Run("Lite.Contains", func(b *testing.B) {
 		lite := new(Lite)
 		for _, p := range worstCasePfxsIP4 {
 			lite.Insert(p)
@@ -501,7 +501,7 @@ func BenchmarkWorstCaseIP4Miss(b *testing.B) {
 		}
 	})
 
-	b.Run("WorstCaseMissIP4Contains", func(b *testing.B) {
+	b.Run("Table.Contains", func(b *testing.B) {
 		tbl := new(Table[string])
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
@@ -515,7 +515,7 @@ func BenchmarkWorstCaseIP4Miss(b *testing.B) {
 		}
 	})
 
-	b.Run("WorstCaseMissIP4Lookup", func(b *testing.B) {
+	b.Run("Lookup", func(b *testing.B) {
 		tbl := new(Table[string])
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
@@ -529,7 +529,7 @@ func BenchmarkWorstCaseIP4Miss(b *testing.B) {
 		}
 	})
 
-	b.Run("WorstCaseMissIP4LookupPrefix", func(b *testing.B) {
+	b.Run("LookupPrefix", func(b *testing.B) {
 		tbl := new(Table[string])
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
@@ -543,7 +543,7 @@ func BenchmarkWorstCaseIP4Miss(b *testing.B) {
 		}
 	})
 
-	b.Run("WorstCaseMissIP4LookupPrefixLPM", func(b *testing.B) {
+	b.Run("LookupPrefixLPM", func(b *testing.B) {
 		tbl := new(Table[string])
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
@@ -558,8 +558,8 @@ func BenchmarkWorstCaseIP4Miss(b *testing.B) {
 	})
 }
 
-func BenchmarkWorstCaseIP6Match(b *testing.B) {
-	b.Run("WorstCaseLiteMatchIP6Contains", func(b *testing.B) {
+func BenchmarkWorstCaseMatch6(b *testing.B) {
+	b.Run("Lite.Contains", func(b *testing.B) {
 		lite := new(Lite)
 		for _, p := range worstCasePfxsIP6 {
 			lite.Insert(p)
@@ -571,7 +571,7 @@ func BenchmarkWorstCaseIP6Match(b *testing.B) {
 		}
 	})
 
-	b.Run("WorstCaseMatchIP6Contains", func(b *testing.B) {
+	b.Run("Table.Contains", func(b *testing.B) {
 		tbl := new(Table[string])
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())
@@ -583,7 +583,7 @@ func BenchmarkWorstCaseIP6Match(b *testing.B) {
 		}
 	})
 
-	b.Run("WorstCaseMatchIP6Lookup", func(b *testing.B) {
+	b.Run("Lookup", func(b *testing.B) {
 		tbl := new(Table[string])
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())
@@ -595,7 +595,7 @@ func BenchmarkWorstCaseIP6Match(b *testing.B) {
 		}
 	})
 
-	b.Run("WorstCaseMatchIP6LookupPrefix", func(b *testing.B) {
+	b.Run("LookupPrefix", func(b *testing.B) {
 		tbl := new(Table[string])
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())
@@ -607,7 +607,7 @@ func BenchmarkWorstCaseIP6Match(b *testing.B) {
 		}
 	})
 
-	b.Run("WorstCaseMatchIP6LookupPrefixLPM", func(b *testing.B) {
+	b.Run("LookupPrefixLPM", func(b *testing.B) {
 		tbl := new(Table[string])
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())
@@ -620,8 +620,8 @@ func BenchmarkWorstCaseIP6Match(b *testing.B) {
 	})
 }
 
-func BenchmarkWorstCaseIP6Miss(b *testing.B) {
-	b.Run("WorstCaseLiteMissIP6Contains", func(b *testing.B) {
+func BenchmarkWorstCaseMiss6(b *testing.B) {
+	b.Run("Lite.Contains", func(b *testing.B) {
 		lite := new(Lite)
 		for _, p := range worstCasePfxsIP6 {
 			lite.Insert(p)
@@ -635,7 +635,7 @@ func BenchmarkWorstCaseIP6Miss(b *testing.B) {
 		}
 	})
 
-	b.Run("WorstCaseMissIP6Contains", func(b *testing.B) {
+	b.Run("Table.Contains", func(b *testing.B) {
 		tbl := new(Table[string])
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())
@@ -649,7 +649,7 @@ func BenchmarkWorstCaseIP6Miss(b *testing.B) {
 		}
 	})
 
-	b.Run("WorstCaseMissIP6Lookup", func(b *testing.B) {
+	b.Run("Lookup", func(b *testing.B) {
 		tbl := new(Table[string])
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())
@@ -663,7 +663,7 @@ func BenchmarkWorstCaseIP6Miss(b *testing.B) {
 		}
 	})
 
-	b.Run("WorstCaseMissIP6LookupPrefix", func(b *testing.B) {
+	b.Run("LookupPrefix", func(b *testing.B) {
 		tbl := new(Table[string])
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())
@@ -677,7 +677,7 @@ func BenchmarkWorstCaseIP6Miss(b *testing.B) {
 		}
 	})
 
-	b.Run("WorstCaseMissIP6LookupPrefixLPM", func(b *testing.B) {
+	b.Run("LookupPrefixLPM", func(b *testing.B) {
 		tbl := new(Table[string])
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())
