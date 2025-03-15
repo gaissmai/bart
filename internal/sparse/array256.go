@@ -65,7 +65,7 @@ func (a *Array256[T]) UpdateAt(i uint, cb func(T, bool) T) (newValue T, wasPrese
 	}
 
 	// new value, insert into bitset ...
-	a.BitSet256.Set(i)
+	a.BitSet256.MustSet(i)
 
 	// bitset has changed, recalc rank
 	rank0 = a.Rank0(i)
@@ -105,7 +105,7 @@ func (a *Array256[T]) InsertAt(i uint, value T) (exists bool) {
 	}
 
 	// new, insert into bitset ...
-	a.BitSet256.Set(i)
+	a.BitSet256.MustSet(i)
 
 	// ... and slice
 	a.insertItem(a.Rank0(i), value)
@@ -126,7 +126,7 @@ func (a *Array256[T]) DeleteAt(i uint) (value T, exists bool) {
 	a.deleteItem(rank0)
 
 	// delete from bitset
-	a.BitSet256.Clear(i)
+	a.BitSet256.MustClear(i)
 
 	return value, true
 }

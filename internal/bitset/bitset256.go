@@ -7,25 +7,26 @@
 // Studied [github.com/bits-and-blooms/bitset] inside out
 // and rewrote needed parts from scratch for this project.
 //
-// This implementation is optimized for the needed use case.
+// This implementation is heavily optimized for this internal use case.
 package bitset
 
 //  can inline (*BitSet256).All with cost 56
 //  can inline (*BitSet256).AsSlice with cost 50
-//  can inline (*BitSet256).Clear with cost 12
 //  can inline (*BitSet256).FirstSet with cost 79
-//  can inline (*BitSet256).IntersectionCardinality with cost 57
+//  can inline (*BitSet256).IntersectionCardinality with cost 53
 //  can inline (*BitSet256).IntersectionTop with cost 42
 //  can inline (*BitSet256).Intersection with cost 53
 //  can inline (*BitSet256).IntersectsAny with cost 48
 //  can inline (*BitSet256).IsEmpty with cost 28
+//  can inline (*BitSet256).MustClear with cost 12
+//  can inline (*BitSet256).MustSet with cost 12
 //  can inline (*BitSet256).NextSet with cost 73
 //  can inline (*BitSet256).popcnt with cost 33
-//  can inline (*BitSet256).Rank0 with cost 63
-//  can inline (*BitSet256).Set with cost 12
+//  can inline (*BitSet256).Rank0 with cost 65
 //  can inline (*BitSet256).Size with cost 36
 //  can inline (*BitSet256).Test with cost 28
 //  can inline (*BitSet256).Union with cost 53
+//  cannot inline (*BitSet256).String: function too complex: cost 121 exceeds budget 80
 
 import (
 	"fmt"
@@ -56,17 +57,17 @@ func (b *BitSet256) String() string {
 	return fmt.Sprint(b.All())
 }
 
-// Set the bit, must panic if bit is > 255 by intention!
-func (b *BitSet256) Set(bit uint) {
+// MustSet, sets the bit, it panic's if bit is > 255 by intention!
+func (b *BitSet256) MustSet(bit uint) {
 	b[bit>>6] |= 1 << (bit & 63)
 }
 
-// Clear the bit, must panic if bit is > 255 by intention!
-func (b *BitSet256) Clear(bit uint) {
+// MustClear, clear the bit, it panic's if bit is > 255 by intention!
+func (b *BitSet256) MustClear(bit uint) {
 	b[bit>>6] &^= 1 << (bit & 63)
 }
 
-// Test if bit is set.
+// Test if the bit is set.
 func (b *BitSet256) Test(bit uint) (ok bool) {
 	if x := int(bit >> 6); x < 4 {
 		return b[x&3]&(1<<(bit&63)) != 0 // [x&3] is bounds check elimination (BCE)
@@ -180,7 +181,7 @@ func (b *BitSet256) Rank0(idx uint) (rnk int) {
 
 	// ... plus partial word at wIdx,
 	if wIdx < 4 {
-		rnk += bits.OnesCount64(b[wIdx&3] & mask[idx&63]) // with BCE
+		rnk += bits.OnesCount64(b[wIdx&3] << (64 - idx&63))
 	}
 
 	// decrement for offset by one
@@ -191,10 +192,10 @@ func (b *BitSet256) Rank0(idx uint) (rnk int) {
 
 // IsEmpty returns true if no bit is set.
 func (b *BitSet256) IsEmpty() bool {
-	return b[0] == 0 &&
-		b[1] == 0 &&
+	return b[3] == 0 &&
 		b[2] == 0 &&
-		b[3] == 0
+		b[1] == 0 &&
+		b[0] == 0
 }
 
 // IntersectsAny returns true if the intersection of base set with the compare set

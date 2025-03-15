@@ -81,7 +81,7 @@ func (l *Lite) Delete(pfx netip.Prefix) {
 
 		// delete prefix in trie node
 		if depth == lastIdx {
-			n.prefixes.Clear(art.PfxToIdx(octet, lastBits))
+			n.prefixes.MustClear(art.PfxToIdx(octet, lastBits))
 			n.purgeAndCompress(stack[:depth], octets, is4)
 			return
 		}

@@ -46,7 +46,7 @@ func (n *liteNode) insertAtDepth(pfx netip.Prefix, depth int) {
 
 		// last significant octet: set prefix idx in node
 		if depth == lastIdx {
-			n.prefixes.Set(art.PfxToIdx(octet, lastBits))
+			n.prefixes.MustSet(art.PfxToIdx(octet, lastBits))
 			return
 		}
 
