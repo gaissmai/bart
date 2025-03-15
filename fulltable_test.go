@@ -51,9 +51,11 @@ var (
 
 func BenchmarkFullMatchV4(b *testing.B) {
 	var rt Table[int]
+	var lt Lite
 
 	for i, route := range routes {
 		rt.Insert(route.CIDR, i)
+		lt.Insert(route.CIDR)
 	}
 
 	var ip netip.Addr
@@ -68,6 +70,13 @@ func BenchmarkFullMatchV4(b *testing.B) {
 			break
 		}
 	}
+
+	b.Run("Lite.Contains", func(b *testing.B) {
+		b.ResetTimer()
+		for range b.N {
+			okSink = lt.Contains(ip)
+		}
+	})
 
 	b.Run("Contains", func(b *testing.B) {
 		b.ResetTimer()
@@ -100,9 +109,11 @@ func BenchmarkFullMatchV4(b *testing.B) {
 
 func BenchmarkFullMatchV6(b *testing.B) {
 	var rt Table[int]
+	var lt Lite
 
 	for i, route := range routes {
 		rt.Insert(route.CIDR, i)
+		lt.Insert(route.CIDR)
 	}
 
 	var ip netip.Addr
@@ -117,6 +128,13 @@ func BenchmarkFullMatchV6(b *testing.B) {
 			break
 		}
 	}
+
+	b.Run("Lite.Contains", func(b *testing.B) {
+		b.ResetTimer()
+		for range b.N {
+			okSink = lt.Contains(ip)
+		}
+	})
 
 	b.Run("Contains", func(b *testing.B) {
 		b.ResetTimer()
@@ -149,9 +167,11 @@ func BenchmarkFullMatchV6(b *testing.B) {
 
 func BenchmarkFullMissV4(b *testing.B) {
 	var rt Table[int]
+	var lt Lite
 
 	for i, route := range routes {
 		rt.Insert(route.CIDR, i)
+		lt.Insert(route.CIDR)
 	}
 
 	var ip netip.Addr
@@ -166,6 +186,13 @@ func BenchmarkFullMissV4(b *testing.B) {
 			break
 		}
 	}
+
+	b.Run("Lite.Contains", func(b *testing.B) {
+		b.ResetTimer()
+		for range b.N {
+			okSink = lt.Contains(ip)
+		}
+	})
 
 	b.Run("Contains", func(b *testing.B) {
 		b.ResetTimer()
@@ -198,9 +225,11 @@ func BenchmarkFullMissV4(b *testing.B) {
 
 func BenchmarkFullMissV6(b *testing.B) {
 	var rt Table[int]
+	var lt Lite
 
 	for i, route := range routes {
 		rt.Insert(route.CIDR, i)
+		lt.Insert(route.CIDR)
 	}
 
 	var ip netip.Addr
@@ -215,6 +244,13 @@ func BenchmarkFullMissV6(b *testing.B) {
 			break
 		}
 	}
+
+	b.Run("Lite.Contains", func(b *testing.B) {
+		b.ResetTimer()
+		for range b.N {
+			okSink = lt.Contains(ip)
+		}
+	})
 
 	b.Run("Contains", func(b *testing.B) {
 		b.ResetTimer()
@@ -364,9 +400,10 @@ func BenchmarkFullTableMemoryV4(b *testing.B) {
 
 		stats := rt.root4.nodeStatsRec()
 		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc)/1024, "KByte")
-		b.ReportMetric(float64(stats.pfxs), "pfxs")
-		b.ReportMetric(float64(stats.nodes), "nodes")
-		b.ReportMetric(float64(stats.leaves), "leaves")
+		b.ReportMetric(float64(stats.pfxs), "pfx")
+		b.ReportMetric(float64(stats.nodes), "node")
+		b.ReportMetric(float64(stats.leaves), "leave")
+		b.ReportMetric(float64(stats.fringes), "fringe")
 		b.ReportMetric(0, "ns/op")
 	})
 }
@@ -390,9 +427,10 @@ func BenchmarkFullTableMemoryV6(b *testing.B) {
 
 		stats := rt.root6.nodeStatsRec()
 		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc)/1024, "KByte")
-		b.ReportMetric(float64(stats.pfxs), "pfxs")
-		b.ReportMetric(float64(stats.nodes), "nodes")
-		b.ReportMetric(float64(stats.leaves), "leaves")
+		b.ReportMetric(float64(stats.pfxs), "pfx")
+		b.ReportMetric(float64(stats.nodes), "node")
+		b.ReportMetric(float64(stats.leaves), "leave")
+		b.ReportMetric(float64(stats.fringes), "fringe")
 		b.ReportMetric(0, "ns/op")
 	})
 }
@@ -425,9 +463,10 @@ func BenchmarkFullTableMemory(b *testing.B) {
 		}
 
 		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc)/1024, "KByte")
-		b.ReportMetric(float64(stats.pfxs), "pfxs")
-		b.ReportMetric(float64(stats.nodes), "nodes")
-		b.ReportMetric(float64(stats.leaves), "leaves")
+		b.ReportMetric(float64(stats.pfxs), "pfx")
+		b.ReportMetric(float64(stats.nodes), "node")
+		b.ReportMetric(float64(stats.leaves), "leave")
+		b.ReportMetric(float64(stats.fringes), "fringe")
 		b.ReportMetric(0, "ns/op")
 	})
 }
