@@ -156,7 +156,7 @@ func (b *BitSet256) IntersectionTop(c *BitSet256) (top uint, ok bool) {
 // Rank0 is equal to Rank(idx) - 1
 // it panics if the idx is > 255
 func (b *BitSet256) Rank0(idx uint) (rnk int) {
-	m := rankMask[idx]
+	m := rankMask[idx&0xff] // BCE
 	rnk += bits.OnesCount64(b[0] & m[0])
 	rnk += bits.OnesCount64(b[1] & m[1])
 	rnk += bits.OnesCount64(b[2] & m[2])
