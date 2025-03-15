@@ -130,7 +130,7 @@ func (l *Lite) Contains(ip netip.Addr) bool {
 		addr := uint(octet)
 
 		// for contains, any lpm match is good enough, no backtracking needed
-		if n.lpmTest(art.HostIdx(addr)) {
+		if !n.prefixes.IsEmpty() && n.lpmTest(art.HostIdx(addr)) {
 			return true
 		}
 
