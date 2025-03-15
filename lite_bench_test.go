@@ -132,14 +132,14 @@ func BenchmarkLiteFullTableMemoryV4(b *testing.B) {
 func BenchmarkLiteFullTableMemoryV6(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 
-	rt := new(Lite)
+	lite := new(Lite)
 	runtime.GC()
 	runtime.ReadMemStats(&startMem)
 
 	b.Run(strconv.Itoa(len(routes6)), func(b *testing.B) {
 		for range b.N {
 			for _, route := range routes6 {
-				rt.Insert(route.CIDR)
+				lite.Insert(route.CIDR)
 			}
 		}
 
@@ -154,14 +154,14 @@ func BenchmarkLiteFullTableMemoryV6(b *testing.B) {
 func BenchmarkLiteFullTableMemory(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 
-	rt := new(Lite)
+	lite := new(Lite)
 	runtime.GC()
 	runtime.ReadMemStats(&startMem)
 
 	b.Run(strconv.Itoa(len(routes)), func(b *testing.B) {
 		for range b.N {
 			for _, route := range routes {
-				rt.Insert(route.CIDR)
+				lite.Insert(route.CIDR)
 			}
 		}
 
