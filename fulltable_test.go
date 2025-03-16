@@ -12,7 +12,6 @@ import (
 	"net/netip"
 	"os"
 	"runtime"
-	"strconv"
 	"strings"
 	"testing"
 )
@@ -388,10 +387,33 @@ func BenchmarkFullTableMemory4(b *testing.B) {
 	runtime.GC()
 	runtime.ReadMemStats(&startMem)
 
-	b.Run(strconv.Itoa(len(routes4)), func(b *testing.B) {
+	b.Run(fmt.Sprintf("Table[]: %d", len(routes4)), func(b *testing.B) {
 		for range b.N {
 			for _, route := range routes4 {
 				rt.Insert(route.CIDR, struct{}{})
+			}
+		}
+
+		runtime.GC()
+		runtime.ReadMemStats(&endMem)
+
+		stats := rt.root4.nodeStatsRec()
+		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc)/1024, "KByte")
+		b.ReportMetric(float64(stats.pfxs), "pfx")
+		b.ReportMetric(float64(stats.nodes), "node")
+		b.ReportMetric(float64(stats.leaves), "leave")
+		b.ReportMetric(float64(stats.fringes), "fringe")
+		b.ReportMetric(0, "ns/op")
+	})
+
+	lt := new(Lite)
+	runtime.GC()
+	runtime.ReadMemStats(&startMem)
+
+	b.Run(fmt.Sprintf("Lite: %d", len(routes4)), func(b *testing.B) {
+		for range b.N {
+			for _, route := range routes4 {
+				lt.Insert(route.CIDR)
 			}
 		}
 
@@ -415,10 +437,33 @@ func BenchmarkFullTableMemory6(b *testing.B) {
 	runtime.GC()
 	runtime.ReadMemStats(&startMem)
 
-	b.Run(strconv.Itoa(len(routes6)), func(b *testing.B) {
+	b.Run(fmt.Sprintf("Table[]: %d", len(routes6)), func(b *testing.B) {
 		for range b.N {
 			for _, route := range routes6 {
 				rt.Insert(route.CIDR, struct{}{})
+			}
+		}
+
+		runtime.GC()
+		runtime.ReadMemStats(&endMem)
+
+		stats := rt.root6.nodeStatsRec()
+		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc)/1024, "KByte")
+		b.ReportMetric(float64(stats.pfxs), "pfx")
+		b.ReportMetric(float64(stats.nodes), "node")
+		b.ReportMetric(float64(stats.leaves), "leave")
+		b.ReportMetric(float64(stats.fringes), "fringe")
+		b.ReportMetric(0, "ns/op")
+	})
+
+	lt := new(Lite)
+	runtime.GC()
+	runtime.ReadMemStats(&startMem)
+
+	b.Run(fmt.Sprintf("Lite: %d", len(routes6)), func(b *testing.B) {
+		for range b.N {
+			for _, route := range routes6 {
+				lt.Insert(route.CIDR)
 			}
 		}
 
@@ -442,10 +487,42 @@ func BenchmarkFullTableMemory(b *testing.B) {
 	runtime.GC()
 	runtime.ReadMemStats(&startMem)
 
-	b.Run(strconv.Itoa(len(routes)), func(b *testing.B) {
+	b.Run(fmt.Sprintf("Table[]: %d", len(routes)), func(b *testing.B) {
 		for range b.N {
 			for _, route := range routes {
 				rt.Insert(route.CIDR, struct{}{})
+			}
+		}
+
+		runtime.GC()
+		runtime.ReadMemStats(&endMem)
+
+		s4 := rt.root4.nodeStatsRec()
+		s6 := rt.root6.nodeStatsRec()
+		stats := stats{
+			s4.pfxs + s6.pfxs,
+			s4.childs + s6.childs,
+			s4.nodes + s6.nodes,
+			s4.leaves + s6.leaves,
+			s4.fringes + s6.fringes,
+		}
+
+		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc)/1024, "KByte")
+		b.ReportMetric(float64(stats.pfxs), "pfx")
+		b.ReportMetric(float64(stats.nodes), "node")
+		b.ReportMetric(float64(stats.leaves), "leave")
+		b.ReportMetric(float64(stats.fringes), "fringe")
+		b.ReportMetric(0, "ns/op")
+	})
+
+	lt := new(Lite)
+	runtime.GC()
+	runtime.ReadMemStats(&startMem)
+
+	b.Run(fmt.Sprintf("Lite: %d", len(routes)), func(b *testing.B) {
+		for range b.N {
+			for _, route := range routes {
+				lt.Insert(route.CIDR)
 			}
 		}
 
