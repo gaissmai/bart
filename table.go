@@ -81,7 +81,7 @@ func (t *Table[V]) rootNodeByVersion(is4 bool) *node[V] {
 //	 /32 and /128 are special, they never form a new node, they are always inserted
 //	 as path-compressed leaf, so the max-depth of the trie is still 4 and 16
 func lastOctetIdxAndBits(bits int) (lastIdx, lastBits int) {
-	return bits >> 3, bits % 8
+	return bits >> 3, bits & 7
 }
 
 // Insert adds pfx to the tree, with given val.
