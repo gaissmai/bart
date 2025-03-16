@@ -5,7 +5,7 @@ package lpmbt
 
 import "github.com/gaissmai/bart/internal/bitset"
 
-// LookupTbl is the backtracking sequence in the complete binary tree
+// BackTrackingBitset is the backtracking sequence in the complete binary tree
 // of the prefixes (mapped by the base_index function) as bitstring.
 //
 //	for idx := 1; idx > 0; idx >>= 1 { b.Set(idx) }
@@ -26,7 +26,11 @@ import "github.com/gaissmai/bart/internal/bitset"
 //		}
 //		return false
 //	}
-var LookupTbl = [512]*bitset.BitSet256{
+func BackTrackingBitset(idx uint) *bitset.BitSet256 {
+	return &lookupTbl[idx&511] // &511 is BCE
+}
+
+var lookupTbl = [512]bitset.BitSet256{
 	/* idx:   0 */ {0x0, 0x0, 0x0, 0x0}, // invalid
 	/* idx:   1 */ {0x2, 0x0, 0x0, 0x0}, // [1]
 	/* idx:   2 */ {0x6, 0x0, 0x0, 0x0}, // [1 2]
