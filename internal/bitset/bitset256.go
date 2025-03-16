@@ -22,7 +22,7 @@ package bitset
 //  can inline (*BitSet256).MustSet with cost 12
 //  can inline (*BitSet256).NextSet with cost 73
 //  can inline (*BitSet256).popcnt with cost 33
-//  can inline (*BitSet256).Rank0 with cost 65
+//  can inline (*BitSet256).Rank0 with cost 64
 //  can inline (*BitSet256).Size with cost 36
 //  can inline (*BitSet256).Test with cost 28
 //  can inline (*BitSet256).Union with cost 53
@@ -155,13 +155,12 @@ func (b *BitSet256) IntersectionTop(c *BitSet256) (top uint, ok bool) {
 }
 
 // Rank0 is equal to Rank(idx) - 1
-// it panics if the idx is > 255
+// If idx > 255 it does NOT PANIC, the bounds check is eliminated for speed!
 func (b *BitSet256) Rank0(idx uint) (rnk int) {
-	m := rankMask[idx&0xff] // BCE
-	rnk += bits.OnesCount64(b[0] & m[0])
-	rnk += bits.OnesCount64(b[1] & m[1])
-	rnk += bits.OnesCount64(b[2] & m[2])
-	rnk += bits.OnesCount64(b[3] & m[3])
+	rnk += bits.OnesCount64(b[0] & rankMask[uint8(idx)][0]) // uint8() is BCE
+	rnk += bits.OnesCount64(b[1] & rankMask[uint8(idx)][1])
+	rnk += bits.OnesCount64(b[2] & rankMask[uint8(idx)][2])
+	rnk += bits.OnesCount64(b[3] & rankMask[uint8(idx)][3])
 	rnk--
 	return
 }
@@ -250,12 +249,15 @@ func (b *BitSet256) popcnt() (cnt int) {
 	return
 }
 
-var rankMask = [256]*BitSet256{
-	/*   0 */ {0x1, 0x0, 0x0, 0x0},
-	/*   1 */ {0x3, 0x0, 0x0, 0x0},
-	/*   2 */ {0x7, 0x0, 0x0, 0x0},
-	/*   3 */ {0xf, 0x0, 0x0, 0x0},
-	/*   4 */ {0x1f, 0x0, 0x0, 0x0},
+// rankMask, all 1 until and including bit pos, the rest is zero, example:
+//
+//	bs.Rank0(7) = popcnt(bs & rankMask[7]) and rankMask[7] = 0000...0000_1111_1111
+var rankMask = [256]BitSet256{
+	/*   0 */ {0x1, 0x0, 0x0, 0x0}, // 256 bits: 0000...0_0001
+	/*   1 */ {0x3, 0x0, 0x0, 0x0}, // 256 bits: 0000...0_0011
+	/*   2 */ {0x7, 0x0, 0x0, 0x0}, // 256 bits: 0000...0_0111
+	/*   3 */ {0xf, 0x0, 0x0, 0x0}, // 256 bits: 0000...0_1111
+	/*   4 */ {0x1f, 0x0, 0x0, 0x0}, // ...
 	/*   5 */ {0x3f, 0x0, 0x0, 0x0},
 	/*   6 */ {0x7f, 0x0, 0x0, 0x0},
 	/*   7 */ {0xff, 0x0, 0x0, 0x0},
