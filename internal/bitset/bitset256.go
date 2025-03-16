@@ -154,13 +154,18 @@ func (b *BitSet256) IntersectionTop(c *BitSet256) (top uint, ok bool) {
 	return
 }
 
-// Rank0 is equal to Rank(idx) - 1
-// If idx > 255 it does NOT PANIC, the bounds check is eliminated for speed!
+// Rank0 returns the set bits up to and including to idx, minus 1.
+//
+// Rank0 is used in the hot path, if idx > 255 it does NOT PANIC,
+// the bounds check is eliminated, we press the pedal to the metal!
 func (b *BitSet256) Rank0(idx uint) (rnk int) {
 	rnk += bits.OnesCount64(b[0] & rankMask[uint8(idx)][0]) // uint8() is BCE
 	rnk += bits.OnesCount64(b[1] & rankMask[uint8(idx)][1])
 	rnk += bits.OnesCount64(b[2] & rankMask[uint8(idx)][2])
 	rnk += bits.OnesCount64(b[3] & rankMask[uint8(idx)][3])
+
+	// Rank0: if bit 0 is set, Rank(0) is 1 (up to and including), but
+	// here it's only used as slice index, so we decrement it already by 1.
 	rnk--
 	return
 }
@@ -251,7 +256,7 @@ func (b *BitSet256) popcnt() (cnt int) {
 
 // rankMask, all 1 until and including bit pos, the rest is zero, example:
 //
-//	bs.Rank0(7) = popcnt(bs & rankMask[7]) and rankMask[7] = 0000...0000_1111_1111
+//	bs.Rank(7) = popcnt(bs & rankMask[7]) and rankMask[7] = 0000...0000_1111_1111
 var rankMask = [256]BitSet256{
 	/*   0 */ {0x1, 0x0, 0x0, 0x0}, // 256 bits: 0000...0_0001
 	/*   1 */ {0x3, 0x0, 0x0, 0x0}, // 256 bits: 0000...0_0011

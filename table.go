@@ -16,6 +16,11 @@
 // together with path compression. This reduces storage consumption
 // by almost two orders of magnitude in comparison to ART with
 // even better lookup times for the longest prefix match.
+//
+// The stride length was specially chosen so that the algorithm can be
+// implemented with a bitset of a fixed length of 256 bits. This has
+// the advantage that a bitset fits into a cache line and that loop-unrolling
+// can be performed with as few branches as possible.
 package bart
 
 import (
@@ -80,6 +85,16 @@ func (t *Table[V]) rootNodeByVersion(is4 bool) *node[V] {
 //
 //	 /32 and /128 are special, they never form a new node, they are always inserted
 //	 as path-compressed leaf, so the max-depth of the trie is still 4 or 16 (v4/v6)
+//
+// We are not splitting at /8, /16, ..., because this would mean that the
+// first node would have 512 prefixes, bits from [0-8]. All remaining nodes
+// would then only have 256 prefixes, e.g. bits from [9-16], [17-24], ...
+// but the algorithm would then require a variable bitset.
+// If you can commit to a fixed size of [4]uint64, then the algorithm will
+// be much faster due to modern CPUs.
+//
+// One could also imagine special hardware, since the actual algorithm consists
+// of a few standardized bitset operations on a fixed length of 256 bits.
 func lastOctetIdxAndBits(bits int) (lastIdx, lastBits int) {
 	return bits >> 3, bits & 7
 }
