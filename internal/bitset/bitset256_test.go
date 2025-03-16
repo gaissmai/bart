@@ -90,7 +90,24 @@ func TestTest(t *testing.T) {
 	var b BitSet256
 	b.MustSet(100)
 	if !b.Test(100) {
-		t.Errorf("Bit %d is clear, and it shouldn't be.", 100)
+		t.Errorf("Test(%d) is false", 100)
+	}
+	if b.Test(1_000) {
+		t.Errorf("Test(%d) is true", 1_000)
+	}
+}
+
+func TestString(t *testing.T) {
+	t.Parallel()
+	bs := BitSet256{}
+	bs.MustSet(0)
+	bs.MustSet(42)
+	bs.MustSet(255)
+
+	want := "[0 42 255]"
+	got := bs.String()
+	if got != want {
+		t.Errorf("String(), expectet: %s, got: %s", want, got)
 	}
 }
 
@@ -130,6 +147,18 @@ func TestFirstSet(t *testing.T) {
 			name:    "2. word",
 			set:     []uint{70, 255},
 			wantIdx: 70,
+			wantOk:  true,
+		},
+		{
+			name:    "3. word",
+			set:     []uint{150, 255},
+			wantIdx: 150,
+			wantOk:  true,
+		},
+		{
+			name:    "4. word",
+			set:     []uint{233, 255},
+			wantIdx: 233,
 			wantOk:  true,
 		},
 	}
@@ -219,6 +248,14 @@ func TestNextSet(t *testing.T) {
 			start:   2,
 			wantIdx: 70,
 			wantOk:  true,
+		},
+		{
+			name:    "out of bounds",
+			set:     []uint{1, 70, 255},
+			del:     []uint{},
+			start:   300,
+			wantIdx: 0,
+			wantOk:  false,
 		},
 	}
 

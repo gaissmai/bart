@@ -157,3 +157,65 @@ func TestIdxToPfx(t *testing.T) {
 		}
 	}
 }
+
+func TestIdxToRange(t *testing.T) {
+	testCases := []struct {
+		idx       uint
+		wantFirst uint8
+		wantLast  uint8
+	}{
+		{
+			idx:       0, // invalid, but not catched
+			wantFirst: 0,
+			wantLast:  255,
+		},
+		{
+			idx:       1,
+			wantFirst: 0,
+			wantLast:  255,
+		},
+		{
+			idx:       2,
+			wantFirst: 0,
+			wantLast:  127,
+		},
+		{
+			idx:       3,
+			wantFirst: 128,
+			wantLast:  255,
+		},
+		{
+			idx:       4,
+			wantFirst: 0,
+			wantLast:  63,
+		},
+		{
+			idx:       8,
+			wantFirst: 0,
+			wantLast:  31,
+		},
+		{
+			idx:       81,
+			wantFirst: 68,
+			wantLast:  71,
+		},
+		{
+			idx:       510,
+			wantFirst: 254,
+			wantLast:  254,
+		},
+		{
+			idx:       511,
+			wantFirst: 255,
+			wantLast:  255,
+		},
+	}
+
+	for _, tc := range testCases {
+		gotFirst, gotLast := IdxToRange(tc.idx)
+		if gotFirst != tc.wantFirst || gotLast != tc.wantLast {
+			t.Errorf("IdxToRange(%d), want: (%d, %d), got: (%d, %d)",
+				tc.idx, tc.wantFirst, tc.wantLast, gotFirst, gotLast)
+		}
+	}
+}
