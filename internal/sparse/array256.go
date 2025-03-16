@@ -36,7 +36,7 @@ func (a *Array256[T]) Get(i uint) (value T, ok bool) {
 }
 
 // MustGet, use it only after a successful test
-// or the behavior is undefined, maybe it panics.
+// or the behavior is undefined, it will NOT PANIC.
 func (a *Array256[T]) MustGet(i uint) T {
 	return a.Items[a.Rank0(i)]
 }
