@@ -49,7 +49,7 @@ var (
 	boolSink bool
 )
 
-func BenchmarkFullMatchV4(b *testing.B) {
+func BenchmarkFullMatch4(b *testing.B) {
 	var rt Table[int]
 	var lt Lite
 
@@ -99,7 +99,7 @@ func BenchmarkFullMatchV4(b *testing.B) {
 		}
 	})
 
-	b.Run("LookupPrefixLPM", func(b *testing.B) {
+	b.Run("LookupPfxLPM", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
 			_, intSink, okSink = rt.LookupPrefixLPM(ipAsPfx)
@@ -107,7 +107,7 @@ func BenchmarkFullMatchV4(b *testing.B) {
 	})
 }
 
-func BenchmarkFullMatchV6(b *testing.B) {
+func BenchmarkFullMatch6(b *testing.B) {
 	var rt Table[int]
 	var lt Lite
 
@@ -157,7 +157,7 @@ func BenchmarkFullMatchV6(b *testing.B) {
 		}
 	})
 
-	b.Run("LookupPrefixLPM", func(b *testing.B) {
+	b.Run("LookupPfxLPM", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
 			_, intSink, okSink = rt.LookupPrefixLPM(ipAsPfx)
@@ -165,7 +165,7 @@ func BenchmarkFullMatchV6(b *testing.B) {
 	})
 }
 
-func BenchmarkFullMissV4(b *testing.B) {
+func BenchmarkFullMiss4(b *testing.B) {
 	var rt Table[int]
 	var lt Lite
 
@@ -215,7 +215,7 @@ func BenchmarkFullMissV4(b *testing.B) {
 		}
 	})
 
-	b.Run("LookupPrefixLPM", func(b *testing.B) {
+	b.Run("LookupPfxLPM", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
 			_, intSink, okSink = rt.LookupPrefixLPM(ipAsPfx)
@@ -223,7 +223,7 @@ func BenchmarkFullMissV4(b *testing.B) {
 	})
 }
 
-func BenchmarkFullMissV6(b *testing.B) {
+func BenchmarkFullMiss6(b *testing.B) {
 	var rt Table[int]
 	var lt Lite
 
@@ -273,7 +273,7 @@ func BenchmarkFullMissV6(b *testing.B) {
 		}
 	})
 
-	b.Run("LookupPrefixLPM", func(b *testing.B) {
+	b.Run("LookupPfxLPM", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
 			_, intSink, okSink = rt.LookupPrefixLPM(ipAsPfx)
@@ -281,7 +281,7 @@ func BenchmarkFullMissV6(b *testing.B) {
 	})
 }
 
-func BenchmarkFullTableOverlapsV4(b *testing.B) {
+func BenchmarkFullTableOverlaps4(b *testing.B) {
 	var rt Table[int]
 
 	for i, route := range routes4 {
@@ -303,7 +303,7 @@ func BenchmarkFullTableOverlapsV4(b *testing.B) {
 	}
 }
 
-func BenchmarkFullTableOverlapsV6(b *testing.B) {
+func BenchmarkFullTableOverlaps6(b *testing.B) {
 	var rt Table[int]
 
 	for i, route := range routes6 {
@@ -381,7 +381,7 @@ func BenchmarkFullTableClone(b *testing.B) {
 	})
 }
 
-func BenchmarkFullTableMemoryV4(b *testing.B) {
+func BenchmarkFullTableMemory4(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 
 	rt := new(Table[struct{}])
@@ -408,7 +408,7 @@ func BenchmarkFullTableMemoryV4(b *testing.B) {
 	})
 }
 
-func BenchmarkFullTableMemoryV6(b *testing.B) {
+func BenchmarkFullTableMemory6(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 
 	rt := new(Table[struct{}])
