@@ -6,12 +6,8 @@
 
 package art
 
-const (
-	strideLen = 8 // octet
-
-	// baseIndex of the first host route 0/8: PfxToIdx(0,8)
-	firstHostIdx = 256
-)
+// split IP addrs into bytes
+const strideLen = 8
 
 //  can inline PfxLen with cost 10
 //  can inline HostIdx with cost 4
@@ -20,7 +16,7 @@ const (
 
 // HostIdx, just PfxToIdx(octet, 8) but faster.
 func HostIdx(octet uint) uint {
-	return octet + firstHostIdx
+	return 256 + octet
 }
 
 // PfxToIdx, maps a prefix table as a 'complete binary tree'.
@@ -31,15 +27,15 @@ func PfxToIdx(octet byte, prefixLen int) uint {
 // IdxToPfx returns the octet and prefix len of baseIdx.
 // It's the inverse to pfxToIdx.
 func IdxToPfx(idx uint) (octet byte, pfxLen int) {
-	return baseIdxLookupTbl[idx].octet, int(baseIdxLookupTbl[idx].pfxLen)
+	return baseIdxLookupTbl[idx&511].octet, int(baseIdxLookupTbl[idx&511].pfxLen) // &511 is BCE
 }
 
 // PfxLen, based on depth and idx.
 func PfxLen(depth int, idx uint) int {
-	return depth*strideLen + int(baseIdxLookupTbl[idx].pfxLen)
+	return depth*strideLen + int(baseIdxLookupTbl[idx&511].pfxLen) // &511 is BCE
 }
 
-// IdxToPfx returns the first and last octet of prefix idx.
+// IdxToRange returns the first and last octet of prefix idx.
 func IdxToRange(idx uint) (first, last uint8) {
 	first, pfxLen := IdxToPfx(idx)
 	last = first | ^NetMask(pfxLen)
