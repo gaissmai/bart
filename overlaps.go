@@ -159,7 +159,7 @@ func (n *node[V]) overlapsChildrenIn(o *node[V]) bool {
 
 	// union all pre alloted bitsets
 	for _, idx := range allIndices {
-		hostRoutes = hostRoutes.Union(allot.HostRoutesTbl[idx])
+		hostRoutes = hostRoutes.Union(allot.IdxToHostRoutes(idx))
 	}
 
 	return hostRoutes.IntersectsAny(&o.children.BitSet256)
@@ -280,13 +280,13 @@ func (n *node[V]) overlapsIdx(idx uint) bool {
 
 	// use bitset intersections instead of range loops
 	// shallow copy pre alloted bitset for idx
-	allotedPrefixRoutes := allot.PrefixRoutesTbl[idx]
+	allotedPrefixRoutes := allot.IdxToPrefixRoutes(idx)
 	if allotedPrefixRoutes.IntersectsAny(&n.prefixes.BitSet256) {
 		return true
 	}
 
 	// 3. Test if prefix overlaps any child in this node
 
-	allotedHostRoutes := allot.HostRoutesTbl[idx]
+	allotedHostRoutes := allot.IdxToHostRoutes(idx)
 	return allotedHostRoutes.IntersectsAny(&n.children.BitSet256)
 }
