@@ -60,10 +60,10 @@ func (t *Table[V]) rootNodeByVersion(is4 bool) *node[V] {
 // lastOctetIdxAndBits, get last significant octet Idx and remaining bits
 // for a given netip.Prefix.
 //
-// Split the IP prefixes at stride borders.
+// Split the IP prefixes at 8bit borders, count from 0.
 //
-//		  IPv4: [0-7],[8-15],[16-23],[24-31].[32]
-//		  IPv6: [0-7],[8-15],[16-23],[24-31],[32-39],[40-47],[48-55],[56-63],...,[120-127],[128]
+//	BitPos: [0-7],[8-15],[16-23],[24-31],[32]
+//	BitPos: [0-7],[8-15],[16-23],[24-31],[32-39],[40-47],[48-55],[56-63],...,[120-127],[128]
 //
 //			 0.0.0.0/0         => lastIdx:  0, lastBits: 0 (default route)
 //			 0.0.0.0/7         => lastIdx:  0, lastBits: 7
@@ -79,12 +79,12 @@ func (t *Table[V]) rootNodeByVersion(is4 bool) *node[V] {
 //			2001:db8::/56      => lastIdx:  7, lastBits: 0 (possible fringe)
 //
 //	 /32 and /128 are special, they never form a new node, they are always inserted
-//	 as path-compressed leaf, so the max-depth of the trie is still 4 and 16
+//	 as path-compressed leaf, so the max-depth of the trie is still 4 or 16 (v4/v6)
 func lastOctetIdxAndBits(bits int) (lastIdx, lastBits int) {
 	return bits >> 3, bits & 7
 }
 
-// Insert adds pfx to the tree, with given val.
+// Insert, add a pfx to the tree, with given val.
 // If pfx is already present in the tree, its value is set to val.
 func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	if !pfx.IsValid() {
