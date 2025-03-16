@@ -28,7 +28,7 @@ type liteLeaf struct {
 
 // lpmTest, true if idx has a (any) longest-prefix-match in node.
 func (n *liteNode) lpmTest(idx uint) bool {
-	return n.prefixes.IntersectsAny(lpmbt.LookupTbl[idx])
+	return n.prefixes.IntersectsAny(lpmbt.BackTrackingBitset(idx))
 }
 
 // insertAtDepth, see the similar method for node, but now simpler without payload V.

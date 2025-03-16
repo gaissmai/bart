@@ -704,7 +704,7 @@ LOOP:
 			idx := art.HostIdx(uint(octets[depth]))
 			// lpmGet(idx), manually inlined
 			// --------------------------------------------------------------
-			if topIdx, ok := n.prefixes.IntersectionTop(lpmbt.LookupTbl[idx]); ok {
+			if topIdx, ok := n.prefixes.IntersectionTop(lpmbt.BackTrackingBitset(idx)); ok {
 				return n.prefixes.MustGet(topIdx), true
 			}
 			// --------------------------------------------------------------
@@ -823,7 +823,7 @@ LOOP:
 		}
 
 		// manually inlined: lpmGet(idx)
-		if topIdx, ok := n.prefixes.IntersectionTop(lpmbt.LookupTbl[idx]); ok {
+		if topIdx, ok := n.prefixes.IntersectionTop(lpmbt.BackTrackingBitset(idx)); ok {
 			val = n.prefixes.MustGet(topIdx)
 
 			// called from LookupPrefix
