@@ -176,30 +176,31 @@ The lock-free versions of insert, update and delete are added, but still experim
 
 Please see the extensive [benchmarks](https://github.com/gaissmai/iprbench) comparing `bart` with other IP routing table implementations.
 
-Just a teaser, Contains and Lookups against the full Internet routing table with random IP address probes:
+Just a teaser, `Contains` and `Lookup` against the Tier1 full Internet routing table with
+random IP address probes:
 
 ```
 goos: linux
 goarch: amd64
 pkg: github.com/gaissmai/bart
 cpu: Intel(R) Core(TM) i5-8250U CPU @ 1.60GHz
-BenchmarkLiteFullMatchV4/Contains         	42745980	        25.08 ns/op
-BenchmarkLiteFullMatchV6/Contains         	100000000	        10.35 ns/op
-BenchmarkLiteFullMissV4/Contains          	131655165	         9.169 ns/op
-BenchmarkLiteFullMissV6/Contains          	229315086	         5.149 ns/op
+BenchmarkFullMatch4/Contains         	80015762	        14.54 ns/op
+BenchmarkFullMatch6/Contains         	93395781	        12.78 ns/op
+BenchmarkFullMiss4/Contains          	264677362	         4.562 ns/op
+BenchmarkFullMiss6/Contains          	250739491	         4.802 ns/op
 PASS
-ok  	github.com/gaissmai/bart	10.900s
+ok  	github.com/gaissmai/bart	11.834s
 
 goos: linux
 goarch: amd64
 pkg: github.com/gaissmai/bart
 cpu: Intel(R) Core(TM) i5-8250U CPU @ 1.60GHz
-BenchmarkFullMatchV4/Lookup         	44743172	        25.39 ns/op
-BenchmarkFullMatchV6/Lookup         	60503485	        19.02 ns/op
-BenchmarkFullMissV4/Lookup          	74727212	        14.74 ns/op
-BenchmarkFullMissV6/Lookup          	165774261	         7.259 ns/op
+BenchmarkFullMatch4/Lookup         	52176051	        22.44 ns/op
+BenchmarkFullMatch6/Lookup         	82442416	        14.50 ns/op
+BenchmarkFullMiss4/Lookup          	174474836	         6.881 ns/op
+BenchmarkFullMiss6/Lookup          	164121382	         7.340 ns/op
 PASS
-ok  	github.com/gaissmai/bart	11.130s
+ok  	github.com/gaissmai/bart	12.399s
 ```
 
 ## Compatibility Guarantees
