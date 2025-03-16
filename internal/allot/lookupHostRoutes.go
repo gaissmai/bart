@@ -5,13 +5,14 @@ package allot
 
 import "github.com/gaissmai/bart/internal/bitset"
 
-// HostRoutesTbl, as precalculated bitsets,
-// map the baseIndex to bitset with precomputed complete binary tree.
+// IdxToHostRoutes as precalculated bitsets,
 //
-//	  // 1 <= idx <= 255
+// Map the baseIndex to a bitset as a precomputed complete binary tree.
+//
+//	  // 1 <= idx <= 511
 //		func allotRec(aTbl *bitset.BitSet, idx uint) {
 //			aTbl = aTbl.Set(idx)
-//			if idx >= 255 {
+//			if idx > 255 {
 //				return
 //			}
 //			allotRec(aTbl, idx<<1)
@@ -20,11 +21,13 @@ import "github.com/gaissmai/bart/internal/bitset"
 //
 // Only used for fast bitset intersections instead of
 // range loops in table overlaps methods.
-//
-// Please read the ART paper ./doc/artlookup.pdf to understand the allotment algorithm.
+func IdxToHostRoutes(idx uint) *bitset.BitSet256 {
+	return &hostRoutesLookupTbl[idx&255] // &255 is BCE
+}
 
-// HostRoutesTbl, the second 256 Bits, see also the PrefixRoutesTbl for the first 256 Bits
-var HostRoutesTbl = [256]*bitset.BitSet256{
+// hostRoutesLookupTbl, the second 256 Bits, see also the pfxRoutesLookupTbl for the first 256 Bits
+// we split the 512 Bits to 2x256 for the BitSet256 optimizations.
+var hostRoutesLookupTbl = [256]bitset.BitSet256{
 	/* idx:   0 */ {0x0, 0x0, 0x0, 0x0}, // invalid
 	/* idx:   1 */ {0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff}, // [0 1 2 3 4 5 6 7 8 9 10 11 12 ...
 	/* idx:   2 */ {0xffffffffffffffff, 0xffffffffffffffff, 0x0, 0x0}, // [0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 ...
