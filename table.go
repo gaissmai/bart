@@ -23,7 +23,7 @@ import (
 	"net/netip"
 
 	"github.com/gaissmai/bart/internal/art"
-	"github.com/gaissmai/bart/internal/lpmbt"
+	"github.com/gaissmai/bart/internal/lpm"
 )
 
 // Table is an IPv4 and IPv6 routing table with payload V.
@@ -704,7 +704,7 @@ LOOP:
 			idx := art.HostIdx(uint(octets[depth]))
 			// lpmGet(idx), manually inlined
 			// --------------------------------------------------------------
-			if topIdx, ok := n.prefixes.IntersectionTop(lpmbt.BackTrackingBitset(idx)); ok {
+			if topIdx, ok := n.prefixes.IntersectionTop(lpm.BackTrackingBitset(idx)); ok {
 				return n.prefixes.MustGet(topIdx), true
 			}
 			// --------------------------------------------------------------
@@ -730,13 +730,13 @@ func (t *Table[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
 //
 // If LookupPrefixLPM is to be used for IP address lookups,
 // they must be converted to /32 or /128 prefixes.
-func (t *Table[V]) LookupPrefixLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) {
+func (t *Table[V]) LookupPrefixLPM(pfx netip.Prefix) (lpmPfx netip.Prefix, val V, ok bool) {
 	return t.lookupPrefixLPM(pfx, true)
 }
 
-func (t *Table[V]) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpm netip.Prefix, val V, ok bool) {
+func (t *Table[V]) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpmPfx netip.Prefix, val V, ok bool) {
 	if !pfx.IsValid() {
-		return lpm, val, false
+		return lpmPfx, val, false
 	}
 
 	// canonicalize the prefix
@@ -823,7 +823,7 @@ LOOP:
 		}
 
 		// manually inlined: lpmGet(idx)
-		if topIdx, ok := n.prefixes.IntersectionTop(lpmbt.BackTrackingBitset(idx)); ok {
+		if topIdx, ok := n.prefixes.IntersectionTop(lpm.BackTrackingBitset(idx)); ok {
 			val = n.prefixes.MustGet(topIdx)
 
 			// called from LookupPrefix
@@ -836,13 +836,13 @@ LOOP:
 			// get the pfxLen from depth and top idx
 			pfxLen := art.PfxLen(depth, topIdx)
 
-			// calculate the lpm from incoming ip and new mask
-			lpm, _ = ip.Prefix(pfxLen)
-			return lpm, val, ok
+			// calculate the lpmPfx from incoming ip and new mask
+			lpmPfx, _ = ip.Prefix(pfxLen)
+			return lpmPfx, val, ok
 		}
 	}
 
-	return lpm, val, false
+	return lpmPfx, val, false
 }
 
 // Supernets returns an iterator over all CIDRs covering pfx.

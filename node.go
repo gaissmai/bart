@@ -8,7 +8,7 @@ import (
 	"slices"
 
 	"github.com/gaissmai/bart/internal/art"
-	"github.com/gaissmai/bart/internal/lpmbt"
+	"github.com/gaissmai/bart/internal/lpm"
 	"github.com/gaissmai/bart/internal/sparse"
 )
 
@@ -276,7 +276,7 @@ func (n *node[V]) purgeAndCompress(parentStack []*node[V], childPath []uint8, is
 // for the respective idx.
 func (n *node[V]) lpmGet(idx uint) (baseIdx uint, val V, ok bool) {
 	// top is the idx of the longest-prefix-match
-	if top, ok := n.prefixes.IntersectionTop(lpmbt.BackTrackingBitset(idx)); ok {
+	if top, ok := n.prefixes.IntersectionTop(lpm.BackTrackingBitset(idx)); ok {
 		return top, n.prefixes.MustGet(top), true
 	}
 
@@ -287,7 +287,7 @@ func (n *node[V]) lpmGet(idx uint) (baseIdx uint, val V, ok bool) {
 // lpmTest, true if idx has a (any) longest-prefix-match in node.
 // this is a contains test, faster as lookup and without value returns.
 func (n *node[V]) lpmTest(idx uint) bool {
-	return n.prefixes.IntersectsAny(lpmbt.BackTrackingBitset(idx))
+	return n.prefixes.IntersectsAny(lpm.BackTrackingBitset(idx))
 }
 
 // cloneRec, clones the node recursive.

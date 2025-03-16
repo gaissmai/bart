@@ -8,7 +8,7 @@ import (
 
 	"github.com/gaissmai/bart/internal/art"
 	"github.com/gaissmai/bart/internal/bitset"
-	"github.com/gaissmai/bart/internal/lpmbt"
+	"github.com/gaissmai/bart/internal/lpm"
 	"github.com/gaissmai/bart/internal/sparse"
 )
 
@@ -26,9 +26,14 @@ type liteLeaf struct {
 	fringe bool
 }
 
+// isEmpty returns true if node has neither prefixes nor children
+func (n *liteNode) isEmpty() bool {
+	return n.prefixes.Size() == 0 && n.children.Len() == 0
+}
+
 // lpmTest, true if idx has a (any) longest-prefix-match in node.
 func (n *liteNode) lpmTest(idx uint) bool {
-	return n.prefixes.IntersectsAny(lpmbt.BackTrackingBitset(idx))
+	return n.prefixes.IntersectsAny(lpm.BackTrackingBitset(idx))
 }
 
 // insertAtDepth, see the similar method for node, but now simpler without payload V.
