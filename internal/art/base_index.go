@@ -21,9 +21,9 @@ func HostIdx(octet uint) uint {
 
 // PfxToIdx, maps a prefix table as a 'complete binary tree'.
 func PfxToIdx(octet byte, prefixLen int) uint {
-	// &7 and &15 are compiler optimization hints, that the shift amount is
-	// smaller than the width of the types (here 8 and IntSize)
-	return uint(octet>>((strideLen-prefixLen)&7)) + (1 << (prefixLen & 15))
+	// uint16() are compiler optimization hints, that the shift amount is
+	// smaller than the width of the types
+	return uint(octet>>uint16(strideLen-prefixLen)) + (1 << uint16(prefixLen))
 }
 
 // IdxToPfx returns the octet and prefix len of baseIdx.
@@ -56,7 +56,7 @@ func IdxToRange(idx uint) (first, last uint8) {
 //	0b1111_1110, // bits == 7
 //	0b1111_1111, // bits == 8
 func NetMask(bits int) uint8 {
-	return 0b1111_1111 << (8 - bits)
+	return 0b1111_1111 << (8 - uint16(bits))
 }
 
 // baseIdxLookupTbl, maps back from idx => octet/bits

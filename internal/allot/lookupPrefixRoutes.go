@@ -22,7 +22,7 @@ import "github.com/gaissmai/bart/internal/bitset"
 // Only used for fast bitset intersections instead of
 // range loops in table overlaps methods.
 func IdxToPrefixRoutes(idx uint) *bitset.BitSet256 {
-	return &pfxRoutesLookupTbl[idx&255]
+	return &pfxRoutesLookupTbl[uint8(idx)] // uint8() is BCE
 }
 
 // pfxRoutesLookupTbl, only the first 256 Bits, see also the hostRoutesLookupTbl for the second 256 Bits
