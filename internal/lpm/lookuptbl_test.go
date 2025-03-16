@@ -1,4 +1,4 @@
-package lpmbt
+package lpm
 
 import (
 	"slices"

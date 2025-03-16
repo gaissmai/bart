@@ -25,8 +25,8 @@ a matter of fast cache friendly bitmask operations.
 
 The `bart.Table` is implemented with popcount compressed sparse arrays
 together with path compression. This reduces storage consumption
-by almost two orders of magnitude in comparison to ART with
-comparable or even better lookup times for longest prefix match.
+by almost two orders of magnitude in comparison to ART and has an even
+better lookup speed.
 
 The algorithm is also excellent for determining whether two tables
 contain overlapping IP addresses.
