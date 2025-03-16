@@ -21,7 +21,9 @@ func HostIdx(octet uint) uint {
 
 // PfxToIdx, maps a prefix table as a 'complete binary tree'.
 func PfxToIdx(octet byte, prefixLen int) uint {
-	return uint(octet>>(strideLen-prefixLen)) + (1 << prefixLen)
+	// &7 and &15 are compiler optimization hints, that the shift amount is
+	// smaller than the width of the types (here 8 and IntSize)
+	return uint(octet>>((strideLen-prefixLen)&7)) + (1 << (prefixLen & 15))
 }
 
 // IdxToPfx returns the octet and prefix len of baseIdx.
