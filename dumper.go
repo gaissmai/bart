@@ -86,7 +86,7 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 		allIndices := n.prefixes.All()
 
 		// print the baseIndices for this node.
-		fmt.Fprintf(w, "%sindexs(#%d): %s\n", indent, nPfxCount, n.prefixes.BitSet256.String())
+		fmt.Fprintf(w, "%sindexs(#%d): %s\n", indent, nPfxCount, n.prefixes.String())
 
 		// print the prefixes for this node
 		fmt.Fprintf(w, "%sprefxs(#%d):", indent, nPfxCount)
@@ -133,7 +133,7 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 		}
 
 		// print the children for this node.
-		fmt.Fprintf(w, "%soctets(#%d): %s\n", indent, n.children.Len(), n.children.BitSet256.String())
+		fmt.Fprintf(w, "%soctets(#%d): %s\n", indent, n.children.Len(), n.children.String())
 
 		if nodeCount := len(nodeAddrs); nodeCount > 0 {
 			// print the next nodes
@@ -268,16 +268,15 @@ func (n *node[V]) nodeStats() stats {
 	s.childs = n.children.Len()
 
 	for i := range n.children.All() {
-		switch kid := n.children.Items[i].(type) {
+		switch n.children.Items[i].(type) {
 		case *node[V]:
 			s.nodes++
 
+		case *fringeFoo[V]:
+			s.fringes++
+
 		case *leaf[V]:
-			if kid.fringe {
-				s.fringes++
-			} else {
-				s.leaves++
-			}
+			s.leaves++
 
 		default:
 			panic("logic error, wrong node type")
