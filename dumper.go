@@ -116,17 +116,16 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 
 		// the node has recursive child nodes or path-compressed leaves
 		for i, addr := range n.children.All() {
-			switch kid := n.children.Items[i].(type) {
+			switch n.children.Items[i].(type) {
 			case *node[V]:
 				nodeAddrs = append(nodeAddrs, addr)
 				continue
 
+			case *fringeFoo[V]:
+				fringeAddrs = append(fringeAddrs, addr)
+
 			case *leaf[V]:
-				if kid.fringe {
-					fringeAddrs = append(fringeAddrs, addr)
-				} else {
-					leafAddrs = append(leafAddrs, addr)
-				}
+				leafAddrs = append(leafAddrs, addr)
 
 			default:
 				panic("logic error, wrong node type")
@@ -169,9 +168,9 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 			for _, addr := range fringeAddrs {
 				octet := byte(addr)
 				k := n.children.MustGet(addr)
-				pc := k.(*leaf[V])
+				pc := k.(*fringeFoo[V])
 
-				fmt.Fprintf(w, " %s:{%s, %v}", octetFmt(octet, is4), pc.prefix, pc.value)
+				fmt.Fprintf(w, " %s:{%v}", octetFmt(octet, is4), pc.value)
 			}
 			fmt.Fprintln(w)
 		}
@@ -313,12 +312,11 @@ func (n *node[V]) nodeStatsRec() stats {
 			s.leaves += rs.leaves
 			s.fringes += rs.fringes
 
+		case *fringeFoo[V]:
+			s.fringes++
+
 		case *leaf[V]:
-			if kid.fringe {
-				s.fringes++
-			} else {
-				s.leaves++
-			}
+			s.leaves++
 
 		default:
 			panic("logic error, wrong node type")

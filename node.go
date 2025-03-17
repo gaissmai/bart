@@ -56,7 +56,14 @@ func (n *node[V]) isEmpty() bool {
 type leaf[V any] struct {
 	prefix netip.Prefix
 	value  V
-	fringe bool
+	fringe bool // <- TODO, delete it
+}
+
+// fringeFoo, a leaf with value but without a prefix. The prefix of a fringe
+// is defined by the position in the trie. Saves a lot of memory, but the algorithm ist
+// a little bit more complex.
+type fringeFoo[V any] struct {
+	value V
 }
 
 // isFringe, prefixes with /8, /16, ... /128 bits
@@ -117,7 +124,11 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 		// reached end of trie path ...
 		if !n.children.Test(addr) {
 			// insert prefix path compressed as leaf or fringe
-			return n.children.InsertAt(addr, &leaf[V]{prefix: pfx, value: val, fringe: isFringe(depth, bits)})
+			if isFringe(depth, bits) {
+				return n.children.InsertAt(addr, &fringeFoo[V]{val})
+			} else {
+				return n.children.InsertAt(addr, &leaf[V]{prefix: pfx, value: val, fringe: false})
+			}
 		}
 
 		// ... or decend down the trie
@@ -144,6 +155,25 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 			// descend down, replace n with new child
 			newNode := new(node[V])
 			newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
+
+			n.children.InsertAt(addr, newNode)
+			n = newNode
+
+		case *fringeFoo[V]:
+			// reached a path compressed fringe
+			// override value in slot if pfx is a fringe
+			if isFringe(depth, bits) {
+				kid.value = val
+				// exists
+				return true
+			}
+
+			// create new node
+			// push the fringe down, it becomes a default route (idx=1)
+			// insert new child at current leaf position (addr)
+			// descend down, replace n with new child
+			newNode := new(node[V])
+			newNode.prefixes.InsertAt(1, kid.value)
 
 			n.children.InsertAt(addr, newNode)
 			n = newNode
@@ -220,11 +250,11 @@ func (n *node[V]) insertAtDepthPersist(pfx netip.Prefix, val V, depth int) (exis
 }
 
 // purgeAndCompress, purge empty nodes or compress nodes with single prefix or leaf.
-func (n *node[V]) purgeAndCompress(parentStack []*node[V], childPath []uint8, is4 bool) {
+func (n *node[V]) purgeAndCompress(parentStack []*node[V], octets []uint8, is4 bool) {
 	// unwind the stack
 	for depth := len(parentStack) - 1; depth >= 0; depth-- {
 		parent := parentStack[depth]
-		addr := uint(childPath[depth])
+		addr := uint(octets[depth])
 
 		pfxCount := n.prefixes.Len()
 		childCount := n.children.Len()
@@ -235,13 +265,28 @@ func (n *node[V]) purgeAndCompress(parentStack []*node[V], childPath []uint8, is
 			parent.children.DeleteAt(addr)
 
 		case pfxCount == 0 && childCount == 1:
-			// if child is a leaf (not a node), shift it up one level
-			if kid, ok := n.children.Items[0].(*leaf[V]); ok {
-				// delete this node
+			switch kid := n.children.Items[0].(type) {
+
+			case *node[V]:
+				// noop
+
+			case *leaf[V]:
+				// it's a leaf, delete this node and reinsert the leaf
 				parent.children.DeleteAt(addr)
 
-				// ... insert prefix/value at parents depth
+				// ... insert prefix at parents depth
 				parent.insertAtDepth(kid.prefix, kid.value, depth)
+
+			case *fringeFoo[V]:
+				// it's a fringe, we must rebuild the prefix!
+				// get the last octet back from sparse array
+				lastOctet, _ := n.children.FirstSet()
+
+				// rebuild the prefix with octets, first, depth and ip version
+				pfx := cidrForFringe(octets, depth+1, is4, lastOctet)
+
+				// ... insert prefix at parents depth
+				parent.insertAtDepth(pfx, kid.value, depth)
 			}
 
 		case pfxCount == 1 && childCount == 0:
@@ -251,7 +296,7 @@ func (n *node[V]) purgeAndCompress(parentStack []*node[V], childPath []uint8, is
 
 			// ... and octet path
 			path := stridePath{}
-			copy(path[:], childPath)
+			copy(path[:], octets)
 			pfx := cidrFromPath(path, depth+1, is4, idx)
 
 			// delete this node
