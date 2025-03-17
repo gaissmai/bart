@@ -266,6 +266,20 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 			n = kid
 			continue // descend down to next trie level
 
+		case *fringeFoo[V]:
+			// not this fringe
+			if !isFringe(depth, bits) {
+				return val, false
+			}
+
+			// prefix is fringe, delete fringe
+			n.children.DeleteAt(addr)
+
+			t.sizeUpdate(is4, -1)
+			n.purgeAndCompress(stack[:depth], octets, is4)
+
+			return kid.value, true
+
 		case *leaf[V]:
 			// reached a path compressed prefix, stop traversing
 			if kid.prefix != pfx {
@@ -376,9 +390,12 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 			n = kid
 			continue // descend down to next trie level
 
-		case *leaf[V]:
+		case *fringeFoo[V]:
 			// fringe is the default-route for all nodes below
-			return kid.fringe || kid.prefix.Contains(ip)
+			return true
+
+		case *leaf[V]:
+			return kid.prefix.Contains(ip)
 
 		default:
 			panic("logic error, wrong node type")
@@ -432,10 +449,13 @@ LOOP:
 			n = kid
 			continue // descend down to next trie level
 
+		case *fringeFoo[V]:
+			// fringe is the default-route for all nodes below
+			return kid.value, true
+
 		case *leaf[V]:
 			// reached a path compressed prefix, stop traversing
-			// fringe is the default-route for all nodes below
-			if kid.fringe || kid.prefix.Contains(ip) {
+			if kid.prefix.Contains(ip) {
 				return kid.value, true
 			}
 			break LOOP
