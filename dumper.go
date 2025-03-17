@@ -42,16 +42,16 @@ func (t *Table[V]) dump(w io.Writer) {
 	if t.size4 > 0 {
 		stats := t.root4.nodeStatsRec()
 		fmt.Fprintln(w)
-		fmt.Fprintf(w, "### IPv4: size(%d), nodes(%d), pfxs(%d), leaves(%d), fringes(%d),",
-			t.size4, stats.nodes, stats.pfxs, stats.leaves, stats.fringes)
+		fmt.Fprintf(w, "### IPv4: nodes(%d), pfxs(%d), leaves(%d), fringes(%d),",
+			stats.nodes, stats.pfxs, stats.leaves, stats.fringes)
 		t.root4.dumpRec(w, stridePath{}, 0, true)
 	}
 
 	if t.size6 > 0 {
 		stats := t.root6.nodeStatsRec()
 		fmt.Fprintln(w)
-		fmt.Fprintf(w, "### IPv6: size(%d), nodes(%d), pfxs(%d), leaves(%d), fringes(%d),",
-			t.size6, stats.nodes, stats.pfxs, stats.leaves, stats.fringes)
+		fmt.Fprintf(w, "### IPv6: nodes(%d), pfxs(%d), leaves(%d), fringes(%d),",
+			stats.nodes, stats.pfxs, stats.leaves, stats.fringes)
 		t.root6.dumpRec(w, stridePath{}, 0, false)
 	}
 }
@@ -86,7 +86,7 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 		allIndices := n.prefixes.All()
 
 		// print the baseIndices for this node.
-		fmt.Fprintf(w, "%sindexs(#%d): %v\n", indent, nPfxCount, allIndices)
+		fmt.Fprintf(w, "%sindexs(#%d): %s\n", indent, nPfxCount, n.prefixes.BitSet256.String())
 
 		// print the prefixes for this node
 		fmt.Fprintf(w, "%sprefxs(#%d):", indent, nPfxCount)
@@ -133,9 +133,12 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 			}
 		}
 
+		// print the children for this node.
+		fmt.Fprintf(w, "%soctets(#%d): %s\n", indent, n.children.Len(), n.children.BitSet256.String())
+
 		if nodeCount := len(nodeAddrs); nodeCount > 0 {
-			// print the childs for this node
-			fmt.Fprintf(w, "%schilds(#%d):", indent, nodeCount)
+			// print the next nodes
+			fmt.Fprintf(w, "%snodes(#%d): ", indent, nodeCount)
 
 			for _, addr := range nodeAddrs {
 				octet := byte(addr)
