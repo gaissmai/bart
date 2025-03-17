@@ -102,7 +102,7 @@ leaves(#2): 169:{169.254.0.0/16, <nil>} 172:{172.16.0.0/12, <nil>}
 
 ..[LEAF] depth:  2 path: [10.0] / 16
 ..octets(#2): [0 1]
-..fringe(#2): 0:{10.0.0.0/24, <nil>} 1:{10.0.1.0/24, <nil>}
+..fringe(#2): 0:{<nil>} 1:{<nil>}
 
 .[LEAF] depth:  1 path: [127] / 8
 .indexs(#1): [1]
@@ -120,7 +120,7 @@ leaves(#2): 169:{169.254.0.0/16, <nil>} 172:{172.16.0.0/12, <nil>}
 ..prefxs(#1): 0/0
 ..values(#1): <nil>
 ..octets(#1): [1]
-..fringe(#1): 1:{192.168.1.0/24, <nil>}
+..fringe(#1): 1:{<nil>}
 `,
 	})
 }
@@ -183,7 +183,7 @@ leaves(#2): 169:{169.254.0.0/16, <nil>} 172:{172.16.0.0/12, <nil>}
 
 ..[LEAF] depth:  2 path: [10.0] / 16
 ..octets(#2): [0 1]
-..fringe(#2): 0:{10.0.0.0/24, <nil>} 1:{10.0.1.0/24, <nil>}
+..fringe(#2): 0:{<nil>} 1:{<nil>}
 
 .[LEAF] depth:  1 path: [127] / 8
 .indexs(#1): [1]
@@ -201,7 +201,7 @@ leaves(#2): 169:{169.254.0.0/16, <nil>} 172:{172.16.0.0/12, <nil>}
 ..prefxs(#1): 0/0
 ..values(#1): <nil>
 ..octets(#1): [1]
-..fringe(#1): 1:{192.168.1.0/24, <nil>}
+..fringe(#1): 1:{<nil>}
 
 ### IPv6: nodes(1), pfxs(2), leaves(2), fringes(0),
 [LEAF] depth:  0 path: [] / 0
