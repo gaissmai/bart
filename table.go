@@ -661,12 +661,25 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 				if kid.prefix.Bits() > pfx.Bits() {
 					break LOOP
 				}
-				// fringe is the default-route for all nodes below
-				if kid.fringe || kid.prefix.Overlaps(pfx) {
+
+				if kid.prefix.Overlaps(pfx) {
 					if !yield(kid.prefix, kid.value) {
 						// early exit
 						return
 					}
+				}
+				// end of trie along this octets path
+				break LOOP
+
+			case *fringeFoo[V]:
+				fringePfx := cidrForFringe(octets, depth+1, is4, addr)
+				if fringePfx.Bits() > pfx.Bits() {
+					break LOOP
+				}
+				// fringe is the default-route for all nodes below
+				if !yield(fringePfx, kid.value) {
+					// early exit
+					return
 				}
 				// end of trie along this octets path
 				break LOOP
@@ -744,6 +757,13 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 			case *leaf[V]:
 				if pfx.Bits() <= kid.prefix.Bits() && pfx.Overlaps(kid.prefix) {
 					_ = yield(kid.prefix, kid.value)
+				}
+				return
+
+			case *fringeFoo[V]:
+				fringePfx := cidrForFringe(octets, depth+1, is4, addr)
+				if pfx.Bits() <= fringePfx.Bits() && pfx.Overlaps(fringePfx) {
+					_ = yield(fringePfx, kid.value)
 				}
 				return
 

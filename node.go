@@ -482,6 +482,13 @@ func (n *node[V]) allRec(path stridePath, depth int, is4 bool, yield func(netip.
 				// early exit
 				return false
 			}
+		case *fringeFoo[V]:
+			fringePfx := cidrForFringe(path[:], depth, is4, addr)
+			// callback for this fringe
+			if !yield(fringePfx, kid.value) {
+				// early exit
+				return false
+			}
 
 		default:
 			panic("logic error, wrong node type")
@@ -532,6 +539,13 @@ func (n *node[V]) allRecSorted(path stridePath, depth int, is4 bool, yield func(
 				if !yield(kid.prefix, kid.value) {
 					return false
 				}
+			case *fringeFoo[V]:
+				fringePfx := cidrForFringe(path[:], depth, is4, childAddr)
+				// callback for this fringe
+				if !yield(fringePfx, kid.value) {
+					// early exit
+					return false
+				}
 
 			default:
 				panic("logic error, wrong node type")
@@ -559,6 +573,13 @@ func (n *node[V]) allRecSorted(path stridePath, depth int, is4 bool, yield func(
 			}
 		case *leaf[V]:
 			if !yield(kid.prefix, kid.value) {
+				return false
+			}
+		case *fringeFoo[V]:
+			fringePfx := cidrForFringe(path[:], depth, is4, addr)
+			// callback for this fringe
+			if !yield(fringePfx, kid.value) {
+				// early exit
 				return false
 			}
 
@@ -762,6 +783,14 @@ func (n *node[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxLen int, yie
 					return false
 				}
 
+			case *fringeFoo[V]:
+				fringePfx := cidrForFringe(path[:], depth, is4, addr)
+				// callback for this fringe
+				if !yield(fringePfx, kid.value) {
+					// early exit
+					return false
+				}
+
 			default:
 				panic("logic error, wrong node type")
 			}
@@ -786,9 +815,15 @@ func (n *node[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxLen int, yie
 			if !kid.allRecSorted(path, depth+1, is4, yield) {
 				return false
 			}
-
 		case *leaf[V]:
 			if !yield(kid.prefix, kid.value) {
+				return false
+			}
+		case *fringeFoo[V]:
+			fringePfx := cidrForFringe(path[:], depth, is4, addr)
+			// callback for this fringe
+			if !yield(fringePfx, kid.value) {
+				// early exit
 				return false
 			}
 
