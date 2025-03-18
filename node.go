@@ -963,3 +963,27 @@ func cidrFromPath(path stridePath, depth int, is4 bool, idx uint) netip.Prefix {
 	// return a normalized prefix from ip/bits
 	return netip.PrefixFrom(ip, bits)
 }
+
+// cidrForFringe, helper function,
+// get prefix back from octets path, depth, IP version ans last octet.
+func cidrForFringe(octets []byte, depth int, is4 bool, lastOctet uint) netip.Prefix {
+	path := stridePath{}
+	copy(path[:], octets[:depth+1])
+
+	// replace last octet
+	path[depth] = byte(lastOctet)
+
+	// make ip addr from octets
+	var ip netip.Addr
+	if is4 {
+		ip = netip.AddrFrom4([4]byte(path[:4]))
+	} else {
+		ip = netip.AddrFrom16(path)
+	}
+
+	// it's a fringe, bits are alway /8, /16, /24, ...
+	bits := (depth + 1) << 3
+
+	// return a (normalized) prefix from ip/bits
+	return netip.PrefixFrom(ip, bits)
+}

@@ -114,7 +114,11 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 		if !n.children.Test(addr) {
 			// insert prefix path compressed
 			newVal := cb(zero, false)
-			n.children.InsertAt(addr, &leaf[V]{prefix: pfx, value: newVal, fringe: isFringe(depth, bits)})
+			if isFringe(depth, bits) {
+				n.children.InsertAt(addr, &fringeFoo[V]{value: newVal})
+			} else {
+				n.children.InsertAt(addr, &leaf[V]{prefix: pfx, value: newVal})
+			}
 
 			pt.sizeUpdate(is4, 1)
 			return pt, newVal
@@ -136,7 +140,8 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 			// update existing value if prefixes are equal
 			if kid.prefix == pfx {
 				newVal = cb(kid.value, true)
-				n.children.InsertAt(addr, &leaf[V]{prefix: pfx, value: newVal, fringe: isFringe(depth, bits)})
+				n.children.InsertAt(addr, &leaf[V]{prefix: pfx, value: newVal})
+
 				return pt, newVal
 			}
 
@@ -146,6 +151,26 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 			// descend down, replace n with new child
 			newNode := new(node[V])
 			newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
+
+			n.children.InsertAt(addr, newNode)
+			n = newNode
+
+		case *fringeFoo[V]:
+			kid = kid.cloneFringe()
+
+			// update existing value if prefix is fringe
+			if isFringe(depth, bits) {
+				newVal = cb(kid.value, true)
+				n.children.InsertAt(addr, &fringeFoo[V]{value: newVal})
+				return pt, newVal
+			}
+
+			// create new node
+			// push the fringe down, it becomes a default route (idx=1)
+			// insert new child at current leaf position (addr)
+			// descend down, replace n with new child
+			newNode := new(node[V])
+			newNode.prefixes.InsertAt(1, kid.value)
 
 			n.children.InsertAt(addr, newNode)
 			n = newNode
@@ -247,6 +272,24 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, e
 			n.children.InsertAt(addr, kid)
 			n = kid
 			continue // descend down to next trie level
+
+		case *fringeFoo[V]:
+			kid = kid.cloneFringe()
+
+			// reached a path compressed fringe, stop traversing
+			if !isFringe(depth, bits) {
+				// nothing to delete
+				return pt, val, false
+			}
+
+			// prefix is equal fringe, delete fringe
+			n.children.DeleteAt(addr)
+
+			pt.sizeUpdate(is4, -1)
+			n.purgeAndCompress(stack[:depth], octets, is4)
+
+			// kid.value is cloned
+			return pt, kid.value, true
 
 		case *leaf[V]:
 			kid = kid.cloneLeaf()
