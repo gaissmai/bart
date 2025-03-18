@@ -98,6 +98,12 @@ func (l *leaf[V]) cloneLeaf() *leaf[V] {
 	return &leaf[V]{prefix: l.prefix, value: cloneOrCopy(l.value), fringe: l.fringe}
 }
 
+// cloneFringe returns a clone of the fringe
+// if the value implements the Cloner interface.
+func (l *fringeFoo[V]) cloneFringe() *fringeFoo[V] {
+	return &fringeFoo[V]{value: cloneOrCopy(l.value)}
+}
+
 // insertAtDepth insert a prefix/val into a node tree at depth.
 // n must not be nil, prefix must be valid and already in canonical form.
 //
@@ -207,8 +213,12 @@ func (n *node[V]) insertAtDepthPersist(pfx netip.Prefix, val V, depth int) (exis
 		}
 
 		if !n.children.Test(addr) {
-			// insert new prefix path compressed
-			return n.children.InsertAt(addr, &leaf[V]{prefix: pfx, value: val, fringe: isFringe(depth, bits)})
+			// insert prefix path compressed as leaf or fringe
+			if isFringe(depth, bits) {
+				return n.children.InsertAt(addr, &fringeFoo[V]{val})
+			} else {
+				return n.children.InsertAt(addr, &leaf[V]{prefix: pfx, value: val, fringe: false})
+			}
 		}
 		kid := n.children.MustGet(addr)
 
@@ -222,12 +232,11 @@ func (n *node[V]) insertAtDepthPersist(pfx netip.Prefix, val V, depth int) (exis
 			continue // descend down to next trie level
 
 		case *leaf[V]:
-			kid = kid.cloneLeaf()
-
+			// reached a path compressed prefix
 			// override value in slot if prefixes are equal
 			if kid.prefix == pfx {
-				// exists
 				kid.value = val
+				// exists
 				return true
 			}
 
@@ -237,6 +246,25 @@ func (n *node[V]) insertAtDepthPersist(pfx netip.Prefix, val V, depth int) (exis
 			// descend down, replace n with new child
 			newNode := new(node[V])
 			newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
+
+			n.children.InsertAt(addr, newNode)
+			n = newNode
+
+		case *fringeFoo[V]:
+			// reached a path compressed fringe
+			// override value in slot if pfx is a fringe
+			if isFringe(depth, bits) {
+				kid.value = val
+				// exists
+				return true
+			}
+
+			// create new node
+			// push the fringe down, it becomes a default route (idx=1)
+			// insert new child at current leaf position (addr)
+			// descend down, replace n with new child
+			newNode := new(node[V])
+			newNode.prefixes.InsertAt(1, kid.value)
 
 			n.children.InsertAt(addr, newNode)
 			n = newNode
@@ -407,8 +435,11 @@ func (n *node[V]) cloneFlat() *node[V] {
 
 	// deep copy of values in path compressed leaves
 	for i, kidAny := range c.children.Items {
-		if kidLeaf, ok := kidAny.(*leaf[V]); ok {
-			c.children.Items[i] = kidLeaf.cloneLeaf()
+		switch kid := kidAny.(type) {
+		case *leaf[V]:
+			c.children.Items[i] = kid.cloneLeaf()
+		case *fringeFoo[V]:
+			c.children.Items[i] = kid.cloneFringe()
 		}
 	}
 
