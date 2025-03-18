@@ -398,6 +398,9 @@ func (n *node[V]) cloneRec() *node[V] {
 		case *leaf[V]:
 			// deep copy if V implements Cloner[V]
 			c.children.Items[i] = kid.cloneLeaf()
+		case *fringeFoo[V]:
+			// deep copy if V implements Cloner[V]
+			c.children.Items[i] = kid.cloneFringe()
 
 		default:
 			panic("logic error, wrong node type")

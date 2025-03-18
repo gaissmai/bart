@@ -1932,6 +1932,10 @@ func TestUpdate(t *testing.T) {
 			pfx:  mpp("::/0"),
 		},
 		{
+			name: "set v4 fringe",
+			pfx:  mpp("0.0.0.0/8"),
+		},
+		{
 			name: "set v4",
 			pfx:  mpp("1.2.3.4/32"),
 		},
