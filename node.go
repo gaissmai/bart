@@ -593,57 +593,57 @@ func (n *node[V]) allRecSorted(path stridePath, depth int, is4 bool, yield func(
 // unionRec combines two nodes, changing the receiver node.
 // If there are duplicate entries, the value is taken from the other node.
 // Count duplicate entries to adjust the t.size struct members.
+// The values are cloned before merging.
 func (n *node[V]) unionRec(o *node[V], depth int) (duplicates int) {
 	// for all prefixes in other node do ...
 	for i, oIdx := range o.prefixes.AsSlice(make([]uint, 0, maxItems)) {
-		// clone the value from other node at idx
+		// clone/copy the value from other node at idx
 		clonedVal := cloneOrCopy(o.prefixes.Items[i])
 
-		// insert/overwrite cloned value from oNode into nNode
+		// insert/overwrite cloned value from o into n
 		if n.prefixes.InsertAt(oIdx, clonedVal) {
 			// this prefix is duplicate in n and o
 			duplicates++
 		}
 	}
 
-LOOP:
 	// for all child addrs in other node do ...
 	for i, addr := range o.children.AsSlice(make([]uint, 0, maxItems)) {
-		//  n possible combinations to union this child and other child
+		//  12 possible combinations to union this child and other child
 		//
-		//  THIS, OTHER:
-		//  ----------
-		//  NULL,   node    <-- easy, insertAt cloned node
-		//  NULL,   leaf    <-- easy, insertAt cloned leaf
-		//  NULL,   fringe  <-- easy, insertAt cloned fringe
+		//  THIS,   OTHER: (always clone the other kid!)
+		//  --------------
+		//  NULL,   node    <-- insert node at addr
+		//  NULL,   leaf    <-- insert leaf at addr
+		//  NULL,   fringe  <-- insert fringe at addr
 
-		//  node,   node    <-- easy, union rec-descent with cloned node
-		//  node,   leaf    <-- easy, insertAt other cloned leaf at depth+1
-		//  node,   fringe  <-- easy, insertAt other cloned fringe at depth+1
+		//  node,   node    <-- union rec-descent with node
+		//  node,   leaf    <-- insert leaf at depth+1
+		//  node,   fringe  <-- insert fringe at depth+1
 
-		//  leaf,   node    <-- cplx, push this leaf down, union rec-descent
-		//  leaf,   leaf    <-- cplx, insert new node, push both leaves down, insert new node at addr
-		//  leaf,   fringe  <-- cplx, new node, push this leaf and fringe down, insert new node at addr
+		//  leaf,   node    <-- insert new node, push this leaf down, union rec-descent
+		//  leaf,   leaf    <-- insert new node, push both leaves down (!first check equality)
+		//  leaf,   fringe  <-- insert new node, push this leaf and fringe down
 
-		//  fringe, node    <-- cplx, push this leaf down, union rec-descent
-		//  fringe, leaf    <-- cplx, push this leaf down, insertAt other cloned leaf at depth+1
-		//  fringe, fringe  <-- cplx, push this leaf down, insertAt other cloned leaf at depth+1
+		//  fringe, node    <-- insert new node, push this fringe down, union rec-descent
+		//  fringe, leaf    <-- insert new node, push this fringe down, insert other leaf at depth+1
+		//  fringe, fringe  <-- just overwrite value
 		//
 		// try to get child at same addr from n
 		thisChild, thisExists := n.children.Get(addr)
-		if !thisExists { // NULL, ...
+		if !thisExists { // NULL, ... slot at addr is empty
 			switch otherKid := o.children.Items[i].(type) {
 			case *node[V]: // NULL, node
 				n.children.InsertAt(addr, otherKid.cloneRec())
-				continue LOOP
+				continue
 
 			case *leaf[V]: // NULL, leaf
 				n.children.InsertAt(addr, otherKid.cloneLeaf())
-				continue LOOP
+				continue
 
 			case *fringeFoo[V]: // NULL, fringe
 				n.children.InsertAt(addr, otherKid.cloneFringe())
-				continue LOOP
+				continue
 
 			default:
 				panic("logic error, wrong node type")
@@ -656,23 +656,23 @@ LOOP:
 			case *node[V]: // node, node
 				// both childs have node at addr, call union rec-descent on child nodes
 				duplicates += thisKid.unionRec(otherKid.cloneRec(), depth+1)
-				continue LOOP
+				continue
 
 			case *leaf[V]: // node, leaf
-				// push this cloned leaf down
+				// push this cloned leaf down, count duplicate entry
 				clonedLeaf := otherKid.cloneLeaf()
-				if n.insertAtDepth(clonedLeaf.prefix, clonedLeaf.value, depth+1) {
+				if thisKid.insertAtDepth(clonedLeaf.prefix, clonedLeaf.value, depth+1) {
 					duplicates++
 				}
-				continue LOOP
+				continue
 
 			case *fringeFoo[V]: // node, fringe
-				// a fringe becomes a default route one level down
+				// push this fringe down, a fringe becomes a default route one level down
 				clonedFringe := otherKid.cloneFringe()
-				if n.prefixes.InsertAt(1, clonedFringe.value) {
+				if thisKid.prefixes.InsertAt(1, clonedFringe.value) {
 					duplicates++
 				}
-				continue LOOP
+				continue
 			}
 
 		case *leaf[V]: // leaf, ...
@@ -684,14 +684,21 @@ LOOP:
 				// push this leaf down
 				nc.insertAtDepth(thisKid.prefix, thisKid.value, depth+1)
 
-				// unionRec this new node with other kid node
-				duplicates += nc.unionRec(otherKid.cloneRec(), depth+1)
-
 				// insert the new node at current addr
 				n.children.InsertAt(addr, nc)
-				continue LOOP
+
+				// unionRec this new node with other kid node
+				duplicates += nc.unionRec(otherKid.cloneRec(), depth+1)
+				continue
 
 			case *leaf[V]: // leaf, leaf
+				// shortcut, prefixes are equal
+				if thisKid.prefix == otherKid.prefix {
+					thisKid.value = cloneOrCopy(otherKid.value)
+					duplicates++
+					continue
+				}
+
 				// create new node
 				nc := new(node[V])
 
@@ -706,7 +713,7 @@ LOOP:
 
 				// insert the new node at current addr
 				n.children.InsertAt(addr, nc)
-				continue LOOP
+				continue
 
 			case *fringeFoo[V]: // leaf, fringe
 				// create new node
@@ -723,7 +730,7 @@ LOOP:
 
 				// insert the new node at current addr
 				n.children.InsertAt(addr, nc)
-				continue LOOP
+				continue
 			}
 
 		case *fringeFoo[V]: // fringe, ...
@@ -732,21 +739,21 @@ LOOP:
 				// create new node
 				nc := new(node[V])
 
-				// push this finge down, it becomes the default route
+				// push this fringe down, it becomes the default route
 				nc.prefixes.InsertAt(1, thisKid.value)
-
-				// unionRec this new node with other kid node
-				duplicates += nc.unionRec(otherKid.cloneRec(), depth+1)
 
 				// insert the new node at current addr
 				n.children.InsertAt(addr, nc)
-				continue LOOP
+
+				// unionRec this new node with other kid node
+				duplicates += nc.unionRec(otherKid.cloneRec(), depth+1)
+				continue
 
 			case *leaf[V]: // fringe, leaf
 				// create new node
 				nc := new(node[V])
 
-				// push this finge down, it becomes the default route
+				// push this fringe down, it becomes the default route
 				nc.prefixes.InsertAt(1, thisKid.value)
 
 				// push this cloned leaf down
@@ -757,10 +764,12 @@ LOOP:
 
 				// insert the new node at current addr
 				n.children.InsertAt(addr, nc)
-				continue LOOP
+				continue
 
 			case *fringeFoo[V]: // fringe, fringe
-				n.children.InsertAt(addr, otherKid.cloneFringe())
+				thisKid.value = otherKid.cloneFringe().value
+				duplicates++
+				continue
 			}
 
 		default:
