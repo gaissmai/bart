@@ -56,7 +56,6 @@ func (n *node[V]) isEmpty() bool {
 type leaf[V any] struct {
 	prefix netip.Prefix
 	value  V
-	fringe bool // <- TODO, delete it
 }
 
 // fringeFoo, a leaf with value but without a prefix. The prefix of a fringe
@@ -95,7 +94,7 @@ func cloneOrCopy[V any](val V) V {
 // cloneLeaf returns a clone of the leaf
 // if the value implements the Cloner interface.
 func (l *leaf[V]) cloneLeaf() *leaf[V] {
-	return &leaf[V]{prefix: l.prefix, value: cloneOrCopy(l.value), fringe: l.fringe}
+	return &leaf[V]{prefix: l.prefix, value: cloneOrCopy(l.value)}
 }
 
 // cloneFringe returns a clone of the fringe
@@ -133,7 +132,7 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 			if isFringe(depth, bits) {
 				return n.children.InsertAt(addr, &fringeFoo[V]{val})
 			} else {
-				return n.children.InsertAt(addr, &leaf[V]{prefix: pfx, value: val, fringe: false})
+				return n.children.InsertAt(addr, &leaf[V]{prefix: pfx, value: val})
 			}
 		}
 
@@ -217,7 +216,7 @@ func (n *node[V]) insertAtDepthPersist(pfx netip.Prefix, val V, depth int) (exis
 			if isFringe(depth, bits) {
 				return n.children.InsertAt(addr, &fringeFoo[V]{val})
 			} else {
-				return n.children.InsertAt(addr, &leaf[V]{prefix: pfx, value: val, fringe: false})
+				return n.children.InsertAt(addr, &leaf[V]{prefix: pfx, value: val})
 			}
 		}
 		kid := n.children.MustGet(addr)
