@@ -16,6 +16,18 @@ type Array256[T any] struct {
 	Items []T
 }
 
+// MustSet of the underlying bitset is forbidden. The bitset and the items are coupled.
+// An unsynchronized Set() disturbs the coupling between bitset and Items[].
+func (a *Array256[T]) MustSet(i uint) {
+	panic("forbidden, use InsertAt")
+}
+
+// MustClear of the underlying bitset is forbidden. The bitset and the items are coupled.
+// An unsynchronized Clear() disturbs the coupling between bitset and Items[].
+func (a *Array256[T]) MustClear(i uint) {
+	panic("forbidden, use DeleteAt")
+}
+
 // Get the value at i from sparse array.
 //
 // example: a.Get(5) -> a.Items[1]
