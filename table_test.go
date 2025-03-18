@@ -2999,10 +2999,9 @@ func checkNumNodes(t *testing.T, tbl *Table[int], want int) {
 func (t *Table[V]) dumpAsGoldTable() goldTable[V] {
 	var tbl goldTable[V]
 
-	t.AllSorted()(func(pfx netip.Prefix, val V) bool {
-		tbl = append(tbl, goldTableItem[V]{pfx: pfx, val: val})
-		return true
-	})
+	for p, v := range t.AllSorted() {
+		tbl = append(tbl, goldTableItem[V]{pfx: p, val: v})
+	}
 
 	return tbl
 }

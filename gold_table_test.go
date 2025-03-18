@@ -5,6 +5,7 @@ package bart
 
 import (
 	"cmp"
+	"fmt"
 	"net/netip"
 	"slices"
 )
@@ -16,6 +17,10 @@ type goldTable[V any] []goldTableItem[V]
 type goldTableItem[V any] struct {
 	pfx netip.Prefix
 	val V
+}
+
+func (g goldTableItem[V]) String() string {
+	return fmt.Sprintf("(%s, %v)", g.pfx, g.val)
 }
 
 //nolint:unused
