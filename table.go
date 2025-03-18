@@ -548,6 +548,14 @@ LOOP:
 
 			break LOOP
 
+		case *fringeFoo[V]:
+			// reached a path compressed fringe, stop traversing
+			fringePfx := cidrForFringe(octets, depth, is4, uint(octet))
+			if fringePfx.Bits() > bits {
+				break LOOP
+			}
+			return fringePfx, kid.value, true
+
 		default:
 			panic("logic error, wrong node type")
 		}
