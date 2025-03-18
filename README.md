@@ -29,13 +29,10 @@ by almost two orders of magnitude in comparison to ART and has an even
 better lookup speed.
 
 The algorithm is also excellent for determining whether two tables
-contain overlapping IP addresses.
+contain overlapping IP addresses in a few nanoseconds.
 
-A `bart.Lite` version is also included, this is ideal for simple IP
-access-control-lists, a.k.a. longest-prefix matches with plain true/false
-results.
-
-For all more complex tasks, the powerful `bart.Table` must be used.
+A `bart.Lite` wrapper is included, this is ideal for simple IP
+ACLs (access-control-lists) with plain true/false results and no payload.
 
 ## Example
 
@@ -87,8 +84,8 @@ func ExampleLite_Contains() {
 ```
 ## API
 
-Release v0.18 requires at least go1.23 and we use the `iter.Seq2[netip.Prefix, V]` types for iterators.
-The lock-free versions of insert, update and delete are added, but still experimentell.
+Release v0.19 requires at least go1.23, the `iter.Seq2[netip.Prefix, V]` types for iterators
+are used. The lock-free versions of insert, update and delete are added, but still experimentell.
 
 ```golang
   import "github.com/gaissmai/bart"
@@ -157,21 +154,6 @@ The lock-free versions of insert, update and delete are added, but still experim
   func (t *Table[V]) DumpList6() []DumpListNode[V]
 ```
 
-```golang
-  type Lite struct {
-  	// Has unexported fields.
-  }
-  //  Lite is the little sister of Table. Lite is ideal for simple IP
-  //  access-control-lists, a.k.a. longest-prefix matches with plain
-  //  true/false results.
-  //
-  //  For all other tasks, the much more powerful Table must be used.
-  
-  func (l *Lite) Insert(pfx netip.Prefix)
-  func (l *Lite) Delete(pfx netip.Prefix)
-  func (l *Lite) Contains(ip netip.Addr) bool
-```
-
 ## benchmarks
 
 Please see the extensive [benchmarks](https://github.com/gaissmai/iprbench) comparing `bart` with other IP routing table implementations.
@@ -184,23 +166,19 @@ goos: linux
 goarch: amd64
 pkg: github.com/gaissmai/bart
 cpu: Intel(R) Core(TM) i5-8250U CPU @ 1.60GHz
-BenchmarkFullMatch4/Contains         	80015762	        14.54 ns/op
-BenchmarkFullMatch6/Contains         	93395781	        12.78 ns/op
-BenchmarkFullMiss4/Contains          	264677362	         4.562 ns/op
-BenchmarkFullMiss6/Contains          	250739491	         4.802 ns/op
-PASS
-ok  	github.com/gaissmai/bart	11.834s
+BenchmarkFullMatch4/Contains        81672672            14.58 ns/op
+BenchmarkFullMatch6/Contains        94038417            12.43 ns/op
+BenchmarkFullMiss4/Contains         259998007            4.61 ns/op
+BenchmarkFullMiss6/Contains         250340162            4.81 ns/op
 
 goos: linux
 goarch: amd64
 pkg: github.com/gaissmai/bart
 cpu: Intel(R) Core(TM) i5-8250U CPU @ 1.60GHz
-BenchmarkFullMatch4/Lookup         	52176051	        22.44 ns/op
-BenchmarkFullMatch6/Lookup         	82442416	        14.50 ns/op
-BenchmarkFullMiss4/Lookup          	174474836	         6.881 ns/op
-BenchmarkFullMiss6/Lookup          	164121382	         7.340 ns/op
-PASS
-ok  	github.com/gaissmai/bart	12.399s
+BenchmarkFullMatch4/Lookup          52725478            22.65 ns/op
+BenchmarkFullMatch6/Lookup          89137046            13.92 ns/op
+BenchmarkFullMiss4/Lookup           181541365            6.60 ns/op
+BenchmarkFullMiss6/Lookup           168788408            7.07 ns/op
 ```
 
 ## Compatibility Guarantees

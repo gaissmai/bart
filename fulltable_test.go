@@ -50,11 +50,9 @@ var (
 
 func BenchmarkFullMatch4(b *testing.B) {
 	var rt Table[int]
-	var lt Lite
 
 	for i, route := range routes {
 		rt.Insert(route.CIDR, i)
-		lt.Insert(route.CIDR)
 	}
 
 	var ip netip.Addr
@@ -69,13 +67,6 @@ func BenchmarkFullMatch4(b *testing.B) {
 			break
 		}
 	}
-
-	b.Run("Lite.Contains", func(b *testing.B) {
-		b.ResetTimer()
-		for range b.N {
-			okSink = lt.Contains(ip)
-		}
-	})
 
 	b.Run("Contains", func(b *testing.B) {
 		b.ResetTimer()
@@ -108,11 +99,9 @@ func BenchmarkFullMatch4(b *testing.B) {
 
 func BenchmarkFullMatch6(b *testing.B) {
 	var rt Table[int]
-	var lt Lite
 
 	for i, route := range routes {
 		rt.Insert(route.CIDR, i)
-		lt.Insert(route.CIDR)
 	}
 
 	var ip netip.Addr
@@ -127,13 +116,6 @@ func BenchmarkFullMatch6(b *testing.B) {
 			break
 		}
 	}
-
-	b.Run("Lite.Contains", func(b *testing.B) {
-		b.ResetTimer()
-		for range b.N {
-			okSink = lt.Contains(ip)
-		}
-	})
 
 	b.Run("Contains", func(b *testing.B) {
 		b.ResetTimer()
@@ -166,11 +148,9 @@ func BenchmarkFullMatch6(b *testing.B) {
 
 func BenchmarkFullMiss4(b *testing.B) {
 	var rt Table[int]
-	var lt Lite
 
 	for i, route := range routes {
 		rt.Insert(route.CIDR, i)
-		lt.Insert(route.CIDR)
 	}
 
 	var ip netip.Addr
@@ -185,13 +165,6 @@ func BenchmarkFullMiss4(b *testing.B) {
 			break
 		}
 	}
-
-	b.Run("Lite.Contains", func(b *testing.B) {
-		b.ResetTimer()
-		for range b.N {
-			okSink = lt.Contains(ip)
-		}
-	})
 
 	b.Run("Contains", func(b *testing.B) {
 		b.ResetTimer()
@@ -224,11 +197,9 @@ func BenchmarkFullMiss4(b *testing.B) {
 
 func BenchmarkFullMiss6(b *testing.B) {
 	var rt Table[int]
-	var lt Lite
 
 	for i, route := range routes {
 		rt.Insert(route.CIDR, i)
-		lt.Insert(route.CIDR)
 	}
 
 	var ip netip.Addr
@@ -243,13 +214,6 @@ func BenchmarkFullMiss6(b *testing.B) {
 			break
 		}
 	}
-
-	b.Run("Lite.Contains", func(b *testing.B) {
-		b.ResetTimer()
-		for range b.N {
-			okSink = lt.Contains(ip)
-		}
-	})
 
 	b.Run("Contains", func(b *testing.B) {
 		b.ResetTimer()
@@ -405,29 +369,6 @@ func BenchmarkFullTableMemory4(b *testing.B) {
 		b.ReportMetric(float64(stats.fringes), "fringe")
 		b.ReportMetric(0, "ns/op")
 	})
-
-	lt := new(Lite)
-	runtime.GC()
-	runtime.ReadMemStats(&startMem)
-
-	b.Run(fmt.Sprintf("Lite: %d", len(routes4)), func(b *testing.B) {
-		for range b.N {
-			for _, route := range routes4 {
-				lt.Insert(route.CIDR)
-			}
-		}
-
-		runtime.GC()
-		runtime.ReadMemStats(&endMem)
-
-		stats := rt.root4.nodeStatsRec()
-		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc)/1024, "KByte")
-		b.ReportMetric(float64(stats.pfxs), "pfx")
-		b.ReportMetric(float64(stats.nodes), "node")
-		b.ReportMetric(float64(stats.leaves), "leave")
-		b.ReportMetric(float64(stats.fringes), "fringe")
-		b.ReportMetric(0, "ns/op")
-	})
 }
 
 func BenchmarkFullTableMemory6(b *testing.B) {
@@ -455,29 +396,6 @@ func BenchmarkFullTableMemory6(b *testing.B) {
 		b.ReportMetric(float64(stats.fringes), "fringe")
 		b.ReportMetric(0, "ns/op")
 	})
-
-	lt := new(Lite)
-	runtime.GC()
-	runtime.ReadMemStats(&startMem)
-
-	b.Run(fmt.Sprintf("Lite: %d", len(routes6)), func(b *testing.B) {
-		for range b.N {
-			for _, route := range routes6 {
-				lt.Insert(route.CIDR)
-			}
-		}
-
-		runtime.GC()
-		runtime.ReadMemStats(&endMem)
-
-		stats := rt.root6.nodeStatsRec()
-		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc)/1024, "KByte")
-		b.ReportMetric(float64(stats.pfxs), "pfx")
-		b.ReportMetric(float64(stats.nodes), "node")
-		b.ReportMetric(float64(stats.leaves), "leave")
-		b.ReportMetric(float64(stats.fringes), "fringe")
-		b.ReportMetric(0, "ns/op")
-	})
 }
 
 func BenchmarkFullTableMemory(b *testing.B) {
@@ -491,38 +409,6 @@ func BenchmarkFullTableMemory(b *testing.B) {
 		for range b.N {
 			for _, route := range routes {
 				rt.Insert(route.CIDR, struct{}{})
-			}
-		}
-
-		runtime.GC()
-		runtime.ReadMemStats(&endMem)
-
-		s4 := rt.root4.nodeStatsRec()
-		s6 := rt.root6.nodeStatsRec()
-		stats := stats{
-			s4.pfxs + s6.pfxs,
-			s4.childs + s6.childs,
-			s4.nodes + s6.nodes,
-			s4.leaves + s6.leaves,
-			s4.fringes + s6.fringes,
-		}
-
-		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc)/1024, "KByte")
-		b.ReportMetric(float64(stats.pfxs), "pfx")
-		b.ReportMetric(float64(stats.nodes), "node")
-		b.ReportMetric(float64(stats.leaves), "leave")
-		b.ReportMetric(float64(stats.fringes), "fringe")
-		b.ReportMetric(0, "ns/op")
-	})
-
-	lt := new(Lite)
-	runtime.GC()
-	runtime.ReadMemStats(&startMem)
-
-	b.Run(fmt.Sprintf("Lite: %d", len(routes)), func(b *testing.B) {
-		for range b.N {
-			for _, route := range routes {
-				lt.Insert(route.CIDR)
 			}
 		}
 
