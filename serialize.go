@@ -270,7 +270,7 @@ func (n *node[V]) directItemsRec(parentIdx uint, path stridePath, depth int, is4
 				path:  path,
 				depth: depth,
 				idx:   idx,
-				//
+				// get the prefix back from trie
 				cidr: cidrFromPath(path, depth, is4, idx),
 				val:  n.prefixes.Items[i],
 			}
@@ -307,7 +307,16 @@ func (n *node[V]) directItemsRec(parentIdx uint, path stridePath, depth int, is4
 					cidr: kid.prefix,
 					val:  kid.value,
 				}
+				directItems = append(directItems, item)
 
+			case *fringeFoo[V]: // path-compressed fringe, stop's recursion for this child
+				item := trieItem[V]{
+					n:   nil,
+					is4: is4,
+					// get the prefix back from trie
+					cidr: cidrForFringe(path[:], depth, is4, addr),
+					val:  kid.value,
+				}
 				directItems = append(directItems, item)
 			}
 		}
