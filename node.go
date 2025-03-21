@@ -128,9 +128,8 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 			// insert prefix path compressed as leaf or fringe
 			if isFringe(depth, bits) {
 				return n.children.InsertAt(addr, &fringeFoo[V]{val})
-			} else {
-				return n.children.InsertAt(addr, &leaf[V]{prefix: pfx, value: val})
 			}
+			return n.children.InsertAt(addr, &leaf[V]{prefix: pfx, value: val})
 		}
 
 		// ... or decend down the trie
@@ -212,9 +211,8 @@ func (n *node[V]) insertAtDepthPersist(pfx netip.Prefix, val V, depth int) (exis
 			// insert prefix path compressed as leaf or fringe
 			if isFringe(depth, bits) {
 				return n.children.InsertAt(addr, &fringeFoo[V]{val})
-			} else {
-				return n.children.InsertAt(addr, &leaf[V]{prefix: pfx, value: val})
 			}
+			return n.children.InsertAt(addr, &leaf[V]{prefix: pfx, value: val})
 		}
 		kid := n.children.MustGet(addr)
 

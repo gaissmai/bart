@@ -1,6 +1,9 @@
 // Copyright (c) 2025 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
+// Package lpm (longest-prefix-match) contains the lookup table with which
+// the backtracking for the lpm in the complete binary tree of the prefixes
+// can be replaced by a fast bitset operation.
 package lpm
 
 import "github.com/gaissmai/bart/internal/bitset"
