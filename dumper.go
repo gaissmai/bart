@@ -102,7 +102,7 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 		fmt.Fprintf(w, "%svalues(#%d):", indent, nPfxCount)
 
 		for _, val := range n.prefixes.Items {
-			fmt.Fprintf(w, " %v", val)
+			fmt.Fprintf(w, " %#v", val)
 		}
 
 		fmt.Fprintln(w)
