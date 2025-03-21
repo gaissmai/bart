@@ -172,7 +172,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 		}
 		kid := n.children.MustGet(addr)
 
-		// kid is node or leaf at addr
+		// kid is node or leaf or fringe at addr
 		switch kid := kid.(type) {
 		case *node[V]:
 			n = kid
@@ -281,7 +281,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 		}
 		kid := n.children.MustGet(addr)
 
-		// kid is node or leaf at addr
+		// kid is node or leaf or fringe at addr
 		switch kid := kid.(type) {
 		case *node[V]:
 			n = kid
@@ -359,7 +359,7 @@ LOOP:
 		}
 		kid := n.children.MustGet(addr)
 
-		// kid is node or leaf at addr
+		// kid is node or leaf or fringe at addr
 		switch kid := kid.(type) {
 		case *node[V]:
 			n = kid
@@ -412,14 +412,14 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 		}
 		kid := n.children.MustGet(addr)
 
-		// kid is node or leaf at addr
+		// kid is node or leaf or fringe at addr
 		switch kid := kid.(type) {
 		case *node[V]:
 			n = kid
 			continue // descend down to next trie level
 
 		case *fringeFoo[V]:
-			// fringe is the default-route for all nodes below
+			// fringe is the default-route for all possible octets below
 			return true
 
 		case *leaf[V]:
@@ -471,14 +471,14 @@ LOOP:
 		}
 		kid := n.children.MustGet(addr)
 
-		// kid is node or leaf at addr
+		// kid is node or leaf or fringe at addr
 		switch kid := kid.(type) {
 		case *node[V]:
 			n = kid
 			continue // descend down to next trie level
 
 		case *fringeFoo[V]:
-			// fringe is the default-route for all nodes below
+			// fringe is the default-route for all possible octets below
 			return kid.value, true
 
 		case *leaf[V]:
@@ -577,11 +577,19 @@ LOOP:
 		}
 		kid := n.children.MustGet(addr)
 
-		// kid is node or leaf at addr
+		// kid is node or leaf or fringe at addr
 		switch kid := kid.(type) {
 		case *node[V]:
 			n = kid
 			continue LOOP // descend down to next trie level
+
+		case *fringeFoo[V]:
+			// reached a path compressed fringe, stop traversing
+			fringePfx := cidrForFringe(octets, depth, is4, uint(octet))
+			if fringePfx.Bits() > bits {
+				break LOOP
+			}
+			return fringePfx, kid.value, true
 
 		case *leaf[V]:
 			// reached a path compressed prefix, stop traversing
@@ -594,14 +602,6 @@ LOOP:
 			}
 
 			break LOOP
-
-		case *fringeFoo[V]:
-			// reached a path compressed fringe, stop traversing
-			fringePfx := cidrForFringe(octets, depth, is4, uint(octet))
-			if fringePfx.Bits() > bits {
-				break LOOP
-			}
-			return fringePfx, kid.value, true
 
 		default:
 			panic("logic error, wrong node type")
@@ -698,7 +698,7 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 			}
 			kid := n.children.MustGet(addr)
 
-			// kid is node or leaf at addr
+			// kid is node or leaf or fringe at addr
 			switch kid := kid.(type) {
 			case *node[V]:
 				n = kid
@@ -795,7 +795,7 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 			}
 			kid := n.children.MustGet(addr)
 
-			// kid is node or leaf at addr
+			// kid is node or leaf or fringe at addr
 			switch kid := kid.(type) {
 			case *node[V]:
 				n = kid
