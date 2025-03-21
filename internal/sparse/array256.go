@@ -1,7 +1,7 @@
 // Copyright (c) 2025 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
-// package sparse implements a special sparse array
+// Package sparse implements a special sparse array
 // with popcount compression for max. 256 items.
 package sparse
 
@@ -9,7 +9,7 @@ import (
 	"github.com/gaissmai/bart/internal/bitset"
 )
 
-// Array256, a generic implementation of a sparse array
+// Array256 is a generic implementation of a sparse array
 // with popcount compression for max. 256 items with payload T.
 type Array256[T any] struct {
 	bitset.BitSet256
@@ -18,13 +18,13 @@ type Array256[T any] struct {
 
 // MustSet of the underlying bitset is forbidden. The bitset and the items are coupled.
 // An unsynchronized Set() disturbs the coupling between bitset and Items[].
-func (a *Array256[T]) MustSet(i uint) {
+func (a *Array256[T]) MustSet(uint) {
 	panic("forbidden, use InsertAt")
 }
 
 // MustClear of the underlying bitset is forbidden. The bitset and the items are coupled.
 // An unsynchronized Clear() disturbs the coupling between bitset and Items[].
-func (a *Array256[T]) MustClear(i uint) {
+func (a *Array256[T]) MustClear(uint) {
 	panic("forbidden, use DeleteAt")
 }
 
@@ -47,7 +47,7 @@ func (a *Array256[T]) Get(i uint) (value T, ok bool) {
 	return
 }
 
-// MustGet, use it only after a successful test
+// MustGet use it only after a successful test
 // or the behavior is undefined, it will NOT PANIC.
 func (a *Array256[T]) MustGet(i uint) T {
 	return a.Items[a.Rank0(i)]

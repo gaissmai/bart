@@ -1,6 +1,11 @@
 // Copyright (c) 2025 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
+// Package allot contains the precalculated bitsets of all baseIndices,
+// which for a given prefix contain all longer prefixes covered by it.
+//
+// Please read the ART paper ./doc/artlookup.pdf
+// to understand the baseIndex algorithm.
 package allot
 
 import "github.com/gaissmai/bart/internal/bitset"

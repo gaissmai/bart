@@ -101,7 +101,7 @@ func lastOctetIdxAndBits(bits int) (lastIdx, lastBits int) {
 	return bits >> 3, bits & 7
 }
 
-// Insert, add a pfx to the tree, with given val.
+// Insert adds a pfx to the tree, with given val.
 // If pfx is already present in the tree, its value is set to val.
 func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	if !pfx.IsValid() {
@@ -871,7 +871,7 @@ func (t *Table[V]) Union(o *Table[V]) {
 	t.size6 += o.size6 - dup6
 }
 
-// Cloner, if implemented by payload of type V the values are deeply copied
+// Cloner is an interface, if implemented by payload of type V the values are deeply copied
 // during [Table.UpdatePersist], [Table.DeletePersist], [Table.Clone] and [Table.Union].
 type Cloner[V any] interface {
 	Clone() V
@@ -928,14 +928,14 @@ func (t *Table[V]) All() iter.Seq2[netip.Prefix, V] {
 	}
 }
 
-// All4, like [Table.All] but only for the v4 routing table.
+// All4 is like [Table.All] but only for the v4 routing table.
 func (t *Table[V]) All4() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
 		_ = t.root4.allRec(stridePath{}, 0, true, yield)
 	}
 }
 
-// All6, like [Table.All] but only for the v6 routing table.
+// All6 is like [Table.All] but only for the v6 routing table.
 func (t *Table[V]) All6() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
 		_ = t.root6.allRec(stridePath{}, 0, false, yield)
@@ -950,14 +950,14 @@ func (t *Table[V]) AllSorted() iter.Seq2[netip.Prefix, V] {
 	}
 }
 
-// AllSorted4, like [Table.AllSorted] but only for the v4 routing table.
+// AllSorted4 is like [Table.AllSorted] but only for the v4 routing table.
 func (t *Table[V]) AllSorted4() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
 		_ = t.root4.allRecSorted(stridePath{}, 0, true, yield)
 	}
 }
 
-// AllSorted6, like [Table.AllSorted] but only for the v6 routing table.
+// AllSorted6 is like [Table.AllSorted] but only for the v6 routing table.
 func (t *Table[V]) AllSorted6() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
 		_ = t.root6.allRecSorted(stridePath{}, 0, false, yield)

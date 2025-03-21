@@ -35,12 +35,12 @@ func (l *Lite) DeletePersist(pfx netip.Prefix) *Lite {
 	return &Lite{*tbl}
 }
 
-// Deprecated: update is pointless without payload and panics.
+// Deprecated: Update is pointless without payload and panics.
 func (l *Lite) Update() {
 	panic("update is pointless without payload")
 }
 
-// Deprecated: update is pointless without payload and panics.
+// Deprecated: UpdatePersist is pointless without payload and panics.
 func (l *Lite) UpdatePersist() {
 	panic("update is pointless without payload")
 }

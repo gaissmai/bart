@@ -1,25 +1,27 @@
 // Copyright (c) 2024 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
+// Package art summarizes the functions and inverse functions
+// for mapping between a prefix and a baseIndex.
+//
+//	can inline PfxLen with cost 10
+//	can inline HostIdx with cost 4
+//	can inline IdxToPfx with cost 10
+//	can inline PfxToIdx with cost 11
+//
 // Please read the ART paper ./doc/artlookup.pdf
 // to understand the baseIndex algorithm.
-
 package art
 
 // split IP addrs into bytes
 const strideLen = 8
 
-//  can inline PfxLen with cost 10
-//  can inline HostIdx with cost 4
-//  can inline IdxToPfx with cost 10
-//  can inline PfxToIdx with cost 11
-
-// HostIdx, just PfxToIdx(octet, 8) but faster.
+// HostIdx is just PfxToIdx(octet, 8) but faster.
 func HostIdx(octet uint) uint {
 	return 256 + octet
 }
 
-// PfxToIdx, maps a prefix table as a 'complete binary tree'.
+// PfxToIdx maps a prefix table as a 'complete binary tree'.
 func PfxToIdx(octet byte, prefixLen int) uint {
 	// uint16() are compiler optimization hints, that the shift amount is
 	// smaller than the width of the types
@@ -32,7 +34,7 @@ func IdxToPfx(idx uint) (octet byte, pfxLen int) {
 	return baseIdxLookupTbl[idx&511].octet, int(baseIdxLookupTbl[idx&511].pfxLen) // &511 is BCE
 }
 
-// PfxLen, based on depth and idx.
+// PfxLen returns the bits based on depth and idx.
 func PfxLen(depth int, idx uint) int {
 	return depth*strideLen + int(baseIdxLookupTbl[idx&511].pfxLen) // &511 is BCE
 }
@@ -44,7 +46,7 @@ func IdxToRange(idx uint) (first, last uint8) {
 	return
 }
 
-// Netmask for bits
+// NetMask for bits
 //
 //	0b0000_0000, // bits == 0
 //	0b1000_0000, // bits == 1
