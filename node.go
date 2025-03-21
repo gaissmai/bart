@@ -960,7 +960,7 @@ func cidrFromPath(path stridePath, depth int, is4 bool, idx uint) netip.Prefix {
 }
 
 // cidrForFringe, helper function,
-// get prefix back from octets path, depth, IP version ans last octet.
+// get prefix back from octets path, depth, IP version and last octet.
 func cidrForFringe(octets []byte, depth int, is4 bool, lastOctet uint) netip.Prefix {
 	path := stridePath{}
 	copy(path[:], octets[:depth+1])
