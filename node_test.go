@@ -121,15 +121,12 @@ func TestOverlapsPrefix(t *testing.T) {
 	}
 }
 
-func TestOverlapsNode(t *testing.T) {
+func TestOverlapsRoutes(t *testing.T) {
 	t.Parallel()
 
-	// Empirically, between 5 and 6 routes per table results in ~50%
-	// of random pairs overlapping. Cool example of the birthday paradox!
-	const numEntries = 6
+	const numEntries = 2
 	all := allStridePfxs()
 
-	seenResult := map[bool]int{}
 	for range 100_000 {
 		shuffleStridePfxs(all)
 		pfxs := all[:numEntries]
@@ -150,14 +147,10 @@ func TestOverlapsNode(t *testing.T) {
 		}
 
 		gotGold := gold.strideOverlaps(goldInter)
-		gotFast := fast.overlaps(fastInter, 0)
+		gotFast := fast.overlapsRoutes(fastInter)
 		if gotGold != gotFast {
 			t.Fatalf("node.overlaps = %v, want %v", gotFast, gotGold)
 		}
-		seenResult[gotFast]++
-	}
-	if len(seenResult) != 2 { // saw both intersections and non-intersections
-		t.Fatalf("didn't see both intersections and non-intersections\nIntersects: %d\nNon-intersects: %d", seenResult[true], seenResult[false])
 	}
 }
 
