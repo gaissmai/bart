@@ -1,4 +1,4 @@
-// Copyright (c) Karl Gaissmaier
+// Copyright (c) 2024 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
 package bart
