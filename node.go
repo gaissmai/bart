@@ -44,7 +44,7 @@ type node[V any] struct {
 	prefixes sparse.Array256[V]
 
 	// children, recursively spans the trie with a branching factor of 256.
-	children sparse.Array256[any] // [any] is a *node or a *leaf
+	children sparse.Array256[any] // [any] is a *node, with path compression a *leaf or *fringe
 }
 
 // isEmpty returns true if node has neither prefixes nor children
@@ -52,20 +52,21 @@ func (n *node[V]) isEmpty() bool {
 	return n.prefixes.Len() == 0 && n.children.Len() == 0
 }
 
-// leaf is a prefix with value, used as a path compressed child, with a fringe flag.
+// leaf is a prefix with value, used as a path compressed child.
 type leaf[V any] struct {
 	prefix netip.Prefix
 	value  V
 }
 
 // fringeFoo, a leaf with value but without a prefix. The prefix of a fringe
-// is defined by the position in the trie. Saves a lot of memory, but the algorithm ist
-// a little bit more complex.
+// is defined by the position in the trie.
+// Saves a lot of memory, but the algorithm ist a little bit more complex.
 type fringeFoo[V any] struct {
 	value V
 }
 
-// isFringe, prefixes with /8, /16, ... /128 bits
+// isFringe, leaves with /8, /16, ... /128 bits at special positions
+// in the trie.
 //
 // A leaf inserted at the last possible level (depth == lastIdx-1)
 // before becoming a prefix in the next level down (depth == lastIdx).
@@ -105,10 +106,6 @@ func (l *fringeFoo[V]) cloneFringe() *fringeFoo[V] {
 
 // insertAtDepth insert a prefix/val into a node tree at depth.
 // n must not be nil, prefix must be valid and already in canonical form.
-//
-// If a path compression has to be resolved because a new value is added
-// that collides with a leaf, the compressed leaf is then reinserted
-// one depth down in the node trie.
 func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool) {
 	ip := pfx.Addr()
 	bits := pfx.Bits()
@@ -121,7 +118,7 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 		octet := octets[depth]
 		addr := uint(octet)
 
-		// last significant octet: insert/override prefix/val into node
+		// last masked octet: insert/override prefix/val into node
 		if depth == lastIdx {
 			return n.prefixes.InsertAt(art.PfxToIdx(octet, lastBits), val)
 		}
@@ -206,7 +203,7 @@ func (n *node[V]) insertAtDepthPersist(pfx netip.Prefix, val V, depth int) (exis
 		octet := octets[depth]
 		addr := uint(octet)
 
-		// last significant octet: insert/override prefix/val into node
+		// last masked octet: insert/override prefix/val into node
 		if depth == lastIdx {
 			return n.prefixes.InsertAt(art.PfxToIdx(octet, lastBits), val)
 		}
@@ -231,6 +228,8 @@ func (n *node[V]) insertAtDepthPersist(pfx netip.Prefix, val V, depth int) (exis
 			continue // descend down to next trie level
 
 		case *leaf[V]:
+			// TODO, to clone or not to clone ...
+
 			// reached a path compressed prefix
 			// override value in slot if prefixes are equal
 			if kid.prefix == pfx {
@@ -250,6 +249,8 @@ func (n *node[V]) insertAtDepthPersist(pfx netip.Prefix, val V, depth int) (exis
 			n = newNode
 
 		case *fringeFoo[V]:
+			// TODO, to clone or not to clone ...
+
 			// reached a path compressed fringe
 			// override value in slot if pfx is a fringe
 			if isFringe(depth, bits) {
