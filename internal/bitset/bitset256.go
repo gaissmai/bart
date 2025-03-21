@@ -57,12 +57,12 @@ func (b *BitSet256) String() string {
 	return fmt.Sprint(b.All())
 }
 
-// MustSet, sets the bit, it panic's if bit is > 255 by intention!
+// MustSet sets the bit, it panic's if bit is > 255 by intention!
 func (b *BitSet256) MustSet(bit uint) {
 	b[bit>>6] |= 1 << (bit & 63)
 }
 
-// MustClear, clear the bit, it panic's if bit is > 255 by intention!
+// MustClear clear the bit, it panic's if bit is > 255 by intention!
 func (b *BitSet256) MustClear(bit uint) {
 	b[bit>>6] &^= 1 << (bit & 63)
 }
