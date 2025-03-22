@@ -41,7 +41,7 @@ import (
 // external lock mechanism or the various ...Persist functions must be used
 // which return a modified routing table by leaving the original unchanged
 //
-// A Table must not be copied by value, see [Table.Clone].
+// A Table must not be copied by value.
 type Table[V any] struct {
 	// used by -copylocks checker from `go vet`.
 	_ noCopy
@@ -163,9 +163,9 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 			// insert prefix path compressed
 			newVal := cb(zero, false)
 			if isFringe(depth, bits) {
-				n.children.InsertAt(addr, &fringeFoo[V]{value: newVal})
+				n.children.InsertAt(addr, &fringeNode[V]{value: newVal})
 			} else {
-				n.children.InsertAt(addr, &leaf[V]{prefix: pfx, value: newVal})
+				n.children.InsertAt(addr, &leafNode[V]{prefix: pfx, value: newVal})
 			}
 			t.sizeUpdate(is4, 1)
 			return newVal
@@ -178,7 +178,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 			n = kid
 			continue // descend down to next trie level
 
-		case *leaf[V]:
+		case *leafNode[V]:
 			// update existing value if prefixes are equal
 			if kid.prefix == pfx {
 				kid.value = cb(kid.value, true)
@@ -195,7 +195,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 			n.children.InsertAt(addr, newNode)
 			n = newNode
 
-		case *fringeFoo[V]:
+		case *fringeNode[V]:
 			// update existing value if prefix is fringe
 			if isFringe(depth, bits) {
 				kid.value = cb(kid.value, true)
@@ -287,7 +287,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 			n = kid
 			continue // descend down to next trie level
 
-		case *fringeFoo[V]:
+		case *fringeNode[V]:
 			// not this fringe
 			if !isFringe(depth, bits) {
 				return val, false
@@ -301,7 +301,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 
 			return kid.value, true
 
-		case *leaf[V]:
+		case *leafNode[V]:
 			// reached a path compressed prefix, stop traversing
 			if kid.prefix != pfx {
 				return val, false
@@ -365,14 +365,14 @@ LOOP:
 			n = kid
 			continue // descend down to next trie level
 
-		case *fringeFoo[V]:
+		case *fringeNode[V]:
 			// reached a path compressed fringe, stop traversing
 			if isFringe(depth, bits) {
 				return kid.value, true
 			}
 			break LOOP
 
-		case *leaf[V]:
+		case *leafNode[V]:
 			// reached a path compressed prefix, stop traversing
 			if kid.prefix == pfx {
 				return kid.value, true
@@ -418,11 +418,11 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 			n = kid
 			continue // descend down to next trie level
 
-		case *fringeFoo[V]:
+		case *fringeNode[V]:
 			// fringe is the default-route for all possible octets below
 			return true
 
-		case *leaf[V]:
+		case *leafNode[V]:
 			return kid.prefix.Contains(ip)
 
 		default:
@@ -477,11 +477,11 @@ LOOP:
 			n = kid
 			continue // descend down to next trie level
 
-		case *fringeFoo[V]:
+		case *fringeNode[V]:
 			// fringe is the default-route for all possible octets below
 			return kid.value, true
 
-		case *leaf[V]:
+		case *leafNode[V]:
 			// reached a path compressed prefix, stop traversing
 			if kid.prefix.Contains(ip) {
 				return kid.value, true
@@ -583,7 +583,7 @@ LOOP:
 			n = kid
 			continue LOOP // descend down to next trie level
 
-		case *fringeFoo[V]:
+		case *fringeNode[V]:
 			// reached a path compressed fringe, stop traversing
 			fringePfx := cidrForFringe(octets, depth, is4, uint(octet))
 			if fringePfx.Bits() > bits {
@@ -591,7 +591,7 @@ LOOP:
 			}
 			return fringePfx, kid.value, true
 
-		case *leaf[V]:
+		case *leafNode[V]:
 			// reached a path compressed prefix, stop traversing
 			if kid.prefix.Bits() > bits {
 				break LOOP
@@ -704,7 +704,7 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 				n = kid
 				continue LOOP // descend down to next trie level
 
-			case *leaf[V]:
+			case *leafNode[V]:
 				if kid.prefix.Bits() > pfx.Bits() {
 					break LOOP
 				}
@@ -718,7 +718,7 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 				// end of trie along this octets path
 				break LOOP
 
-			case *fringeFoo[V]:
+			case *fringeNode[V]:
 				fringePfx := cidrForFringe(octets, depth, is4, addr)
 				if fringePfx.Bits() > pfx.Bits() {
 					break LOOP
@@ -803,13 +803,13 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 				n = kid
 				continue // descend down to next trie level
 
-			case *leaf[V]:
+			case *leafNode[V]:
 				if pfx.Bits() <= kid.prefix.Bits() && pfx.Overlaps(kid.prefix) {
 					_ = yield(kid.prefix, kid.value)
 				}
 				return
 
-			case *fringeFoo[V]:
+			case *fringeNode[V]:
 				fringePfx := cidrForFringe(octets, depth, is4, addr)
 				if pfx.Bits() <= fringePfx.Bits() && pfx.Overlaps(fringePfx) {
 					_ = yield(fringePfx, kid.value)
