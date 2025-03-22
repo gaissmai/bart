@@ -15,10 +15,11 @@ import (
 type nodeType byte
 
 const (
-	nullNode         nodeType = iota // empty node
-	fullNode                         // prefixes and children or path-compressed prefixes
-	leafNode                         // no children, only prefixes or path-compressed prefixes
-	intermediateNode                 // only children, no prefix nor path-compressed prefixes
+	nullNode nodeType = iota // empty node
+	fullNode                 // prefixes and children or path-compressed prefixes
+	halfNode                 // no prefixes, only children and path-compressed prefixes
+	pathNode                 // only children, no prefix nor path-compressed prefixes
+	stopNode                 // no children, only prefixes or path-compressed prefixes
 )
 
 // ##################################################
@@ -121,10 +122,10 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 				nodeAddrs = append(nodeAddrs, addr)
 				continue
 
-			case *fringeFoo[V]:
+			case *fringeNode[V]:
 				fringeAddrs = append(fringeAddrs, addr)
 
-			case *leaf[V]:
+			case *leafNode[V]:
 				leafAddrs = append(leafAddrs, addr)
 
 			default:
@@ -135,18 +136,6 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 		// print the children for this node.
 		fmt.Fprintf(w, "%soctets(#%d): %s\n", indent, n.children.Len(), n.children.String())
 
-		if nodeCount := len(nodeAddrs); nodeCount > 0 {
-			// print the next nodes
-			fmt.Fprintf(w, "%snodes(#%d): ", indent, nodeCount)
-
-			for _, addr := range nodeAddrs {
-				octet := byte(addr)
-				fmt.Fprintf(w, " %s", octetFmt(octet, is4))
-			}
-
-			fmt.Fprintln(w)
-		}
-
 		if leafCount := len(leafAddrs); leafCount > 0 {
 			// print the pathcomp prefixes for this node
 			fmt.Fprintf(w, "%sleaves(#%d):", indent, leafCount)
@@ -154,7 +143,7 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 			for _, addr := range leafAddrs {
 				octet := byte(addr)
 				k := n.children.MustGet(addr)
-				pc := k.(*leaf[V])
+				pc := k.(*leafNode[V])
 
 				fmt.Fprintf(w, " %s:{%s, %v}", octetFmt(octet, is4), pc.prefix, pc.value)
 			}
@@ -168,12 +157,25 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 			for _, addr := range fringeAddrs {
 				octet := byte(addr)
 				k := n.children.MustGet(addr)
-				pc := k.(*fringeFoo[V])
+				pc := k.(*fringeNode[V])
 
 				fmt.Fprintf(w, " %s:{%v}", octetFmt(octet, is4), pc.value)
 			}
 			fmt.Fprintln(w)
 		}
+
+		if nodeCount := len(nodeAddrs); nodeCount > 0 {
+			// print the next nodes
+			fmt.Fprintf(w, "%snodes(#%d): ", indent, nodeCount)
+
+			for _, addr := range nodeAddrs {
+				octet := byte(addr)
+				fmt.Fprintf(w, " %s", octetFmt(octet, is4))
+			}
+
+			fmt.Fprintln(w)
+		}
+
 	}
 }
 
@@ -185,11 +187,13 @@ func (n *node[V]) hasType() nodeType {
 	case s.pfxs == 0 && s.childs == 0:
 		return nullNode
 	case s.nodes == 0:
-		return leafNode
+		return stopNode
+	case (s.leaves > 0 || s.fringes > 0) && s.nodes > 0 && s.pfxs == 0:
+		return halfNode
 	case (s.pfxs > 0 || s.leaves > 0 || s.fringes > 0) && s.nodes > 0:
 		return fullNode
 	case (s.pfxs == 0 && s.leaves == 0 && s.fringes == 0) && s.nodes > 0:
-		return intermediateNode
+		return pathNode
 	default:
 		panic(fmt.Sprintf("UNREACHABLE: pfx: %d, chld: %d, node: %d, leaf: %d, fringe: %d",
 			s.pfxs, s.childs, s.nodes, s.leaves, s.fringes))
@@ -242,10 +246,12 @@ func (nt nodeType) String() string {
 		return "NULL"
 	case fullNode:
 		return "FULL"
-	case leafNode:
-		return "LEAF"
-	case intermediateNode:
-		return "IMED"
+	case halfNode:
+		return "HALF"
+	case pathNode:
+		return "PATH"
+	case stopNode:
+		return "STOP"
 	default:
 		return "unreachable"
 	}
@@ -272,10 +278,10 @@ func (n *node[V]) nodeStats() stats {
 		case *node[V]:
 			s.nodes++
 
-		case *fringeFoo[V]:
+		case *fringeNode[V]:
 			s.fringes++
 
-		case *leaf[V]:
+		case *leafNode[V]:
 			s.leaves++
 
 		default:
@@ -311,10 +317,10 @@ func (n *node[V]) nodeStatsRec() stats {
 			s.leaves += rs.leaves
 			s.fringes += rs.fringes
 
-		case *fringeFoo[V]:
+		case *fringeNode[V]:
 			s.fringes++
 
-		case *leaf[V]:
+		case *leafNode[V]:
 			s.leaves++
 
 		default:
