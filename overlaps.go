@@ -179,7 +179,7 @@ func (n *node[V]) overlapsSameChildren(o *node[V], depth int) bool {
 			nChild := n.children.MustGet(addr)
 			oChild := o.children.MustGet(addr)
 
-			if overlapsTwoChilds[V](nChild, oChild, depth) {
+			if overlapsTwoChilds[V](nChild, oChild, depth+1) {
 				return true
 			}
 			addr++
@@ -235,8 +235,6 @@ func overlapsTwoChilds[V any](nChild, oChild any, depth int) bool {
 	default:
 		panic("logic error, wrong node type")
 	}
-
-	return false
 }
 
 // overlapsPrefixAtDepth, returns true if node overlaps with prefix
