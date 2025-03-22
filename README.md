@@ -26,14 +26,13 @@ orders of magnitude in comparison to ART, with even better lookup times for the
 longest prefix match.
 
 The BART algorithm is based on fixed size bit vectors and precalculated
-lookup tables. The search is performed entirely by fast,
+lookup tables. The lookup is performed entirely by fast,
 cache-friendly bitmask operations, which in modern CPUs are performed
-by advanced bit manipulation instruction sets (POPCNT, LZCNT, TZCNT).
+by advanced bit manipulation instruction sets (POPCNT, LZCNT, TZCNT, ...).
 
 The algorithm was specially developed so that it can always work with a fixed
-length of 256 bits. This means that the bitsets fit well in a cache line and
-that loops in hot paths (4x uint64 = 256) can be accelerated by loop unrolling,
-e.g.
+length of 256 bits. This means that the bitset fit very well in a cache line and
+that loops over the bitset in hot paths can be accelerated by loop unrolling, e.g.
 
 ```go
  func (b *BitSet256) Intersection(c *BitSet256) (bs BitSet256) {
