@@ -5,11 +5,12 @@ package bart
 
 import "net/netip"
 
-// Lite is just a convenience wrapper for [Table], instantiated with an
+// Lite is just a convenience wrapper for Table, instantiated with an
 // empty struct as payload. Lite is ideal for simple IP ACLs
 // (access-control-lists) with plain true/false results without a payload.
 //
-// Lite delegates almost all methods unmodified to the underlying [Table].
+// Lite delegates almost all methods unmodified to the underlying Table.
+// Only those that have a payload as an argument are adapted.
 type Lite struct {
 	Table[struct{}]
 }
