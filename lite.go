@@ -76,3 +76,23 @@ func (l *Lite) Update() {
 func (l *Lite) UpdatePersist() {
 	panic("update is pointless without payload")
 }
+
+// Deprecated: Get is pointless without payload and panics.
+func (l *Lite) Get() {
+	panic("get is pointless without payload")
+}
+
+// Deprecated: GetAndDelete is pointless without payload and panics.
+func (l *Lite) GetAndDelete() {
+	panic("get is pointless without payload")
+}
+
+// Deprecated: GetAndDeletePersist is pointless without payload and panics.
+func (l *Lite) GetAndDeletePersist() {
+	panic("get is pointless without payload")
+}
+
+// Deprecated: Lookup is pointless without payload and panics.
+func (l *Lite) Lookup() {
+	panic("lookup is pointless without payload")
+}
