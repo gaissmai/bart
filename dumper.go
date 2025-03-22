@@ -43,16 +43,16 @@ func (t *Table[V]) dump(w io.Writer) {
 	if t.size4 > 0 {
 		stats := t.root4.nodeStatsRec()
 		fmt.Fprintln(w)
-		fmt.Fprintf(w, "### IPv4: nodes(%d), pfxs(%d), leaves(%d), fringes(%d),",
-			stats.nodes, stats.pfxs, stats.leaves, stats.fringes)
+		fmt.Fprintf(w, "### IPv4: size(%d), nodes(%d), pfxs(%d), leaves(%d), fringes(%d),",
+			t.size4, stats.nodes, stats.pfxs, stats.leaves, stats.fringes)
 		t.root4.dumpRec(w, stridePath{}, 0, true)
 	}
 
 	if t.size6 > 0 {
 		stats := t.root6.nodeStatsRec()
 		fmt.Fprintln(w)
-		fmt.Fprintf(w, "### IPv6: nodes(%d), pfxs(%d), leaves(%d), fringes(%d),",
-			stats.nodes, stats.pfxs, stats.leaves, stats.fringes)
+		fmt.Fprintf(w, "### IPv6: size(%d), nodes(%d), pfxs(%d), leaves(%d), fringes(%d),",
+			t.size6, stats.nodes, stats.pfxs, stats.leaves, stats.fringes)
 		t.root6.dumpRec(w, stridePath{}, 0, false)
 	}
 }
@@ -99,14 +99,18 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 
 		fmt.Fprintln(w)
 
-		// print the values for this node
-		fmt.Fprintf(w, "%svalues(#%d):", indent, nPfxCount)
+		// skip values if the payload is the empty struct
+		if _, ok := any(n.prefixes.Items[0]).(struct{}); !ok {
 
-		for _, val := range n.prefixes.Items {
-			fmt.Fprintf(w, " %#v", val)
+			// print the values for this node
+			fmt.Fprintf(w, "%svalues(#%d):", indent, nPfxCount)
+
+			for _, val := range n.prefixes.Items {
+				fmt.Fprintf(w, " %#v", val)
+			}
+
+			fmt.Fprintln(w)
 		}
-
-		fmt.Fprintln(w)
 	}
 
 	if n.children.Len() != 0 {
@@ -145,7 +149,12 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 				k := n.children.MustGet(addr)
 				pc := k.(*leafNode[V])
 
-				fmt.Fprintf(w, " %s:{%s, %v}", octetFmt(octet, is4), pc.prefix, pc.value)
+				// only print the payload of not them empty struct
+				if _, ok := any(pc.value).(struct{}); ok {
+					fmt.Fprintf(w, " %s:{%s}", octetFmt(octet, is4), pc.prefix)
+				} else {
+					fmt.Fprintf(w, " %s:{%s, %v}", octetFmt(octet, is4), pc.prefix, pc.value)
+				}
 			}
 			fmt.Fprintln(w)
 		}
@@ -156,10 +165,17 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 
 			for _, addr := range fringeAddrs {
 				octet := byte(addr)
+				fringePfx := cidrForFringe(path[:], depth, is4, addr)
+
 				k := n.children.MustGet(addr)
 				pc := k.(*fringeNode[V])
 
-				fmt.Fprintf(w, " %s:{%v}", octetFmt(octet, is4), pc.value)
+				// only print the payload of not them empty struct
+				if _, ok := any(pc.value).(struct{}); ok {
+					fmt.Fprintf(w, " %s:{%s}", octetFmt(octet, is4), fringePfx)
+				} else {
+					fmt.Fprintf(w, " %s:{%s, %v}", octetFmt(octet, is4), fringePfx, pc.value)
+				}
 			}
 			fmt.Fprintln(w)
 		}
