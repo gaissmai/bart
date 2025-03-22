@@ -584,12 +584,18 @@ LOOP:
 			continue LOOP // descend down to next trie level
 
 		case *fringeNode[V]:
-			// reached a path compressed fringe, stop traversing
-			fringePfx := cidrForFringe(octets, depth, is4, addr)
-			if fringePfx.Bits() > bits {
+			fringeBits := (depth + 1) << 3
+			if fringeBits > bits {
 				break LOOP
 			}
-			return fringePfx, kid.value, true
+
+			if withLPM {
+				// get the lpm prefix back
+				fringePfx := cidrForFringe(octets, depth, is4, addr)
+				return fringePfx, kid.value, true
+			}
+
+			return netip.Prefix{}, kid.value, true
 
 		case *leafNode[V]:
 			// reached a path compressed prefix, stop traversing
