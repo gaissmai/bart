@@ -61,8 +61,6 @@ func TestRegressionOverlaps(t *testing.T) {
 func TestOverlapsCompare(t *testing.T) {
 	t.Parallel()
 
-	t.Skip("TODO")
-
 	// Empirically, between 5 and 6 routes per table results in ~50%
 	// of random pairs overlapping. Cool example of the birthday paradox!
 	const numEntries = 6
