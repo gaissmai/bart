@@ -583,31 +583,29 @@ LOOP:
 			n = kid
 			continue LOOP // descend down to next trie level
 
+		case *leafNode[V]:
+			// reached a path compressed prefix, stop traversing
+			if kid.prefix.Bits() > bits || !kid.prefix.Contains(ip) {
+				break LOOP
+			}
+			return kid.prefix, kid.value, true
+
 		case *fringeNode[V]:
+			// the bits of the fringe are defined by the depth
+			// maybe the LPM isn't needed, saves some cycles
 			fringeBits := (depth + 1) << 3
 			if fringeBits > bits {
 				break LOOP
 			}
 
-			if withLPM {
-				// get the lpm prefix back
-				fringePfx := cidrForFringe(octets, depth, is4, addr)
-				return fringePfx, kid.value, true
+			// the LPM isn't needed, saves some cycles
+			if !withLPM {
+				return netip.Prefix{}, kid.value, true
 			}
 
-			return netip.Prefix{}, kid.value, true
-
-		case *leafNode[V]:
-			// reached a path compressed prefix, stop traversing
-			if kid.prefix.Bits() > bits {
-				break LOOP
-			}
-
-			if kid.prefix.Contains(ip) {
-				return kid.prefix, kid.value, true
-			}
-
-			break LOOP
+			// sic, get the LPM prefix back, it costs some cycles!
+			fringePfx := cidrForFringe(octets, depth, is4, addr)
+			return fringePfx, kid.value, true
 
 		default:
 			panic("logic error, wrong node type")
