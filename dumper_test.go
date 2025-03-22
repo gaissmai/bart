@@ -45,7 +45,7 @@ func TestDumpDefaultRouteV4(t *testing.T) {
 		},
 		want: `
 ### IPv4: nodes(1), pfxs(1), leaves(0), fringes(0),
-[LEAF] depth:  0 path: [] / 0
+[STOP] depth:  0 path: [] / 0
 indexs(#1): [1]
 prefxs(#1): 0/0
 values(#1): <nil>
@@ -62,7 +62,7 @@ func TestDumpDefaultRouteV6(t *testing.T) {
 		},
 		want: `
 ### IPv6: nodes(1), pfxs(1), leaves(0), fringes(0),
-[LEAF] depth:  0 path: [] / 0
+[STOP] depth:  0 path: [] / 0
 indexs(#1): [1]
 prefxs(#1): 0x00/0
 values(#1): <nil>
@@ -88,10 +88,10 @@ func TestDumpSampleV4(t *testing.T) {
 		},
 		want: `
 ### IPv4: nodes(6), pfxs(3), leaves(3), fringes(3),
-[FULL] depth:  0 path: [] / 0
+[HALF] depth:  0 path: [] / 0
 octets(#5): [10 127 169 172 192]
-nodes(#3):  10 127 192
 leaves(#2): 169:{169.254.0.0/16, <nil>} 172:{172.16.0.0/12, <nil>}
+nodes(#3):  10 127 192
 
 .[FULL] depth:  1 path: [10] / 8
 .indexs(#1): [1]
@@ -100,22 +100,22 @@ leaves(#2): 169:{169.254.0.0/16, <nil>} 172:{172.16.0.0/12, <nil>}
 .octets(#1): [0]
 .nodes(#1):  0
 
-..[LEAF] depth:  2 path: [10.0] / 16
+..[STOP] depth:  2 path: [10.0] / 16
 ..octets(#2): [0 1]
 ..fringe(#2): 0:{<nil>} 1:{<nil>}
 
-.[LEAF] depth:  1 path: [127] / 8
+.[STOP] depth:  1 path: [127] / 8
 .indexs(#1): [1]
 .prefxs(#1): 0/0
 .values(#1): <nil>
 .octets(#1): [0]
 .leaves(#1): 0:{127.0.0.1/32, <nil>}
 
-.[IMED] depth:  1 path: [192] / 8
+.[PATH] depth:  1 path: [192] / 8
 .octets(#1): [168]
 .nodes(#1):  168
 
-..[LEAF] depth:  2 path: [192.168] / 16
+..[STOP] depth:  2 path: [192.168] / 16
 ..indexs(#1): [1]
 ..prefxs(#1): 0/0
 ..values(#1): <nil>
@@ -137,7 +137,7 @@ func TestDumpSampleV6(t *testing.T) {
 		},
 		want: `
 ### IPv6: nodes(1), pfxs(2), leaves(2), fringes(0),
-[LEAF] depth:  0 path: [] / 0
+[STOP] depth:  0 path: [] / 0
 indexs(#2): [1 9]
 prefxs(#2): 0x00/0 0x20/3
 values(#2): <nil> <nil>
@@ -169,10 +169,10 @@ func TestDumpSample(t *testing.T) {
 		},
 		want: `
 ### IPv4: nodes(6), pfxs(3), leaves(3), fringes(3),
-[FULL] depth:  0 path: [] / 0
+[HALF] depth:  0 path: [] / 0
 octets(#5): [10 127 169 172 192]
-nodes(#3):  10 127 192
 leaves(#2): 169:{169.254.0.0/16, <nil>} 172:{172.16.0.0/12, <nil>}
+nodes(#3):  10 127 192
 
 .[FULL] depth:  1 path: [10] / 8
 .indexs(#1): [1]
@@ -181,22 +181,22 @@ leaves(#2): 169:{169.254.0.0/16, <nil>} 172:{172.16.0.0/12, <nil>}
 .octets(#1): [0]
 .nodes(#1):  0
 
-..[LEAF] depth:  2 path: [10.0] / 16
+..[STOP] depth:  2 path: [10.0] / 16
 ..octets(#2): [0 1]
 ..fringe(#2): 0:{<nil>} 1:{<nil>}
 
-.[LEAF] depth:  1 path: [127] / 8
+.[STOP] depth:  1 path: [127] / 8
 .indexs(#1): [1]
 .prefxs(#1): 0/0
 .values(#1): <nil>
 .octets(#1): [0]
 .leaves(#1): 0:{127.0.0.1/32, <nil>}
 
-.[IMED] depth:  1 path: [192] / 8
+.[PATH] depth:  1 path: [192] / 8
 .octets(#1): [168]
 .nodes(#1):  168
 
-..[LEAF] depth:  2 path: [192.168] / 16
+..[STOP] depth:  2 path: [192.168] / 16
 ..indexs(#1): [1]
 ..prefxs(#1): 0/0
 ..values(#1): <nil>
@@ -204,7 +204,7 @@ leaves(#2): 169:{169.254.0.0/16, <nil>} 172:{172.16.0.0/12, <nil>}
 ..fringe(#1): 1:{<nil>}
 
 ### IPv6: nodes(1), pfxs(2), leaves(2), fringes(0),
-[LEAF] depth:  0 path: [] / 0
+[STOP] depth:  0 path: [] / 0
 indexs(#2): [1 9]
 prefxs(#2): 0x00/0 0x20/3
 values(#2): <nil> <nil>
