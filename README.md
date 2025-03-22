@@ -13,23 +13,40 @@
 
 `package bart` provides a Balanced-Routing-Table (BART).
 
-BART is balanced in terms of memory usage and lookup time
-for the longest-prefix match.
+BART is balanced in terms of memory usage and lookup time for the longest-prefix
+match.
 
-BART is a multibit-trie with fixed stride length of 8 bits,
-using the _baseIndex_ function from the ART algorithm to
-build the complete-binary-tree (CBT) of prefixes for each stride.
+BART is a multibit-trie with fixed stride length of 8 bits, using a fast mapping
+function (taken from the ART algorithm) to map the 256 prefixes in each level
+node to form a complete-binary-tree.
 
-The CBT is implemented as a bit-vector, backtracking is just
-a matter of fast cache friendly bitmask operations.
+This complete binary tree is implemented with popcount compressed sparse arrays
+together with path compression. This reduces storage consumption by almost two
+orders of magnitude in comparison to ART, with even better lookup times for the
+longest prefix match.
 
-The `bart.Table` is implemented with popcount compressed sparse arrays
-together with path compression. This reduces storage consumption
-by almost two orders of magnitude in comparison to ART and has an even
-better lookup speed.
+The BART algorithm is based on fixed size bit vectors and precalculated
+lookup tables. The search is performed entirely by fast,
+cache-friendly bitmask operations, which in modern CPUs are performed
+by advanced bit manipulation instruction sets (POPCNT, LZCNT, TZCNT).
 
-The algorithm is also excellent for determining whether two tables
-contain overlapping IP addresses in a few nanoseconds.
+The algorithm was specially developed so that it can always work with a fixed
+length of 256 bits. This means that the bitsets fit well in a cache line and
+that loops in hot paths (4x uint64 = 256) can be accelerated by loop unrolling,
+e.g.
+
+```go
+ func (b *BitSet256) Intersection(c *BitSet256) (bs BitSet256) {
+     bs[0] = b[0] & c[0]
+     bs[1] = b[1] & c[1]
+     bs[2] = b[2] & c[2]
+     bs[3] = b[3] & c[3]
+     return
+ }
+```
+
+The BART algorithm is also excellent for determining whether two tables
+contain overlapping IP addresses, just in a few nanoseconds.
 
 A `bart.Lite` wrapper is included, this is ideal for simple IP
 ACLs (access-control-lists) with plain true/false results and no payload.
@@ -42,11 +59,11 @@ func ExampleLite_Contains() {
 
 	// Insert some prefixes
 	prefixes := []string{
-		"192.168.0.0/16",       // corporate
-		"192.168.1.0/24",       // department
-		"2001:7c0:3100::/40",   // corporate
-		"2001:7c0:3100:1::/64", // department
-		"fc00::/7",             // unique local
+		"192.168.0.0/16",
+		"192.168.1.0/24",
+		"2001:7c0:3100::/40",
+		"2001:7c0:3100:1::/64",
+		"fc00::/7",
 	}
 
 	for _, s := range prefixes {
@@ -56,11 +73,11 @@ func ExampleLite_Contains() {
 
 	// Test some IP addresses for black/whitelist containment
 	ips := []string{
-		"192.168.1.100",      // must match, department
-		"192.168.2.1",        // must match, corporate
-		"2001:7c0:3100:1::1", // must match, department
-		"2001:7c0:3100:2::1", // must match, corporate
-		"fc00::1",            // must match, unique local
+		"192.168.1.100",      // must match
+		"192.168.2.1",        // must match
+		"2001:7c0:3100:1::1", // must match
+		"2001:7c0:3100:2::1", // must match
+		"fc00::1",            // must match
 		//
 		"172.16.0.1",        // must NOT match
 		"2003:dead:beef::1", // must NOT match
@@ -84,7 +101,7 @@ func ExampleLite_Contains() {
 ```
 ## API
 
-Release v0.19 requires at least go1.23, the `iter.Seq2[netip.Prefix, V]` types for iterators
+From release v0.18.x on, bart requires at least go1.23, the `iter.Seq2[netip.Prefix, V]` types for iterators
 are used. The lock-free versions of insert, update and delete are added, but still experimentell.
 
 ```golang
@@ -101,7 +118,7 @@ are used. The lock-free versions of insert, update and delete are added, but sti
     // external lock mechanism or the various ...Persist functions must be used
     // which return a modified routing table by leaving the original unchanged
 
-    // A Table must not be copied by value, see Table.Clone.
+    // A Table must not be copied by value.
 
   func (t *Table[V]) Contains(ip netip.Addr) bool
   func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool)
