@@ -2517,15 +2517,13 @@ func TestSize(t *testing.T) {
 	var allInc4 int
 	var allInc6 int
 
-	tbl.AllSorted4()(func(netip.Prefix, any) bool {
+	for range tbl.AllSorted4() {
 		allInc4++
-		return true
-	})
+	}
 
-	tbl.AllSorted6()(func(netip.Prefix, any) bool {
+	for range tbl.AllSorted6() {
 		allInc6++
-		return true
-	})
+	}
 
 	if allInc4 != tbl.Size4() {
 		t.Errorf("Size4: want: %d, got: %d", allInc4, tbl.Size4())
@@ -2536,7 +2534,6 @@ func TestSize(t *testing.T) {
 	}
 }
 
-/*
 func TestLastIdxLastBits(t *testing.T) {
 	t.Parallel()
 
@@ -2552,8 +2549,8 @@ func TestLastIdxLastBits(t *testing.T) {
 		},
 		{
 			pfx:      mpp("0.0.0.0/32"),
-			wantIdx:  3,
-			wantBits: 8,
+			wantIdx:  4,
+			wantBits: 0,
 		},
 		{
 			pfx:      mpp("10.0.0.0/7"),
@@ -2567,8 +2564,8 @@ func TestLastIdxLastBits(t *testing.T) {
 		},
 		{
 			pfx:      mpp("10.20.30.0/24"),
-			wantIdx:  2,
-			wantBits: 8,
+			wantIdx:  3,
+			wantBits: 0,
 		},
 		{
 			pfx:      mpp("10.20.30.40/31"),
@@ -2583,8 +2580,8 @@ func TestLastIdxLastBits(t *testing.T) {
 		},
 		{
 			pfx:      mpp("::/128"),
-			wantIdx:  15,
-			wantBits: 8,
+			wantIdx:  16,
+			wantBits: 0,
 		},
 		{
 			pfx:      mpp("2001:db8::/31"),
@@ -2603,7 +2600,6 @@ func TestLastIdxLastBits(t *testing.T) {
 		}
 	}
 }
-*/
 
 // ############ benchmarks ################################
 
