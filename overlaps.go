@@ -210,15 +210,15 @@ func overlapsTwoChilds[V any](nChild, oChild any, path stridePath, depth int, is
 		switch oKind := oChild.(type) {
 		case *node[V]: // node, node
 			return nKind.overlaps(oKind, path, depth, is4)
-		case *leaf[V]: // node, leaf
+		case *leafNode[V]: // node, leaf
 			return nKind.overlapsPrefixAtDepth(oKind.prefix, depth)
 		}
 
-	case *leaf[V]:
+	case *leafNode[V]:
 		switch oKind := oChild.(type) {
 		case *node[V]: // leaf, node
 			return oKind.overlapsPrefixAtDepth(nKind.prefix, depth)
-		case *leaf[V]: // leaf, leaf
+		case *leafNode[V]: // leaf, leaf
 			return oKind.prefix.Overlaps(nKind.prefix)
 		}
 
@@ -268,7 +268,7 @@ func (n *node[V]) overlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
 			n = kid
 			continue
 
-		case *leaf[V]:
+		case *leafNode[V]:
 			return kid.prefix.Overlaps(pfx)
 
 		default:
