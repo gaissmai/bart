@@ -1,27 +1,28 @@
 // Copyright (c) 2024 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
-// package bart provides a Balanced-Routing-Table (BART).
+// Package bart provides a Balanced-Routing-Table (BART).
 //
 // BART is balanced in terms of memory usage and lookup time
 // for the longest-prefix match.
 //
 // BART is a multibit-trie with fixed stride length of 8 bits,
-// using the _baseIndex_ function from the ART algorithm to
-// build the complete-binary-tree (CBT) of prefixes for each stride.
+// using a fast mapping function (taken from the ART algorithm) to map
+// the 256 prefixes in each level node to form a complete-binary-tree.
 //
-// The CBT is implemented as a bit-vector, backtracking is just
-// a matter of fast cache friendly bitmask operations.
+// This complete binary tree is implemented with popcount compressed
+// sparse arrays together with path compression. This reduces storage
+// consumption by almost two orders of magnitude in comparison to ART,
+// with even better lookup times for the longest prefix match.
 //
-// The routing table is implemented with popcount compressed sparse arrays
-// together with path compression. This reduces storage consumption
-// by almost two orders of magnitude in comparison to ART with
-// even better lookup times for the longest prefix match.
+// The BART algorithm is based on bit vectors and precalculated
+// lookup tables. The search is performed entirely by fast,
+// cache-friendly bitmask operations, which in modern CPUs are performed
+// by advanced bit manipulation instruction sets (POPCNT, LZCNT, TZCNT).
 //
-// The stride length was specially chosen so that the algorithm can be
-// implemented with a bitset of a fixed length of 256 bits. This has
-// the advantage that a bitset fits into a cache line and that loop-unrolling
-// can be performed with as few branches as possible.
+// The algorithm was specially developed so that it can always work with a fixed
+// length of 256 bits. This means that the bitsets fit well in a cache line and
+// that loops in hot paths (4x uint64 = 256) can be accelerated by loop unrolling.
 package bart
 
 import (
