@@ -305,6 +305,7 @@ func (n *node[V]) purgeAndCompress(parentStack []*node[V], octets []uint8, is4 b
 				lastOctet, _ := n.children.FirstSet()
 
 				// rebuild the prefix with octets, first, depth and ip version
+				// it's the parent depth, so add +1 here for the kid
 				fringePfx := cidrForFringe(octets, depth+1, is4, lastOctet)
 
 				// ... insert prefix at parents depth
