@@ -300,7 +300,7 @@ func (n *node[V]) directItemsRec(parentIdx uint, path stridePath, depth int, is4
 				path[depth&0xf] = byte(addr)
 				directItems = append(directItems, kid.directItemsRec(0, path, depth+1, is4)...)
 
-			case *leaf[V]: // path-compressed child, stop's recursion for this child
+			case *leafNode[V]: // path-compressed child, stop's recursion for this child
 				item := trieItem[V]{
 					n:    nil,
 					is4:  is4,
@@ -309,7 +309,7 @@ func (n *node[V]) directItemsRec(parentIdx uint, path stridePath, depth int, is4
 				}
 				directItems = append(directItems, item)
 
-			case *fringeFoo[V]: // path-compressed fringe, stop's recursion for this child
+			case *fringeNode[V]: // path-compressed fringe, stop's recursion for this child
 				item := trieItem[V]{
 					n:   nil,
 					is4: is4,

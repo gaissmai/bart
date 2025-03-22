@@ -115,9 +115,9 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 			// insert prefix path compressed
 			newVal := cb(zero, false)
 			if isFringe(depth, bits) {
-				n.children.InsertAt(addr, &fringeFoo[V]{value: newVal})
+				n.children.InsertAt(addr, &fringeNode[V]{value: newVal})
 			} else {
-				n.children.InsertAt(addr, &leaf[V]{prefix: pfx, value: newVal})
+				n.children.InsertAt(addr, &leafNode[V]{prefix: pfx, value: newVal})
 			}
 
 			pt.sizeUpdate(is4, 1)
@@ -134,13 +134,13 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 			n = kid
 			continue // descend down to next trie level
 
-		case *leaf[V]:
+		case *leafNode[V]:
 			kid = kid.cloneLeaf()
 
 			// update existing value if prefixes are equal
 			if kid.prefix == pfx {
 				newVal = cb(kid.value, true)
-				n.children.InsertAt(addr, &leaf[V]{prefix: pfx, value: newVal})
+				n.children.InsertAt(addr, &leafNode[V]{prefix: pfx, value: newVal})
 
 				return pt, newVal
 			}
@@ -155,13 +155,13 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 			n.children.InsertAt(addr, newNode)
 			n = newNode
 
-		case *fringeFoo[V]:
+		case *fringeNode[V]:
 			kid = kid.cloneFringe()
 
 			// update existing value if prefix is fringe
 			if isFringe(depth, bits) {
 				newVal = cb(kid.value, true)
-				n.children.InsertAt(addr, &fringeFoo[V]{value: newVal})
+				n.children.InsertAt(addr, &fringeNode[V]{value: newVal})
 				return pt, newVal
 			}
 
@@ -273,7 +273,7 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, e
 			n = kid
 			continue // descend down to next trie level
 
-		case *fringeFoo[V]:
+		case *fringeNode[V]:
 			kid = kid.cloneFringe()
 
 			// reached a path compressed fringe, stop traversing
@@ -291,7 +291,7 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, e
 			// kid.value is cloned
 			return pt, kid.value, true
 
-		case *leaf[V]:
+		case *leafNode[V]:
 			kid = kid.cloneLeaf()
 
 			// reached a path compressed prefix, stop traversing
