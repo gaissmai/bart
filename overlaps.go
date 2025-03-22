@@ -88,11 +88,10 @@ func (n *node[V]) overlapsRoutes(o *node[V]) bool {
 	nFirstIdx, _ := n.prefixes.FirstSet()
 	oFirstIdx, _ := o.prefixes.FirstSet()
 
-	// start with other min value, see ART algo
+	// start with other min value
 	nIdx := oFirstIdx
 	oIdx := nFirstIdx
 
-	// make full cross check
 	nOK := true
 	oOK := true
 
@@ -193,7 +192,7 @@ func (n *node[V]) overlapsSameChildren(o *node[V], depth int) bool {
 func overlapsTwoChilds[V any](nChild, oChild any, depth int) bool {
 	//  3x3 possible different combinations for n and o
 	//
-	//  node, node    --> overlapsRec
+	//  node, node    --> overlaps rec descent
 	//  node, leaf    --> overlapsPrefixAtDepth
 	//  node, fringe  --> true
 	//
