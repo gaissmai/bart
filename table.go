@@ -585,7 +585,7 @@ LOOP:
 
 		case *fringeNode[V]:
 			// reached a path compressed fringe, stop traversing
-			fringePfx := cidrForFringe(octets, depth, is4, uint(octet))
+			fringePfx := cidrForFringe(octets, depth, is4, addr)
 			if fringePfx.Bits() > bits {
 				break LOOP
 			}
@@ -850,7 +850,7 @@ func (t *Table[V]) Overlaps4(o *Table[V]) bool {
 	if t.size4 == 0 || o.size4 == 0 {
 		return false
 	}
-	return t.root4.overlaps(&o.root4, stridePath{}, 0, true)
+	return t.root4.overlaps(&o.root4, 0)
 }
 
 // Overlaps6 reports whether any IPv6 in the table matches a route in the
@@ -859,7 +859,7 @@ func (t *Table[V]) Overlaps6(o *Table[V]) bool {
 	if t.size6 == 0 || o.size6 == 0 {
 		return false
 	}
-	return t.root6.overlaps(&o.root6, stridePath{}, 0, false)
+	return t.root6.overlaps(&o.root6, 0)
 }
 
 // Union combines two tables, changing the receiver table.

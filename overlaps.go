@@ -12,7 +12,7 @@ import (
 )
 
 // overlaps returns true if any IP in the nodes n or o overlaps.
-func (n *node[V]) overlaps(o *node[V], path stridePath, depth int, is4 bool) bool {
+func (n *node[V]) overlaps(o *node[V], depth int) bool {
 	nPfxCount := n.prefixes.Len()
 	oPfxCount := o.prefixes.Len()
 
@@ -74,7 +74,7 @@ func (n *node[V]) overlaps(o *node[V], path stridePath, depth int, is4 bool) boo
 		return false
 	}
 
-	return n.overlapsSameChildren(o, path, depth, is4)
+	return n.overlapsSameChildren(o, depth)
 }
 
 // overlapsRoutes, test if n overlaps o prefixes and vice versa
@@ -134,7 +134,7 @@ func (n *node[V]) overlapsChildrenIn(o *node[V]) bool {
 	magicNumber := 15
 	doRange := childCount < magicNumber || pfxCount > magicNumber
 
-	// do range over, not so many childs and maybe to many prefixes for other algo below
+	// do range over, not so many childs and maybe too many prefixes for other algo below
 	if doRange {
 		lowerBound, _ := n.prefixes.FirstSet()
 		for _, addr := range o.children.AsSlice(make([]uint, 0, maxItems)) {
@@ -169,7 +169,7 @@ func (n *node[V]) overlapsChildrenIn(o *node[V]) bool {
 }
 
 // overlapsSameChildren, find same octets with bitset intersection.
-func (n *node[V]) overlapsSameChildren(o *node[V], path stridePath, depth int, is4 bool) bool {
+func (n *node[V]) overlapsSameChildren(o *node[V], depth int) bool {
 	// intersect the child bitsets from n with o
 	commonChildren := n.children.BitSet256.Intersection(&o.children.BitSet256)
 
@@ -180,7 +180,7 @@ func (n *node[V]) overlapsSameChildren(o *node[V], path stridePath, depth int, i
 			nChild := n.children.MustGet(addr)
 			oChild := o.children.MustGet(addr)
 
-			if overlapsTwoChilds[V](nChild, oChild, path, depth+1, is4) {
+			if overlapsTwoChilds[V](nChild, oChild, depth) {
 				return true
 			}
 			addr++
@@ -190,28 +190,32 @@ func (n *node[V]) overlapsSameChildren(o *node[V], path stridePath, depth int, i
 }
 
 // overlapsTwoChilds, childs can be node or leaf.
-func overlapsTwoChilds[V any](nChild, oChild any, path stridePath, depth int, is4 bool) bool {
+func overlapsTwoChilds[V any](nChild, oChild any, depth int) bool {
 	//  3x3 possible different combinations for n and o
 	//
 	//  node, node    --> overlapsRec
 	//  node, leaf    --> overlapsPrefixAtDepth
-	//  node, fringe  --> overlapsPrefixAtDepth
+	//  node, fringe  --> true
 	//
 	//  leaf, node    --> overlapsPrefixAtDepth
 	//  leaf, leaf    --> netip.Prefix.Overlaps
-	//  leaf, fringe  --> netip.Prefix.Overlaps
+	//  leaf, fringe  --> true
 	//
-	//  fringe, node    --> overlapsPrefixAtDepth
-	//  fringe, leaf    --> netip.Prefix.Overlaps
-	//  fringe, fringe  --> equality
+	//  fringe, node    --> true
+	//  fringe, leaf    --> true
+	//  fringe, fringe  --> true
 	//
 	switch nKind := nChild.(type) {
 	case *node[V]: // node, ...
 		switch oKind := oChild.(type) {
 		case *node[V]: // node, node
-			return nKind.overlaps(oKind, path, depth, is4)
+			return nKind.overlaps(oKind, depth)
 		case *leafNode[V]: // node, leaf
 			return nKind.overlapsPrefixAtDepth(oKind.prefix, depth)
+		case *fringeNode[V]: // node, fringe
+			return true
+		default:
+			panic("logic error, wrong node type")
 		}
 
 	case *leafNode[V]:
@@ -220,7 +224,14 @@ func overlapsTwoChilds[V any](nChild, oChild any, path stridePath, depth int, is
 			return oKind.overlapsPrefixAtDepth(nKind.prefix, depth)
 		case *leafNode[V]: // leaf, leaf
 			return oKind.prefix.Overlaps(nKind.prefix)
+		case *fringeNode[V]: // leaf, fringe
+			return true
+		default:
+			panic("logic error, wrong node type")
 		}
+
+	case *fringeNode[V]:
+		return true
 
 	default:
 		panic("logic error, wrong node type")
@@ -270,6 +281,9 @@ func (n *node[V]) overlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
 
 		case *leafNode[V]:
 			return kid.prefix.Overlaps(pfx)
+
+		case *fringeNode[V]:
+			return true
 
 		default:
 			panic("logic error, wrong node type")
