@@ -16,11 +16,11 @@ func ExampleLite_Contains() {
 
 	// Insert some prefixes
 	prefixes := []string{
-		"192.168.0.0/16",       // corporate
-		"192.168.1.0/24",       // department
-		"2001:7c0:3100::/40",   // corporate
-		"2001:7c0:3100:1::/64", // department
-		"fc00::/7",             // unique local
+		"192.168.0.0/16",
+		"192.168.1.0/24",
+		"2001:7c0:3100::/40",
+		"2001:7c0:3100:1::/64",
+		"fc00::/7",
 	}
 
 	for _, s := range prefixes {
@@ -30,11 +30,11 @@ func ExampleLite_Contains() {
 
 	// Test some IP addresses for black/whitelist containment
 	ips := []string{
-		"192.168.1.100",      // must match, department
-		"192.168.2.1",        // must match, corporate
-		"2001:7c0:3100:1::1", // must match, department
-		"2001:7c0:3100:2::1", // must match, corporate
-		"fc00::1",            // must match, unique local
+		"192.168.1.100",      // must match
+		"192.168.2.1",        // must match
+		"2001:7c0:3100:1::1", // must match
+		"2001:7c0:3100:2::1", // must match
+		"fc00::1",            // must match
 		//
 		"172.16.0.1",        // must NOT match
 		"2003:dead:beef::1", // must NOT match
