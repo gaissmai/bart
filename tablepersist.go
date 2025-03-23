@@ -93,14 +93,14 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 	// clone the root of insertion path
 	*n = *(n.cloneFlat())
 
-	lastOctetIdx, lastBits := lastOctetIdxAndBits(bits)
+	maxDepth, lastBits := maxDepthAndLastBits(bits)
 
 	octets := ip.AsSlice()
 
 	// find the proper trie node to update prefix
 	for depth, octet := range octets {
 		// last octet from prefix, update/insert prefix into node
-		if depth == lastOctetIdx {
+		if depth == maxDepth {
 			newVal, exists := n.prefixes.UpdateAt(art.PfxToIdx(octet, lastBits), cb)
 			if !exists {
 				pt.sizeUpdate(is4, 1)
@@ -229,7 +229,7 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, e
 	// clone the root of insertion path
 	*n = *n.cloneFlat()
 
-	lastOctetIdx, lastBits := lastOctetIdxAndBits(bits)
+	maxDepth, lastBits := maxDepthAndLastBits(bits)
 
 	octets := ip.AsSlice()
 
@@ -242,7 +242,7 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, e
 		// push cloned node on stack for path recording
 		stack[depth] = n
 
-		if depth == lastOctetIdx {
+		if depth == maxDepth {
 			// try to delete prefix in trie node
 			val, exists = n.prefixes.DeleteAt(art.PfxToIdx(octet, lastBits))
 			if !exists {
