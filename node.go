@@ -290,17 +290,16 @@ func (n *node[V]) purgeAndCompress(parentStack []*node[V], octets []uint8, is4 b
 
 		case pfxCount == 0 && childCount == 1:
 			switch kid := n.children.Items[0].(type) {
-
 			case *node[V]:
-				// noop
-
+				// fast exit, we are at an intermediate node
+				// no further compression upwards possible
+				return
 			case *leafNode[V]:
 				// it's a leaf, delete this node and reinsert the leaf
 				parent.children.DeleteAt(addr)
 
 				// ... insert prefix at parents depth
 				parent.insertAtDepth(kid.prefix, kid.value, depth)
-
 			case *fringeNode[V]:
 				// it's a fringe, we must rebuild the prefix!
 				// get the last octet back from sparse array

@@ -259,6 +259,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 
 	// find the trie node
 	for depth, octet := range octets {
+		depth = depth & 0xf // BCE, Delete must be fast
 		if depth > lastOctetIdx {
 			break
 		}
