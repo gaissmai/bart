@@ -68,8 +68,9 @@ type fringeNode[V any] struct {
 // isFringe, leaves with /8, /16, ... /128 bits at special positions
 // in the trie.
 //
-// A leaf inserted at the last possible level (depth == lastIdx-1)
-// before becoming a prefix in the next level down (depth == lastIdx).
+// A leaf path-compressed inserted at the last
+// possible level (depth == lastIdx-1) before inserted just as a
+// prefix in the next level down (depth == lastIdx).
 //
 // A leaf being a fringe is the default-route for all nodes below this slot.
 //

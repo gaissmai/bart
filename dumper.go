@@ -149,13 +149,15 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 				k := n.children.MustGet(addr)
 				pc := k.(*leafNode[V])
 
-				// only print the payload of not them empty struct
-				if _, ok := any(pc.value).(struct{}); ok {
+				// Lite: val is the empty struct, don't print it
+				switch any(pc.value).(type) {
+				case struct{}:
 					fmt.Fprintf(w, " %s:{%s}", octetFmt(octet, is4), pc.prefix)
-				} else {
+				default:
 					fmt.Fprintf(w, " %s:{%s, %v}", octetFmt(octet, is4), pc.prefix, pc.value)
 				}
 			}
+
 			fmt.Fprintln(w)
 		}
 
@@ -170,13 +172,15 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 				k := n.children.MustGet(addr)
 				pc := k.(*fringeNode[V])
 
-				// only print the payload of not them empty struct
-				if _, ok := any(pc.value).(struct{}); ok {
+				// Lite: val is the empty struct, don't print it
+				switch any(pc.value).(type) {
+				case struct{}:
 					fmt.Fprintf(w, " %s:{%s}", octetFmt(octet, is4), fringePfx)
-				} else {
+				default:
 					fmt.Fprintf(w, " %s:{%s, %v}", octetFmt(octet, is4), fringePfx, pc.value)
 				}
 			}
+
 			fmt.Fprintln(w)
 		}
 

@@ -10,9 +10,19 @@ import "net/netip"
 // (access-control-lists) with plain true/false results without a payload.
 //
 // Lite delegates almost all methods unmodified to the underlying Table.
-// Only those that have a payload as an argument are adapted.
+//
+// Some of the Table methods make no sense without a payload.
+// Their signature has been changed and they do not accept any arguments
+// and if they are used anyway, they will generate a panic.
 type Lite struct {
 	Table[struct{}]
+}
+
+// Exists returns true if the prefix exists in the table.
+// It's an adapter to [Table.Get].
+func (l *Lite) Exists(pfx netip.Prefix) bool {
+	_, ok := l.Table.Get(pfx)
+	return ok
 }
 
 // Insert a pfx into the tree.
@@ -69,30 +79,20 @@ func (l *Lite) Overlaps(o *Lite) bool {
 
 // Deprecated: Update is pointless without payload and panics.
 func (l *Lite) Update() {
-	panic("update is pointless without payload")
+	panic("Update is pointless without payload")
 }
 
 // Deprecated: UpdatePersist is pointless without payload and panics.
 func (l *Lite) UpdatePersist() {
-	panic("update is pointless without payload")
-}
-
-// Deprecated: Get is pointless without payload and panics.
-func (l *Lite) Get() {
-	panic("get is pointless without payload")
+	panic("UpdatePersist is pointless without payload")
 }
 
 // Deprecated: GetAndDelete is pointless without payload and panics.
 func (l *Lite) GetAndDelete() {
-	panic("get is pointless without payload")
+	panic("GetAndDelete is pointless without payload")
 }
 
 // Deprecated: GetAndDeletePersist is pointless without payload and panics.
 func (l *Lite) GetAndDeletePersist() {
-	panic("get is pointless without payload")
-}
-
-// Deprecated: Lookup is pointless without payload and panics.
-func (l *Lite) Lookup() {
-	panic("lookup is pointless without payload")
+	panic("GetAndDeletePersist is pointless without payload")
 }
