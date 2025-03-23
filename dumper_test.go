@@ -47,7 +47,7 @@ func TestDumpDefaultRouteV4(t *testing.T) {
 ### IPv4: size(1), nodes(1), pfxs(1), leaves(0), fringes(0),
 [STOP] depth:  0 path: [] / 0
 indexs(#1): [1]
-prefxs(#1): 0/0
+prefxs(#1): 0.0.0.0/0
 values(#1): <nil>
 `,
 	})
@@ -64,7 +64,7 @@ func TestDumpDefaultRouteV6(t *testing.T) {
 ### IPv6: size(1), nodes(1), pfxs(1), leaves(0), fringes(0),
 [STOP] depth:  0 path: [] / 0
 indexs(#1): [1]
-prefxs(#1): 0x00/0
+prefxs(#1): ::/0
 values(#1): <nil>
 `,
 	})
@@ -91,14 +91,14 @@ func TestDumpSampleV4(t *testing.T) {
 [HALF] depth:  0 path: [] / 0
 octets(#5): [10 127 169 172 192]
 leaves(#2): 169:{169.254.0.0/16, <nil>} 172:{172.16.0.0/12, <nil>}
-nodes(#3):  10 127 192
+childs(#3): 10 127 192
 
 .[FULL] depth:  1 path: [10] / 8
 .indexs(#1): [1]
-.prefxs(#1): 0/0
+.prefxs(#1): 10.0.0.0/8
 .values(#1): <nil>
 .octets(#1): [0]
-.nodes(#1):  0
+.childs(#1): 0
 
 ..[STOP] depth:  2 path: [10.0] / 16
 ..octets(#2): [0 1]
@@ -106,18 +106,18 @@ nodes(#3):  10 127 192
 
 .[STOP] depth:  1 path: [127] / 8
 .indexs(#1): [1]
-.prefxs(#1): 0/0
+.prefxs(#1): 127.0.0.0/8
 .values(#1): <nil>
 .octets(#1): [0]
 .leaves(#1): 0:{127.0.0.1/32, <nil>}
 
 .[PATH] depth:  1 path: [192] / 8
 .octets(#1): [168]
-.nodes(#1):  168
+.childs(#1): 168
 
 ..[STOP] depth:  2 path: [192.168] / 16
 ..indexs(#1): [1]
-..prefxs(#1): 0/0
+..prefxs(#1): 192.168.0.0/16
 ..values(#1): <nil>
 ..octets(#1): [1]
 ..fringe(#1): 1:{192.168.1.0/24, <nil>}
@@ -139,7 +139,7 @@ func TestDumpSampleV6(t *testing.T) {
 ### IPv6: size(4), nodes(1), pfxs(2), leaves(2), fringes(0),
 [STOP] depth:  0 path: [] / 0
 indexs(#2): [1 9]
-prefxs(#2): 0x00/0 0x20/3
+prefxs(#2): ::/0 2000::/3
 values(#2): <nil> <nil>
 octets(#2): [32 254]
 leaves(#2): 0x20:{2001:db8::/32, <nil>} 0xfe:{fe80::/10, <nil>}
@@ -172,14 +172,14 @@ func TestDumpSample(t *testing.T) {
 [HALF] depth:  0 path: [] / 0
 octets(#5): [10 127 169 172 192]
 leaves(#2): 169:{169.254.0.0/16, <nil>} 172:{172.16.0.0/12, <nil>}
-nodes(#3):  10 127 192
+childs(#3): 10 127 192
 
 .[FULL] depth:  1 path: [10] / 8
 .indexs(#1): [1]
-.prefxs(#1): 0/0
+.prefxs(#1): 10.0.0.0/8
 .values(#1): <nil>
 .octets(#1): [0]
-.nodes(#1):  0
+.childs(#1): 0
 
 ..[STOP] depth:  2 path: [10.0] / 16
 ..octets(#2): [0 1]
@@ -187,18 +187,18 @@ nodes(#3):  10 127 192
 
 .[STOP] depth:  1 path: [127] / 8
 .indexs(#1): [1]
-.prefxs(#1): 0/0
+.prefxs(#1): 127.0.0.0/8
 .values(#1): <nil>
 .octets(#1): [0]
 .leaves(#1): 0:{127.0.0.1/32, <nil>}
 
 .[PATH] depth:  1 path: [192] / 8
 .octets(#1): [168]
-.nodes(#1):  168
+.childs(#1): 168
 
 ..[STOP] depth:  2 path: [192.168] / 16
 ..indexs(#1): [1]
-..prefxs(#1): 0/0
+..prefxs(#1): 192.168.0.0/16
 ..values(#1): <nil>
 ..octets(#1): [1]
 ..fringe(#1): 1:{192.168.1.0/24, <nil>}
@@ -206,7 +206,7 @@ nodes(#3):  10 127 192
 ### IPv6: size(4), nodes(1), pfxs(2), leaves(2), fringes(0),
 [STOP] depth:  0 path: [] / 0
 indexs(#2): [1 9]
-prefxs(#2): 0x00/0 0x20/3
+prefxs(#2): ::/0 2000::/3
 values(#2): <nil> <nil>
 octets(#2): [32 254]
 leaves(#2): 0x20:{2001:db8::/32, <nil>} 0xfe:{fe80::/10, <nil>}
@@ -239,13 +239,13 @@ func TestLiteDumpSample(t *testing.T) {
 [HALF] depth:  0 path: [] / 0
 octets(#5): [10 127 169 172 192]
 leaves(#2): 169:{169.254.0.0/16} 172:{172.16.0.0/12}
-nodes(#3):  10 127 192
+childs(#3): 10 127 192
 
 .[FULL] depth:  1 path: [10] / 8
 .indexs(#1): [1]
-.prefxs(#1): 0/0
+.prefxs(#1): 10.0.0.0/8
 .octets(#1): [0]
-.nodes(#1):  0
+.childs(#1): 0
 
 ..[STOP] depth:  2 path: [10.0] / 16
 ..octets(#2): [0 1]
@@ -253,24 +253,24 @@ nodes(#3):  10 127 192
 
 .[STOP] depth:  1 path: [127] / 8
 .indexs(#1): [1]
-.prefxs(#1): 0/0
+.prefxs(#1): 127.0.0.0/8
 .octets(#1): [0]
 .leaves(#1): 0:{127.0.0.1/32}
 
 .[PATH] depth:  1 path: [192] / 8
 .octets(#1): [168]
-.nodes(#1):  168
+.childs(#1): 168
 
 ..[STOP] depth:  2 path: [192.168] / 16
 ..indexs(#1): [1]
-..prefxs(#1): 0/0
+..prefxs(#1): 192.168.0.0/16
 ..octets(#1): [1]
 ..fringe(#1): 1:{192.168.1.0/24}
 
 ### IPv6: size(4), nodes(1), pfxs(2), leaves(2), fringes(0),
 [STOP] depth:  0 path: [] / 0
 indexs(#2): [1 9]
-prefxs(#2): 0x00/0 0x20/3
+prefxs(#2): ::/0 2000::/3
 octets(#2): [32 254]
 leaves(#2): 0x20:{2001:db8::/32} 0xfe:{fe80::/10}
 `,
