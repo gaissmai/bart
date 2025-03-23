@@ -245,10 +245,10 @@ func (n *node[V]) overlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
 	ip := pfx.Addr()
 	bits := pfx.Bits()
 	octets := ip.AsSlice()
-	lastIdx, lastBits := lastOctetIdxAndBits(bits)
+	lastOctetIdx, lastBits := lastOctetIdxAndBits(bits)
 
 	for ; depth < len(octets); depth++ {
-		if depth > lastIdx {
+		if depth > lastOctetIdx {
 			break
 		}
 
@@ -256,7 +256,7 @@ func (n *node[V]) overlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
 		addr := uint(octet)
 
 		// full octet path in node trie, check overlap with last prefix octet
-		if depth == lastIdx {
+		if depth == lastOctetIdx {
 			return n.overlapsIdx(art.PfxToIdx(octet, lastBits))
 		}
 

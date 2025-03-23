@@ -67,37 +67,42 @@ func (t *Table[V]) rootNodeByVersion(is4 bool) *node[V] {
 // lastOctetIdxAndBits, get last significant octet Idx and remaining bits
 // for a given netip.Prefix.
 //
-// Split the IP prefixes at 8bit borders, count from 0.
+// ATTENTION: Split the IP prefixes at 8bit borders, count from 0.
 //
-//	BitPos: [0-7],[8-15],[16-23],[24-31],[32]
-//	BitPos: [0-7],[8-15],[16-23],[24-31],[32-39],[40-47],[48-55],[56-63],...,[120-127],[128]
+//	           /0, /7, /15, /23, ...
 //
-//			 0.0.0.0/0         => lastIdx:  0, lastBits: 0 (default route)
-//			 0.0.0.0/7         => lastIdx:  0, lastBits: 7
-//			 0.0.0.0/8         => lastIdx:  1, lastBits: 0 (possible fringe)
-//			10.0.0.0/8         => lastIdx:  1, lastBits: 0 (possible fringe)
-//			10.0.0.0/22        => lastIdx:  2, lastBits: 6
-//			10.0.0.0/29        => lastIdx:  3, lastBits: 5
-//			10.0.0.0/32        => lastIdx:  4, lastBits: 0 (possible fringe)
+//		BitPos: [0-7],[8-15],[16-23],[24-31],[32]
+//		BitPos: [0-7],[8-15],[16-23],[24-31],[32-39],[40-47],[48-55],[56-63],...,[120-127],[128]
 //
-//			::/0               => lastIdx:  0, lastBits: 0 (default route)
-//			::1/128            => lastIdx: 17, lastBits: 0 (possible fringe)
-//			2001:db8::/42      => lastIdx:  5, lastBits: 2
-//			2001:db8::/56      => lastIdx:  7, lastBits: 0 (possible fringe)
+//				 0.0.0.0/0         => lastIdx:  0, lastBits: 0 (default route)
+//				 0.0.0.0/7         => lastIdx:  0, lastBits: 7
+//				 0.0.0.0/8         => lastIdx:  1, lastBits: 0 (possible fringe)
+//				10.0.0.0/8         => lastIdx:  1, lastBits: 0 (possible fringe)
+//				10.0.0.0/22        => lastIdx:  2, lastBits: 6
+//				10.0.0.0/29        => lastIdx:  3, lastBits: 5
+//				10.0.0.0/32        => lastIdx:  4, lastBits: 0 (possible fringe)
 //
-//	 /32 and /128 are special, they never form a new node, they are always inserted
-//	 as path-compressed leaf, so the max-depth of the trie is still 4 or 16 (v4/v6)
+//				::/0               => lastIdx:  0, lastBits: 0 (default route)
+//				::1/128            => lastIdx: 17, lastBits: 0 (possible fringe)
+//				2001:db8::/42      => lastIdx:  5, lastBits: 2
+//				2001:db8::/56      => lastIdx:  7, lastBits: 0 (possible fringe)
+//
+//		 /32 and /128 are special, they never form a new node, they are always inserted
+//		 as path-compressed leaf, so the max-depth of the trie is still 4 or 16 (v4/v6)
 //
 // We are not splitting at /8, /16, ..., because this would mean that the
 // first node would have 512 prefixes, bits from [0-8]. All remaining nodes
 // would then only have 256 prefixes, e.g. bits from [9-16], [17-24], ...
 // but the algorithm would then require a variable bitset.
+//
 // If you can commit to a fixed size of [4]uint64, then the algorithm will
 // be much faster due to modern CPUs.
 //
 // One could also imagine special hardware, since the actual algorithm consists
-// of a few standardized bitset operations on a fixed length of 256 bits.
-func lastOctetIdxAndBits(bits int) (lastIdx, lastBits int) {
+// only of a few standardized bitset operations on a fixed length of 256 bits.
+func lastOctetIdxAndBits(bits int) (lastOctetIdx, lastBits int) {
+	// lastOctetIdx:  range from 0..4 or 0..16 !!! not 0..3 or 0..15
+	// lastBits:      range from 0..7
 	return bits >> 3, bits & 7
 }
 
@@ -141,14 +146,14 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 	is4 := ip.Is4()
 	bits := pfx.Bits()
 	octets := ip.AsSlice()
-	lastIdx, lastBits := lastOctetIdxAndBits(bits)
+	lastOctetIdx, lastBits := lastOctetIdxAndBits(bits)
 
 	n := t.rootNodeByVersion(is4)
 
 	// find the proper trie node to update prefix
 	for depth, octet := range octets {
 		// last octet from prefix, update/insert prefix into node
-		if depth == lastIdx {
+		if depth == lastOctetIdx {
 			newVal, exists := n.prefixes.UpdateAt(art.PfxToIdx(octet, lastBits), cb)
 			if !exists {
 				t.sizeUpdate(is4, 1)
@@ -244,7 +249,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 	is4 := ip.Is4()
 	bits := pfx.Bits()
 	octets := ip.AsSlice()
-	lastIdx, lastBits := lastOctetIdxAndBits(bits)
+	lastOctetIdx, lastBits := lastOctetIdxAndBits(bits)
 
 	n := t.rootNodeByVersion(is4)
 
@@ -254,16 +259,14 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 
 	// find the trie node
 	for depth, octet := range octets {
-		depth = depth & 0xf // BCE
-
-		if depth > lastIdx {
+		if depth > lastOctetIdx {
 			break
 		}
 
 		// push current node on stack for path recording
 		stack[depth] = n
 
-		if depth == lastIdx {
+		if depth == lastOctetIdx {
 			// try to delete prefix in trie node
 			val, exists = n.prefixes.DeleteAt(art.PfxToIdx(octet, lastBits))
 			if !exists {
@@ -342,14 +345,14 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 
 	n := t.rootNodeByVersion(is4)
 
-	lastIdx, lastBits := lastOctetIdxAndBits(bits)
+	lastOctetIdx, lastBits := lastOctetIdxAndBits(bits)
 
 	octets := ip.AsSlice()
 
 	// find the trie node
 LOOP:
 	for depth, octet := range octets {
-		if depth == lastIdx {
+		if depth == lastOctetIdx {
 			return n.prefixes.Get(art.PfxToIdx(octet, lastBits))
 		}
 
@@ -430,7 +433,6 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 		}
 	}
 
-	// invalid IP
 	return false
 }
 
@@ -457,7 +459,7 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 LOOP:
 	// find leaf node
 	for depth, octet = range octets {
-		depth = depth & 0xf // BCE
+		depth = depth & 0xf // BCE, Lookup must be fast
 
 		addr = uint(octet)
 
@@ -511,7 +513,6 @@ LOOP:
 		}
 	}
 
-	// invalid IP
 	return val, false
 }
 
@@ -546,7 +547,7 @@ func (t *Table[V]) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpmPfx netip
 	bits := pfx.Bits()
 	is4 := ip.Is4()
 	octets := ip.AsSlice()
-	lastIdx, lastBits := lastOctetIdxAndBits(bits)
+	lastOctetIdx, lastBits := lastOctetIdxAndBits(bits)
 
 	n := t.rootNodeByVersion(is4)
 
@@ -562,7 +563,7 @@ LOOP:
 	for depth, octet = range octets {
 		depth = depth & 0xf // BCE
 
-		if depth > lastIdx {
+		if depth > lastOctetIdx {
 			depth--
 			break
 		}
@@ -627,7 +628,7 @@ LOOP:
 		// all others are just host routes
 		var idx uint
 		octet = octets[depth]
-		if depth == lastIdx {
+		if depth == lastOctetIdx {
 			idx = art.PfxToIdx(octet, lastBits)
 		} else {
 			idx = art.HostIdx(uint(octet))
@@ -671,7 +672,7 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 		is4 := ip.Is4()
 		bits := pfx.Bits()
 		octets := ip.AsSlice()
-		lastIdx, lastBits := lastOctetIdxAndBits(bits)
+		lastOctetIdx, lastBits := lastOctetIdxAndBits(bits)
 
 		n := t.rootNodeByVersion(is4)
 
@@ -685,9 +686,7 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 		// find last node along this octet path
 	LOOP:
 		for depth, octet = range octets {
-			depth = depth & 0xf // BCE
-
-			if depth > lastIdx {
+			if depth > lastOctetIdx {
 				depth--
 				break
 			}
@@ -744,8 +743,6 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 
 		// start backtracking, unwind the stack
 		for ; depth >= 0; depth-- {
-			depth = depth & 0xf // BCE
-
 			n = stack[depth]
 
 			// micro benchmarking
@@ -756,7 +753,7 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 			// only the lastOctet may have a different prefix len
 			// all others are just host routes
 			pfxLen := strideLen
-			if depth == lastIdx {
+			if depth == lastOctetIdx {
 				pfxLen = lastBits
 			}
 
@@ -784,13 +781,13 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 		is4 := ip.Is4()
 		bits := pfx.Bits()
 		octets := ip.AsSlice()
-		lastIdx, lastBits := lastOctetIdxAndBits(bits)
+		lastOctetIdx, lastBits := lastOctetIdxAndBits(bits)
 
 		n := t.rootNodeByVersion(is4)
 
 		// find the trie node
 		for depth, octet := range octets {
-			if depth == lastIdx {
+			if depth == lastOctetIdx {
 				_ = n.eachSubnet(octets, depth, is4, lastBits, yield)
 				return
 			}

@@ -58,9 +58,10 @@ type leafNode[V any] struct {
 	value  V
 }
 
-// fringeNode is a leaf with value but without a prefix.
-// The prefix of a fringe is defined by the position in the trie.
-// Saves a lot of memory, but the algorithm ist a little bit more complex.
+// fringeNode is a path-compressed leaf with value but without a prefix.
+// The prefix of a fringe is solely defined by the position in the trie.
+// fringe-compressiion (no stored prefix) saves a lot of memory,
+// but the algorithm is a little bit more complex.
 type fringeNode[V any] struct {
 	value V
 }
@@ -79,8 +80,8 @@ type fringeNode[V any] struct {
 //	depth == lastIdx-1 : a fringe leaf, path-compressed
 //	depth == lastIdx   : a prefix with octet/0 => idx == 1, a default route
 func isFringe(depth, bits int) bool {
-	lastIdx, lastBits := lastOctetIdxAndBits(bits)
-	return depth == lastIdx-1 && lastBits == 0
+	lastOctetIdx, lastBits := lastOctetIdxAndBits(bits)
+	return depth == lastOctetIdx-1 && lastBits == 0
 }
 
 // cloneOrCopy, helper function,
@@ -111,7 +112,7 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 	ip := pfx.Addr()
 	bits := pfx.Bits()
 	octets := ip.AsSlice()
-	lastIdx, lastBits := lastOctetIdxAndBits(bits)
+	lastOctetIdx, lastBits := lastOctetIdxAndBits(bits)
 
 	// find the proper trie node to insert prefix
 	// start with prefix octet at depth
@@ -120,7 +121,7 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 		addr := uint(octet)
 
 		// last masked octet: insert/override prefix/val into node
-		if depth == lastIdx {
+		if depth == lastOctetIdx {
 			return n.prefixes.InsertAt(art.PfxToIdx(octet, lastBits), val)
 		}
 
@@ -194,7 +195,7 @@ func (n *node[V]) insertAtDepthPersist(pfx netip.Prefix, val V, depth int) (exis
 	ip := pfx.Addr()
 	bits := pfx.Bits()
 	octets := ip.AsSlice()
-	lastIdx, lastBits := lastOctetIdxAndBits(bits)
+	lastOctetIdx, lastBits := lastOctetIdxAndBits(bits)
 
 	// find the proper trie node to insert prefix
 	// start with prefix octet at depth
@@ -204,7 +205,7 @@ func (n *node[V]) insertAtDepthPersist(pfx netip.Prefix, val V, depth int) (exis
 		addr := uint(octet)
 
 		// last masked octet: insert/override prefix/val into node
-		if depth == lastIdx {
+		if depth == lastOctetIdx {
 			return n.prefixes.InsertAt(art.PfxToIdx(octet, lastBits), val)
 		}
 
@@ -937,6 +938,7 @@ func cmpIndexRank(aIdx, bIdx uint) int {
 
 // cidrFromPath, helper function,
 // get prefix back from stride path, depth and idx.
+// The prefix is solely defined by the position in the trie and the baseIndex.
 func cidrFromPath(path stridePath, depth int, is4 bool, idx uint) netip.Prefix {
 	octet, pfxLen := art.IdxToPfx(idx)
 
@@ -963,6 +965,7 @@ func cidrFromPath(path stridePath, depth int, is4 bool, idx uint) netip.Prefix {
 
 // cidrForFringe, helper function,
 // get prefix back from octets path, depth, IP version and last octet.
+// The prefix of a fringe is solely defined by the position in the trie.
 func cidrForFringe(octets []byte, depth int, is4 bool, lastOctet uint) netip.Prefix {
 	path := stridePath{}
 	copy(path[:], octets[:depth+1])
