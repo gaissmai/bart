@@ -60,8 +60,8 @@ type leafNode[V any] struct {
 
 // fringeNode is a path-compressed leaf with value but without a prefix.
 // The prefix of a fringe is solely defined by the position in the trie.
-// fringe-compressiion (no stored prefix) saves a lot of memory,
-// but the algorithm is a little bit more complex.
+// The fringe-compressiion (no stored prefix) saves a lot of memory,
+// but the algorithm is more complex.
 type fringeNode[V any] struct {
 	value V
 }
@@ -69,19 +69,19 @@ type fringeNode[V any] struct {
 // isFringe, leaves with /8, /16, ... /128 bits at special positions
 // in the trie.
 //
-// A leaf path-compressed inserted at the last
-// possible level (depth == lastIdx-1) before inserted just as a
-// prefix in the next level down (depth == lastIdx).
+// Just a path-compressed leaf, inserted at the last
+// possible level as path compressed (depth == maxDepth-1)
+// before inserted just as a prefix in the next level down (depth == maxDepth).
 //
-// A leaf being a fringe is the default-route for all nodes below this slot.
+// Nice side effect: A fringe is the default-route for all nodes below this slot!
 //
 //	e.g. prefix is addr/8, or addr/16, or ... addr/128
-//	depth <  lastIdx-1 : a leaf, path-compressed
-//	depth == lastIdx-1 : a fringe leaf, path-compressed
-//	depth == lastIdx   : a prefix with octet/0 => idx == 1, a default route
+//	depth <  maxDepth-1 : a leaf, path-compressed
+//	depth == maxDepth-1 : a fringe, path-compressed
+//	depth == maxDepth   : a prefix with octet/pfx == 0/0 => idx == 1, a strides default route
 func isFringe(depth, bits int) bool {
-	lastOctetIdx, lastBits := lastOctetIdxAndBits(bits)
-	return depth == lastOctetIdx-1 && lastBits == 0
+	maxDepth, lastBits := maxDepthAndLastBits(bits)
+	return depth == maxDepth-1 && lastBits == 0
 }
 
 // cloneOrCopy, helper function,
@@ -112,7 +112,7 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 	ip := pfx.Addr()
 	bits := pfx.Bits()
 	octets := ip.AsSlice()
-	lastOctetIdx, lastBits := lastOctetIdxAndBits(bits)
+	maxDepth, lastBits := maxDepthAndLastBits(bits)
 
 	// find the proper trie node to insert prefix
 	// start with prefix octet at depth
@@ -121,7 +121,7 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 		addr := uint(octet)
 
 		// last masked octet: insert/override prefix/val into node
-		if depth == lastOctetIdx {
+		if depth == maxDepth {
 			return n.prefixes.InsertAt(art.PfxToIdx(octet, lastBits), val)
 		}
 
@@ -195,7 +195,7 @@ func (n *node[V]) insertAtDepthPersist(pfx netip.Prefix, val V, depth int) (exis
 	ip := pfx.Addr()
 	bits := pfx.Bits()
 	octets := ip.AsSlice()
-	lastOctetIdx, lastBits := lastOctetIdxAndBits(bits)
+	maxDepth, lastBits := maxDepthAndLastBits(bits)
 
 	// find the proper trie node to insert prefix
 	// start with prefix octet at depth
@@ -205,7 +205,7 @@ func (n *node[V]) insertAtDepthPersist(pfx netip.Prefix, val V, depth int) (exis
 		addr := uint(octet)
 
 		// last masked octet: insert/override prefix/val into node
-		if depth == lastOctetIdx {
+		if depth == maxDepth {
 			return n.prefixes.InsertAt(art.PfxToIdx(octet, lastBits), val)
 		}
 

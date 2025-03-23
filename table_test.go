@@ -2538,65 +2538,65 @@ func TestLastIdxLastBits(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		pfx      netip.Prefix
-		wantIdx  int
-		wantBits int
+		pfx       netip.Prefix
+		wantDepth int
+		wantBits  int
 	}{
 		{
-			pfx:      mpp("0.0.0.0/0"),
-			wantIdx:  0,
-			wantBits: 0,
+			pfx:       mpp("0.0.0.0/0"),
+			wantDepth: 0,
+			wantBits:  0,
 		},
 		{
-			pfx:      mpp("0.0.0.0/32"),
-			wantIdx:  4,
-			wantBits: 0,
+			pfx:       mpp("0.0.0.0/32"),
+			wantDepth: 4,
+			wantBits:  0,
 		},
 		{
-			pfx:      mpp("10.0.0.0/7"),
-			wantIdx:  0,
-			wantBits: 7,
+			pfx:       mpp("10.0.0.0/7"),
+			wantDepth: 0,
+			wantBits:  7,
 		},
 		{
-			pfx:      mpp("10.20.0.0/14"),
-			wantIdx:  1,
-			wantBits: 6,
+			pfx:       mpp("10.20.0.0/14"),
+			wantDepth: 1,
+			wantBits:  6,
 		},
 		{
-			pfx:      mpp("10.20.30.0/24"),
-			wantIdx:  3,
-			wantBits: 0,
+			pfx:       mpp("10.20.30.0/24"),
+			wantDepth: 3,
+			wantBits:  0,
 		},
 		{
-			pfx:      mpp("10.20.30.40/31"),
-			wantIdx:  3,
-			wantBits: 7,
+			pfx:       mpp("10.20.30.40/31"),
+			wantDepth: 3,
+			wantBits:  7,
 		},
 		//
 		{
-			pfx:      mpp("::/0"),
-			wantIdx:  0,
-			wantBits: 0,
+			pfx:       mpp("::/0"),
+			wantDepth: 0,
+			wantBits:  0,
 		},
 		{
-			pfx:      mpp("::/128"),
-			wantIdx:  16,
-			wantBits: 0,
+			pfx:       mpp("::/128"),
+			wantDepth: 16,
+			wantBits:  0,
 		},
 		{
-			pfx:      mpp("2001:db8::/31"),
-			wantIdx:  3,
-			wantBits: 7,
+			pfx:       mpp("2001:db8::/31"),
+			wantDepth: 3,
+			wantBits:  7,
 		},
 	}
 
 	for _, tc := range tests {
-		gotIdx, gotBits := lastOctetIdxAndBits(tc.pfx.Bits())
-		if gotIdx != tc.wantIdx {
-			t.Errorf("lastOctetIdxAndBits(%d), lastIdx got: %d, want: %d", tc.pfx.Bits(), gotIdx, tc.wantIdx)
+		gotMaxDepth, gotBits := maxDepthAndLastBits(tc.pfx.Bits())
+		if gotMaxDepth != tc.wantDepth {
+			t.Errorf("maxDepthAndLastBits(%d), maxDepth got: %d, want: %d", tc.pfx.Bits(), gotMaxDepth, tc.wantDepth)
 		}
 		if gotBits != tc.wantBits {
-			t.Errorf("lastOctetIdxAndBits(%d), lastBits got: %d, want: %d", tc.pfx.Bits(), gotBits, tc.wantBits)
+			t.Errorf("maxDepthAndLastBits(%d), lastBits got: %d, want: %d", tc.pfx.Bits(), gotBits, tc.wantBits)
 		}
 	}
 }
