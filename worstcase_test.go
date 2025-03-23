@@ -12,6 +12,7 @@ var (
 	worstCaseProbeIP4  = mpa("255.255.255.255")
 	worstCaseProbePfx4 = mpp("255.255.255.255/32")
 
+	ipv4DefaultRoute = mpp("0.0.0.0/0")
 	worstCasePfxsIP4 = []netip.Prefix{
 		mpp("0.0.0.0/1"),
 		mpp("254.0.0.0/8"),
@@ -26,6 +27,7 @@ var (
 	worstCaseProbeIP6  = mpa("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")
 	worstCaseProbePfx6 = mpp("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff/128")
 
+	ipv6DefaultRoute = mpp("::/0")
 	worstCasePfxsIP6 = []netip.Prefix{
 		mpp("::/1"),
 		mpp("fe00::/8"),
@@ -88,8 +90,10 @@ func TestWorstCaseMatch4(t *testing.T) {
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
 		}
+		tbl.Insert(ipv4DefaultRoute, ipv4DefaultRoute.String())
+		tbl.Delete(worstCaseProbePfx4)
 
-		wantVal := mpp("255.255.255.255/32").String()
+		wantVal := ipv4DefaultRoute.String()
 		want := true
 		val, ok := tbl.Lookup(worstCaseProbeIP4)
 		if ok != want {
@@ -107,8 +111,10 @@ func TestWorstCaseMatch4(t *testing.T) {
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
 		}
+		tbl.Insert(ipv4DefaultRoute, ipv4DefaultRoute.String())
+		tbl.Delete(worstCaseProbePfx4)
 
-		wantVal := mpp("255.255.255.255/32").String()
+		wantVal := ipv4DefaultRoute.String()
 		want := true
 		val, ok := tbl.LookupPrefix(worstCaseProbePfx4)
 		if ok != want {
@@ -126,9 +132,11 @@ func TestWorstCaseMatch4(t *testing.T) {
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
 		}
+		tbl.Insert(ipv4DefaultRoute, ipv4DefaultRoute.String())
+		tbl.Delete(worstCaseProbePfx4)
 
-		wantLPM := mpp("255.255.255.255/32")
-		wantVal := mpp("255.255.255.255/32").String()
+		wantLPM := ipv4DefaultRoute
+		wantVal := ipv4DefaultRoute.String()
 		want := true
 		lpm, val, ok := tbl.LookupPrefixLPM(worstCaseProbePfx4)
 		if ok != want {
@@ -154,7 +162,7 @@ func TestWorstCaseMiss4(t *testing.T) {
 			tbl.Insert(p, p.String())
 		}
 
-		tbl.Delete(mpp("255.255.255.255/32")) // delete matching prefix
+		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
 
 		want := false
 		ok := tbl.Contains(worstCaseProbeIP4)
@@ -171,7 +179,7 @@ func TestWorstCaseMiss4(t *testing.T) {
 			tbl.Insert(p, p.String())
 		}
 
-		tbl.Delete(mpp("255.255.255.255/32")) // delete matching prefix
+		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
 
 		want := false
 		_, ok := tbl.Lookup(worstCaseProbeIP4)
@@ -188,7 +196,7 @@ func TestWorstCaseMiss4(t *testing.T) {
 			tbl.Insert(p, p.String())
 		}
 
-		tbl.Delete(mpp("255.255.255.255/32")) // delete matching prefix
+		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
 
 		want := false
 		_, ok := tbl.LookupPrefix(worstCaseProbePfx4)
@@ -205,7 +213,7 @@ func TestWorstCaseMiss4(t *testing.T) {
 			tbl.Insert(p, p.String())
 		}
 
-		tbl.Delete(mpp("255.255.255.255/32")) // delete matching prefix
+		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
 
 		want := false
 		_, _, ok := tbl.LookupPrefixLPM(worstCaseProbePfx4)
@@ -240,11 +248,17 @@ func TestWorstCaseMatch6(t *testing.T) {
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())
 		}
+		tbl.Insert(ipv6DefaultRoute, ipv6DefaultRoute.String())
+		tbl.Delete(worstCaseProbePfx6)
 
+		wantVal := ipv6DefaultRoute.String()
 		want := true
-		_, ok := tbl.Lookup(worstCaseProbeIP6)
+		val, ok := tbl.Lookup(worstCaseProbeIP6)
 		if ok != want {
 			t.Errorf("Lookup, worst case match IP6, expected OK: %v, got: %v", want, ok)
+		}
+		if val != wantVal {
+			t.Errorf("Lookup, worst case match IP6, expected: %v, got: %v", wantVal, val)
 		}
 	})
 
@@ -255,8 +269,10 @@ func TestWorstCaseMatch6(t *testing.T) {
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())
 		}
+		tbl.Insert(ipv6DefaultRoute, ipv6DefaultRoute.String())
+		tbl.Delete(worstCaseProbePfx6)
 
-		wantVal := mpp("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff/128").String()
+		wantVal := ipv6DefaultRoute.String()
 		want := true
 		val, ok := tbl.LookupPrefix(worstCaseProbePfx6)
 		if ok != want {
@@ -274,9 +290,11 @@ func TestWorstCaseMatch6(t *testing.T) {
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())
 		}
+		tbl.Insert(ipv6DefaultRoute, ipv6DefaultRoute.String())
+		tbl.Delete(worstCaseProbePfx6)
 
-		wantLPM := mpp("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff/128")
-		wantVal := mpp("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff/128").String()
+		wantLPM := ipv6DefaultRoute
+		wantVal := ipv6DefaultRoute.String()
 		want := true
 		lpm, val, ok := tbl.LookupPrefixLPM(worstCaseProbePfx6)
 		if ok != want {
@@ -302,7 +320,7 @@ func TestWorstCaseMiss6(t *testing.T) {
 			tbl.Insert(p, p.String())
 		}
 
-		tbl.Delete(mpp("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff/128")) // delete matching prefix
+		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
 
 		want := false
 		ok := tbl.Contains(worstCaseProbeIP6)
@@ -319,7 +337,7 @@ func TestWorstCaseMiss6(t *testing.T) {
 			tbl.Insert(p, p.String())
 		}
 
-		tbl.Delete(mpp("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff/128")) // delete matching prefix
+		tbl.Delete(worstCaseProbePfx6)
 
 		want := false
 		_, ok := tbl.Lookup(worstCaseProbeIP6)
@@ -336,7 +354,7 @@ func TestWorstCaseMiss6(t *testing.T) {
 			tbl.Insert(p, p.String())
 		}
 
-		tbl.Delete(mpp("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff/128")) // delete matching prefix
+		tbl.Delete(worstCaseProbePfx6)
 
 		want := false
 		_, ok := tbl.LookupPrefix(worstCaseProbePfx6)
@@ -353,7 +371,7 @@ func TestWorstCaseMiss6(t *testing.T) {
 			tbl.Insert(p, p.String())
 		}
 
-		tbl.Delete(mpp("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff/128")) // delete matching prefix
+		tbl.Delete(worstCaseProbePfx6)
 
 		want := false
 		_, _, ok := tbl.LookupPrefixLPM(worstCaseProbePfx6)
@@ -381,6 +399,8 @@ func BenchmarkWorstCaseMatch4(b *testing.B) {
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
 		}
+		tbl.Insert(ipv4DefaultRoute, ipv4DefaultRoute.String())
+		tbl.Delete(worstCaseProbePfx4)
 
 		b.ResetTimer()
 		for range b.N {
@@ -393,6 +413,8 @@ func BenchmarkWorstCaseMatch4(b *testing.B) {
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
 		}
+		tbl.Insert(ipv4DefaultRoute, ipv4DefaultRoute.String())
+		tbl.Delete(worstCaseProbePfx4)
 
 		b.ResetTimer()
 		for range b.N {
@@ -405,6 +427,8 @@ func BenchmarkWorstCaseMatch4(b *testing.B) {
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
 		}
+		tbl.Insert(ipv4DefaultRoute, ipv4DefaultRoute.String())
+		tbl.Delete(worstCaseProbePfx4)
 
 		b.ResetTimer()
 		for range b.N {
@@ -420,7 +444,7 @@ func BenchmarkWorstCaseMiss4(b *testing.B) {
 			tbl.Insert(p, p.String())
 		}
 
-		tbl.Delete(mpp("255.255.255.255/32")) // delete matching prefix
+		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
 
 		b.ResetTimer()
 		for range b.N {
@@ -434,7 +458,7 @@ func BenchmarkWorstCaseMiss4(b *testing.B) {
 			tbl.Insert(p, p.String())
 		}
 
-		tbl.Delete(mpp("255.255.255.255/32")) // delete matching prefix
+		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
 
 		b.ResetTimer()
 		for range b.N {
@@ -448,7 +472,7 @@ func BenchmarkWorstCaseMiss4(b *testing.B) {
 			tbl.Insert(p, p.String())
 		}
 
-		tbl.Delete(mpp("255.255.255.255/32")) // delete matching prefix
+		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
 
 		b.ResetTimer()
 		for range b.N {
@@ -462,7 +486,7 @@ func BenchmarkWorstCaseMiss4(b *testing.B) {
 			tbl.Insert(p, p.String())
 		}
 
-		tbl.Delete(mpp("255.255.255.255/32")) // delete matching prefix
+		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
 
 		b.ResetTimer()
 		for range b.N {
@@ -489,6 +513,8 @@ func BenchmarkWorstCaseMatch6(b *testing.B) {
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())
 		}
+		tbl.Insert(ipv6DefaultRoute, ipv6DefaultRoute.String())
+		tbl.Delete(worstCaseProbePfx6)
 
 		b.ResetTimer()
 		for range b.N {
@@ -501,6 +527,8 @@ func BenchmarkWorstCaseMatch6(b *testing.B) {
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())
 		}
+		tbl.Insert(ipv6DefaultRoute, ipv6DefaultRoute.String())
+		tbl.Delete(worstCaseProbePfx6)
 
 		b.ResetTimer()
 		for range b.N {
@@ -513,6 +541,8 @@ func BenchmarkWorstCaseMatch6(b *testing.B) {
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())
 		}
+		tbl.Insert(ipv6DefaultRoute, ipv6DefaultRoute.String())
+		tbl.Delete(worstCaseProbePfx6)
 
 		b.ResetTimer()
 		for range b.N {
@@ -528,7 +558,7 @@ func BenchmarkWorstCaseMiss6(b *testing.B) {
 			tbl.Insert(p, p.String())
 		}
 
-		tbl.Delete(mpp("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff/128")) // delete matching prefix
+		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
 
 		b.ResetTimer()
 		for range b.N {
@@ -542,7 +572,7 @@ func BenchmarkWorstCaseMiss6(b *testing.B) {
 			tbl.Insert(p, p.String())
 		}
 
-		tbl.Delete(mpp("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff/128")) // delete matching prefix
+		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
 
 		b.ResetTimer()
 		for range b.N {
@@ -556,7 +586,7 @@ func BenchmarkWorstCaseMiss6(b *testing.B) {
 			tbl.Insert(p, p.String())
 		}
 
-		tbl.Delete(mpp("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff/128")) // delete matching prefix
+		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
 
 		b.ResetTimer()
 		for range b.N {
@@ -570,7 +600,7 @@ func BenchmarkWorstCaseMiss6(b *testing.B) {
 			tbl.Insert(p, p.String())
 		}
 
-		tbl.Delete(mpp("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff/128")) // delete matching prefix
+		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
 
 		b.ResetTimer()
 		for range b.N {
