@@ -55,15 +55,20 @@ func BenchmarkFullMatch4(b *testing.B) {
 		rt.Insert(route.CIDR, i)
 	}
 
-	var ip netip.Addr
-	var ipAsPfx netip.Prefix
+	var matchIP netip.Addr
+	var matchPfx netip.Prefix
 
 	// find a random match
 	for {
-		ip = randomIP4()
-		_, ok := rt.Lookup(ip)
-		if ok {
-			ipAsPfx, _ = ip.Prefix(ip.BitLen())
+		matchIP = randomRealWorldPrefixes4(1)[0].Addr().Next()
+		if ok := rt.Contains(matchIP); ok {
+			break
+		}
+	}
+
+	for {
+		matchPfx = randomRealWorldPrefixes4(1)[0]
+		if _, ok := rt.LookupPrefix(matchPfx); ok {
 			break
 		}
 	}
@@ -71,28 +76,28 @@ func BenchmarkFullMatch4(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
-			okSink = rt.Contains(ip)
+			okSink = rt.Contains(matchIP)
 		}
 	})
 
 	b.Run("Lookup", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
-			intSink, okSink = rt.Lookup(ip)
+			intSink, okSink = rt.Lookup(matchIP)
 		}
 	})
 
 	b.Run("LookupPrefix", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
-			intSink, okSink = rt.LookupPrefix(ipAsPfx)
+			intSink, okSink = rt.LookupPrefix(matchPfx)
 		}
 	})
 
 	b.Run("LookupPfxLPM", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
-			_, intSink, okSink = rt.LookupPrefixLPM(ipAsPfx)
+			_, intSink, okSink = rt.LookupPrefixLPM(matchPfx)
 		}
 	})
 }
@@ -104,15 +109,20 @@ func BenchmarkFullMatch6(b *testing.B) {
 		rt.Insert(route.CIDR, i)
 	}
 
-	var ip netip.Addr
-	var ipAsPfx netip.Prefix
+	var matchIP netip.Addr
+	var matchPfx netip.Prefix
 
-	// find a random match
+	// find a random miss
 	for {
-		ip = randomIP6()
-		_, ok := rt.Lookup(ip)
-		if ok {
-			ipAsPfx, _ = ip.Prefix(ip.BitLen())
+		matchIP = randomRealWorldPrefixes6(1)[0].Addr().Next()
+		if ok := rt.Contains(matchIP); ok {
+			break
+		}
+	}
+
+	for {
+		matchPfx = randomRealWorldPrefixes6(1)[0]
+		if _, ok := rt.LookupPrefix(matchPfx); ok {
 			break
 		}
 	}
@@ -120,28 +130,28 @@ func BenchmarkFullMatch6(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
-			okSink = rt.Contains(ip)
+			okSink = rt.Contains(matchIP)
 		}
 	})
 
 	b.Run("Lookup", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
-			intSink, okSink = rt.Lookup(ip)
+			intSink, okSink = rt.Lookup(matchIP)
 		}
 	})
 
 	b.Run("LookupPrefix", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
-			intSink, okSink = rt.LookupPrefix(ipAsPfx)
+			intSink, okSink = rt.LookupPrefix(matchPfx)
 		}
 	})
 
 	b.Run("LookupPfxLPM", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
-			_, intSink, okSink = rt.LookupPrefixLPM(ipAsPfx)
+			_, intSink, okSink = rt.LookupPrefixLPM(matchPfx)
 		}
 	})
 }
@@ -153,15 +163,20 @@ func BenchmarkFullMiss4(b *testing.B) {
 		rt.Insert(route.CIDR, i)
 	}
 
-	var ip netip.Addr
-	var ipAsPfx netip.Prefix
+	var missIP netip.Addr
+	var missPfx netip.Prefix
 
-	// find a random miss
+	// find a random match
 	for {
-		ip = randomIP4()
-		_, ok := rt.Lookup(ip)
-		if !ok {
-			ipAsPfx, _ = ip.Prefix(ip.BitLen())
+		missIP = randomRealWorldPrefixes4(1)[0].Addr().Next()
+		if ok := rt.Contains(missIP); !ok {
+			break
+		}
+	}
+
+	for {
+		missPfx = randomRealWorldPrefixes4(1)[0]
+		if _, ok := rt.LookupPrefix(missPfx); !ok {
 			break
 		}
 	}
@@ -169,28 +184,28 @@ func BenchmarkFullMiss4(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
-			okSink = rt.Contains(ip)
+			okSink = rt.Contains(missIP)
 		}
 	})
 
 	b.Run("Lookup", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
-			intSink, okSink = rt.Lookup(ip)
+			intSink, okSink = rt.Lookup(missIP)
 		}
 	})
 
 	b.Run("LookupPrefix", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
-			intSink, okSink = rt.LookupPrefix(ipAsPfx)
+			intSink, okSink = rt.LookupPrefix(missPfx)
 		}
 	})
 
 	b.Run("LookupPfxLPM", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
-			_, intSink, okSink = rt.LookupPrefixLPM(ipAsPfx)
+			_, intSink, okSink = rt.LookupPrefixLPM(missPfx)
 		}
 	})
 }
@@ -202,15 +217,20 @@ func BenchmarkFullMiss6(b *testing.B) {
 		rt.Insert(route.CIDR, i)
 	}
 
-	var ip netip.Addr
-	var ipAsPfx netip.Prefix
+	var missIP netip.Addr
+	var missPfx netip.Prefix
 
-	// find a random miss
+	// find a random match
 	for {
-		ip = randomIP6()
-		_, ok := rt.Lookup(ip)
-		if !ok {
-			ipAsPfx, _ = ip.Prefix(ip.BitLen())
+		missIP = randomRealWorldPrefixes6(1)[0].Addr().Next()
+		if ok := rt.Contains(missIP); !ok {
+			break
+		}
+	}
+
+	for {
+		missPfx = randomRealWorldPrefixes6(1)[0]
+		if _, ok := rt.LookupPrefix(missPfx); !ok {
 			break
 		}
 	}
@@ -218,28 +238,28 @@ func BenchmarkFullMiss6(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
-			okSink = rt.Contains(ip)
+			okSink = rt.Contains(missIP)
 		}
 	})
 
 	b.Run("Lookup", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
-			intSink, okSink = rt.Lookup(ip)
+			intSink, okSink = rt.Lookup(missIP)
 		}
 	})
 
 	b.Run("LookupPrefix", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
-			intSink, okSink = rt.LookupPrefix(ipAsPfx)
+			intSink, okSink = rt.LookupPrefix(missPfx)
 		}
 	})
 
 	b.Run("LookupPfxLPM", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
-			_, intSink, okSink = rt.LookupPrefixLPM(ipAsPfx)
+			_, intSink, okSink = rt.LookupPrefixLPM(missPfx)
 		}
 	})
 }
