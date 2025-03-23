@@ -8,8 +8,6 @@ import (
 	"io"
 	"strconv"
 	"strings"
-
-	"github.com/gaissmai/bart/internal/art"
 )
 
 type nodeType byte
@@ -93,8 +91,8 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 		fmt.Fprintf(w, "%sprefxs(#%d):", indent, nPfxCount)
 
 		for _, idx := range allIndices {
-			octet, pfxLen := art.IdxToPfx(idx)
-			fmt.Fprintf(w, " %s/%d", octetFmt(octet, is4), pfxLen)
+			pfx := cidrFromPath(path, depth, is4, idx)
+			fmt.Fprintf(w, " %s", pfx)
 		}
 
 		fmt.Fprintln(w)
@@ -115,7 +113,7 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 
 	if n.children.Len() != 0 {
 
-		nodeAddrs := make([]uint, 0, maxItems)
+		childAddrs := make([]uint, 0, maxItems)
 		leafAddrs := make([]uint, 0, maxItems)
 		fringeAddrs := make([]uint, 0, maxItems)
 
@@ -123,7 +121,7 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 		for i, addr := range n.children.All() {
 			switch n.children.Items[i].(type) {
 			case *node[V]:
-				nodeAddrs = append(nodeAddrs, addr)
+				childAddrs = append(childAddrs, addr)
 				continue
 
 			case *fringeNode[V]:
@@ -184,11 +182,11 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 			fmt.Fprintln(w)
 		}
 
-		if nodeCount := len(nodeAddrs); nodeCount > 0 {
-			// print the next nodes
-			fmt.Fprintf(w, "%snodes(#%d): ", indent, nodeCount)
+		if childCount := len(childAddrs); childCount > 0 {
+			// print the next child
+			fmt.Fprintf(w, "%schilds(#%d):", indent, childCount)
 
-			for _, addr := range nodeAddrs {
+			for _, addr := range childAddrs {
 				octet := byte(addr)
 				fmt.Fprintf(w, " %s", octetFmt(octet, is4))
 			}
