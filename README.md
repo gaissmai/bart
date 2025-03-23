@@ -35,13 +35,13 @@ length of 256 bits. This means that the bitset fit very well in a cache line and
 that loops over the bitset in hot paths can be accelerated by loop unrolling, e.g.
 
 ```go
- func (b *BitSet256) Intersection(c *BitSet256) (bs BitSet256) {
-     bs[0] = b[0] & c[0]
-     bs[1] = b[1] & c[1]
-     bs[2] = b[2] & c[2]
-     bs[3] = b[3] & c[3]
-     return
- }
+func (b *BitSet256) popcnt() (cnt int) {
+	cnt += bits.OnesCount64(b[0])
+	cnt += bits.OnesCount64(b[1])
+	cnt += bits.OnesCount64(b[2])
+	cnt += bits.OnesCount64(b[3])
+	return
+}
 ```
 
 The BART algorithm is also excellent for determining whether two tables
