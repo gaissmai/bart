@@ -155,8 +155,8 @@ func TestOverlapsRoutes(t *testing.T) {
 }
 
 var (
-	prefixCount = []int{10, 20, 50, 100, 200, 500}
-	childCount  = []int{10, 20, 50, 100, 200, 250}
+	prefixCount = []int{10, 20, 50, 100, 200, maxItems - 1}
+	childCount  = []int{10, 20, 50, 100, 200, maxItems - 1}
 )
 
 func BenchmarkNodePrefixInsert(b *testing.B) {
@@ -174,10 +174,11 @@ func BenchmarkNodePrefixInsert(b *testing.B) {
 
 		b.Run(fmt.Sprintf("Into %d", nroutes), func(b *testing.B) {
 			route := routes[rand.Intn(len(routes))]
+			idx := art.PfxToIdx(route.octet, route.bits)
 
 			b.ResetTimer()
 			for range b.N {
-				this.prefixes.InsertAt(art.PfxToIdx(route.octet, route.bits), 0)
+				this.prefixes.InsertAt(idx, 0)
 			}
 		})
 	}
@@ -198,10 +199,11 @@ func BenchmarkNodePrefixUpdate(b *testing.B) {
 
 		b.Run(fmt.Sprintf("In %d", nroutes), func(b *testing.B) {
 			route := routes[rand.Intn(len(routes))]
+			idx := art.PfxToIdx(route.octet, route.bits)
 
 			b.ResetTimer()
 			for range b.N {
-				this.prefixes.UpdateAt(art.PfxToIdx(route.octet, route.bits), func(int, bool) int { return 1 })
+				this.prefixes.UpdateAt(idx, func(int, bool) int { return 1 })
 			}
 		})
 	}
@@ -222,10 +224,11 @@ func BenchmarkNodePrefixDelete(b *testing.B) {
 
 		b.Run(fmt.Sprintf("From %d", nroutes), func(b *testing.B) {
 			route := routes[rand.Intn(len(routes))]
+			idx := art.PfxToIdx(route.octet, route.bits)
 
 			b.ResetTimer()
 			for range b.N {
-				this.prefixes.DeleteAt(art.PfxToIdx(route.octet, route.bits))
+				this.prefixes.DeleteAt(idx)
 			}
 		})
 	}
@@ -269,46 +272,39 @@ func BenchmarkNodePrefixLPM(b *testing.B) {
 }
 
 func BenchmarkNodePrefixesAsSlice(b *testing.B) {
-	routes := shuffleStridePfxs(allStridePfxs())
+	for _, nPrefixes := range prefixCount {
+		this := new(node[any])
 
-	for _, nroutes := range prefixCount {
-		this := new(node[int])
-
-		for i, route := range routes {
-			if i >= nroutes {
-				break
-			}
-			this.prefixes.InsertAt(art.PfxToIdx(route.octet, route.bits), 0)
+		for range nPrefixes {
+			idx := byte(rand.Intn(maxItems))
+			this.prefixes.InsertAt(uint(idx), nil)
 		}
 
-		b.Run(fmt.Sprintf("Set %d", nroutes), func(b *testing.B) {
+		b.Run(fmt.Sprintf("Set %d", nPrefixes), func(b *testing.B) {
 			b.ResetTimer()
 			for range b.N {
-				this.prefixes.AsSlice(make([]uint, 0, maxItems))
+				_ = this.prefixes.AsSlice(make([]uint, 0, maxItems))
 			}
 		})
 	}
 }
 
 func BenchmarkNodePrefixesAll(b *testing.B) {
-	routes := shuffleStridePfxs(allStridePfxs())
+	for _, nPrefixes := range prefixCount {
+		this := new(node[any])
 
-	for _, nroutes := range prefixCount {
-		this := new(node[int])
-
-		for i, route := range routes {
-			if i >= nroutes {
-				break
-			}
-			this.prefixes.InsertAt(art.PfxToIdx(route.octet, route.bits), 0)
+		for range nPrefixes {
+			idx := byte(rand.Intn(maxItems))
+			this.prefixes.InsertAt(uint(idx), nil)
 		}
 
-		b.Run(fmt.Sprintf("Set %d", nroutes), func(b *testing.B) {
+		b.Run(fmt.Sprintf("Set %d", nPrefixes), func(b *testing.B) {
 			b.ResetTimer()
 			for range b.N {
-				this.prefixes.All()
+				_ = this.prefixes.All()
 			}
 		})
+
 	}
 }
 
