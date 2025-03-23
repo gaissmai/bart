@@ -17,6 +17,64 @@ import (
 
 // ############ tests ################################
 
+func TestLiteDeprecated(t *testing.T) {
+	t.Parallel()
+
+	var testname string
+
+	testname = "Update"
+	t.Run(testname, func(t *testing.T) {
+		t.Parallel()
+		defer func(testname string) {
+			if r := recover(); r == nil {
+				t.Fatalf("Lite.%s is deprecated, should panic", testname)
+			}
+		}(testname)
+
+		tbl := new(Lite)
+		tbl.Update()
+	})
+
+	testname = "UpdatePersist"
+	t.Run(testname, func(t *testing.T) {
+		t.Parallel()
+		defer func(testname string) {
+			if r := recover(); r == nil {
+				t.Fatalf("Lite.%s is deprecated, should panic", testname)
+			}
+		}(testname)
+
+		tbl := new(Lite)
+		tbl.UpdatePersist()
+	})
+
+	testname = "GetAndDelete"
+	t.Run(testname, func(t *testing.T) {
+		t.Parallel()
+		defer func(testname string) {
+			if r := recover(); r == nil {
+				t.Fatalf("Lite.%s is deprecated, should panic", testname)
+			}
+		}(testname)
+
+		tbl := new(Lite)
+		tbl.GetAndDelete()
+	})
+
+	testname = "GetAndDeletePersist"
+	t.Run(testname, func(t *testing.T) {
+		t.Parallel()
+		defer func(testname string) {
+			if r := recover(); r == nil {
+				t.Fatalf("Lite.%s is deprecated, should panic", testname)
+			}
+		}(testname)
+
+		tbl := new(Lite)
+		tbl.GetAndDeletePersist()
+	})
+}
+
 func TestLiteInvalid(t *testing.T) {
 	t.Parallel()
 
@@ -618,6 +676,93 @@ func TestLiteClone(t *testing.T) {
 	}
 }
 
+func TestLiteStringEmpty(t *testing.T) {
+	t.Parallel()
+	tbl := new(Lite)
+	want := ""
+	got := tbl.String()
+	if got != want {
+		t.Errorf("table is nil, expected %q, got %q", want, got)
+	}
+}
+
+func TestLiteStringDefaultRouteV4(t *testing.T) {
+	t.Parallel()
+
+	tt := stringTest{
+		cidrs: []netip.Prefix{
+			mpp("0.0.0.0/0"),
+		},
+		want: `▼
+└─ 0.0.0.0/0
+`,
+	}
+
+	tbl := new(Lite)
+	checkLiteString(t, tbl, tt)
+}
+
+func TestLiteStringDefaultRouteV6(t *testing.T) {
+	t.Parallel()
+
+	tt := stringTest{
+		cidrs: []netip.Prefix{
+			mpp("::/0"),
+		},
+		want: `▼
+└─ ::/0
+`,
+	}
+
+	tbl := new(Lite)
+	checkLiteString(t, tbl, tt)
+}
+
+func TestLiteStringSample(t *testing.T) {
+	t.Parallel()
+
+	tt := stringTest{
+		cidrs: []netip.Prefix{
+			mpp("fe80::/10"),
+			mpp("172.16.0.0/12"),
+			mpp("10.0.0.0/24"),
+			mpp("::1/128"),
+			mpp("192.168.0.0/16"),
+			mpp("10.0.0.0/8"),
+			mpp("::/0"),
+			mpp("10.0.1.0/24"),
+			mpp("169.254.0.0/16"),
+			mpp("2000::/3"),
+			mpp("2001:db8::/32"),
+			mpp("127.0.0.0/8"),
+			mpp("127.0.0.1/32"),
+			mpp("192.168.1.0/24"),
+		},
+		want: `▼
+├─ 10.0.0.0/8
+│  ├─ 10.0.0.0/24
+│  └─ 10.0.1.0/24
+├─ 127.0.0.0/8
+│  └─ 127.0.0.1/32
+├─ 169.254.0.0/16
+├─ 172.16.0.0/12
+└─ 192.168.0.0/16
+   └─ 192.168.1.0/24
+▼
+└─ ::/0
+   ├─ ::1/128
+   ├─ 2000::/3
+   │  └─ 2001:db8::/32
+   └─ fe80::/10
+`,
+	}
+
+	tbl := new(Lite)
+	checkLiteString(t, tbl, tt)
+}
+
+// ###################################################################
+
 func checkLiteNumNodes(t *testing.T, tbl *Lite, want int) {
 	t.Helper()
 
@@ -628,5 +773,26 @@ func checkLiteNumNodes(t *testing.T, tbl *Lite, want int) {
 	if got := nodes; got != want {
 		t.Errorf("wrong table dump, got %d nodes want %d", got, want)
 		t.Error(tbl.dumpString())
+	}
+}
+
+func checkLiteString(t *testing.T, tbl *Lite, tt stringTest) {
+	t.Helper()
+
+	for _, cidr := range tt.cidrs {
+		tbl.Insert(cidr)
+	}
+
+	got := tbl.String()
+	if tt.want != got {
+		t.Errorf("String got:\n%swant:\n%s", got, tt.want)
+	}
+
+	gotBytes, err := tbl.MarshalText()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if tt.want != string(gotBytes) {
+		t.Errorf("MarshalText got:\n%swant:\n%s", gotBytes, tt.want)
 	}
 }
