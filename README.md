@@ -182,19 +182,19 @@ goos: linux
 goarch: amd64
 pkg: github.com/gaissmai/bart
 cpu: Intel(R) Core(TM) i5-8250U CPU @ 1.60GHz
-BenchmarkFullMatch4/Contains        81672672            14.58 ns/op
-BenchmarkFullMatch6/Contains        94038417            12.43 ns/op
-BenchmarkFullMiss4/Contains         259998007            4.61 ns/op
-BenchmarkFullMiss6/Contains         250340162            4.81 ns/op
+BenchmarkFullMatch4/Contains        129756907	         8.409 ns/op
+BenchmarkFullMatch6/Contains        96855786	        11.72 ns/op
+BenchmarkFullMiss4/Contains         56269990	        18.58 ns/op
+BenchmarkFullMiss6/Contains         131779195	        10.08 ns/op
 
 goos: linux
 goarch: amd64
 pkg: github.com/gaissmai/bart
 cpu: Intel(R) Core(TM) i5-8250U CPU @ 1.60GHz
-BenchmarkFullMatch4/Lookup          52725478            22.65 ns/op
-BenchmarkFullMatch6/Lookup          89137046            13.92 ns/op
-BenchmarkFullMiss4/Lookup           181541365            6.60 ns/op
-BenchmarkFullMiss6/Lookup           168788408            7.07 ns/op
+BenchmarkFullMatch4/Lookup         	47039798	        24.44 ns/op
+BenchmarkFullMatch6/Lookup         	81769753	        13.61 ns/op
+BenchmarkFullMiss4/Lookup          	51986374	        22.72 ns/op
+BenchmarkFullMiss6/Lookup          	100000000	        11.47 ns/op
 ```
 
 ## Compatibility Guarantees
