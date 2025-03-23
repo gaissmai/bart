@@ -305,7 +305,7 @@ func (n *node[V]) purgeAndCompress(parentStack []*node[V], octets []uint8, is4 b
 				// get the last octet back from sparse array
 				lastOctet, _ := n.children.FirstSet()
 
-				// rebuild the prefix with octets, first, depth and ip version
+				// rebuild the prefix with octets, depth, ip version and lastOctet
 				// it's the parent depth, so add +1 here for the kid
 				fringePfx := cidrForFringe(octets, depth+1, is4, lastOctet)
 
@@ -321,6 +321,7 @@ func (n *node[V]) purgeAndCompress(parentStack []*node[V], octets []uint8, is4 b
 			// ... and octet path
 			path := stridePath{}
 			copy(path[:], octets)
+			// it's the parent depth, so add +1 here for the kid
 			pfx := cidrFromPath(path, depth+1, is4, idx)
 
 			// delete this node

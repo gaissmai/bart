@@ -119,7 +119,7 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	is4 := pfx.Addr().Is4()
 	n := t.rootNodeByVersion(is4)
 
-	if n.insertAtDepth(pfx, val, 0) {
+	if exists := n.insertAtDepth(pfx, val, 0); exists {
 		return
 	}
 
@@ -276,7 +276,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 
 			t.sizeUpdate(is4, -1)
 			n.purgeAndCompress(stack[:depth], octets, is4)
-			return val, exists
+			return val, true
 		}
 
 		addr := uint(octet)
@@ -292,12 +292,12 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 			continue // descend down to next trie level
 
 		case *fringeNode[V]:
-			// not this fringe
+			// if pfx is no fringe at this depth, fast exit
 			if !isFringe(depth, bits) {
 				return val, false
 			}
 
-			// prefix is fringe, must be equal, delete fringe
+			// pfx is fringe at depth, delete fringe
 			n.children.DeleteAt(addr)
 
 			t.sizeUpdate(is4, -1)
@@ -306,7 +306,6 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 			return kid.value, true
 
 		case *leafNode[V]:
-			// reached a path compressed prefix, stop traversing
 			// Attention: pfx must be masked to be comparable!
 			if kid.prefix != pfx {
 				return val, false
