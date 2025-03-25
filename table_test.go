@@ -2767,7 +2767,7 @@ func BenchmarkTableOverlapsPrefix(b *testing.B) {
 		}
 
 		for _, nroutes := range benchRouteCount {
-			var rt Table[int]
+			rt := new(Table[int])
 			for _, route := range rng(nroutes) {
 				rt.Insert(route.pfx, route.val)
 			}
@@ -2792,7 +2792,7 @@ func BenchmarkTableOverlaps(b *testing.B) {
 		}
 
 		for _, nroutes := range benchRouteCount {
-			var rt Table[int]
+			rt := new(Table[int])
 			for _, route := range rng(nroutes) {
 				rt.Insert(route.pfx, route.val)
 			}
@@ -2820,7 +2820,7 @@ func BenchmarkTableClone(b *testing.B) {
 		}
 
 		for _, nroutes := range benchRouteCount {
-			var rt Table[int]
+			rt := new(Table[int])
 			for _, route := range rng(nroutes) {
 				rt.Insert(route.pfx, route.val)
 			}
