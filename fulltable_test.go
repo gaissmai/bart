@@ -302,7 +302,7 @@ func BenchmarkFullTableOverlaps4(b *testing.B) {
 }
 
 func BenchmarkFullTableOverlaps6(b *testing.B) {
-	var rt Table[int]
+	rt := new(Table[int])
 
 	for i, route := range routes6 {
 		rt.Insert(route.CIDR, i)
@@ -324,7 +324,7 @@ func BenchmarkFullTableOverlaps6(b *testing.B) {
 }
 
 func BenchmarkFullTableOverlapsPrefix(b *testing.B) {
-	var rt Table[int]
+	rt := new(Table[int])
 
 	for i, route := range routes {
 		rt.Insert(route.CIDR, i)
@@ -339,7 +339,7 @@ func BenchmarkFullTableOverlapsPrefix(b *testing.B) {
 }
 
 func BenchmarkFullTableClone(b *testing.B) {
-	var rt4 Table[int]
+	rt4 := new(Table[int])
 
 	for i, route := range routes4 {
 		rt4.Insert(route.CIDR, i)
@@ -352,7 +352,7 @@ func BenchmarkFullTableClone(b *testing.B) {
 		}
 	})
 
-	var rt6 Table[int]
+	rt6 := new(Table[int])
 
 	for i, route := range routes6 {
 		rt6.Insert(route.CIDR, i)
@@ -365,7 +365,7 @@ func BenchmarkFullTableClone(b *testing.B) {
 		}
 	})
 
-	var rt Table[int]
+	rt := new(Table[int])
 
 	for i, route := range routes {
 		rt.Insert(route.CIDR, i)
