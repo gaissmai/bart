@@ -28,6 +28,7 @@ package bart
 import (
 	"iter"
 	"net/netip"
+	"sync"
 
 	"github.com/gaissmai/bart/internal/art"
 	"github.com/gaissmai/bart/internal/lpm"
@@ -44,7 +45,7 @@ import (
 // A Table must not be copied by value.
 type Table[V any] struct {
 	// used by -copylocks checker from `go vet`.
-	_ noCopy
+	_ [0]sync.Mutex
 
 	// the root nodes, implemented as popcount compressed multibit tries
 	root4 node[V]
@@ -351,7 +352,6 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 	octets := ip.AsSlice()
 
 	// find the trie node
-LOOP:
 	for depth, octet := range octets {
 		if depth == maxDepth {
 			return n.prefixes.Get(art.PfxToIdx(octet, lastBits))
@@ -359,7 +359,7 @@ LOOP:
 
 		addr := uint(octet)
 		if !n.children.Test(addr) {
-			break LOOP
+			return zero, false
 		}
 		kid := n.children.MustGet(addr)
 
@@ -374,20 +374,19 @@ LOOP:
 			if isFringe(depth, bits) {
 				return kid.value, true
 			}
-			break LOOP
+			return zero, false
 
 		case *leafNode[V]:
 			// reached a path compressed prefix, stop traversing
 			if kid.prefix == pfx {
 				return kid.value, true
 			}
-			break LOOP
+			return zero, false
 
 		default:
 			panic("logic error, wrong node type")
 		}
 	}
-
 	return zero, false
 }
 
@@ -967,22 +966,3 @@ func (t *Table[V]) AllSorted6() iter.Seq2[netip.Prefix, V] {
 		_ = t.root6.allRecSorted(stridePath{}, 0, false, yield)
 	}
 }
-
-// noCopy may be added to structs which must not be copied
-// after the first use.
-//
-//	type My struct {
-//		_ noCopy
-//		A state
-//		b foo
-//	}
-//
-// See https://golang.org/issues/8005#issuecomment-190753527
-// for details.
-//
-// Note that it must not be embedded, due to the Lock and Unlock methods.
-type noCopy struct{}
-
-// Lock is a no-op used by -copylocks checker from `go vet`.
-func (*noCopy) Lock()   {}
-func (*noCopy) Unlock() {}

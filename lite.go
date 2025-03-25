@@ -33,24 +33,21 @@ func (l *Lite) Insert(pfx netip.Prefix) {
 // InsertPersist is similar to Insert but the receiver isn't modified.
 func (l *Lite) InsertPersist(pfx netip.Prefix) *Lite {
 	tbl := l.Table.InsertPersist(pfx, struct{}{})
-	// copy of *tbl is here by intention
-	//nolint:govet
+	//nolint:govet // copy of *tbl is here by intention
 	return &Lite{*tbl}
 }
 
 // DeletePersist is similar to Delete but the receiver isn't modified.
 func (l *Lite) DeletePersist(pfx netip.Prefix) *Lite {
 	tbl := l.Table.DeletePersist(pfx)
-	// copy of *tbl is here by intention
-	//nolint:govet
+	//nolint:govet // copy of *tbl is here by intention
 	return &Lite{*tbl}
 }
 
 // Clone returns a copy of the routing table.
 func (l *Lite) Clone() *Lite {
 	tbl := l.Table.Clone()
-	// copy of *tbl is here by intention
-	//nolint:govet
+	//nolint:govet // copy of *tbl is here by intention
 	return &Lite{*tbl}
 }
 
