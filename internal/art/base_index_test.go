@@ -34,11 +34,13 @@ func TestPfxLen(t *testing.T) {
 		idx   uint
 		want  int
 	}{
-		{
-			depth: 0,
-			idx:   0,  // invalid
-			want:  -1, // invalid
-		},
+		/*
+			{
+				depth: 0,
+				idx:   0,  // invalid
+				want:  -1, // invalid
+			},
+		*/
 		{
 			depth: 0,
 			idx:   1,
@@ -126,11 +128,13 @@ func TestIdxToPfx(t *testing.T) {
 		wantOctet  uint8
 		wantPfxLen int
 	}{
-		{
-			idx:        0,  // invalid
-			wantOctet:  0,  // invalid
-			wantPfxLen: -1, // invalid
-		},
+		/*
+			{
+				idx:        0,  // invalid
+				wantOctet:  0,  // invalid
+				wantPfxLen: -1, // invalid
+			},
+		*/
 		{
 			idx:        1,
 			wantOctet:  0,
@@ -167,11 +171,13 @@ func TestIdxToRange(t *testing.T) {
 		wantFirst uint8
 		wantLast  uint8
 	}{
-		{
-			idx:       0, // invalid, but not catched
-			wantFirst: 0,
-			wantLast:  255,
-		},
+		/*
+			{
+				idx:       0, // invalid
+				wantFirst: 0,
+				wantLast:  255,
+			},
+		*/
 		{
 			idx:       1,
 			wantFirst: 0,

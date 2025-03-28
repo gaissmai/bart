@@ -6,9 +6,9 @@
 //
 //	can inline HostIdx with cost 4
 //	can inline PfxToIdx with cost 13
-//	can inline IdxToPfx with cost 39
-//	can inline IdxToRange with cost 63
-//	can inline PfxLen with cost 21
+//	can inline IdxToPfx with cost 42
+//	can inline IdxToRange with cost 66
+//	can inline PfxLen with cost 31
 //	can inline NetMask with cost 7
 //
 // Please read the ART paper ./doc/artlookup.pdf
@@ -31,16 +31,18 @@ func PfxToIdx(octet byte, pfxLen int) uint {
 
 // IdxToPfx returns the octet and prefix len of baseIdx.
 // It's the inverse to pfxToIdx.
+//
+// It panics on invalid input, valid values for idx are form [1..511],
 func IdxToPfx(idx uint) (octet uint8, pfxLen int) {
-	// the idx is in the range [0..511]
-	if idx > 255 {
-		pfxLen = 8
-	} else {
-		pfxLen = bits.Len8(uint8(idx)) - 1
+	if idx == 0 || idx > 511 {
+		panic("logic error, idx is invalid")
 	}
 
-	shiftBits := uint8(8 - pfxLen)
-	mask := uint8(0xff >> shiftBits)
+	// the idx is in the range [0..511]
+	pfxLen = bits.Len64(uint64(idx)) - 1
+
+	shiftBits := 8 - uint8(pfxLen)
+	mask := uint8(0xff) >> shiftBits
 	octet = (uint8(idx) & mask) << shiftBits
 
 	return
@@ -49,10 +51,13 @@ func IdxToPfx(idx uint) (octet uint8, pfxLen int) {
 // PfxLen returns the bits based on depth and idx.
 func PfxLen(depth int, idx uint) int {
 	// see IdxToPfx
+	if idx == 0 || idx > 511 {
+		panic("logic error, idx is invalid")
+	}
 	if idx > 255 {
 		return (depth + 1) << 3
 	}
-	return depth<<3 + bits.Len8(uint8(idx)) - 1
+	return depth<<3 + bits.Len64(uint64(idx)) - 1
 }
 
 // IdxToRange returns the first and last octet of prefix idx.
