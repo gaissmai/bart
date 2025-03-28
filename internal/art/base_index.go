@@ -6,9 +6,9 @@
 //
 //	can inline HostIdx with cost 4
 //	can inline PfxToIdx with cost 13
+//	can inline PfxLen with cost 21
 //	can inline IdxToPfx with cost 42
 //	can inline IdxToRange with cost 66
-//	can inline PfxLen with cost 31
 //	can inline NetMask with cost 7
 //
 // Please read the ART paper ./doc/artlookup.pdf
@@ -17,14 +17,27 @@ package art
 
 import "math/bits"
 
-// HostIdx is just PfxToIdx(octet, 8) but faster.
+// HostIdx is just PfxToIdx(octet/8) but faster.
 func HostIdx(octet uint) uint {
-	return 256 + octet
+	return octet + 256
 }
 
-// PfxToIdx maps a prefix table as a 'complete binary tree'.
+// PfxToIdx maps 8bit prefixes to numbers. The prefixes range from 0/0 to 255/8
+// and the mapped values from:
+//
+//	  [0x0000_00001 .. 0x0000_0001_1111_1111] = [1 .. 511]
+//
+//		example: octet/pfxLen: 160/3 = 0b1010_0000/3 => IdxToPfx(160/3) => 13
+//
+//		                0b1010_0000 => 0b0000_0101
+//		                  ^^^ >> (8-3)         ^^^
+//
+//		                0b0000_0001 => 0b0000_1000
+//		                          ^ << 3      ^
+//		                 + -----------------------
+//		                               0b0000_1101 = 13
 func PfxToIdx(octet byte, pfxLen int) uint {
-	// uint16() are compiler optimization hints, that the shift amount is
+	// uint8() are compiler optimization hints, that the shift amount is
 	// smaller than the width of the types
 	return uint(octet>>uint8(8-pfxLen)) + (1 << uint8(pfxLen))
 }
@@ -32,16 +45,15 @@ func PfxToIdx(octet byte, pfxLen int) uint {
 // IdxToPfx returns the octet and prefix len of baseIdx.
 // It's the inverse to pfxToIdx.
 //
-// It panics on invalid input, valid values for idx are form [1..511],
+// It panics on invalid input, valid values for idx are from [1 .. 511]
 func IdxToPfx(idx uint) (octet uint8, pfxLen int) {
 	if idx == 0 || idx > 511 {
 		panic("logic error, idx is invalid")
 	}
 
-	// the idx is in the range [0..511]
 	pfxLen = bits.Len64(uint64(idx)) - 1
-
 	shiftBits := 8 - uint8(pfxLen)
+
 	mask := uint8(0xff) >> shiftBits
 	octet = (uint8(idx) & mask) << shiftBits
 
@@ -53,9 +65,6 @@ func PfxLen(depth int, idx uint) int {
 	// see IdxToPfx
 	if idx == 0 || idx > 511 {
 		panic("logic error, idx is invalid")
-	}
-	if idx > 255 {
-		return (depth + 1) << 3
 	}
 	return depth<<3 + bits.Len64(uint64(idx)) - 1
 }
