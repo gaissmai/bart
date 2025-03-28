@@ -136,7 +136,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 	var zero V
 
 	if !pfx.IsValid() {
-		return zero
+		return
 	}
 
 	// canonicalize prefix
@@ -239,7 +239,7 @@ func (t *Table[V]) GetAndDelete(pfx netip.Prefix) (val V, ok bool) {
 
 func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 	if !pfx.IsValid() {
-		return val, false
+		return
 	}
 
 	// canonicalize prefix
@@ -254,16 +254,13 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 
 	n := t.rootNodeByVersion(is4)
 
-	// record path to deleted node
-	// needed to purge and/or path compress nodes after deletion
+	// record the nodes on the path to the deleted node, needed to purge
+	// and/or path compress nodes after the deletion of a prefix
 	stack := [maxTreeDepth]*node[V]{}
 
 	// find the trie node
 	for depth, octet := range octets {
 		depth = depth & 0xf // BCE, Delete must be fast
-		if depth > maxDepth {
-			break
-		}
 
 		// push current node on stack for path recording
 		stack[depth] = n
@@ -272,7 +269,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 			// try to delete prefix in trie node
 			val, exists = n.prefixes.DeleteAt(art.PfxToIdx(octet, lastBits))
 			if !exists {
-				return val, false
+				return
 			}
 
 			t.sizeUpdate(is4, -1)
@@ -282,7 +279,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 
 		addr := uint(octet)
 		if !n.children.Test(addr) {
-			return val, false
+			return
 		}
 		kid := n.children.MustGet(addr)
 
@@ -295,7 +292,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 		case *fringeNode[V]:
 			// if pfx is no fringe at this depth, fast exit
 			if !isFringe(depth, bits) {
-				return val, false
+				return
 			}
 
 			// pfx is fringe at depth, delete fringe
@@ -309,7 +306,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 		case *leafNode[V]:
 			// Attention: pfx must be masked to be comparable!
 			if kid.prefix != pfx {
-				return val, false
+				return
 			}
 
 			// prefix is equal leaf, delete leaf
@@ -325,16 +322,14 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 		}
 	}
 
-	panic("unreachable")
+	return
 }
 
 // Get returns the associated payload for prefix and true, or false if
 // prefix is not set in the routing table.
 func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
-	var zero V
-
 	if !pfx.IsValid() {
-		return zero, false
+		return
 	}
 
 	// canonicalize the prefix
@@ -359,7 +354,7 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 
 		addr := uint(octet)
 		if !n.children.Test(addr) {
-			return zero, false
+			return
 		}
 		kid := n.children.MustGet(addr)
 
@@ -374,20 +369,21 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 			if isFringe(depth, bits) {
 				return kid.value, true
 			}
-			return zero, false
+			return
 
 		case *leafNode[V]:
 			// reached a path compressed prefix, stop traversing
 			if kid.prefix == pfx {
 				return kid.value, true
 			}
-			return zero, false
+			return
 
 		default:
 			panic("logic error, wrong node type")
 		}
 	}
-	return zero, false
+
+	panic("unreachable")
 }
 
 // Contains does a route lookup for IP and
@@ -440,7 +436,7 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 // returns the associated value and true, or false if no route matched.
 func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	if !ip.IsValid() {
-		return val, false
+		return
 	}
 
 	is4 := ip.Is4()
@@ -513,7 +509,7 @@ LOOP:
 		}
 	}
 
-	return val, false
+	return
 }
 
 // LookupPrefix does a route lookup (longest prefix match) for pfx and
@@ -537,7 +533,7 @@ func (t *Table[V]) LookupPrefixLPM(pfx netip.Prefix) (lpmPfx netip.Prefix, val V
 
 func (t *Table[V]) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpmPfx netip.Prefix, val V, ok bool) {
 	if !pfx.IsValid() {
-		return lpmPfx, val, false
+		return
 	}
 
 	// canonicalize the prefix
@@ -654,7 +650,7 @@ LOOP:
 		}
 	}
 
-	return lpmPfx, val, false
+	return
 }
 
 // Supernets returns an iterator over all CIDRs covering pfx.

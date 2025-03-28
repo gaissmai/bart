@@ -353,7 +353,7 @@ func (n *node[V]) lpmGet(idx uint) (baseIdx uint, val V, ok bool) {
 	}
 
 	// not found (on this level)
-	return 0, val, false
+	return
 }
 
 // lpmTest, true if idx has a (any) longest-prefix-match in node.

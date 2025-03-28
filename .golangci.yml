@@ -23,7 +23,7 @@ linters:
     - stylecheck
     - usestdlibvars
     - wastedassign
-    - nakedret
+    # - nakedret
     #
     # - gosec
     # - dupl
