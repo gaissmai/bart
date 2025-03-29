@@ -5,6 +5,54 @@ package art
 
 import "testing"
 
+func TestIdxOutOfBounds(t *testing.T) {
+	t.Parallel()
+
+	t.Run("IdxToPfx(0)", func(t *testing.T) {
+		t.Parallel()
+		defer func() {
+			if r := recover(); r == nil {
+				t.Error("An idx out of bounds MUST panic")
+			}
+		}()
+
+		IdxToPfx(0)
+	})
+
+	t.Run("IdxToPfx(512)", func(t *testing.T) {
+		t.Parallel()
+		defer func() {
+			if r := recover(); r == nil {
+				t.Error("An idx out of bounds MUST panic")
+			}
+		}()
+
+		IdxToPfx(512)
+	})
+
+	t.Run("PfxLen(0,0)", func(t *testing.T) {
+		t.Parallel()
+		defer func() {
+			if r := recover(); r == nil {
+				t.Error("An idx out of bounds MUST panic")
+			}
+		}()
+
+		PfxLen(0, 0)
+	})
+
+	t.Run("PfxLen(0,512)", func(t *testing.T) {
+		t.Parallel()
+		defer func() {
+			if r := recover(); r == nil {
+				t.Error("An idx out of bounds MUST panic")
+			}
+		}()
+
+		PfxLen(0, 512)
+	})
+}
+
 func TestHostIdx(t *testing.T) {
 	testCases := []struct {
 		octet uint
