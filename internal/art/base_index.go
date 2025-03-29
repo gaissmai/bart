@@ -48,7 +48,7 @@ func PfxToIdx(octet byte, pfxLen int) uint {
 // It panics on invalid input, valid values for idx are from [1 .. 511]
 func IdxToPfx(idx uint) (octet uint8, pfxLen int) {
 	if idx == 0 || idx > 511 {
-		panic("logic error, idx is invalid")
+		panic("logic error, idx is out of bounds [1..511]")
 	}
 
 	pfxLen = bits.Len64(uint64(idx)) - 1
@@ -64,7 +64,7 @@ func IdxToPfx(idx uint) (octet uint8, pfxLen int) {
 func PfxLen(depth int, idx uint) int {
 	// see IdxToPfx
 	if idx == 0 || idx > 511 {
-		panic("logic error, idx is invalid")
+		panic("logic error, idx is out of bounds [1..511]")
 	}
 	return depth<<3 + bits.Len64(uint64(idx)) - 1
 }
