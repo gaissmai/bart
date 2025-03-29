@@ -291,45 +291,46 @@ func (n *node[V]) purgeAndCompress(stack []*node[V], octets []uint8, is4 bool) {
 		case pfxCount == 0 && childCount == 1:
 			switch kid := n.children.Items[0].(type) {
 			case *node[V]:
-				// fast exit, we are at an intermediate node
-				// no further compression the stack upwards possible
+				// fast exit, we are at an intermediate path node
+				// no further delete/compress upwards the stack is possible
 				return
 			case *leafNode[V]:
 				// just one leaf, delete this node and reinsert the leaf above
 				parent.children.DeleteAt(addr)
 
-				// ... reinsert the leaf at parents depth
+				// ... (re)insert the leaf at parents depth
 				parent.insertAtDepth(kid.prefix, kid.value, depth)
 			case *fringeNode[V]:
-				// get prefix back from addr
+				// just one fringe, delete this node and reinsert the fringe as leaf above
+				parent.children.DeleteAt(addr)
+
+				// get the last octet back, the only item is also the first item
 				lastOctet, _ := n.children.FirstSet()
 
 				// rebuild the prefix with octets, depth, ip version and addr
 				// depth is the parent's depth, so add +1 here for the kid
 				fringePfx := cidrForFringe(octets, depth+1, is4, lastOctet)
 
-				// delete this node
-				parent.children.DeleteAt(addr)
-
-				// ... reinsert prefix/value at parents depth
+				// ... (re)reinsert prefix/value at parents depth
 				parent.insertAtDepth(fringePfx, kid.value, depth)
 			}
 
 		case pfxCount == 1 && childCount == 0:
-			// get prefix back from idx
+			// just one prefix, delete this node and reinsert the idx as leaf above
+			parent.children.DeleteAt(addr)
+
+			// get prefix back from idx ...
 			idx, _ := n.prefixes.FirstSet() // single idx must be first bit set
 			val := n.prefixes.Items[0]      // single value must be at Items[0]
 
 			// ... and octet path
 			path := stridePath{}
 			copy(path[:], octets)
-			// it's the parent depth, so add +1 here for the kid
+
+			// depth is the parent's depth, so add +1 here for the kid
 			pfx := cidrFromPath(path, depth+1, is4, idx)
 
-			// delete this node
-			parent.children.DeleteAt(addr)
-
-			// ... insert prefix/value at parents depth
+			// ... (re)insert prefix/value at parents depth
 			parent.insertAtDepth(pfx, val, depth)
 		}
 
