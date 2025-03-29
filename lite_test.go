@@ -1,10 +1,4 @@
-// Copyright (c) Tailscale Inc & AUTHORS
-// SPDX-License-Identifier: BSD-3-Clause
-//
-// some regression tests modified from github.com/tailscale/art
-// for this implementation by:
-//
-// Copyright (c) 2024 Karl Gaissmaier
+// Copyright (c) 2025 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
 package bart
@@ -78,10 +72,22 @@ func TestLiteDeprecated(t *testing.T) {
 func TestLiteInvalid(t *testing.T) {
 	t.Parallel()
 
-	tbl := new(Lite)
+	tbl1 := new(Lite)
 	var zeroPfx netip.Prefix
 	var zeroIP netip.Addr
 	var testname string
+
+	testname = "Exists"
+	t.Run(testname, func(t *testing.T) {
+		t.Parallel()
+		defer func(testname string) {
+			if r := recover(); r != nil {
+				t.Fatalf("%s panics on invalid prefix input", testname)
+			}
+		}(testname)
+
+		tbl1.Exists(zeroPfx)
+	})
 
 	testname = "Insert"
 	t.Run(testname, func(t *testing.T) {
@@ -92,7 +98,7 @@ func TestLiteInvalid(t *testing.T) {
 			}
 		}(testname)
 
-		tbl.Insert(zeroPfx)
+		tbl1.Insert(zeroPfx)
 	})
 
 	testname = "InsertPersist"
@@ -104,7 +110,7 @@ func TestLiteInvalid(t *testing.T) {
 			}
 		}(testname)
 
-		_ = tbl.InsertPersist(zeroPfx)
+		_ = tbl1.InsertPersist(zeroPfx)
 	})
 
 	testname = "Delete"
@@ -116,7 +122,7 @@ func TestLiteInvalid(t *testing.T) {
 			}
 		}(testname)
 
-		tbl.Delete(zeroPfx)
+		tbl1.Delete(zeroPfx)
 	})
 
 	testname = "DeletePersist"
@@ -128,19 +134,13 @@ func TestLiteInvalid(t *testing.T) {
 			}
 		}(testname)
 
-		_ = tbl.DeletePersist(zeroPfx)
+		_ = tbl1.DeletePersist(zeroPfx)
 	})
 
 	testname = "Contains"
 	t.Run(testname, func(t *testing.T) {
 		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid IP input", testname)
-			}
-		}(testname)
-
-		if tbl.Contains(zeroIP) != false {
+		if tbl1.Contains(zeroIP) != false {
 			t.Errorf("%s returns true on invalid IP input, expected false", testname)
 		}
 	})
@@ -154,7 +154,7 @@ func TestLiteInvalid(t *testing.T) {
 			}
 		}(testname)
 
-		tbl.LookupPrefix(zeroPfx)
+		tbl1.LookupPrefix(zeroPfx)
 	})
 
 	testname = "LookupPrefixLPM"
@@ -166,7 +166,7 @@ func TestLiteInvalid(t *testing.T) {
 			}
 		}(testname)
 
-		tbl.LookupPrefixLPM(zeroPfx)
+		tbl1.LookupPrefixLPM(zeroPfx)
 	})
 
 	testname = "OverlapsPrefix"
@@ -178,7 +178,22 @@ func TestLiteInvalid(t *testing.T) {
 			}
 		}(testname)
 
-		tbl.OverlapsPrefix(zeroPfx)
+		tbl1.OverlapsPrefix(zeroPfx)
+	})
+
+	testname = "Overlaps"
+	t.Run(testname, func(t *testing.T) {
+		t.Parallel()
+		defer func(testname string) {
+			if r := recover(); r != nil {
+				t.Fatalf("%s panics on empty table", testname)
+			}
+		}(testname)
+
+		tbl2 := new(Lite)
+		tbl1.Overlaps(tbl2)
+		tbl1.Overlaps4(tbl2)
+		tbl1.Overlaps6(tbl2)
 	})
 
 	testname = "Contains"
@@ -190,7 +205,7 @@ func TestLiteInvalid(t *testing.T) {
 			}
 		}(testname)
 
-		tbl.Contains(zeroIP)
+		tbl1.Contains(zeroIP)
 	})
 }
 
@@ -673,6 +688,39 @@ func TestLiteClone(t *testing.T) {
 
 	if tbl.dumpString() != clone.dumpString() {
 		t.Errorf("Clone: got:\n%swant:\n%s", clone.dumpString(), tbl.dumpString())
+	}
+}
+
+func TestLiteUnion(t *testing.T) {
+	t.Parallel()
+
+	for range 10 {
+		t.Run("Union", func(t *testing.T) {
+			t.Parallel()
+			pfx1 := randomRealWorldPrefixes(1_000)
+			pfx2 := randomRealWorldPrefixes(2_000)
+
+			golden := new(Lite)
+			for _, pfx := range append(pfx1, pfx2...) {
+				golden.Insert(pfx)
+			}
+
+			tbl1 := new(Lite)
+			for _, pfx := range pfx1 {
+				tbl1.Insert(pfx)
+			}
+
+			tbl2 := new(Lite)
+			for _, pfx := range pfx2 {
+				tbl2.Insert(pfx)
+			}
+
+			tbl1.Union(tbl2)
+
+			if tbl1.dumpString() != golden.dumpString() {
+				t.Errorf("Union: got:\n%swant:\n%s", tbl1.dumpString(), golden.dumpString())
+			}
+		})
 	}
 }
 
