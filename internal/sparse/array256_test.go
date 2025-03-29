@@ -68,6 +68,34 @@ func TestSparseArrayGet(t *testing.T) {
 	}
 }
 
+func TestSparseArrayMustSetPanic(t *testing.T) {
+	t.Parallel()
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("MustSet, expected panic")
+		}
+	}()
+
+	a := new(Array256[int])
+
+	// must panic
+	a.MustSet(0)
+}
+
+func TestSparseArrayMustClearPanic(t *testing.T) {
+	t.Parallel()
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("MustClear, expected panic")
+		}
+	}()
+
+	a := new(Array256[int])
+
+	// must panic
+	a.MustClear(0)
+}
+
 func TestSparseArrayMustGetPanic(t *testing.T) {
 	t.Parallel()
 	defer func() {
@@ -123,7 +151,13 @@ func TestSparseArrayUpdate(t *testing.T) {
 
 func TestSparseArrayCopy(t *testing.T) {
 	t.Parallel()
-	a := new(Array256[int])
+	var a *Array256[int]
+
+	if a.Copy() != nil {
+		t.Fatal("copy a nil array, expected nil")
+	}
+
+	a = new(Array256[int])
 
 	for i := range 255 {
 		a.InsertAt(uint(i), i)
