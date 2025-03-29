@@ -1638,41 +1638,49 @@ func TestDeleteShuffled(t *testing.T) {
 		numPrefixes  = 10_000 // prefixes to insert (test deletes 50% of them)
 		numPerFamily = numPrefixes / 2
 		deleteCut    = numPerFamily / 2
-		numProbes    = 10_000 // random addr lookups to do
 	)
 
-	// We have to do this little dance instead of just using allPrefixes,
-	// because we want pfxs and toDelete to be non-overlapping sets.
-	all4, all6 := randomPrefixes4(numPerFamily), randomPrefixes6(numPerFamily)
-
-	pfxs := append([]goldTableItem[int](nil), all4[:deleteCut]...)
-	pfxs = append(pfxs, all6[:deleteCut]...)
-
-	toDelete := append([]goldTableItem[int](nil), all4[deleteCut:]...)
-	toDelete = append(toDelete, all6[deleteCut:]...)
-
-	rt1 := new(Table[int])
-	for _, pfx := range pfxs {
-		rt1.Insert(pfx.pfx, pfx.val)
-	}
-	for _, pfx := range toDelete {
-		rt1.Insert(pfx.pfx, pfx.val)
-	}
-	for _, pfx := range toDelete {
-		rt1.Delete(pfx.pfx)
-	}
-
 	for range 10 {
+		// We have to do this little dance instead of just using allPrefixes,
+		// because we want pfxs and toDelete to be non-overlapping sets.
+		all4, all6 := randomPrefixes4(numPerFamily), randomPrefixes6(numPerFamily)
+
+		pfxs := append([]goldTableItem[int](nil), all4[:deleteCut]...)
+		pfxs = append(pfxs, all6[:deleteCut]...)
+
+		toDelete := append([]goldTableItem[int](nil), all4[deleteCut:]...)
+		toDelete = append(toDelete, all6[deleteCut:]...)
+
+		rt1 := new(Table[int])
+
+		// insert
+		for _, pfx := range pfxs {
+			rt1.Insert(pfx.pfx, pfx.val)
+		}
+		for _, pfx := range toDelete {
+			rt1.Insert(pfx.pfx, pfx.val)
+		}
+
+		// delete
+		for _, pfx := range toDelete {
+			rt1.Delete(pfx.pfx)
+		}
+
 		pfxs2 := append([]goldTableItem[int](nil), pfxs...)
 		toDelete2 := append([]goldTableItem[int](nil), toDelete...)
 		rand.Shuffle(len(toDelete2), func(i, j int) { toDelete2[i], toDelete2[j] = toDelete2[j], toDelete2[i] })
+
 		rt2 := new(Table[int])
+
+		// insert
 		for _, pfx := range pfxs2 {
 			rt2.Insert(pfx.pfx, pfx.val)
 		}
 		for _, pfx := range toDelete2 {
 			rt2.Insert(pfx.pfx, pfx.val)
 		}
+
+		// delete
 		for _, pfx := range toDelete2 {
 			rt2.Delete(pfx.pfx)
 		}
@@ -1714,6 +1722,49 @@ func TestDeleteIsReverseOfInsert(t *testing.T) {
 	}
 	if got := tbl.dumpString(); got != want {
 		t.Fatalf("after delete, mismatch:\n\n got: %s\n\nwant: %s", got, want)
+	}
+}
+
+func TestDeleteButOne(t *testing.T) {
+	t.Parallel()
+	// Insert N prefixes, then delete all but one
+	const N = 100
+
+	for range 1_000 {
+
+		tbl := new(Table[int])
+		prefixes := randomPrefixes(N)
+
+		for _, p := range prefixes {
+			tbl.Insert(p.pfx, p.val)
+		}
+
+		// shuffle the prefixes
+		rand.Shuffle(N, func(i, j int) {
+			prefixes[i], prefixes[j] = prefixes[j], prefixes[i]
+		})
+
+		for i, p := range prefixes {
+			// skip the first
+			if i == 0 {
+				continue
+			}
+			tbl.Delete(p.pfx)
+		}
+
+		stats4 := tbl.root4.nodeStatsRec()
+		stats6 := tbl.root6.nodeStatsRec()
+
+		if nodes := stats4.nodes + stats6.nodes; nodes != 1 {
+			t.Fatalf("delete but one, want nodes: 1, got: %d\n%s", nodes, tbl.dumpString())
+		}
+
+		sum := stats4.pfxs + stats4.leaves + stats4.fringes +
+			stats6.pfxs + stats6.leaves + stats6.fringes
+
+		if sum != 1 {
+			t.Fatalf("delete but one, onle one item must be left, but: %d\n%s", sum, tbl.dumpString())
+		}
 	}
 }
 
