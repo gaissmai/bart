@@ -209,7 +209,7 @@ func randomPrefixes4(n int) []goldTableItem[int] {
 	return ret
 }
 
-// randomPrefixes6 returns n randomly generated IPv4 prefixes and associated values.
+// randomPrefixes6 returns n randomly generated IPv6 prefixes and associated values.
 // skip default route
 func randomPrefixes6(n int) []goldTableItem[int] {
 	pfxs := map[netip.Prefix]bool{}
