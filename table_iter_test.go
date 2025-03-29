@@ -364,7 +364,7 @@ func TestSupernetsEdgeCase(t *testing.T) {
 func TestSupernetsCompare(t *testing.T) {
 	t.Parallel()
 
-	pfxs := randomRealWorldPrefixes(10_000)
+	pfxs := randomRealWorldPrefixes(1_000)
 
 	fast := new(Table[int])
 	gold := new(goldTable[int])
@@ -374,18 +374,20 @@ func TestSupernetsCompare(t *testing.T) {
 		gold.insert(pfx, i)
 	}
 
-	tests := randomPrefixes(200)
-	for _, tt := range tests {
-		gotGold := gold.supernets(tt.pfx)
-		gotFast := []netip.Prefix{}
+	for _, pfx := range randomRealWorldPrefixes(100_000) {
+		t.Run("subtest", func(t *testing.T) {
+			t.Parallel()
+			gotGold := gold.supernets(pfx)
+			gotFast := []netip.Prefix{}
 
-		for p := range fast.Supernets(tt.pfx) {
-			gotFast = append(gotFast, p)
-		}
+			for p := range fast.Supernets(pfx) {
+				gotFast = append(gotFast, p)
+			}
 
-		if !slices.Equal(gotGold, gotFast) {
-			t.Fatalf("Supernets(%q) = %v, want %v", tt.pfx, gotFast, gotGold)
-		}
+			if !slices.Equal(gotGold, gotFast) {
+				t.Fatalf("Supernets(%q) = %v, want %v", pfx, gotFast, gotGold)
+			}
+		})
 	}
 }
 
@@ -468,7 +470,7 @@ func TestSubnets(t *testing.T) {
 func TestSubnetsCompare(t *testing.T) {
 	t.Parallel()
 
-	pfxs := randomRealWorldPrefixes(10_000)
+	pfxs := randomRealWorldPrefixes(1_000)
 
 	fast := new(Table[int])
 	gold := new(goldTable[int])
@@ -478,16 +480,19 @@ func TestSubnetsCompare(t *testing.T) {
 		gold.insert(pfx, i)
 	}
 
-	tests := randomPrefixes(200)
-	for _, tt := range tests {
-		gotGold := gold.subnets(tt.pfx)
-		gotFast := []netip.Prefix{}
-		for pfx := range fast.Subnets(tt.pfx) {
-			gotFast = append(gotFast, pfx)
-		}
-		if !slices.Equal(gotGold, gotFast) {
-			t.Fatalf("Subnets(%q) = %v, want %v", tt.pfx, gotFast, gotGold)
-		}
+	for _, pfx := range randomRealWorldPrefixes(100_000) {
+		t.Run("subtest", func(t *testing.T) {
+			t.Parallel()
+
+			gotGold := gold.subnets(pfx)
+			gotFast := []netip.Prefix{}
+			for pfx := range fast.Subnets(pfx) {
+				gotFast = append(gotFast, pfx)
+			}
+			if !slices.Equal(gotGold, gotFast) {
+				t.Fatalf("Subnets(%q) = %v, want %v", pfx, gotFast, gotGold)
+			}
+		})
 	}
 }
 
