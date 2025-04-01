@@ -170,7 +170,7 @@ func (n *node[V]) overlapsChildrenIn(o *node[V]) bool {
 // overlapsSameChildren, find same octets with bitset intersection.
 func (n *node[V]) overlapsSameChildren(o *node[V], depth int) bool {
 	// intersect the child bitsets from n with o
-	commonChildren := n.children.BitSet256.Intersection(&o.children.BitSet256)
+	commonChildren := n.children.Intersection(&o.children.BitSet256)
 
 	addr := uint(0)
 	ok := true

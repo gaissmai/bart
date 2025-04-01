@@ -15,6 +15,8 @@ import (
 )
 
 func TestRegressionOverlaps(t *testing.T) {
+	t.Parallel()
+
 	t.Run("overlaps_divergent_children_with_parent_route_entry", func(t *testing.T) {
 		t.Parallel()
 		t1, t2 := new(Table[int]), new(Table[int])

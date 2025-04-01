@@ -21,7 +21,7 @@ type Lite struct {
 // Exists returns true if the prefix exists in the table.
 // It's an adapter to [Table.Get].
 func (l *Lite) Exists(pfx netip.Prefix) bool {
-	_, ok := l.Table.Get(pfx)
+	_, ok := l.Get(pfx)
 	return ok
 }
 
