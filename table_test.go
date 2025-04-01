@@ -2309,7 +2309,7 @@ func TestCloneShallow(t *testing.T) {
 	want, _ := tbl.Get(pfx)
 	got, _ := clone.Get(pfx)
 
-	if !(*got == *want && got == want) {
+	if *got != *want || got != want {
 		t.Errorf("shallow copy, values and pointers must be equal:\nvalues(%d, %d)\n(ptr(%v, %v)", *got, *want, got, want)
 	}
 
@@ -2429,7 +2429,7 @@ func TestUnionShallow(t *testing.T) {
 	got, _ := tbl1.Get(pfx)
 	want, _ := tbl2.Get(pfx)
 
-	if !(*got == *want && got == want) {
+	if *got != *want || got != want {
 		t.Errorf("shallow copy, values and pointers must be equal:\nvalues(%d, %d)\n(ptr(%v, %v)", *got, *want, got, want)
 	}
 

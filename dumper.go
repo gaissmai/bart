@@ -251,7 +251,7 @@ func ipStridePath(path stridePath, depth int, is4 bool) string {
 			buf.WriteString(":")
 		}
 
-		buf.WriteString(fmt.Sprintf("%02x", b))
+		fmt.Fprintf(buf, "%02x", b)
 	}
 
 	return buf.String()

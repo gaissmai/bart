@@ -322,6 +322,7 @@ func TestSupernetsEdgeCase(t *testing.T) {
 	var zeroPfx netip.Prefix
 
 	t.Run("empty table", func(t *testing.T) {
+		t.Parallel()
 		rtbl := new(Table[any])
 		pfx := mpp("::1/128")
 
@@ -397,6 +398,7 @@ func TestSubnets(t *testing.T) {
 	var zeroPfx netip.Prefix
 
 	t.Run("empty table", func(t *testing.T) {
+		t.Parallel()
 		rtbl := new(Table[string])
 		pfx := mpp("::1/128")
 
