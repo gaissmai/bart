@@ -101,7 +101,7 @@ func ExampleLite_Contains() {
 ## API
 
 From release v0.18.x on, bart requires at least go1.23, the `iter.Seq2[netip.Prefix, V]` types for iterators
-are used. The lock-free versions of insert, update and delete are added, but still experimentell.
+are used. The lock-free versions of insert, update and delete are added, but still experimental.
 
 ```golang
   import "github.com/gaissmai/bart"
