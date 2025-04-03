@@ -54,8 +54,8 @@ func init() {
 
 var (
 	intSink  int
-	okSink   bool
 	boolSink bool
+	anySink  any
 )
 
 func init() {
@@ -133,28 +133,28 @@ func BenchmarkFullMatch4(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
-			okSink = rt.Contains(matchIP4)
+			boolSink = rt.Contains(matchIP4)
 		}
 	})
 
 	b.Run("Lookup", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
-			_, okSink = rt.Lookup(matchIP4)
+			_, boolSink = rt.Lookup(matchIP4)
 		}
 	})
 
 	b.Run("LookupPrefix", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
-			_, okSink = rt.LookupPrefix(matchPfx4)
+			_, boolSink = rt.LookupPrefix(matchPfx4)
 		}
 	})
 
 	b.Run("LookupPfxLPM", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
-			_, _, okSink = rt.LookupPrefixLPM(matchPfx4)
+			_, _, boolSink = rt.LookupPrefixLPM(matchPfx4)
 		}
 	})
 }
@@ -172,28 +172,28 @@ func BenchmarkFullMatch6(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
-			okSink = rt.Contains(matchIP6)
+			boolSink = rt.Contains(matchIP6)
 		}
 	})
 
 	b.Run("Lookup", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
-			_, okSink = rt.Lookup(matchIP6)
+			_, boolSink = rt.Lookup(matchIP6)
 		}
 	})
 
 	b.Run("LookupPrefix", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
-			_, okSink = rt.LookupPrefix(matchPfx6)
+			_, boolSink = rt.LookupPrefix(matchPfx6)
 		}
 	})
 
 	b.Run("LookupPfxLPM", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
-			_, _, okSink = rt.LookupPrefixLPM(matchPfx6)
+			_, _, boolSink = rt.LookupPrefixLPM(matchPfx6)
 		}
 	})
 }
@@ -211,28 +211,28 @@ func BenchmarkFullMiss4(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
-			okSink = rt.Contains(missIP4)
+			boolSink = rt.Contains(missIP4)
 		}
 	})
 
 	b.Run("Lookup", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
-			intSink, okSink = rt.Lookup(missIP4)
+			intSink, boolSink = rt.Lookup(missIP4)
 		}
 	})
 
 	b.Run("LookupPrefix", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
-			intSink, okSink = rt.LookupPrefix(missPfx4)
+			intSink, boolSink = rt.LookupPrefix(missPfx4)
 		}
 	})
 
 	b.Run("LookupPfxLPM", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
-			_, intSink, okSink = rt.LookupPrefixLPM(missPfx4)
+			_, intSink, boolSink = rt.LookupPrefixLPM(missPfx4)
 		}
 	})
 }
@@ -250,28 +250,28 @@ func BenchmarkFullMiss6(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
-			okSink = rt.Contains(missIP6)
+			boolSink = rt.Contains(missIP6)
 		}
 	})
 
 	b.Run("Lookup", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
-			intSink, okSink = rt.Lookup(missIP6)
+			intSink, boolSink = rt.Lookup(missIP6)
 		}
 	})
 
 	b.Run("LookupPrefix", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
-			intSink, okSink = rt.LookupPrefix(missPfx6)
+			intSink, boolSink = rt.LookupPrefix(missPfx6)
 		}
 	})
 
 	b.Run("LookupPfxLPM", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
-			_, intSink, okSink = rt.LookupPrefixLPM(missPfx6)
+			_, intSink, boolSink = rt.LookupPrefixLPM(missPfx6)
 		}
 	})
 }
