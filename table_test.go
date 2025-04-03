@@ -2757,7 +2757,7 @@ func BenchmarkTableGet(b *testing.B) {
 			b.ResetTimer()
 			b.Run(fmt.Sprintf("%s/From_%d", fam, nroutes), func(b *testing.B) {
 				for range b.N {
-					_, _ = rt.Get(probe.pfx)
+					_, boolSink = rt.Get(probe.pfx)
 				}
 			})
 		}
@@ -2782,28 +2782,28 @@ func BenchmarkTableLPM(b *testing.B) {
 			b.ResetTimer()
 			b.Run(fmt.Sprintf("%s/In_%6d/%s", fam, nroutes, "Contains"), func(b *testing.B) {
 				for range b.N {
-					_ = rt.Contains(probe.pfx.Addr())
+					boolSink = rt.Contains(probe.pfx.Addr())
 				}
 			})
 
 			b.ResetTimer()
 			b.Run(fmt.Sprintf("%s/In_%6d/%s", fam, nroutes, "Lookup"), func(b *testing.B) {
 				for range b.N {
-					writeSink, _ = rt.Lookup(probe.pfx.Addr())
+					_, boolSink = rt.Lookup(probe.pfx.Addr())
 				}
 			})
 
 			b.ResetTimer()
 			b.Run(fmt.Sprintf("%s/In_%6d/%s", fam, nroutes, "Prefix"), func(b *testing.B) {
 				for range b.N {
-					_, _ = rt.LookupPrefix(probe.pfx)
+					_, boolSink = rt.LookupPrefix(probe.pfx)
 				}
 			})
 
 			b.ResetTimer()
 			b.Run(fmt.Sprintf("%s/In_%6d/%s", fam, nroutes, "PrefixLPM"), func(b *testing.B) {
 				for range b.N {
-					_, _, _ = rt.LookupPrefixLPM(probe.pfx)
+					_, _, boolSink = rt.LookupPrefixLPM(probe.pfx)
 				}
 			})
 		}

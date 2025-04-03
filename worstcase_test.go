@@ -390,7 +390,7 @@ func BenchmarkWorstCaseMatch4(b *testing.B) {
 
 		b.ResetTimer()
 		for range b.N {
-			tbl.Contains(worstCaseProbeIP4)
+			boolSink = tbl.Contains(worstCaseProbeIP4)
 		}
 	})
 
@@ -404,7 +404,7 @@ func BenchmarkWorstCaseMatch4(b *testing.B) {
 
 		b.ResetTimer()
 		for range b.N {
-			tbl.Lookup(worstCaseProbeIP4)
+			_, boolSink = tbl.Lookup(worstCaseProbeIP4)
 		}
 	})
 
@@ -418,7 +418,7 @@ func BenchmarkWorstCaseMatch4(b *testing.B) {
 
 		b.ResetTimer()
 		for range b.N {
-			tbl.LookupPrefix(worstCaseProbePfx4)
+			_, boolSink = tbl.LookupPrefix(worstCaseProbePfx4)
 		}
 	})
 
@@ -432,7 +432,7 @@ func BenchmarkWorstCaseMatch4(b *testing.B) {
 
 		b.ResetTimer()
 		for range b.N {
-			tbl.LookupPrefixLPM(worstCaseProbePfx4)
+			_, _, boolSink = tbl.LookupPrefixLPM(worstCaseProbePfx4)
 		}
 	})
 }
@@ -448,7 +448,7 @@ func BenchmarkWorstCaseMiss4(b *testing.B) {
 
 		b.ResetTimer()
 		for range b.N {
-			tbl.Contains(worstCaseProbeIP4)
+			boolSink = tbl.Contains(worstCaseProbeIP4)
 		}
 	})
 
@@ -462,7 +462,7 @@ func BenchmarkWorstCaseMiss4(b *testing.B) {
 
 		b.ResetTimer()
 		for range b.N {
-			tbl.Lookup(worstCaseProbeIP4)
+			_, boolSink = tbl.Lookup(worstCaseProbeIP4)
 		}
 	})
 
@@ -476,7 +476,7 @@ func BenchmarkWorstCaseMiss4(b *testing.B) {
 
 		b.ResetTimer()
 		for range b.N {
-			tbl.LookupPrefix(worstCaseProbePfx4)
+			_, boolSink = tbl.LookupPrefix(worstCaseProbePfx4)
 		}
 	})
 
@@ -490,7 +490,7 @@ func BenchmarkWorstCaseMiss4(b *testing.B) {
 
 		b.ResetTimer()
 		for range b.N {
-			tbl.LookupPrefixLPM(worstCaseProbePfx4)
+			_, _, boolSink = tbl.LookupPrefixLPM(worstCaseProbePfx4)
 		}
 	})
 }
@@ -504,7 +504,7 @@ func BenchmarkWorstCaseMatch6(b *testing.B) {
 
 		b.ResetTimer()
 		for range b.N {
-			tbl.Contains(worstCaseProbeIP6)
+			boolSink = tbl.Contains(worstCaseProbeIP6)
 		}
 	})
 
@@ -518,7 +518,7 @@ func BenchmarkWorstCaseMatch6(b *testing.B) {
 
 		b.ResetTimer()
 		for range b.N {
-			tbl.Lookup(worstCaseProbeIP6)
+			_, boolSink = tbl.Lookup(worstCaseProbeIP6)
 		}
 	})
 
@@ -532,7 +532,7 @@ func BenchmarkWorstCaseMatch6(b *testing.B) {
 
 		b.ResetTimer()
 		for range b.N {
-			tbl.LookupPrefix(worstCaseProbePfx6)
+			_, boolSink = tbl.LookupPrefix(worstCaseProbePfx6)
 		}
 	})
 
@@ -546,7 +546,7 @@ func BenchmarkWorstCaseMatch6(b *testing.B) {
 
 		b.ResetTimer()
 		for range b.N {
-			tbl.LookupPrefixLPM(worstCaseProbePfx6)
+			_, _, boolSink = tbl.LookupPrefixLPM(worstCaseProbePfx6)
 		}
 	})
 }
@@ -562,7 +562,7 @@ func BenchmarkWorstCaseMiss6(b *testing.B) {
 
 		b.ResetTimer()
 		for range b.N {
-			tbl.Contains(worstCaseProbeIP6)
+			boolSink = tbl.Contains(worstCaseProbeIP6)
 		}
 	})
 
@@ -576,7 +576,7 @@ func BenchmarkWorstCaseMiss6(b *testing.B) {
 
 		b.ResetTimer()
 		for range b.N {
-			tbl.Lookup(worstCaseProbeIP6)
+			_, boolSink = tbl.Lookup(worstCaseProbeIP6)
 		}
 	})
 
@@ -590,7 +590,7 @@ func BenchmarkWorstCaseMiss6(b *testing.B) {
 
 		b.ResetTimer()
 		for range b.N {
-			tbl.LookupPrefix(worstCaseProbePfx6)
+			_, boolSink = tbl.LookupPrefix(worstCaseProbePfx6)
 		}
 	})
 
@@ -604,7 +604,7 @@ func BenchmarkWorstCaseMiss6(b *testing.B) {
 
 		b.ResetTimer()
 		for range b.N {
-			tbl.LookupPrefixLPM(worstCaseProbePfx6)
+			_, _, boolSink = tbl.LookupPrefixLPM(worstCaseProbePfx6)
 		}
 	})
 }
