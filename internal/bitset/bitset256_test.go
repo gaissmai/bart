@@ -714,10 +714,10 @@ func TestIntersectionCardinality(t *testing.T) {
 }
 
 var (
-	boolSink   bool
-	intSink    int
-	anySink    any
-	bitsetSink BitSet256
+	boolSink      bool
+	intSink       int
+	uintSliceSink []uint
+	bitsetSink    BitSet256
 )
 
 func BenchmarkTest(b *testing.B) {
@@ -884,7 +884,7 @@ func BenchmarkAsSlice(b *testing.B) {
 			buf := make([]uint, 256)
 			b.ResetTimer()
 			for range b.N {
-				anySink = aa.AsSlice(buf)
+				uintSliceSink = aa.AsSlice(buf)
 			}
 		})
 	}
@@ -899,7 +899,7 @@ func BenchmarkAsSlice(b *testing.B) {
 			buf := make([]uint, 256)
 			b.ResetTimer()
 			for range b.N {
-				anySink = aa.AsSlice(buf)
+				uintSliceSink = aa.AsSlice(buf)
 			}
 		})
 	}
