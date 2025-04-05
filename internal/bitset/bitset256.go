@@ -10,23 +10,22 @@
 // This implementation is heavily optimized for this internal use case.
 package bitset
 
-//  can inline (*BitSet256).All with cost 56
-//  can inline (*BitSet256).AsSlice with cost 50
-//  can inline (*BitSet256).FirstSet with cost 79
-//  can inline (*BitSet256).IntersectionCardinality with cost 53
-//  can inline (*BitSet256).IntersectionTop with cost 42
-//  can inline (*BitSet256).Intersection with cost 53
-//  can inline (*BitSet256).IntersectsAny with cost 48
-//  can inline (*BitSet256).IsEmpty with cost 28
-//  can inline (*BitSet256).MustClear with cost 12
-//  can inline (*BitSet256).MustSet with cost 12
-//  can inline (*BitSet256).NextSet with cost 73
-//  can inline (*BitSet256).popcnt with cost 33
-//  can inline (*BitSet256).Rank0 with cost 64
-//  can inline (*BitSet256).Size with cost 36
-//  can inline (*BitSet256).Test with cost 28
-//  can inline (*BitSet256).Union with cost 53
-//  cannot inline (*BitSet256).String: function too complex: cost 121 exceeds budget 80
+// can inline (*BitSet256).All with cost 55
+// can inline (*BitSet256).AsSlice with cost 50
+// can inline (*BitSet256).Clear with cost 12
+// can inline (*BitSet256).FirstSet with cost 79
+// can inline (*BitSet256).IntersectionCardinality with cost 53
+// can inline (*BitSet256).IntersectionTop with cost 42
+// can inline (*BitSet256).Intersection with cost 53
+// can inline (*BitSet256).IntersectsAny with cost 48
+// can inline (*BitSet256).IsEmpty with cost 28
+// can inline (*BitSet256).NextSet with cost 65
+// can inline (*BitSet256).popcnt with cost 33
+// can inline (*BitSet256).Rank with cost 57
+// can inline (*BitSet256).Set with cost 12
+// can inline (*BitSet256).Size with cost 36
+// can inline (*BitSet256).Test with cost 15
+// can inline (*BitSet256).Union with cost 53
 
 import (
 	"fmt"
@@ -53,153 +52,124 @@ import (
 // BitSet256 represents a fixed size bitset from [0..255]
 type BitSet256 [4]uint64
 
+// String implements fmt.Stringer.
 func (b *BitSet256) String() string {
-	return fmt.Sprint(b.All())
+	return fmt.Sprintf("%v", b.All())
 }
 
-// MustSet sets the bit, it panic's if bit is > 255 by intention!
-func (b *BitSet256) MustSet(bit uint) {
+// Set sets the bit.
+func (b *BitSet256) Set(bit uint8) {
 	b[bit>>6] |= 1 << (bit & 63)
 }
 
-// MustClear clear the bit, it panic's if bit is > 255 by intention!
-func (b *BitSet256) MustClear(bit uint) {
+// Clear clears the bit.
+func (b *BitSet256) Clear(bit uint8) {
 	b[bit>>6] &^= 1 << (bit & 63)
 }
 
 // Test if the bit is set.
-func (b *BitSet256) Test(bit uint) (ok bool) {
-	if x := int(bit >> 6); x < 4 {
-		return b[x&3]&(1<<(bit&63)) != 0 // [x&3] is bounds check elimination (BCE)
-	}
-	return
+func (b *BitSet256) Test(bit uint8) (ok bool) {
+	return b[bit>>6]&(1<<(bit&63)) != 0
 }
 
 // FirstSet returns the first bit set along with an ok code.
-func (b *BitSet256) FirstSet() (first uint, ok bool) {
+func (b *BitSet256) FirstSet() (first uint8, ok bool) {
 	// optimized for pipelining, can still inline with cost 79
-	if x := bits.TrailingZeros64(b[0]); x != 64 {
-		return uint(x), true
-	} else if x := bits.TrailingZeros64(b[1]); x != 64 {
-		return uint(x + 64), true
-	} else if x := bits.TrailingZeros64(b[2]); x != 64 {
-		return uint(x + 128), true
-	} else if x := bits.TrailingZeros64(b[3]); x != 64 {
-		return uint(x + 192), true
+	x0 := uint8(bits.TrailingZeros64(b[0]))
+	x1 := uint8(bits.TrailingZeros64(b[1]))
+	x2 := uint8(bits.TrailingZeros64(b[2]))
+	x3 := uint8(bits.TrailingZeros64(b[3]))
+
+	if x0 != 64 {
+		return x0, true
 	}
+	if x1 != 64 {
+		return x1 + 64, true
+	}
+	if x2 != 64 {
+		return x2 + 128, true
+	}
+	if x3 != 64 {
+		return x3 + 192, true
+	}
+
 	return
 }
 
 // NextSet returns the next bit set from the specified start bit,
 // including possibly the current bit along with an ok code.
-func (b *BitSet256) NextSet(bit uint) (uint, bool) {
+func (b *BitSet256) NextSet(bit uint8) (next uint8, iok bool) {
 	wIdx := int(bit >> 6)
-	if wIdx >= 4 {
-		return 0, false
-	}
-	// wIdx is < 4
 
 	// process the first (maybe partial) word
-	first := b[wIdx&3] >> (bit & 63) // i % 64
+	first := b[wIdx] >> (bit & 63)
 	if first != 0 {
-		return bit + uint(bits.TrailingZeros64(first)), true
+		return bit + uint8(bits.TrailingZeros64(first)), true
 	}
 
 	// process the following words until next bit is set
-	wIdx++ // wIdx is <= 4
-	for jIdx, word := range b[wIdx:] {
-		if word != 0 {
-			return uint((wIdx+jIdx)<<6 + bits.TrailingZeros64(word)), true
+	for wIdx++; wIdx < 4; wIdx++ {
+		if next := b[wIdx]; next != 0 {
+			return uint8(wIdx<<6 + bits.TrailingZeros64(next)), true
 		}
 	}
-	return 0, false
+	return
 }
 
-// AsSlice returns all set bits as slice of uint without
+// AsSlice returns all set bits as slice of uint8 without
 // heap allocations.
 //
 // This is faster than All, but also more dangerous,
 // it panics if the capacity of buf is < b.Size()
-func (b *BitSet256) AsSlice(buf []uint) []uint {
+func (b *BitSet256) AsSlice(buf []uint8) []uint8 {
 	buf = buf[:cap(buf)] // use cap as max len
 
 	size := 0
 	for wIdx, word := range b {
 		for ; word != 0; size++ {
 			// panics if capacity of buf is exceeded.
-			buf[size] = uint(wIdx<<6 + bits.TrailingZeros64(word))
+			buf[size] = uint8(wIdx<<6 + bits.TrailingZeros64(word))
 
 			// clear the rightmost set bit
 			word &= word - 1
 		}
 	}
 
-	buf = buf[:size]
+	buf = buf[:size] // resize
 	return buf
 }
 
 // All returns all set bits. This has a simpler API but is slower than AsSlice.
-func (b *BitSet256) All() []uint {
-	return b.AsSlice(make([]uint, 0, 256))
+func (b *BitSet256) All() []uint8 {
+	return b.AsSlice(make([]uint8, 256))
 }
 
 // IntersectionTop computes the intersection of base set with the compare set.
 // If the result set isn't empty, it returns the top most set bit and true.
-func (b *BitSet256) IntersectionTop(c *BitSet256) (top uint, ok bool) {
+func (b *BitSet256) IntersectionTop(c *BitSet256) (top uint8, ok bool) {
 	for wIdx := 4 - 1; wIdx >= 0; wIdx-- {
 		if word := b[wIdx] & c[wIdx]; word != 0 {
-			return uint(wIdx<<6+bits.Len64(word)) - 1, true
+			return uint8(wIdx<<6+bits.Len64(word)) - 1, true
 		}
 	}
 	return
 }
 
-// Rank0 returns the set bits up to and including to idx, minus 1.
-//
-// Rank0 is used in the hot path, if idx > 255 it does NOT PANIC,
-// the bounds check is eliminated, we press the pedal to the metal!
-func (b *BitSet256) Rank0(idx uint) (rnk int) {
-	rnk += bits.OnesCount64(b[0] & rankMask[uint8(idx)][0]) // uint8() is BCE
-	rnk += bits.OnesCount64(b[1] & rankMask[uint8(idx)][1])
-	rnk += bits.OnesCount64(b[2] & rankMask[uint8(idx)][2])
-	rnk += bits.OnesCount64(b[3] & rankMask[uint8(idx)][3])
-
-	// Rank0: if bit 0 is set, Rank(0) is 1 (up to and including), but
-	// here it's only used as slice index, so we decrement it already by 1.
-	rnk--
+// Rank returns the set bits up to and including to idx.
+func (b *BitSet256) Rank(idx uint8) (rnk int) {
+	rnk += bits.OnesCount64(b[0] & rankMask[idx][0])
+	rnk += bits.OnesCount64(b[1] & rankMask[idx][1])
+	rnk += bits.OnesCount64(b[2] & rankMask[idx][2])
+	rnk += bits.OnesCount64(b[3] & rankMask[idx][3])
 	return
 }
-
-/*
-// Rank0 is equal to Rank(idx) - 1
-func (b *BitSet256) Rank0(idx uint) (rnk int) {
-	// Rank count is inclusive
-	idx++
-	wIdx := min(4, int((idx)>>6))
-
-	// sum up the popcounts until wIdx ...
-	// don't test x == 0, just add, less branches
-	for jIdx := range wIdx {
-		rnk += bits.OnesCount64(b[jIdx])
-	}
-
-	// ... plus partial word at wIdx,
-	if wIdx < 4 {
-		rnk += bits.OnesCount64(b[wIdx&3] << (64 - idx&63))
-	}
-
-	// decrement for offset by one
-	rnk--
-	return
-}
-*/
 
 // IsEmpty returns true if no bit is set.
 func (b *BitSet256) IsEmpty() bool {
-	return b[3] == 0 &&
-		b[2] == 0 &&
+	return b[0] == 0 &&
 		b[1] == 0 &&
-		b[0] == 0
+		b[2] == 0 &&
+		b[3] == 0
 }
 
 // IntersectsAny returns true if the intersection of base set with the compare set

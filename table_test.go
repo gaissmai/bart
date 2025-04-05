@@ -2591,7 +2591,7 @@ func TestLastIdxLastBits(t *testing.T) {
 	tests := []struct {
 		pfx       netip.Prefix
 		wantDepth int
-		wantBits  int
+		wantBits  uint8
 	}{
 		{
 			pfx:       mpp("0.0.0.0/0"),

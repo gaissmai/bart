@@ -16,15 +16,15 @@ type Array256[T any] struct {
 	Items []T
 }
 
-// MustSet of the underlying bitset is forbidden. The bitset and the items are coupled.
+// Set of the underlying bitset is forbidden. The bitset and the items are coupled.
 // An unsynchronized Set() disturbs the coupling between bitset and Items[].
-func (a *Array256[T]) MustSet(uint) {
+func (a *Array256[T]) Set(uint) {
 	panic("forbidden, use InsertAt")
 }
 
-// MustClear of the underlying bitset is forbidden. The bitset and the items are coupled.
+// Clear of the underlying bitset is forbidden. The bitset and the items are coupled.
 // An unsynchronized Clear() disturbs the coupling between bitset and Items[].
-func (a *Array256[T]) MustClear(uint) {
+func (a *Array256[T]) Clear(uint) {
 	panic("forbidden, use DeleteAt")
 }
 
@@ -38,31 +38,30 @@ func (a *Array256[T]) MustClear(uint) {
 //	                ⬆
 //
 //	BitSet256.Test(5):     true
-//	BitSet256.popcount(5): 2, for interval [0,5]
-//	BitSet256.Rank0(5):    1, equal popcount(5)-1
-func (a *Array256[T]) Get(i uint) (value T, ok bool) {
+//	BitSet256.Rank(5):     2,
+func (a *Array256[T]) Get(i uint8) (value T, ok bool) {
 	if a.Test(i) {
-		return a.Items[a.Rank0(i)], true
+		return a.Items[a.Rank(i)-1], true
 	}
 	return
 }
 
 // MustGet use it only after a successful test
 // or the behavior is undefined, it will NOT PANIC.
-func (a *Array256[T]) MustGet(i uint) T {
-	return a.Items[a.Rank0(i)]
+func (a *Array256[T]) MustGet(i uint8) T {
+	return a.Items[a.Rank(i)-1]
 }
 
 // UpdateAt or set the value at i via callback. The new value is returned
 // and true if the value was already present.
-func (a *Array256[T]) UpdateAt(i uint, cb func(T, bool) T) (newValue T, wasPresent bool) {
+func (a *Array256[T]) UpdateAt(i uint8, cb func(T, bool) T) (newValue T, wasPresent bool) {
 	var rank0 int
 
 	// if already set, get current value
 	var oldValue T
 
 	if wasPresent = a.Test(i); wasPresent {
-		rank0 = a.Rank0(i)
+		rank0 = a.Rank(i) - 1
 		oldValue = a.Items[rank0]
 	}
 
@@ -77,10 +76,10 @@ func (a *Array256[T]) UpdateAt(i uint, cb func(T, bool) T) (newValue T, wasPrese
 	}
 
 	// new value, insert into bitset ...
-	a.BitSet256.MustSet(i)
+	a.BitSet256.Set(i)
 
 	// bitset has changed, recalc rank
-	rank0 = a.Rank0(i)
+	rank0 = a.Rank(i) - 1
 
 	// ... and insert value into slice
 	a.insertItem(rank0, newValue)
@@ -109,36 +108,36 @@ func (a *Array256[T]) Copy() *Array256[T] {
 
 // InsertAt a value at i into the sparse array.
 // If the value already exists, overwrite it with val and return true.
-func (a *Array256[T]) InsertAt(i uint, value T) (exists bool) {
+func (a *Array256[T]) InsertAt(i uint8, value T) (exists bool) {
 	// slot exists, overwrite value
 	if a.Test(i) {
-		a.Items[a.Rank0(i)] = value
+		a.Items[a.Rank(i)-1] = value
 		return true
 	}
 
 	// new, insert into bitset ...
-	a.BitSet256.MustSet(i)
+	a.BitSet256.Set(i)
 
 	// ... and slice
-	a.insertItem(a.Rank0(i), value)
+	a.insertItem(a.Rank(i)-1, value)
 
 	return false
 }
 
 // DeleteAt a value at i from the sparse array, zeroes the tail.
-func (a *Array256[T]) DeleteAt(i uint) (value T, exists bool) {
+func (a *Array256[T]) DeleteAt(i uint8) (value T, exists bool) {
 	if a.Len() == 0 || !a.Test(i) {
 		return
 	}
 
-	rank0 := a.Rank0(i)
+	rank0 := a.Rank(i) - 1
 	value = a.Items[rank0]
 
 	// delete from slice
 	a.deleteItem(rank0)
 
 	// delete from bitset
-	a.BitSet256.MustClear(i)
+	a.BitSet256.Clear(i)
 
 	return value, true
 }

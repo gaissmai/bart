@@ -62,8 +62,7 @@ func (n *node[V]) dumpRec(w io.Writer, path stridePath, depth int, is4 bool) {
 
 	// the node may have childs, rec-descent down
 	for i, addr := range n.children.All() {
-		octet := byte(addr)
-		path[depth&15] = octet
+		path[depth&15] = addr
 
 		if child, ok := n.children.Items[i].(*node[V]); ok {
 			child.dumpRec(w, path, depth+1, is4)
@@ -113,9 +112,9 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 
 	if n.children.Len() != 0 {
 
-		childAddrs := make([]uint, 0, maxItems)
-		leafAddrs := make([]uint, 0, maxItems)
-		fringeAddrs := make([]uint, 0, maxItems)
+		childAddrs := make([]uint8, 0, maxItems)
+		leafAddrs := make([]uint8, 0, maxItems)
+		fringeAddrs := make([]uint8, 0, maxItems)
 
 		// the node has recursive child nodes or path-compressed leaves
 		for i, addr := range n.children.All() {
@@ -143,16 +142,15 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 			fmt.Fprintf(w, "%sleaves(#%d):", indent, leafCount)
 
 			for _, addr := range leafAddrs {
-				octet := byte(addr)
 				k := n.children.MustGet(addr)
 				pc := k.(*leafNode[V])
 
 				// Lite: val is the empty struct, don't print it
 				switch any(pc.value).(type) {
 				case struct{}:
-					fmt.Fprintf(w, " %s:{%s}", octetFmt(octet, is4), pc.prefix)
+					fmt.Fprintf(w, " %s:{%s}", addrFmt(addr, is4), pc.prefix)
 				default:
-					fmt.Fprintf(w, " %s:{%s, %v}", octetFmt(octet, is4), pc.prefix, pc.value)
+					fmt.Fprintf(w, " %s:{%s, %v}", addrFmt(addr, is4), pc.prefix, pc.value)
 				}
 			}
 
@@ -164,7 +162,6 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 			fmt.Fprintf(w, "%sfringe(#%d):", indent, fringeCount)
 
 			for _, addr := range fringeAddrs {
-				octet := byte(addr)
 				fringePfx := cidrForFringe(path[:], depth, is4, addr)
 
 				k := n.children.MustGet(addr)
@@ -173,9 +170,9 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 				// Lite: val is the empty struct, don't print it
 				switch any(pc.value).(type) {
 				case struct{}:
-					fmt.Fprintf(w, " %s:{%s}", octetFmt(octet, is4), fringePfx)
+					fmt.Fprintf(w, " %s:{%s}", addrFmt(addr, is4), fringePfx)
 				default:
-					fmt.Fprintf(w, " %s:{%s, %v}", octetFmt(octet, is4), fringePfx, pc.value)
+					fmt.Fprintf(w, " %s:{%s, %v}", addrFmt(addr, is4), fringePfx, pc.value)
 				}
 			}
 
@@ -187,8 +184,7 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 			fmt.Fprintf(w, "%schilds(#%d):", indent, childCount)
 
 			for _, addr := range childAddrs {
-				octet := byte(addr)
-				fmt.Fprintf(w, " %s", octetFmt(octet, is4))
+				fmt.Fprintf(w, " %s", addrFmt(addr, is4))
 			}
 
 			fmt.Fprintln(w)
@@ -218,13 +214,13 @@ func (n *node[V]) hasType() nodeType {
 	}
 }
 
-// octetFmt, different format strings for IPv4 and IPv6, decimal versus hex.
-func octetFmt(octet byte, is4 bool) string {
+// addrFmt, different format strings for IPv4 and IPv6, decimal versus hex.
+func addrFmt(addr byte, is4 bool) string {
 	if is4 {
-		return fmt.Sprintf("%d", octet)
+		return fmt.Sprintf("%d", addr)
 	}
 
-	return fmt.Sprintf("0x%02x", octet)
+	return fmt.Sprintf("0x%02x", addr)
 }
 
 // ip stride path, different formats for IPv4 and IPv6, dotted decimal or hex.
