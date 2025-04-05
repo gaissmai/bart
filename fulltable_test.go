@@ -55,7 +55,6 @@ func init() {
 var (
 	intSink  int
 	boolSink bool
-	anySink  any
 )
 
 func init() {
