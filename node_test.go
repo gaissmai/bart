@@ -17,6 +17,8 @@ import (
 	"github.com/gaissmai/bart/internal/art"
 )
 
+var uintSliceSink []uint
+
 func TestInverseIndex(t *testing.T) {
 	t.Parallel()
 	for i := range maxItems {
@@ -279,9 +281,10 @@ func BenchmarkNodePrefixesAsSlice(b *testing.B) {
 		}
 
 		b.Run(fmt.Sprintf("Set %d", nPrefixes), func(b *testing.B) {
+			buf := make([]uint, maxItems)
 			b.ResetTimer()
 			for range b.N {
-				anySink = this.prefixes.AsSlice(make([]uint, 0, maxItems))
+				uintSliceSink = this.prefixes.AsSlice(buf)
 			}
 		})
 	}
@@ -299,7 +302,7 @@ func BenchmarkNodePrefixesAll(b *testing.B) {
 		b.Run(fmt.Sprintf("Set %d", nPrefixes), func(b *testing.B) {
 			b.ResetTimer()
 			for range b.N {
-				anySink = this.prefixes.All()
+				uintSliceSink = this.prefixes.All()
 			}
 		})
 
@@ -387,9 +390,10 @@ func BenchmarkNodeChildrenAsSlice(b *testing.B) {
 		}
 
 		b.Run(fmt.Sprintf("Set %d", nchilds), func(b *testing.B) {
+			buf := make([]uint, maxItems)
 			b.ResetTimer()
 			for range b.N {
-				anySink = this.children.AsSlice(make([]uint, 0, maxItems))
+				uintSliceSink = this.children.AsSlice(buf)
 			}
 		})
 	}
@@ -407,7 +411,7 @@ func BenchmarkNodeChildrenAll(b *testing.B) {
 		b.Run(fmt.Sprintf("Set %d", nchilds), func(b *testing.B) {
 			b.ResetTimer()
 			for range b.N {
-				anySink = this.children.All()
+				uintSliceSink = this.children.All()
 			}
 		})
 	}
