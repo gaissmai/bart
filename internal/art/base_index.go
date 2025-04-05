@@ -4,12 +4,13 @@
 // Package art summarizes the functions and inverse functions
 // for mapping between a prefix and a baseIndex.
 //
-//	can inline HostIdx with cost 4
-//	can inline PfxToIdx with cost 13
-//	can inline PfxLen with cost 21
-//	can inline IdxToPfx with cost 42
-//	can inline IdxToRange with cost 66
+//	can inline HostIdx with cost 5
+//	can inline IdxToPfx256 with cost 37
+//	can inline IdxToRange256 with cost 61
 //	can inline NetMask with cost 7
+//	can inline PfxLen256 with cost 18
+//	can inline PfxToIdx256 with cost 29
+//	can inline pfxToIdx with cost 11
 //
 // Please read the ART paper ./doc/artlookup.pdf
 // to understand the baseIndex algorithm.
@@ -18,11 +19,11 @@ package art
 import "math/bits"
 
 // HostIdx is just PfxToIdx(octet/8) but faster.
-func HostIdx(octet uint) uint {
-	return octet + 256
+func HostIdx(octet uint8) uint {
+	return uint(octet) + 256
 }
 
-// PfxToIdx maps 8bit prefixes to numbers. The prefixes range from 0/0 to 255/8
+// pfxToIdx maps 8bit prefixes to numbers. The prefixes range from 0/0 to 255/8
 // and the mapped values from:
 //
 //	  [0x0000_00001 .. 0x0000_0001_1111_1111] = [1 .. 511]
@@ -36,42 +37,50 @@ func HostIdx(octet uint) uint {
 //		                          ^ << 3      ^
 //		                 + -----------------------
 //		                               0b0000_1101 = 13
-func PfxToIdx(octet byte, pfxLen int) uint {
-	// uint8() are compiler optimization hints, that the shift amount is
-	// smaller than the width of the types
-	return uint(octet>>uint8(8-pfxLen)) + (1 << uint8(pfxLen))
+func pfxToIdx(octet, pfxLen uint8) uint {
+	return uint(octet>>(8-pfxLen)) + uint(1<<pfxLen)
 }
 
-// IdxToPfx returns the octet and prefix len of baseIdx.
-// It's the inverse to pfxToIdx.
+// PfxToIdx256 maps 8bit prefixes to numbers. The values range [1 .. 255].
+// Values > 255 are shifted by >> 1.
+func PfxToIdx256(octet, pfxLen uint8) uint8 {
+	idx := pfxToIdx(octet, pfxLen)
+	if idx > 255 {
+		idx >>= 1
+	}
+	return uint8(idx)
+}
+
+// IdxToPfx256 returns the octet and prefix len of baseIdx.
+// It's the inverse to pfxToIdx256.
 //
-// It panics on invalid input, valid values for idx are from [1 .. 511]
-func IdxToPfx(idx uint) (octet uint8, pfxLen int) {
-	if idx == 0 || idx > 511 {
-		panic("logic error, idx is out of bounds [1..511]")
+// It panics on invalid input.
+func IdxToPfx256(idx uint8) (octet, pfxLen uint8) {
+	if idx == 0 {
+		panic("logic error, idx is 0")
 	}
 
-	pfxLen = bits.Len64(uint64(idx)) - 1
-	shiftBits := 8 - uint8(pfxLen)
+	pfxLen = uint8(bits.Len8(idx)) - 1
+	shiftBits := 8 - pfxLen
 
 	mask := uint8(0xff) >> shiftBits
-	octet = (uint8(idx) & mask) << shiftBits
+	octet = (idx & mask) << shiftBits
 
 	return
 }
 
-// PfxLen returns the bits based on depth and idx.
-func PfxLen(depth int, idx uint) int {
-	// see IdxToPfx
-	if idx == 0 || idx > 511 {
-		panic("logic error, idx is out of bounds [1..511]")
+// PfxLen256 returns the bits based on depth and idx.
+func PfxLen256(depth int, idx uint8) uint8 {
+	// see IdxToPfx256
+	if idx == 0 {
+		panic("logic error, idx is 0")
 	}
-	return depth<<3 + bits.Len64(uint64(idx)) - 1
+	return uint8(depth<<3 + bits.Len8(idx) - 1)
 }
 
-// IdxToRange returns the first and last octet of prefix idx.
-func IdxToRange(idx uint) (first, last uint8) {
-	first, pfxLen := IdxToPfx(idx)
+// IdxToRange256 returns the first and last octet of prefix idx.
+func IdxToRange256(idx uint8) (first, last uint8) {
+	first, pfxLen := IdxToPfx256(idx)
 	last = first | ^NetMask(pfxLen)
 	return
 }
@@ -87,6 +96,6 @@ func IdxToRange(idx uint) (first, last uint8) {
 //	0b1111_1100, // bits == 6
 //	0b1111_1110, // bits == 7
 //	0b1111_1111, // bits == 8
-func NetMask(bits int) uint8 {
+func NetMask(bits uint8) uint8 {
 	return 0b1111_1111 << (8 - uint16(bits))
 }

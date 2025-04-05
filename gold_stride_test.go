@@ -14,8 +14,8 @@ import (
 type goldStrideTbl[V any] []goldStrideItem[V]
 
 type goldStrideItem[V any] struct {
-	octet byte
-	bits  int
+	octet uint8
+	bits  uint8
 	val   V
 }
 
@@ -26,7 +26,7 @@ func (t *goldStrideTbl[V]) insertMany(strides []goldStrideItem[V]) *goldStrideTb
 }
 
 // delete prefix
-func (t *goldStrideTbl[V]) delete(octet byte, prefixLen int) {
+func (t *goldStrideTbl[V]) delete(octet, prefixLen uint8) {
 	pfx := make([]goldStrideItem[V], 0, len(*t))
 	for _, e := range *t {
 		if e.octet == octet && e.bits == prefixLen {
@@ -42,16 +42,16 @@ func (t *goldStrideTbl[V]) lpm(octet byte) (ret V, ok bool) {
 	const noMatch = -1
 	longest := noMatch
 	for _, e := range *t {
-		if octet&pfxMask(e.bits) == e.octet && e.bits >= longest {
+		if octet&pfxMask(e.bits) == e.octet && int(e.bits) >= longest {
 			ret = e.val
-			longest = e.bits
+			longest = int(e.bits)
 		}
 	}
 	return ret, longest != noMatch
 }
 
 // strideOverlapsPrefix
-func (t *goldStrideTbl[V]) strideOverlapsPrefix(octet uint8, prefixLen int) bool {
+func (t *goldStrideTbl[V]) strideOverlapsPrefix(octet, prefixLen uint8) bool {
 	for _, e := range *t {
 		minBits := prefixLen
 		if e.bits < minBits {
@@ -81,14 +81,14 @@ func (ta *goldStrideTbl[V]) strideOverlaps(tb *goldStrideTbl[V]) bool {
 	return false
 }
 
-func pfxMask(pfxLen int) byte {
-	return 0xFF << (strideLen - pfxLen)
+func pfxMask(pfxLen uint8) uint8 {
+	return 0xFF << (8 - pfxLen)
 }
 
 func allStridePfxs() []goldStrideItem[int] {
-	ret := make([]goldStrideItem[int], 0, maxItems-1)
+	ret := make([]goldStrideItem[int], 0, maxItems)
 	for idx := 1; idx < maxItems; idx++ {
-		octet, bits := art.IdxToPfx(uint(idx))
+		octet, bits := art.IdxToPfx256(uint8(idx))
 		ret = append(ret, goldStrideItem[int]{octet, bits, idx})
 	}
 	return ret

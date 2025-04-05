@@ -101,10 +101,10 @@ func (t *Table[V]) rootNodeByVersion(is4 bool) *node[V] {
 //
 // One could also imagine special hardware, since the actual algorithm consists
 // only of a few standardized bitset operations on a fixed length of 256 bits.
-func maxDepthAndLastBits(bits int) (maxDepth, lastBits int) {
+func maxDepthAndLastBits(bits int) (maxDepth int, lastBits uint8) {
 	// maxDepth:  range from 0..4 or 0..16 !ATTENTION: not 0..3 or 0..15
 	// lastBits:  range from 0..7
-	return bits >> 3, bits & 7
+	return bits >> 3, uint8(bits & 7)
 }
 
 // Insert adds a pfx to the tree, with given val.
@@ -155,30 +155,28 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 	for depth, octet := range octets {
 		// last octet from prefix, update/insert prefix into node
 		if depth == maxDepth {
-			newVal, exists := n.prefixes.UpdateAt(art.PfxToIdx(octet, lastBits), cb)
+			newVal, exists := n.prefixes.UpdateAt(art.PfxToIdx256(octet, lastBits), cb)
 			if !exists {
 				t.sizeUpdate(is4, 1)
 			}
 			return newVal
 		}
 
-		addr := uint(octet)
-
 		// go down in tight loop to last octet
-		if !n.children.Test(addr) {
+		if !n.children.Test(octet) {
 			// insert prefix path compressed
 			newVal := cb(zero, false)
 			if isFringe(depth, bits) {
-				n.children.InsertAt(addr, &fringeNode[V]{value: newVal})
+				n.children.InsertAt(octet, &fringeNode[V]{value: newVal})
 			} else {
-				n.children.InsertAt(addr, &leafNode[V]{prefix: pfx, value: newVal})
+				n.children.InsertAt(octet, &leafNode[V]{prefix: pfx, value: newVal})
 			}
 			t.sizeUpdate(is4, 1)
 			return newVal
 		}
-		kid := n.children.MustGet(addr)
+		kid := n.children.MustGet(octet)
 
-		// kid is node or leaf or fringe at addr
+		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
 		case *node[V]:
 			n = kid
@@ -193,12 +191,12 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 
 			// create new node
 			// push the leaf down
-			// insert new child at current leaf position (addr)
+			// insert new child at current leaf position (octet
 			// descend down, replace n with new child
 			newNode := new(node[V])
 			newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
 
-			n.children.InsertAt(addr, newNode)
+			n.children.InsertAt(octet, newNode)
 			n = newNode
 
 		case *fringeNode[V]:
@@ -210,12 +208,12 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 
 			// create new node
 			// push the fringe down, it becomes a default route (idx=1)
-			// insert new child at current leaf position (addr)
+			// insert new child at current leaf position (octet
 			// descend down, replace n with new child
 			newNode := new(node[V])
 			newNode.prefixes.InsertAt(1, kid.value)
 
-			n.children.InsertAt(addr, newNode)
+			n.children.InsertAt(octet, newNode)
 			n = newNode
 
 		default:
@@ -267,7 +265,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 
 		if depth == maxDepth {
 			// try to delete prefix in trie node
-			val, exists = n.prefixes.DeleteAt(art.PfxToIdx(octet, lastBits))
+			val, exists = n.prefixes.DeleteAt(art.PfxToIdx256(octet, lastBits))
 			if !exists {
 				return
 			}
@@ -277,13 +275,12 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 			return val, true
 		}
 
-		addr := uint(octet)
-		if !n.children.Test(addr) {
+		if !n.children.Test(octet) {
 			return
 		}
-		kid := n.children.MustGet(addr)
+		kid := n.children.MustGet(octet)
 
-		// kid is node or leaf or fringe at addr
+		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
 		case *node[V]:
 			n = kid
@@ -296,7 +293,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 			}
 
 			// pfx is fringe at depth, delete fringe
-			n.children.DeleteAt(addr)
+			n.children.DeleteAt(octet)
 
 			t.sizeUpdate(is4, -1)
 			n.purgeAndCompress(stack[:depth], octets, is4)
@@ -310,7 +307,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 			}
 
 			// prefix is equal leaf, delete leaf
-			n.children.DeleteAt(addr)
+			n.children.DeleteAt(octet)
 
 			t.sizeUpdate(is4, -1)
 			n.purgeAndCompress(stack[:depth], octets, is4)
@@ -349,16 +346,15 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 	// find the trie node
 	for depth, octet := range octets {
 		if depth == maxDepth {
-			return n.prefixes.Get(art.PfxToIdx(octet, lastBits))
+			return n.prefixes.Get(art.PfxToIdx256(octet, lastBits))
 		}
 
-		addr := uint(octet)
-		if !n.children.Test(addr) {
+		if !n.children.Test(octet) {
 			return
 		}
-		kid := n.children.MustGet(addr)
+		kid := n.children.MustGet(octet)
 
-		// kid is node or leaf or fringe at addr
+		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
 		case *node[V]:
 			n = kid
@@ -398,20 +394,18 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 	n := t.rootNodeByVersion(is4)
 
 	for _, octet := range ip.AsSlice() {
-		addr := uint(octet)
-
 		// for contains, any lpm match is good enough, no backtracking needed
-		if n.prefixes.Len() != 0 && n.lpmTest(art.HostIdx(addr)) {
+		if n.prefixes.Len() != 0 && n.lpmTest(art.HostIdx(octet)) {
 			return true
 		}
 
 		// stop traversing?
-		if !n.children.Test(addr) {
+		if !n.children.Test(octet) {
 			return false
 		}
-		kid := n.children.MustGet(addr)
+		kid := n.children.MustGet(octet)
 
-		// kid is node or leaf or fringe at addr
+		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
 		case *node[V]:
 			n = kid
@@ -450,26 +444,23 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	// run variable, used after for loop
 	var depth int
 	var octet byte
-	var addr uint
 
 LOOP:
 	// find leaf node
 	for depth, octet = range octets {
 		depth = depth & 0xf // BCE, Lookup must be fast
 
-		addr = uint(octet)
-
 		// push current node on stack for fast backtracking
 		stack[depth] = n
 
 		// go down in tight loop to last octet
-		if !n.children.Test(addr) {
+		if !n.children.Test(octet) {
 			// no more nodes below octet
 			break LOOP
 		}
-		kid := n.children.MustGet(addr)
+		kid := n.children.MustGet(octet)
 
-		// kid is node or leaf or fringe at addr
+		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
 		case *node[V]:
 			n = kid
@@ -499,7 +490,7 @@ LOOP:
 
 		// longest prefix match, skip if node has no prefixes
 		if n.prefixes.Len() != 0 {
-			idx := art.HostIdx(uint(octets[depth]))
+			idx := art.HostIdx(octets[depth])
 			// lpmGet(idx), manually inlined
 			// --------------------------------------------------------------
 			if topIdx, ok := n.prefixes.IntersectionTop(lpm.BackTrackingBitset(idx)); ok {
@@ -552,7 +543,6 @@ func (t *Table[V]) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpmPfx netip
 
 	var depth int
 	var octet byte
-	var addr uint
 
 LOOP:
 	// find the last node on the octets path in the trie,
@@ -566,15 +556,13 @@ LOOP:
 		// push current node on stack
 		stack[depth] = n
 
-		addr = uint(octet)
-
 		// go down in tight loop to leaf node
-		if !n.children.Test(addr) {
+		if !n.children.Test(octet) {
 			break LOOP
 		}
-		kid := n.children.MustGet(addr)
+		kid := n.children.MustGet(octet)
 
-		// kid is node or leaf or fringe at addr
+		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
 		case *node[V]:
 			n = kid
@@ -601,7 +589,7 @@ LOOP:
 			}
 
 			// sic, get the LPM prefix back, it costs some cycles!
-			fringePfx := cidrForFringe(octets, depth, is4, addr)
+			fringePfx := cidrForFringe(octets, depth, is4, octet)
 			return fringePfx, kid.value, true
 
 		default:
@@ -625,9 +613,9 @@ LOOP:
 		var idx uint
 		octet = octets[depth]
 		if depth == maxDepth {
-			idx = art.PfxToIdx(octet, lastBits)
+			idx = uint(art.PfxToIdx256(octet, lastBits))
 		} else {
-			idx = art.HostIdx(uint(octet))
+			idx = art.HostIdx(octet)
 		}
 
 		// manually inlined: lpmGet(idx)
@@ -642,10 +630,10 @@ LOOP:
 			// called from LookupPrefixLPM
 
 			// get the pfxLen from depth and top idx
-			pfxLen := art.PfxLen(depth, topIdx)
+			pfxLen := art.PfxLen256(depth, topIdx)
 
 			// calculate the lpmPfx from incoming ip and new mask
-			lpmPfx, _ = ip.Prefix(pfxLen)
+			lpmPfx, _ = ip.Prefix(int(pfxLen))
 			return lpmPfx, val, ok
 		}
 	}
@@ -689,15 +677,13 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 			// push current node on stack
 			stack[depth] = n
 
-			addr := uint(octet)
-
 			// descend down the trie
-			if !n.children.Test(addr) {
+			if !n.children.Test(octet) {
 				break LOOP
 			}
-			kid := n.children.MustGet(addr)
+			kid := n.children.MustGet(octet)
 
-			// kid is node or leaf or fringe at addr
+			// kid is node or leaf or fringe at octet
 			switch kid := kid.(type) {
 			case *node[V]:
 				n = kid
@@ -718,7 +704,7 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 				break LOOP
 
 			case *fringeNode[V]:
-				fringePfx := cidrForFringe(octets, depth, is4, addr)
+				fringePfx := cidrForFringe(octets, depth, is4, octet)
 				if fringePfx.Bits() > pfx.Bits() {
 					break LOOP
 				}
@@ -741,19 +727,23 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 		for ; depth >= 0; depth-- {
 			n = stack[depth]
 
-			// micro benchmarking
-			if n.prefixes.Len() == 0 {
+			// only the lastOctet may have a different prefix len
+			// all others are just host routes
+			var idx uint
+			octet = octets[depth]
+			if depth == maxDepth {
+				idx = uint(art.PfxToIdx256(octet, lastBits))
+			} else {
+				idx = art.HostIdx(octet)
+			}
+
+			// micro benchmarking, skip if there is no match
+			if !n.lpmTest(idx) {
 				continue
 			}
 
-			// only the lastOctet may have a different prefix len
-			// all others are just host routes
-			pfxLen := strideLen
-			if depth == maxDepth {
-				pfxLen = lastBits
-			}
-
-			if !n.eachLookupPrefix(octets, depth, is4, pfxLen, yield) {
+			// yield all the matching prefixes, not just the lpm
+			if !n.eachLookupPrefix(octets, depth, is4, idx, yield) {
 				// early exit
 				return
 			}
@@ -784,17 +774,17 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 		// find the trie node
 		for depth, octet := range octets {
 			if depth == maxDepth {
-				_ = n.eachSubnet(octets, depth, is4, lastBits, yield)
+				idx := art.PfxToIdx256(octet, lastBits)
+				_ = n.eachSubnet(octets, depth, is4, idx, yield)
 				return
 			}
 
-			addr := uint(octet)
-			if !n.children.Test(addr) {
+			if !n.children.Test(octet) {
 				return
 			}
-			kid := n.children.MustGet(addr)
+			kid := n.children.MustGet(octet)
 
-			// kid is node or leaf or fringe at addr
+			// kid is node or leaf or fringe at octet
 			switch kid := kid.(type) {
 			case *node[V]:
 				n = kid
@@ -807,7 +797,7 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 				return
 
 			case *fringeNode[V]:
-				fringePfx := cidrForFringe(octets, depth, is4, addr)
+				fringePfx := cidrForFringe(octets, depth, is4, octet)
 				if pfx.Bits() <= fringePfx.Bits() && pfx.Overlaps(fringePfx) {
 					_ = yield(fringePfx, kid.value)
 				}

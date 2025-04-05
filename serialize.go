@@ -32,7 +32,7 @@ type trieItem[V any] struct {
 	is4   bool
 	path  stridePath
 	depth int
-	idx   uint
+	idx   uint8
 
 	// for printing
 	cidr netip.Prefix
@@ -215,7 +215,7 @@ func (t *Table[V]) DumpList6() []DumpListNode[V] {
 
 // dumpListRec, build the data structure rec-descent with the help
 // of getDirectCoveredEntries()
-func (n *node[V]) dumpListRec(parentIdx uint, path stridePath, depth int, is4 bool) []DumpListNode[V] {
+func (n *node[V]) dumpListRec(parentIdx uint8, path stridePath, depth int, is4 bool) []DumpListNode[V] {
 	// recursion stop condition
 	if n == nil {
 		return nil
@@ -247,7 +247,7 @@ func (n *node[V]) dumpListRec(parentIdx uint, path stridePath, depth int, is4 bo
 // by heart to understand this function!
 //
 // See the  artlookup.pdf paper in the doc folder, the baseIndex function is the key.
-func (n *node[V]) directItemsRec(parentIdx uint, path stridePath, depth int, is4 bool) (directItems []trieItem[V]) {
+func (n *node[V]) directItemsRec(parentIdx uint8, path stridePath, depth int, is4 bool) (directItems []trieItem[V]) {
 	// recursion stop condition
 	if n == nil {
 		return nil
@@ -256,7 +256,7 @@ func (n *node[V]) directItemsRec(parentIdx uint, path stridePath, depth int, is4
 	// prefixes:
 	// for all idx's (prefixes mapped by baseIndex) in this node
 	// do a longest-prefix-match
-	for i, idx := range n.prefixes.AsSlice(make([]uint, 0, maxItems)) {
+	for i, idx := range n.prefixes.AsSlice(make([]uint8, 0, maxItems)) {
 		// tricky part, skip self, test with next possible lpm (idx>>1), it's a complete binary tree
 		nextIdx := idx >> 1
 
@@ -266,7 +266,7 @@ func (n *node[V]) directItemsRec(parentIdx uint, path stridePath, depth int, is4
 		}
 
 		// do a longest-prefix-match
-		lpm, _, _ := n.lpmGet(nextIdx)
+		lpm, _, _ := n.lpmGet(uint(nextIdx))
 
 		// be aware, 0 is here a possible value for parentIdx and lpm (if not found)
 		if lpm == parentIdx {
@@ -288,11 +288,11 @@ func (n *node[V]) directItemsRec(parentIdx uint, path stridePath, depth int, is4
 	}
 
 	// children:
-	for i, addr := range n.children.AsSlice(make([]uint, 0, maxItems)) {
+	for i, addr := range n.children.AsSlice(make([]uint8, 0, maxItems)) {
 		hostIdx := art.HostIdx(addr)
 
 		// fast skip, lpm not possible
-		if hostIdx < parentIdx {
+		if hostIdx < uint(parentIdx) {
 			continue
 		}
 
@@ -305,7 +305,7 @@ func (n *node[V]) directItemsRec(parentIdx uint, path stridePath, depth int, is4
 			switch kid := n.children.Items[i].(type) {
 			case *node[V]: // traverse rec-descent, call with next child node,
 				// next trie level, set parentIdx to 0, adjust path and depth
-				path[depth&0xf] = byte(addr)
+				path[depth&0xf] = addr
 				directItems = append(directItems, kid.directItemsRec(0, path, depth+1, is4)...)
 
 			case *leafNode[V]: // path-compressed child, stop's recursion for this child
