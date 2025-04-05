@@ -135,13 +135,8 @@ func (n *node[V]) overlapsChildrenIn(o *node[V]) bool {
 
 	// do range over, not so many childs and maybe too many prefixes for other algo below
 	if doRange {
-		lowerBound, _ := n.prefixes.FirstSet()
 		for _, addr := range o.children.AsSlice(make([]uint, 0, maxItems)) {
-			idx := art.HostIdx(addr)
-			if idx < lowerBound { // lpm match impossible
-				continue
-			}
-			if n.lpmTest(idx) {
+			if n.lpmTest(art.HostIdx(addr)) {
 				return true
 			}
 		}
