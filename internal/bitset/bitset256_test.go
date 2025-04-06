@@ -538,7 +538,7 @@ func TestInplaceIntersection(t *testing.T) {
 	}
 }
 
-func TestIntersects(t *testing.T) {
+func TestIntersectsAny(t *testing.T) {
 	t.Parallel()
 	var a BitSet256
 	var b BitSet256
