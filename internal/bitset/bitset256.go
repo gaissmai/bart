@@ -18,7 +18,7 @@ package bitset
 // can inline (*BitSet256).IntersectionTop with cost 42
 // can inline (*BitSet256).Intersection with cost 53
 // can inline (*BitSet256).IntersectsAny with cost 48
-// can inline (*BitSet256).IsEmpty with cost 28
+// can inline (*BitSet256).IsEmpty with cost 22
 // can inline (*BitSet256).NextSet with cost 65
 // can inline (*BitSet256).popcnt with cost 33
 // can inline (*BitSet256).Rank with cost 57
@@ -166,10 +166,7 @@ func (b *BitSet256) Rank(idx uint8) (rnk int) {
 
 // IsEmpty returns true if no bit is set.
 func (b *BitSet256) IsEmpty() bool {
-	return b[0] == 0 &&
-		b[1] == 0 &&
-		b[2] == 0 &&
-		b[3] == 0
+	return b[0]|b[1]|b[2]|b[3] == 0
 }
 
 // IntersectsAny returns true if the intersection of base set with the compare set
