@@ -39,9 +39,6 @@ func TestZeroValue(t *testing.T) {
 	b.NextSet(0)
 
 	b = BitSet256{}
-	b.AsSlice(nil)
-
-	b = BitSet256{}
 	b.All()
 
 	b = BitSet256{}
@@ -376,42 +373,36 @@ func TestAsSlice(t *testing.T) {
 		set []uint8
 		del []uint8
 		//
-		buf      []uint8
 		wantData []uint8
 	}{
 		{
 			name:     "null",
 			set:      []uint8{},
 			del:      []uint8{},
-			buf:      make([]uint8, 0, 256),
 			wantData: []uint8{},
 		},
 		{
 			name:     "zero",
 			set:      []uint8{0},
 			del:      []uint8{},
-			buf:      make([]uint8, 0, 256),
 			wantData: []uint8{0}, // bit #0 is set
 		},
 		{
 			name:     "1,5",
 			set:      []uint8{1, 5},
 			del:      []uint8{},
-			buf:      make([]uint8, 0, 256),
 			wantData: []uint8{1, 5},
 		},
 		{
 			name:     "many",
 			set:      []uint8{1, 65, 130, 190, 250},
 			del:      []uint8{},
-			buf:      make([]uint8, 0, 256),
 			wantData: []uint8{1, 65, 130, 190, 250},
 		},
 		{
 			name:     "special, last return",
 			set:      []uint8{1},
-			del:      []uint8{1},          // delete without compact
-			buf:      make([]uint8, 0, 5), // buffer
+			del:      []uint8{1}, // delete without compact
 			wantData: []uint8{},
 		},
 	}
@@ -426,7 +417,7 @@ func TestAsSlice(t *testing.T) {
 			b.Clear(u) // without compact
 		}
 
-		buf := b.AsSlice(tc.buf)
+		buf := b.AsSlice(&[256]uint8{})
 
 		if !slices.Equal(buf, tc.wantData) {
 			t.Errorf("AsSlice, %s: returned buf is not equal as expected:\ngot:  %v\nwant: %v",
@@ -846,10 +837,10 @@ func BenchmarkAsSlice(b *testing.B) {
 		{1, 1, 1, 1},
 	} {
 		b.Run(fmt.Sprintf("sparse at %d", i), func(b *testing.B) {
-			buf := make([]uint8, 256)
+			var buf [256]uint8
 			b.ResetTimer()
 			for range b.N {
-				uint8SliceSink = aa.AsSlice(buf)
+				uint8SliceSink = aa.AsSlice(&buf)
 			}
 		})
 	}
@@ -861,10 +852,10 @@ func BenchmarkAsSlice(b *testing.B) {
 		{math.MaxUint64, math.MaxUint64, math.MaxUint64, math.MaxUint64},
 	} {
 		b.Run(fmt.Sprintf("dense at %d", i), func(b *testing.B) {
-			buf := make([]uint8, 256)
+			var buf [256]uint8
 			b.ResetTimer()
 			for range b.N {
-				uint8SliceSink = aa.AsSlice(buf)
+				uint8SliceSink = aa.AsSlice(&buf)
 			}
 		})
 	}

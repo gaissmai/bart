@@ -10,8 +10,8 @@
 // This implementation is heavily optimized for this internal use case.
 package bitset
 
-// can inline (*BitSet256).All with cost 55
-// can inline (*BitSet256).AsSlice with cost 50
+// can inline (*BitSet256).All with cost 47
+// can inline (*BitSet256).AsSlice with cost 42
 // can inline (*BitSet256).Clear with cost 12
 // can inline (*BitSet256).FirstSet with cost 79
 // can inline (*BitSet256).IntersectionCardinality with cost 53
@@ -118,30 +118,21 @@ func (b *BitSet256) NextSet(bit uint8) (next uint8, iok bool) {
 
 // AsSlice returns all set bits as slice of uint8 without
 // heap allocations.
-//
-// This is faster than All, but also more dangerous,
-// it panics if the capacity of buf is < b.Size()
-func (b *BitSet256) AsSlice(buf []uint8) []uint8 {
-	buf = buf[:cap(buf)] // use cap as max len
-
+func (b *BitSet256) AsSlice(buf *[256]uint8) []uint8 {
 	size := 0
 	for wIdx, word := range b {
 		for ; word != 0; size++ {
-			// panics if capacity of buf is exceeded.
 			buf[size] = uint8(wIdx<<6 + bits.TrailingZeros64(word))
-
-			// clear the rightmost set bit
-			word &= word - 1
+			word &= word - 1 // clear the rightmost set bit
 		}
 	}
 
-	buf = buf[:size] // resize
-	return buf
+	return buf[:size]
 }
 
 // All returns all set bits. This has a simpler API but is slower than AsSlice.
 func (b *BitSet256) All() []uint8 {
-	return b.AsSlice(make([]uint8, 256))
+	return b.AsSlice(&[256]uint8{})
 }
 
 // IntersectionTop computes the intersection of base set with the compare set.
