@@ -270,10 +270,10 @@ func BenchmarkNodePrefixesAsSlice(b *testing.B) {
 		}
 
 		b.Run(fmt.Sprintf("Set %d", nPrefixes), func(b *testing.B) {
-			buf := make([]uint8, maxItems)
+			var buf [256]uint8
 			b.ResetTimer()
 			for range b.N {
-				uint8SliceSink = this.prefixes.AsSlice(buf)
+				uint8SliceSink = this.prefixes.AsSlice(&buf)
 			}
 		})
 	}
@@ -379,10 +379,10 @@ func BenchmarkNodeChildrenAsSlice(b *testing.B) {
 		}
 
 		b.Run(fmt.Sprintf("Set %d", nchilds), func(b *testing.B) {
-			buf := make([]uint8, maxItems)
+			var buf [256]uint8
 			b.ResetTimer()
 			for range b.N {
-				uint8SliceSink = this.children.AsSlice(buf)
+				uint8SliceSink = this.children.AsSlice(&buf)
 			}
 		})
 	}

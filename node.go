@@ -453,7 +453,7 @@ func (n *node[V]) cloneFlat() *node[V] {
 //
 // The iteration order is not defined, just the simplest and fastest recursive implementation.
 func (n *node[V]) allRec(path stridePath, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
-	for _, idx := range n.prefixes.AsSlice(make([]uint8, maxItems)) {
+	for _, idx := range n.prefixes.AsSlice(&[256]uint8{}) {
 		cidr := cidrFromPath(path, depth, is4, idx)
 
 		// callback for this prefix and val
@@ -464,7 +464,7 @@ func (n *node[V]) allRec(path stridePath, depth int, is4 bool, yield func(netip.
 	}
 
 	// for all children (nodes and leaves) in this node do ...
-	for i, addr := range n.children.AsSlice(make([]uint8, maxItems)) {
+	for i, addr := range n.children.AsSlice(&[256]uint8{}) {
 		switch kid := n.children.Items[i].(type) {
 		case *node[V]:
 			// rec-descent with this node
@@ -503,10 +503,10 @@ func (n *node[V]) allRec(path stridePath, depth int, is4 bool, yield func(netip.
 // false value is propagated.
 func (n *node[V]) allRecSorted(path stridePath, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
 	// get slice of all child octets, sorted by addr
-	allChildAddrs := n.children.AsSlice(make([]uint8, maxItems))
+	allChildAddrs := n.children.AsSlice(&[256]uint8{})
 
 	// get slice of all indexes, sorted by idx
-	allIndices := n.prefixes.AsSlice(make([]uint8, maxItems))
+	allIndices := n.prefixes.AsSlice(&[256]uint8{})
 
 	// sort indices in CIDR sort order
 	slices.SortFunc(allIndices, cmpIndexRank)
@@ -594,7 +594,7 @@ func (n *node[V]) allRecSorted(path stridePath, depth int, is4 bool, yield func(
 // The values are cloned before merging.
 func (n *node[V]) unionRec(o *node[V], depth int) (duplicates int) {
 	// for all prefixes in other node do ...
-	for i, oIdx := range o.prefixes.AsSlice(make([]uint8, maxItems)) {
+	for i, oIdx := range o.prefixes.AsSlice(&[256]uint8{}) {
 		// clone/copy the value from other node at idx
 		clonedVal := cloneOrCopy(o.prefixes.Items[i])
 
@@ -606,7 +606,7 @@ func (n *node[V]) unionRec(o *node[V], depth int) (duplicates int) {
 	}
 
 	// for all child addrs in other node do ...
-	for i, addr := range o.children.AsSlice(make([]uint8, maxItems)) {
+	for i, addr := range o.children.AsSlice(&[256]uint8{}) {
 		//  12 possible combinations to union this child and other child
 		//
 		//  THIS,   OTHER: (always clone the other kid!)
@@ -814,7 +814,7 @@ func (n *node[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxIdx uint8, y
 	pfxFirstAddr, pfxLastAddr := art.IdxToRange256(pfxIdx)
 
 	allCoveredIndices := make([]uint8, 0, maxItems)
-	for _, idx := range n.prefixes.AsSlice(make([]uint8, maxItems)) {
+	for _, idx := range n.prefixes.AsSlice(&[256]uint8{}) {
 		thisFirstAddr, thisLastAddr := art.IdxToRange256(idx)
 
 		if thisFirstAddr >= pfxFirstAddr && thisLastAddr <= pfxLastAddr {
@@ -828,7 +828,7 @@ func (n *node[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxIdx uint8, y
 	// 2. collect all covered child addrs by prefix
 
 	allCoveredChildAddrs := make([]uint8, 0, maxItems)
-	for _, addr := range n.children.AsSlice(make([]uint8, maxItems)) {
+	for _, addr := range n.children.AsSlice(&[256]uint8{}) {
 		if addr >= pfxFirstAddr && addr <= pfxLastAddr {
 			allCoveredChildAddrs = append(allCoveredChildAddrs, addr)
 		}
