@@ -590,7 +590,6 @@ func TestIntersectionTop(t *testing.T) {
 	}
 }
 
-// Rank is popcount-1
 func TestRank(t *testing.T) {
 	t.Parallel()
 	u := []uint8{0, 3, 5, 7, 11, 62, 63, 64, 70, 150, 255}
@@ -601,47 +600,47 @@ func TestRank(t *testing.T) {
 	}{
 		{
 			idx:  0,
-			want: 0,
+			want: 1,
 		},
 		{
 			idx:  1,
-			want: 0,
+			want: 1,
 		},
 		{
 			idx:  2,
-			want: 0,
+			want: 1,
 		},
 		{
 			idx:  3,
-			want: 1,
+			want: 2,
 		},
 		{
 			idx:  4,
-			want: 1,
+			want: 2,
 		},
 		{
 			idx:  62,
-			want: 5,
-		},
-		{
-			idx:  63,
 			want: 6,
 		},
 		{
-			idx:  64,
+			idx:  63,
 			want: 7,
 		},
 		{
+			idx:  64,
+			want: 8,
+		},
+		{
 			idx:  150,
-			want: 9,
+			want: 10,
 		},
 		{
 			idx:  254,
-			want: 9,
+			want: 10,
 		},
 		{
 			idx:  255,
-			want: 10,
+			want: 11,
 		},
 	}
 
@@ -651,7 +650,7 @@ func TestRank(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		if got := b.Rank(tc.idx) - 1; got != tc.want {
+		if got := b.Rank(tc.idx); got != tc.want {
 			t.Errorf("Rank(%d): want: %d, got: %d", tc.idx, tc.want, got)
 		}
 	}
