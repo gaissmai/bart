@@ -931,7 +931,7 @@ func (t *Table[V]) All6() iter.Seq2[netip.Prefix, V] {
 	}
 }
 
-// AllSorted returns an iterator over key-value pairs from Table2 in natural CIDR sort order.
+// AllSorted returns an iterator over key-value pairs from Table in natural CIDR sort order.
 func (t *Table[V]) AllSorted() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
 		_ = t.root4.allRecSorted(stridePath{}, 0, true, yield) &&
