@@ -397,10 +397,10 @@ func BenchmarkFullTableMemory4(b *testing.B) {
 
 		stats := rt.root4.nodeStatsRec()
 		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc)/1024, "KByte")
-		b.ReportMetric(float64(stats.pfxs), "pfx")
-		b.ReportMetric(float64(stats.nodes), "node")
-		b.ReportMetric(float64(stats.leaves), "leave")
-		b.ReportMetric(float64(stats.fringes), "fringe")
+		b.ReportMetric(float64(stats.pfxs), "pfxs")
+		b.ReportMetric(float64(stats.nodes), "nodes")
+		b.ReportMetric(float64(stats.leaves), "leaves")
+		b.ReportMetric(float64(stats.fringes), "fringes")
 		b.ReportMetric(0, "ns/op")
 	})
 }
@@ -424,10 +424,10 @@ func BenchmarkFullTableMemory6(b *testing.B) {
 
 		stats := rt.root6.nodeStatsRec()
 		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc)/1024, "KByte")
-		b.ReportMetric(float64(stats.pfxs), "pfx")
-		b.ReportMetric(float64(stats.nodes), "node")
-		b.ReportMetric(float64(stats.leaves), "leave")
-		b.ReportMetric(float64(stats.fringes), "fringe")
+		b.ReportMetric(float64(stats.pfxs), "pfxs")
+		b.ReportMetric(float64(stats.nodes), "nodes")
+		b.ReportMetric(float64(stats.leaves), "leaves")
+		b.ReportMetric(float64(stats.fringes), "fringes")
 		b.ReportMetric(0, "ns/op")
 	})
 }
@@ -460,10 +460,10 @@ func BenchmarkFullTableMemory(b *testing.B) {
 		}
 
 		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc)/1024, "KByte")
-		b.ReportMetric(float64(stats.pfxs), "pfx")
-		b.ReportMetric(float64(stats.nodes), "node")
-		b.ReportMetric(float64(stats.leaves), "leave")
-		b.ReportMetric(float64(stats.fringes), "fringe")
+		b.ReportMetric(float64(stats.pfxs), "pfxs")
+		b.ReportMetric(float64(stats.nodes), "nodes")
+		b.ReportMetric(float64(stats.leaves), "leaves")
+		b.ReportMetric(float64(stats.fringes), "fringes")
 		b.ReportMetric(0, "ns/op")
 	})
 }
