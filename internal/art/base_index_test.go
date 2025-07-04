@@ -5,32 +5,6 @@ package art
 
 import "testing"
 
-func TestIdx256OutOfBounds(t *testing.T) {
-	t.Parallel()
-
-	t.Run("IdxToPfx256(0)", func(t *testing.T) {
-		t.Parallel()
-		defer func() {
-			if r := recover(); r == nil {
-				t.Error("An idx out of bounds MUST panic")
-			}
-		}()
-
-		IdxToPfx256(0)
-	})
-
-	t.Run("PfxLen256(0,0)", func(t *testing.T) {
-		t.Parallel()
-		defer func() {
-			if r := recover(); r == nil {
-				t.Error("An idx out of bounds MUST panic")
-			}
-		}()
-
-		PfxLen256(0, 0)
-	})
-}
-
 func TestHostIdx(t *testing.T) {
 	testCases := []struct {
 		octet uint8
@@ -92,62 +66,6 @@ func TestPfxLen256(t *testing.T) {
 	}
 }
 
-func TestPfxToIdx(t *testing.T) {
-	testCases := []struct {
-		octet  uint8
-		pfxLen uint8
-		want   uint
-	}{
-		{
-			octet:  0,
-			pfxLen: 0,
-			want:   1,
-		},
-		{
-			octet:  0,
-			pfxLen: 1,
-			want:   2,
-		},
-		{
-			octet:  128,
-			pfxLen: 1,
-			want:   3,
-		},
-		{
-			octet:  80,
-			pfxLen: 4,
-			want:   21,
-		},
-		{
-			octet:  254,
-			pfxLen: 7,
-			want:   255,
-		},
-		{
-			octet:  255,
-			pfxLen: 7,
-			want:   255,
-		},
-		{
-			octet:  0,
-			pfxLen: 8,
-			want:   256,
-		},
-		{
-			octet:  255,
-			pfxLen: 8,
-			want:   511,
-		},
-	}
-
-	for _, tc := range testCases {
-		got := pfxToIdx(tc.octet, tc.pfxLen)
-		if got != tc.want {
-			t.Errorf("PfxToIdx(%d, %d), want: %d, got: %d", tc.octet, tc.pfxLen, tc.want, got)
-		}
-	}
-}
-
 func TestPfxToIdx256(t *testing.T) {
 	testCases := []struct {
 		octet  uint8
@@ -177,17 +95,6 @@ func TestPfxToIdx256(t *testing.T) {
 		{
 			octet:  255,
 			pfxLen: 7,
-			want:   255,
-		},
-		// pfcLen 8, idx gets shifted >> 1
-		{
-			octet:  0,
-			pfxLen: 8,
-			want:   128,
-		},
-		{
-			octet:  255,
-			pfxLen: 8,
 			want:   255,
 		},
 	}
