@@ -70,7 +70,7 @@ func (t *Table[V]) rootNodeByVersion(is4 bool) *node[V] {
 //
 // ATTENTION: Split the IP prefixes at 8bit borders, count from 0.
 //
-//	/0, /7, /15, /23, ...
+//	/7, /15, /23, ...
 //
 //	BitPos: [0-7],[8-15],[16-23],[24-31],[32]
 //	BitPos: [0-7],[8-15],[16-23],[24-31],[32-39],[40-47],[48-55],[56-63],...,[120-127],[128]
