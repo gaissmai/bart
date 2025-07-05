@@ -34,9 +34,6 @@ The algorithm was specially developed so that it can always work with a fixed
 length of 256 bits. This means that the bitset fit very well in a cache line and
 that loops over the bitset in hot paths can be accelerated by loop unrolling, e.g.
 
-Perhaps a future Go version that supports SIMD instructions for the [4]uint64 vectors
-will make the algorithm even faster on suitable hardware.
-
 ```go
 func (b *BitSet256) popcnt() (cnt int) {
 	cnt += bits.OnesCount64(b[0])
@@ -46,6 +43,9 @@ func (b *BitSet256) popcnt() (cnt int) {
 	return
 }
 ```
+
+Perhaps a future Go version that supports SIMD instructions for the [4]uint64 vectors
+will make the algorithm even faster on suitable hardware.
 
 The BART algorithm is also excellent for determining whether two tables
 contain overlapping IP addresses, just in a few nanoseconds.
