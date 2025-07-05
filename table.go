@@ -155,7 +155,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 	for depth, octet := range octets {
 		// last octet from prefix, update/insert prefix into node
 		if depth == maxDepth {
-			newVal, exists := n.prefixes.UpdateAt(art.PfxToIdx256(octet, lastBits), cb)
+			newVal, exists := n.prefixes.UpdateAt(art.PfxToIdx(octet, lastBits), cb)
 			if !exists {
 				t.sizeUpdate(is4, 1)
 			}
@@ -265,7 +265,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 
 		if depth == maxDepth {
 			// try to delete prefix in trie node
-			val, exists = n.prefixes.DeleteAt(art.PfxToIdx256(octet, lastBits))
+			val, exists = n.prefixes.DeleteAt(art.PfxToIdx(octet, lastBits))
 			if !exists {
 				return
 			}
@@ -346,7 +346,7 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 	// find the trie node
 	for depth, octet := range octets {
 		if depth == maxDepth {
-			return n.prefixes.Get(art.PfxToIdx256(octet, lastBits))
+			return n.prefixes.Get(art.PfxToIdx(octet, lastBits))
 		}
 
 		if !n.children.Test(octet) {
@@ -395,7 +395,7 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 
 	for _, octet := range ip.AsSlice() {
 		// for contains, any lpm match is good enough, no backtracking needed
-		if n.prefixes.Len() != 0 && n.lpmTest(art.HostIdx(octet)) {
+		if n.prefixes.Len() != 0 && n.lpmTest(art.OctetToIdx(octet)) {
 			return true
 		}
 
@@ -490,7 +490,7 @@ LOOP:
 
 		// longest prefix match, skip if node has no prefixes
 		if n.prefixes.Len() != 0 {
-			idx := art.HostIdx(octets[depth])
+			idx := art.OctetToIdx(octets[depth])
 			// lpmGet(idx), manually inlined
 			// --------------------------------------------------------------
 			if topIdx, ok := n.prefixes.IntersectionTop(lpm.BackTrackingBitset(idx)); ok {
@@ -613,9 +613,9 @@ LOOP:
 		var idx uint
 		octet = octets[depth]
 		if depth == maxDepth {
-			idx = uint(art.PfxToIdx256(octet, lastBits))
+			idx = uint(art.PfxToIdx(octet, lastBits))
 		} else {
-			idx = art.HostIdx(octet)
+			idx = art.OctetToIdx(octet)
 		}
 
 		// manually inlined: lpmGet(idx)
@@ -629,11 +629,11 @@ LOOP:
 
 			// called from LookupPrefixLPM
 
-			// get the pfxLen from depth and top idx
-			pfxLen := art.PfxLen256(depth, topIdx)
+			// get the bits from depth and top idx
+			pfxBits := int(art.PfxBits(depth, topIdx))
 
 			// calculate the lpmPfx from incoming ip and new mask
-			lpmPfx, _ = ip.Prefix(int(pfxLen))
+			lpmPfx, _ = ip.Prefix(pfxBits)
 			return lpmPfx, val, ok
 		}
 	}
@@ -732,9 +732,9 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 			var idx uint
 			octet = octets[depth]
 			if depth == maxDepth {
-				idx = uint(art.PfxToIdx256(octet, lastBits))
+				idx = uint(art.PfxToIdx(octet, lastBits))
 			} else {
-				idx = art.HostIdx(octet)
+				idx = art.OctetToIdx(octet)
 			}
 
 			// micro benchmarking, skip if there is no match
@@ -774,7 +774,7 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 		// find the trie node
 		for depth, octet := range octets {
 			if depth == maxDepth {
-				idx := art.PfxToIdx256(octet, lastBits)
+				idx := art.PfxToIdx(octet, lastBits)
 				_ = n.eachSubnet(octets, depth, is4, idx, yield)
 				return
 			}

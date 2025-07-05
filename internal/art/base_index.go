@@ -18,13 +18,7 @@ package art
 
 import "math/bits"
 
-// HostIdx maps 8bit prefixes to numbers. The prefixes range from 0/8 to 255/8
-// The return values range from 256 to 511.
-func HostIdx(octet uint8) uint {
-	return uint(octet) + 256
-}
-
-// PfxToIdx256 maps 8bit prefixes to numbers. The prefixes range from 0/0 to 255/7
+// PfxToIdx maps 8bit prefixes to numbers. The prefixes range from 0/0 to 255/7
 // The return values range from 1 to 255.
 //
 //	  [0x0000_00001 .. 0x1111_1111] = [1 .. 255]
@@ -38,13 +32,19 @@ func HostIdx(octet uint8) uint {
 //		                          ^ << 3      ^
 //		                 + -----------------------
 //		                               0b0000_1101 = 13
-func PfxToIdx256(octet, pfxLen uint8) uint8 {
+func PfxToIdx(octet, pfxLen uint8) uint8 {
 	return octet>>(8-pfxLen) + 1<<pfxLen
 }
 
-// IdxToPfx256 returns the octet and prefix len of baseIdx.
+// OctetToIdx maps octet/8 prefixes to numbers. The return values range from 256 to 511.
+// OctetToIdx is a special case of PfxToIdx.
+func OctetToIdx(octet uint8) uint {
+	return uint(octet) + 256
+}
+
+// IdxToPfx returns the octet and prefix len of baseIdx.
 // It's the inverse to pfxToIdx256.
-func IdxToPfx256(idx uint8) (octet, pfxLen uint8) {
+func IdxToPfx(idx uint8) (octet, pfxLen uint8) {
 	pfxLen = uint8(bits.Len8(idx)) - 1
 	shiftBits := 8 - pfxLen
 
@@ -54,14 +54,14 @@ func IdxToPfx256(idx uint8) (octet, pfxLen uint8) {
 	return
 }
 
-// PfxLen256 returns the bits based on depth and idx.
-func PfxLen256(depth int, idx uint8) uint8 {
+// PfxBits returns the bits based on depth and idx.
+func PfxBits(depth int, idx uint8) uint8 {
 	return uint8(depth<<3 + bits.Len8(idx) - 1)
 }
 
-// IdxToRange256 returns the first and last octet of prefix idx.
-func IdxToRange256(idx uint8) (first, last uint8) {
-	first, pfxLen := IdxToPfx256(idx)
+// IdxToRange returns the first and last octet of prefix idx.
+func IdxToRange(idx uint8) (first, last uint8) {
+	first, pfxLen := IdxToPfx(idx)
 	last = first | ^NetMask(pfxLen)
 	return
 }

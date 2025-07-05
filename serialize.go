@@ -289,7 +289,7 @@ func (n *node[V]) directItemsRec(parentIdx uint8, path stridePath, depth int, is
 
 	// children:
 	for i, addr := range n.children.AsSlice(&[256]uint8{}) {
-		hostIdx := art.HostIdx(addr)
+		hostIdx := art.OctetToIdx(addr)
 
 		// fast skip, lpm not possible
 		if hostIdx < uint(parentIdx) {

@@ -21,7 +21,7 @@ func TestHostIdx(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		got := HostIdx(tc.octet)
+		got := OctetToIdx(tc.octet)
 		if got != tc.want {
 			t.Errorf("HostIdx(%d), want: %d, got: %d", tc.octet, tc.want, got)
 		}
@@ -59,7 +59,7 @@ func TestPfxLen256(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		got := PfxLen256(tc.depth, tc.idx)
+		got := PfxBits(tc.depth, tc.idx)
 		if got != tc.want {
 			t.Errorf("PfxLen256(%d, %d), want: %d, got: %d", tc.depth, tc.idx, tc.want, got)
 		}
@@ -100,7 +100,7 @@ func TestPfxToIdx256(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		got := PfxToIdx256(tc.octet, tc.pfxLen)
+		got := PfxToIdx(tc.octet, tc.pfxLen)
 		if got != tc.want {
 			t.Errorf("PfxToIdx256(%d, %d), want: %d, got: %d", tc.octet, tc.pfxLen, tc.want, got)
 		}
@@ -138,7 +138,7 @@ func TestIdxToPfx256(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		gotOctet, gotPfxLen := IdxToPfx256(tc.idx)
+		gotOctet, gotPfxLen := IdxToPfx(tc.idx)
 		if gotOctet != tc.wantOctet || gotPfxLen != tc.wantPfxLen {
 			t.Errorf("IdxToPfx256(%d), want: (%d, %d), got: (%d, %d)", tc.idx, tc.wantOctet, tc.wantPfxLen, gotOctet, gotPfxLen)
 		}
@@ -201,7 +201,7 @@ func TestIdxToRange256(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		gotFirst, gotLast := IdxToRange256(tc.idx)
+		gotFirst, gotLast := IdxToRange(tc.idx)
 		if gotFirst != tc.wantFirst || gotLast != tc.wantLast {
 			t.Errorf("IdxToRange256(%d), want: (%d, %d), got: (%d, %d)",
 				tc.idx, tc.wantFirst, tc.wantLast, gotFirst, gotLast)
