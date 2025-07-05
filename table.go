@@ -65,12 +65,12 @@ func (t *Table[V]) rootNodeByVersion(is4 bool) *node[V] {
 	return &t.root6
 }
 
-// maxDepthAndLastBits, get last significant octet and remaining bits
-// for a given netip.Prefix.
+// maxDepthAndLastBits, get the max depth in the trie and remaining bits
+// for a given CIDR at max depth.
 //
 // ATTENTION: Split the IP prefixes at 8bit borders, count from 0.
 //
-//	/7, /15, /23, ...
+//	/7, /15, /23, /31, ..., /127
 //
 //	BitPos: [0-7],[8-15],[16-23],[24-31],[32]
 //	BitPos: [0-7],[8-15],[16-23],[24-31],[32-39],[40-47],[48-55],[56-63],...,[120-127],[128]
@@ -92,15 +92,15 @@ func (t *Table[V]) rootNodeByVersion(is4 bool) *node[V] {
 //	as path-compressed leaf.
 //
 // We are not splitting at /8, /16, ..., because this would mean that the
-// first node would have 512 prefixes, bits from [0-8]. All remaining nodes
-// would then only have 256 prefixes, e.g. bits from [9-16], [17-24], ...
-// but the algorithm would then require a variable bitset.
+// first node would have 512 prefixes, 9 bits from [0-8]. All remaining nodes
+// would then only have 8 bits from [9-16], [17-24], [25..32], ...
+// but the algorithm would then require a variable length bitset.
 //
 // If you can commit to a fixed size of [4]uint64, then the algorithm is
 // much faster due to modern CPUs.
 //
-// One could also imagine special hardware, since the actual algorithm consists
-// only of a few standardized bitset operations on a fixed length of 256 bits.
+// Perhaps a future Go version that supports SIMD instructions for the [4]uint64 vectors
+// will make the algorithm even faster on suitable hardware.
 func maxDepthAndLastBits(bits int) (maxDepth int, lastBits uint8) {
 	// maxDepth:  range from 0..4 or 0..16 !ATTENTION: not 0..3 or 0..15
 	// lastBits:  range from 0..7
