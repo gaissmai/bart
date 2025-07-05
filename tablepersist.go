@@ -101,7 +101,7 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 	for depth, octet := range octets {
 		// last octet from prefix, update/insert prefix into node
 		if depth == maxDepth {
-			newVal, exists := n.prefixes.UpdateAt(art.PfxToIdx256(octet, lastBits), cb)
+			newVal, exists := n.prefixes.UpdateAt(art.PfxToIdx(octet, lastBits), cb)
 			if !exists {
 				pt.sizeUpdate(is4, 1)
 			}
@@ -244,7 +244,7 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, e
 
 		if depth == maxDepth {
 			// try to delete prefix in trie node
-			val, exists = n.prefixes.DeleteAt(art.PfxToIdx256(octet, lastBits))
+			val, exists = n.prefixes.DeleteAt(art.PfxToIdx(octet, lastBits))
 			if !exists {
 				// nothing to delete
 				return pt, val, false
