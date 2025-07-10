@@ -1967,6 +1967,7 @@ func TestUpdatePersistCompare(t *testing.T) {
 	}
 }
 
+//nolint:tparallel
 func TestUpdate(t *testing.T) {
 	t.Parallel()
 
