@@ -10,6 +10,7 @@
 package bart
 
 import (
+	"math/rand/v2"
 	"net/netip"
 	"testing"
 )
@@ -62,6 +63,7 @@ func TestRegressionOverlaps(t *testing.T) {
 
 func TestOverlapsCompare(t *testing.T) {
 	t.Parallel()
+	prng := rand.New(rand.NewPCG(42, 42))
 
 	// Empirically, between 5 and 6 routes per table results in ~50%
 	// of random pairs overlapping. Cool example of the birthday paradox!
@@ -69,7 +71,7 @@ func TestOverlapsCompare(t *testing.T) {
 
 	seen := map[bool]int{}
 	for range 10_000 {
-		pfxs := randomPrefixes(numEntries)
+		pfxs := randomPrefixes(prng, numEntries)
 		fast := new(Table[int])
 		gold := new(goldTable[int]).insertMany(pfxs)
 
@@ -77,7 +79,7 @@ func TestOverlapsCompare(t *testing.T) {
 			fast.Insert(pfx.pfx, pfx.val)
 		}
 
-		inter := randomPrefixes(numEntries)
+		inter := randomPrefixes(prng, numEntries)
 		goldInter := new(goldTable[int]).insertMany(inter)
 		fastInter := new(Table[int])
 		for _, pfx := range inter {
@@ -98,7 +100,8 @@ func TestOverlapsCompare(t *testing.T) {
 
 func TestOverlapsPrefixCompare(t *testing.T) {
 	t.Parallel()
-	pfxs := randomPrefixes(100_000)
+	prng := rand.New(rand.NewPCG(42, 42))
+	pfxs := randomPrefixes(prng, 100_000)
 
 	fast := new(Table[int])
 	gold := new(goldTable[int]).insertMany(pfxs)
@@ -107,7 +110,7 @@ func TestOverlapsPrefixCompare(t *testing.T) {
 		fast.Insert(pfx.pfx, pfx.val)
 	}
 
-	tests := randomPrefixes(10_000)
+	tests := randomPrefixes(prng, 10_000)
 	for _, tt := range tests {
 		gotGold := gold.overlapsPrefix(tt.pfx)
 		gotFast := fast.OverlapsPrefix(tt.pfx)

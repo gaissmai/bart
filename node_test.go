@@ -11,7 +11,7 @@ package bart
 
 import (
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
 	"testing"
 
 	"github.com/gaissmai/bart/internal/art"
@@ -151,6 +151,7 @@ var (
 )
 
 func BenchmarkNodePrefixInsert(b *testing.B) {
+	prng := rand.New(rand.NewPCG(42, 42))
 	routes := shuffleStridePfxs(allStridePfxs())
 
 	for _, nroutes := range prefixCount {
@@ -164,7 +165,7 @@ func BenchmarkNodePrefixInsert(b *testing.B) {
 		}
 
 		b.Run(fmt.Sprintf("Into %d", nroutes), func(b *testing.B) {
-			route := routes[rand.Intn(len(routes))]
+			route := routes[prng.IntN(len(routes))]
 			idx := art.PfxToIdx(route.octet, route.bits)
 
 			b.ResetTimer()
@@ -176,6 +177,7 @@ func BenchmarkNodePrefixInsert(b *testing.B) {
 }
 
 func BenchmarkNodePrefixUpdate(b *testing.B) {
+	prng := rand.New(rand.NewPCG(42, 42))
 	routes := shuffleStridePfxs(allStridePfxs())
 
 	for _, nroutes := range prefixCount {
@@ -189,7 +191,7 @@ func BenchmarkNodePrefixUpdate(b *testing.B) {
 		}
 
 		b.Run(fmt.Sprintf("In %d", nroutes), func(b *testing.B) {
-			route := routes[rand.Intn(len(routes))]
+			route := routes[prng.IntN(len(routes))]
 			idx := art.PfxToIdx(route.octet, route.bits)
 
 			b.ResetTimer()
@@ -201,6 +203,7 @@ func BenchmarkNodePrefixUpdate(b *testing.B) {
 }
 
 func BenchmarkNodePrefixDelete(b *testing.B) {
+	prng := rand.New(rand.NewPCG(42, 42))
 	routes := shuffleStridePfxs(allStridePfxs())
 
 	for _, nroutes := range prefixCount {
@@ -214,7 +217,7 @@ func BenchmarkNodePrefixDelete(b *testing.B) {
 		}
 
 		b.Run(fmt.Sprintf("From %d", nroutes), func(b *testing.B) {
-			route := routes[rand.Intn(len(routes))]
+			route := routes[prng.IntN(len(routes))]
 			idx := art.PfxToIdx(route.octet, route.bits)
 
 			b.ResetTimer()
@@ -226,6 +229,7 @@ func BenchmarkNodePrefixDelete(b *testing.B) {
 }
 
 func BenchmarkNodePrefixLPM(b *testing.B) {
+	prng := rand.New(rand.NewPCG(42, 42))
 	routes := shuffleStridePfxs(allStridePfxs())
 
 	for _, nroutes := range prefixCount {
@@ -239,7 +243,7 @@ func BenchmarkNodePrefixLPM(b *testing.B) {
 		}
 
 		b.Run(fmt.Sprintf("lpmGet  IN %d", nroutes), func(b *testing.B) {
-			route := routes[rand.Intn(len(routes))]
+			route := routes[prng.IntN(len(routes))]
 			idx := art.PfxToIdx(route.octet, route.bits)
 
 			b.ResetTimer()
@@ -249,7 +253,7 @@ func BenchmarkNodePrefixLPM(b *testing.B) {
 		})
 
 		b.Run(fmt.Sprintf("lpmTest IN %d", nroutes), func(b *testing.B) {
-			route := routes[rand.Intn(len(routes))]
+			route := routes[prng.IntN(len(routes))]
 			idx := art.PfxToIdx(route.octet, route.bits)
 
 			b.ResetTimer()
@@ -261,11 +265,12 @@ func BenchmarkNodePrefixLPM(b *testing.B) {
 }
 
 func BenchmarkNodePrefixesAsSlice(b *testing.B) {
+	prng := rand.New(rand.NewPCG(42, 42))
 	for _, nPrefixes := range prefixCount {
 		this := new(node[any])
 
 		for range nPrefixes {
-			idx := byte(rand.Intn(maxItems))
+			idx := byte(prng.IntN(maxItems))
 			this.prefixes.InsertAt(idx, nil)
 		}
 
@@ -280,11 +285,12 @@ func BenchmarkNodePrefixesAsSlice(b *testing.B) {
 }
 
 func BenchmarkNodePrefixesAll(b *testing.B) {
+	prng := rand.New(rand.NewPCG(42, 42))
 	for _, nPrefixes := range prefixCount {
 		this := new(node[any])
 
 		for range nPrefixes {
-			idx := byte(rand.Intn(maxItems))
+			idx := byte(prng.IntN(maxItems))
 			boolSink = this.prefixes.InsertAt(idx, nil)
 		}
 
@@ -330,16 +336,17 @@ func BenchmarkNodePrefixIntersectionCardinality(b *testing.B) {
 }
 
 func BenchmarkNodeChildInsert(b *testing.B) {
+	prng := rand.New(rand.NewPCG(42, 42))
 	for _, nchilds := range childCount {
 		this := new(node[int])
 
 		for range nchilds {
-			octet := rand.Intn(maxItems)
+			octet := prng.IntN(maxItems)
 			this.children.InsertAt(uint8(octet), nil)
 		}
 
 		b.Run(fmt.Sprintf("Into %d", nchilds), func(b *testing.B) {
-			octet := rand.Intn(maxItems)
+			octet := prng.IntN(maxItems)
 
 			b.ResetTimer()
 			for range b.N {
@@ -350,16 +357,17 @@ func BenchmarkNodeChildInsert(b *testing.B) {
 }
 
 func BenchmarkNodeChildDelete(b *testing.B) {
+	prng := rand.New(rand.NewPCG(42, 42))
 	for _, nchilds := range childCount {
 		this := new(node[int])
 
 		for range nchilds {
-			octet := rand.Intn(maxItems)
+			octet := prng.IntN(maxItems)
 			this.children.InsertAt(uint8(octet), nil)
 		}
 
 		b.Run(fmt.Sprintf("From %d", nchilds), func(b *testing.B) {
-			octet := rand.Intn(maxItems)
+			octet := prng.IntN(maxItems)
 
 			b.ResetTimer()
 			for range b.N {
@@ -370,11 +378,12 @@ func BenchmarkNodeChildDelete(b *testing.B) {
 }
 
 func BenchmarkNodeChildrenAsSlice(b *testing.B) {
+	prng := rand.New(rand.NewPCG(42, 42))
 	for _, nchilds := range childCount {
 		this := new(node[int])
 
 		for range nchilds {
-			octet := byte(rand.Intn(maxItems))
+			octet := byte(prng.IntN(maxItems))
 			this.children.InsertAt(octet, nil)
 		}
 
@@ -389,11 +398,12 @@ func BenchmarkNodeChildrenAsSlice(b *testing.B) {
 }
 
 func BenchmarkNodeChildrenAll(b *testing.B) {
+	prng := rand.New(rand.NewPCG(42, 42))
 	for _, nchilds := range childCount {
 		this := new(node[int])
 
 		for range nchilds {
-			octet := byte(rand.Intn(maxItems))
+			octet := byte(prng.IntN(maxItems))
 			this.children.InsertAt(octet, nil)
 		}
 
@@ -407,15 +417,16 @@ func BenchmarkNodeChildrenAll(b *testing.B) {
 }
 
 func BenchmarkNodeChildIntersectionCardinality(b *testing.B) {
+	prng := rand.New(rand.NewPCG(42, 42))
 	for _, nchilds := range childCount {
 		this := new(node[int])
 		other := new(node[int])
 
 		for range nchilds {
-			octet := byte(rand.Intn(maxItems))
+			octet := byte(prng.IntN(maxItems))
 			this.children.InsertAt(octet, nil)
 
-			octet = byte(rand.Intn(maxItems))
+			octet = byte(prng.IntN(maxItems))
 			other.children.InsertAt(octet, nil)
 		}
 
