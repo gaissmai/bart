@@ -11,7 +11,7 @@ package bart
 
 import (
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
 	"net/netip"
 	"runtime"
 	"strconv"
@@ -834,10 +834,11 @@ func TestDelete(t *testing.T) {
 
 	t.Run("table_is_empty", func(t *testing.T) {
 		t.Parallel()
+		prng := rand.New(rand.NewPCG(42, 42))
 		// must not panic
 		tbl := new(Table[int])
 		checkNumNodes(t, tbl, 0)
-		tbl.Delete(randomPrefix())
+		tbl.Delete(randomPrefix(prng))
 		checkNumNodes(t, tbl, 0)
 	})
 
@@ -1046,10 +1047,11 @@ func TestDeletePersist(t *testing.T) {
 
 	t.Run("table_is_empty", func(t *testing.T) {
 		t.Parallel()
+		prng := rand.New(rand.NewPCG(42, 42))
 		// must not panic
 		tbl := new(Table[int])
 		checkNumNodes(t, tbl, 0)
-		tbl = tbl.DeletePersist(randomPrefix())
+		tbl = tbl.DeletePersist(randomPrefix(prng))
 		checkNumNodes(t, tbl, 0)
 	})
 
@@ -1257,7 +1259,8 @@ func TestContainsCompare(t *testing.T) {
 	// Create large route tables repeatedly, and compare Table's
 	// behavior to a naive and slow but correct implementation.
 	t.Parallel()
-	pfxs := randomPrefixes(10_000)
+	prng := rand.New(rand.NewPCG(42, 42))
+	pfxs := randomPrefixes(prng, 10_000)
 
 	gold := new(goldTable[int]).insertMany(pfxs)
 	fast := new(Table[int])
@@ -1267,7 +1270,7 @@ func TestContainsCompare(t *testing.T) {
 	}
 
 	for range 10_000 {
-		a := randomAddr()
+		a := randomAddr(prng)
 
 		_, goldOK := gold.lookup(a)
 		fastOK := fast.Contains(a)
@@ -1282,7 +1285,8 @@ func TestLookupCompare(t *testing.T) {
 	// Create large route tables repeatedly, and compare Table's
 	// behavior to a naive and slow but correct implementation.
 	t.Parallel()
-	pfxs := randomPrefixes(10_000)
+	prng := rand.New(rand.NewPCG(42, 42))
+	pfxs := randomPrefixes(prng, 10_000)
 
 	fast := new(Table[int])
 	gold := new(goldTable[int]).insertMany(pfxs)
@@ -1295,7 +1299,7 @@ func TestLookupCompare(t *testing.T) {
 	seenVals6 := map[int]bool{}
 
 	for range 10_000 {
-		a := randomAddr()
+		a := randomAddr(prng)
 
 		goldVal, goldOK := gold.lookup(a)
 		fastVal, fastOK := fast.Lookup(a)
@@ -1383,7 +1387,8 @@ func TestLookupPrefixCompare(t *testing.T) {
 	// Create large route tables repeatedly, and compare Table's
 	// behavior to a naive and slow but correct implementation.
 	t.Parallel()
-	pfxs := randomPrefixes(10_000)
+	prng := rand.New(rand.NewPCG(42, 42))
+	pfxs := randomPrefixes(prng, 10_000)
 
 	fast := new(Table[int])
 	gold := new(goldTable[int]).insertMany(pfxs)
@@ -1396,7 +1401,7 @@ func TestLookupPrefixCompare(t *testing.T) {
 	seenVals6 := map[int]bool{}
 
 	for range 10_000 {
-		pfx := randomPrefix()
+		pfx := randomPrefix(prng)
 
 		goldVal, goldOK := gold.lookupPfx(pfx)
 		fastVal, fastOK := fast.LookupPrefix(pfx)
@@ -1428,7 +1433,8 @@ func TestLookupPrefixLPMCompare(t *testing.T) {
 	// Create large route tables repeatedly, and compare Table's
 	// behavior to a naive and slow but correct implementation.
 	t.Parallel()
-	pfxs := randomPrefixes(10_000)
+	prng := rand.New(rand.NewPCG(42, 42))
+	pfxs := randomPrefixes(prng, 10_000)
 
 	fast := new(Table[int])
 	gold := new(goldTable[int]).insertMany(pfxs)
@@ -1441,7 +1447,7 @@ func TestLookupPrefixLPMCompare(t *testing.T) {
 	seenVals6 := map[int]bool{}
 
 	for range 10_000 {
-		pfx := randomPrefix()
+		pfx := randomPrefix(prng)
 
 		goldLPM, goldVal, goldOK := gold.lookupPfxLPM(pfx)
 		fastLPM, fastVal, fastOK := fast.LookupPrefixLPM(pfx)
@@ -1479,7 +1485,8 @@ func TestInsertShuffled(t *testing.T) {
 	// routes.
 	t.Parallel()
 
-	pfxs := randomPrefixes(1000)
+	prng := rand.New(rand.NewPCG(42, 42))
+	pfxs := randomPrefixes(prng, 1000)
 
 	for range 10 {
 		pfxs2 := append([]goldTableItem[int](nil), pfxs...)
@@ -1487,7 +1494,7 @@ func TestInsertShuffled(t *testing.T) {
 
 		addrs := make([]netip.Addr, 0, 10_000)
 		for range 10_000 {
-			addrs = append(addrs, randomAddr())
+			addrs = append(addrs, randomAddr(prng))
 		}
 
 		rt1 := new(Table[int])
@@ -1516,8 +1523,9 @@ func TestInsertPersistShuffled(t *testing.T) {
 	// should not matter, as long as you're inserting the same set of
 	// routes.
 	t.Parallel()
+	prng := rand.New(rand.NewPCG(42, 42))
 
-	pfxs := randomPrefixes(1000)
+	pfxs := randomPrefixes(prng, 1000)
 
 	for range 10 {
 		pfxs2 := append([]goldTableItem[int](nil), pfxs...)
@@ -1525,7 +1533,7 @@ func TestInsertPersistShuffled(t *testing.T) {
 
 		addrs := make([]netip.Addr, 0, 10_000)
 		for range 10_000 {
-			addrs = append(addrs, randomAddr())
+			addrs = append(addrs, randomAddr(prng))
 		}
 
 		rt1 := new(Table[int])
@@ -1565,6 +1573,7 @@ func TestDeleteCompare(t *testing.T) {
 	// prefixes, and compare Table's behavior to a naive and slow but
 	// correct implementation.
 	t.Parallel()
+	prng := rand.New(rand.NewPCG(42, 42))
 
 	const (
 		numPrefixes  = 10_000 // total prefixes to insert (test deletes 50% of them)
@@ -1575,7 +1584,7 @@ func TestDeleteCompare(t *testing.T) {
 
 	// We have to do this little dance instead of just using allPrefixes,
 	// because we want pfxs and toDelete to be non-overlapping sets.
-	all4, all6 := randomPrefixes4(numPerFamily), randomPrefixes6(numPerFamily)
+	all4, all6 := randomPrefixes4(prng, numPerFamily), randomPrefixes6(prng, numPerFamily)
 
 	pfxs := append([]goldTableItem[int](nil), all4[:deleteCut]...)
 	pfxs = append(pfxs, all6[:deleteCut]...)
@@ -1601,7 +1610,7 @@ func TestDeleteCompare(t *testing.T) {
 	seenVals6 := map[int]bool{}
 
 	for range numProbes {
-		a := randomAddr()
+		a := randomAddr(prng)
 
 		goldVal, goldOK := gold.lookup(a)
 		fastVal, fastOK := fast.Lookup(a)
@@ -1633,6 +1642,7 @@ func TestDeleteShuffled(t *testing.T) {
 	// should not matter, as long as you're deleting the same set of
 	// routes.
 	t.Parallel()
+	prng := rand.New(rand.NewPCG(42, 42))
 
 	const (
 		numPrefixes  = 10_000 // prefixes to insert (test deletes 50% of them)
@@ -1643,7 +1653,7 @@ func TestDeleteShuffled(t *testing.T) {
 	for range 10 {
 		// We have to do this little dance instead of just using allPrefixes,
 		// because we want pfxs and toDelete to be non-overlapping sets.
-		all4, all6 := randomPrefixes4(numPerFamily), randomPrefixes6(numPerFamily)
+		all4, all6 := randomPrefixes4(prng, numPerFamily), randomPrefixes6(prng, numPerFamily)
 
 		pfxs := append([]goldTableItem[int](nil), all4[:deleteCut]...)
 		pfxs = append(pfxs, all6[:deleteCut]...)
@@ -1697,6 +1707,7 @@ func TestDeleteShuffled(t *testing.T) {
 
 func TestDeleteIsReverseOfInsert(t *testing.T) {
 	t.Parallel()
+	prng := rand.New(rand.NewPCG(42, 42))
 	// Insert N prefixes, then delete those same prefixes in reverse
 	// order. Each deletion should exactly undo the internal structure
 	// changes that each insert did.
@@ -1705,7 +1716,7 @@ func TestDeleteIsReverseOfInsert(t *testing.T) {
 	tbl := new(Table[int])
 	want := tbl.dumpString()
 
-	prefixes := randomPrefixes(N)
+	prefixes := randomPrefixes(prng, N)
 
 	defer func() {
 		if t.Failed() {
@@ -1727,13 +1738,14 @@ func TestDeleteIsReverseOfInsert(t *testing.T) {
 
 func TestDeleteButOne(t *testing.T) {
 	t.Parallel()
+	prng := rand.New(rand.NewPCG(42, 42))
 	// Insert N prefixes, then delete all but one
 	const N = 100
 
 	for range 1_000 {
 
 		tbl := new(Table[int])
-		prefixes := randomPrefixes(N)
+		prefixes := randomPrefixes(prng, N)
 
 		for _, p := range prefixes {
 			tbl.Insert(p.pfx, p.val)
@@ -1770,12 +1782,13 @@ func TestDeleteButOne(t *testing.T) {
 
 func TestGetAndDelete(t *testing.T) {
 	t.Parallel()
+	prng := rand.New(rand.NewPCG(42, 42))
 	// Insert N prefixes, then delete those same prefixes in shuffled
 	// order.
 	const N = 10_000
 
 	tbl := new(Table[int])
-	prefixes := randomPrefixes(N)
+	prefixes := randomPrefixes(prng, N)
 
 	// insert the prefixes
 	for _, p := range prefixes {
@@ -1811,9 +1824,10 @@ func TestGet(t *testing.T) {
 
 	t.Run("empty table", func(t *testing.T) {
 		t.Parallel()
+		prng := rand.New(rand.NewPCG(42, 42))
 
 		rt := new(Table[int])
-		pfx := randomPrefix()
+		pfx := randomPrefix(prng)
 		_, ok := rt.Get(pfx)
 
 		if ok {
@@ -1871,8 +1885,9 @@ func TestGet(t *testing.T) {
 
 func TestGetCompare(t *testing.T) {
 	t.Parallel()
+	prng := rand.New(rand.NewPCG(42, 42))
 
-	pfxs := randomPrefixes(10_000)
+	pfxs := randomPrefixes(prng, 10_000)
 	fast := new(Table[int])
 	gold := new(goldTable[int]).insertMany(pfxs)
 
@@ -1893,7 +1908,8 @@ func TestGetCompare(t *testing.T) {
 func TestUpdateCompare(t *testing.T) {
 	t.Parallel()
 
-	pfxs := randomPrefixes(10_000)
+	prng := rand.New(rand.NewPCG(42, 42))
+	pfxs := randomPrefixes(prng, 10_000)
 	fast := new(Table[int])
 	gold := new(goldTable[int]).insertMany(pfxs)
 
@@ -1930,7 +1946,10 @@ func TestUpdateCompare(t *testing.T) {
 }
 
 func TestUpdatePersistCompare(t *testing.T) {
-	pfxs := randomPrefixes(10_000)
+	t.Parallel()
+	prng := rand.New(rand.NewPCG(42, 42))
+
+	pfxs := randomPrefixes(prng, 10_000)
 	immu := new(Table[int])
 	bart := new(Table[int])
 
@@ -2199,11 +2218,12 @@ func TestUnionMemoryAliasing(t *testing.T) {
 
 func TestUnionCompare(t *testing.T) {
 	t.Parallel()
+	prng := rand.New(rand.NewPCG(42, 42))
 
 	const numEntries = 200
 
 	for range 100 {
-		pfxs := randomPrefixes(numEntries)
+		pfxs := randomPrefixes(prng, numEntries)
 		fast := new(Table[int])
 		gold := new(goldTable[int]).insertMany(pfxs)
 
@@ -2211,7 +2231,7 @@ func TestUnionCompare(t *testing.T) {
 			fast.Insert(pfx.pfx, pfx.val)
 		}
 
-		pfxs2 := randomPrefixes(numEntries)
+		pfxs2 := randomPrefixes(prng, numEntries)
 		gold2 := new(goldTable[int]).insertMany(pfxs2)
 		fast2 := new(Table[int])
 		for _, pfx := range pfxs2 {
@@ -2273,8 +2293,9 @@ func TestCloneEdgeCases(t *testing.T) {
 
 func TestClone(t *testing.T) {
 	t.Parallel()
+	prng := rand.New(rand.NewPCG(42, 42))
 
-	pfxs := randomPrefixes(100_000)
+	pfxs := randomPrefixes(prng, 100_000)
 
 	golden := new(Table[int])
 	tbl := new(Table[int])
@@ -2326,6 +2347,7 @@ func TestCloneShallow(t *testing.T) {
 
 func TestUpdatePersistDeep(t *testing.T) {
 	t.Parallel()
+	prng := rand.New(rand.NewPCG(42, 42))
 
 	tbl := new(Table[*MyInt])
 	val1 := MyInt(1)
@@ -2352,7 +2374,7 @@ func TestUpdatePersistDeep(t *testing.T) {
 		t.Errorf("memory aliasing after UpdatePersist, values must be different:\nvalues(%d, %d)", *got, *want)
 	}
 
-	pfxs := randomRealWorldPrefixes(100_000)
+	pfxs := randomRealWorldPrefixes(prng, 100_000)
 	tbl = new(Table[*MyInt])
 	for i, pfx := range pfxs {
 		i := MyInt(i)
@@ -2531,6 +2553,7 @@ func TestOverlapsPrefixEdgeCases(t *testing.T) {
 
 func TestSize(t *testing.T) {
 	t.Parallel()
+	prng := rand.New(rand.NewPCG(42, 42))
 
 	tbl := new(Table[any])
 	if tbl.Size() != 0 {
@@ -2545,8 +2568,8 @@ func TestSize(t *testing.T) {
 		t.Errorf("empty Table: want: 0, got: %d", tbl.Size6())
 	}
 
-	pfxs1 := randomPrefixes(10_000)
-	pfxs2 := randomPrefixes(10_000)
+	pfxs1 := randomPrefixes(prng, 10_000)
+	pfxs2 := randomPrefixes(prng, 10_000)
 
 	for _, pfx := range pfxs1 {
 		tbl.Insert(pfx.pfx, nil)
@@ -2562,7 +2585,7 @@ func TestSize(t *testing.T) {
 		tbl.Update(pfx.pfx, func(any, bool) any { return nil })
 	}
 
-	for _, pfx := range randomPrefixes(20_000) {
+	for _, pfx := range randomPrefixes(prng, 20_000) {
 		tbl.Delete(pfx.pfx)
 	}
 
@@ -2658,8 +2681,9 @@ func TestLastIdxLastBits(t *testing.T) {
 var benchRouteCount = []int{1, 2, 5, 10, 100, 1000, 10_000, 100_000, 200_000}
 
 func BenchmarkTableInsertRandom(b *testing.B) {
+	prng := rand.New(rand.NewPCG(42, 42))
 	for _, n := range []int{10_000, 100_000, 1_000_000, 2_000_000} {
-		randomPfxs := randomRealWorldPrefixes(n)
+		randomPfxs := randomRealWorldPrefixes(prng, n)
 
 		rt := new(Table[*MyInt])
 		for i, pfx := range randomPfxs {
@@ -2669,7 +2693,7 @@ func BenchmarkTableInsertRandom(b *testing.B) {
 
 		prt := rt
 
-		probe := randomPrefix()
+		probe := randomPrefix(prng)
 		myInt := MyInt(42)
 
 		b.ResetTimer()
@@ -2714,15 +2738,16 @@ func BenchmarkTableInsertRandom(b *testing.B) {
 }
 
 func BenchmarkTableDelete(b *testing.B) {
+	prng := rand.New(rand.NewPCG(42, 42))
 	for _, n := range benchRouteCount {
 		rt := new(Table[*MyInt])
-		for i, route := range randomPrefixes(n) {
+		for i, route := range randomPrefixes(prng, n) {
 			myInt := MyInt(i)
 			rt.Insert(route.pfx, &myInt)
 		}
 
 		prt := rt
-		probe := randomPrefix()
+		probe := randomPrefix(prng)
 
 		b.ResetTimer()
 		b.Run(fmt.Sprintf("mutable from_%d", n), func(b *testing.B) {
@@ -2741,6 +2766,7 @@ func BenchmarkTableDelete(b *testing.B) {
 }
 
 func BenchmarkTableGet(b *testing.B) {
+	prng := rand.New(rand.NewPCG(42, 42))
 	for _, fam := range []string{"ipv4", "ipv6"} {
 		rng := randomPrefixes4
 		if fam == "ipv6" {
@@ -2749,11 +2775,11 @@ func BenchmarkTableGet(b *testing.B) {
 
 		for _, nroutes := range benchRouteCount {
 			rt := new(Table[int])
-			for _, route := range rng(nroutes) {
+			for _, route := range rng(prng, nroutes) {
 				rt.Insert(route.pfx, route.val)
 			}
 
-			probe := rng(1)[0]
+			probe := rng(prng, 1)[0]
 
 			b.ResetTimer()
 			b.Run(fmt.Sprintf("%s/From_%d", fam, nroutes), func(b *testing.B) {
@@ -2766,6 +2792,7 @@ func BenchmarkTableGet(b *testing.B) {
 }
 
 func BenchmarkTableLPM(b *testing.B) {
+	prng := rand.New(rand.NewPCG(42, 42))
 	for _, fam := range []string{"ipv4", "ipv6"} {
 		rng := randomPrefixes4
 		if fam == "ipv6" {
@@ -2774,11 +2801,11 @@ func BenchmarkTableLPM(b *testing.B) {
 
 		for _, nroutes := range benchRouteCount {
 			rt := new(Table[int])
-			for _, route := range rng(nroutes) {
+			for _, route := range rng(prng, nroutes) {
 				rt.Insert(route.pfx, route.val)
 			}
 
-			probe := rng(1)[0]
+			probe := rng(prng, 1)[0]
 
 			b.ResetTimer()
 			b.Run(fmt.Sprintf("%s/In_%6d/%s", fam, nroutes, "Contains"), func(b *testing.B) {
@@ -2812,6 +2839,7 @@ func BenchmarkTableLPM(b *testing.B) {
 }
 
 func BenchmarkTableOverlapsPrefix(b *testing.B) {
+	prng := rand.New(rand.NewPCG(42, 42))
 	for _, fam := range []string{"ipv4", "ipv6"} {
 		rng := randomPrefixes4
 		if fam == "ipv6" {
@@ -2820,11 +2848,11 @@ func BenchmarkTableOverlapsPrefix(b *testing.B) {
 
 		for _, nroutes := range benchRouteCount {
 			rt := new(Table[int])
-			for _, route := range rng(nroutes) {
+			for _, route := range rng(prng, nroutes) {
 				rt.Insert(route.pfx, route.val)
 			}
 
-			probe := rng(1)[0]
+			probe := rng(prng, 1)[0]
 
 			b.ResetTimer()
 			b.Run(fmt.Sprintf("%s/With_%d", fam, nroutes), func(b *testing.B) {
@@ -2837,6 +2865,7 @@ func BenchmarkTableOverlapsPrefix(b *testing.B) {
 }
 
 func BenchmarkTableOverlaps(b *testing.B) {
+	prng := rand.New(rand.NewPCG(42, 42))
 	for _, fam := range []string{"ipv4", "ipv6"} {
 		rng := randomPrefixes4
 		if fam == "ipv6" {
@@ -2845,12 +2874,12 @@ func BenchmarkTableOverlaps(b *testing.B) {
 
 		for _, nroutes := range benchRouteCount {
 			rt := new(Table[int])
-			for _, route := range rng(nroutes) {
+			for _, route := range rng(prng, nroutes) {
 				rt.Insert(route.pfx, route.val)
 			}
 
 			inter := new(Table[int])
-			for _, route := range rng(nroutes) {
+			for _, route := range rng(prng, nroutes) {
 				inter.Insert(route.pfx, route.val)
 			}
 
@@ -2865,6 +2894,7 @@ func BenchmarkTableOverlaps(b *testing.B) {
 }
 
 func BenchmarkTableClone(b *testing.B) {
+	prng := rand.New(rand.NewPCG(42, 42))
 	for _, fam := range []string{"ipv4", "ipv6"} {
 		rng := randomPrefixes4
 		if fam == "ipv6" {
@@ -2873,7 +2903,7 @@ func BenchmarkTableClone(b *testing.B) {
 
 		for _, nroutes := range benchRouteCount {
 			rt := new(Table[int])
-			for _, route := range rng(nroutes) {
+			for _, route := range rng(prng, nroutes) {
 				rt.Insert(route.pfx, route.val)
 			}
 
@@ -2888,6 +2918,7 @@ func BenchmarkTableClone(b *testing.B) {
 }
 
 func BenchmarkMemIP4(b *testing.B) {
+	prng := rand.New(rand.NewPCG(42, 42))
 	for _, k := range []int{1_000, 10_000, 100_000, 1_000_000} {
 		var startMem, endMem runtime.MemStats
 
@@ -2898,7 +2929,7 @@ func BenchmarkMemIP4(b *testing.B) {
 			rt := new(Table[struct{}])
 			for range b.N {
 				rt = new(Table[struct{}])
-				for _, pfx := range randomRealWorldPrefixes4(k) {
+				for _, pfx := range randomRealWorldPrefixes4(prng, k) {
 					rt.Insert(pfx, struct{}{})
 				}
 			}
@@ -2918,6 +2949,7 @@ func BenchmarkMemIP4(b *testing.B) {
 }
 
 func BenchmarkMemIP6(b *testing.B) {
+	prng := rand.New(rand.NewPCG(42, 42))
 	for _, k := range []int{1_000, 10_000, 100_000, 1_000_000} {
 		var startMem, endMem runtime.MemStats
 
@@ -2928,7 +2960,7 @@ func BenchmarkMemIP6(b *testing.B) {
 			rt := new(Table[struct{}])
 			for range b.N {
 				rt = new(Table[struct{}])
-				for _, pfx := range randomRealWorldPrefixes6(k) {
+				for _, pfx := range randomRealWorldPrefixes6(prng, k) {
 					rt.Insert(pfx, struct{}{})
 				}
 			}
@@ -2948,6 +2980,7 @@ func BenchmarkMemIP6(b *testing.B) {
 }
 
 func BenchmarkMem(b *testing.B) {
+	prng := rand.New(rand.NewPCG(42, 42))
 	for _, k := range []int{1_000, 10_000, 100_000, 1_000_000} {
 		var startMem, endMem runtime.MemStats
 
@@ -2958,7 +2991,7 @@ func BenchmarkMem(b *testing.B) {
 			rt := new(Table[struct{}])
 			for range b.N {
 				rt = new(Table[struct{}])
-				for _, pfx := range randomRealWorldPrefixes(k) {
+				for _, pfx := range randomRealWorldPrefixes(prng, k) {
 					rt.Insert(pfx, struct{}{})
 				}
 			}

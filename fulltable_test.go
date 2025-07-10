@@ -16,8 +16,6 @@ import (
 	"testing"
 )
 
-var prng = rand.New(rand.NewPCG(42, 42))
-
 // full internet prefix list, gzipped
 const prefixFile = "testdata/prefixes.txt.gz"
 
@@ -46,6 +44,7 @@ type route struct {
 }
 
 func init() {
+	prng := rand.New(rand.NewPCG(42, 42))
 	fillRouteTables()
 
 	randRoute4 = routes4[prng.IntN(len(routes4))]
@@ -58,6 +57,7 @@ var (
 )
 
 func init() {
+	prng := rand.New(rand.NewPCG(42, 42))
 	lt := new(Lite)
 
 	for _, route := range routes {
@@ -66,13 +66,13 @@ func init() {
 
 	// find a random match IP4 and IP6
 	for {
-		matchIP4 = randomRealWorldPrefixes4(1)[0].Addr().Next()
+		matchIP4 = randomRealWorldPrefixes4(prng, 1)[0].Addr().Next()
 		if ok := lt.Contains(matchIP4); ok {
 			break
 		}
 	}
 	for {
-		matchIP6 = randomRealWorldPrefixes6(1)[0].Addr().Next()
+		matchIP6 = randomRealWorldPrefixes6(prng, 1)[0].Addr().Next()
 		if ok := lt.Contains(matchIP6); ok {
 			break
 		}
@@ -80,39 +80,39 @@ func init() {
 
 	// find a random match Pfx4
 	for {
-		matchPfx4 = randomRealWorldPrefixes4(1)[0]
+		matchPfx4 = randomRealWorldPrefixes4(prng, 1)[0]
 		if _, ok := lt.LookupPrefix(matchPfx4); ok {
 			break
 		}
 	}
 	for {
-		matchPfx6 = randomRealWorldPrefixes6(1)[0]
+		matchPfx6 = randomRealWorldPrefixes6(prng, 1)[0]
 		if _, ok := lt.LookupPrefix(matchPfx6); ok {
 			break
 		}
 	}
 
 	for {
-		missIP4 = randomRealWorldPrefixes4(1)[0].Addr().Next()
+		missIP4 = randomRealWorldPrefixes4(prng, 1)[0].Addr().Next()
 		if ok := lt.Contains(missIP4); !ok {
 			break
 		}
 	}
 	for {
-		missIP6 = randomRealWorldPrefixes6(1)[0].Addr().Next()
+		missIP6 = randomRealWorldPrefixes6(prng, 1)[0].Addr().Next()
 		if ok := lt.Contains(missIP6); !ok {
 			break
 		}
 	}
 
 	for {
-		missPfx4 = randomRealWorldPrefixes4(1)[0]
+		missPfx4 = randomRealWorldPrefixes4(prng, 1)[0]
 		if _, ok := lt.LookupPrefix(missPfx4); !ok {
 			break
 		}
 	}
 	for {
-		missPfx6 = randomRealWorldPrefixes6(1)[0]
+		missPfx6 = randomRealWorldPrefixes6(prng, 1)[0]
 		if _, ok := lt.LookupPrefix(missPfx6); !ok {
 			break
 		}
@@ -276,64 +276,64 @@ func BenchmarkFullMiss6(b *testing.B) {
 }
 
 func BenchmarkFullTableOverlaps4(b *testing.B) {
-	rt := new(Table[int])
+	lt := new(Lite)
 
-	for i, route := range routes4 {
-		rt.Insert(route.CIDR, i)
+	for _, route := range routes4 {
+		lt.Insert(route.CIDR)
 	}
 
-	b.Log(missIP4)
-	b.Log(missPfx4)
-
 	for i := 1; i <= 1<<20; i *= 2 {
-		rt2 := new(Table[int])
-		for j, pfx := range randomRealWorldPrefixes4(i) {
-			rt2.Insert(pfx, j)
+		prng := rand.New(rand.NewPCG(42, 42))
+		lt2 := new(Lite)
+		for _, pfx := range randomRealWorldPrefixes4(prng, i) {
+			lt2.Insert(pfx)
 		}
 
 		b.Run(fmt.Sprintf("With_%4d", i), func(b *testing.B) {
 			b.ResetTimer()
 			for range b.N {
-				boolSink = rt.Overlaps(rt2)
+				boolSink = lt.Overlaps(lt2)
 			}
 		})
 	}
 }
 
 func BenchmarkFullTableOverlaps6(b *testing.B) {
-	rt := new(Table[int])
+	lt := new(Lite)
 
-	for i, route := range routes6 {
-		rt.Insert(route.CIDR, i)
+	for _, route := range routes6 {
+		lt.Insert(route.CIDR)
 	}
 
 	for i := 1; i <= 1<<20; i *= 2 {
-		rt2 := new(Table[int])
-		for j, pfx := range randomRealWorldPrefixes6(i) {
-			rt2.Insert(pfx, j)
+		prng := rand.New(rand.NewPCG(42, 42))
+		lt2 := new(Lite)
+		for _, pfx := range randomRealWorldPrefixes6(prng, i) {
+			lt2.Insert(pfx)
 		}
 
 		b.Run(fmt.Sprintf("With_%4d", i), func(b *testing.B) {
 			b.ResetTimer()
 			for range b.N {
-				boolSink = rt.Overlaps(rt2)
+				boolSink = lt.Overlaps(lt2)
 			}
 		})
 	}
 }
 
 func BenchmarkFullTableOverlapsPrefix(b *testing.B) {
-	rt := new(Table[int])
+	lt := new(Lite)
 
-	for i, route := range routes {
-		rt.Insert(route.CIDR, i)
+	for _, route := range routes {
+		lt.Insert(route.CIDR)
 	}
 
-	pfx := randomRealWorldPrefixes(1)[0]
+	prng := rand.New(rand.NewPCG(42, 42))
+	pfx := randomRealWorldPrefixes(prng, 1)[0]
 
 	b.ResetTimer()
 	for range b.N {
-		boolSink = rt.OverlapsPrefix(pfx)
+		boolSink = lt.OverlapsPrefix(pfx)
 	}
 }
 
@@ -503,12 +503,12 @@ func fillRouteTables() {
 
 // #########################################################
 
-func randomRealWorldPrefixes4(n int) []netip.Prefix {
+func randomRealWorldPrefixes4(prng *rand.Rand, n int) []netip.Prefix {
 	set := map[netip.Prefix]netip.Prefix{}
 	pfxs := make([]netip.Prefix, 0, n)
 
 	for {
-		pfx := randomPrefix4()
+		pfx := randomPrefix4(prng)
 
 		// skip too small or too big masks
 		if pfx.Bits() < 8 || pfx.Bits() > 28 {
@@ -532,12 +532,12 @@ func randomRealWorldPrefixes4(n int) []netip.Prefix {
 	return pfxs
 }
 
-func randomRealWorldPrefixes6(n int) []netip.Prefix {
+func randomRealWorldPrefixes6(prng *rand.Rand, n int) []netip.Prefix {
 	set := map[netip.Prefix]netip.Prefix{}
 	pfxs := make([]netip.Prefix, 0, n)
 
 	for {
-		pfx := randomPrefix6()
+		pfx := randomPrefix6(prng)
 
 		// skip too small or too big masks
 		if pfx.Bits() < 16 || pfx.Bits() > 56 {
@@ -563,10 +563,10 @@ func randomRealWorldPrefixes6(n int) []netip.Prefix {
 	return pfxs
 }
 
-func randomRealWorldPrefixes(n int) []netip.Prefix {
+func randomRealWorldPrefixes(prng *rand.Rand, n int) []netip.Prefix {
 	pfxs := make([]netip.Prefix, 0, n)
-	pfxs = append(pfxs, randomRealWorldPrefixes4(n/2)...)
-	pfxs = append(pfxs, randomRealWorldPrefixes6(n-len(pfxs))...)
+	pfxs = append(pfxs, randomRealWorldPrefixes4(prng, n/2)...)
+	pfxs = append(pfxs, randomRealWorldPrefixes6(prng, n-len(pfxs))...)
 
 	prng.Shuffle(n, func(i, j int) {
 		pfxs[i], pfxs[j] = pfxs[j], pfxs[i]

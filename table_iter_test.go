@@ -5,6 +5,7 @@ package bart
 
 import (
 	"fmt"
+	"math/rand/v2"
 	"net/netip"
 	"slices"
 	"testing"
@@ -12,7 +13,8 @@ import (
 
 func TestAll4RangeOverFunc(t *testing.T) {
 	t.Parallel()
-	pfxs := randomPrefixes4(10_000)
+	prng := rand.New(rand.NewPCG(42, 42))
+	pfxs := randomPrefixes4(prng, 10_000)
 	seen := make(map[netip.Prefix]int, 10_000)
 
 	t.Run("All4RangeOverFunc", func(t *testing.T) {
@@ -63,7 +65,8 @@ func TestAll4RangeOverFunc(t *testing.T) {
 
 func TestAll6RangeOverFunc(t *testing.T) {
 	t.Parallel()
-	pfxs := randomPrefixes6(10_000)
+	prng := rand.New(rand.NewPCG(42, 42))
+	pfxs := randomPrefixes6(prng, 10_000)
 	seen := make(map[netip.Prefix]int, 10_000)
 
 	t.Run("All6RangeOverFunc", func(t *testing.T) {
@@ -114,7 +117,8 @@ func TestAll6RangeOverFunc(t *testing.T) {
 
 func TestAllRangeOverFunc(t *testing.T) {
 	t.Parallel()
-	pfxs := randomPrefixes(10_000)
+	prng := rand.New(rand.NewPCG(42, 42))
+	pfxs := randomPrefixes(prng, 10_000)
 	seen := make(map[netip.Prefix]int, 10_000)
 
 	t.Run("AllRangeOverFunc", func(t *testing.T) {
@@ -165,7 +169,8 @@ func TestAllRangeOverFunc(t *testing.T) {
 
 func TestAll4SortedIter(t *testing.T) {
 	t.Parallel()
-	pfxs := randomPrefixes4(10_000)
+	prng := rand.New(rand.NewPCG(42, 42))
+	pfxs := randomPrefixes4(prng, 10_000)
 	seen := make(map[netip.Prefix]int, 10_000)
 
 	t.Run("All4SortedRangeOverFunc", func(t *testing.T) {
@@ -216,7 +221,8 @@ func TestAll4SortedIter(t *testing.T) {
 
 func TestAll6SortedRangeOverFunc(t *testing.T) {
 	t.Parallel()
-	pfxs := randomPrefixes6(10_000)
+	prng := rand.New(rand.NewPCG(42, 42))
+	pfxs := randomPrefixes6(prng, 10_000)
 	seen := make(map[netip.Prefix]int, 10_000)
 
 	t.Run("All6SortedRangeOverFunc", func(t *testing.T) {
@@ -267,7 +273,8 @@ func TestAll6SortedRangeOverFunc(t *testing.T) {
 
 func TestAllSortedRangeOverFunc(t *testing.T) {
 	t.Parallel()
-	pfxs := randomPrefixes(10_000)
+	prng := rand.New(rand.NewPCG(42, 42))
+	pfxs := randomPrefixes(prng, 10_000)
 	seen := make(map[netip.Prefix]int, 10_000)
 
 	t.Run("AllSortedRangeOverFunc", func(t *testing.T) {
@@ -364,8 +371,9 @@ func TestSupernetsEdgeCase(t *testing.T) {
 
 func TestSupernetsCompare(t *testing.T) {
 	t.Parallel()
+	prng := rand.New(rand.NewPCG(42, 42))
 
-	pfxs := randomRealWorldPrefixes(1_000)
+	pfxs := randomRealWorldPrefixes(prng, 1_000)
 
 	fast := new(Table[int])
 	gold := new(goldTable[int])
@@ -375,7 +383,7 @@ func TestSupernetsCompare(t *testing.T) {
 		gold.insert(pfx, i)
 	}
 
-	for _, pfx := range randomRealWorldPrefixes(100_000) {
+	for _, pfx := range randomRealWorldPrefixes(prng, 100_000) {
 		t.Run("subtest", func(t *testing.T) {
 			t.Parallel()
 			gotGold := gold.supernets(pfx)
@@ -435,14 +443,15 @@ func TestSubnets(t *testing.T) {
 	})
 
 	t.Run("default gateway", func(t *testing.T) {
+		prng := rand.New(rand.NewPCG(42, 42))
 		want4 := 95_555
 		want6 := 105_555
 
 		rtbl := new(Table[int])
-		for i, pfx := range randomRealWorldPrefixes4(want4) {
+		for i, pfx := range randomRealWorldPrefixes4(prng, want4) {
 			rtbl.Insert(pfx, i)
 		}
-		for i, pfx := range randomRealWorldPrefixes6(want6) {
+		for i, pfx := range randomRealWorldPrefixes6(prng, want6) {
 			rtbl.Insert(pfx, i)
 		}
 
@@ -471,8 +480,9 @@ func TestSubnets(t *testing.T) {
 
 func TestSubnetsCompare(t *testing.T) {
 	t.Parallel()
+	prng := rand.New(rand.NewPCG(42, 42))
 
-	pfxs := randomRealWorldPrefixes(1_000)
+	pfxs := randomRealWorldPrefixes(prng, 1_000)
 
 	fast := new(Table[int])
 	gold := new(goldTable[int])
@@ -482,7 +492,7 @@ func TestSubnetsCompare(t *testing.T) {
 		gold.insert(pfx, i)
 	}
 
-	for _, pfx := range randomRealWorldPrefixes(100_000) {
+	for _, pfx := range randomRealWorldPrefixes(prng, 100_000) {
 		t.Run("subtest", func(t *testing.T) {
 			t.Parallel()
 
@@ -516,10 +526,11 @@ func (t *goldTable[V]) lookupPrefixReverse(pfx netip.Prefix) []netip.Prefix {
 }
 
 func BenchmarkSubnets(b *testing.B) {
+	prng := rand.New(rand.NewPCG(42, 42))
 	n := 1_000_000
 
 	rtbl := new(Table[int])
-	for i, pfx := range randomRealWorldPrefixes(n) {
+	for i, pfx := range randomRealWorldPrefixes(prng, n) {
 		rtbl.Insert(pfx, i)
 	}
 
@@ -535,10 +546,11 @@ func BenchmarkSubnets(b *testing.B) {
 }
 
 func BenchmarkSupernets(b *testing.B) {
+	prng := rand.New(rand.NewPCG(42, 42))
 	n := 1_000_000
 
 	rtbl := new(Table[int])
-	for i, pfx := range randomRealWorldPrefixes(n) {
+	for i, pfx := range randomRealWorldPrefixes(prng, n) {
 		rtbl.Insert(pfx, i)
 	}
 
