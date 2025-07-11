@@ -27,7 +27,7 @@ func TestZeroValue(t *testing.T) {
 	b.Clear(100)
 
 	b = BitSet256{}
-	b.Size()
+	b.popcount()
 
 	b = BitSet256{}
 	b.Rank(100)
@@ -39,7 +39,7 @@ func TestZeroValue(t *testing.T) {
 	b.NextSet(0)
 
 	b = BitSet256{}
-	b.All()
+	b.Bits()
 
 	b = BitSet256{}
 	c := BitSet256{}
@@ -51,7 +51,7 @@ func TestZeroValue(t *testing.T) {
 
 	b = BitSet256{}
 	c = BitSet256{}
-	b.IntersectsAny(&c)
+	b.Intersects(&c)
 
 	b = BitSet256{}
 	c = BitSet256{}
@@ -356,7 +356,7 @@ func TestAll(t *testing.T) {
 			b.Clear(u) // without compact
 		}
 
-		buf := b.All()
+		buf := b.Bits()
 
 		if !slices.Equal(buf, tc.wantData) {
 			t.Errorf("All, %s: returned buf is not equal as expected:\ngot:  %v\nwant: %v",
@@ -434,7 +434,7 @@ func TestCount(t *testing.T) {
 	checkLast := true
 
 	for i := range tot {
-		sz := uint8(b.Size())
+		sz := uint8(b.popcount())
 		if sz != i {
 			t.Logf("%v", b)
 			t.Errorf("Count reported as %d, but it should be %d", sz, i)
@@ -445,7 +445,7 @@ func TestCount(t *testing.T) {
 	}
 
 	if checkLast {
-		sz := uint8(b.Size())
+		sz := uint8(b.popcount())
 		if sz != tot {
 			t.Errorf("After all bits set, size reported as %d, but it should be %d", sz, tot)
 		}
@@ -458,7 +458,7 @@ func TestCount2(t *testing.T) {
 	var b BitSet256
 	tot := uint8(64*3 + 11)
 	for i := uint8(0); i < tot; i += 3 {
-		sz := uint8(b.Size())
+		sz := uint8(b.popcount())
 		if sz != i/3 {
 			t.Errorf("Count reported as %d, but it should be %d", sz, i)
 			break
@@ -488,11 +488,11 @@ func TestUnion(t *testing.T) {
 	d := b
 	d = d.Union(&a)
 
-	if c.Size() != 200 {
-		t.Errorf("Union should have 200 bits set, but had %d", c.Size())
+	if c.popcount() != 200 {
+		t.Errorf("Union should have 200 bits set, but had %d", c.popcount())
 	}
-	if d.Size() != 200 {
-		t.Errorf("Union should have 200 bits set, but had %d", d.Size())
+	if d.popcount() != 200 {
+		t.Errorf("Union should have 200 bits set, but had %d", d.popcount())
 	}
 }
 
@@ -514,18 +514,11 @@ func TestInplaceIntersection(t *testing.T) {
 
 	d := b
 	d = d.Intersection(&a)
-	if c.Size() != 50 {
-		t.Errorf("Intersection should have 50 bits set, but had %d", c.Size())
+	if c.popcount() != 50 {
+		t.Errorf("Intersection should have 50 bits set, but had %d", c.popcount())
 	}
-	if d.Size() != 50 {
-		t.Errorf("Intersection should have 50 bits set, but had %d", d.Size())
-	}
-
-	if a.IntersectionCardinality(&b) != c.Size() {
-		t.Error("Intersection and IntersectionCardinality differ")
-	}
-	if b.IntersectionCardinality(&a) != c.Size() {
-		t.Error("Intersection and IntersectionCardinality differ")
+	if d.popcount() != 50 {
+		t.Errorf("Intersection should have 50 bits set, but had %d", d.popcount())
 	}
 }
 
@@ -542,14 +535,14 @@ func TestIntersectsAny(t *testing.T) {
 	}
 
 	want := false
-	got := a.IntersectsAny(&b)
+	got := a.Intersects(&b)
 	if want != got {
 		t.Errorf("Intersection should be %v, but got: %v", want, got)
 	}
 
 	b = a
 	want = true
-	got = a.IntersectsAny(&b)
+	got = a.Intersects(&b)
 	if want != got {
 		t.Errorf("Intersection should be %v, but got: %v", want, got)
 	}
@@ -656,18 +649,6 @@ func TestRank(t *testing.T) {
 	}
 }
 
-func TestIntersectionCardinality(t *testing.T) {
-	t.Parallel()
-	s := BitSet256{0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010}
-	m := BitSet256{0b1111_1111_1111, 0b1111_1111_1111, 0b1111_1111_1111, 0b1111_1111_1111}
-
-	want := 16
-	got := s.IntersectionCardinality(&m)
-	if got != want {
-		t.Errorf("Wrong And %d !=  %d", got, want)
-	}
-}
-
 var (
 	boolSink       bool
 	intSink        int
@@ -700,7 +681,7 @@ func BenchmarkIntersectsAny(b *testing.B) {
 		b.Run(fmt.Sprintf("Any: at %d", i), func(b *testing.B) {
 			b.ResetTimer()
 			for range b.N {
-				boolSink = aa.IntersectsAny(&bb)
+				boolSink = aa.Intersects(&bb)
 			}
 		})
 	}
@@ -726,22 +707,12 @@ func BenchmarkIntersection(b *testing.B) {
 	}
 }
 
-func BenchmarkIntersectionCardinality(b *testing.B) {
-	aa := BitSet256{0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010}
-	bb := BitSet256{0b1111_1111_1111, 0b1111_1111_1111, 0b1111_1111_1111, 0b1111_1111_1111}
-
-	b.ResetTimer()
-	for range b.N {
-		intSink = aa.IntersectionCardinality(&bb)
-	}
-}
-
 func BenchmarkPopcount(b *testing.B) {
 	aa := BitSet256{0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010}
 
 	b.ResetTimer()
 	for range b.N {
-		intSink = aa.popcnt()
+		intSink = aa.popcount()
 	}
 }
 

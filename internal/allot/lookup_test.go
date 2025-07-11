@@ -40,7 +40,7 @@ func TestIdxToFringeRoutes(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		got := IdxToFringeRoutes(tc.idx).All()
+		got := IdxToFringeRoutes(tc.idx).Bits()
 		if !slices.Equal(got, tc.want) {
 			t.Errorf("IdxToFringeRoutes(%d), want: %v, got: %v", tc.idx, tc.want, got)
 		}
@@ -83,7 +83,7 @@ func TestIdxToPrefixRoutes(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		got := IdxToPrefixRoutes(tc.idx).All()
+		got := IdxToPrefixRoutes(tc.idx).Bits()
 		if !slices.Equal(got, tc.want) {
 			t.Errorf("IdxToPrefixRoutes(%d), want: %v, got: %v", tc.idx, tc.want, got)
 		}

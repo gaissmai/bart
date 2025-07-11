@@ -357,7 +357,7 @@ func (n *node[V]) lpmGet(idx uint) (baseIdx uint8, val V, ok bool) {
 // lpmTest, true if idx has a (any) longest-prefix-match in node.
 // this is a contains test, faster as lookup and without value returns.
 func (n *node[V]) lpmTest(idx uint) bool {
-	return n.prefixes.IntersectsAny(lpm.BackTrackingBitset(idx))
+	return n.prefixes.Intersects(lpm.BackTrackingBitset(idx))
 }
 
 // cloneRec, clones the node recursive.

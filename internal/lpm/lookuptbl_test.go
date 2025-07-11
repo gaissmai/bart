@@ -60,7 +60,7 @@ func TestBackTrackingBitset(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		got := BackTrackingBitset(tc.idx).All()
+		got := BackTrackingBitset(tc.idx).Bits()
 		if !slices.Equal(got, tc.want) {
 			t.Errorf("BackTrackingBitset(%d), want: %v, got: %v", tc.idx, tc.want, got)
 		}

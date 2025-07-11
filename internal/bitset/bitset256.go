@@ -10,20 +10,18 @@
 // This implementation is heavily optimized for this internal use case.
 package bitset
 
-// can inline (*BitSet256).All with cost 47
 // can inline (*BitSet256).AsSlice with cost 42
+// can inline (*BitSet256).Bits with cost 47
 // can inline (*BitSet256).Clear with cost 12
 // can inline (*BitSet256).FirstSet with cost 79
-// can inline (*BitSet256).IntersectionCardinality with cost 53
-// can inline (*BitSet256).IntersectionTop with cost 42
+// can inline (*BitSet256).Intersects with cost 48
 // can inline (*BitSet256).Intersection with cost 53
-// can inline (*BitSet256).IntersectsAny with cost 48
+// can inline (*BitSet256).IntersectionTop with cost 42
 // can inline (*BitSet256).IsEmpty with cost 22
 // can inline (*BitSet256).NextSet with cost 65
 // can inline (*BitSet256).popcnt with cost 33
 // can inline (*BitSet256).Rank with cost 57
 // can inline (*BitSet256).Set with cost 12
-// can inline (*BitSet256).Size with cost 36
 // can inline (*BitSet256).Test with cost 15
 // can inline (*BitSet256).Union with cost 53
 
@@ -54,7 +52,7 @@ type BitSet256 [4]uint64
 
 // String implements fmt.Stringer.
 func (b *BitSet256) String() string {
-	return fmt.Sprintf("%v", b.All())
+	return fmt.Sprintf("%v", b.Bits())
 }
 
 // Set sets the bit.
@@ -116,8 +114,12 @@ func (b *BitSet256) NextSet(bit uint8) (next uint8, iok bool) {
 	return
 }
 
-// AsSlice returns all set bits as slice of uint8 without
-// heap allocations.
+// AsSlice returns a slice containing all set bits in the BitSet256.
+//
+// The bits are returned in ascending order as uint8 values. The provided buf
+// must be a pointer to an array of 256 uint8s; it is used as backing
+// storage for the result to avoid heap allocations. The returned slice shares
+// its backing array with buf and is only valid until buf is modified or reused.
 func (b *BitSet256) AsSlice(buf *[256]uint8) []uint8 {
 	size := 0
 	for wIdx, word := range b {
@@ -130,8 +132,17 @@ func (b *BitSet256) AsSlice(buf *[256]uint8) []uint8 {
 	return buf[:size]
 }
 
-// All returns all set bits. This has a simpler API but is slower than AsSlice.
-func (b *BitSet256) All() []uint8 {
+// Bits returns a slice containing all set bits in the BitSet256.
+//
+// The bits are returned in ascending order as uint8 values. Bits allocates
+// a new slice on the heap for the result. For allocation-free collection,
+// use [AsSlice] with a pre-allocated buffer.
+//
+// Example usage:
+//
+//	bits := b.Bits()
+//	// bits now contains the indices of all set bits in b
+func (b *BitSet256) Bits() []uint8 {
 	return b.AsSlice(&[256]uint8{})
 }
 
@@ -160,9 +171,9 @@ func (b *BitSet256) IsEmpty() bool {
 	return b[0]|b[1]|b[2]|b[3] == 0
 }
 
-// IntersectsAny returns true if the intersection of base set with the compare set
+// Intersects returns true if the intersection of base set with the compare set
 // is not the empty set.
-func (b *BitSet256) IntersectsAny(c *BitSet256) bool {
+func (b *BitSet256) Intersects(c *BitSet256) bool {
 	return b[0]&c[0] != 0 ||
 		b[1]&c[1] != 0 ||
 		b[2]&c[2] != 0 ||
@@ -189,22 +200,8 @@ func (b *BitSet256) Union(c *BitSet256) (bs BitSet256) {
 	return
 }
 
-// IntersectionCardinality computes the popcount of the intersection.
-func (b *BitSet256) IntersectionCardinality(c *BitSet256) (cnt int) {
-	cnt += bits.OnesCount64(b[0] & c[0])
-	cnt += bits.OnesCount64(b[1] & c[1])
-	cnt += bits.OnesCount64(b[2] & c[2])
-	cnt += bits.OnesCount64(b[3] & c[3])
-	return
-}
-
-// Size is the number of set bits (popcount).
-func (b *BitSet256) Size() int {
-	return b.popcnt()
-}
-
-// popcnt, count all the set bits
-func (b *BitSet256) popcnt() (cnt int) {
+// popcount is the number of set bits.
+func (b *BitSet256) popcount() (cnt int) {
 	cnt += bits.OnesCount64(b[0])
 	cnt += bits.OnesCount64(b[1])
 	cnt += bits.OnesCount64(b[2])
