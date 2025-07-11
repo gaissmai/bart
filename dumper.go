@@ -61,7 +61,7 @@ func (n *node[V]) dumpRec(w io.Writer, path stridePath, depth int, is4 bool) {
 	n.dump(w, path, depth, is4)
 
 	// the node may have childs, rec-descent down
-	for i, addr := range n.children.All() {
+	for i, addr := range n.children.Bits() {
 		path[depth&15] = addr
 
 		if child, ok := n.children.Items[i].(*node[V]); ok {
@@ -81,7 +81,7 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 
 	if nPfxCount := n.prefixes.Len(); nPfxCount != 0 {
 		// no heap allocs
-		allIndices := n.prefixes.All()
+		allIndices := n.prefixes.Bits()
 
 		// print the baseIndices for this node.
 		fmt.Fprintf(w, "%sindexs(#%d): %s\n", indent, nPfxCount, n.prefixes.String())
@@ -117,7 +117,7 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 		fringeAddrs := make([]uint8, 0, maxItems)
 
 		// the node has recursive child nodes or path-compressed leaves
-		for i, addr := range n.children.All() {
+		for i, addr := range n.children.Bits() {
 			switch n.children.Items[i].(type) {
 			case *node[V]:
 				childAddrs = append(childAddrs, addr)
@@ -287,7 +287,7 @@ func (n *node[V]) nodeStats() stats {
 	s.pfxs = n.prefixes.Len()
 	s.childs = n.children.Len()
 
-	for i := range n.children.All() {
+	for i := range n.children.Bits() {
 		switch n.children.Items[i].(type) {
 		case *node[V]:
 			s.nodes++
