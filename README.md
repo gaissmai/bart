@@ -30,6 +30,9 @@ lookup tables. The lookup is performed entirely by fast,
 cache-friendly bitmask operations, which in modern CPUs are performed
 by advanced bit manipulation instruction sets (POPCNT, LZCNT, TZCNT, ...).
 
+You should specify the CPU feature set when compiling, e.g. GOAMD64=v2 for 
+maximum performance, see also https://go.dev/wiki/MinimumRequirements#architectures
+
 The algorithm was specially developed so that it can always work with a fixed
 length of 256 bits. This means that the bitset fit very well in a cache line and
 that loops over the bitset in hot paths can be accelerated by loop unrolling, e.g.
@@ -43,9 +46,8 @@ func (b *BitSet256) popcnt() (cnt int) {
 	return
 }
 ```
-
-Perhaps a future Go version that supports SIMD instructions for the [4]uint64 vectors
-will make the algorithm even faster on suitable hardware.
+A future Go version that supports SIMD intrinsics for the `[4]uint64` vectors will
+probably allow the algorithm to be made even faster on suitable hardware.
 
 The BART algorithm is also excellent for determining whether two tables
 contain overlapping IP addresses, just in a few nanoseconds.
