@@ -225,6 +225,7 @@ func (n *node[V]) insertAtDepthPersist(pfx netip.Prefix, val V, depth int) (exis
 			continue // descend down to next trie level
 
 		case *leafNode[V]:
+			kid = kid.cloneLeaf()
 			// reached a path compressed prefix
 			// override value in slot if prefixes are equal
 			if kid.prefix == pfx {
@@ -244,6 +245,7 @@ func (n *node[V]) insertAtDepthPersist(pfx netip.Prefix, val V, depth int) (exis
 			n = newNode
 
 		case *fringeNode[V]:
+			kid = kid.cloneFringe()
 			// reached a path compressed fringe
 			// override value in slot if pfx is a fringe
 			if isFringe(depth, bits) {
