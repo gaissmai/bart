@@ -11,36 +11,35 @@ import (
 	"github.com/gaissmai/bart"
 )
 
-func ExampleLite_Contains() {
+var examplePrefixes = []string{
+	"192.168.0.0/16",
+	"192.168.1.0/24",
+	"2001:7c0:3100::/40",
+	"2001:7c0:3100:1::/64",
+	"fc00::/7",
+}
+
+// some example IP addresses for black/whitelist containment
+var exampleIPs = []string{
+	"192.168.1.100",      // must match
+	"192.168.2.1",        // must match
+	"2001:7c0:3100:1::1", // must match
+	"2001:7c0:3100:2::1", // must match
+	"fc00::1",            // must match
+	//
+	"172.16.0.1",        // must NOT match
+	"2003:dead:beef::1", // must NOT match
+}
+
+func ExampleLite_contains() {
 	lite := new(bart.Lite)
 
-	// Insert some prefixes
-	prefixes := []string{
-		"192.168.0.0/16",
-		"192.168.1.0/24",
-		"2001:7c0:3100::/40",
-		"2001:7c0:3100:1::/64",
-		"fc00::/7",
-	}
-
-	for _, s := range prefixes {
+	for _, s := range examplePrefixes {
 		pfx := netip.MustParsePrefix(s)
 		lite.Insert(pfx)
 	}
 
-	// Test some IP addresses for black/whitelist containment
-	ips := []string{
-		"192.168.1.100",      // must match
-		"192.168.2.1",        // must match
-		"2001:7c0:3100:1::1", // must match
-		"2001:7c0:3100:2::1", // must match
-		"fc00::1",            // must match
-		//
-		"172.16.0.1",        // must NOT match
-		"2003:dead:beef::1", // must NOT match
-	}
-
-	for _, s := range ips {
+	for _, s := range exampleIPs {
 		ip := netip.MustParseAddr(s)
 		ok := lite.Contains(ip)
 		fmt.Printf("%-20s is contained: %t\n", ip, ok)
