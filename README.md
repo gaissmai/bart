@@ -52,7 +52,12 @@ probably allow the algorithm to be made even faster on suitable hardware.
 The BART algorithm is also excellent for determining whether two tables
 contain overlapping IP addresses, just in a few nanoseconds.
 
-A `bart.Lite` wrapper is included, this is ideal for simple IP
+There is an example demonstrating how to use bart concurrently with multiple readers and writers.
+Readers can access the table lock-free, while writers synchronize using a mutex to ensure
+that only one writer can modify the table at a time.
+See the test `ExampleTable_concurrent` for a concrete example of this pattern.
+
+A `bart.Lite` wrapper is also included, this is ideal for simple IP
 ACLs (access-control-lists) with plain true/false results and no payload.
 
 ## Example
@@ -106,7 +111,7 @@ func ExampleLite_Contains() {
 ## API
 
 From release v0.18.x on, bart requires at least go1.23, the `iter.Seq2[netip.Prefix, V]` types for iterators
-are used. The lock-free versions of insert, update and delete are added, but still experimental.
+are used.
 
 ```golang
   import "github.com/gaissmai/bart"
