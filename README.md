@@ -54,7 +54,7 @@ contain overlapping IP addresses, just in a few nanoseconds.
 
 There is an example demonstrating how to use bart concurrently with multiple readers and writers.
 Readers can access the table lock-free, while writers synchronize using a mutex to ensure
-that only one writer can modify the table at a time.
+that only one writer can modify the table persistent at a time.
 See the test `ExampleTable_concurrent` for a concrete example of this pattern.
 
 A `bart.Lite` wrapper is also included, this is ideal for simple IP
