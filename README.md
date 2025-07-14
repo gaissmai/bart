@@ -57,6 +57,9 @@ Readers can access the table lock-free, while writers synchronize using a mutex 
 that only one writer can modify the table persistent at a time.
 See the test `ExampleTable_concurrent` for a concrete example of this pattern.
 
+**ATTENTION**: The lock-free implementation using the ...Persist() methods is still in an
+early stage and has not been fully tested yet. It is not recommended for production use at this time.
+
 A `bart.Lite` wrapper is also included, this is ideal for simple IP
 ACLs (access-control-lists) with plain true/false results and no payload.
 
