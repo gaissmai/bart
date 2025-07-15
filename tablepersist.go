@@ -91,7 +91,7 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 	n := pt.rootNodeByVersion(is4)
 
 	// clone the root of insertion path
-	*n = *(n.cloneFlat())
+	*n = *n.cloneFlat()
 
 	maxDepth, lastBits := maxDepthAndLastBits(bits)
 
@@ -128,15 +128,18 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 		// kid is node or leaf at addr
 		switch kid := kid.(type) {
 		case *node[V]:
-			// proceed to next level
+			// clone the traversed path
+
+			// kid points now to cloned kid
 			kid = kid.cloneFlat()
+
+			// replace kid with clone
 			n.children.InsertAt(addr, kid)
+
 			n = kid
 			continue // descend down to next trie level
 
 		case *leafNode[V]:
-			kid = kid.cloneLeaf()
-
 			// update existing value if prefixes are equal
 			if kid.prefix == pfx {
 				newVal = cb(kid.value, true)
@@ -156,8 +159,6 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 			n = newNode
 
 		case *fringeNode[V]:
-			kid = kid.cloneFringe()
-
 			// update existing value if prefix is fringe
 			if isFringe(depth, bits) {
 				newVal = cb(kid.value, true)
@@ -265,15 +266,18 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, e
 		// kid is node or leaf at addr
 		switch kid := kid.(type) {
 		case *node[V]:
-			// proceed to next level
+			// clone the traversed path
+
+			// kid points now to cloned kid
 			kid = kid.cloneFlat()
+
+			// replace kid with clone
 			n.children.InsertAt(addr, kid)
+
 			n = kid
 			continue // descend down to next trie level
 
 		case *fringeNode[V]:
-			kid = kid.cloneFringe()
-
 			// reached a path compressed fringe, stop traversing
 			if !isFringe(depth, bits) {
 				// nothing to delete
@@ -286,12 +290,9 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, e
 			pt.sizeUpdate(is4, -1)
 			n.purgeAndCompress(stack[:depth], octets, is4)
 
-			// kid.value is cloned
 			return pt, kid.value, true
 
 		case *leafNode[V]:
-			kid = kid.cloneLeaf()
-
 			// reached a path compressed prefix, stop traversing
 			if kid.prefix != pfx {
 				// nothing to delete
@@ -304,7 +305,6 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, e
 			pt.sizeUpdate(is4, -1)
 			n.purgeAndCompress(stack[:depth], octets, is4)
 
-			// kid.value is cloned
 			return pt, kid.value, true
 
 		default:

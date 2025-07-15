@@ -1950,21 +1950,21 @@ func TestUpdatePersistCompare(t *testing.T) {
 	prng := rand.New(rand.NewPCG(42, 42))
 
 	pfxs := randomPrefixes(prng, 10_000)
-	immu := new(Table[int])
-	bart := new(Table[int])
+	imu := new(Table[int])
+	mut := new(Table[int])
 
 	// Update as insert
 	for _, pfx := range pfxs {
-		immu, _ = immu.UpdatePersist(pfx.pfx, func(int, bool) int { return pfx.val })
-		bart.Update(pfx.pfx, func(int, bool) int { return pfx.val })
+		imu, _ = imu.UpdatePersist(pfx.pfx, func(int, bool) int { return pfx.val })
+		mut.Update(pfx.pfx, func(int, bool) int { return pfx.val })
 	}
 
 	for _, pfx := range pfxs {
-		immuVal, immuOK := immu.Get(pfx.pfx)
-		bartVal, bartOK := bart.Get(pfx.pfx)
+		imuVal, imuOk := imu.Get(pfx.pfx)
+		mutVal, mutOk := mut.Get(pfx.pfx)
 
-		if !getsEqual(bartVal, bartOK, immuVal, immuOK) {
-			t.Fatalf("Get(%q) = (%v, %v), want (%v, %v)", pfx.pfx, immuVal, immuOK, bartVal, bartOK)
+		if !getsEqual(mutVal, mutOk, imuVal, imuOk) {
+			t.Fatalf("Get(%q) = (%v, %v), want (%v, %v)", pfx.pfx, imuVal, imuOk, mutVal, mutOk)
 		}
 	}
 
@@ -1972,13 +1972,13 @@ func TestUpdatePersistCompare(t *testing.T) {
 
 	// Update as update
 	for _, pfx := range pfxs[:len(pfxs)/2] {
-		immu, _ = immu.UpdatePersist(pfx.pfx, cb)
-		bart.Update(pfx.pfx, cb)
+		imu, _ = imu.UpdatePersist(pfx.pfx, cb)
+		mut.Update(pfx.pfx, cb)
 	}
 
 	for _, pfx := range pfxs {
-		bartVal, bartOK := bart.Get(pfx.pfx)
-		immuVal, immuOK := immu.Get(pfx.pfx)
+		bartVal, bartOK := mut.Get(pfx.pfx)
+		immuVal, immuOK := imu.Get(pfx.pfx)
 
 		if !getsEqual(bartVal, bartOK, immuVal, immuOK) {
 			t.Fatalf("Get(%q) = (%v, %v), want (%v, %v)", pfx.pfx, immuVal, immuOK, bartVal, bartOK)
