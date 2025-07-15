@@ -218,9 +218,14 @@ func (n *node[V]) insertAtDepthPersist(pfx netip.Prefix, val V, depth int) (exis
 		// kid is node or leaf at addr
 		switch kid := kid.(type) {
 		case *node[V]:
-			// proceed to next level
+			// clone the traversed path
+
+			// kid points now to cloned kid
 			kid = kid.cloneFlat()
+
+			// replace kid with clone
 			n.children.InsertAt(octet, kid)
+
 			n = kid
 			continue // descend down to next trie level
 
