@@ -74,22 +74,18 @@ func (l *Lite) Overlaps(o *Lite) bool {
 	return l.Table.Overlaps(&o.Table)
 }
 
-// Deprecated: Update is pointless without payload and panics.
 func (l *Lite) Update() {
 	panic("Update is pointless without payload")
 }
 
-// Deprecated: UpdatePersist is pointless without payload and panics.
 func (l *Lite) UpdatePersist() {
 	panic("UpdatePersist is pointless without payload")
 }
 
-// Deprecated: GetAndDelete is pointless without payload and panics.
 func (l *Lite) GetAndDelete() {
 	panic("GetAndDelete is pointless without payload")
 }
 
-// Deprecated: GetAndDeletePersist is pointless without payload and panics.
 func (l *Lite) GetAndDeletePersist() {
 	panic("GetAndDeletePersist is pointless without payload")
 }
