@@ -52,62 +52,16 @@ probably allow the algorithm to be made even faster on suitable hardware.
 The BART algorithm is also excellent for determining whether two tables
 contain overlapping IP addresses, just in a few nanoseconds.
 
-There is an example demonstrating how to use bart concurrently with multiple readers and writers.
-Readers can access the table lock-free, while writers synchronize using a mutex to ensure
-that only one writer can modify the table persistent at a time.
-See the `ExampleTable_concurrent` test for a concrete example of this pattern.
+## lock-free concurrency
 
-A `bart.Lite` wrapper is also included, this is ideal for simple IP
-ACLs (access-control-lists) with plain true/false results and no payload.
+There are examples demonstrating how to use bart concurrently with multiple readers and writers.
+Readers can access the table always lock-free, while writers may synchronize using a mutex to ensure
+that only one writer can modify the table persistent at a time, not using Compare-and-Swap (CAS)
+with all the known problems for multiple long-running writers.
+But as always, it depends on the specific use case.
 
-## Example
+See the `ExampleLite_concurrent` and `ExampleTable_concurrent` tests for concrete examples of this pattern.
 
-```golang
-func ExampleLite_Contains() {
-	lite := new(bart.Lite)
-
-	// Insert some prefixes
-	prefixes := []string{
-		"192.168.0.0/16",
-		"192.168.1.0/24",
-		"2001:7c0:3100::/40",
-		"2001:7c0:3100:1::/64",
-		"fc00::/7",
-	}
-
-	for _, s := range prefixes {
-		pfx := netip.MustParsePrefix(s)
-		lite.Insert(pfx)
-	}
-
-	// Test some IP addresses for black/whitelist containment
-	ips := []string{
-		"192.168.1.100",      // must match
-		"192.168.2.1",        // must match
-		"2001:7c0:3100:1::1", // must match
-		"2001:7c0:3100:2::1", // must match
-		"fc00::1",            // must match
-		//
-		"172.16.0.1",        // must NOT match
-		"2003:dead:beef::1", // must NOT match
-	}
-
-	for _, s := range ips {
-		ip := netip.MustParseAddr(s)
-		ok := lite.Contains(ip)
-		fmt.Printf("%-20s is contained: %t\n", ip, ok)
-	}
-
-	// Output:
-	// 192.168.1.100        is contained: true
-	// 192.168.2.1          is contained: true
-	// 2001:7c0:3100:1::1   is contained: true
-	// 2001:7c0:3100:2::1   is contained: true
-	// fc00::1              is contained: true
-	// 172.16.0.1           is contained: false
-	// 2003:dead:beef::1    is contained: false
-}
-```
 ## API
 
 From release v0.18.x on, bart requires at least go1.23, the `iter.Seq2[netip.Prefix, V]` types for iterators
@@ -178,6 +132,35 @@ are used.
 
   func (t *Table[V]) DumpList4() []DumpListNode[V]
   func (t *Table[V]) DumpList6() []DumpListNode[V]
+```
+
+A `bart.Lite` wrapper is also included, this is ideal for simple IP
+ACLs (access-control-lists) with plain true/false results and no payload.
+Lite is just a convenience wrapper for Table, instantiated with an empty
+struct as payload.
+
+Lite wraps some methods where needed or delegates almost all other methods unmodified
+to the underlying Table.
+
+```golang
+   type Lite struct {
+   	 Table[struct{}]
+   }
+   func (l *Lite) Exists(pfx netip.Prefix) bool
+
+   func (l *Lite) Insert(pfx netip.Prefix)
+   func (l *Lite) Delete(pfx netip.Prefix)
+
+   func (l *Lite) InsertPersist(pfx netip.Prefix) *Lite
+   func (l *Lite) DeletePersist(pfx netip.Prefix) *Lite
+
+   func (l *Lite) Union(o *Lite)
+   func (l *Lite) Clone() *Lite
+
+   func (l *Lite) Overlaps(o *Lite) bool
+   func (l *Lite) Overlaps4(o *Lite) bool
+   func (l *Lite) Overlaps6(o *Lite) bool
+   
 ```
 
 ## benchmarks
