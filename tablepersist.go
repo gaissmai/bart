@@ -27,22 +27,25 @@ func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V] {
 		return t
 	}
 
+	// canonicalize prefix
+	pfx = pfx.Masked()
+	is4 := pfx.Addr().Is4()
+
 	pt := &Table[V]{
-		root4: t.root4,
-		root6: t.root6,
 		size4: t.size4,
 		size6: t.size6,
 	}
 
-	// canonicalize prefix
-	pfx = pfx.Masked()
-
-	is4 := pfx.Addr().Is4()
+	// clone or copy root node
+	if is4 {
+		pt.root4 = *t.root4.cloneFlat()
+		pt.root6 = t.root6
+	} else {
+		pt.root4 = t.root4
+		pt.root6 = *t.root6.cloneFlat()
+	}
 
 	n := pt.rootNodeByVersion(is4)
-
-	// clone the root of insertion path
-	*n = *n.cloneFlat()
 
 	// clone nodes along the insertion path
 	if n.insertAtDepthPersist(pfx, val, 0) {
@@ -82,20 +85,23 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 	bits := pfx.Bits()
 
 	pt = &Table[V]{
-		root4: t.root4,
-		root6: t.root6,
 		size4: t.size4,
 		size6: t.size6,
 	}
 
-	n := pt.rootNodeByVersion(is4)
-
-	// clone the root of insertion path
-	*n = *n.cloneFlat()
+	// clone or copy root node
+	if is4 {
+		pt.root4 = *t.root4.cloneFlat()
+		pt.root6 = t.root6
+	} else {
+		pt.root4 = t.root4
+		pt.root6 = *t.root6.cloneFlat()
+	}
 
 	maxDepth, lastBits := maxDepthAndLastBits(bits)
-
 	octets := ip.AsSlice()
+
+	n := pt.rootNodeByVersion(is4)
 
 	// find the proper trie node to update prefix
 	for depth, octet := range octets {
@@ -219,24 +225,27 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, e
 	bits := pfx.Bits()
 
 	pt = &Table[V]{
-		root4: t.root4,
-		root6: t.root6,
 		size4: t.size4,
 		size6: t.size6,
 	}
 
-	n := pt.rootNodeByVersion(is4)
-
-	// clone the root of insertion path
-	*n = *n.cloneFlat()
+	// clone or copy root node
+	if is4 {
+		pt.root4 = *t.root4.cloneFlat()
+		pt.root6 = t.root6
+	} else {
+		pt.root4 = t.root4
+		pt.root6 = *t.root6.cloneFlat()
+	}
 
 	maxDepth, lastBits := maxDepthAndLastBits(bits)
-
 	octets := ip.AsSlice()
 
 	// record path to deleted node
 	// needed to purge and/or path compress nodes after deletion
 	stack := [maxTreeDepth]*node[V]{}
+
+	n := pt.rootNodeByVersion(is4)
 
 	// find the trie node
 	for depth, octet := range octets {
