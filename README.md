@@ -139,14 +139,17 @@ ACLs (access-control-lists) with plain true/false results and no payload.
 Lite is just a convenience wrapper for Table, instantiated with an empty
 struct as payload.
 
-Lite wraps some methods where needed or delegates almost all other methods unmodified
-to the underlying Table.
+Lite wraps ore adapts some methods where needed or delegates almost all
+other methods unmodified to the underlying Table.
+Some delegated methods are pointless without a payload.
 
 ```golang
    type Lite struct {
    	 Table[struct{}]
    }
+
    func (l *Lite) Exists(pfx netip.Prefix) bool
+   func (l *Lite) Contains(pfx netip.Prefix) bool
 
    func (l *Lite) Insert(pfx netip.Prefix)
    func (l *Lite) Delete(pfx netip.Prefix)
