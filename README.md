@@ -139,7 +139,7 @@ ACLs (access-control-lists) with plain true/false results and no payload.
 Lite is just a convenience wrapper for Table, instantiated with an empty
 struct as payload.
 
-Lite wraps ore adapts some methods where needed or delegates almost all
+Lite wraps or adapts some methods where needed or delegates almost all
 other methods unmodified to the underlying Table.
 Some delegated methods are pointless without a payload.
 
