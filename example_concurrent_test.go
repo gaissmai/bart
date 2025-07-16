@@ -88,32 +88,28 @@ func (lf *SyncTable[V]) Delete(pfx netip.Prefix) {
 // just a very stupid example of a payload
 // #######################################
 
-// payload with embedded pointer
-type payload struct {
-	ptr *int
+// testVal is a sample value type.
+// We use *testVal as the generic type V, which is a pointer type,
+// so it must implement Cloner[*testVal].
+type testVal struct {
+	data int
 }
 
-// Clone implements [bart.Cloner]
-func (p payload) Clone() payload {
-	if p.ptr == nil {
+// Clone ensures deep copying for use with ...Persist.
+func (v *testVal) Clone() *testVal {
+	if v == nil {
+		return nil
+	}
+	return &testVal{data: v.data}
+}
+
+// example callback for Update, just decrement data
+var cb = func(p *testVal, ok bool) *testVal {
+	if ok && p != nil {
+		p.data--
 		return p
 	}
-
-	// deep copy
-	clone := *p.ptr
-	return payload{ptr: &clone}
-}
-
-// example callback for Update, decrement
-var cb = func(p payload, _ bool) payload {
-	if p.ptr == nil {
-		val := 0
-		p.ptr = &val
-	}
-
-	*(p.ptr)--
-
-	return p
+	return &testVal{data: -1}
 }
 
 // #######################################
@@ -125,7 +121,7 @@ var cb = func(p payload, _ bool) payload {
 func ExampleTable_concurrent() {
 	wg := sync.WaitGroup{}
 
-	syncTbl := NewSyncTable[payload]()
+	syncTbl := NewSyncTable[*testVal]()
 
 	wg.Add(1)
 	go func() {
@@ -141,21 +137,33 @@ func ExampleTable_concurrent() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for _, s := range examplePrefixes {
-			start := 0
-			p := payload{ptr: &start}
-
-			pfx := netip.MustParsePrefix(s)
-			syncTbl.Insert(pfx, p)
+		for range 10_000 {
+			for _, s := range examplePrefixes {
+				pfx := netip.MustParsePrefix(s)
+				syncTbl.Insert(pfx, &testVal{data: 0})
+			}
 		}
 	}()
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for _, s := range examplePrefixes {
-			pfx := netip.MustParsePrefix(s)
-			syncTbl.Update(pfx, cb)
+		for range 10_000 {
+			for _, s := range examplePrefixes {
+				pfx := netip.MustParsePrefix(s)
+				syncTbl.Update(pfx, cb)
+			}
+		}
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for range 10_000 {
+			for _, s := range examplePrefixes {
+				pfx := netip.MustParsePrefix(s)
+				syncTbl.Delete(pfx)
+			}
 		}
 	}()
 
