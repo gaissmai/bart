@@ -3,17 +3,22 @@
 
 package bart
 
-import "net/netip"
+import (
+	"net/netip"
+)
 
 // Lite is just a convenience wrapper for Table, instantiated with an
 // empty struct as payload. Lite is ideal for simple IP ACLs
 // (access-control-lists) with plain true/false results without a payload.
 //
-// Lite delegates almost all methods unmodified to the underlying Table.
-//
-// Some of the Table methods make no sense without a payload.
-// Their signature has been changed and they do not accept any arguments
-// and if they are used anyway, they will generate a panic.
+// Lite delegates or adapts all methods to the embedded table.
+// The following methods are pointless without a payload:
+//   - Lookup (use Contains)
+//   - Get (use Exists)
+//   - GetAndDelete
+//   - GetAndDeletePersist
+//   - Update
+//   - UpdatePersist
 type Lite struct {
 	Table[struct{}]
 }
@@ -25,67 +30,58 @@ func (l *Lite) Exists(pfx netip.Prefix) bool {
 	return ok
 }
 
-// Insert a pfx into the tree.
+// Contains is a wrapper for the underlying table.
+func (l *Lite) Contains(ip netip.Addr) bool {
+	return l.Table.Contains(ip)
+}
+
+// Insert is an adapter for the underlying table.
 func (l *Lite) Insert(pfx netip.Prefix) {
 	l.Table.Insert(pfx, struct{}{})
 }
 
-// InsertPersist is similar to Insert but the receiver isn't modified.
+// InsertPersist is an adapter for the underlying table.
 func (l *Lite) InsertPersist(pfx netip.Prefix) *Lite {
 	tbl := l.Table.InsertPersist(pfx, struct{}{})
 	//nolint:govet // copy of *tbl is here by intention
 	return &Lite{*tbl}
 }
 
-// DeletePersist is similar to Delete but the receiver isn't modified.
+// Delete is a wrapper for the underlying table.
+func (l *Lite) Delete(pfx netip.Prefix) {
+	l.Table.Delete(pfx)
+}
+
+// DeletePersist is an adapter for the underlying table.
 func (l *Lite) DeletePersist(pfx netip.Prefix) *Lite {
 	tbl := l.Table.DeletePersist(pfx)
 	//nolint:govet // copy of *tbl is here by intention
 	return &Lite{*tbl}
 }
 
-// Clone returns a copy of the routing table.
+// Clone is an adapter for the underlying table.
 func (l *Lite) Clone() *Lite {
 	tbl := l.Table.Clone()
 	//nolint:govet // copy of *tbl is here by intention
 	return &Lite{*tbl}
 }
 
-// Union combines two tables, changing the receiver table.
+// Union is an adapter for the underlying table.
 func (l *Lite) Union(o *Lite) {
 	l.Table.Union(&o.Table)
 }
 
-// Overlaps4 reports whether any IPv4 in the table matches a route in the
-// other table or vice versa.
+// Overlaps4 is an adapter for the underlying table.
 func (l *Lite) Overlaps4(o *Lite) bool {
 	return l.Table.Overlaps4(&o.Table)
 }
 
-// Overlaps6 reports whether any IPv6 in the table matches a route in the
-// other table or vice versa.
+// Overlaps6 is an adapter for the underlying table.
 func (l *Lite) Overlaps6(o *Lite) bool {
 	return l.Table.Overlaps6(&o.Table)
 }
 
-// Overlaps reports whether any IP in the table matches a route in the
-// other table or vice versa.
+// Overlaps is an adapter for the underlying table.
 func (l *Lite) Overlaps(o *Lite) bool {
 	return l.Table.Overlaps(&o.Table)
-}
-
-func (l *Lite) Update() {
-	panic("Update is pointless without payload")
-}
-
-func (l *Lite) UpdatePersist() {
-	panic("UpdatePersist is pointless without payload")
-}
-
-func (l *Lite) GetAndDelete() {
-	panic("GetAndDelete is pointless without payload")
-}
-
-func (l *Lite) GetAndDeletePersist() {
-	panic("GetAndDeletePersist is pointless without payload")
 }

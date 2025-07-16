@@ -11,64 +11,6 @@ import (
 
 // ############ tests ################################
 
-func TestLiteDeprecated(t *testing.T) {
-	t.Parallel()
-
-	var testname string
-
-	testname = "Update"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r == nil {
-				t.Fatalf("Lite.%s is deprecated, should panic", testname)
-			}
-		}(testname)
-
-		tbl := new(Lite)
-		tbl.Update()
-	})
-
-	testname = "UpdatePersist"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r == nil {
-				t.Fatalf("Lite.%s is deprecated, should panic", testname)
-			}
-		}(testname)
-
-		tbl := new(Lite)
-		tbl.UpdatePersist()
-	})
-
-	testname = "GetAndDelete"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r == nil {
-				t.Fatalf("Lite.%s is deprecated, should panic", testname)
-			}
-		}(testname)
-
-		tbl := new(Lite)
-		tbl.GetAndDelete()
-	})
-
-	testname = "GetAndDeletePersist"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r == nil {
-				t.Fatalf("Lite.%s is deprecated, should panic", testname)
-			}
-		}(testname)
-
-		tbl := new(Lite)
-		tbl.GetAndDeletePersist()
-	})
-}
-
 func TestLiteInvalid(t *testing.T) {
 	t.Parallel()
 
