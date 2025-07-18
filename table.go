@@ -45,7 +45,8 @@ import (
 // A Table must not be copied by value.
 type Table[V any] struct {
 	// used by -copylocks checker from `go vet`.
-	_ [0]sync.Mutex
+	_    [0]sync.Mutex
+	pool *pool[V]
 
 	// the root nodes, implemented as popcount compressed multibit tries
 	root4 node[V]
@@ -54,6 +55,25 @@ type Table[V any] struct {
 	// the number of prefixes in the routing table
 	size4 int
 	size6 int
+}
+
+// WithPool initializes and associates a new node pool with the Table
+// if it doesn't already have one.
+//
+// If the Table's pool is already set, it returns the Table unchanged.
+// Otherwise, it creates a new node pool for nodes of type V, assigns it to the Table,
+// and returns the updated Table.
+//
+// This method enables the Table to reuse node instances to reduce allocations and
+// improve performance.
+func (t *Table[V]) WithPool() *Table[V] {
+	if t.pool != nil {
+		return t
+	}
+
+	// make new sync.Pool
+	t.pool = newNodePool[V]()
+	return t
 }
 
 // rootNodeByVersion, root node getter for ip version.
@@ -120,7 +140,7 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	is4 := pfx.Addr().Is4()
 	n := t.rootNodeByVersion(is4)
 
-	if exists := n.insertAtDepth(pfx, val, 0); exists {
+	if exists := n.insertAtDepth(t.pool, pfx, val, 0); exists {
 		return
 	}
 
@@ -193,8 +213,8 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 			// push the leaf down
 			// insert new child at current leaf position (octet
 			// descend down, replace n with new child
-			newNode := new(node[V])
-			newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
+			newNode := t.pool.Get()
+			newNode.insertAtDepth(t.pool, kid.prefix, kid.value, depth+1)
 
 			n.children.InsertAt(octet, newNode)
 			n = newNode
@@ -210,7 +230,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 			// push the fringe down, it becomes a default route (idx=1)
 			// insert new child at current leaf position (octet
 			// descend down, replace n with new child
-			newNode := new(node[V])
+			newNode := t.pool.Get()
 			newNode.prefixes.InsertAt(1, kid.value)
 
 			n.children.InsertAt(octet, newNode)
@@ -271,7 +291,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 			}
 
 			t.sizeUpdate(is4, -1)
-			n.purgeAndCompress(stack[:depth], octets, is4)
+			n.purgeAndCompress(t.pool, stack[:depth], octets, is4)
 			return val, true
 		}
 
@@ -296,7 +316,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 			n.children.DeleteAt(octet)
 
 			t.sizeUpdate(is4, -1)
-			n.purgeAndCompress(stack[:depth], octets, is4)
+			n.purgeAndCompress(t.pool, stack[:depth], octets, is4)
 
 			return kid.value, true
 
@@ -310,7 +330,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 			n.children.DeleteAt(octet)
 
 			t.sizeUpdate(is4, -1)
-			n.purgeAndCompress(stack[:depth], octets, is4)
+			n.purgeAndCompress(t.pool, stack[:depth], octets, is4)
 
 			return kid.value, true
 
@@ -853,8 +873,8 @@ func (t *Table[V]) Overlaps6(o *Table[V]) bool {
 // If there are duplicate entries, the payload of type V is shallow copied from the other table.
 // If type V implements the [Cloner] interface, the values are cloned, see also [Table.Clone].
 func (t *Table[V]) Union(o *Table[V]) {
-	dup4 := t.root4.unionRec(&o.root4, 0)
-	dup6 := t.root6.unionRec(&o.root6, 0)
+	dup4 := t.root4.unionRec(t.pool, &o.root4, 0)
+	dup6 := t.root6.unionRec(t.pool, &o.root6, 0)
 
 	t.size4 += o.size4 - dup4
 	t.size6 += o.size6 - dup6
@@ -876,8 +896,8 @@ func (t *Table[V]) Clone() *Table[V] {
 
 	c := new(Table[V])
 
-	c.root4 = *t.root4.cloneRec()
-	c.root6 = *t.root6.cloneRec()
+	c.root4 = *t.root4.cloneRec(t.pool)
+	c.root6 = *t.root6.cloneRec(t.pool)
 
 	c.size4 = t.size4
 	c.size6 = t.size6
