@@ -11,7 +11,18 @@ import (
 	"github.com/gaissmai/bart/internal/bitset"
 )
 
-// overlaps returns true if any IP in the nodes n or o overlaps.
+// overlaps recursively compares two trie nodes and returns true
+// if any of their prefixes or descendants overlap.
+//
+// The implementation checks for:
+// 1. Direct overlapping prefixes on this node level
+// 2. Prefixes in one node overlapping with children in the other
+// 3. Matching child addresses in both nodes, which are recursively compared
+//
+// All 12 possible type combinations for child entries (node, leaf, fringe) are supported.
+//
+// The function is optimized for early exit on first match and uses heuristics to
+// choose between set-based and loop-based matching for performance.
 func (n *node[V]) overlaps(o *node[V], depth int) bool {
 	nPfxCount := n.prefixes.Len()
 	oPfxCount := o.prefixes.Len()
@@ -77,7 +88,11 @@ func (n *node[V]) overlaps(o *node[V], depth int) bool {
 	return n.overlapsSameChildren(o, depth)
 }
 
-// overlapsRoutes, test if n overlaps o prefixes and vice versa
+// overlapsRoutes compares the prefix sets of two nodes (n and o).
+//
+// It first checks for direct bitset intersection (identical indices),
+// then walks both prefix sets using lpmTest to detect if any
+// of the n-prefixes is contained in o, or vice versa.
 func (n *node[V]) overlapsRoutes(o *node[V]) bool {
 	// some prefixes are identical, trivial overlap
 	if n.prefixes.Intersects(&o.prefixes.BitSet256) {
@@ -133,7 +148,14 @@ func (n *node[V]) overlapsRoutes(o *node[V]) bool {
 	return false
 }
 
-// overlapsChildrenIn, test if prefixes in n overlaps child octets in o.
+// overlapsChildrenIn checks whether the prefixes in node n
+// overlap with any children (by address range) in node o.
+//
+// Uses bitset intersection or manual iteration heuristically,
+// depending on prefix and child count.
+//
+// Bitset-based matching uses precomputed coverage tables
+// to avoid per-address looping. This is critical for high fan-out nodes.
 func (n *node[V]) overlapsChildrenIn(o *node[V]) bool {
 	pfxCount := n.prefixes.Len()
 	childCount := o.children.Len()
@@ -172,7 +194,12 @@ func (n *node[V]) overlapsChildrenIn(o *node[V]) bool {
 	return hostRoutes.Intersects(&o.children.BitSet256)
 }
 
-// overlapsSameChildren, find same octets with bitset intersection.
+// overlapsSameChildren compares all matching child addresses (octets)
+// between node n and node o recursively.
+//
+// For each shared address, the corresponding child nodes (of any type)
+// are compared using overlapsTwoChilds, which handles all
+// node/leaf/fringe combinations.
 func (n *node[V]) overlapsSameChildren(o *node[V], depth int) bool {
 	// intersect the child bitsets from n with o
 	commonChildren := n.children.Intersection(&o.children.BitSet256)
@@ -199,7 +226,14 @@ func (n *node[V]) overlapsSameChildren(o *node[V], depth int) bool {
 	return false
 }
 
-// overlapsTwoChilds, childs can be node or leaf.
+// overlapsTwoChilds checks two child entries for semantic overlap.
+//
+// Handles all 3×3 combinations of node kinds (node, leaf, fringe).
+//
+// Recurses into subtrees for (node, node), delegates to overlapsPrefixAtDepth
+// for node/leaf mismatches, and returns true immediately if either side is fringe.
+//
+// Supports path-compressed routing structures without requiring full expansion.
 func overlapsTwoChilds[V any](nChild, oChild any, depth int) bool {
 	//  3x3 possible different combinations for n and o
 	//
@@ -252,6 +286,20 @@ func overlapsTwoChilds[V any](nChild, oChild any, depth int) bool {
 // starting with prefix octet at depth.
 //
 // Needed for path compressed prefix some level down in the node trie.
+
+// overlapsPrefixAtDepth returns true if any route in the subtree rooted at this node
+// overlaps with the given pfx, starting the comparison at the specified depth.
+//
+// This function supports structural overlap detection even in compressed or sparse
+// paths within the trie, including fringe and leaf nodes. Matching is directional:
+// it returns true if a route fully covers pfx, or if pfx covers an existing route.
+//
+// At each step, it checks for visible prefixes and children that may intersect the
+// target prefix via stride-based longest-prefix test. The walk terminates early as
+// soon as a structural overlap is found.
+//
+// This function underlies the top-level OverlapsPrefix behavior and handles details of
+// trie traversal across varying prefix lengths and compression levels.
 func (n *node[V]) overlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
 	ip := pfx.Addr()
 	bits := pfx.Bits()
@@ -300,7 +348,18 @@ func (n *node[V]) overlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
 	panic("unreachable: " + pfx.String())
 }
 
-// overlapsIdx returns true if node overlaps with prefix.
+// overlapsIdx returns true if the given prefix index overlaps with any entry in this node.
+//
+// The overlap detection considers three categories:
+//
+//  1. Whether any stored prefix in this node covers the requested prefix (LPM test)
+//  2. Whether the requested prefix covers any stored route in the node
+//  3. Whether the requested prefix overlaps with any fringe or child entry
+//
+// Internally, it leverages precomputed bitsets from the allotment model,
+// using fast bitwise set intersections instead of explicit range comparisons.
+// This enables high-performance overlap checks on a single stride level
+// without descending further into the trie.
 func (n *node[V]) overlapsIdx(idx uint8) bool {
 	// 1. Test if any route in this node overlaps prefix?
 	if n.lpmTest(uint(idx)) {
