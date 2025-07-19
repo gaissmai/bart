@@ -65,11 +65,13 @@ type node[V any] struct {
 func (n *node[V]) reset() {
 	// clear prefixes
 	n.prefixes.BitSet256 = bitset.BitSet256{}
-	n.prefixes.Items = n.prefixes.Items[:0]
+	clear(n.prefixes.Items)                 // set items to zero
+	n.prefixes.Items = n.prefixes.Items[:0] // keep capacity
 
 	// clear children (without recursing)
 	n.children.BitSet256 = bitset.BitSet256{}
-	n.children.Items = n.children.Items[:0]
+	clear(n.children.Items)                 // set items to zero
+	n.children.Items = n.children.Items[:0] // keep capacity
 }
 
 // isEmpty returns true if node has neither prefixes nor children

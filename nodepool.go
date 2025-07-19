@@ -37,7 +37,7 @@ func (p *pool[V]) Get() *node[V] {
 	if p == nil {
 		return new(node[V])
 	}
-	p.currentLive.Add(1)
+	p.currentLive.Add(1) // debug stats
 	return p.Pool.Get().(*node[V])
 }
 
@@ -50,8 +50,8 @@ func (p *pool[V]) Put(n *node[V]) {
 	if p == nil {
 		return
 	}
-	n.reset() // clean prefixes and children
-	p.currentLive.Add(-1)
+	n.reset()             // clean prefixes and children
+	p.currentLive.Add(-1) // debug stats
 	p.Pool.Put(n)
 }
 

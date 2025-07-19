@@ -1,43 +1,42 @@
 package bart
 
 import (
-	"net/netip"
+	"math/rand/v2"
 	"testing"
 )
 
 func TestTablePool_InsertDelete_ReusesTrieNodes(t *testing.T) {
+	t.Parallel()
+
 	type Value string
 
-	tbl := &Table[Value]{}
-	tbl.WithPool()
+	tbl := new(Table[Value]).WithPool()
 
 	// Insert multiple prefixes that cause new trie nodes to be created.
-	// These routes diverge — resulting in logically separate paths
-	// in the multibit trie beyond the root node.
-	prefixes := []netip.Prefix{
-		netip.MustParsePrefix("10.0.0.0/8"),
-		netip.MustParsePrefix("10.1.0.0/16"),
-	}
+	prng := rand.New(rand.NewPCG(42, 42))
+	pfxs := randomRealWorldPrefixes(prng, 500_000)
 
-	for _, pfx := range prefixes {
+	for _, pfx := range pfxs {
 		tbl.Insert(pfx, Value("route-"+pfx.String()))
 	}
-	t.Log(tbl.dumpString())
 
 	liveAfterInsert, totalAfterInsert := tbl.pool.Stats()
 	t.Logf("after insert: live: %d, total: %d", liveAfterInsert, totalAfterInsert)
 
 	if totalAfterInsert == 0 {
-		t.Errorf("expected at least one node allocated after insert #%d", len(prefixes))
+		t.Errorf("expected at least one node allocated after insert #%d", len(pfxs))
 	}
 	if liveAfterInsert == 0 {
-		t.Errorf("expected at least one node live after insert #%d", len(prefixes))
+		t.Errorf("expected at least one node live after insert #%d", len(pfxs))
 	}
 
-	// Delete the same prefixes
-	for _, pfx := range prefixes {
+	// Delete the same prefixes, shuffeled
+	prng.Shuffle(len(pfxs), func(i, j int) {
+		pfxs[i], pfxs[j] = pfxs[j], pfxs[i]
+	})
+
+	for _, pfx := range pfxs {
 		tbl.Delete(pfx)
-		t.Log(tbl.dumpString())
 	}
 
 	// Check pool stats after deletes
