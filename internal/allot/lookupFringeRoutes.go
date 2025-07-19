@@ -5,22 +5,12 @@ package allot
 
 import "github.com/gaissmai/bart/internal/bitset"
 
-// IdxToFringeRoutes as precalculated bitsets,
+// IdxToFringeRoutes returns the precomputed BitSet for a base index,
+// representing all more specific baseIndices (i.e., subprefixes) covered
+// by this index in the binary prefix tree.
 //
-// Map the baseIndex to a bitset as a precomputed complete binary tree.
-//
-//	  // 1 <= idx <= 511
-//		func allotRec(aTbl *bitset.BitSet, idx uint) {
-//			aTbl = aTbl.Set(idx)
-//			if idx > 255 {
-//				return
-//			}
-//			allotRec(aTbl, idx<<1)
-//			allotRec(aTbl, idx<<1+1)
-//		}
-//
-// Only used for fast bitset intersections instead of
-// range loops in table overlaps methods.
+// This structure is functionally identical to IdxToPrefixRoutes,
+// but applies only to the fringe part of the trie.
 func IdxToFringeRoutes(idx uint8) *bitset.BitSet256 {
 	return &fringeRoutesLookupTbl[idx]
 }
