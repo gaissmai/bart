@@ -1,37 +1,72 @@
 // Copyright (c) 2025 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
-// Package allot contains the precalculated bitsets of all baseIndices,
-// which for a given prefix contain all longer prefixes covered by it.
+// Package allot provides precalculated bitsets that map baseIndex values
+// to all longer (more specific) prefixes covered within the same stride.
 //
-// Please read the ART paper ./doc/artlookup.pdf
-// to understand the baseIndex algorithm.
+// Each baseIndex corresponds to a prefix in the complete binary tree
+// formed by all possible 8-bit stride prefixes.
+// The associated BitSet represents the subtree of that prefix,
+// including all more specific baseIndices (deeper in the trie).
+//
+// These precomputed sets allow efficient, branchless lookups and
+// fast set comparisons using bitwise operations.
+//
+// For background on the baseIndex algorithm and its trie structure,
+// see the ART paper at: ./doc/artlookup.pdf
 package allot
 
 import "github.com/gaissmai/bart/internal/bitset"
 
-// IdxToPrefixRoutes as precalculated bitsets,
+// IdxToPrefixRoutes returns the precalculated BitSet for a given base index.
 //
-// Map the baseIndex to a bitset as a precomputed complete binary tree.
+// A prefix with baseIndex idx covers all baseIndices that represent longer, more specific
+// prefixes within the same stride (i.e., subtree of the binary prefix trie).
 //
-//	  // 1 <= idx <= 511
-//		func allotRec(aTbl *bitset.BitSet, idx uint) {
-//			aTbl = aTbl.Set(idx)
-//			if idx > 255 {
-//				return
-//			}
-//			allotRec(aTbl, idx<<1)
-//			allotRec(aTbl, idx<<1+1)
-//		}
+// This lookup returns a BitSet that contains those indices.
 //
-// Only used for fast bitset intersections instead of
-// range loops in table overlaps methods.
+// Example:
+//   - prefix 0b10/2 -> baseIndex 6
+//   - it covers: 0b100/3 (index 12), 0b101/3 (index 13), 0b1000/4 (24), etc.
+//
+// Only the first 256 baseIndex values (1 to 255) are included here.
+// For indices >= 256 (i.e., full 8-bit prefixes), see fringeRoutesLookupTbl.
+//
+// This function is used for fast prefix set comparisons using bitwise intersection
+// instead of scanning or looping over ranges.
 func IdxToPrefixRoutes(idx uint8) *bitset.BitSet256 {
+	// Recursive function to generate coverage sets for each base index:
+	// func generate(idx uint, bs *bitset.BitSet) {
+	//     bs = bs.Set(idx)
+	//     if idx >= 256 {
+	//         return // no children beyond this prefix
+	//     }
+	//     generate(2*idx, bs)     // left child
+	//     generate(2*idx + 1, bs) // right child
+	// }
+
 	return &pfxRoutesLookupTbl[idx]
 }
 
-// pfxRoutesLookupTbl, only the first 256 Bits, see also the fringeRoutesLookupTbl for the second 256 Bits
-// we split the 512 Bits to 2x256 for the BitSet256 optimizations.
+// pfxRoutesLookupTbl is a lookup table of BitSet256 entries.
+//
+// It maps a baseIndex (1 <= idx <= 255) to a bitset that contains all more
+// specific baseIndices that are covered by the prefix at that index.
+//
+// Internally, the prefix space is a complete binary tree:
+//   - node at index i has children at indices 2*i and 2*i+1
+//   - leaves are at indices >= 256
+//
+// The idea:
+//
+//	If prefix P has baseIndex idx, then P covers all prefixes in the subtree
+//	rooted at idx. This table enumerates and encodes those indices.
+//
+// The table is split:
+//   - pfxRoutesLookupTbl holds prefixes up to /7 (idx <= 255)
+//   - fringeRoutesLookupTbl holds /8 prefixes (idx >= 256)
+//
+// This structure allows for very fast set inclusion checks using simple bitwise AND.
 var pfxRoutesLookupTbl = [256]bitset.BitSet256{
 	/* idx:   0 */ {0x0, 0x0, 0x0, 0x0}, // invalid
 	/* idx:   1 */ {0xfffffffffffffffe, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff}, // [1 2 3 4 5 6 7 8 9 ...

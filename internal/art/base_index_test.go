@@ -184,6 +184,11 @@ func TestIdxToRange256(t *testing.T) {
 			wantLast:  31,
 		},
 		{
+			idx:       13,
+			wantFirst: 160,
+			wantLast:  191,
+		},
+		{
 			idx:       81,
 			wantFirst: 68,
 			wantLast:  71,
