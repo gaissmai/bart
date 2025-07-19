@@ -398,6 +398,7 @@ func (n *node[V]) purgeAndCompress(p *pool[V], stack []*node[V], octets []uint8,
 
 				// ... (re)insert the leaf at parents depth
 				parent.insertAtDepth(p, kid.prefix, kid.value, depth)
+				p.Put(n)
 			case *fringeNode[V]:
 				// just one fringe, delete this node and reinsert the fringe as leaf above
 				parent.children.DeleteAt(octet)
@@ -411,6 +412,7 @@ func (n *node[V]) purgeAndCompress(p *pool[V], stack []*node[V], octets []uint8,
 
 				// ... (re)reinsert prefix/value at parents depth
 				parent.insertAtDepth(p, fringePfx, kid.value, depth)
+				p.Put(n)
 			}
 
 		case pfxCount == 1 && childCount == 0:
@@ -430,6 +432,7 @@ func (n *node[V]) purgeAndCompress(p *pool[V], stack []*node[V], octets []uint8,
 
 			// ... (re)insert prefix/value at parents depth
 			parent.insertAtDepth(p, pfx, val, depth)
+			p.Put(n)
 		}
 
 		// climb up the stack
