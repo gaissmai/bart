@@ -21,30 +21,38 @@ const (
 // stridePath, max 16 octets deep
 type stridePath [maxTreeDepth]uint8
 
-// node is a level node in the multibit-trie.
-// A node has prefixes and children, forming the multibit trie.
+// node is a trie level node in the multibit routing table.
 //
-// The prefixes, mapped by the baseIndex() function from the ART algorithm,
-// form a complete binary tree.
-// See the artlookup.pdf paper in the doc folder to understand the mapping function
-// and the binary tree of prefixes.
+// Each node contains two conceptually different arrays:
+//   - prefixes: representing routes, using a complete binary tree layout
+//     driven by the baseIndex() function from the ART algorithm.
+//   - children: holding subtries or path-compressed leaves/fringes with
+//     a branching factor of 256 (8 bits per stride).
 //
-// In contrast to the ART algorithm, sparse arrays (popcount-compressed slices)
-// are used instead of fixed-size arrays.
+// Unlike the original ART, this implementation uses popcount-compressed sparse arrays
+// instead of fixed-size arrays. Array slots are not pre-allocated; insertion
+// and lookup rely on fast bitset operations and precomputed rank indexes.
 //
-// The array slots are also not pre-allocated (alloted) as described
-// in the ART algorithm, fast bitset operations are used to find the
-// longest-prefix-match.
-//
-// The child array recursively spans the trie with a branching factor of 256
-// and also records path-compressed leaves in the free node slots.
+// See doc/artlookup.pdf for the mapping mechanics and prefix tree details.
 type node[V any] struct {
-	// prefixes contains the routes, indexed as a complete binary tree with payload V
-	// with the help of the baseIndex mapping function from the ART algorithm.
+	// prefixes stores routing entries (prefix -> value),
+	// laid out as a complete binary tree using baseIndex().
 	prefixes sparse.Array256[V]
 
-	// children, recursively spans the trie with a branching factor of 256.
-	children sparse.Array256[any] // [any] is a *node, with path compression a *leaf or *fringe
+	// children holds subnodes for the 256 possible next-hop paths
+	// at this trie level (8-bit stride).
+	//
+	// Entries in children may be:
+	//   - *node[V]       -> internal child node for further traversal
+	//   - *leafNode[V]   -> path-comp. node (depth < maxDepth - 1)
+	//   - *fringeNode[V] -> path-comp. node (depth == maxDepth - 1, stride-aligned: /8, /16, ... /128))
+	//
+	// Note: Both *leafNode and *fringeNode entries are only created by path compression.
+	// Prefixes that match exactly at the maximum trie depth (depth == maxDepth) are
+	// never stored as children, but always directly in the prefixes array at that level.
+	children sparse.Array256[any]
+}
+
 }
 
 // isEmpty returns true if node has neither prefixes nor children
@@ -66,26 +74,45 @@ type fringeNode[V any] struct {
 	value V
 }
 
-// isFringe, leaves with /8, /16, ... /128 bits at special positions
-// in the trie.
+// isFringe determines whether a prefix qualifies as a "fringe node" -
+// that is, a special kind of path-compressed leaf inserted at the final
+// possible trie level (depth == maxDepth - 1).
 //
-// Just a path-compressed leaf, inserted at the last
-// possible level as path compressed (depth == maxDepth-1)
-// before inserted just as a prefix in the next level down (depth == maxDepth).
+// Both "leaves" and "fringes" are path-compressed terminal entries;
+// the distinction lies in their position within the trie:
 //
-// Nice side effect: A fringe is the default-route for all nodes below this slot!
+//   - A leaf is inserted at any intermediate level if no further stride
+//     boundary matches (depth < maxDepth - 1).
+//
+//   - A fringe is inserted at the last possible stride level
+//     (depth == maxDepth - 1) before a prefix would otherwise land
+//     as a direct prefix (depth == maxDepth).
+//
+// Special property:
+//   - A fringe acts as a default route for all downstream bit patterns
+//     extending beyond its prefix.
+//
+// Examples:
 //
 //	e.g. prefix is addr/8, or addr/16, or ... addr/128
 //	depth <  maxDepth-1 : a leaf, path-compressed
 //	depth == maxDepth-1 : a fringe, path-compressed
 //	depth == maxDepth   : a prefix with octet/pfx == 0/0 => idx == 1, a strides default route
+//
+// Logic:
+//   - A prefix qualifies as a fringe if:
+//     depth == maxDepth - 1 &&
+//     lastBits == 0 (i.e., aligned on stride boundary, /8, /16, ... /128 bits)
 func isFringe(depth, bits int) bool {
 	maxDepth, lastBits := maxDepthAndLastBits(bits)
 	return depth == maxDepth-1 && lastBits == 0
 }
 
-// cloneOrCopy, helper function,
-// deep copy if v implements the Cloner interface.
+// cloneOrCopy returns either a deep copy or a shallow copy of the given value v,
+// depending on whether the value type V implements the Cloner[V] interface.
+//
+// If the provided value implements Cloner[V], its Clone method is invoked to produce
+// a deep copy. Otherwise, the value is returned as-is, which yields a shallow copy.
 func cloneOrCopy[V any](val V) V {
 	if cloner, ok := any(val).(Cloner[V]); ok {
 		return cloner.Clone()
@@ -94,22 +121,43 @@ func cloneOrCopy[V any](val V) V {
 	return val
 }
 
-// cloneLeaf returns a clone of the leaf
-// if the value implements the Cloner interface.
+// cloneLeaf creates a copy of the current leafNode[V].
+//
+// If the stored value implements the Cloner[V] interface, a deep copy of the value
+// is produced via cloneOrCopy. Otherwise, a shallow copy of the value is used.
+//
+// This function preserves the original prefix and clones the value,
+// ensuring that the cloned leaf does not alias the original value if cloning is supported.
 func (l *leafNode[V]) cloneLeaf() *leafNode[V] {
 	return &leafNode[V]{prefix: l.prefix, value: cloneOrCopy(l.value)}
 }
 
 // cloneFringe returns a clone of the fringe
 // if the value implements the Cloner interface.
+
+// cloneFringe creates a copy of the current fringeNode[V].
+//
+// If the stored value implements the Cloner[V] interface, it is deep-copied
+// via cloneOrCopy. Otherwise, a shallow copy is taken.
+//
+// Unlike leafNode, fringeNode does not store a prefix path - this method simply clones
+// the held value to avoid unintended mutations on shared references.
 func (l *fringeNode[V]) cloneFringe() *fringeNode[V] {
 	return &fringeNode[V]{value: cloneOrCopy(l.value)}
 }
 
-// insertAtDepth insert a prefix/val into a node tree at depth.
-// n must not be nil, prefix must be valid and already in canonical form.
 func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool) {
 	ip := pfx.Addr()
+// insertAtDepth inserts a network prefix and its associated value into the
+// trie starting at the specified byte depth.
+//
+// The function walks the prefix address from the given depth and inserts the value either directly into
+// the node´s prefix table or as a compressed leaf or fringe node. If a conflicting leaf or fringe exists,
+// it is pushed down via a new intermediate node allocated from the pool. Existing entries with the same
+// prefix are overwritten.
+//
+// If the Table.WithPool() was called, the provided pool is used to efficiently allocate
+// new *node[V] instances, to minimize allocations during dynamic trie updates.
 	bits := pfx.Bits()
 	octets := ip.AsSlice()
 	maxDepth, lastBits := maxDepthAndLastBits(bits)
@@ -191,6 +239,21 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 // insertAtDepthPersist is the immutable version of insertAtDepth.
 // All visited nodes are cloned during insertion.
 func (n *node[V]) insertAtDepthPersist(pfx netip.Prefix, val V, depth int) (exists bool) {
+
+// insertAtDepthPersist performs an immutable insertion of a network prefix and its associated value
+// into the trie starting at the specified byte depth.
+//
+// Unlike insertAtDepth, this function preserves the original trie by cloning each node visited along
+// the insertion path. Modified subtrees are allocated via the provided pool, typically backed by sync.Pool,
+// to avoid redundant allocations.
+//
+// Nodes are shallow-cloned with deep-copied values when necessary. If a node, leaf, or fringe exists
+// at the insertion point, it's replaced with a newly allocated version, ensuring that the original structure
+// remains unchanged.
+// The function uses cloneFlat to replicate each traversed node before continuing the insert.
+//
+// This allows multiple versions of the trie to coexist safely and efficiently, enabling purely functional
+// route updates with structural sharing where possible.
 	ip := pfx.Addr()
 	bits := pfx.Bits()
 	octets := ip.AsSlice()
@@ -275,8 +338,23 @@ func (n *node[V]) insertAtDepthPersist(pfx netip.Prefix, val V, depth int) (exis
 	panic("unreachable")
 }
 
-// purgeAndCompress, purge empty nodes or compress nodes with single prefix or leaf.
 func (n *node[V]) purgeAndCompress(stack []*node[V], octets []uint8, is4 bool) {
+// purgeAndCompress traverses the deletion path upward and removes empty or compressible nodes
+// in the trie.
+//
+// After a route deletion, this function walks back through the recorded traversal stack
+// and optimizes the trie by eliminating redundant intermediate nodes. A node is purged if it is empty,
+// and compressed if it contains only a single leaf, fringe, or prefix.
+//
+// Compressible cases are handled by removing the node and reinserting its content (prefix or value)
+// one level higher, preserving routing semantics while reducing structural depth. The child is then
+// replaced in the parent, effectively flattening the trie where appropriate.
+//
+// The reconstruction of prefixes for fringe or prefix entries is based on
+// the original `octets` traversal path and the parent´s depth.
+//
+// Any removed intermediate nodes are returned to the memory pool, enabling efficient re-use through
+// a sync.Pool-based allocator.
 	// unwind the stack
 	for depth := len(stack) - 1; depth >= 0; depth-- {
 		parent := stack[depth]
@@ -341,14 +419,16 @@ func (n *node[V]) purgeAndCompress(stack []*node[V], octets []uint8, is4 bool) {
 	}
 }
 
-// lpmGet does a route lookup for idx in the 8-bit (stride) routing table
-// at this depth and returns (baseIdx, value, true) if a matching
-// longest prefix exists, or ok=false otherwise.
+// lpmGet performs a longest-prefix match (LPM) lookup for the given index (idx)
+// within the 8-bit stride-based prefix table at this trie depth.
 //
-// The prefixes in the stride form a complete binary tree (CBT) using the baseIndex function.
-// In contrast to the ART algorithm, I do not use an allotment approach but map
-// the backtracking in the CBT by a bitset operation with a precalculated backtracking path
-// for the respective idx.
+// The function returns the matched base index, associated value, and true if a
+// matching prefix exists at this level; otherwise, ok is false.
+//
+// Internally, the prefix table is organized as a complete binary tree (CBT) indexed
+// via the baseIndex function. Unlike the original ART algorithm, this implementation
+// does not use an allotment-based approach. Instead, it performs CBT backtracking
+// using a bitset-based operation with a precomputed backtracking pattern specific to idx.
 func (n *node[V]) lpmGet(idx uint) (baseIdx uint8, val V, ok bool) {
 	// top is the idx of the longest-prefix-match
 	if top, ok := n.prefixes.IntersectionTop(lpm.BackTrackingBitset(idx)); ok {
@@ -359,14 +439,27 @@ func (n *node[V]) lpmGet(idx uint) (baseIdx uint8, val V, ok bool) {
 	return
 }
 
-// lpmTest, true if idx has a (any) longest-prefix-match in node.
-// this is a contains test, faster as lookup and without value returns.
+// lpmTest returns true if an index (idx) has any matching longest-prefix
+// in the current node’s prefix table.
+//
+// This function performs a presence check without retrieving the associated value.
+// It is faster than a full lookup, as it only tests for intersection with the
+// backtracking bitset for the given index.
+//
+// The prefix table is structured as a complete binary tree (CBT), and LPM testing
+// is done via a bitset operation that maps the traversal path from the given index
+// toward its possible ancestors.
 func (n *node[V]) lpmTest(idx uint) bool {
 	return n.prefixes.Intersects(lpm.BackTrackingBitset(idx))
 }
 
-// cloneRec, clones the node recursive.
 func (n *node[V]) cloneRec() *node[V] {
+// cloneRec performs a recursive deep copy of the node[V].
+//
+// The method uses a pool[V] instance for efficient memory allocation of new nodes.
+// It differentiates between shallow and deep copies:
+//
+// If the value type V implements the Cloner[V] interface, each item is deep-copied.
 	if n == nil {
 		return nil
 	}
@@ -412,9 +505,12 @@ func (n *node[V]) cloneRec() *node[V] {
 	return c
 }
 
-// cloneFlat, copies the node and clone the values in prefixes and path compressed leaves
-// if V implements Cloner. Used in the various ...Persist functions.
 func (n *node[V]) cloneFlat() *node[V] {
+// cloneFlat creates a shallow copy of the current node[V], with optional deep copies of values.
+//
+// This method is intended for fast, non-recursive cloning of a node structure. It copies only
+// the current node and selectively performs deep copies of stored values, without recursively
+// cloning child nodes.
 	if n == nil {
 		return nil
 	}
@@ -451,12 +547,20 @@ func (n *node[V]) cloneFlat() *node[V] {
 	return c
 }
 
-// allRec runs recursive the trie, starting at this node and
-// the yield function is called for each route entry with prefix and value.
-// If the yield function returns false the recursion ends prematurely and the
-// false value is propagated.
+// allRec recursively traverses the trie starting at the current node,
+// applying the provided yield function to every stored prefix and value.
 //
-// The iteration order is not defined, just the simplest and fastest recursive implementation.
+// For each route entry (prefix and value), yield is invoked. If yield returns false,
+// the traversal stops immediately, and false is propagated upwards,
+// enabling early termination.
+//
+// The function handles all prefix entries in the current node, as well as any children -
+// including sub-nodes, leaf nodes with full prefixes, and fringe nodes
+// representing path-compressed prefixes. IP prefix reconstruction is performed on-the-fly
+// from the current path and depth.
+//
+// The traversal order is not defined. This implementation favors simplicity
+// and runtime efficiency over consistency of iteration sequence.
 func (n *node[V]) allRec(path stridePath, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
 	for _, idx := range n.prefixes.AsSlice(&[256]uint8{}) {
 		cidr := cidrFromPath(path, depth, is4, idx)
@@ -500,12 +604,25 @@ func (n *node[V]) allRec(path stridePath, depth int, is4 bool, yield func(netip.
 	return true
 }
 
-// allRecSorted runs recursive the trie, starting at node and
-// the yield function is called for each route entry with prefix and value.
-// The iteration is in prefix sort order.
+// allRecSorted recursively traverses the trie in prefix-sorted order and applies
+// the given yield function to each stored prefix and value.
 //
-// If the yield function returns false the recursion ends prematurely and the
-// false value is propagated.
+// Unlike allRec, this implementation ensures that route entries are visited in
+// canonical prefix sort order. To achieve this,
+// both the prefixes and children of the current node are gathered, sorted,
+// and then interleaved during traversal based on logical octet positioning.
+//
+// The function first sorts relevant entries by their prefix index and address value,
+// using a comparison function that ranks prefixes according to their mask length and position.
+// Then it walks the trie, always yielding child entries that fall before the current prefix,
+// followed by the prefix itself. Remaining children are processed once all prefixes have been visited.
+//
+// Prefixes are reconstructed on-the-fly from the traversal path, and iteration includes all child types:
+// inner nodes (recursive descent), leaf nodes, and fringe (compressed) prefixes.
+//
+// If the yield callback returns false at any point, traversal stops early and false is returned,
+// allowing for efficient filtered iteration. The order is stable and predictable, making the function
+// suitable for use cases like table exports, comparisons, or serialization.
 func (n *node[V]) allRecSorted(path stridePath, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
 	// get slice of all child octets, sorted by addr
 	allChildAddrs := n.children.AsSlice(&[256]uint8{})
@@ -593,11 +710,24 @@ func (n *node[V]) allRecSorted(path stridePath, depth int, is4 bool, yield func(
 	return true
 }
 
-// unionRec combines two nodes, changing the receiver node.
-// If there are duplicate entries, the value is taken from the other node.
-// Count duplicate entries to adjust the t.size struct members.
-// The values are cloned before merging.
 func (n *node[V]) unionRec(o *node[V], depth int) (duplicates int) {
+// unionRec recursively merges another node o into the receiver node n.
+//
+// All prefix and child entries from o are cloned and inserted into n.
+// If a prefix already exists in n, its value is overwritten by the value from o,
+// and the duplicate is counted in the return value. This count can later be used
+// to update size-related metadata in the parent trie.
+//
+// The union handles all possible combinations of child node types (node, leaf, fringe)
+// between the two nodes. Structural conflicts are resolved by creating new intermediate
+// *node[V] objects and pushing both children further down the trie. Leaves and fringes
+// are also recursively relocated as needed to preserve prefix semantics.
+//
+// All allocations use the provided pool p, ensuring efficient management of intermediate
+// nodes during recursive merging. The merge operation is destructive on the receiver n,
+// but leaves the source node o unchanged.
+//
+// Returns the number of duplicate prefixes that were overwritten during merging.
 	// for all prefixes in other node do ...
 	for i, oIdx := range o.prefixes.AsSlice(&[256]uint8{}) {
 		// clone/copy the value from other node at idx
@@ -785,6 +915,21 @@ func (n *node[V]) unionRec(o *node[V], depth int) (duplicates int) {
 
 // eachLookupPrefix does an all prefix match in the 8-bit (stride) routing table
 // at this depth and calls yield() for any matching CIDR.
+
+// eachLookupPrefix performs a hierarchical lookup of all matching prefixes
+// in the current node’s 8-bit stride-based prefix table.
+//
+// The function walks up the trie-internal complete binary tree (CBT),
+// testing each possible prefix length mask (in decreasing order of specificity),
+// and invokes the yield function for every matching entry.
+//
+// The given idx refers to the position for this stride's prefix and is used
+// to derive a backtracking path through the CBT by repeatedly halving the index.
+// At each step, if a prefix exists in the table, its corresponding CIDR is
+// reconstructed and yielded. If yield returns false, traversal stops early.
+//
+// This function is intended for internal use during supernet traversal and
+// does not descend the trie further.
 func (n *node[V]) eachLookupPrefix(octets []byte, depth int, is4 bool, pfxIdx uint, yield func(netip.Prefix, V) bool) (ok bool) {
 	// path needed below more than once in loop
 	var path stridePath
@@ -810,7 +955,18 @@ func (n *node[V]) eachLookupPrefix(octets []byte, depth int, is4 bool, pfxIdx ui
 	return true
 }
 
-// eachSubnet calls yield() for any covered CIDR by parent prefix in natural CIDR sort order.
+// eachSubnet yields all prefix entries and child nodes covered by a given parent prefix,
+// sorted in natural CIDR order, within the current node.
+//
+// The function iterates through all prefixes and children from the node’s stride tables.
+// Only entries that fall within the address range defined by the parent prefix index (pfxIdx)
+// are included. Matching entries are buffered, sorted, and passed through to the yield function.
+//
+// Child entries (nodes, leaves, fringes) that fall under the covered address range
+// are processed recursively via allRecSorted to ensure sorted traversal.
+//
+// This function is intended for internal use by Subnets(), and it assumes the
+// current node is positioned at the point in the trie corresponding to the parent prefix.
 func (n *node[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxIdx uint8, yield func(netip.Prefix, V) bool) bool {
 	// octets as array, needed below more than once
 	var path stridePath
