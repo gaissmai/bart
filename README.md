@@ -59,8 +59,8 @@ Readers can access the table always lock-free, while writers may synchronize usi
 that only one writer can modify the table persistent at a time, not using Compare-and-Swap (CAS)
 with all the known problems for multiple long-running writers.
 
-The combination of lock-free concurrency, fast lookup times, low memory usage, and
-internal data structure pooling should offer significant benefits to any routing daemon.
+The combination of lock-free concurrency, fast lookup and update times, low memory consumption,
+and optional internal data structure pooling provides clear advantages for any routing daemon.
 
 But as always, it depends on the specific use case.
 
@@ -77,15 +77,16 @@ are used.
   type Table[V any] struct {
   	// Has unexported fields.
   }
-    // Table is an IPv4 and IPv6 routing table with payload V. The zero value is
-    // ready to use.
-
-    // The Table is safe for concurrent readers but not for concurrent readers
-    // and/or writers. Either the update operations must be protected by an
-    // external lock mechanism or the various ...Persist functions must be used
-    // which return a modified routing table by leaving the original unchanged
-
-    // A Table must not be copied by value.
+    // Table represents a thread-safe IPv4 and IPv6 routing table with payload V.
+    //
+    // The zero value is ready to use.
+    //
+    // The Table is safe for concurrent reads, but concurrent reads and writes
+    // must be externally synchronized. Mutation via Insert/Delete requires locks,
+    // or alternatively, use ...Persist methods which return a modified copy
+    // without altering the original table (copy-on-write).
+    //
+    // A Table must not be copied by value; always pass by pointer.
 
   func (t *Table[V]) WithPool() *Table[V]
 
@@ -142,10 +143,8 @@ are used.
 
 A `bart.Lite` wrapper is also included, this is ideal for simple IP
 ACLs (access-control-lists) with plain true/false results and no payload.
-Lite is just a convenience wrapper for Table, instantiated with an empty
-struct as payload.
 
-Lite wraps or adapts some methods where needed or delegates almost all
+Lite wraps or adapts some methods where needed and delegates almost all
 other methods unmodified to the underlying Table.
 Some delegated methods are pointless without a payload.
 
@@ -153,6 +152,9 @@ Some delegated methods are pointless without a payload.
    type Lite struct {
    	 Table[struct{}]
    }
+     // Lite is just a convenience wrapper for Table, instantiated with an
+     // empty struct as payload. Lite is ideal for simple IP ACLs
+     // (access-control-lists) with plain true/false results without a payload.
 
    func (l *Lite) WithPool() *Lite
 
