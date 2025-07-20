@@ -34,6 +34,24 @@ func NewSyncLite() *SyncLite {
 	return lf
 }
 
+// WithPool replaces the current table version with a new version with a sync.Pool for trie nodes.
+//
+// WithPool acquires an exclusive writer lock, ensuring no other writer can modify the value concurrently.
+// It then retrieves the current table version, creates a new version using the table's WithPool method,
+// and atomically publishes this new version for concurrent readers.
+//
+// This method is safe for concurrent use by multiple goroutines.
+func (lf *SyncLite) WithPool() *SyncLite {
+	lf.Lock() // acquire writer lock to exclude other writers
+	defer lf.Unlock()
+
+	oldPtr := lf.Load()         // get current table version
+	newPtr := oldPtr.WithPool() // create new persistent table version
+
+	lf.Store(newPtr) // atomically publish new version for readers
+	return lf
+}
+
 // Contains is a sync adapter for [bart.Lite.Contains].
 func (lf *SyncLite) Contains(ip netip.Addr) bool {
 	return lf.Load().Contains(ip)
@@ -71,7 +89,7 @@ func (lf *SyncLite) Delete(pfx netip.Prefix) {
 func ExampleLite_concurrent() {
 	wg := sync.WaitGroup{}
 
-	syncTbl := NewSyncLite()
+	syncTbl := NewSyncLite().WithPool()
 
 	wg.Add(1)
 	go func() {

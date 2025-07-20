@@ -32,23 +32,24 @@ func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V] {
 	is4 := pfx.Addr().Is4()
 
 	pt := &Table[V]{
+		pool:  t.pool,
 		size4: t.size4,
 		size6: t.size6,
 	}
 
 	// clone or copy root node
 	if is4 {
-		pt.root4 = *t.root4.cloneFlat()
+		pt.root4 = *t.root4.cloneFlat(t.pool)
 		pt.root6 = t.root6
 	} else {
 		pt.root4 = t.root4
-		pt.root6 = *t.root6.cloneFlat()
+		pt.root6 = *t.root6.cloneFlat(t.pool)
 	}
 
 	n := pt.rootNodeByVersion(is4)
 
 	// clone nodes along the insertion path
-	if n.insertAtDepthPersist(pfx, val, 0) {
+	if n.insertAtDepthPersist(t.pool, pfx, val, 0) {
 		// prefix existed, no size increment
 		return pt
 	}
@@ -85,17 +86,18 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 	bits := pfx.Bits()
 
 	pt = &Table[V]{
+		pool:  t.pool,
 		size4: t.size4,
 		size6: t.size6,
 	}
 
 	// clone or copy root node
 	if is4 {
-		pt.root4 = *t.root4.cloneFlat()
+		pt.root4 = *t.root4.cloneFlat(t.pool)
 		pt.root6 = t.root6
 	} else {
 		pt.root4 = t.root4
-		pt.root6 = *t.root6.cloneFlat()
+		pt.root6 = *t.root6.cloneFlat(t.pool)
 	}
 
 	maxDepth, lastBits := maxDepthAndLastBits(bits)
@@ -137,7 +139,7 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 			// clone the traversed path
 
 			// kid points now to cloned kid
-			kid = kid.cloneFlat()
+			kid = kid.cloneFlat(t.pool)
 
 			// replace kid with clone
 			n.children.InsertAt(addr, kid)
@@ -158,8 +160,8 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 			// push the leaf down
 			// insert new child at current leaf position (addr)
 			// descend down, replace n with new child
-			newNode := new(node[V])
-			newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
+			newNode := t.pool.Get()
+			newNode.insertAtDepth(t.pool, kid.prefix, kid.value, depth+1)
 
 			n.children.InsertAt(addr, newNode)
 			n = newNode
@@ -176,7 +178,7 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 			// push the fringe down, it becomes a default route (idx=1)
 			// insert new child at current leaf position (addr)
 			// descend down, replace n with new child
-			newNode := new(node[V])
+			newNode := t.pool.Get()
 			newNode.prefixes.InsertAt(1, kid.value)
 
 			n.children.InsertAt(addr, newNode)
@@ -225,17 +227,18 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, e
 	bits := pfx.Bits()
 
 	pt = &Table[V]{
+		pool:  t.pool,
 		size4: t.size4,
 		size6: t.size6,
 	}
 
 	// clone or copy root node
 	if is4 {
-		pt.root4 = *t.root4.cloneFlat()
+		pt.root4 = *t.root4.cloneFlat(t.pool)
 		pt.root6 = t.root6
 	} else {
 		pt.root4 = t.root4
-		pt.root6 = *t.root6.cloneFlat()
+		pt.root6 = *t.root6.cloneFlat(t.pool)
 	}
 
 	maxDepth, lastBits := maxDepthAndLastBits(bits)
@@ -261,7 +264,7 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, e
 			}
 
 			pt.sizeUpdate(is4, -1)
-			n.purgeAndCompress(stack[:depth], octets, is4)
+			n.purgeAndCompress(t.pool, stack[:depth], octets, is4)
 			return pt, val, exists
 		}
 
@@ -278,7 +281,7 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, e
 			// clone the traversed path
 
 			// kid points now to cloned kid
-			kid = kid.cloneFlat()
+			kid = kid.cloneFlat(t.pool)
 
 			// replace kid with clone
 			n.children.InsertAt(addr, kid)
@@ -297,7 +300,7 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, e
 			n.children.DeleteAt(addr)
 
 			pt.sizeUpdate(is4, -1)
-			n.purgeAndCompress(stack[:depth], octets, is4)
+			n.purgeAndCompress(t.pool, stack[:depth], octets, is4)
 
 			return pt, kid.value, true
 
@@ -312,7 +315,7 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, e
 			n.children.DeleteAt(addr)
 
 			pt.sizeUpdate(is4, -1)
-			n.purgeAndCompress(stack[:depth], octets, is4)
+			n.purgeAndCompress(t.pool, stack[:depth], octets, is4)
 
 			return pt, kid.value, true
 

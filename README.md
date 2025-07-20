@@ -58,6 +58,10 @@ There are examples demonstrating how to use bart concurrently with multiple read
 Readers can access the table always lock-free, while writers may synchronize using a mutex to ensure
 that only one writer can modify the table persistent at a time, not using Compare-and-Swap (CAS)
 with all the known problems for multiple long-running writers.
+
+The combination of lock-free concurrency, fast lookup times, low memory usage, and
+internal data structure pooling should offer significant benefits to any routing daemon.
+
 But as always, it depends on the specific use case.
 
 See the `ExampleLite_concurrent` and `ExampleTable_concurrent` tests for concrete examples of this pattern.
@@ -82,6 +86,8 @@ are used.
     // which return a modified routing table by leaving the original unchanged
 
     // A Table must not be copied by value.
+
+  func (t *Table[V]) WithPool() *Table[V]
 
   func (t *Table[V]) Contains(ip netip.Addr) bool
   func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool)
@@ -148,6 +154,8 @@ Some delegated methods are pointless without a payload.
    	 Table[struct{}]
    }
 
+   func (l *Lite) WithPool() *Lite
+
    func (l *Lite) Exists(pfx netip.Prefix) bool
    func (l *Lite) Contains(pfx netip.Prefix) bool
 
@@ -163,7 +171,6 @@ Some delegated methods are pointless without a payload.
    func (l *Lite) Overlaps(o *Lite) bool
    func (l *Lite) Overlaps4(o *Lite) bool
    func (l *Lite) Overlaps6(o *Lite) bool
-   
 ```
 
 ## benchmarks
