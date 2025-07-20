@@ -37,6 +37,24 @@ func NewSyncTable[V bart.Cloner[V]]() *SyncTable[V] {
 	return lf
 }
 
+// WithPool replaces the current table version with a new version with a sync.Pool for trie nodes.
+//
+// WithPool acquires an exclusive writer lock, ensuring no other writer can modify the value concurrently.
+// It then retrieves the current table version, creates a new version using the table's WithPool method,
+// and atomically publishes this new version for concurrent readers.
+//
+// This method is safe for concurrent use by multiple goroutines.
+func (lf *SyncTable[V]) WithPool() *SyncTable[V] {
+	lf.Lock() // acquire writer lock to exclude other writers
+	defer lf.Unlock()
+
+	oldPtr := lf.Load()         // get current table version
+	newPtr := oldPtr.WithPool() // create new persistent table version
+
+	lf.Store(newPtr) // atomically publish new version for readers
+	return lf
+}
+
 // Contains is a sync adapter for [bart.Table.Contains].
 func (lf *SyncTable[V]) Contains(ip netip.Addr) bool {
 	return lf.Load().Contains(ip)
@@ -122,6 +140,7 @@ func ExampleTable_concurrent() {
 	wg := sync.WaitGroup{}
 
 	syncTbl := NewSyncTable[*testVal]()
+	syncTbl.WithPool()
 
 	wg.Add(1)
 	go func() {
