@@ -149,9 +149,7 @@ other methods unmodified to the underlying Table.
 Some delegated methods are pointless without a payload.
 
 ```golang
-   type Lite struct {
-   	 Table[struct{}]
-   }
+   type Lite struct { ...  }
      // Lite is just a convenience wrapper for Table, instantiated with an
      // empty struct as payload. Lite is ideal for simple IP ACLs
      // (access-control-lists) with plain true/false results without a payload.

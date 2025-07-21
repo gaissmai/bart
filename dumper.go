@@ -97,7 +97,7 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 		fmt.Fprintln(w)
 
 		// skip values if the payload is the empty struct
-		if _, ok := any(n.prefixes.Items[0]).(struct{}); !ok {
+		if _, ok := any(n.prefixes.Items[0]).(zeroStruct); !ok {
 
 			// print the values for this node
 			fmt.Fprintf(w, "%svalues(#%d):", indent, nPfxCount)
@@ -147,7 +147,7 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 
 				// Lite: val is the empty struct, don't print it
 				switch any(pc.value).(type) {
-				case struct{}:
+				case zeroStruct:
 					fmt.Fprintf(w, " %s:{%s}", addrFmt(addr, is4), pc.prefix)
 				default:
 					fmt.Fprintf(w, " %s:{%s, %v}", addrFmt(addr, is4), pc.prefix, pc.value)
@@ -169,7 +169,7 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 
 				// Lite: val is the empty struct, don't print it
 				switch any(pc.value).(type) {
-				case struct{}:
+				case zeroStruct:
 					fmt.Fprintf(w, " %s:{%s}", addrFmt(addr, is4), fringePfx)
 				default:
 					fmt.Fprintf(w, " %s:{%s, %v}", addrFmt(addr, is4), fringePfx, pc.value)

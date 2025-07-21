@@ -138,8 +138,8 @@ func cloneOrCopy[V any](val V) V {
 //
 // This function preserves the original prefix and clones the value,
 // ensuring that the cloned leaf does not alias the original value if cloning is supported.
-func (l *leafNode[V]) cloneLeaf() *leafNode[V] {
-	return &leafNode[V]{prefix: l.prefix, value: cloneOrCopy(l.value)}
+func (l *leafNode[V]) cloneLeaf(mp *multiPool[V]) *leafNode[V] {
+	return mp.getLeaf(l.prefix, cloneOrCopy(l.value))
 }
 
 // cloneFringe returns a clone of the fringe
@@ -152,8 +152,8 @@ func (l *leafNode[V]) cloneLeaf() *leafNode[V] {
 //
 // Unlike leafNode, fringeNode does not store a prefix path - this method simply clones
 // the held value to avoid unintended mutations on shared references.
-func (l *fringeNode[V]) cloneFringe() *fringeNode[V] {
-	return &fringeNode[V]{value: cloneOrCopy(l.value)}
+func (l *fringeNode[V]) cloneFringe(mp *multiPool[V]) *fringeNode[V] {
+	return mp.getFringe(cloneOrCopy(l.value))
 }
 
 // insertAtDepth inserts a network prefix and its associated value into the
@@ -166,7 +166,7 @@ func (l *fringeNode[V]) cloneFringe() *fringeNode[V] {
 //
 // If the Table.WithPool() was called, the provided pool is used to efficiently allocate
 // new *node[V] instances, to minimize allocations during dynamic trie updates.
-func (n *node[V]) insertAtDepth(p *pool[V], pfx netip.Prefix, val V, depth int) (exists bool) {
+func (n *node[V]) insertAtDepth(mp *multiPool[V], pfx netip.Prefix, val V, depth int) (exists bool) {
 	ip := pfx.Addr() // the pfx must be in canonical form
 	bits := pfx.Bits()
 	octets := ip.AsSlice()
@@ -186,9 +186,9 @@ func (n *node[V]) insertAtDepth(p *pool[V], pfx netip.Prefix, val V, depth int) 
 		if !n.children.Test(octet) {
 			// insert prefix path compressed as leaf or fringe
 			if isFringe(depth, bits) {
-				return n.children.InsertAt(octet, &fringeNode[V]{val})
+				return n.children.InsertAt(octet, mp.getFringe(val))
 			}
-			return n.children.InsertAt(octet, &leafNode[V]{prefix: pfx, value: val})
+			return n.children.InsertAt(octet, mp.getLeaf(pfx, val))
 		}
 
 		// ... or decend down the trie
@@ -213,8 +213,9 @@ func (n *node[V]) insertAtDepth(p *pool[V], pfx netip.Prefix, val V, depth int) 
 			// push the leaf down
 			// insert new child at current leaf position (addr)
 			// descend down, replace n with new child
-			newNode := p.Get()
-			newNode.insertAtDepth(p, kid.prefix, kid.value, depth+1)
+			newNode := mp.getNode()
+			newNode.insertAtDepth(mp, kid.prefix, kid.value, depth+1)
+			mp.putLeaf(kid)
 
 			n.children.InsertAt(octet, newNode)
 			n = newNode
@@ -232,8 +233,9 @@ func (n *node[V]) insertAtDepth(p *pool[V], pfx netip.Prefix, val V, depth int) 
 			// push the fringe down, it becomes a default route (idx=1)
 			// insert new child at current leaf position (addr)
 			// descend down, replace n with new child
-			newNode := p.Get()
+			newNode := mp.getNode()
 			newNode.prefixes.InsertAt(1, kid.value)
+			mp.putFringe(kid)
 
 			n.children.InsertAt(octet, newNode)
 			n = newNode
@@ -263,7 +265,7 @@ func (n *node[V]) insertAtDepth(p *pool[V], pfx netip.Prefix, val V, depth int) 
 //
 // This allows multiple versions of the trie to coexist safely and efficiently, enabling purely functional
 // route updates with structural sharing where possible.
-func (n *node[V]) insertAtDepthPersist(p *pool[V], pfx netip.Prefix, val V, depth int) (exists bool) {
+func (n *node[V]) insertAtDepthPersist(mp *multiPool[V], pfx netip.Prefix, val V, depth int) (exists bool) {
 	ip := pfx.Addr()
 	bits := pfx.Bits()
 	octets := ip.AsSlice()
@@ -282,9 +284,9 @@ func (n *node[V]) insertAtDepthPersist(p *pool[V], pfx netip.Prefix, val V, dept
 		if !n.children.Test(octet) {
 			// insert prefix path compressed as leaf or fringe
 			if isFringe(depth, bits) {
-				return n.children.InsertAt(octet, &fringeNode[V]{val})
+				return n.children.InsertAt(octet, mp.getFringe(val))
 			}
-			return n.children.InsertAt(octet, &leafNode[V]{prefix: pfx, value: val})
+			return n.children.InsertAt(octet, mp.getLeaf(pfx, val))
 		}
 		kid := n.children.MustGet(octet)
 
@@ -294,7 +296,7 @@ func (n *node[V]) insertAtDepthPersist(p *pool[V], pfx netip.Prefix, val V, dept
 			// clone the traversed path
 
 			// kid points now to cloned kid
-			kid = kid.cloneFlat(p)
+			kid = kid.cloneFlat(mp)
 
 			// replace kid with clone
 			n.children.InsertAt(octet, kid)
@@ -315,8 +317,9 @@ func (n *node[V]) insertAtDepthPersist(p *pool[V], pfx netip.Prefix, val V, dept
 			// push the leaf down
 			// insert new child at current leaf position (addr)
 			// descend down, replace n with new child
-			newNode := p.Get()
-			newNode.insertAtDepth(p, kid.prefix, kid.value, depth+1)
+			newNode := mp.getNode()
+			newNode.insertAtDepth(mp, kid.prefix, kid.value, depth+1)
+			mp.putLeaf(kid)
 
 			n.children.InsertAt(octet, newNode)
 			n = newNode
@@ -334,8 +337,9 @@ func (n *node[V]) insertAtDepthPersist(p *pool[V], pfx netip.Prefix, val V, dept
 			// push the fringe down, it becomes a default route (idx=1)
 			// insert new child at current leaf position (addr)
 			// descend down, replace n with new child
-			newNode := p.Get()
+			newNode := mp.getNode()
 			newNode.prefixes.InsertAt(1, kid.value)
+			mp.putFringe(kid)
 
 			n.children.InsertAt(octet, newNode)
 			n = newNode
@@ -364,7 +368,7 @@ func (n *node[V]) insertAtDepthPersist(p *pool[V], pfx netip.Prefix, val V, dept
 //
 // Any removed intermediate nodes are returned to the memory pool, enabling efficient re-use through
 // a sync.Pool-based allocator.
-func (n *node[V]) purgeAndCompress(p *pool[V], stack []*node[V], octets []uint8, is4 bool) {
+func (n *node[V]) purgeAndCompress(mp *multiPool[V], stack []*node[V], octets []uint8, is4 bool) {
 	// unwind the stack
 	for depth := len(stack) - 1; depth >= 0; depth-- {
 		parent := stack[depth]
@@ -377,7 +381,7 @@ func (n *node[V]) purgeAndCompress(p *pool[V], stack []*node[V], octets []uint8,
 		case n.isEmpty():
 			// just delete this empty node from parent
 			parent.children.DeleteAt(octet)
-			p.Put(n)
+			mp.putNode(n)
 
 		case pfxCount == 0 && childCount == 1:
 			switch kid := n.children.Items[0].(type) {
@@ -390,8 +394,9 @@ func (n *node[V]) purgeAndCompress(p *pool[V], stack []*node[V], octets []uint8,
 				parent.children.DeleteAt(octet)
 
 				// ... (re)insert the leaf at parents depth
-				parent.insertAtDepth(p, kid.prefix, kid.value, depth)
-				p.Put(n)
+				parent.insertAtDepth(mp, kid.prefix, kid.value, depth)
+				mp.putNode(n)
+				mp.putLeaf(kid)
 			case *fringeNode[V]:
 				// just one fringe, delete this node and reinsert the fringe as leaf above
 				parent.children.DeleteAt(octet)
@@ -404,8 +409,9 @@ func (n *node[V]) purgeAndCompress(p *pool[V], stack []*node[V], octets []uint8,
 				fringePfx := cidrForFringe(octets, depth+1, is4, lastOctet)
 
 				// ... (re)reinsert prefix/value at parents depth
-				parent.insertAtDepth(p, fringePfx, kid.value, depth)
-				p.Put(n)
+				parent.insertAtDepth(mp, fringePfx, kid.value, depth)
+				mp.putNode(n)
+				mp.putFringe(kid)
 			}
 
 		case pfxCount == 1 && childCount == 0:
@@ -424,8 +430,8 @@ func (n *node[V]) purgeAndCompress(p *pool[V], stack []*node[V], octets []uint8,
 			pfx := cidrFromPath(path, depth+1, is4, idx)
 
 			// ... (re)insert prefix/value at parents depth
-			parent.insertAtDepth(p, pfx, val, depth)
-			p.Put(n)
+			parent.insertAtDepth(mp, pfx, val, depth)
+			mp.putNode(n)
 		}
 
 		// climb up the stack
@@ -473,12 +479,12 @@ func (n *node[V]) lpmTest(idx uint) bool {
 // It differentiates between shallow and deep copies:
 //
 // If the value type V implements the Cloner[V] interface, each item is deep-copied.
-func (n *node[V]) cloneRec(p *pool[V]) *node[V] {
+func (n *node[V]) cloneRec(mp *multiPool[V]) *node[V] {
 	if n == nil {
 		return nil
 	}
 
-	c := p.Get()
+	c := mp.getNode()
 	if n.isEmpty() {
 		return c
 	}
@@ -503,13 +509,13 @@ func (n *node[V]) cloneRec(p *pool[V]) *node[V] {
 		switch kid := kidAny.(type) {
 		case *node[V]:
 			// clone the child node rec-descent
-			c.children.Items[i] = kid.cloneRec(p)
+			c.children.Items[i] = kid.cloneRec(mp)
 		case *leafNode[V]:
 			// deep copy if V implements Cloner[V]
-			c.children.Items[i] = kid.cloneLeaf()
+			c.children.Items[i] = kid.cloneLeaf(mp)
 		case *fringeNode[V]:
 			// deep copy if V implements Cloner[V]
-			c.children.Items[i] = kid.cloneFringe()
+			c.children.Items[i] = kid.cloneFringe(mp)
 
 		default:
 			panic("logic error, wrong node type")
@@ -524,12 +530,12 @@ func (n *node[V]) cloneRec(p *pool[V]) *node[V] {
 // This method is intended for fast, non-recursive cloning of a node structure. It copies only
 // the current node and selectively performs deep copies of stored values, without recursively
 // cloning child nodes.
-func (n *node[V]) cloneFlat(p *pool[V]) *node[V] {
+func (n *node[V]) cloneFlat(mp *multiPool[V]) *node[V] {
 	if n == nil {
 		return nil
 	}
 
-	c := p.Get()
+	c := mp.getNode()
 	if n.isEmpty() {
 		return c
 	}
@@ -552,9 +558,9 @@ func (n *node[V]) cloneFlat(p *pool[V]) *node[V] {
 	for i, kidAny := range c.children.Items {
 		switch kid := kidAny.(type) {
 		case *leafNode[V]:
-			c.children.Items[i] = kid.cloneLeaf()
+			c.children.Items[i] = kid.cloneLeaf(mp)
 		case *fringeNode[V]:
-			c.children.Items[i] = kid.cloneFringe()
+			c.children.Items[i] = kid.cloneFringe(mp)
 		}
 	}
 
@@ -741,7 +747,7 @@ func (n *node[V]) allRecSorted(path stridePath, depth int, is4 bool, yield func(
 // but leaves the source node o unchanged.
 //
 // Returns the number of duplicate prefixes that were overwritten during merging.
-func (n *node[V]) unionRec(p *pool[V], o *node[V], depth int) (duplicates int) {
+func (n *node[V]) unionRec(mp *multiPool[V], o *node[V], depth int) (duplicates int) {
 	// for all prefixes in other node do ...
 	for i, oIdx := range o.prefixes.AsSlice(&[256]uint8{}) {
 		// clone/copy the value from other node at idx
@@ -781,15 +787,15 @@ func (n *node[V]) unionRec(p *pool[V], o *node[V], depth int) (duplicates int) {
 		if !thisExists { // NULL, ... slot at addr is empty
 			switch otherKid := o.children.Items[i].(type) {
 			case *node[V]: // NULL, node
-				n.children.InsertAt(addr, otherKid.cloneRec(p))
+				n.children.InsertAt(addr, otherKid.cloneRec(mp))
 				continue
 
 			case *leafNode[V]: // NULL, leaf
-				n.children.InsertAt(addr, otherKid.cloneLeaf())
+				n.children.InsertAt(addr, otherKid.cloneLeaf(mp))
 				continue
 
 			case *fringeNode[V]: // NULL, fringe
-				n.children.InsertAt(addr, otherKid.cloneFringe())
+				n.children.InsertAt(addr, otherKid.cloneFringe(mp))
 				continue
 
 			default:
@@ -802,20 +808,20 @@ func (n *node[V]) unionRec(p *pool[V], o *node[V], depth int) (duplicates int) {
 			switch otherKid := o.children.Items[i].(type) {
 			case *node[V]: // node, node
 				// both childs have node at addr, call union rec-descent on child nodes
-				duplicates += thisKid.unionRec(p, otherKid.cloneRec(p), depth+1)
+				duplicates += thisKid.unionRec(mp, otherKid.cloneRec(mp), depth+1)
 				continue
 
 			case *leafNode[V]: // node, leaf
 				// push this cloned leaf down, count duplicate entry
-				clonedLeaf := otherKid.cloneLeaf()
-				if thisKid.insertAtDepth(p, clonedLeaf.prefix, clonedLeaf.value, depth+1) {
+				clonedLeaf := otherKid.cloneLeaf(mp)
+				if thisKid.insertAtDepth(mp, clonedLeaf.prefix, clonedLeaf.value, depth+1) {
 					duplicates++
 				}
 				continue
 
 			case *fringeNode[V]: // node, fringe
 				// push this fringe down, a fringe becomes a default route one level down
-				clonedFringe := otherKid.cloneFringe()
+				clonedFringe := otherKid.cloneFringe(mp)
 				if thisKid.prefixes.InsertAt(1, clonedFringe.value) {
 					duplicates++
 				}
@@ -826,16 +832,16 @@ func (n *node[V]) unionRec(p *pool[V], o *node[V], depth int) (duplicates int) {
 			switch otherKid := o.children.Items[i].(type) {
 			case *node[V]: // leaf, node
 				// create new node
-				nc := p.Get()
+				nc := mp.getNode()
 
 				// push this leaf down
-				nc.insertAtDepth(p, thisKid.prefix, thisKid.value, depth+1)
+				nc.insertAtDepth(mp, thisKid.prefix, thisKid.value, depth+1)
 
 				// insert the new node at current addr
 				n.children.InsertAt(addr, nc)
 
 				// unionRec this new node with other kid node
-				duplicates += nc.unionRec(p, otherKid.cloneRec(p), depth+1)
+				duplicates += nc.unionRec(mp, otherKid.cloneRec(mp), depth+1)
 				continue
 
 			case *leafNode[V]: // leaf, leaf
@@ -847,14 +853,14 @@ func (n *node[V]) unionRec(p *pool[V], o *node[V], depth int) (duplicates int) {
 				}
 
 				// create new node
-				nc := p.Get()
+				nc := mp.getNode()
 
 				// push this leaf down
-				nc.insertAtDepth(p, thisKid.prefix, thisKid.value, depth+1)
+				nc.insertAtDepth(mp, thisKid.prefix, thisKid.value, depth+1)
 
 				// insert at depth cloned leaf, maybe duplicate
-				clonedLeaf := otherKid.cloneLeaf()
-				if nc.insertAtDepth(p, clonedLeaf.prefix, clonedLeaf.value, depth+1) {
+				clonedLeaf := otherKid.cloneLeaf(mp)
+				if nc.insertAtDepth(mp, clonedLeaf.prefix, clonedLeaf.value, depth+1) {
 					duplicates++
 				}
 
@@ -864,13 +870,13 @@ func (n *node[V]) unionRec(p *pool[V], o *node[V], depth int) (duplicates int) {
 
 			case *fringeNode[V]: // leaf, fringe
 				// create new node
-				nc := p.Get()
+				nc := mp.getNode()
 
 				// push this leaf down
-				nc.insertAtDepth(p, thisKid.prefix, thisKid.value, depth+1)
+				nc.insertAtDepth(mp, thisKid.prefix, thisKid.value, depth+1)
 
 				// push this cloned fringe down, it becomes the default route
-				clonedFringe := otherKid.cloneFringe()
+				clonedFringe := otherKid.cloneFringe(mp)
 				if nc.prefixes.InsertAt(1, clonedFringe.value) {
 					duplicates++
 				}
@@ -884,7 +890,7 @@ func (n *node[V]) unionRec(p *pool[V], o *node[V], depth int) (duplicates int) {
 			switch otherKid := o.children.Items[i].(type) {
 			case *node[V]: // fringe, node
 				// create new node
-				nc := p.Get()
+				nc := mp.getNode()
 
 				// push this fringe down, it becomes the default route
 				nc.prefixes.InsertAt(1, thisKid.value)
@@ -893,19 +899,19 @@ func (n *node[V]) unionRec(p *pool[V], o *node[V], depth int) (duplicates int) {
 				n.children.InsertAt(addr, nc)
 
 				// unionRec this new node with other kid node
-				duplicates += nc.unionRec(p, otherKid.cloneRec(p), depth+1)
+				duplicates += nc.unionRec(mp, otherKid.cloneRec(mp), depth+1)
 				continue
 
 			case *leafNode[V]: // fringe, leaf
 				// create new node
-				nc := p.Get()
+				nc := mp.getNode()
 
 				// push this fringe down, it becomes the default route
 				nc.prefixes.InsertAt(1, thisKid.value)
 
 				// push this cloned leaf down
-				clonedLeaf := otherKid.cloneLeaf()
-				if nc.insertAtDepth(p, clonedLeaf.prefix, clonedLeaf.value, depth+1) {
+				clonedLeaf := otherKid.cloneLeaf(mp)
+				if nc.insertAtDepth(mp, clonedLeaf.prefix, clonedLeaf.value, depth+1) {
 					duplicates++
 				}
 
@@ -914,7 +920,7 @@ func (n *node[V]) unionRec(p *pool[V], o *node[V], depth int) (duplicates int) {
 				continue
 
 			case *fringeNode[V]: // fringe, fringe
-				thisKid.value = otherKid.cloneFringe().value
+				thisKid.value = otherKid.cloneFringe(mp).value
 				duplicates++
 				continue
 			}
