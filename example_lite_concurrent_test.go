@@ -89,7 +89,8 @@ func (lf *SyncLite) Delete(pfx netip.Prefix) {
 func ExampleLite_concurrent() {
 	wg := sync.WaitGroup{}
 
-	syncTbl := NewSyncLite().WithPool()
+	syncLite := NewSyncLite()
+	syncLite.WithPool()
 
 	wg.Add(1)
 	go func() {
@@ -97,7 +98,7 @@ func ExampleLite_concurrent() {
 		for range 1_000_000 {
 			for _, s := range exampleIPs {
 				ip := netip.MustParseAddr(s)
-				_ = syncTbl.Contains(ip)
+				_ = syncLite.Contains(ip)
 			}
 		}
 	}()
@@ -108,7 +109,7 @@ func ExampleLite_concurrent() {
 		for range 10_000 {
 			for _, s := range examplePrefixes {
 				pfx := netip.MustParsePrefix(s)
-				syncTbl.Insert(pfx)
+				syncLite.Insert(pfx)
 			}
 		}
 	}()
@@ -119,7 +120,7 @@ func ExampleLite_concurrent() {
 		for range 10_000 {
 			for _, s := range examplePrefixes {
 				pfx := netip.MustParsePrefix(s)
-				syncTbl.Delete(pfx)
+				syncLite.Delete(pfx)
 			}
 		}
 	}()

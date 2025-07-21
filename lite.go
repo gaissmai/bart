@@ -7,6 +7,13 @@ import (
 	"net/netip"
 )
 
+type zeroStruct struct{}
+
+// zeroStruct must implement Cloner.
+func (z zeroStruct) Clone() zeroStruct {
+	return zeroStruct{}
+}
+
 // Lite is just a convenience wrapper for Table, instantiated with an
 // empty struct as payload. Lite is ideal for simple IP ACLs
 // (access-control-lists) with plain true/false results without a payload.
@@ -20,7 +27,7 @@ import (
 //   - Update
 //   - UpdatePersist
 type Lite struct {
-	Table[struct{}]
+	Table[zeroStruct]
 }
 
 // WithPool is an adapter for the underlying table.

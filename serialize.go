@@ -142,7 +142,7 @@ func (n *node[V]) fprintRec(w io.Writer, parent trieItem[V], pad string) error {
 		var err error
 		// Lite: val is the empty struct, don't print it
 		switch any(item.val).(type) {
-		case struct{}:
+		case zeroStruct:
 			_, err = fmt.Fprintf(w, "%s%s\n", pad+glyphe, item.cidr)
 		default:
 			_, err = fmt.Fprintf(w, "%s%s (%v)\n", pad+glyphe, item.cidr, item.val)
