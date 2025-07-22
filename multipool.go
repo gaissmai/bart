@@ -19,21 +19,62 @@ type multiPool[V any] struct {
 // separate pools for internal nodes, leaf nodes, and fringe nodes.
 func newMultiPool[V any]() *multiPool[V] {
 	return &multiPool[V]{
-		node:   newNodePool[V](),
-		leaf:   newLeafPool[V](),
-		fringe: newFringePool[V](),
+		node:   &nodePool[V]{},
+		leaf:   &leafPool[V]{},
+		fringe: &fringePool[V]{},
 	}
 }
+
+// nodePool manages *node[V] instances with a sync.Pool,
+// tracking total allocations and in-use count for diagnostics.
+type nodePool[V any] struct {
+	sync.Pool
+	totalAllocated atomic.Int64 // total *node[V] instances allocated
+	currentLive    atomic.Int64 // currently checked-out instances
+}
+
+// leafPool manages *leafNode[V] instances using sync.Pool,
+// tracking allocations and usage counts for monitoring.
+type leafPool[V any] struct {
+	sync.Pool
+	totalAllocated atomic.Int64 // total *leafNode[V] instances allocated
+	currentLive    atomic.Int64 // currently in-use instances
+}
+
+// fringePool manages *fringeNode[V] instances with sync.Pool,
+// tracking allocation counts and active usage for profiling and debugging.
+type fringePool[V any] struct {
+	sync.Pool
+
+	totalAllocated atomic.Int64 // total *fringeNode[V] instances allocated
+	currentLive    atomic.Int64 // currently in-use instances
+}
+
+// ##########################################################################
 
 // getNode retrieves an internal node from the pool, incrementing the live allocation count.
 // If the multiPool receiver is nil, indicating no sub-pools exist,
 // it returns a newly allocated internal node instance without tracking or reuse.
-func (mp *multiPool[V]) getNode() *node[V] {
+func (mp *multiPool[V]) getNode() (n *node[V]) {
 	if mp == nil {
-		return new(node[V])
+		return &node[V]{}
 	}
+
+	// Update statistics
 	mp.node.currentLive.Add(1)
-	return mp.node.Get().(*node[V])
+
+	// Try to get a *node[V] from the internal sync.Pool
+	i := mp.node.Get()
+	if i == nil {
+		// Update statistics
+		mp.node.totalAllocated.Add(1)
+
+		// Fallback for nil return: explicitly allocate a new node
+		return &node[V]{}
+	}
+
+	// Return the cached node
+	return i.(*node[V])
 }
 
 // getLeaf retrieves a leaf node from the pool, initialized with the given
@@ -44,10 +85,26 @@ func (mp *multiPool[V]) getLeaf(pfx netip.Prefix, val V) *leafNode[V] {
 	if mp == nil {
 		return &leafNode[V]{prefix: pfx, value: val}
 	}
+
+	// Update statistics
 	mp.leaf.currentLive.Add(1)
-	l := mp.leaf.Get().(*leafNode[V])
+
+	// Try to get a *leafNode[V] from the internal sync.Pool
+	i := mp.leaf.Get()
+	if i == nil {
+		// Update statistics
+		mp.leaf.totalAllocated.Add(1)
+
+		// Fallback for nil return: explicitly allocate a new node
+		return &leafNode[V]{prefix: pfx, value: val}
+	}
+
+	l := i.(*leafNode[V])
+	// Initialize the reused leaf with the caller-provided prefix and value
 	l.prefix = pfx
 	l.value = val
+
+	// Return the cached node
 	return l
 }
 
@@ -59,9 +116,26 @@ func (mp *multiPool[V]) getFringe(val V) *fringeNode[V] {
 	if mp == nil {
 		return &fringeNode[V]{value: val}
 	}
+
+	// Update statistics
 	mp.fringe.currentLive.Add(1)
-	f := mp.fringe.Get().(*fringeNode[V])
+
+	// Try to get a *fringeNode[V] from the internal sync.Pool
+	i := mp.fringe.Get()
+	if i == nil {
+		// Update statistics
+		mp.fringe.totalAllocated.Add(1)
+
+		// Fallback for nil return: explicitly allocate a new node
+		return &fringeNode[V]{value: val}
+	}
+
+	f := i.(*fringeNode[V])
+
+	// Initialize the reused fringe with the caller-provided value
 	f.value = val
+
+	// Return the cached node
 	return f
 }
 
@@ -70,11 +144,12 @@ func (mp *multiPool[V]) getFringe(val V) *fringeNode[V] {
 // If the multiPool receiver is nil, indicating no sub-pools exist,
 // the node is discarded since there is no pool to return it to.
 func (mp *multiPool[V]) putNode(n *node[V]) {
-	if mp != nil {
-		n.reset() // reset internal state but keep allocated memory
-		mp.node.currentLive.Add(-1)
-		mp.node.Put(n)
+	if mp == nil {
+		return
 	}
+	n.reset() // reset internal state but keep allocated memory
+	mp.node.currentLive.Add(-1)
+	mp.node.Put(n)
 }
 
 // putLeaf returns a leaf node to its pool for reuse,
@@ -82,10 +157,16 @@ func (mp *multiPool[V]) putNode(n *node[V]) {
 // If the multiPool receiver is nil, indicating no sub-pools exist,
 // the node is discarded since there is no pool to return it to.
 func (mp *multiPool[V]) putLeaf(l *leafNode[V]) {
-	if mp != nil {
-		mp.leaf.currentLive.Add(-1)
-		mp.leaf.Put(l)
+	if mp == nil {
+		return
 	}
+	// reset
+	var zero V
+	l.value = zero
+	l.prefix = netip.Prefix{}
+
+	mp.leaf.currentLive.Add(-1)
+	mp.leaf.Put(l)
 }
 
 // putFringe returns a fringe node to its pool for reuse,
@@ -93,10 +174,15 @@ func (mp *multiPool[V]) putLeaf(l *leafNode[V]) {
 // If the multiPool receiver is nil, indicating no sub-pools exist,
 // the node is discarded since there is no pool to return it to.
 func (mp *multiPool[V]) putFringe(f *fringeNode[V]) {
-	if mp != nil {
-		mp.fringe.currentLive.Add(-1)
-		mp.fringe.Put(f)
+	if mp == nil {
+		return
 	}
+	// reset
+	var zero V
+	f.value = zero
+
+	mp.fringe.currentLive.Add(-1)
+	mp.fringe.Put(f)
 }
 
 // nodeStats returns the count of currently live internal nodes and
@@ -124,65 +210,4 @@ func (mp *multiPool[V]) fringeStats() (live int64, total int64) {
 		return 0, 0
 	}
 	return mp.fringe.currentLive.Load(), mp.fringe.totalAllocated.Load()
-}
-
-// ##################################################################
-
-// nodePool manages *node[V] instances with a sync.Pool,
-// tracking total allocations and in-use count for diagnostics.
-type nodePool[V any] struct {
-	sync.Pool
-	totalAllocated atomic.Int64 // total *node[V] instances allocated
-	currentLive    atomic.Int64 // currently checked-out instances
-}
-
-// newNodePool creates a nodePool with allocation tracking enabled.
-func newNodePool[V any]() *nodePool[V] {
-	np := &nodePool[V]{}
-	np.New = func() any {
-		np.totalAllocated.Add(1)
-		return new(node[V])
-	}
-	return np
-}
-
-// ##################################################################
-
-// leafPool manages *leafNode[V] instances using sync.Pool,
-// tracking allocations and usage counts for monitoring.
-type leafPool[V any] struct {
-	sync.Pool
-	totalAllocated atomic.Int64 // total *leafNode[V] instances allocated
-	currentLive    atomic.Int64 // currently in-use instances
-}
-
-// newLeafPool creates a leafPool with allocation tracking.
-func newLeafPool[V any]() *leafPool[V] {
-	lp := &leafPool[V]{}
-	lp.New = func() any {
-		lp.totalAllocated.Add(1)
-		return new(leafNode[V])
-	}
-	return lp
-}
-
-// ##################################################################
-
-// fringePool manages *fringeNode[V] instances with sync.Pool,
-// tracking allocation counts and active usage for profiling and debugging.
-type fringePool[V any] struct {
-	sync.Pool
-
-	totalAllocated atomic.Int64 // total *fringeNode[V] instances allocated
-	currentLive    atomic.Int64 // currently in-use instances
-}
-
-// newFringePool creates a fringePool with tracking enabled.
-func newFringePool[V any]() *fringePool[V] {
-	fp := &fringePool[V]{}
-	fp.New = func() any {
-		fp.totalAllocated.Add(1)
-		return new(fringeNode[V])
-	}
-	return fp
 }
