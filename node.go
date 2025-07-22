@@ -544,17 +544,12 @@ func (n *node[V]) cloneFlat(mp *multiPool[V]) *node[V] {
 	c.prefixes = *(n.prefixes.Copy())
 	c.children = *(n.children.Copy())
 
-	if _, ok := any(*new(V)).(Cloner[V]); !ok {
-		// if V doesn't implement Cloner[V], return early
-		return c
-	}
-
-	// deep copy of values in prefixes
+	// copy or clone of values in prefixes
 	for i, val := range c.prefixes.Items {
 		c.prefixes.Items[i] = cloneOrCopy(val)
 	}
 
-	// deep copy of values in path compressed leaves
+	// copy or clone of values in path compressed leaves and fringes
 	for i, kidAny := range c.children.Items {
 		switch kid := kidAny.(type) {
 		case *leafNode[V]:

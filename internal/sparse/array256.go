@@ -211,7 +211,7 @@ func (a *Array256[T]) DeleteAt(i uint8) (value T, exists bool) {
 // insertItem inserts a new element at the given index position i in the Items slice,
 // shifting all following elements one position to the right to make space.
 //
-// This method must be called with the correct insertion index — that is,
+// This method must be called with the correct insertion index - that is,
 // the rank-0 value of the corresponding bit index i in BitSet256 once it's set.
 //
 // The slice will be extended by one element. If the capacity allows, this is done

@@ -11,7 +11,7 @@
 // to arrange all 256 possible prefixes in a complete binary tree structure.
 //
 // Instead of allocating full arrays, BART uses popcount-compressed sparse arrays
-// and aggressive path compression. This results in up to 100× less memory usage
+// and aggressive path compression. This results in up to 100x less memory usage
 // than ART, while maintaining or even improving lookup speed.
 //
 // Lookup operations are entirely bit-vector based and rely on precomputed
@@ -19,7 +19,7 @@
 // for extremely efficient, cacheline-aligned access and is accelerated by
 // CPU instructions such as POPCNT, LZCNT, and TZCNT.
 //
-// The fixed 256-bit representation (4× uint64) permits loop unrolling in hot paths,
+// The fixed 256-bit representation (4x uint64) permits loop unrolling in hot paths,
 // ensuring predictable and fast performance even under high routing load.
 package bart
 
@@ -802,7 +802,7 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 // Example:
 //
 //	for sub, val := range table.Subnets(netip.MustParsePrefix("10.0.0.0/8")) {
-//	    fmt.Println("Covered:", sub, "→", val)
+//	    fmt.Println("Covered:", sub, "->", val)
 //	}
 func (t *Table[V]) Subnets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {

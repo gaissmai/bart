@@ -143,16 +143,17 @@ are used.
 
 A `bart.Lite` wrapper is also included, this is ideal for simple IP
 ACLs (access-control-lists) with plain true/false results and no payload.
+Lite is just a convenience wrapper for Table, instantiated with an empty
+struct as payload.
 
 Lite wraps or adapts some methods where needed and delegates almost all
 other methods unmodified to the underlying Table.
 Some delegated methods are pointless without a payload.
 
 ```golang
-   type Lite struct { ...  }
-     // Lite is just a convenience wrapper for Table, instantiated with an
-     // empty struct as payload. Lite is ideal for simple IP ACLs
-     // (access-control-lists) with plain true/false results without a payload.
+   type Lite struct {
+     Table[struct{}]
+   }
 
    func (l *Lite) WithPool() *Lite
 

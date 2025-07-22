@@ -228,7 +228,7 @@ func (n *node[V]) overlapsSameChildren(o *node[V], depth int) bool {
 
 // overlapsTwoChilds checks two child entries for semantic overlap.
 //
-// Handles all 3×3 combinations of node kinds (node, leaf, fringe).
+// Handles all 3x3 combinations of node kinds (node, leaf, fringe).
 //
 // Recurses into subtrees for (node, node), delegates to overlapsPrefixAtDepth
 // for node/leaf mismatches, and returns true immediately if either side is fringe.
