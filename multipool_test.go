@@ -10,7 +10,7 @@ func TestMultiPool(t *testing.T) {
 
 	mp := newMultiPool[testVal]()
 
-	// Initial stats → all should be zero
+	// Initial stats -> all should be zero
 	if live, total := mp.nodeStats(); live != 0 || total != 0 {
 		t.Fatalf("expected node stats to start at 0/0, got %d/%d", live, total)
 	}
