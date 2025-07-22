@@ -187,9 +187,9 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 			// insert prefix path compressed
 			newVal := cb(zero, false)
 			if isFringe(depth, bits) {
-				n.children.InsertAt(octet, &fringeNode[V]{value: newVal})
+				n.children.InsertAt(octet, t.multiPool.getFringe(newVal))
 			} else {
-				n.children.InsertAt(octet, &leafNode[V]{prefix: pfx, value: newVal})
+				n.children.InsertAt(octet, t.multiPool.getLeaf(pfx, newVal))
 			}
 			t.sizeUpdate(is4, 1)
 			return newVal

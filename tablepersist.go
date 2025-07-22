@@ -123,9 +123,9 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 			// insert prefix path compressed
 			newVal := cb(zero, false)
 			if isFringe(depth, bits) {
-				n.children.InsertAt(addr, &fringeNode[V]{value: newVal})
+				n.children.InsertAt(addr, pt.multiPool.getFringe(newVal))
 			} else {
-				n.children.InsertAt(addr, &leafNode[V]{prefix: pfx, value: newVal})
+				n.children.InsertAt(addr, pt.multiPool.getLeaf(pfx, newVal))
 			}
 
 			pt.sizeUpdate(is4, 1)
@@ -151,7 +151,9 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 			// update existing value if prefixes are equal
 			if kid.prefix == pfx {
 				newVal = cb(kid.value, true)
-				n.children.InsertAt(addr, &leafNode[V]{prefix: pfx, value: newVal})
+
+				// Replace the existing leaf with an updated one.
+				n.children.InsertAt(addr, pt.multiPool.getLeaf(pfx, newVal))
 
 				return pt, newVal
 			}
@@ -170,7 +172,8 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 			// update existing value if prefix is fringe
 			if isFringe(depth, bits) {
 				newVal = cb(kid.value, true)
-				n.children.InsertAt(addr, &fringeNode[V]{value: newVal})
+				// Replace fringe node with updated value.
+				n.children.InsertAt(addr, pt.multiPool.getFringe(newVal))
 				return pt, newVal
 			}
 
