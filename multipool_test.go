@@ -5,6 +5,8 @@ import (
 )
 
 func TestMultiPool(t *testing.T) {
+	t.Parallel()
+
 	// Use simple value type for testing (e.g., string)
 	type testVal = string
 
@@ -66,6 +68,9 @@ func TestMultiPool(t *testing.T) {
 
 	// re-allocate from pool (should reuse)
 	n2 := mp.getNode()
+	if !n2.isEmpty() {
+		t.Errorf("expected reused node to be empty")
+	}
 	mp.putNode(n2)
 
 	leaf2 := mp.getLeaf(pfx, "leaf2")
@@ -93,6 +98,7 @@ func TestMultiPool(t *testing.T) {
 }
 
 func TestMultiPool_NilFallback(t *testing.T) {
+	t.Parallel()
 	var mp *multiPool[string] // nil pool
 
 	n := mp.getNode()
