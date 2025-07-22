@@ -45,7 +45,7 @@ import (
 type Table[V any] struct {
 	// used by -copylocks checker from `go vet`.
 	_         [0]sync.Mutex
-	multiPool *multiPool[V]
+	multiPool *multiPool[V] // optional pools for node reuse (node, leaf, fringe)
 
 	// the root nodes, implemented as popcount compressed multibit tries
 	root4 node[V]
@@ -56,22 +56,26 @@ type Table[V any] struct {
 	size6 int
 }
 
-// WithPool initializes a sync.Pool for trie node reuse if one is not already set.
+// WithPool initializes a multiPool for node reuse on the Table if not already set.
 //
-// This method enables the Table to reuse node instances, which reduces heap allocations
-// and decreases garbage collection (GC) pressure in use cases with frequent inserts
-// and deletes. Pooling often improves performance for concurrent or high-throughput
-// workloads by recycling previously allocated objects instead of constantly
-// creating and destroying them.
+// This method enables the Table to recycle internal, leaf, and fringe node instances,
+// which reduces heap allocations and lowers garbage collection (GC) pressure,
+// particularly in workloads with frequent insertions and deletions.
 //
-// If the Table already has a non-nil pool, WithPool returns the Table unchanged.
-// Otherwise, it creates a new generic sync.Pool for node instances and assigns it.
+// By pooling nodes, performance often improves for concurrent or high-throughput usage
+// by avoiding repeated allocations and deallocations of node objects.
+//
+// If the Table already has a non-nil multiPool, WithPool returns the Table unchanged.
+// Otherwise, it creates and assigns a new multiPool managing separate pools
+// for the different node types.
+//
+// Returns the Table to allow method chaining.
 func (t *Table[V]) WithPool() *Table[V] {
 	if t.multiPool != nil {
 		return t
 	}
 
-	// Initialize a new generic sync.Pool for node reuse.
+	// Initialize the multiPool for node reuse.
 	t.multiPool = newMultiPool[V]()
 	return t
 }
