@@ -134,7 +134,6 @@ func (a *Array256[T]) UpdateAt(i uint8, cb func(T, bool) T) (newValue T, wasPres
 	// new value, insert into bitset ...
 	a.BitSet256.Set(i)
 
-	// bitset has changed, recalc rank
 	rank0 = a.Rank(i) - 1
 
 	// ... and insert value into slice
