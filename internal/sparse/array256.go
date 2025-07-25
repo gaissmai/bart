@@ -99,25 +99,22 @@ func (a *Array256[T]) MustGet(i uint8) T {
 // UpdateAt or set the value at i via callback. The new value is returned
 // and true if the value was already present.
 
-// UpdateAt updates the value at index i using a callback. The callback receives:
+// The callback receives:
 //   - the existing value (if present)
 //   - a boolean indicating whether i was already set
 //
 // It must return a new value which is inserted into the sparse array.
-// The method returns the updated value and whether it was already present:
 //
 //	newVal, existed := a.UpdateAt(5, func(prev T, wasSet bool) T {
 //	    if wasSet { return modify(prev) }
 //	    return newEntry()
 //	})
 func (a *Array256[T]) UpdateAt(i uint8, cb func(T, bool) T) (newValue T, wasPresent bool) {
-	var rank0 int
-
 	// if already set, get current value
 	var oldValue T
 
+	rank0 := a.Rank(i) - 1
 	if wasPresent = a.Test(i); wasPresent {
-		rank0 = a.Rank(i) - 1
 		oldValue = a.Items[rank0]
 	}
 
@@ -127,14 +124,14 @@ func (a *Array256[T]) UpdateAt(i uint8, cb func(T, bool) T) (newValue T, wasPres
 	// already set, update and return value
 	if wasPresent {
 		a.Items[rank0] = newValue
-
 		return newValue, wasPresent
 	}
 
-	// new value, insert into bitset ...
+	// insert into bitset ...
 	a.BitSet256.Set(i)
 
-	rank0 = a.Rank(i) - 1
+	// Rank(i) is now one more
+	rank0++
 
 	// ... and insert value into slice
 	a.insertItem(rank0, newValue)
