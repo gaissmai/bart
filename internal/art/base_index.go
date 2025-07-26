@@ -4,13 +4,12 @@
 // Package art summarizes the functions and inverse functions
 // for mapping between a prefix and a baseIndex.
 //
-//	can inline HostIdx with cost 5
-//	can inline IdxToPfx256 with cost 37
-//	can inline IdxToRange256 with cost 61
+//	can inline OctetToIdx with cost 5
+//	can inline PfxToIdx with cost 10
+//	can inline IdxToPfx with cost 30
+//	can inline IdxToRange with cost 54
+//	can inline PfxBits with cost 21
 //	can inline NetMask with cost 7
-//	can inline PfxLen256 with cost 18
-//	can inline PfxToIdx256 with cost 29
-//	can inline pfxToIdx with cost 11
 //
 // Please read the ART paper ./doc/artlookup.pdf
 // to understand the baseIndex algorithm.
