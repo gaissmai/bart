@@ -25,7 +25,7 @@ var (
 // or take a long time in comparison to reads,
 // providing high performance for concurrent workloads.
 func ExampleLite_concurrent() {
-	baseTbl := new(bart.Lite) // .WithPool()
+	baseTbl := new(bart.Lite)
 	liteAtomicPtr.Store(baseTbl)
 
 	wg := sync.WaitGroup{}
