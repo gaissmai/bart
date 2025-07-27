@@ -44,7 +44,7 @@ var (
 // If the payload V either contains a pointer or is a pointer,
 // it must implement the [bart.Cloner] interface.
 func ExampleTable_concurrent() {
-	baseTbl := new(bart.Table[*testVal]) // .WithPool()
+	baseTbl := new(bart.Table[*testVal])
 	tblAtomicPtr.Store(baseTbl)
 
 	wg := sync.WaitGroup{}
