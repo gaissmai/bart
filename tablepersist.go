@@ -32,24 +32,21 @@ func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V] {
 	pfx = pfx.Masked()
 	is4 := pfx.Addr().Is4()
 
-	// Create a new Table instance that copies the pointer to the
-	// same multiPool and counts of prefixes from the current Table.
-	// This supports sharing pools while enabling copy-on-write updates.
+	// share size counters; root nodes cloned selectively.
 	pt := &Table[V]{
-		multiPool: t.multiPool,
-		size4:     t.size4,
-		size6:     t.size6,
+		size4: t.size4,
+		size6: t.size6,
 	}
 
 	// Clone the root node corresponding to the address family:
 	// For the address family in use, perform a shallow clone with copy-on-write semantics.
 	// The other root node (IPv4 or IPv6) is simply copied by value (shared).
 	if is4 {
-		pt.root4 = *t.root4.cloneFlat(t.multiPool)
+		pt.root4 = *t.root4.cloneFlat()
 		pt.root6 = t.root6
 	} else {
 		pt.root4 = t.root4
-		pt.root6 = *t.root6.cloneFlat(t.multiPool)
+		pt.root6 = *t.root6.cloneFlat()
 	}
 
 	// Get a pointer to the root node we will modify in this operation.
@@ -58,7 +55,7 @@ func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V] {
 	// Insert the prefix and value using the persist insert method that clones nodes
 	// along the path. If insertAtDepthPersist returns true, the prefix existed,
 	// so no size increment is necessary.
-	if n.insertAtDepthPersist(pt.multiPool, pfx, val, 0) {
+	if n.insertAtDepthPersist(pfx, val, 0) {
 		return pt
 	}
 
@@ -95,21 +92,19 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 	is4 := ip.Is4()
 	bits := pfx.Bits()
 
-	// See InsertPersist for rationale of this Table clone pattern:
-	// share multiPool and size counters; root nodes cloned selectively.
+	// share size counters; root nodes cloned selectively.
 	pt = &Table[V]{
-		multiPool: t.multiPool,
-		size4:     t.size4,
-		size6:     t.size6,
+		size4: t.size4,
+		size6: t.size6,
 	}
 
 	// Clone root node corresponding to the IP version, for copy-on-write.
 	if is4 {
-		pt.root4 = *t.root4.cloneFlat(t.multiPool)
+		pt.root4 = *t.root4.cloneFlat()
 		pt.root6 = t.root6
 	} else {
 		pt.root4 = t.root4
-		pt.root6 = *t.root6.cloneFlat(t.multiPool)
+		pt.root6 = *t.root6.cloneFlat()
 	}
 
 	// Prepare traversal info.
@@ -137,9 +132,9 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 		if !n.children.Test(addr) {
 			newVal := cb(zero, false)
 			if isFringe(depth, bits) {
-				n.children.InsertAt(addr, pt.multiPool.getFringe(newVal))
+				n.children.InsertAt(addr, newFringeNode[V](newVal))
 			} else {
-				n.children.InsertAt(addr, pt.multiPool.getLeaf(pfx, newVal))
+				n.children.InsertAt(addr, newLeafNode[V](pfx, newVal))
 			}
 
 			// New prefix addition updates size.
@@ -154,7 +149,7 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 		switch kid := kid.(type) {
 		case *node[V]:
 			// Clone the node along the traversed path to respect copy-on-write.
-			kid = kid.cloneFlat(pt.multiPool)
+			kid = kid.cloneFlat()
 
 			// Replace original child with the cloned child.
 			n.children.InsertAt(addr, kid)
@@ -169,15 +164,15 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 				newVal = cb(kid.value, true)
 
 				// Replace the existing leaf with an updated one.
-				n.children.InsertAt(addr, pt.multiPool.getLeaf(pfx, newVal))
+				n.children.InsertAt(addr, newLeafNode[V](pfx, newVal))
 
 				return pt, newVal
 			}
 
 			// Prefixes differ - need to push existing leaf down the trie,
 			// create a new internal node, and insert the original leaf under it.
-			newNode := pt.multiPool.getNode()
-			newNode.insertAtDepth(pt.multiPool, kid.prefix, kid.value, depth+1)
+			newNode := new(node[V])
+			newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
 
 			// Replace leaf with new node and descend.
 			n.children.InsertAt(addr, newNode)
@@ -188,13 +183,13 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 			if isFringe(depth, bits) {
 				newVal = cb(kid.value, true)
 				// Replace fringe node with updated value.
-				n.children.InsertAt(addr, pt.multiPool.getFringe(newVal))
+				n.children.InsertAt(addr, newFringeNode[V](newVal))
 				return pt, newVal
 			}
 
 			// Else convert fringe node into an internal node with fringe value
 			// pushed down as default route (idx=1).
-			newNode := pt.multiPool.getNode()
+			newNode := new(node[V])
 			newNode.prefixes.InsertAt(1, kid.value)
 
 			// Replace fringe with newly created internal node and descend.
@@ -255,21 +250,19 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, e
 	is4 := ip.Is4()
 	bits := pfx.Bits()
 
-	// Create new Table sharing multiPool and prefix counts;
 	// root nodes cloned selectively for copy-on-write.
 	pt = &Table[V]{
-		multiPool: t.multiPool,
-		size4:     t.size4,
-		size6:     t.size6,
+		size4: t.size4,
+		size6: t.size6,
 	}
 
 	// Clone the root node for the IP version involved.
 	if is4 {
-		pt.root4 = *t.root4.cloneFlat(t.multiPool)
+		pt.root4 = *t.root4.cloneFlat()
 		pt.root6 = t.root6
 	} else {
 		pt.root4 = t.root4
-		pt.root6 = *t.root6.cloneFlat(t.multiPool)
+		pt.root6 = *t.root6.cloneFlat()
 	}
 
 	// Prepare traversal context.
@@ -300,7 +293,7 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, e
 			pt.sizeUpdate(is4, -1)
 
 			// After deletion, purge nodes and compress the path if needed.
-			n.purgeAndCompress(pt.multiPool, stack[:depth], octets, is4)
+			n.purgeAndCompress(stack[:depth], octets, is4)
 
 			return pt, val, exists
 		}
@@ -318,7 +311,7 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, e
 		switch kid := kid.(type) {
 		case *node[V]:
 			// Clone the internal node for copy-on-write.
-			kid = kid.cloneFlat(pt.multiPool)
+			kid = kid.cloneFlat()
 
 			// Replace child with cloned node.
 			n.children.InsertAt(addr, kid)
@@ -337,14 +330,11 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, e
 			// Delete the fringe node.
 			n.children.DeleteAt(addr)
 
-			// Return fringe node to pool for reuse.
-			pt.multiPool.putFringe(kid)
-
 			// Update size to reflect deletion.
 			pt.sizeUpdate(is4, -1)
 
 			// Purge and compress affected path.
-			n.purgeAndCompress(pt.multiPool, stack[:depth], octets, is4)
+			n.purgeAndCompress(stack[:depth], octets, is4)
 
 			return pt, kid.value, true
 
@@ -358,14 +348,11 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, e
 			// Delete leaf node.
 			n.children.DeleteAt(addr)
 
-			// Return leaf node to pool for reuse.
-			pt.multiPool.putLeaf(kid)
-
 			// Update size to reflect deletion.
 			pt.sizeUpdate(is4, -1)
 
 			// Purge and compress affected path.
-			n.purgeAndCompress(pt.multiPool, stack[:depth], octets, is4)
+			n.purgeAndCompress(stack[:depth], octets, is4)
 
 			return pt, kid.value, true
 

@@ -60,14 +60,6 @@ func (a *Array256[T]) Clear(uint) {
 	panic("forbidden, use DeleteAt")
 }
 
-// Reset clears the Array256 by resetting the internal BitSet and item slice.
-// The capacity of the Items slice is retained to avoid reallocations.
-func (a *Array256[T]) Reset() {
-	a.BitSet256 = bitset.BitSet256{}
-	clear(a.Items)        // zero all elements in the current slice
-	a.Items = a.Items[:0] // reset length to zero but keep allocated capacity
-}
-
 // Get returns the value at index i and whether it exists.
 //
 // If the bit for i is not set, ok is false and value is the zero-value of T.
