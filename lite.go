@@ -23,13 +23,6 @@ type Lite struct {
 	Table[struct{}]
 }
 
-// WithPool is an adapter for the underlying table.
-func (l *Lite) WithPool() *Lite {
-	tbl := l.Table.WithPool()
-	//nolint:govet // copy of *tbl is here by intention
-	return &Lite{*tbl}
-}
-
 // Exists returns true if the prefix exists in the table.
 // It's an adapter to [Table.Get].
 func (l *Lite) Exists(pfx netip.Prefix) bool {

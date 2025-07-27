@@ -59,8 +59,8 @@ Readers can access the table always lock-free, while writers may synchronize usi
 that only one writer can modify the table persistent at a time, not using Compare-and-Swap (CAS)
 with all the known problems for multiple long-running writers.
 
-The combination of lock-free concurrency, fast lookup and update times, low memory consumption,
-and optional internal data structure pooling provides clear advantages for any routing daemon.
+The combination of lock-free concurrency, fast lookup and update times and low memory consumption
+provides clear advantages for any routing daemon.
 
 But as always, it depends on the specific use case.
 
@@ -87,8 +87,6 @@ are used.
     // without altering the original table (copy-on-write).
     //
     // A Table must not be copied by value; always pass by pointer.
-
-  func (t *Table[V]) WithPool() *Table[V]
 
   func (t *Table[V]) Contains(ip netip.Addr) bool
   func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool)
@@ -154,8 +152,6 @@ Some delegated methods are pointless without a payload.
    type Lite struct {
      Table[struct{}]
    }
-
-   func (l *Lite) WithPool() *Lite
 
    func (l *Lite) Exists(pfx netip.Prefix) bool
    func (l *Lite) Contains(pfx netip.Prefix) bool
