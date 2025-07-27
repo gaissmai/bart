@@ -781,14 +781,11 @@ func BenchmarkNextSet(b *testing.B) {
 
 func BenchmarkIntersectionTop(b *testing.B) {
 	for i, aa := range []BitSet256{
-		{1},
-		{0, 1},
-		{0, 0, 1},
+		{0, 0, 0, 0},
+		{1, 0, 0, 0},
+		{0, 1, 0, 0},
+		{0, 0, 1, 0},
 		{0, 0, 0, 1},
-		{0},
-		{0},
-		{0},
-		{0},
 	} {
 		b.Run(fmt.Sprintf("Top: at %d", i), func(b *testing.B) {
 			b.ResetTimer()
