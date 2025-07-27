@@ -21,6 +21,8 @@ jobs:
           go-version: ${{ matrix.go-version }}
       - uses: actions/checkout@v4
       - run: go test -v ./...      
+      - run: go test -v -run='Persist' -race
+      - run: go test -v -run='Example' -race
   
   govulncheck:
     runs-on: ubuntu-latest
