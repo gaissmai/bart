@@ -151,6 +151,82 @@ func TestFirstSet(t *testing.T) {
 	}
 }
 
+func TestLastSet(t *testing.T) {
+	t.Parallel()
+	testCases := []struct {
+		name    string
+		set     []uint8
+		wantIdx uint8
+		wantOk  bool
+	}{
+		{
+			name:    "null",
+			set:     []uint8{},
+			wantIdx: 0,
+			wantOk:  false,
+		},
+		{
+			name:    "zero",
+			set:     []uint8{0},
+			wantIdx: 0,
+			wantOk:  true,
+		},
+		{
+			name:    "1,5",
+			set:     []uint8{1, 5},
+			wantIdx: 5,
+			wantOk:  true,
+		},
+		{
+			name:    "5,7",
+			set:     []uint8{5, 7},
+			wantIdx: 7,
+			wantOk:  true,
+		},
+		{
+			name:    "2. word",
+			set:     []uint8{70, 126},
+			wantIdx: 126,
+			wantOk:  true,
+		},
+		{
+			name:    "3. word",
+			set:     []uint8{1, 34, 150},
+			wantIdx: 150,
+			wantOk:  true,
+		},
+		{
+			name:    "4. word",
+			set:     []uint8{1, 70, 150, 233},
+			wantIdx: 233,
+			wantOk:  true,
+		},
+		{
+			name:    "very last",
+			set:     []uint8{1, 70, 150, 233, 255},
+			wantIdx: 255,
+			wantOk:  true,
+		},
+	}
+
+	for _, tc := range testCases {
+		var b BitSet256
+		for _, u := range tc.set {
+			b.Set(u)
+		}
+
+		idx, ok := b.LastSet()
+
+		if ok != tc.wantOk {
+			t.Errorf("LastSet, %s: got ok: %v, want: %v", tc.name, ok, tc.wantOk)
+		}
+
+		if idx != tc.wantIdx {
+			t.Errorf("LastSet, %s: got idx: %d, want: %d", tc.name, idx, tc.wantIdx)
+		}
+	}
+}
+
 func TestNextSet(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
@@ -747,11 +823,11 @@ func BenchmarkIsEmpty(b *testing.B) {
 
 func BenchmarkFirstSet(b *testing.B) {
 	for i, bb := range []*BitSet256{
-		{1},
-		{0, 1},
-		{0, 0, 1},
+		{1, 0, 0, 0},
+		{0, 1, 0, 0},
+		{0, 0, 1, 0},
 		{0, 0, 0, 1},
-		{},
+		{0, 0, 0, 0},
 	} {
 		b.Run(fmt.Sprintf("FirstSet, at %d", i), func(b *testing.B) {
 			b.ResetTimer()
@@ -791,6 +867,23 @@ func BenchmarkIntersectionTop(b *testing.B) {
 			b.ResetTimer()
 			for range b.N {
 				_, boolSink = aa.IntersectionTop(&aa)
+			}
+		})
+	}
+}
+
+func BenchmarkLastSet(b *testing.B) {
+	for i, aa := range []BitSet256{
+		{0, 0, 0, 0},
+		{1, 0, 0, 0},
+		{0, 1, 0, 0},
+		{0, 0, 1, 0},
+		{0, 0, 0, 1},
+	} {
+		b.Run(fmt.Sprintf("Last: at %d", i), func(b *testing.B) {
+			b.ResetTimer()
+			for range b.N {
+				_, boolSink = aa.LastSet()
 			}
 		})
 	}
