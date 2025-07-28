@@ -12,6 +12,8 @@
 // Internally, the bitset is represented by four uint64 words, providing
 // fast bit-level access through direct indexing and hardware-accelerated primitives.
 //
+// If Go eventually supports SIMD intrinsics, this can be further optimized.
+//
 // For external consumers, the API intentionally avoids dynamic allocation except
 // when explicitly requested (via Bits()).
 package bitset
@@ -24,6 +26,7 @@ package bitset
 // can inline (*BitSet256).Intersection with cost 53
 // can inline (*BitSet256).IntersectionTop with cost 42
 // can inline (*BitSet256).IsEmpty with cost 22
+// can inline (*BitSet256).LastSet with cost 37
 // can inline (*BitSet256).NextSet with cost 65
 // can inline (*BitSet256).popcnt with cost 33
 // can inline (*BitSet256).Rank with cost 57
@@ -79,14 +82,17 @@ func (b *BitSet256) Test(bit uint8) (ok bool) {
 // FirstSet returns the index of the lowest (first) bit that is set in the BitSet256.
 //
 // It searches the 256-bit set in ascending order and returns the position of the
-// first bit with value 1. If at least one bit is set, ok is true and first is the
-// index (0–255). If no bits are set, ok is false and first is undefined.
+// first bit with value 1. If at least one bit is set, ok is true.
+// If no bits are set, ok is false and first is undefined.
 //
 // Example:
 //
 //	var bs BitSet256
+//	bs.Set(17)
+//	bs.Set(42)
 //	bs.Set(130)
-//	index, ok := bs.FirstSet()  // index == 130, ok == true
+//	bs.Set(255)
+//	index, ok := bs.FirstSet()  // index == 17, ok == true
 //
 // Note: This implementation avoids a for loop for optimal speed.
 // On modern CPUs, computing all four trailing-zero counts up front allows
@@ -95,22 +101,22 @@ func (b *BitSet256) Test(bit uint8) (ok bool) {
 // is especially effective for bitsets with known, fixed word count.
 func (b *BitSet256) FirstSet() (first uint8, ok bool) {
 	// optimized for pipelining, can still inline with cost 79
-	x0 := uint8(bits.TrailingZeros64(b[0]))
-	x1 := uint8(bits.TrailingZeros64(b[1]))
-	x2 := uint8(bits.TrailingZeros64(b[2]))
-	x3 := uint8(bits.TrailingZeros64(b[3]))
+	x0 := bits.TrailingZeros64(b[0])
+	x1 := bits.TrailingZeros64(b[1])
+	x2 := bits.TrailingZeros64(b[2])
+	x3 := bits.TrailingZeros64(b[3])
 
 	if x0 != 64 {
-		return x0, true
+		return uint8(x0), true
 	}
 	if x1 != 64 {
-		return x1 + 64, true
+		return uint8(x1 + 64), true
 	}
 	if x2 != 64 {
-		return x2 + 128, true
+		return uint8(x2 + 128), true
 	}
 	if x3 != 64 {
-		return x3 + 192, true
+		return uint8(x3 + 192), true
 	}
 
 	return
@@ -145,6 +151,50 @@ func (b *BitSet256) NextSet(bit uint8) (next uint8, ok bool) {
 	for wIdx++; wIdx < 4; wIdx++ {
 		if next := b[wIdx]; next != 0 {
 			return uint8(wIdx<<6 + bits.TrailingZeros64(next)), true
+		}
+	}
+	return
+}
+
+// LastSet returns the index of the highest (last) bit that is set in the BitSet256.
+//
+// It searches the bitset in descending order and returns the position of the
+// first bit (top bit) with value 1. If at least one bit is set, ok is true.
+// If no bits are set, ok is false and last is undefined.
+//
+// Example:
+//
+//	var bs BitSet256
+//	bs.Set(2)
+//	bs.Set(130)
+//	bs.Set(214)
+//	index, ok := bs.LastSet()  // index == 214, ok == true
+func (b *BitSet256) LastSet() (last uint8, ok bool) {
+	// optimized for pipelining, sorry, can't inline, cost 81>80
+	// try it again when Go supports SIMD intrinsics
+	//
+	// ### b3 := bits.Len64(b[3])
+	// ### b2 := bits.Len64(b[2])
+	// ### b1 := bits.Len64(b[1])
+	// ### b0 := bits.Len64(b[0])
+
+	// ### if b3 != 0 {
+	// ### 	return uint8(b3 + 191), true
+	// ### }
+	// ### if b2 != 0 {
+	// ### 	return uint8(b2 + 127), true
+	// ### }
+	// ### if b1 != 0 {
+	// ### 	return uint8(b1 + 63), true
+	// ### }
+	// ### if b0 != 0 {
+	// ### 	return uint8(b0 - 1), true
+	// ### }
+	// ### return
+
+	for wIdx := 3; wIdx >= 0; wIdx-- {
+		if word := b[wIdx]; word != 0 {
+			return uint8(wIdx<<6+bits.Len64(word)) - 1, true
 		}
 	}
 	return
