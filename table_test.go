@@ -3055,7 +3055,7 @@ func checkRoutes(t *testing.T, tbl *Table[int], tt []tableTest) {
 		v, ok := tbl.Lookup(mpa(tc.addr))
 
 		if !ok && tc.want != -1 {
-			t.Errorf("Lookup %q got (%v, %v), want (%v, false)", tc.addr, v, ok, tc.want)
+			t.Errorf("Lookup %q got (%v, %v), want (%v, true)", tc.addr, v, ok, tc.want)
 		}
 		if ok && v != tc.want {
 			t.Errorf("Lookup %q got (%v, %v), want (%v, true)", tc.addr, v, ok, tc.want)
