@@ -2938,7 +2938,7 @@ func BenchmarkMemIP4(b *testing.B) {
 			runtime.ReadMemStats(&endMem)
 
 			stats := rt.root4.nodeStatsRec()
-			b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc)/1024, "KByte")
+			b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/k), "bytes/pfx")
 			b.ReportMetric(float64(stats.nodes), "node")
 			b.ReportMetric(float64(stats.pfxs), "pfxs")
 			b.ReportMetric(float64(stats.leaves), "leaf")
@@ -2969,7 +2969,7 @@ func BenchmarkMemIP6(b *testing.B) {
 			runtime.ReadMemStats(&endMem)
 
 			stats := rt.root6.nodeStatsRec()
-			b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc)/1024, "KByte")
+			b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/k), "bytes/pfx")
 			b.ReportMetric(float64(stats.nodes), "node")
 			b.ReportMetric(float64(stats.pfxs), "pfxs")
 			b.ReportMetric(float64(stats.leaves), "leaf")
@@ -3009,7 +3009,7 @@ func BenchmarkMem(b *testing.B) {
 				s4.fringes + s6.fringes,
 			}
 
-			b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc)/1024, "KByte")
+			b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/k), "bytes/pfx")
 			b.ReportMetric(float64(stats.nodes), "node")
 			b.ReportMetric(float64(stats.pfxs), "pfxs")
 			b.ReportMetric(float64(stats.leaves), "leaf")
