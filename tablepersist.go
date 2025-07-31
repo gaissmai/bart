@@ -24,6 +24,8 @@ import (
 // The bulk table load could be done with [Table.Insert] and then you can
 // use InsertPersist, [Table.UpdatePersist] and [Table.DeletePersist] for lock-free updates.
 func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V] {
+	t.init()
+
 	if !pfx.IsValid() {
 		return t
 	}
@@ -32,24 +34,24 @@ func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V] {
 	pfx = pfx.Masked()
 	is4 := pfx.Addr().Is4()
 
-	// share size counters; root nodes cloned selectively.
-	pt := &Table[V]{
-		size4: t.size4,
-		size6: t.size6,
-	}
+	pt := new(Table[V])
+	pt.init()
+
+	pt.size4 = t.size4
+	pt.size6 = t.size6
 
 	// Clone the root node corresponding to the address family:
 	// For the address family in use, perform a shallow clone with copy-on-write semantics.
 	// The other root node (IPv4 or IPv6) is simply copied by value (shared).
 	if is4 {
-		pt.root4 = *t.root4.cloneFlat()
+		pt.root4 = t.root4.cloneFlat()
 		pt.root6 = t.root6
 	} else {
 		pt.root4 = t.root4
-		pt.root6 = *t.root6.cloneFlat()
+		pt.root6 = t.root6.cloneFlat()
 	}
 
-	// Get a pointer to the root node we will modify in this operation.
+	// Get the root node we will modify in this operation.
 	n := pt.rootNodeByVersion(is4)
 
 	// Insert the prefix and value using the persist insert method that clones nodes
@@ -78,6 +80,8 @@ func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V] {
 // Due to cloning overhead, UpdatePersist is significantly slower than Update,
 // typically taking μsec instead of nsec.
 func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (pt *Table[V], newVal V) {
+	t.init()
+
 	var zero V // zero value of V for default initialization
 
 	if !pfx.IsValid() {
@@ -92,19 +96,19 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 	is4 := ip.Is4()
 	bits := pfx.Bits()
 
-	// share size counters; root nodes cloned selectively.
-	pt = &Table[V]{
-		size4: t.size4,
-		size6: t.size6,
-	}
+	pt = new(Table[V])
+	pt.init()
 
-	// Clone root node corresponding to the IP version, for copy-on-write.
+	pt.size4 = t.size4
+	pt.size6 = t.size6
+
+	// Clone the root node for the IP version involved.
 	if is4 {
-		pt.root4 = *t.root4.cloneFlat()
+		pt.root4 = t.root4.cloneFlat()
 		pt.root6 = t.root6
 	} else {
 		pt.root4 = t.root4
-		pt.root6 = *t.root6.cloneFlat()
+		pt.root6 = t.root6.cloneFlat()
 	}
 
 	// Prepare traversal info.
@@ -238,6 +242,8 @@ func (t *Table[V]) GetAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, o
 // getAndDeletePersist is the internal implementation of GetAndDeletePersist,
 // performing the copy-on-write delete without modifying the receiver.
 func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, exists bool) {
+	t.init()
+
 	if !pfx.IsValid() {
 		return t, val, false
 	}
@@ -250,19 +256,19 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, e
 	is4 := ip.Is4()
 	bits := pfx.Bits()
 
-	// root nodes cloned selectively for copy-on-write.
-	pt = &Table[V]{
-		size4: t.size4,
-		size6: t.size6,
-	}
+	pt = new(Table[V])
+	pt.init()
+
+	pt.size4 = t.size4
+	pt.size6 = t.size6
 
 	// Clone the root node for the IP version involved.
 	if is4 {
-		pt.root4 = *t.root4.cloneFlat()
+		pt.root4 = t.root4.cloneFlat()
 		pt.root6 = t.root6
 	} else {
 		pt.root4 = t.root4
-		pt.root6 = *t.root6.cloneFlat()
+		pt.root6 = t.root6.cloneFlat()
 	}
 
 	// Prepare traversal context.

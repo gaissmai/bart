@@ -27,6 +27,7 @@ import (
 	"iter"
 	"net/netip"
 	"sync"
+	"sync/atomic"
 
 	"github.com/gaissmai/bart/internal/art"
 	"github.com/gaissmai/bart/internal/lpm"
@@ -43,25 +44,61 @@ import (
 //
 // A Table must not be copied by value; always pass by pointer.
 type Table[V any] struct {
-	// used by -copylocks checker from `go vet`.
-	_ [0]sync.Mutex
+	// Atomic flag indicating whether the Table is initialized (1) or not (0)
+	inited atomic.Uint64
+
+	// Mutex protecting mutations (Insert/Delete, initialization)
+	mu sync.Mutex
 
 	// the root nodes, implemented as popcount compressed multibit tries
-	root4 node[V]
-	root6 node[V]
+	root4 *node[V]
+	root6 *node[V]
 
 	// the number of prefixes in the routing table
 	size4 int
 	size6 int
 }
 
+// init ensures that the Table is initialized before use.
+// This method performs a quick atomic check, and if Table is uninitialized,
+// calls the slower path initSlow for proper setup.
+// It is safe for concurrent use.
+func (t *Table[V]) init() {
+	if t.inited.Load() == 1 {
+		return
+	}
+	// Not initialized yet, fallback to slow init with locking
+	t.initSlow()
+}
+
+// initSlow performs the actual initialization under mutex protection.
+// It sets up the root nodes for both IPv4 and IPv6 trie structures
+// and marks the Table as initialized atomically.
+func (t *Table[V]) initSlow() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	// Check again if the Table was initialized while waiting for the lock
+	if t.inited.Load() == 1 {
+		// Initialization done by another goroutine, just return
+		return
+	}
+
+	// Setup root nodes
+	t.root4 = new(node[V])
+	t.root6 = new(node[V])
+
+	// Mark as initialized atomically so other goroutines see that Table is ready
+	t.inited.Store(1)
+}
+
 // rootNodeByVersion, root node getter for ip version.
 func (t *Table[V]) rootNodeByVersion(is4 bool) *node[V] {
 	if is4 {
-		return &t.root4
+		return t.root4
 	}
 
-	return &t.root6
+	return t.root6
 }
 
 // maxDepthAndLastBits, get the max depth in the trie and remaining bits
@@ -109,6 +146,8 @@ func maxDepthAndLastBits(bits int) (maxDepth int, lastBits uint8) {
 // Insert adds a pfx to the tree, with given val.
 // If pfx is already present in the tree, its value is set to val.
 func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
+	t.init()
+
 	if !pfx.IsValid() {
 		return
 	}
@@ -132,6 +171,8 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 //
 // If the pfx does not already exist, it is set with the new value.
 func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V) {
+	t.init()
+
 	var zero V
 
 	if !pfx.IsValid() {
@@ -235,6 +276,8 @@ func (t *Table[V]) GetAndDelete(pfx netip.Prefix) (val V, ok bool) {
 }
 
 func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
+	t.init()
+
 	if !pfx.IsValid() {
 		return
 	}
@@ -324,6 +367,8 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 // Get returns the associated payload for prefix and true, or false if
 // prefix is not set in the routing table.
 func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
+	t.init()
+
 	if !pfx.IsValid() {
 		return
 	}
@@ -388,6 +433,8 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 // but as a test against a black- or whitelist it's often sufficient
 // and even few nanoseconds faster than [Table.Lookup].
 func (t *Table[V]) Contains(ip netip.Addr) bool {
+	t.init()
+
 	// if ip is invalid, Is4() returns false and AsSlice() returns nil
 	is4 := ip.Is4()
 	n := t.rootNodeByVersion(is4)
@@ -428,6 +475,8 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 // Lookup does a route lookup (longest prefix match) for IP and
 // returns the associated value and true, or false if no route matched.
 func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
+	t.init()
+
 	if !ip.IsValid() {
 		return
 	}
@@ -522,6 +571,8 @@ func (t *Table[V]) LookupPrefixLPM(pfx netip.Prefix) (lpmPfx netip.Prefix, val V
 }
 
 func (t *Table[V]) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpmPfx netip.Prefix, val V, ok bool) {
+	t.init()
+
 	if !pfx.IsValid() {
 		return
 	}
@@ -664,6 +715,8 @@ LOOP:
 //	    fmt.Println("Matched covering route:", supernet, "->", val)
 //	}
 func (t *Table[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
+	t.init()
+
 	return func(yield func(netip.Prefix, V) bool) {
 		if !pfx.IsValid() {
 			return
@@ -782,6 +835,8 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 //	    fmt.Println("Covered:", sub, "->", val)
 //	}
 func (t *Table[V]) Subnets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
+	t.init()
+
 	return func(yield func(netip.Prefix, V) bool) {
 		if !pfx.IsValid() {
 			return
@@ -849,6 +904,8 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 // This is useful for containment tests, route validation, or policy checks using prefix
 // semantics without retrieving exact matches.
 func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
+	t.init()
+
 	if !pfx.IsValid() {
 		return false
 	}
@@ -880,18 +937,25 @@ func (t *Table[V]) Overlaps(o *Table[V]) bool {
 
 // Overlaps4 is like [Table.Overlaps] but for the v4 routing table only.
 func (t *Table[V]) Overlaps4(o *Table[V]) bool {
+	t.init()
+	o.init()
+
 	if t.size4 == 0 || o.size4 == 0 {
 		return false
 	}
-	return t.root4.overlaps(&o.root4, 0)
+
+	return t.root4.overlaps(o.root4, 0)
 }
 
 // Overlaps6 is like [Table.Overlaps] but for the v6 routing table only.
 func (t *Table[V]) Overlaps6(o *Table[V]) bool {
+	t.init()
+	o.init()
+
 	if t.size6 == 0 || o.size6 == 0 {
 		return false
 	}
-	return t.root6.overlaps(&o.root6, 0)
+	return t.root6.overlaps(o.root6, 0)
 }
 
 // Union combines two tables, changing the receiver table.
@@ -905,11 +969,14 @@ func (t *Table[V]) Overlaps6(o *Table[V]) bool {
 // This duplicate is shallow-copied by default, but if the value type V implements the
 // Cloner interface, the value is deeply cloned before insertion. See also Table.Clone.
 func (t *Table[V]) Union(o *Table[V]) {
-	dup4 := t.root4.unionRec(&o.root4, 0)
-	dup6 := t.root6.unionRec(&o.root6, 0)
+	t.init()
+	o.init()
 
-	t.size4 += o.size4 - dup4
+	dup4 := t.root4.unionRec(o.root4, 0)
+	dup6 := t.root6.unionRec(o.root6, 0)
+
 	t.size6 += o.size6 - dup6
+	t.size4 += o.size4 - dup4
 }
 
 // Cloner is an interface, if implemented by payload of type V the values are deeply copied
@@ -922,14 +989,13 @@ type Cloner[V any] interface {
 // The payload of type V is shallow copied, but if type V implements the [Cloner] interface,
 // the values are cloned.
 func (t *Table[V]) Clone() *Table[V] {
-	if t == nil {
-		return nil
-	}
+	t.init()
 
 	c := new(Table[V])
+	c.init()
 
-	c.root4 = *t.root4.cloneRec()
-	c.root6 = *t.root6.cloneRec()
+	c.root4 = t.root4.cloneRec()
+	c.root6 = t.root6.cloneRec()
 
 	c.size4 = t.size4
 	c.size6 = t.size6
@@ -975,6 +1041,8 @@ func (t *Table[V]) Size6() int {
 // Under the hood, the loop body is passed as a yield function to the iterator.
 // If you break or return from the loop, iteration stops early as expected.
 func (t *Table[V]) All() iter.Seq2[netip.Prefix, V] {
+	t.init()
+
 	return func(yield func(netip.Prefix, V) bool) {
 		_ = t.root4.allRec(stridePath{}, 0, true, yield) && t.root6.allRec(stridePath{}, 0, false, yield)
 	}
@@ -982,6 +1050,8 @@ func (t *Table[V]) All() iter.Seq2[netip.Prefix, V] {
 
 // All4 is like [Table.All] but only for the v4 routing table.
 func (t *Table[V]) All4() iter.Seq2[netip.Prefix, V] {
+	t.init()
+
 	return func(yield func(netip.Prefix, V) bool) {
 		_ = t.root4.allRec(stridePath{}, 0, true, yield)
 	}
@@ -989,6 +1059,8 @@ func (t *Table[V]) All4() iter.Seq2[netip.Prefix, V] {
 
 // All6 is like [Table.All] but only for the v6 routing table.
 func (t *Table[V]) All6() iter.Seq2[netip.Prefix, V] {
+	t.init()
+
 	return func(yield func(netip.Prefix, V) bool) {
 		_ = t.root6.allRec(stridePath{}, 0, false, yield)
 	}
@@ -1006,6 +1078,8 @@ func (t *Table[V]) All6() iter.Seq2[netip.Prefix, V] {
 // The traversal is stable and predictable across calls.
 // Iteration stops early if you break out of the loop.
 func (t *Table[V]) AllSorted() iter.Seq2[netip.Prefix, V] {
+	t.init()
+
 	return func(yield func(netip.Prefix, V) bool) {
 		_ = t.root4.allRecSorted(stridePath{}, 0, true, yield) &&
 			t.root6.allRecSorted(stridePath{}, 0, false, yield)
@@ -1014,6 +1088,8 @@ func (t *Table[V]) AllSorted() iter.Seq2[netip.Prefix, V] {
 
 // AllSorted4 is like [Table.AllSorted] but only for the v4 routing table.
 func (t *Table[V]) AllSorted4() iter.Seq2[netip.Prefix, V] {
+	t.init()
+
 	return func(yield func(netip.Prefix, V) bool) {
 		_ = t.root4.allRecSorted(stridePath{}, 0, true, yield)
 	}
@@ -1021,6 +1097,8 @@ func (t *Table[V]) AllSorted4() iter.Seq2[netip.Prefix, V] {
 
 // AllSorted6 is like [Table.AllSorted] but only for the v6 routing table.
 func (t *Table[V]) AllSorted6() iter.Seq2[netip.Prefix, V] {
+	t.init()
+
 	return func(yield func(netip.Prefix, V) bool) {
 		_ = t.root6.allRecSorted(stridePath{}, 0, false, yield)
 	}
