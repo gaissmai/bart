@@ -43,6 +43,8 @@ type trieItem[V any] struct {
 // as string, just a wrapper for [Table.Fprint].
 // If Fprint returns an error, String panics.
 func (t *Table[V]) String() string {
+	t.init()
+
 	w := new(strings.Builder)
 	if err := t.Fprint(w); err != nil {
 		panic(err)
@@ -77,6 +79,7 @@ func (t *Table[V]) Fprint(w io.Writer) error {
 	if t == nil || w == nil {
 		return nil
 	}
+	t.init()
 
 	// v4
 	if err := t.fprint(w, true); err != nil {
@@ -178,6 +181,7 @@ func (t *Table[V]) MarshalJSON() ([]byte, error) {
 	if t == nil {
 		return nil, nil
 	}
+	t.init()
 
 	result := struct {
 		Ipv4 []DumpListNode[V] `json:"ipv4,omitempty"`
@@ -201,6 +205,7 @@ func (t *Table[V]) DumpList4() []DumpListNode[V] {
 	if t == nil {
 		return nil
 	}
+	t.init()
 	return t.root4.Load().dumpListRec(0, stridePath{}, 0, true)
 }
 
@@ -210,6 +215,7 @@ func (t *Table[V]) DumpList6() []DumpListNode[V] {
 	if t == nil {
 		return nil
 	}
+	t.init()
 	return t.root6.Load().dumpListRec(0, stridePath{}, 0, false)
 }
 

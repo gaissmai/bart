@@ -26,6 +26,7 @@ const (
 
 // dumpString is just a wrapper for dump.
 func (t *Table[V]) dumpString() string {
+	t.init()
 	w := new(strings.Builder)
 	t.dump(w)
 
@@ -37,6 +38,7 @@ func (t *Table[V]) dump(w io.Writer) {
 	if t == nil {
 		return
 	}
+	t.init()
 
 	if t.size4.Load() > 0 {
 		stats := t.root4.Load().nodeStatsRec()

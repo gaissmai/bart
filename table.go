@@ -148,6 +148,9 @@ func maxDepthAndLastBits(bits int) (maxDepth int, lastBits uint8) {
 func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	t.init()
 
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
 	if !pfx.IsValid() {
 		return
 	}
@@ -1005,24 +1008,31 @@ func (t *Table[V]) Clone() *Table[V] {
 
 func (t *Table[V]) sizeUpdate(is4 bool, n int) {
 	if is4 {
-		t.size4.Store(t.size4.Load() + int64(n))
+		t.size4.Add(int64(n))
 		return
 	}
-	t.size6.Store(t.size6.Load() + int64(n))
+	t.size6.Add(int64(n))
 }
 
 // Size returns the prefix count.
 func (t *Table[V]) Size() int {
+	t.init()
+
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
 	return t.Size4() + t.Size6()
 }
 
 // Size4 returns the IPv4 prefix count.
 func (t *Table[V]) Size4() int {
+	t.init()
 	return int(t.size4.Load())
 }
 
 // Size6 returns the IPv6 prefix count.
 func (t *Table[V]) Size6() int {
+	t.init()
 	return int(t.size6.Load())
 }
 

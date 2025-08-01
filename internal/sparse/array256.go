@@ -88,6 +88,11 @@ func (a *Array256[T]) MustGet(i uint8) T {
 	return a.Items[a.Rank(i)-1]
 }
 
+func (a *Array256[T]) MustGet2(i uint8) (T, int) {
+	rnk0 := a.Rank(i) - 1
+	return a.Items[rnk0], rnk0
+}
+
 // UpdateAt or set the value at i via callback. The new value is returned
 // and true if the value was already present.
 
@@ -148,6 +153,24 @@ func (a *Array256[T]) Copy() *Array256[T] {
 		BitSet256: a.BitSet256,
 		Items:     append(a.Items[:0:0], a.Items...),
 	}
+}
+
+// Clone returns a deep copy of the Array.
+func (a *Array256[T]) Clone(cloneFn func(val T) T) *Array256[T] {
+	if a == nil {
+		return nil
+	}
+
+	c := &Array256[T]{
+		BitSet256: a.BitSet256,
+		Items:     make([]T, len(a.Items)),
+	}
+
+	for i, v := range a.Items {
+		c.Items[i] = cloneFn(v)
+	}
+
+	return c
 }
 
 // InsertAt adds the value to the index i. If a value already exists there,

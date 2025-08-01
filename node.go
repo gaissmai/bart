@@ -175,32 +175,47 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 
 		// last masked octet: insert/override prefix/val into node
 		if depth == maxDepth {
-			return n.prefixes.Load().InsertAt(art.PfxToIdx(octet, lastBits), val)
+			clonedPfxs := n.prefixes.Load().Clone(cloneOrCopy)
+			exists = clonedPfxs.InsertAt(art.PfxToIdx(octet, lastBits), val)
+			n.prefixes.Store(clonedPfxs)
+			return exists
 		}
 
 		// reached end of trie path ...
 		if !n.children.Load().Test(octet) {
+			clonedKids := n.children.Load().Clone(cloneOrCopy)
+
 			// insert prefix path compressed as leaf or fringe
 			if isFringe(depth, bits) {
-				return n.children.Load().InsertAt(octet, newFringeNode[V](val))
+				exists = clonedKids.InsertAt(octet, newFringeNode(val))
+				n.children.Store(clonedKids)
+				return exists
 			}
-			return n.children.Load().InsertAt(octet, newLeafNode[V](pfx, val))
+			// as leaf
+			exists = clonedKids.InsertAt(octet, newLeafNode(pfx, val))
+			n.children.Store(clonedKids)
+			return exists
 		}
 
 		// ... or decend down the trie
-		kid := n.children.Load().MustGet(octet)
-
-		// kid is node or leaf at addr
-		switch kid := kid.(type) {
-		case *node[V]:
+		kid, idx := n.children.Load().MustGet2(octet)
+		if kid, ok := kid.(*node[V]); ok {
 			n = kid
 			continue // descend down to next trie level
+		}
 
+		// TODO
+		clonedKids := n.children.Load().Clone(cloneOrCopy)
+		kid = clonedKids.Items[idx]
+
+		// kid is fringe or leaf
+		switch kid := kid.(type) {
 		case *leafNode[V]:
 			// reached a path compressed prefix
 			// override value in slot if prefixes are equal
 			if kid.prefix == pfx {
 				kid.value = val
+				n.children.Store(clonedKids)
 				// exists
 				return true
 			}
@@ -212,7 +227,8 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 			newNode := new(node[V])
 			newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
 
-			n.children.Load().InsertAt(octet, newNode)
+			clonedKids.InsertAt(octet, newNode)
+			n.children.Store(clonedKids)
 			n = newNode
 
 		case *fringeNode[V]:
@@ -220,6 +236,7 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 			// override value in slot if pfx is a fringe
 			if isFringe(depth, bits) {
 				kid.value = val
+				n.children.Store(clonedKids)
 				// exists
 				return true
 			}
@@ -231,7 +248,8 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 			newNode := new(node[V])
 			newNode.prefixes.Load().InsertAt(1, kid.value)
 
-			n.children.Load().InsertAt(octet, newNode)
+			clonedKids.InsertAt(octet, newNode)
+			n.children.Store(clonedKids)
 			n = newNode
 
 		default:
