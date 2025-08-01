@@ -47,16 +47,16 @@ type Table[V any] struct {
 	// Atomic flag indicating whether the Table is initialized (1) or not (0)
 	inited atomic.Uint64
 
-	// Mutex protecting mutations (Insert/Delete, initialization)
+	// Mutex protecting mutations (initialization, ...)
 	mu sync.Mutex
 
 	// the root nodes, implemented as popcount compressed multibit tries
-	root4 *node[V]
-	root6 *node[V]
+	root4 atomic.Pointer[node[V]]
+	root6 atomic.Pointer[node[V]]
 
 	// the number of prefixes in the routing table
-	size4 int
-	size6 int
+	size4 atomic.Int64
+	size6 atomic.Int64
 }
 
 // init ensures that the Table is initialized before use.
@@ -85,8 +85,8 @@ func (t *Table[V]) initSlow() {
 	}
 
 	// Setup root nodes
-	t.root4 = new(node[V])
-	t.root6 = new(node[V])
+	t.root4.Store(new(node[V]))
+	t.root6.Store(new(node[V]))
 
 	// Mark as initialized atomically so other goroutines see that Table is ready
 	t.inited.Store(1)
@@ -95,10 +95,10 @@ func (t *Table[V]) initSlow() {
 // rootNodeByVersion, root node getter for ip version.
 func (t *Table[V]) rootNodeByVersion(is4 bool) *node[V] {
 	if is4 {
-		return t.root4
+		return t.root4.Load()
 	}
 
-	return t.root6
+	return t.root6.Load()
 }
 
 // maxDepthAndLastBits, get the max depth in the trie and remaining bits
@@ -195,7 +195,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 	for depth, octet := range octets {
 		// last octet from prefix, update/insert prefix into node
 		if depth == maxDepth {
-			newVal, exists := n.prefixes.UpdateAt(art.PfxToIdx(octet, lastBits), cb)
+			newVal, exists := n.prefixes.Load().UpdateAt(art.PfxToIdx(octet, lastBits), cb)
 			if !exists {
 				t.sizeUpdate(is4, 1)
 			}
@@ -203,18 +203,18 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 		}
 
 		// go down in tight loop to last octet
-		if !n.children.Test(octet) {
+		if !n.children.Load().Test(octet) {
 			// insert prefix path compressed
 			newVal := cb(zero, false)
 			if isFringe(depth, bits) {
-				n.children.InsertAt(octet, newFringeNode[V](newVal))
+				n.children.Load().InsertAt(octet, newFringeNode[V](newVal))
 			} else {
-				n.children.InsertAt(octet, newLeafNode[V](pfx, newVal))
+				n.children.Load().InsertAt(octet, newLeafNode[V](pfx, newVal))
 			}
 			t.sizeUpdate(is4, 1)
 			return newVal
 		}
-		kid := n.children.MustGet(octet)
+		kid := n.children.Load().MustGet(octet)
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
@@ -236,7 +236,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 			newNode := new(node[V])
 			newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
 
-			n.children.InsertAt(octet, newNode)
+			n.children.Load().InsertAt(octet, newNode)
 			n = newNode
 
 		case *fringeNode[V]:
@@ -251,9 +251,9 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 			// insert new child at current leaf position (octet
 			// descend down, replace n with new child
 			newNode := new(node[V])
-			newNode.prefixes.InsertAt(1, kid.value)
+			newNode.prefixes.Load().InsertAt(1, kid.value)
 
-			n.children.InsertAt(octet, newNode)
+			n.children.Load().InsertAt(octet, newNode)
 			n = newNode
 
 		default:
@@ -307,7 +307,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 
 		if depth == maxDepth {
 			// try to delete prefix in trie node
-			val, exists = n.prefixes.DeleteAt(art.PfxToIdx(octet, lastBits))
+			val, exists = n.prefixes.Load().DeleteAt(art.PfxToIdx(octet, lastBits))
 			if !exists {
 				return
 			}
@@ -317,10 +317,10 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 			return val, true
 		}
 
-		if !n.children.Test(octet) {
+		if !n.children.Load().Test(octet) {
 			return
 		}
-		kid := n.children.MustGet(octet)
+		kid := n.children.Load().MustGet(octet)
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
@@ -335,7 +335,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 			}
 
 			// pfx is fringe at depth, delete fringe
-			n.children.DeleteAt(octet)
+			n.children.Load().DeleteAt(octet)
 
 			t.sizeUpdate(is4, -1)
 			n.purgeAndCompress(stack[:depth], octets, is4)
@@ -349,7 +349,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 			}
 
 			// prefix is equal leaf, delete leaf
-			n.children.DeleteAt(octet)
+			n.children.Load().DeleteAt(octet)
 
 			t.sizeUpdate(is4, -1)
 			n.purgeAndCompress(stack[:depth], octets, is4)
@@ -390,13 +390,13 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 	// find the trie node
 	for depth, octet := range octets {
 		if depth == maxDepth {
-			return n.prefixes.Get(art.PfxToIdx(octet, lastBits))
+			return n.prefixes.Load().Get(art.PfxToIdx(octet, lastBits))
 		}
 
-		if !n.children.Test(octet) {
+		if !n.children.Load().Test(octet) {
 			return
 		}
-		kid := n.children.MustGet(octet)
+		kid := n.children.Load().MustGet(octet)
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
@@ -441,15 +441,15 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 
 	for _, octet := range ip.AsSlice() {
 		// for contains, any lpm match is good enough, no backtracking needed
-		if n.prefixes.Len() != 0 && n.lpmTest(art.OctetToIdx(octet)) {
+		if n.prefixes.Load().Len() != 0 && n.lpmTest(art.OctetToIdx(octet)) {
 			return true
 		}
 
 		// stop traversing?
-		if !n.children.Test(octet) {
+		if !n.children.Load().Test(octet) {
 			return false
 		}
-		kid := n.children.MustGet(octet)
+		kid := n.children.Load().MustGet(octet)
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
@@ -502,11 +502,11 @@ LOOP:
 		stack[depth] = n
 
 		// go down in tight loop to last octet
-		if !n.children.Test(octet) {
+		if !n.children.Load().Test(octet) {
 			// no more nodes below octet
 			break LOOP
 		}
-		kid := n.children.MustGet(octet)
+		kid := n.children.Load().MustGet(octet)
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
@@ -537,12 +537,12 @@ LOOP:
 		n = stack[depth]
 
 		// longest prefix match, skip if node has no prefixes
-		if n.prefixes.Len() != 0 {
+		if n.prefixes.Load().Len() != 0 {
 			idx := art.OctetToIdx(octets[depth])
 			// lpmGet(idx), manually inlined
 			// --------------------------------------------------------------
-			if topIdx, ok := n.prefixes.IntersectionTop(lpm.BackTrackingBitset(idx)); ok {
-				return n.prefixes.MustGet(topIdx), true
+			if topIdx, ok := n.prefixes.Load().IntersectionTop(lpm.BackTrackingBitset(idx)); ok {
+				return n.prefixes.Load().MustGet(topIdx), true
 			}
 			// --------------------------------------------------------------
 		}
@@ -607,10 +607,10 @@ LOOP:
 		stack[depth] = n
 
 		// go down in tight loop to leaf node
-		if !n.children.Test(octet) {
+		if !n.children.Load().Test(octet) {
 			break LOOP
 		}
-		kid := n.children.MustGet(octet)
+		kid := n.children.Load().MustGet(octet)
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
@@ -654,7 +654,7 @@ LOOP:
 		n = stack[depth]
 
 		// longest prefix match, skip if node has no prefixes
-		if n.prefixes.Len() == 0 {
+		if n.prefixes.Load().Len() == 0 {
 			continue
 		}
 
@@ -669,8 +669,8 @@ LOOP:
 		}
 
 		// manually inlined: lpmGet(idx)
-		if topIdx, ok := n.prefixes.IntersectionTop(lpm.BackTrackingBitset(idx)); ok {
-			val = n.prefixes.MustGet(topIdx)
+		if topIdx, ok := n.prefixes.Load().IntersectionTop(lpm.BackTrackingBitset(idx)); ok {
+			val = n.prefixes.Load().MustGet(topIdx)
 
 			// called from LookupPrefix
 			if !withLPM {
@@ -751,10 +751,10 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 			stack[depth] = n
 
 			// descend down the trie
-			if !n.children.Test(octet) {
+			if !n.children.Load().Test(octet) {
 				break LOOP
 			}
-			kid := n.children.MustGet(octet)
+			kid := n.children.Load().MustGet(octet)
 
 			// kid is node or leaf or fringe at octet
 			switch kid := kid.(type) {
@@ -862,10 +862,10 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 				return
 			}
 
-			if !n.children.Test(octet) {
+			if !n.children.Load().Test(octet) {
 				return
 			}
-			kid := n.children.MustGet(octet)
+			kid := n.children.Load().MustGet(octet)
 
 			// kid is node or leaf or fringe at octet
 			switch kid := kid.(type) {
@@ -940,11 +940,11 @@ func (t *Table[V]) Overlaps4(o *Table[V]) bool {
 	t.init()
 	o.init()
 
-	if t.size4 == 0 || o.size4 == 0 {
+	if t.size4.Load() == 0 || o.size4.Load() == 0 {
 		return false
 	}
 
-	return t.root4.overlaps(o.root4, 0)
+	return t.root4.Load().overlaps(o.root4.Load(), 0)
 }
 
 // Overlaps6 is like [Table.Overlaps] but for the v6 routing table only.
@@ -952,10 +952,10 @@ func (t *Table[V]) Overlaps6(o *Table[V]) bool {
 	t.init()
 	o.init()
 
-	if t.size6 == 0 || o.size6 == 0 {
+	if t.size6.Load() == 0 || o.size6.Load() == 0 {
 		return false
 	}
-	return t.root6.overlaps(o.root6, 0)
+	return t.root6.Load().overlaps(o.root6.Load(), 0)
 }
 
 // Union combines two tables, changing the receiver table.
@@ -972,11 +972,11 @@ func (t *Table[V]) Union(o *Table[V]) {
 	t.init()
 	o.init()
 
-	dup4 := t.root4.unionRec(o.root4, 0)
-	dup6 := t.root6.unionRec(o.root6, 0)
+	dup4 := t.root4.Load().unionRec(o.root4.Load(), 0)
+	dup6 := t.root6.Load().unionRec(o.root6.Load(), 0)
 
-	t.size6 += o.size6 - dup6
-	t.size4 += o.size4 - dup4
+	t.size4.Store(t.size4.Load() + o.size4.Load() - int64(dup4))
+	t.size6.Store(t.size6.Load() + o.size6.Load() - int64(dup6))
 }
 
 // Cloner is an interface, if implemented by payload of type V the values are deeply copied
@@ -994,36 +994,36 @@ func (t *Table[V]) Clone() *Table[V] {
 	c := new(Table[V])
 	c.init()
 
-	c.root4 = t.root4.cloneRec()
-	c.root6 = t.root6.cloneRec()
+	c.root4.Store(t.root4.Load().cloneRec())
+	c.root6.Store(t.root6.Load().cloneRec())
 
-	c.size4 = t.size4
-	c.size6 = t.size6
+	c.size4.Store(t.size4.Load())
+	c.size6.Store(t.size6.Load())
 
 	return c
 }
 
 func (t *Table[V]) sizeUpdate(is4 bool, n int) {
 	if is4 {
-		t.size4 += n
+		t.size4.Store(t.size4.Load() + int64(n))
 		return
 	}
-	t.size6 += n
+	t.size6.Store(t.size6.Load() + int64(n))
 }
 
 // Size returns the prefix count.
 func (t *Table[V]) Size() int {
-	return t.size4 + t.size6
+	return t.Size4() + t.Size6()
 }
 
 // Size4 returns the IPv4 prefix count.
 func (t *Table[V]) Size4() int {
-	return t.size4
+	return int(t.size4.Load())
 }
 
 // Size6 returns the IPv6 prefix count.
 func (t *Table[V]) Size6() int {
-	return t.size6
+	return int(t.size6.Load())
 }
 
 // All returns an iterator over all prefix–value pairs in the table.
@@ -1044,7 +1044,7 @@ func (t *Table[V]) All() iter.Seq2[netip.Prefix, V] {
 	t.init()
 
 	return func(yield func(netip.Prefix, V) bool) {
-		_ = t.root4.allRec(stridePath{}, 0, true, yield) && t.root6.allRec(stridePath{}, 0, false, yield)
+		_ = t.root4.Load().allRec(stridePath{}, 0, true, yield) && t.root6.Load().allRec(stridePath{}, 0, false, yield)
 	}
 }
 
@@ -1053,7 +1053,7 @@ func (t *Table[V]) All4() iter.Seq2[netip.Prefix, V] {
 	t.init()
 
 	return func(yield func(netip.Prefix, V) bool) {
-		_ = t.root4.allRec(stridePath{}, 0, true, yield)
+		_ = t.root4.Load().allRec(stridePath{}, 0, true, yield)
 	}
 }
 
@@ -1062,7 +1062,7 @@ func (t *Table[V]) All6() iter.Seq2[netip.Prefix, V] {
 	t.init()
 
 	return func(yield func(netip.Prefix, V) bool) {
-		_ = t.root6.allRec(stridePath{}, 0, false, yield)
+		_ = t.root6.Load().allRec(stridePath{}, 0, false, yield)
 	}
 }
 
@@ -1081,8 +1081,8 @@ func (t *Table[V]) AllSorted() iter.Seq2[netip.Prefix, V] {
 	t.init()
 
 	return func(yield func(netip.Prefix, V) bool) {
-		_ = t.root4.allRecSorted(stridePath{}, 0, true, yield) &&
-			t.root6.allRecSorted(stridePath{}, 0, false, yield)
+		_ = t.root4.Load().allRecSorted(stridePath{}, 0, true, yield) &&
+			t.root6.Load().allRecSorted(stridePath{}, 0, false, yield)
 	}
 }
 
@@ -1091,7 +1091,7 @@ func (t *Table[V]) AllSorted4() iter.Seq2[netip.Prefix, V] {
 	t.init()
 
 	return func(yield func(netip.Prefix, V) bool) {
-		_ = t.root4.allRecSorted(stridePath{}, 0, true, yield)
+		_ = t.root4.Load().allRecSorted(stridePath{}, 0, true, yield)
 	}
 }
 
@@ -1100,6 +1100,6 @@ func (t *Table[V]) AllSorted6() iter.Seq2[netip.Prefix, V] {
 	t.init()
 
 	return func(yield func(netip.Prefix, V) bool) {
-		_ = t.root6.allRecSorted(stridePath{}, 0, false, yield)
+		_ = t.root6.Load().allRecSorted(stridePath{}, 0, false, yield)
 	}
 }

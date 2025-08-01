@@ -6,6 +6,8 @@ package bart
 import (
 	"net/netip"
 	"slices"
+	"sync"
+	"sync/atomic"
 
 	"github.com/gaissmai/bart/internal/art"
 	"github.com/gaissmai/bart/internal/lpm"
@@ -35,9 +37,11 @@ type stridePath [maxTreeDepth]uint8
 //
 // See doc/artlookup.pdf for the mapping mechanics and prefix tree details.
 type node[V any] struct {
+	mu sync.Mutex
+
 	// prefixes stores routing entries (prefix -> value),
 	// laid out as a complete binary tree using baseIndex().
-	prefixes sparse.Array256[V]
+	prefixes atomic.Pointer[sparse.Array256[V]]
 
 	// children holds subnodes for the 256 possible next-hop paths
 	// at this trie level (8-bit stride).
@@ -50,12 +54,12 @@ type node[V any] struct {
 	// Note: Both *leafNode and *fringeNode entries are only created by path compression.
 	// Prefixes that match exactly at the maximum trie depth (depth == maxDepth) are
 	// never stored as children, but always directly in the prefixes array at that level.
-	children sparse.Array256[any]
+	children atomic.Pointer[sparse.Array256[any]]
 }
 
 // isEmpty returns true if node has neither prefixes nor children
 func (n *node[V]) isEmpty() bool {
-	return n.prefixes.Len() == 0 && n.children.Len() == 0
+	return n.prefixes.Load().Len() == 0 && n.children.Load().Len() == 0
 }
 
 // leafNode is a prefix with value, used as a path compressed child.
@@ -171,20 +175,20 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 
 		// last masked octet: insert/override prefix/val into node
 		if depth == maxDepth {
-			return n.prefixes.InsertAt(art.PfxToIdx(octet, lastBits), val)
+			return n.prefixes.Load().InsertAt(art.PfxToIdx(octet, lastBits), val)
 		}
 
 		// reached end of trie path ...
-		if !n.children.Test(octet) {
+		if !n.children.Load().Test(octet) {
 			// insert prefix path compressed as leaf or fringe
 			if isFringe(depth, bits) {
-				return n.children.InsertAt(octet, newFringeNode[V](val))
+				return n.children.Load().InsertAt(octet, newFringeNode[V](val))
 			}
-			return n.children.InsertAt(octet, newLeafNode[V](pfx, val))
+			return n.children.Load().InsertAt(octet, newLeafNode[V](pfx, val))
 		}
 
 		// ... or decend down the trie
-		kid := n.children.MustGet(octet)
+		kid := n.children.Load().MustGet(octet)
 
 		// kid is node or leaf at addr
 		switch kid := kid.(type) {
@@ -208,7 +212,7 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 			newNode := new(node[V])
 			newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
 
-			n.children.InsertAt(octet, newNode)
+			n.children.Load().InsertAt(octet, newNode)
 			n = newNode
 
 		case *fringeNode[V]:
@@ -225,9 +229,9 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 			// insert new child at current leaf position (addr)
 			// descend down, replace n with new child
 			newNode := new(node[V])
-			newNode.prefixes.InsertAt(1, kid.value)
+			newNode.prefixes.Load().InsertAt(1, kid.value)
 
-			n.children.InsertAt(octet, newNode)
+			n.children.Load().InsertAt(octet, newNode)
 			n = newNode
 
 		default:
@@ -267,17 +271,17 @@ func (n *node[V]) insertAtDepthPersist(pfx netip.Prefix, val V, depth int) (exis
 
 		// last masked octet: insert/override prefix/val into node
 		if depth == maxDepth {
-			return n.prefixes.InsertAt(art.PfxToIdx(octet, lastBits), val)
+			return n.prefixes.Load().InsertAt(art.PfxToIdx(octet, lastBits), val)
 		}
 
-		if !n.children.Test(octet) {
+		if !n.children.Load().Test(octet) {
 			// insert prefix path compressed as leaf or fringe
 			if isFringe(depth, bits) {
-				return n.children.InsertAt(octet, newFringeNode[V](val))
+				return n.children.Load().InsertAt(octet, newFringeNode[V](val))
 			}
-			return n.children.InsertAt(octet, newLeafNode[V](pfx, val))
+			return n.children.Load().InsertAt(octet, newLeafNode[V](pfx, val))
 		}
-		kid := n.children.MustGet(octet)
+		kid := n.children.Load().MustGet(octet)
 
 		// kid is node or leaf at addr
 		switch kid := kid.(type) {
@@ -288,7 +292,7 @@ func (n *node[V]) insertAtDepthPersist(pfx netip.Prefix, val V, depth int) (exis
 			kid = kid.cloneFlat()
 
 			// replace kid with clone
-			n.children.InsertAt(octet, kid)
+			n.children.Load().InsertAt(octet, kid)
 
 			n = kid
 			continue // descend down to next trie level
@@ -309,7 +313,7 @@ func (n *node[V]) insertAtDepthPersist(pfx netip.Prefix, val V, depth int) (exis
 			newNode := new(node[V])
 			newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
 
-			n.children.InsertAt(octet, newNode)
+			n.children.Load().InsertAt(octet, newNode)
 			n = newNode
 
 		case *fringeNode[V]:
@@ -326,9 +330,9 @@ func (n *node[V]) insertAtDepthPersist(pfx netip.Prefix, val V, depth int) (exis
 			// insert new child at current leaf position (addr)
 			// descend down, replace n with new child
 			newNode := new(node[V])
-			newNode.prefixes.InsertAt(1, kid.value)
+			newNode.prefixes.Load().InsertAt(1, kid.value)
 
-			n.children.InsertAt(octet, newNode)
+			n.children.Load().InsertAt(octet, newNode)
 			n = newNode
 
 		default:
@@ -358,32 +362,32 @@ func (n *node[V]) purgeAndCompress(stack []*node[V], octets []uint8, is4 bool) {
 		parent := stack[depth]
 		octet := octets[depth]
 
-		pfxCount := n.prefixes.Len()
-		childCount := n.children.Len()
+		pfxCount := n.prefixes.Load().Len()
+		childCount := n.children.Load().Len()
 
 		switch {
 		case n.isEmpty():
 			// just delete this empty node from parent
-			parent.children.DeleteAt(octet)
+			parent.children.Load().DeleteAt(octet)
 
 		case pfxCount == 0 && childCount == 1:
-			switch kid := n.children.Items[0].(type) {
+			switch kid := n.children.Load().Items[0].(type) {
 			case *node[V]:
 				// fast exit, we are at an intermediate path node
 				// no further delete/compress upwards the stack is possible
 				return
 			case *leafNode[V]:
 				// just one leaf, delete this node and reinsert the leaf above
-				parent.children.DeleteAt(octet)
+				parent.children.Load().DeleteAt(octet)
 
 				// ... (re)insert the leaf at parents depth
 				parent.insertAtDepth(kid.prefix, kid.value, depth)
 			case *fringeNode[V]:
 				// just one fringe, delete this node and reinsert the fringe as leaf above
-				parent.children.DeleteAt(octet)
+				parent.children.Load().DeleteAt(octet)
 
 				// get the last octet back, the only item is also the first item
-				lastOctet, _ := n.children.FirstSet()
+				lastOctet, _ := n.children.Load().FirstSet()
 
 				// rebuild the prefix with octets, depth, ip version and addr
 				// depth is the parent's depth, so add +1 here for the kid
@@ -395,11 +399,11 @@ func (n *node[V]) purgeAndCompress(stack []*node[V], octets []uint8, is4 bool) {
 
 		case pfxCount == 1 && childCount == 0:
 			// just one prefix, delete this node and reinsert the idx as leaf above
-			parent.children.DeleteAt(octet)
+			parent.children.Load().DeleteAt(octet)
 
 			// get prefix back from idx ...
-			idx, _ := n.prefixes.FirstSet() // single idx must be first bit set
-			val := n.prefixes.Items[0]      // single value must be at Items[0]
+			idx, _ := n.prefixes.Load().FirstSet() // single idx must be first bit set
+			val := n.prefixes.Load().Items[0]      // single value must be at Items[0]
 
 			// ... and octet path
 			path := stridePath{}
@@ -429,8 +433,8 @@ func (n *node[V]) purgeAndCompress(stack []*node[V], octets []uint8, is4 bool) {
 // using a bitset-based operation with a precomputed backtracking pattern specific to idx.
 func (n *node[V]) lpmGet(idx uint) (baseIdx uint8, val V, ok bool) {
 	// top is the idx of the longest-prefix-match
-	if top, ok := n.prefixes.IntersectionTop(lpm.BackTrackingBitset(idx)); ok {
-		return top, n.prefixes.MustGet(top), true
+	if top, ok := n.prefixes.Load().IntersectionTop(lpm.BackTrackingBitset(idx)); ok {
+		return top, n.prefixes.Load().MustGet(top), true
 	}
 
 	// not found (on this level)
@@ -448,7 +452,7 @@ func (n *node[V]) lpmGet(idx uint) (baseIdx uint8, val V, ok bool) {
 // is done via a bitset operation that maps the traversal path from the given index
 // toward its possible ancestors.
 func (n *node[V]) lpmTest(idx uint) bool {
-	return n.prefixes.Intersects(lpm.BackTrackingBitset(idx))
+	return n.prefixes.Load().Intersects(lpm.BackTrackingBitset(idx))
 }
 
 // cloneRec performs a recursive deep copy of the node[V].
@@ -467,32 +471,32 @@ func (n *node[V]) cloneRec() *node[V] {
 	}
 
 	// shallow
-	c.prefixes = *(n.prefixes.Copy())
+	c.prefixes.Store(n.prefixes.Load().Copy())
 
 	_, isCloner := any(*new(V)).(Cloner[V])
 
 	// deep copy if V implements Cloner[V]
 	if isCloner {
-		for i, val := range c.prefixes.Items {
-			c.prefixes.Items[i] = cloneOrCopy(val)
+		for i, val := range c.prefixes.Load().Items {
+			c.prefixes.Load().Items[i] = cloneOrCopy(val)
 		}
 	}
 
 	// shallow
-	c.children = *(n.children.Copy())
+	c.children.Store(n.children.Load().Copy())
 
 	// deep copy of nodes and leaves
-	for i, kidAny := range c.children.Items {
+	for i, kidAny := range c.children.Load().Items {
 		switch kid := kidAny.(type) {
 		case *node[V]:
 			// clone the child node rec-descent
-			c.children.Items[i] = kid.cloneRec()
+			c.children.Load().Items[i] = kid.cloneRec()
 		case *leafNode[V]:
 			// deep copy if V implements Cloner[V]
-			c.children.Items[i] = kid.cloneLeaf()
+			c.children.Load().Items[i] = kid.cloneLeaf()
 		case *fringeNode[V]:
 			// deep copy if V implements Cloner[V]
-			c.children.Items[i] = kid.cloneFringe()
+			c.children.Load().Items[i] = kid.cloneFringe()
 
 		default:
 			panic("logic error, wrong node type")
@@ -518,21 +522,21 @@ func (n *node[V]) cloneFlat() *node[V] {
 	}
 
 	// shallow copy
-	c.prefixes = *(n.prefixes.Copy())
-	c.children = *(n.children.Copy())
+	c.prefixes.Store(n.prefixes.Load().Copy())
+	c.children.Store(n.children.Load().Copy())
 
 	// copy or clone of values in prefixes
-	for i, val := range c.prefixes.Items {
-		c.prefixes.Items[i] = cloneOrCopy(val)
+	for i, val := range c.prefixes.Load().Items {
+		c.prefixes.Load().Items[i] = cloneOrCopy(val)
 	}
 
 	// copy or clone of values in path compressed leaves and fringes
-	for i, kidAny := range c.children.Items {
+	for i, kidAny := range c.children.Load().Items {
 		switch kid := kidAny.(type) {
 		case *leafNode[V]:
-			c.children.Items[i] = kid.cloneLeaf()
+			c.children.Load().Items[i] = kid.cloneLeaf()
 		case *fringeNode[V]:
-			c.children.Items[i] = kid.cloneFringe()
+			c.children.Load().Items[i] = kid.cloneFringe()
 		}
 	}
 
@@ -554,19 +558,19 @@ func (n *node[V]) cloneFlat() *node[V] {
 // The traversal order is not defined. This implementation favors simplicity
 // and runtime efficiency over consistency of iteration sequence.
 func (n *node[V]) allRec(path stridePath, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
-	for _, idx := range n.prefixes.AsSlice(&[256]uint8{}) {
+	for _, idx := range n.prefixes.Load().AsSlice(&[256]uint8{}) {
 		cidr := cidrFromPath(path, depth, is4, idx)
 
 		// callback for this prefix and val
-		if !yield(cidr, n.prefixes.MustGet(idx)) {
+		if !yield(cidr, n.prefixes.Load().MustGet(idx)) {
 			// early exit
 			return false
 		}
 	}
 
 	// for all children (nodes and leaves) in this node do ...
-	for i, addr := range n.children.AsSlice(&[256]uint8{}) {
-		switch kid := n.children.Items[i].(type) {
+	for i, addr := range n.children.Load().AsSlice(&[256]uint8{}) {
+		switch kid := n.children.Load().Items[i].(type) {
 		case *node[V]:
 			// rec-descent with this node
 			path[depth] = addr
@@ -617,10 +621,10 @@ func (n *node[V]) allRec(path stridePath, depth int, is4 bool, yield func(netip.
 // suitable for use cases like table exports, comparisons, or serialization.
 func (n *node[V]) allRecSorted(path stridePath, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
 	// get slice of all child octets, sorted by addr
-	allChildAddrs := n.children.AsSlice(&[256]uint8{})
+	allChildAddrs := n.children.Load().AsSlice(&[256]uint8{})
 
 	// get slice of all indexes, sorted by idx
-	allIndices := n.prefixes.AsSlice(&[256]uint8{})
+	allIndices := n.prefixes.Load().AsSlice(&[256]uint8{})
 
 	// sort indices in CIDR sort order
 	slices.SortFunc(allIndices, cmpIndexRank)
@@ -640,7 +644,7 @@ func (n *node[V]) allRecSorted(path stridePath, depth int, is4 bool, yield func(
 			}
 
 			// yield the node (rec-descent) or leaf
-			switch kid := n.children.Items[j].(type) {
+			switch kid := n.children.Load().Items[j].(type) {
 			case *node[V]:
 				path[depth] = childAddr
 				if !kid.allRecSorted(path, depth+1, is4, yield) {
@@ -668,7 +672,7 @@ func (n *node[V]) allRecSorted(path stridePath, depth int, is4 bool, yield func(
 		// yield the prefix for this idx
 		cidr := cidrFromPath(path, depth, is4, pfxIdx)
 		// n.prefixes.Items[i] not possible after sorting allIndices
-		if !yield(cidr, n.prefixes.MustGet(pfxIdx)) {
+		if !yield(cidr, n.prefixes.Load().MustGet(pfxIdx)) {
 			return false
 		}
 	}
@@ -676,7 +680,7 @@ func (n *node[V]) allRecSorted(path stridePath, depth int, is4 bool, yield func(
 	// yield the rest of leaves and nodes (rec-descent)
 	for j := childCursor; j < len(allChildAddrs); j++ {
 		addr := allChildAddrs[j]
-		switch kid := n.children.Items[j].(type) {
+		switch kid := n.children.Load().Items[j].(type) {
 		case *node[V]:
 			path[depth] = addr
 			if !kid.allRecSorted(path, depth+1, is4, yield) {
@@ -719,19 +723,19 @@ func (n *node[V]) allRecSorted(path stridePath, depth int, is4 bool, yield func(
 // Returns the number of duplicate prefixes that were overwritten during merging.
 func (n *node[V]) unionRec(o *node[V], depth int) (duplicates int) {
 	// for all prefixes in other node do ...
-	for i, oIdx := range o.prefixes.AsSlice(&[256]uint8{}) {
+	for i, oIdx := range o.prefixes.Load().AsSlice(&[256]uint8{}) {
 		// clone/copy the value from other node at idx
-		clonedVal := cloneOrCopy(o.prefixes.Items[i])
+		clonedVal := cloneOrCopy(o.prefixes.Load().Items[i])
 
 		// insert/overwrite cloned value from o into n
-		if n.prefixes.InsertAt(oIdx, clonedVal) {
+		if n.prefixes.Load().InsertAt(oIdx, clonedVal) {
 			// this prefix is duplicate in n and o
 			duplicates++
 		}
 	}
 
 	// for all child addrs in other node do ...
-	for i, addr := range o.children.AsSlice(&[256]uint8{}) {
+	for i, addr := range o.children.Load().AsSlice(&[256]uint8{}) {
 		//  12 possible combinations to union this child and other child
 		//
 		//  THIS,   OTHER: (always clone the other kid!)
@@ -753,19 +757,19 @@ func (n *node[V]) unionRec(o *node[V], depth int) (duplicates int) {
 		//  fringe, fringe  <-- just overwrite value
 		//
 		// try to get child at same addr from n
-		thisChild, thisExists := n.children.Get(addr)
+		thisChild, thisExists := n.children.Load().Get(addr)
 		if !thisExists { // NULL, ... slot at addr is empty
-			switch otherKid := o.children.Items[i].(type) {
+			switch otherKid := o.children.Load().Items[i].(type) {
 			case *node[V]: // NULL, node
-				n.children.InsertAt(addr, otherKid.cloneRec())
+				n.children.Load().InsertAt(addr, otherKid.cloneRec())
 				continue
 
 			case *leafNode[V]: // NULL, leaf
-				n.children.InsertAt(addr, otherKid.cloneLeaf())
+				n.children.Load().InsertAt(addr, otherKid.cloneLeaf())
 				continue
 
 			case *fringeNode[V]: // NULL, fringe
-				n.children.InsertAt(addr, otherKid.cloneFringe())
+				n.children.Load().InsertAt(addr, otherKid.cloneFringe())
 				continue
 
 			default:
@@ -775,7 +779,7 @@ func (n *node[V]) unionRec(o *node[V], depth int) (duplicates int) {
 
 		switch thisKid := thisChild.(type) {
 		case *node[V]: // node, ...
-			switch otherKid := o.children.Items[i].(type) {
+			switch otherKid := o.children.Load().Items[i].(type) {
 			case *node[V]: // node, node
 				// both childs have node at addr, call union rec-descent on child nodes
 				duplicates += thisKid.unionRec(otherKid.cloneRec(), depth+1)
@@ -792,14 +796,14 @@ func (n *node[V]) unionRec(o *node[V], depth int) (duplicates int) {
 			case *fringeNode[V]: // node, fringe
 				// push this fringe down, a fringe becomes a default route one level down
 				clonedFringe := otherKid.cloneFringe()
-				if thisKid.prefixes.InsertAt(1, clonedFringe.value) {
+				if thisKid.prefixes.Load().InsertAt(1, clonedFringe.value) {
 					duplicates++
 				}
 				continue
 			}
 
 		case *leafNode[V]: // leaf, ...
-			switch otherKid := o.children.Items[i].(type) {
+			switch otherKid := o.children.Load().Items[i].(type) {
 			case *node[V]: // leaf, node
 				// create new node
 				nc := new(node[V])
@@ -808,7 +812,7 @@ func (n *node[V]) unionRec(o *node[V], depth int) (duplicates int) {
 				nc.insertAtDepth(thisKid.prefix, thisKid.value, depth+1)
 
 				// insert the new node at current addr
-				n.children.InsertAt(addr, nc)
+				n.children.Load().InsertAt(addr, nc)
 
 				// unionRec this new node with other kid node
 				duplicates += nc.unionRec(otherKid.cloneRec(), depth+1)
@@ -835,7 +839,7 @@ func (n *node[V]) unionRec(o *node[V], depth int) (duplicates int) {
 				}
 
 				// insert the new node at current addr
-				n.children.InsertAt(addr, nc)
+				n.children.Load().InsertAt(addr, nc)
 				continue
 
 			case *fringeNode[V]: // leaf, fringe
@@ -847,26 +851,26 @@ func (n *node[V]) unionRec(o *node[V], depth int) (duplicates int) {
 
 				// push this cloned fringe down, it becomes the default route
 				clonedFringe := otherKid.cloneFringe()
-				if nc.prefixes.InsertAt(1, clonedFringe.value) {
+				if nc.prefixes.Load().InsertAt(1, clonedFringe.value) {
 					duplicates++
 				}
 
 				// insert the new node at current addr
-				n.children.InsertAt(addr, nc)
+				n.children.Load().InsertAt(addr, nc)
 				continue
 			}
 
 		case *fringeNode[V]: // fringe, ...
-			switch otherKid := o.children.Items[i].(type) {
+			switch otherKid := o.children.Load().Items[i].(type) {
 			case *node[V]: // fringe, node
 				// create new node
 				nc := new(node[V])
 
 				// push this fringe down, it becomes the default route
-				nc.prefixes.InsertAt(1, thisKid.value)
+				nc.prefixes.Load().InsertAt(1, thisKid.value)
 
 				// insert the new node at current addr
-				n.children.InsertAt(addr, nc)
+				n.children.Load().InsertAt(addr, nc)
 
 				// unionRec this new node with other kid node
 				duplicates += nc.unionRec(otherKid.cloneRec(), depth+1)
@@ -877,7 +881,7 @@ func (n *node[V]) unionRec(o *node[V], depth int) (duplicates int) {
 				nc := new(node[V])
 
 				// push this fringe down, it becomes the default route
-				nc.prefixes.InsertAt(1, thisKid.value)
+				nc.prefixes.Load().InsertAt(1, thisKid.value)
 
 				// push this cloned leaf down
 				clonedLeaf := otherKid.cloneLeaf()
@@ -886,7 +890,7 @@ func (n *node[V]) unionRec(o *node[V], depth int) (duplicates int) {
 				}
 
 				// insert the new node at current addr
-				n.children.InsertAt(addr, nc)
+				n.children.Load().InsertAt(addr, nc)
 				continue
 
 			case *fringeNode[V]: // fringe, fringe
@@ -932,8 +936,8 @@ func (n *node[V]) eachLookupPrefix(octets []byte, depth int, is4 bool, pfxIdx ui
 	idx := uint8(pfxIdx) // now it fits into uint8
 
 	for ; idx > 0; idx >>= 1 {
-		if n.prefixes.Test(idx) {
-			val := n.prefixes.MustGet(idx)
+		if n.prefixes.Load().Test(idx) {
+			val := n.prefixes.Load().MustGet(idx)
 			cidr := cidrFromPath(path, depth, is4, idx)
 
 			if !yield(cidr, val) {
@@ -965,7 +969,7 @@ func (n *node[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxIdx uint8, y
 	pfxFirstAddr, pfxLastAddr := art.IdxToRange(pfxIdx)
 
 	allCoveredIndices := make([]uint8, 0, maxItems)
-	for _, idx := range n.prefixes.AsSlice(&[256]uint8{}) {
+	for _, idx := range n.prefixes.Load().AsSlice(&[256]uint8{}) {
 		thisFirstAddr, thisLastAddr := art.IdxToRange(idx)
 
 		if thisFirstAddr >= pfxFirstAddr && thisLastAddr <= pfxLastAddr {
@@ -979,7 +983,7 @@ func (n *node[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxIdx uint8, y
 	// 2. collect all covered child addrs by prefix
 
 	allCoveredChildAddrs := make([]uint8, 0, maxItems)
-	for _, addr := range n.children.AsSlice(&[256]uint8{}) {
+	for _, addr := range n.children.Load().AsSlice(&[256]uint8{}) {
 		if addr >= pfxFirstAddr && addr <= pfxLastAddr {
 			allCoveredChildAddrs = append(allCoveredChildAddrs, addr)
 		}
@@ -1001,7 +1005,7 @@ func (n *node[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxIdx uint8, y
 			}
 
 			// yield the node or leaf?
-			switch kid := n.children.MustGet(addr).(type) {
+			switch kid := n.children.Load().MustGet(addr).(type) {
 			case *node[V]:
 				path[depth] = addr
 				if !kid.allRecSorted(path, depth+1, is4, yield) {
@@ -1031,7 +1035,7 @@ func (n *node[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxIdx uint8, y
 		// yield the prefix for this idx
 		cidr := cidrFromPath(path, depth, is4, pfxIdx)
 		// n.prefixes.Items[i] not possible after sorting allIndices
-		if !yield(cidr, n.prefixes.MustGet(pfxIdx)) {
+		if !yield(cidr, n.prefixes.Load().MustGet(pfxIdx)) {
 			return false
 		}
 	}
@@ -1039,7 +1043,7 @@ func (n *node[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxIdx uint8, y
 	// yield the rest of leaves and nodes (rec-descent)
 	for _, addr := range allCoveredChildAddrs[addrCursor:] {
 		// yield the node or leaf?
-		switch kid := n.children.MustGet(addr).(type) {
+		switch kid := n.children.Load().MustGet(addr).(type) {
 		case *node[V]:
 			path[depth] = addr
 			if !kid.allRecSorted(path, depth+1, is4, yield) {

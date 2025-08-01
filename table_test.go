@@ -1764,8 +1764,8 @@ func TestDeleteButOne(t *testing.T) {
 			tbl.Delete(p.pfx)
 		}
 
-		stats4 := tbl.root4.nodeStatsRec()
-		stats6 := tbl.root6.nodeStatsRec()
+		stats4 := tbl.root4.Load().nodeStatsRec()
+		stats6 := tbl.root6.Load().nodeStatsRec()
 
 		if nodes := stats4.nodes + stats6.nodes; nodes != 1 {
 			t.Fatalf("delete but one, want nodes: 1, got: %d\n%s", nodes, tbl.dumpString())
@@ -2702,8 +2702,8 @@ func BenchmarkTableInsertRandom(b *testing.B) {
 				rt.Insert(probe, &myInt)
 			}
 
-			s4 := rt.root4.nodeStatsRec()
-			s6 := rt.root6.nodeStatsRec()
+			s4 := rt.root4.Load().nodeStatsRec()
+			s6 := rt.root6.Load().nodeStatsRec()
 			stats := stats{
 				s4.pfxs + s6.pfxs,
 				s4.childs + s6.childs,
@@ -2721,8 +2721,8 @@ func BenchmarkTableInsertRandom(b *testing.B) {
 				_ = prt.InsertPersist(probe, &myInt)
 			}
 
-			s4 := rt.root4.nodeStatsRec()
-			s6 := rt.root6.nodeStatsRec()
+			s4 := rt.root4.Load().nodeStatsRec()
+			s6 := rt.root6.Load().nodeStatsRec()
 			stats := stats{
 				s4.pfxs + s6.pfxs,
 				s4.childs + s6.childs,
@@ -2937,7 +2937,7 @@ func BenchmarkMemIP4(b *testing.B) {
 			runtime.GC()
 			runtime.ReadMemStats(&endMem)
 
-			stats := rt.root4.nodeStatsRec()
+			stats := rt.root4.Load().nodeStatsRec()
 			b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc)/1024, "KByte")
 			b.ReportMetric(float64(stats.nodes), "node")
 			b.ReportMetric(float64(stats.pfxs), "pfxs")
@@ -2968,7 +2968,7 @@ func BenchmarkMemIP6(b *testing.B) {
 			runtime.GC()
 			runtime.ReadMemStats(&endMem)
 
-			stats := rt.root6.nodeStatsRec()
+			stats := rt.root6.Load().nodeStatsRec()
 			b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc)/1024, "KByte")
 			b.ReportMetric(float64(stats.nodes), "node")
 			b.ReportMetric(float64(stats.pfxs), "pfxs")
@@ -2999,8 +2999,8 @@ func BenchmarkMem(b *testing.B) {
 			runtime.GC()
 			runtime.ReadMemStats(&endMem)
 
-			s4 := rt.root4.nodeStatsRec()
-			s6 := rt.root6.nodeStatsRec()
+			s4 := rt.root4.Load().nodeStatsRec()
+			s6 := rt.root6.Load().nodeStatsRec()
 			stats := stats{
 				s4.pfxs + s6.pfxs,
 				s4.childs + s6.childs,
@@ -3066,8 +3066,8 @@ func checkRoutes(t *testing.T, tbl *Table[int], tt []tableTest) {
 func checkNumNodes(t *testing.T, tbl *Table[int], want int) {
 	t.Helper()
 
-	s4 := tbl.root4.nodeStatsRec()
-	s6 := tbl.root6.nodeStatsRec()
+	s4 := tbl.root4.Load().nodeStatsRec()
+	s6 := tbl.root6.Load().nodeStatsRec()
 	nodes := s4.nodes + s6.nodes
 
 	if got := nodes; got != want {

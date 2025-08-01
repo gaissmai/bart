@@ -766,8 +766,8 @@ func TestLiteStringSample(t *testing.T) {
 func checkLiteNumNodes(t *testing.T, tbl *Lite, want int) {
 	t.Helper()
 
-	s4 := tbl.root4.nodeStatsRec()
-	s6 := tbl.root6.nodeStatsRec()
+	s4 := tbl.root4.Load().nodeStatsRec()
+	s6 := tbl.root6.Load().nodeStatsRec()
 	nodes := s4.nodes + s6.nodes
 
 	if got := nodes; got != want {

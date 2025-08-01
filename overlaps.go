@@ -24,11 +24,11 @@ import (
 // The function is optimized for early exit on first match and uses heuristics to
 // choose between set-based and loop-based matching for performance.
 func (n *node[V]) overlaps(o *node[V], depth int) bool {
-	nPfxCount := n.prefixes.Len()
-	oPfxCount := o.prefixes.Len()
+	nPfxCount := n.prefixes.Load().Len()
+	oPfxCount := o.prefixes.Load().Len()
 
-	nChildCount := n.children.Len()
-	oChildCount := o.children.Len()
+	nChildCount := n.children.Load().Len()
+	oChildCount := o.children.Load().Len()
 
 	// ##############################
 	// 1. Test if any routes overlaps
@@ -51,11 +51,11 @@ func (n *node[V]) overlaps(o *node[V], depth int) bool {
 	if nChildCount > oChildCount {
 		n, o = o, n
 
-		nPfxCount = n.prefixes.Len()
-		oPfxCount = o.prefixes.Len()
+		nPfxCount = n.prefixes.Load().Len()
+		oPfxCount = o.prefixes.Load().Len()
 
-		nChildCount = n.children.Len()
-		oChildCount = o.children.Len()
+		nChildCount = n.children.Load().Len()
+		oChildCount = o.children.Load().Len()
 	}
 
 	if nPfxCount > 0 && oChildCount > 0 {
@@ -81,7 +81,7 @@ func (n *node[V]) overlaps(o *node[V], depth int) bool {
 	}
 
 	// stop condition, no child with identical octet in n and o
-	if !n.children.Intersects(&o.children.BitSet256) {
+	if !n.children.Load().Intersects(&o.children.Load().BitSet256) {
 		return false
 	}
 
@@ -95,13 +95,13 @@ func (n *node[V]) overlaps(o *node[V], depth int) bool {
 // of the n-prefixes is contained in o, or vice versa.
 func (n *node[V]) overlapsRoutes(o *node[V]) bool {
 	// some prefixes are identical, trivial overlap
-	if n.prefixes.Intersects(&o.prefixes.BitSet256) {
+	if n.prefixes.Load().Intersects(&o.prefixes.Load().BitSet256) {
 		return true
 	}
 
 	// get the lowest idx (biggest prefix)
-	nFirstIdx, _ := n.prefixes.FirstSet()
-	oFirstIdx, _ := o.prefixes.FirstSet()
+	nFirstIdx, _ := n.prefixes.Load().FirstSet()
+	oFirstIdx, _ := o.prefixes.Load().FirstSet()
 
 	// start with other min value
 	nIdx := oFirstIdx
@@ -114,7 +114,7 @@ func (n *node[V]) overlapsRoutes(o *node[V]) bool {
 	for nOK || oOK {
 		if nOK {
 			// does any route in o overlap this prefix from n
-			if nIdx, nOK = n.prefixes.NextSet(nIdx); nOK {
+			if nIdx, nOK = n.prefixes.Load().NextSet(nIdx); nOK {
 				if o.lpmTest(uint(nIdx)) {
 					return true
 				}
@@ -130,7 +130,7 @@ func (n *node[V]) overlapsRoutes(o *node[V]) bool {
 
 		if oOK {
 			// does any route in n overlap this prefix from o
-			if oIdx, oOK = o.prefixes.NextSet(oIdx); oOK {
+			if oIdx, oOK = o.prefixes.Load().NextSet(oIdx); oOK {
 				if n.lpmTest(uint(oIdx)) {
 					return true
 				}
@@ -157,8 +157,8 @@ func (n *node[V]) overlapsRoutes(o *node[V]) bool {
 // Bitset-based matching uses precomputed coverage tables
 // to avoid per-address looping. This is critical for high fan-out nodes.
 func (n *node[V]) overlapsChildrenIn(o *node[V]) bool {
-	pfxCount := n.prefixes.Len()
-	childCount := o.children.Len()
+	pfxCount := n.prefixes.Load().Len()
+	childCount := o.children.Load().Len()
 
 	// heuristic, compare benchmarks
 	// when will we range over the children and when will we do bitset calc?
@@ -167,7 +167,7 @@ func (n *node[V]) overlapsChildrenIn(o *node[V]) bool {
 
 	// do range over, not so many childs and maybe too many prefixes for other algo below
 	if doRange {
-		for _, addr := range o.children.AsSlice(&[256]uint8{}) {
+		for _, addr := range o.children.Load().AsSlice(&[256]uint8{}) {
 			if n.lpmTest(art.OctetToIdx(addr)) {
 				return true
 			}
@@ -184,14 +184,14 @@ func (n *node[V]) overlapsChildrenIn(o *node[V]) bool {
 	// in this node
 	hostRoutes := bitset.BitSet256{}
 
-	allIndices := n.prefixes.AsSlice(&[256]uint8{})
+	allIndices := n.prefixes.Load().AsSlice(&[256]uint8{})
 
 	// union all pre alloted bitsets
 	for _, idx := range allIndices {
 		hostRoutes = hostRoutes.Union(allot.IdxToFringeRoutes(idx))
 	}
 
-	return hostRoutes.Intersects(&o.children.BitSet256)
+	return hostRoutes.Intersects(&o.children.Load().BitSet256)
 }
 
 // overlapsSameChildren compares all matching child addresses (octets)
@@ -202,14 +202,14 @@ func (n *node[V]) overlapsChildrenIn(o *node[V]) bool {
 // node/leaf/fringe combinations.
 func (n *node[V]) overlapsSameChildren(o *node[V], depth int) bool {
 	// intersect the child bitsets from n with o
-	commonChildren := n.children.Intersection(&o.children.BitSet256)
+	commonChildren := n.children.Load().Intersection(&o.children.Load().BitSet256)
 
 	addr := uint8(0)
 	ok := true
 	for ok {
 		if addr, ok = commonChildren.NextSet(addr); ok {
-			nChild := n.children.MustGet(addr)
-			oChild := o.children.MustGet(addr)
+			nChild := n.children.Load().MustGet(addr)
+			oChild := o.children.Load().MustGet(addr)
 
 			if overlapsTwoChilds[V](nChild, oChild, depth+1) {
 				return true
@@ -320,16 +320,16 @@ func (n *node[V]) overlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
 
 		// test if any route overlaps prefix´ so far
 		// no best match needed, forward tests without backtracking
-		if n.prefixes.Len() != 0 && n.lpmTest(art.OctetToIdx(octet)) {
+		if n.prefixes.Load().Len() != 0 && n.lpmTest(art.OctetToIdx(octet)) {
 			return true
 		}
 
-		if !n.children.Test(octet) {
+		if !n.children.Load().Test(octet) {
 			return false
 		}
 
 		// next child, node or leaf
-		switch kid := n.children.MustGet(octet).(type) {
+		switch kid := n.children.Load().MustGet(octet).(type) {
 		case *node[V]:
 			n = kid
 			continue
@@ -371,12 +371,12 @@ func (n *node[V]) overlapsIdx(idx uint8) bool {
 	// use bitset intersections instead of range loops
 	// shallow copy pre alloted bitset for idx
 	allotedPrefixRoutes := allot.IdxToPrefixRoutes(idx)
-	if allotedPrefixRoutes.Intersects(&n.prefixes.BitSet256) {
+	if allotedPrefixRoutes.Intersects(&n.prefixes.Load().BitSet256) {
 		return true
 	}
 
 	// 3. Test if prefix overlaps any child in this node
 
 	allotedHostRoutes := allot.IdxToFringeRoutes(idx)
-	return allotedHostRoutes.Intersects(&n.children.BitSet256)
+	return allotedHostRoutes.Intersects(&n.children.Load().BitSet256)
 }

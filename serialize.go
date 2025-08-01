@@ -201,7 +201,7 @@ func (t *Table[V]) DumpList4() []DumpListNode[V] {
 	if t == nil {
 		return nil
 	}
-	return t.root4.dumpListRec(0, stridePath{}, 0, true)
+	return t.root4.Load().dumpListRec(0, stridePath{}, 0, true)
 }
 
 // DumpList6 dumps the ipv6 tree into a list of roots and their subnets.
@@ -210,7 +210,7 @@ func (t *Table[V]) DumpList6() []DumpListNode[V] {
 	if t == nil {
 		return nil
 	}
-	return t.root6.dumpListRec(0, stridePath{}, 0, false)
+	return t.root6.Load().dumpListRec(0, stridePath{}, 0, false)
 }
 
 // dumpListRec, build the data structure rec-descent with the help
@@ -256,7 +256,7 @@ func (n *node[V]) directItemsRec(parentIdx uint8, path stridePath, depth int, is
 	// prefixes:
 	// for all idx's (prefixes mapped by baseIndex) in this node
 	// do a longest-prefix-match
-	for i, idx := range n.prefixes.AsSlice(&[256]uint8{}) {
+	for i, idx := range n.prefixes.Load().AsSlice(&[256]uint8{}) {
 		// tricky part, skip self, test with next possible lpm (idx>>1), it's a complete binary tree
 		nextIdx := idx >> 1
 
@@ -280,7 +280,7 @@ func (n *node[V]) directItemsRec(parentIdx uint8, path stridePath, depth int, is
 				idx:   idx,
 				// get the prefix back from trie
 				cidr: cidrFromPath(path, depth, is4, idx),
-				val:  n.prefixes.Items[i],
+				val:  n.prefixes.Load().Items[i],
 			}
 
 			directItems = append(directItems, item)
@@ -288,7 +288,7 @@ func (n *node[V]) directItemsRec(parentIdx uint8, path stridePath, depth int, is
 	}
 
 	// children:
-	for i, addr := range n.children.AsSlice(&[256]uint8{}) {
+	for i, addr := range n.children.Load().AsSlice(&[256]uint8{}) {
 		hostIdx := art.OctetToIdx(addr)
 
 		// fast skip, lpm not possible
@@ -302,7 +302,7 @@ func (n *node[V]) directItemsRec(parentIdx uint8, path stridePath, depth int, is
 		// be aware, 0 is here a possible value for parentIdx and lpm (if not found)
 		if lpm == parentIdx {
 			// child is directly covered by parent
-			switch kid := n.children.Items[i].(type) {
+			switch kid := n.children.Load().Items[i].(type) {
 			case *node[V]: // traverse rec-descent, call with next child node,
 				// next trie level, set parentIdx to 0, adjust path and depth
 				path[depth&0xf] = addr
