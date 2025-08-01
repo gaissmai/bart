@@ -132,9 +132,9 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 		if !n.children.Test(addr) {
 			newVal := cb(zero, false)
 			if isFringe(depth, bits) {
-				n.children.InsertAt(addr, newFringeNode[V](newVal))
+				n.children.InsertAt(addr, newFringeNode(newVal))
 			} else {
-				n.children.InsertAt(addr, newLeafNode[V](pfx, newVal))
+				n.children.InsertAt(addr, newLeafNode(pfx, newVal))
 			}
 
 			// New prefix addition updates size.
@@ -164,7 +164,7 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 				newVal = cb(kid.value, true)
 
 				// Replace the existing leaf with an updated one.
-				n.children.InsertAt(addr, newLeafNode[V](pfx, newVal))
+				n.children.InsertAt(addr, newLeafNode(pfx, newVal))
 
 				return pt, newVal
 			}
@@ -183,7 +183,7 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 			if isFringe(depth, bits) {
 				newVal = cb(kid.value, true)
 				// Replace fringe node with updated value.
-				n.children.InsertAt(addr, newFringeNode[V](newVal))
+				n.children.InsertAt(addr, newFringeNode(newVal))
 				return pt, newVal
 			}
 

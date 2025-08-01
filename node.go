@@ -135,7 +135,7 @@ func cloneOrCopy[V any](val V) V {
 // This function preserves the original prefix and clones the value,
 // ensuring that the cloned leaf does not alias the original value if cloning is supported.
 func (l *leafNode[V]) cloneLeaf() *leafNode[V] {
-	return newLeafNode[V](l.prefix, cloneOrCopy(l.value))
+	return newLeafNode(l.prefix, cloneOrCopy(l.value))
 }
 
 // cloneFringe returns a clone of the fringe
@@ -149,7 +149,7 @@ func (l *leafNode[V]) cloneLeaf() *leafNode[V] {
 // Unlike leafNode, fringeNode does not store a prefix path - this method simply clones
 // the held value to avoid unintended mutations on shared references.
 func (l *fringeNode[V]) cloneFringe() *fringeNode[V] {
-	return newFringeNode[V](cloneOrCopy(l.value))
+	return newFringeNode(cloneOrCopy(l.value))
 }
 
 // insertAtDepth inserts a network prefix and its associated value into the
@@ -178,9 +178,9 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 		if !n.children.Test(octet) {
 			// insert prefix path compressed as leaf or fringe
 			if isFringe(depth, bits) {
-				return n.children.InsertAt(octet, newFringeNode[V](val))
+				return n.children.InsertAt(octet, newFringeNode(val))
 			}
-			return n.children.InsertAt(octet, newLeafNode[V](pfx, val))
+			return n.children.InsertAt(octet, newLeafNode(pfx, val))
 		}
 
 		// ... or decend down the trie
@@ -273,9 +273,9 @@ func (n *node[V]) insertAtDepthPersist(pfx netip.Prefix, val V, depth int) (exis
 		if !n.children.Test(octet) {
 			// insert prefix path compressed as leaf or fringe
 			if isFringe(depth, bits) {
-				return n.children.InsertAt(octet, newFringeNode[V](val))
+				return n.children.InsertAt(octet, newFringeNode(val))
 			}
-			return n.children.InsertAt(octet, newLeafNode[V](pfx, val))
+			return n.children.InsertAt(octet, newLeafNode(pfx, val))
 		}
 		kid := n.children.MustGet(octet)
 
