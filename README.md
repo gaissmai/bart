@@ -30,7 +30,7 @@ lookup tables. The lookup is performed entirely by fast,
 cache-friendly bitmask operations, which in modern CPUs are performed
 by advanced bit manipulation instruction sets (POPCNT, LZCNT, TZCNT, ...).
 
-You should specify the CPU feature set when compiling, e.g. GOAMD64=v2 for 
+You should specify the CPU feature set when compiling, e.g. GOAMD64=v3 for 
 maximum performance, see also https://go.dev/wiki/MinimumRequirements#architectures
 
 The algorithm was specially developed so that it can always work with a fixed
@@ -68,25 +68,12 @@ See the `ExampleLite_concurrent` and `ExampleTable_concurrent` tests for concret
 
 ## API
 
-From release v0.18.x on, bart requires at least go1.23, the `iter.Seq2[netip.Prefix, V]` types for iterators
-are used.
-
 ```golang
   import "github.com/gaissmai/bart"
   
   type Table[V any] struct {
   	// Has unexported fields.
   }
-    // Table represents a thread-safe IPv4 and IPv6 routing table with payload V.
-    //
-    // The zero value is ready to use.
-    //
-    // The Table is safe for concurrent reads, but concurrent reads and writes
-    // must be externally synchronized. Mutation via Insert/Delete requires locks,
-    // or alternatively, use ...Persist methods which return a modified copy
-    // without altering the original table (copy-on-write).
-    //
-    // A Table must not be copied by value; always pass by pointer.
 
   func (t *Table[V]) Contains(ip netip.Addr) bool
   func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool)
@@ -178,25 +165,25 @@ Just a teaser, `Contains` and `Lookup` against the Tier1 full Internet routing t
 random IP address probes:
 
 ```
-$ GOAMD64=v2 go test -run=xxx -bench=FullM/Contains -cpu=1
+$ GOAMD64=v3 go test -run=xxx -bench=FullM/Contains -cpu=1
 goos: linux
 goarch: amd64
 pkg: github.com/gaissmai/bart
 cpu: Intel(R) Core(TM) i5-8250U CPU @ 1.60GHz
-BenchmarkFullMatch4/Contains         	83951143	        14.15 ns/op
-BenchmarkFullMatch6/Contains         	62731105	        19.14 ns/op
-BenchmarkFullMiss4/Contains          	74333276	        16.17 ns/op
-BenchmarkFullMiss6/Contains          	142984221	         8.610 ns/op
+BenchmarkFullMatch4/Contains        82013714	        13.59 ns/op
+BenchmarkFullMatch6/Contains        64516006	        18.66 ns/op
+BenchmarkFullMiss4/Contains         75341578	        15.94 ns/op
+BenchmarkFullMiss6/Contains         148116180	         8.122 ns/op
 
-$ GOAMD64=v2 go test -run=xxx -bench=FullM/Lookup -skip=/x -cpu=1
+$ GOAMD64=v3 go test -run=xxx -bench=FullM/Lookup -skip=/x -cpu=1
 goos: linux
 goarch: amd64
 pkg: github.com/gaissmai/bart
 cpu: Intel(R) Core(TM) i5-8250U CPU @ 1.60GHz
-BenchmarkFullMatch4/Lookup         	54066939	        22.09 ns/op
-BenchmarkFullMatch6/Lookup         	27839944	        44.13 ns/op
-BenchmarkFullMiss4/Lookup          	55061455	        21.80 ns/op
-BenchmarkFullMiss6/Lookup          	100000000	        11.21 ns/op
+BenchmarkFullMatch4/Lookup         	54616323	        22.02 ns/op
+BenchmarkFullMatch6/Lookup         	30073657	        39.98 ns/op
+BenchmarkFullMiss4/Lookup          	55132899	        21.90 ns/op
+BenchmarkFullMiss6/Lookup          	100000000	        11.12 ns/op
 ```
 
 ## Compatibility Guarantees
