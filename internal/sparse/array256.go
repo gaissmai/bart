@@ -150,6 +150,28 @@ func (a *Array256[T]) Copy() *Array256[T] {
 	}
 }
 
+// Clone returns a deep copy of the Array256,
+// cloning each item using the provided cloneFunc.
+func (a *Array256[T]) Clone(cloneFunc func(val T) T) *Array256[T] {
+	if a == nil {
+		return nil
+	}
+
+	// Allocate a new Array256[T] with the same BitSet
+	// and an appropriately-sized Items slice.
+	c := &Array256[T]{
+		BitSet256: a.BitSet256,
+		Items:     make([]T, len(a.Items)),
+	}
+
+	// Deep-copy each item using the provided clone function.
+	for i, v := range a.Items {
+		c.Items[i] = cloneFunc(v)
+	}
+
+	return c
+}
+
 // InsertAt adds the value to the index i. If a value already exists there,
 // it is overwritten and true is returned.
 //
