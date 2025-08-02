@@ -85,8 +85,8 @@ func (t *Table[V]) initSlow() {
 	}
 
 	// Setup root nodes
-	t.root4.Store(new(node[V]))
-	t.root6.Store(new(node[V]))
+	t.root4.Store(newNode[V]())
+	t.root6.Store(newNode[V]())
 
 	// Mark as initialized atomically so other goroutines see that Table is ready
 	t.inited.Store(1)
@@ -236,7 +236,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 			// push the leaf down
 			// insert new child at current leaf position (octet
 			// descend down, replace n with new child
-			newNode := new(node[V])
+			newNode := newNode[V]()
 			newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
 
 			n.children.Load().InsertAt(octet, newNode)
@@ -253,7 +253,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 			// push the fringe down, it becomes a default route (idx=1)
 			// insert new child at current leaf position (octet
 			// descend down, replace n with new child
-			newNode := new(node[V])
+			newNode := newNode[V]()
 			newNode.prefixes.Load().InsertAt(1, kid.value)
 
 			n.children.Load().InsertAt(octet, newNode)
@@ -280,6 +280,9 @@ func (t *Table[V]) GetAndDelete(pfx netip.Prefix) (val V, ok bool) {
 
 func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 	t.init()
+
+	t.mu.Lock()
+	defer t.mu.Unlock()
 
 	if !pfx.IsValid() {
 		return
@@ -310,7 +313,10 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 
 		if depth == maxDepth {
 			// try to delete prefix in trie node
-			val, exists = n.prefixes.Load().DeleteAt(art.PfxToIdx(octet, lastBits))
+			clonedPfxs := n.prefixes.Load().Clone(cloneOrCopy)
+			val, exists = clonedPfxs.DeleteAt(art.PfxToIdx(octet, lastBits))
+			n.prefixes.Store(clonedPfxs)
+
 			if !exists {
 				return
 			}
@@ -323,14 +329,17 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 		if !n.children.Load().Test(octet) {
 			return
 		}
-		kid := n.children.Load().MustGet(octet)
-
-		// kid is node or leaf or fringe at octet
-		switch kid := kid.(type) {
-		case *node[V]:
+		kid, idx := n.children.Load().MustGet2(octet)
+		if kid, ok := kid.(*node[V]); ok {
 			n = kid
 			continue // descend down to next trie level
+		}
 
+		// TODO
+		clonedKids := n.children.Load().Clone(cloneLeafOrFringe[V])
+		kid = clonedKids.Items[idx]
+
+		switch kid := kid.(type) {
 		case *fringeNode[V]:
 			// if pfx is no fringe at this depth, fast exit
 			if !isFringe(depth, bits) {
@@ -338,7 +347,8 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 			}
 
 			// pfx is fringe at depth, delete fringe
-			n.children.Load().DeleteAt(octet)
+			clonedKids.DeleteAt(octet)
+			n.children.Store(clonedKids)
 
 			t.sizeUpdate(is4, -1)
 			n.purgeAndCompress(stack[:depth], octets, is4)
@@ -352,7 +362,8 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 			}
 
 			// prefix is equal leaf, delete leaf
-			n.children.Load().DeleteAt(octet)
+			clonedKids.DeleteAt(octet)
+			n.children.Store(clonedKids)
 
 			t.sizeUpdate(is4, -1)
 			n.purgeAndCompress(stack[:depth], octets, is4)

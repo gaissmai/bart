@@ -5,6 +5,7 @@ package sparse
 
 import (
 	"math/rand/v2"
+	"reflect"
 	"testing"
 )
 
@@ -178,5 +179,108 @@ func TestSparseArrayCopy(t *testing.T) {
 		if b.Items[i] == v {
 			t.Errorf("update a after Clone, b must now differ: aValue: %v, bValue: %v", b.Items[i], v)
 		}
+	}
+}
+
+// ----- The actual test -----
+func TestArray256_Clone_PointerItem_InsertAt(t *testing.T) {
+	type payload struct{ V int }
+
+	buildArray256 := func(items map[uint8]*payload) *Array256[*payload] {
+		arr := &Array256[*payload]{}
+		for i, v := range items {
+			arr.InsertAt(i, v)
+		}
+		return arr
+	}
+
+	cloneFunc := func(src *payload) *payload {
+		if src == nil {
+			return nil
+		}
+		out := *src
+		return &out
+	}
+
+	tests := []struct {
+		name      string
+		inItems   map[uint8]*payload
+		cloneFunc func(*payload) *payload
+		wantItems map[uint8]*payload
+	}{
+		{
+			name:      "nil receiver",
+			inItems:   nil,
+			cloneFunc: cloneFunc,
+			wantItems: nil,
+		},
+		{
+			name:      "empty array",
+			inItems:   map[uint8]*payload{},
+			cloneFunc: cloneFunc,
+			wantItems: map[uint8]*payload{},
+		},
+		{
+			name: "with pointers and nil",
+			inItems: map[uint8]*payload{
+				5:   {V: 1},
+				42:  {V: 2},
+				200: nil,
+			},
+			cloneFunc: cloneFunc,
+			wantItems: map[uint8]*payload{
+				5:   {V: 1},
+				42:  {V: 2},
+				200: nil,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var in *Array256[*payload]
+			if tt.inItems != nil {
+				in = buildArray256(tt.inItems)
+			}
+			var want *Array256[*payload]
+			if tt.wantItems != nil {
+				want = buildArray256(tt.wantItems)
+			}
+			got := in.Clone(tt.cloneFunc)
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("Clone() = %#v, want %#v", got, want)
+			}
+
+			// --- Memory aliasing checks ---
+			if got != nil && in != nil {
+				for i, gotPtr := range got.Items {
+					if i >= len(in.Items) {
+						panic("insertItem grew the slice") // TODO
+					}
+					inPtr := in.Items[i]
+					switch {
+					case gotPtr == nil && inPtr == nil:
+						// ok
+					case gotPtr == nil || inPtr == nil:
+						t.Errorf("Clone nil mismatch at index %d: got %v, in %v", i, gotPtr, inPtr)
+					case gotPtr == inPtr:
+						t.Errorf("Aliasing detected at index %d: got.Items[%d] and in.Items[%d] are same pointer (%p)", i, i, i, gotPtr)
+					case gotPtr.V != inPtr.V:
+						t.Errorf("Value mismatch at index %d: got.V=%v, in.V=%v", i, gotPtr.V, inPtr.V)
+					}
+				}
+
+				// Mutate a value and ensure original is unchanged.
+				for i, gotPtr := range got.Items {
+					if gotPtr != nil && i < len(in.Items) && in.Items[i] != nil {
+						orig := in.Items[i].V
+						gotPtr.V++
+						if in.Items[i].V != orig {
+							t.Errorf("Aliasing: modifying got.Items[%d].V affected in.Items[%d].V (got %v, in %v)", i, i, gotPtr.V, in.Items[i].V)
+						}
+					}
+				}
+			}
+		})
 	}
 }

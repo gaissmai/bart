@@ -42,7 +42,7 @@ func TestPrefixInsert(t *testing.T) {
 
 	pfxs := shuffleStridePfxs(allStridePfxs())[:100]
 	gold := new(goldStrideTbl[int]).insertMany(pfxs)
-	fast := new(node[int])
+	fast := newNode[int]()
 
 	for _, pfx := range pfxs {
 		fast.prefixes.Load().InsertAt(art.PfxToIdx(pfx.octet, pfx.bits), pfx.val)
@@ -64,7 +64,7 @@ func TestPrefixDelete(t *testing.T) {
 	// Compare route deletion to our reference table.
 	pfxs := shuffleStridePfxs(allStridePfxs())[:100]
 	gold := new(goldStrideTbl[int]).insertMany(pfxs)
-	fast := new(node[int])
+	fast := newNode[int]()
 
 	for _, pfx := range pfxs {
 		fast.prefixes.Load().InsertAt(art.PfxToIdx(pfx.octet, pfx.bits), pfx.val)
@@ -97,7 +97,7 @@ func TestOverlapsPrefix(t *testing.T) {
 
 	pfxs := shuffleStridePfxs(allStridePfxs())[:100]
 	gold := new(goldStrideTbl[int]).insertMany(pfxs)
-	fast := new(node[int])
+	fast := newNode[int]()
 
 	for _, pfx := range pfxs {
 		fast.prefixes.Load().InsertAt(art.PfxToIdx(pfx.octet, pfx.bits), pfx.val)
@@ -123,7 +123,7 @@ func TestOverlapsRoutes(t *testing.T) {
 		pfxs := all[:numEntries]
 
 		gold := new(goldStrideTbl[int]).insertMany(pfxs)
-		fast := new(node[int])
+		fast := newNode[int]()
 
 		for _, pfx := range pfxs {
 			fast.prefixes.Load().InsertAt(art.PfxToIdx(pfx.octet, pfx.bits), pfx.val)
@@ -131,7 +131,7 @@ func TestOverlapsRoutes(t *testing.T) {
 
 		inter := all[numEntries : 2*numEntries]
 		goldInter := new(goldStrideTbl[int]).insertMany(inter)
-		fastInter := new(node[int])
+		fastInter := newNode[int]()
 
 		for _, pfx := range inter {
 			fastInter.prefixes.Load().InsertAt(art.PfxToIdx(pfx.octet, pfx.bits), pfx.val)
@@ -155,7 +155,7 @@ func BenchmarkNodePrefixInsert(b *testing.B) {
 	routes := shuffleStridePfxs(allStridePfxs())
 
 	for _, nroutes := range prefixCount {
-		this := new(node[int])
+		this := newNode[int]()
 
 		for i, route := range routes {
 			if i >= nroutes {
@@ -181,7 +181,7 @@ func BenchmarkNodePrefixUpdate(b *testing.B) {
 	routes := shuffleStridePfxs(allStridePfxs())
 
 	for _, nroutes := range prefixCount {
-		this := new(node[int])
+		this := newNode[int]()
 
 		for i, route := range routes {
 			if i >= nroutes {
@@ -207,7 +207,7 @@ func BenchmarkNodePrefixDelete(b *testing.B) {
 	routes := shuffleStridePfxs(allStridePfxs())
 
 	for _, nroutes := range prefixCount {
-		this := new(node[int])
+		this := newNode[int]()
 
 		for i, route := range routes {
 			if i >= nroutes {
@@ -233,7 +233,7 @@ func BenchmarkNodePrefixLPM(b *testing.B) {
 	routes := shuffleStridePfxs(allStridePfxs())
 
 	for _, nroutes := range prefixCount {
-		this := new(node[int])
+		this := newNode[int]()
 
 		for i, route := range routes {
 			if i >= nroutes {
@@ -267,7 +267,7 @@ func BenchmarkNodePrefixLPM(b *testing.B) {
 func BenchmarkNodePrefixesAsSlice(b *testing.B) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, nPrefixes := range prefixCount {
-		this := new(node[any])
+		this := newNode[any]()
 
 		for range nPrefixes {
 			idx := byte(prng.IntN(maxItems))
@@ -287,7 +287,7 @@ func BenchmarkNodePrefixesAsSlice(b *testing.B) {
 func BenchmarkNodePrefixesAll(b *testing.B) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, nPrefixes := range prefixCount {
-		this := new(node[any])
+		this := newNode[any]()
 
 		for range nPrefixes {
 			idx := byte(prng.IntN(maxItems))
@@ -307,7 +307,7 @@ func BenchmarkNodePrefixesAll(b *testing.B) {
 func BenchmarkNodeChildInsert(b *testing.B) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, nchilds := range childCount {
-		this := new(node[int])
+		this := newNode[int]()
 
 		for range nchilds {
 			octet := prng.IntN(maxItems)
@@ -328,7 +328,7 @@ func BenchmarkNodeChildInsert(b *testing.B) {
 func BenchmarkNodeChildDelete(b *testing.B) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, nchilds := range childCount {
-		this := new(node[int])
+		this := newNode[int]()
 
 		for range nchilds {
 			octet := prng.IntN(maxItems)
@@ -349,7 +349,7 @@ func BenchmarkNodeChildDelete(b *testing.B) {
 func BenchmarkNodeChildrenAsSlice(b *testing.B) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, nchilds := range childCount {
-		this := new(node[int])
+		this := newNode[int]()
 
 		for range nchilds {
 			octet := byte(prng.IntN(maxItems))
@@ -369,7 +369,7 @@ func BenchmarkNodeChildrenAsSlice(b *testing.B) {
 func BenchmarkNodeChildrenAll(b *testing.B) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, nchilds := range childCount {
-		this := new(node[int])
+		this := newNode[int]()
 
 		for range nchilds {
 			octet := byte(prng.IntN(maxItems))

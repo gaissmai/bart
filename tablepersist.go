@@ -177,7 +177,7 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 
 			// Prefixes differ - need to push existing leaf down the trie,
 			// create a new internal node, and insert the original leaf under it.
-			newNode := new(node[V])
+			newNode := newNode[V]()
 			newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
 
 			// Replace leaf with new node and descend.
@@ -195,7 +195,7 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 
 			// Else convert fringe node into an internal node with fringe value
 			// pushed down as default route (idx=1).
-			newNode := new(node[V])
+			newNode := newNode[V]()
 			newNode.prefixes.Load().InsertAt(1, kid.value)
 
 			// Replace fringe with newly created internal node and descend.
