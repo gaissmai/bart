@@ -912,12 +912,6 @@ func (t *Table[V]) Union(o *Table[V]) {
 	t.size6 += o.size6 - dup6
 }
 
-// Cloner is an interface, if implemented by payload of type V the values are deeply copied
-// during [Table.UpdatePersist], [Table.DeletePersist], [Table.Clone] and [Table.Union].
-type Cloner[V any] interface {
-	Clone() V
-}
-
 // Clone returns a copy of the routing table.
 // The payload of type V is shallow copied, but if type V implements the [Cloner] interface,
 // the values are cloned.

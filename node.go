@@ -413,105 +413,6 @@ func (n *node[V]) lpmTest(idx uint) bool {
 	return n.prefixes.Intersects(lpm.BackTrackingBitset(idx))
 }
 
-// cloneOrCopy returns either a deep copy or a shallow copy of the given value v,
-// depending on whether the value type V implements the Cloner[V] interface.
-//
-// If the provided value implements Cloner[V], its Clone method is invoked to produce
-// a deep copy. Otherwise, the value is returned as-is, which yields a shallow copy.
-func cloneOrCopy[V any](val V) V {
-	if cloner, ok := any(val).(Cloner[V]); ok {
-		return cloner.Clone()
-	}
-	// just a shallow copy
-	return val
-}
-
-// cloneLeaf creates a copy of the current leafNode[V].
-//
-// If the stored value implements the Cloner[V] interface, a deep copy of the value
-// is produced via cloneOrCopy. Otherwise, a shallow copy of the value is used.
-//
-// This function preserves the original prefix and clones the value,
-// ensuring that the cloned leaf does not alias the original value if cloning is supported.
-func (l *leafNode[V]) cloneLeaf() *leafNode[V] {
-	return newLeafNode(l.prefix, cloneOrCopy(l.value))
-}
-
-// cloneFringe returns a clone of the fringe
-// if the value implements the Cloner interface.
-
-// cloneFringe creates a copy of the current fringeNode[V].
-//
-// If the stored value implements the Cloner[V] interface, it is deep-copied
-// via cloneOrCopy. Otherwise, a shallow copy is taken.
-//
-// Unlike leafNode, fringeNode does not store a prefix path - this method simply clones
-// the held value to avoid unintended mutations on shared references.
-func (l *fringeNode[V]) cloneFringe() *fringeNode[V] {
-	return newFringeNode(cloneOrCopy(l.value))
-}
-
-// cloneLeafOrFringe takes a value of dynamic type 'any' that represents a pointer to a node,
-// and returns a cloned copy of that node depending on its actual concrete type.
-func cloneLeafOrFringe[V any](anyKid any) any {
-	switch kid := anyKid.(type) {
-	case *node[V]:
-		return any(kid) // just copy
-	case *leafNode[V]:
-		return any(kid.cloneLeaf())
-	case *fringeNode[V]:
-		return any(kid.cloneFringe())
-	default:
-		panic("logic error, wrong node type")
-	}
-}
-
-// cloneFlat creates a shallow copy of the current node[V], with optional deep copies of values.
-//
-// This method is intended for fast, non-recursive cloning of a node structure. It copies only
-// the current node and selectively performs deep copies of stored values, without recursively
-// cloning child nodes.
-func (n *node[V]) cloneFlat() *node[V] {
-	if n == nil {
-		return nil
-	}
-
-	c := new(node[V])
-	if n.isEmpty() {
-		return c
-	}
-
-	// deep clone
-	c.prefixes = *(n.prefixes.Clone(cloneOrCopy[V]))
-
-	// flat clone, not traversing the node levels
-	c.children = *(n.children.Clone(cloneLeafOrFringe[V]))
-
-	return c
-}
-
-// cloneRec performs a recursive deep copy of the node[V].
-//
-// If the value type V implements the Cloner[V] interface,
-// each value is deep-copied.
-func (n *node[V]) cloneRec() *node[V] {
-	if n == nil {
-		return nil
-	}
-
-	c := n.cloneFlat()
-
-	// clone the child nodes rec-descent
-	for i, kidAny := range c.children.Items {
-		// leaves and fringes are already flat cloned
-		if kid, ok := kidAny.(*node[V]); ok {
-			c.children.Items[i] = kid.cloneRec()
-		}
-	}
-
-	return c
-}
-
 // allRec recursively traverses the trie starting at the current node,
 // applying the provided yield function to every stored prefix and value.
 //
@@ -691,10 +592,12 @@ func (n *node[V]) allRecSorted(path stridePath, depth int, is4 bool, yield func(
 //
 // Returns the number of duplicate prefixes that were overwritten during merging.
 func (n *node[V]) unionRec(o *node[V], depth int) (duplicates int) {
+	cloneFn := cloneFnFactory[V]()
+
 	// for all prefixes in other node do ...
 	for i, oIdx := range o.prefixes.AsSlice(&[256]uint8{}) {
 		// clone/copy the value from other node at idx
-		clonedVal := cloneOrCopy(o.prefixes.Items[i])
+		clonedVal := cloneFn(o.prefixes.Items[i])
 
 		// insert/overwrite cloned value from o into n
 		if n.prefixes.InsertAt(oIdx, clonedVal) {
@@ -734,11 +637,11 @@ func (n *node[V]) unionRec(o *node[V], depth int) (duplicates int) {
 				continue
 
 			case *leafNode[V]: // NULL, leaf
-				n.children.InsertAt(addr, otherKid.cloneLeaf())
+				n.children.InsertAt(addr, otherKid.cloneLeaf(cloneFn))
 				continue
 
 			case *fringeNode[V]: // NULL, fringe
-				n.children.InsertAt(addr, otherKid.cloneFringe())
+				n.children.InsertAt(addr, otherKid.cloneFringe(cloneFn))
 				continue
 
 			default:
@@ -756,7 +659,7 @@ func (n *node[V]) unionRec(o *node[V], depth int) (duplicates int) {
 
 			case *leafNode[V]: // node, leaf
 				// push this cloned leaf down, count duplicate entry
-				clonedLeaf := otherKid.cloneLeaf()
+				clonedLeaf := otherKid.cloneLeaf(cloneFn)
 				if thisKid.insertAtDepth(clonedLeaf.prefix, clonedLeaf.value, depth+1) {
 					duplicates++
 				}
@@ -764,7 +667,7 @@ func (n *node[V]) unionRec(o *node[V], depth int) (duplicates int) {
 
 			case *fringeNode[V]: // node, fringe
 				// push this fringe down, a fringe becomes a default route one level down
-				clonedFringe := otherKid.cloneFringe()
+				clonedFringe := otherKid.cloneFringe(cloneFn)
 				if thisKid.prefixes.InsertAt(1, clonedFringe.value) {
 					duplicates++
 				}
@@ -790,7 +693,7 @@ func (n *node[V]) unionRec(o *node[V], depth int) (duplicates int) {
 			case *leafNode[V]: // leaf, leaf
 				// shortcut, prefixes are equal
 				if thisKid.prefix == otherKid.prefix {
-					thisKid.value = cloneOrCopy(otherKid.value)
+					thisKid.value = cloneFn(otherKid.value)
 					duplicates++
 					continue
 				}
@@ -802,7 +705,7 @@ func (n *node[V]) unionRec(o *node[V], depth int) (duplicates int) {
 				nc.insertAtDepth(thisKid.prefix, thisKid.value, depth+1)
 
 				// insert at depth cloned leaf, maybe duplicate
-				clonedLeaf := otherKid.cloneLeaf()
+				clonedLeaf := otherKid.cloneLeaf(cloneFn)
 				if nc.insertAtDepth(clonedLeaf.prefix, clonedLeaf.value, depth+1) {
 					duplicates++
 				}
@@ -819,7 +722,7 @@ func (n *node[V]) unionRec(o *node[V], depth int) (duplicates int) {
 				nc.insertAtDepth(thisKid.prefix, thisKid.value, depth+1)
 
 				// push this cloned fringe down, it becomes the default route
-				clonedFringe := otherKid.cloneFringe()
+				clonedFringe := otherKid.cloneFringe(cloneFn)
 				if nc.prefixes.InsertAt(1, clonedFringe.value) {
 					duplicates++
 				}
@@ -853,7 +756,7 @@ func (n *node[V]) unionRec(o *node[V], depth int) (duplicates int) {
 				nc.prefixes.InsertAt(1, thisKid.value)
 
 				// push this cloned leaf down
-				clonedLeaf := otherKid.cloneLeaf()
+				clonedLeaf := otherKid.cloneLeaf(cloneFn)
 				if nc.insertAtDepth(clonedLeaf.prefix, clonedLeaf.value, depth+1) {
 					duplicates++
 				}
@@ -863,7 +766,7 @@ func (n *node[V]) unionRec(o *node[V], depth int) (duplicates int) {
 				continue
 
 			case *fringeNode[V]: // fringe, fringe
-				thisKid.value = otherKid.cloneFringe().value
+				thisKid.value = otherKid.cloneFringe(cloneFn).value
 				duplicates++
 				continue
 			}
