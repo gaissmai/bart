@@ -22,7 +22,7 @@ import (
 // typically taking μsec instead of nsec.
 //
 // The bulk table load could be done with [Table.Insert] and then you can
-// use InsertPersist, [Table.UpdatePersist] and [Table.DeletePersist] for lock-free updates.
+// use InsertPersist, [Table.UpdatePersist] and [Table.DeletePersist] for lock-free lookups.
 func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V] {
 	if !pfx.IsValid() {
 		return t
