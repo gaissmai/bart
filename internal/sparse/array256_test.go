@@ -5,6 +5,7 @@ package sparse
 
 import (
 	"math/rand/v2"
+	"slices"
 	"testing"
 )
 
@@ -60,6 +61,12 @@ func TestSparseArrayGet(t *testing.T) {
 		if v != i {
 			t.Errorf("MustGet, expected %d, got %d", i, v)
 		}
+	}
+
+	a.DeleteAt(0)
+	_, ok := a.Get(0)
+	if ok {
+		t.Errorf("Get, expected false, got %v", ok)
 	}
 }
 
@@ -145,38 +152,283 @@ func TestSparseArrayUpdate(t *testing.T) {
 }
 
 func TestSparseArrayCopy(t *testing.T) {
-	t.Parallel()
-	var a *Array256[int]
-
-	if a.Copy() != nil {
-		t.Fatal("copy a nil array, expected nil")
+	type testCase struct {
+		name  string
+		setup func() *Array256[int]
 	}
 
-	a = new(Array256[int])
-
-	for i := range 255 {
-		a.InsertAt(uint8(i), i)
+	tests := []testCase{
+		{
+			name: "Copy of nil returns nil",
+			setup: func() *Array256[int] {
+				return nil
+			},
+		},
+		{
+			name: "Copy of empty Array256",
+			setup: func() *Array256[int] {
+				return &Array256[int]{}
+			},
+		},
+		{
+			name: "Copy after InsertAt few elements",
+			setup: func() *Array256[int] {
+				a := &Array256[int]{}
+				a.InsertAt(10, 100)
+				a.InsertAt(20, 200)
+				a.InsertAt(30, 300)
+				return a
+			},
+		},
+		{
+			name: "Copy after Insert and Delete",
+			setup: func() *Array256[int] {
+				a := &Array256[int]{}
+				a.InsertAt(1, 11)
+				a.InsertAt(2, 22)
+				a.DeleteAt(1)
+				a.InsertAt(3, 33)
+				return a
+			},
+		},
 	}
 
-	// shallow copy
-	b := a.Copy()
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			original := tc.setup()
+			aCopy := original.Copy()
 
-	// basic values identity
-	for i, v := range a.Items {
-		if b.Items[i] != v {
-			t.Errorf("Clone, expect value: %v, got: %v", v, b.Items[i])
-		}
+			if original == nil {
+				if aCopy != nil {
+					t.Errorf("Copy of nil should be nil, got %v", aCopy)
+				}
+				return
+			}
+
+			if aCopy == original {
+				t.Error("Copy() returned same pointer as original, want distinct copy")
+			}
+
+			if aCopy.BitSet256 != original.BitSet256 {
+				t.Errorf("BitSet256 not copied properly. got=%v, want=%v", aCopy.BitSet256, original.BitSet256)
+			}
+
+			if !slices.Equal(aCopy.Items, original.Items) {
+				t.Errorf("Items slice not copied properly. got=%v, want=%v", aCopy.Items, original.Items)
+			}
+
+			if len(original.Items) > 0 && len(aCopy.Items) > 0 {
+				if &aCopy.Items[0] == &original.Items[0] {
+					t.Error("Items backing array not copied, pointers are equal")
+				}
+			}
+		})
+	}
+}
+
+func TestArray256Clone(t *testing.T) {
+	type testCase struct {
+		name      string
+		setup     func() *Array256[int]
+		cloneFunc func(int) int
+		verify    func(t *testing.T, orig, clone *Array256[int])
 	}
 
-	// update array a
-	for i := range 255 {
-		a.UpdateAt(uint8(i), func(u int, _ bool) int { return u + 1 })
+	tests := []testCase{
+		{
+			name: "Clone returns nil for nil receiver",
+			setup: func() *Array256[int] {
+				return nil
+			},
+			cloneFunc: func(v int) int { return v },
+			verify: func(t *testing.T, orig, clone *Array256[int]) {
+				if clone != nil {
+					t.Errorf("expected nil clone, got %v", clone)
+				}
+			},
+		},
+
+		{
+			name: "Clone empty array",
+			setup: func() *Array256[int] {
+				return &Array256[int]{}
+			},
+			cloneFunc: func(v int) int { return v },
+			verify: func(t *testing.T, orig, clone *Array256[int]) {
+				if clone == orig {
+					t.Error("clone pointer must differ from original")
+				}
+				if clone.BitSet256 != orig.BitSet256 {
+					t.Error("BitSet256 must be equal")
+				}
+				if len(clone.Items) != 0 {
+					t.Errorf("Items must be empty, got: %v", clone.Items)
+				}
+			},
+		},
+
+		{
+			name: "Clone after InsertAt several elements",
+			setup: func() *Array256[int] {
+				a := &Array256[int]{}
+				a.InsertAt(7, 100)
+				a.InsertAt(42, 200)
+				a.InsertAt(127, 300)
+				return a
+			},
+			cloneFunc: func(v int) int { return v },
+			verify: func(t *testing.T, orig, clone *Array256[int]) {
+				if clone == orig {
+					t.Error("clone pointer must differ from original")
+				}
+				if clone.BitSet256 != orig.BitSet256 {
+					t.Errorf("BitSet256 mismatch got=%v want=%v", clone.BitSet256, orig.BitSet256)
+				}
+				if !slices.Equal(clone.Items, orig.Items) {
+					t.Errorf("Items mismatch got=%v want=%v", clone.Items, orig.Items)
+				}
+				if &clone.Items[0] == &orig.Items[0] && len(orig.Items) > 0 {
+					t.Error("Items backing arrays must be distinct")
+				}
+			},
+		},
+
+		{
+			name: "Clone after InsertAt and DeleteAt",
+			setup: func() *Array256[int] {
+				a := &Array256[int]{}
+				a.InsertAt(5, 55)
+				a.InsertAt(10, 110)
+				a.InsertAt(15, 150)
+				a.DeleteAt(10)
+				a.InsertAt(20, 200)
+				return a
+			},
+			cloneFunc: func(v int) int { return v * 10 },
+			verify: func(t *testing.T, orig, clone *Array256[int]) {
+				if clone == orig {
+					t.Error("clone pointer must differ from original")
+				}
+				if clone.BitSet256 != orig.BitSet256 {
+					t.Errorf("BitSet256 mismatch got=%v want=%v", clone.BitSet256, orig.BitSet256)
+				}
+				expected := make([]int, len(orig.Items))
+				for i, v := range orig.Items {
+					expected[i] = v * 10
+				}
+				if !slices.Equal(clone.Items, expected) {
+					t.Errorf("Items mismatch got=%v want=%v", clone.Items, expected)
+				}
+			},
+		},
 	}
 
-	// cloned array must now differ
-	for i, v := range a.Items {
-		if b.Items[i] == v {
-			t.Errorf("update a after Clone, b must now differ: aValue: %v, bValue: %v", b.Items[i], v)
-		}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			orig := tc.setup()
+			clone := orig.Clone(tc.cloneFunc)
+
+			tc.verify(t, orig, clone)
+
+			// Confirm modifying original does not affect clone
+			if orig != nil && len(orig.Items) > 0 && clone != nil {
+				orig.Items[0] = 9999
+				if clone.Items[0] == 9999 {
+					t.Error("Modifying original affected clone")
+				}
+			}
+			// Confirm modifying clone does not affect original
+			if clone != nil && len(clone.Items) > 0 && orig != nil {
+				clone.Items[0] = -9999
+				if orig.Items[0] == -9999 {
+					t.Error("Modifying clone affected original")
+				}
+			}
+		})
+	}
+}
+
+func TestArray256Clone_WithPtrValues(t *testing.T) {
+	type testCase struct {
+		name      string
+		setup     func() *Array256[*int]
+		cloneFunc func(*int) *int
+		verify    func(t *testing.T, orig, clone *Array256[*int])
+	}
+
+	tests := []testCase{
+		{
+			name: "Clone with pointer values",
+			setup: func() *Array256[*int] {
+				a := &Array256[*int]{}
+				v1 := 10
+				v2 := 20
+				v3 := 30
+				a.InsertAt(1, &v1)
+				a.InsertAt(2, &v2)
+				a.InsertAt(3, &v3)
+				return a
+			},
+			cloneFunc: func(p *int) *int {
+				if p == nil {
+					return nil
+				}
+				val := *p
+				return &val
+			},
+			verify: func(t *testing.T, orig, clone *Array256[*int]) {
+				if clone == orig {
+					t.Error("clone pointer must differ from original")
+				}
+				if clone.BitSet256 != orig.BitSet256 {
+					t.Errorf("BitSet256 mismatch got=%v want=%v", clone.BitSet256, orig.BitSet256)
+				}
+				if len(clone.Items) != len(orig.Items) {
+					t.Fatalf("Items length mismatch got=%d want=%d", len(clone.Items), len(orig.Items))
+				}
+				for i := range orig.Items {
+					origVal := orig.Items[i]
+					cloneVal := clone.Items[i]
+					if origVal == cloneVal {
+						t.Errorf("item pointer at index %d is the same between original and clone; want distinct pointer", i)
+					}
+					if origVal == nil && cloneVal != nil {
+						t.Errorf("original pointer at index %d is nil but clone is not", i)
+					} else if origVal != nil && cloneVal == nil {
+						t.Errorf("clone pointer at index %d is nil but original is not", i)
+					} else if origVal != nil && cloneVal != nil && *origVal != *cloneVal {
+						t.Errorf("values differ at index %d: got=%v want=%v", i, *cloneVal, *origVal)
+					}
+				}
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			orig := tc.setup()
+			clone := orig.Clone(tc.cloneFunc)
+			tc.verify(t, orig, clone)
+
+			// modify original pointee to ensure clone unaffected
+			if orig != nil && len(orig.Items) > 0 && clone != nil {
+				if orig.Items[0] != nil {
+					*orig.Items[0] = 9999
+					if clone.Items[0] != nil && *clone.Items[0] == 9999 {
+						t.Error("Modifying original pointer value affected clone")
+					}
+				}
+			}
+
+			// modify clone pointee to ensure original unaffected
+			if clone != nil && len(clone.Items) > 0 && orig != nil {
+				if clone.Items[0] != nil {
+					*clone.Items[0] = -9999
+					if orig.Items[0] != nil && *orig.Items[0] == -9999 {
+						t.Error("Modifying clone pointer value affected original")
+					}
+				}
+			}
+		})
 	}
 }
