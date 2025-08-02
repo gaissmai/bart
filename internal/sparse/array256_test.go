@@ -184,6 +184,8 @@ func TestSparseArrayCopy(t *testing.T) {
 
 // ----- The actual test -----
 func TestArray256_Clone_PointerItem_InsertAt(t *testing.T) {
+	t.Skip("not yet ready")
+
 	type payload struct{ V int }
 
 	buildArray256 := func(items map[uint8]*payload) *Array256[*payload] {

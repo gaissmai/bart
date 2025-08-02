@@ -44,8 +44,7 @@ var (
 // If the payload V either contains a pointer or is a pointer,
 // it must implement the [bart.Cloner] interface.
 func ExampleTable_concurrent() {
-	baseTbl := new(bart.Table[*testVal])
-	tblAtomicPtr.Store(baseTbl)
+	rt := new(bart.Table[*testVal])
 
 	wg := sync.WaitGroup{}
 
@@ -55,7 +54,7 @@ func ExampleTable_concurrent() {
 		for range 10_000_000 {
 			for _, s := range exampleIPs {
 				ip := netip.MustParseAddr(s)
-				_, _ = tblAtomicPtr.Load().Lookup(ip)
+				_, _ = rt.Lookup(ip)
 			}
 		}
 	}()
@@ -66,13 +65,7 @@ func ExampleTable_concurrent() {
 		for range 10_000 {
 			for _, s := range examplePrefixes {
 				pfx := netip.MustParsePrefix(s)
-				tblMutex.Lock()
-
-				oldTbl := tblAtomicPtr.Load()
-				newTbl := oldTbl.InsertPersist(pfx, &testVal{data: 0})
-				tblAtomicPtr.Store(newTbl)
-
-				tblMutex.Unlock()
+				rt.InsertSync(pfx, &testVal{data: 0})
 			}
 		}
 	}()
@@ -83,12 +76,7 @@ func ExampleTable_concurrent() {
 		for range 10_000 {
 			for _, s := range examplePrefixes {
 				pfx := netip.MustParsePrefix(s)
-
-				tblMutex.Lock()
-				oldTbl := tblAtomicPtr.Load()
-				newTbl := oldTbl.DeletePersist(pfx)
-				tblAtomicPtr.Store(newTbl)
-				tblMutex.Unlock()
+				rt.DeleteSync(pfx)
 			}
 		}
 	}()

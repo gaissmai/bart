@@ -40,11 +40,9 @@ func (l *Lite) Insert(pfx netip.Prefix) {
 	l.Table.Insert(pfx, struct{}{})
 }
 
-// InsertPersist is an adapter for the underlying table.
-func (l *Lite) InsertPersist(pfx netip.Prefix) *Lite {
-	tbl := l.Table.InsertPersist(pfx, struct{}{})
-	//nolint:govet // copy of *tbl is here by intention
-	return &Lite{*tbl}
+// InsertSync is an adapter for the underlying table.
+func (l *Lite) InsertSync(pfx netip.Prefix) {
+	l.Table.InsertSync(pfx, struct{}{})
 }
 
 // Delete is a wrapper for the underlying table.
@@ -52,11 +50,9 @@ func (l *Lite) Delete(pfx netip.Prefix) {
 	l.Table.Delete(pfx)
 }
 
-// DeletePersist is an adapter for the underlying table.
-func (l *Lite) DeletePersist(pfx netip.Prefix) *Lite {
-	tbl := l.Table.DeletePersist(pfx)
-	//nolint:govet // copy of *tbl is here by intention
-	return &Lite{*tbl}
+// DeleteSync is a wrapper for the underlying table.
+func (l *Lite) DeleteSync(pfx netip.Prefix) {
+	l.Table.DeleteSync(pfx)
 }
 
 // Clone is an adapter for the underlying table.

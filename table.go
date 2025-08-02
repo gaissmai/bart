@@ -31,6 +31,7 @@ import (
 
 	"github.com/gaissmai/bart/internal/art"
 	"github.com/gaissmai/bart/internal/lpm"
+	"github.com/gaissmai/bart/internal/sparse"
 )
 
 // Table represents a thread-safe IPv4 and IPv6 routing table with payload V.
@@ -147,9 +148,6 @@ func maxDepthAndLastBits(bits int) (maxDepth int, lastBits uint8) {
 // If pfx is already present in the tree, its value is set to val.
 func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	t.init()
-
-	t.mu.Lock()
-	defer t.mu.Unlock()
 
 	if !pfx.IsValid() {
 		return
@@ -281,9 +279,6 @@ func (t *Table[V]) GetAndDelete(pfx netip.Prefix) (val V, ok bool) {
 func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 	t.init()
 
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
 	if !pfx.IsValid() {
 		return
 	}
@@ -313,10 +308,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 
 		if depth == maxDepth {
 			// try to delete prefix in trie node
-			clonedPfxs := n.prefixes.Load().Clone(cloneOrCopy)
-			val, exists = clonedPfxs.DeleteAt(art.PfxToIdx(octet, lastBits))
-			n.prefixes.Store(clonedPfxs)
-
+			val, exists = n.prefixes.Load().DeleteAt(art.PfxToIdx(octet, lastBits))
 			if !exists {
 				return
 			}
@@ -329,17 +321,14 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 		if !n.children.Load().Test(octet) {
 			return
 		}
-		kid, idx := n.children.Load().MustGet2(octet)
-		if kid, ok := kid.(*node[V]); ok {
+		kid := n.children.Load().MustGet(octet)
+
+		// kid is node or leaf or fringe at octet
+		switch kid := kid.(type) {
+		case *node[V]:
 			n = kid
 			continue // descend down to next trie level
-		}
 
-		// TODO
-		clonedKids := n.children.Load().Clone(cloneLeafOrFringe[V])
-		kid = clonedKids.Items[idx]
-
-		switch kid := kid.(type) {
 		case *fringeNode[V]:
 			// if pfx is no fringe at this depth, fast exit
 			if !isFringe(depth, bits) {
@@ -347,8 +336,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 			}
 
 			// pfx is fringe at depth, delete fringe
-			clonedKids.DeleteAt(octet)
-			n.children.Store(clonedKids)
+			n.children.Load().DeleteAt(octet)
 
 			t.sizeUpdate(is4, -1)
 			n.purgeAndCompress(stack[:depth], octets, is4)
@@ -362,8 +350,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 			}
 
 			// prefix is equal leaf, delete leaf
-			clonedKids.DeleteAt(octet)
-			n.children.Store(clonedKids)
+			n.children.Load().DeleteAt(octet)
 
 			t.sizeUpdate(is4, -1)
 			n.purgeAndCompress(stack[:depth], octets, is4)
@@ -455,15 +442,16 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 
 	for _, octet := range ip.AsSlice() {
 		// for contains, any lpm match is good enough, no backtracking needed
-		if n.prefixes.Load().Len() != 0 && n.lpmTest(art.OctetToIdx(octet)) {
+		prefixes := n.prefixes.Load()
+		if prefixes.Len() != 0 && prefixes.Intersects(lpm.BackTrackingBitset(art.OctetToIdx(octet))) {
 			return true
 		}
 
 		// stop traversing?
-		if !n.children.Load().Test(octet) {
+		kid, ok := n.children.Load().Get(octet)
+		if !ok {
 			return false
 		}
-		kid := n.children.Load().MustGet(octet)
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
@@ -500,8 +488,8 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 
 	n := t.rootNodeByVersion(is4)
 
-	// stack of the traversed nodes for fast backtracking, if needed
-	stack := [maxTreeDepth]*node[V]{}
+	// stack of the traversed prefixes for fast backtracking, if needed
+	stack := [maxTreeDepth]*sparse.Array256[V]{}
 
 	// run variable, used after for loop
 	var depth int
@@ -512,15 +500,15 @@ LOOP:
 	for depth, octet = range octets {
 		depth = depth & 0xf // BCE, Lookup must be fast
 
-		// push current node on stack for fast backtracking
-		stack[depth] = n
+		// push current prefixes on stack for fast backtracking
+		stack[depth] = n.prefixes.Load()
 
 		// go down in tight loop to last octet
-		if !n.children.Load().Test(octet) {
+		kid, ok := n.children.Load().Get(octet)
+		if !ok {
 			// no more nodes below octet
 			break LOOP
 		}
-		kid := n.children.Load().MustGet(octet)
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
@@ -548,15 +536,15 @@ LOOP:
 	for ; depth >= 0; depth-- {
 		depth = depth & 0xf // BCE
 
-		n = stack[depth]
+		prefixes := stack[depth]
 
 		// longest prefix match, skip if node has no prefixes
-		if n.prefixes.Load().Len() != 0 {
+		if prefixes.Len() != 0 {
 			idx := art.OctetToIdx(octets[depth])
 			// lpmGet(idx), manually inlined
 			// --------------------------------------------------------------
-			if topIdx, ok := n.prefixes.Load().IntersectionTop(lpm.BackTrackingBitset(idx)); ok {
-				return n.prefixes.Load().MustGet(topIdx), true
+			if topIdx, ok := prefixes.IntersectionTop(lpm.BackTrackingBitset(idx)); ok {
+				return prefixes.MustGet(topIdx), true
 			}
 			// --------------------------------------------------------------
 		}
@@ -603,7 +591,7 @@ func (t *Table[V]) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpmPfx netip
 	n := t.rootNodeByVersion(is4)
 
 	// record path to leaf node
-	stack := [maxTreeDepth]*node[V]{}
+	stack := [maxTreeDepth]*sparse.Array256[V]{}
 
 	var depth int
 	var octet byte
@@ -617,14 +605,15 @@ LOOP:
 			depth--
 			break
 		}
-		// push current node on stack
-		stack[depth] = n
+		// push current prefixes on stack
+		stack[depth] = n.prefixes.Load()
 
-		// go down in tight loop to leaf node
-		if !n.children.Load().Test(octet) {
+		// go down in tight loop to last octet
+		kid, ok := n.children.Load().Get(octet)
+		if !ok {
+			// no more nodes below octet
 			break LOOP
 		}
-		kid := n.children.Load().MustGet(octet)
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
@@ -665,10 +654,10 @@ LOOP:
 	for ; depth >= 0; depth-- {
 		depth = depth & 0xf // BCE
 
-		n = stack[depth]
+		prefixes := stack[depth]
 
 		// longest prefix match, skip if node has no prefixes
-		if n.prefixes.Load().Len() == 0 {
+		if prefixes.Len() == 0 {
 			continue
 		}
 
@@ -683,8 +672,8 @@ LOOP:
 		}
 
 		// manually inlined: lpmGet(idx)
-		if topIdx, ok := n.prefixes.Load().IntersectionTop(lpm.BackTrackingBitset(idx)); ok {
-			val = n.prefixes.Load().MustGet(topIdx)
+		if topIdx, ok := prefixes.IntersectionTop(lpm.BackTrackingBitset(idx)); ok {
+			val = prefixes.MustGet(topIdx)
 
 			// called from LookupPrefix
 			if !withLPM {

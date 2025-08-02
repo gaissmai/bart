@@ -43,7 +43,7 @@ func TestLiteInvalid(t *testing.T) {
 		tbl1.Insert(zeroPfx)
 	})
 
-	testname = "InsertPersist"
+	testname = "InsertSync"
 	t.Run(testname, func(t *testing.T) {
 		t.Parallel()
 		defer func(testname string) {
@@ -52,7 +52,7 @@ func TestLiteInvalid(t *testing.T) {
 			}
 		}(testname)
 
-		_ = tbl1.InsertPersist(zeroPfx)
+		tbl1.InsertSync(zeroPfx)
 	})
 
 	testname = "Delete"
@@ -67,7 +67,7 @@ func TestLiteInvalid(t *testing.T) {
 		tbl1.Delete(zeroPfx)
 	})
 
-	testname = "DeletePersist"
+	testname = "DeleteSync"
 	t.Run(testname, func(t *testing.T) {
 		t.Parallel()
 		defer func(testname string) {
@@ -76,7 +76,7 @@ func TestLiteInvalid(t *testing.T) {
 			}
 		}(testname)
 
-		_ = tbl1.DeletePersist(zeroPfx)
+		tbl1.DeleteSync(zeroPfx)
 	})
 
 	testname = "Contains"
@@ -151,7 +151,7 @@ func TestLiteInvalid(t *testing.T) {
 	})
 }
 
-func TestLiteDeletePersist(t *testing.T) {
+func TestLiteDeleteSync(t *testing.T) {
 	t.Parallel()
 
 	prng := rand.New(rand.NewPCG(42, 42))
@@ -160,7 +160,7 @@ func TestLiteDeletePersist(t *testing.T) {
 		// must not panic
 		tbl := new(Lite)
 		checkLiteNumNodes(t, tbl, 0)
-		tbl = tbl.DeletePersist(randomPrefix(prng))
+		tbl.DeleteSync(randomPrefix(prng))
 		checkLiteNumNodes(t, tbl, 0)
 	})
 
@@ -172,7 +172,7 @@ func TestLiteDeletePersist(t *testing.T) {
 
 		tbl.Insert(mpp("10.0.0.0/8"))
 		checkLiteNumNodes(t, tbl, 1)
-		tbl = tbl.DeletePersist(mpp("10.0.0.0/8"))
+		tbl.DeleteSync(mpp("10.0.0.0/8"))
 		checkLiteNumNodes(t, tbl, 0)
 	})
 
@@ -185,7 +185,7 @@ func TestLiteDeletePersist(t *testing.T) {
 		tbl.Insert(mpp("192.168.0.1/32"))
 		checkLiteNumNodes(t, tbl, 1)
 
-		tbl = tbl.DeletePersist(mpp("192.168.0.1/32"))
+		tbl.DeleteSync(mpp("192.168.0.1/32"))
 		checkLiteNumNodes(t, tbl, 0)
 	})
 
@@ -199,7 +199,7 @@ func TestLiteDeletePersist(t *testing.T) {
 		tbl.Insert(mpp("192.180.0.1/32"))
 		checkLiteNumNodes(t, tbl, 2)
 
-		tbl = tbl.DeletePersist(mpp("192.180.0.1/32"))
+		tbl.DeleteSync(mpp("192.180.0.1/32"))
 		checkLiteNumNodes(t, tbl, 1)
 	})
 
@@ -215,7 +215,7 @@ func TestLiteDeletePersist(t *testing.T) {
 
 		checkLiteNumNodes(t, tbl, 2)
 
-		tbl = tbl.DeletePersist(mpp("192.180.0.1/32"))
+		tbl.DeleteSync(mpp("192.180.0.1/32"))
 		checkLiteNumNodes(t, tbl, 2)
 	})
 
@@ -231,7 +231,7 @@ func TestLiteDeletePersist(t *testing.T) {
 
 		checkLiteNumNodes(t, tbl, 2)
 
-		tbl = tbl.DeletePersist(mpp("192.180.0.1/32"))
+		tbl.DeleteSync(mpp("192.180.0.1/32"))
 		checkLiteNumNodes(t, tbl, 2)
 	})
 
@@ -244,7 +244,7 @@ func TestLiteDeletePersist(t *testing.T) {
 		tbl.Insert(mpp("192.168.0.1/32"))
 		checkLiteNumNodes(t, tbl, 1)
 
-		tbl = tbl.DeletePersist(mpp("200.0.0.0/32"))
+		tbl.DeleteSync(mpp("200.0.0.0/32"))
 		checkLiteNumNodes(t, tbl, 1)
 	})
 
@@ -259,7 +259,7 @@ func TestLiteDeletePersist(t *testing.T) {
 		tbl.Insert(mpp("192.168.0.0/22"))
 		checkLiteNumNodes(t, tbl, 3)
 
-		tbl = tbl.DeletePersist(mpp("192.168.0.0/22"))
+		tbl.DeleteSync(mpp("192.168.0.0/22"))
 		checkLiteNumNodes(t, tbl, 1)
 	})
 
@@ -270,7 +270,7 @@ func TestLiteDeletePersist(t *testing.T) {
 
 		tbl.Insert(mpp("0.0.0.0/0"))
 		tbl.Insert(mpp("::/0"))
-		tbl = tbl.DeletePersist(mpp("0.0.0.0/0"))
+		tbl.DeleteSync(mpp("0.0.0.0/0"))
 
 		checkLiteNumNodes(t, tbl, 1)
 	})
@@ -284,10 +284,10 @@ func TestLiteDeletePersist(t *testing.T) {
 		tbl.Insert(mpp("10.20.0.0/17"))
 		checkLiteNumNodes(t, tbl, 2)
 
-		tbl = tbl.DeletePersist(mpp("10.20.0.0/17"))
+		tbl.DeleteSync(mpp("10.20.0.0/17"))
 		checkLiteNumNodes(t, tbl, 1)
 
-		tbl = tbl.DeletePersist(mpp("10.10.0.0/17"))
+		tbl.DeleteSync(mpp("10.10.0.0/17"))
 		checkLiteNumNodes(t, tbl, 0)
 	})
 }
@@ -428,7 +428,7 @@ func TestLiteLookupPrefixLPMCompare(t *testing.T) {
 	}
 }
 
-func TestLiteInsertPersistShuffled(t *testing.T) {
+func TestLiteInsertSyncShuffled(t *testing.T) {
 	// The order in which you insert prefixes into a route table
 	// should not matter, as long as you're inserting the same set of
 	// routes.
@@ -456,7 +456,7 @@ func TestLiteInsertPersistShuffled(t *testing.T) {
 
 		// rt2 is persistent
 		for _, pfx := range pfxs2 {
-			rt2 = rt2.InsertPersist(pfx.pfx)
+			rt2.InsertSync(pfx.pfx)
 		}
 
 		if rt1.String() != rt2.String() {
