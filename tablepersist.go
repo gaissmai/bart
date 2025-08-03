@@ -38,15 +38,17 @@ func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V] {
 		size6: t.size6,
 	}
 
+	cloneFn := cloneFnFactory[V]()
+
 	// Clone the root node corresponding to the address family:
 	// For the address family in use, perform a shallow clone with copy-on-write semantics.
 	// The other root node (IPv4 or IPv6) is simply copied by value (shared).
 	if is4 {
-		pt.root4 = *t.root4.cloneFlat()
+		pt.root4 = *t.root4.cloneFlat(cloneFn)
 		pt.root6 = t.root6
 	} else {
 		pt.root4 = t.root4
-		pt.root6 = *t.root6.cloneFlat()
+		pt.root6 = *t.root6.cloneFlat(cloneFn)
 	}
 
 	// Get a pointer to the root node we will modify in this operation.
@@ -55,7 +57,7 @@ func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V] {
 	// Insert the prefix and value using the persist insert method that clones nodes
 	// along the path. If insertAtDepthPersist returns true, the prefix existed,
 	// so no size increment is necessary.
-	if n.insertAtDepthPersist(pfx, val, 0) {
+	if n.insertAtDepthPersist(cloneFn, pfx, val, 0) {
 		return pt
 	}
 
@@ -98,13 +100,15 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 		size6: t.size6,
 	}
 
+	cloneFn := cloneFnFactory[V]()
+
 	// Clone root node corresponding to the IP version, for copy-on-write.
 	if is4 {
-		pt.root4 = *t.root4.cloneFlat()
+		pt.root4 = *t.root4.cloneFlat(cloneFn)
 		pt.root6 = t.root6
 	} else {
 		pt.root4 = t.root4
-		pt.root6 = *t.root6.cloneFlat()
+		pt.root6 = *t.root6.cloneFlat(cloneFn)
 	}
 
 	// Prepare traversal info.
@@ -149,7 +153,7 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 		switch kid := kid.(type) {
 		case *node[V]:
 			// Clone the node along the traversed path to respect copy-on-write.
-			kid = kid.cloneFlat()
+			kid = kid.cloneFlat(cloneFn)
 
 			// Replace original child with the cloned child.
 			n.children.InsertAt(addr, kid)
@@ -256,13 +260,15 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, e
 		size6: t.size6,
 	}
 
+	cloneFn := cloneFnFactory[V]()
+
 	// Clone the root node for the IP version involved.
 	if is4 {
-		pt.root4 = *t.root4.cloneFlat()
+		pt.root4 = *t.root4.cloneFlat(cloneFn)
 		pt.root6 = t.root6
 	} else {
 		pt.root4 = t.root4
-		pt.root6 = *t.root6.cloneFlat()
+		pt.root6 = *t.root6.cloneFlat(cloneFn)
 	}
 
 	// Prepare traversal context.
@@ -311,7 +317,7 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, e
 		switch kid := kid.(type) {
 		case *node[V]:
 			// Clone the internal node for copy-on-write.
-			kid = kid.cloneFlat()
+			kid = kid.cloneFlat(cloneFn)
 
 			// Replace child with cloned node.
 			n.children.InsertAt(addr, kid)
