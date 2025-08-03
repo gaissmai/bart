@@ -62,12 +62,15 @@ func ExampleTable_concurrent() {
 	go func() {
 		defer wg.Done()
 		for range 10_000 {
-			tblMutex.Lock() // lock for a batch of inserts
+			tblMutex.Lock()
+			tbl := tblAtomicPtr.Load()
+
+			// batch of inserts
 			for _, pfx := range examplePrefixes {
-				oldTbl := tblAtomicPtr.Load()
-				newTbl := oldTbl.InsertPersist(pfx, &testVal{data: 0})
-				tblAtomicPtr.Store(newTbl)
+				tbl = tbl.InsertPersist(pfx, &testVal{data: 0})
 			}
+
+			tblAtomicPtr.Store(tbl)
 			tblMutex.Unlock()
 		}
 	}()
@@ -76,12 +79,15 @@ func ExampleTable_concurrent() {
 	go func() {
 		defer wg.Done()
 		for range 10_000 {
-			tblMutex.Lock() // lock for a batch of deletes
+			tblMutex.Lock()
+			tbl := tblAtomicPtr.Load()
+
+			// batch of deletes
 			for _, pfx := range examplePrefixes {
-				oldTbl := tblAtomicPtr.Load()
-				newTbl := oldTbl.DeletePersist(pfx)
-				tblAtomicPtr.Store(newTbl)
+				tbl = tbl.DeletePersist(pfx)
 			}
+
+			tblAtomicPtr.Store(tbl)
 			tblMutex.Unlock()
 		}
 	}()
