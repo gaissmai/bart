@@ -11,36 +11,39 @@ import (
 	"github.com/gaissmai/bart"
 )
 
-var examplePrefixes = []string{
-	"192.168.0.0/16",
-	"192.168.1.0/24",
-	"2001:7c0:3100::/40",
-	"2001:7c0:3100:1::/64",
-	"fc00::/7",
+var (
+	mpa = netip.MustParseAddr
+	mpp = netip.MustParsePrefix
+)
+
+var examplePrefixes = []netip.Prefix{
+	mpp("192.168.0.0/16"),
+	mpp("192.168.1.0/24"),
+	mpp("2001:7c0:3100::/40"),
+	mpp("2001:7c0:3100:1::/64"),
+	mpp("fc00::/7"),
 }
 
 // some example IP addresses for black/whitelist containment
-var exampleIPs = []string{
-	"192.168.1.100",      // must match
-	"192.168.2.1",        // must match
-	"2001:7c0:3100:1::1", // must match
-	"2001:7c0:3100:2::1", // must match
-	"fc00::1",            // must match
+var exampleIPs = []netip.Addr{
+	mpa("192.168.1.100"),      // must match
+	mpa("192.168.2.1"),        // must match
+	mpa("2001:7c0:3100:1::1"), // must match
+	mpa("2001:7c0:3100:2::1"), // must match
+	mpa("fc00::1"),            // must match
 	//
-	"172.16.0.1",        // must NOT match
-	"2003:dead:beef::1", // must NOT match
+	mpa("172.16.0.1"),        // must NOT match
+	mpa("2003:dead:beef::1"), // must NOT match
 }
 
 func ExampleLite_contains() {
 	lite := new(bart.Lite)
 
-	for _, s := range examplePrefixes {
-		pfx := netip.MustParsePrefix(s)
+	for _, pfx := range examplePrefixes {
 		lite.Insert(pfx)
 	}
 
-	for _, s := range exampleIPs {
-		ip := netip.MustParseAddr(s)
+	for _, ip := range exampleIPs {
 		ok := lite.Contains(ip)
 		fmt.Printf("%-20s is contained: %t\n", ip, ok)
 	}
@@ -55,29 +58,24 @@ func ExampleLite_contains() {
 	// 2003:dead:beef::1    is contained: false
 }
 
-var (
-	a = netip.MustParseAddr
-	p = netip.MustParsePrefix
-)
-
 var input = []struct {
 	cidr    netip.Prefix
 	nextHop netip.Addr
 }{
-	{p("fe80::/10"), a("::1%eth0")},
-	{p("172.16.0.0/12"), a("8.8.8.8")},
-	{p("10.0.0.0/24"), a("8.8.8.8")},
-	{p("::1/128"), a("::1%lo")},
-	{p("192.168.0.0/16"), a("9.9.9.9")},
-	{p("10.0.0.0/8"), a("9.9.9.9")},
-	{p("::/0"), a("2001:db8::1")},
-	{p("10.0.1.0/24"), a("10.0.0.0")},
-	{p("169.254.0.0/16"), a("10.0.0.0")},
-	{p("2000::/3"), a("2000::")},
-	{p("2001:db8::/32"), a("2001:db8::1")},
-	{p("127.0.0.0/8"), a("127.0.0.1")},
-	{p("127.0.0.1/32"), a("127.0.0.1")},
-	{p("192.168.1.0/24"), a("127.0.0.1")},
+	{mpp("fe80::/10"), mpa("::1%eth0")},
+	{mpp("172.16.0.0/12"), mpa("8.8.8.8")},
+	{mpp("10.0.0.0/24"), mpa("8.8.8.8")},
+	{mpp("::1/128"), mpa("::1%lo")},
+	{mpp("192.168.0.0/16"), mpa("9.9.9.9")},
+	{mpp("10.0.0.0/8"), mpa("9.9.9.9")},
+	{mpp("::/0"), mpa("2001:db8::1")},
+	{mpp("10.0.1.0/24"), mpa("10.0.0.0")},
+	{mpp("169.254.0.0/16"), mpa("10.0.0.0")},
+	{mpp("2000::/3"), mpa("2000::")},
+	{mpp("2001:db8::/32"), mpa("2001:db8::1")},
+	{mpp("127.0.0.0/8"), mpa("127.0.0.1")},
+	{mpp("127.0.0.1/32"), mpa("127.0.0.1")},
+	{mpp("192.168.1.0/24"), mpa("127.0.0.1")},
 }
 
 func ExampleTable_Lookup() {
@@ -89,15 +87,15 @@ func ExampleTable_Lookup() {
 
 	fmt.Println()
 
-	ip := a("42.0.0.0")
+	ip := mpa("42.0.0.0")
 	value, ok := rtbl.Lookup(ip)
 	fmt.Printf("Lookup: %-20v next-hop: %11v, ok: %v\n", ip, value, ok)
 
-	ip = a("10.0.1.17")
+	ip = mpa("10.0.1.17")
 	value, ok = rtbl.Lookup(ip)
 	fmt.Printf("Lookup: %-20v next-hop: %11v, ok: %v\n", ip, value, ok)
 
-	ip = a("2001:7c0:3100:1::111")
+	ip = mpa("2001:7c0:3100:1::111")
 	value, ok = rtbl.Lookup(ip)
 	fmt.Printf("Lookup: %-20v next-hop: %11v, ok: %v\n", ip, value, ok)
 

@@ -1,7 +1,6 @@
 package bart_test
 
 import (
-	"net/netip"
 	"sync"
 	"sync/atomic"
 
@@ -16,7 +15,7 @@ var (
 // ExampleLite_concurrent demonstrates safe concurrent usage of bart.
 //
 // This example is intended to be run with the Go race detector enabled
-// (use `go test -race -run=ExampleTable_concurrent`)
+// (use `go test -race -run=ExampleLite_concurrent`)
 // to verify that concurrent access is safe and free of data races.
 //
 // This example demonstrates how multiple goroutines perform lock-free, concurrent reads
@@ -33,8 +32,7 @@ func ExampleLite_concurrent() {
 	go func() {
 		defer wg.Done()
 		for range 1_000_000 {
-			for _, s := range exampleIPs {
-				ip := netip.MustParseAddr(s)
+			for _, ip := range exampleIPs {
 				_ = liteAtomicPtr.Load().Contains(ip)
 			}
 		}
@@ -44,15 +42,13 @@ func ExampleLite_concurrent() {
 	go func() {
 		defer wg.Done()
 		for range 10_000 {
-			for _, s := range examplePrefixes {
-				pfx := netip.MustParsePrefix(s)
-
-				liteMutex.Lock()
+			liteMutex.Lock() // lock for a batch of inserts
+			for _, pfx := range examplePrefixes {
 				oldTbl := liteAtomicPtr.Load()
 				newTbl := oldTbl.InsertPersist(pfx)
 				liteAtomicPtr.Store(newTbl)
-				liteMutex.Unlock()
 			}
+			liteMutex.Unlock()
 		}
 	}()
 
@@ -60,15 +56,13 @@ func ExampleLite_concurrent() {
 	go func() {
 		defer wg.Done()
 		for range 10_000 {
-			for _, s := range examplePrefixes {
-				pfx := netip.MustParsePrefix(s)
-
-				liteMutex.Lock()
+			liteMutex.Lock() // lock for a batch of deletes
+			for _, pfx := range examplePrefixes {
 				oldTbl := liteAtomicPtr.Load()
 				newTbl := oldTbl.DeletePersist(pfx)
 				liteAtomicPtr.Store(newTbl)
-				liteMutex.Unlock()
 			}
+			liteMutex.Unlock()
 		}
 	}()
 
