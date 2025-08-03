@@ -38,11 +38,11 @@ func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V] {
 		size6: t.size6,
 	}
 
+	// Create a cloning function for deep copying values;
+	// returns nil if V does not implement the Cloner interface.
 	cloneFn := cloneFnFactory[V]()
 
-	// Clone the root node corresponding to the address family:
-	// For the address family in use, perform a shallow clone with copy-on-write semantics.
-	// The other root node (IPv4 or IPv6) is simply copied by value (shared).
+	// Clone root node corresponding to the IP version, for copy-on-write.
 	if is4 {
 		pt.root4 = *t.root4.cloneFlat(cloneFn)
 		pt.root6 = t.root6
@@ -86,7 +86,7 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 		return t, zero
 	}
 
-	// Normalize prefix by masking host bits.
+	// canonicalize prefix
 	pfx = pfx.Masked()
 
 	// Extract address, version info and prefix length.
@@ -100,6 +100,8 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 		size6: t.size6,
 	}
 
+	// Create a cloning function for deep copying values;
+	// returns nil if V does not implement the Cloner interface.
 	cloneFn := cloneFnFactory[V]()
 
 	// Clone root node corresponding to the IP version, for copy-on-write.
@@ -246,7 +248,7 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, e
 		return t, val, false
 	}
 
-	// Normalize prefix by masking host bits.
+	// canonicalize prefix
 	pfx = pfx.Masked()
 
 	// Extract address, IP version, and prefix length.
@@ -254,15 +256,17 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, e
 	is4 := ip.Is4()
 	bits := pfx.Bits()
 
-	// root nodes cloned selectively for copy-on-write.
+	// share size counters; root nodes cloned selectively.
 	pt = &Table[V]{
 		size4: t.size4,
 		size6: t.size6,
 	}
 
+	// Create a cloning function for deep copying values;
+	// returns nil if V does not implement the Cloner interface.
 	cloneFn := cloneFnFactory[V]()
 
-	// Clone the root node for the IP version involved.
+	// Clone root node corresponding to the IP version, for copy-on-write.
 	if is4 {
 		pt.root4 = *t.root4.cloneFlat(cloneFn)
 		pt.root6 = t.root6
