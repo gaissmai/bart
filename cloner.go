@@ -7,22 +7,16 @@ type Cloner[V any] interface {
 	Clone() V
 }
 
-// isCloner reports whether the type of val implements the Cloner[V] interface.
-func isCloner[V any](val V) (ok bool) {
-	_, ok = any(val).(Cloner[V])
-	return
-}
-
 // cloneFunc is a type definition for a function that takes a value of type V
-// and returns a (possibly cloned) value of type V.
+// and returns the (possibly cloned) value of type V.
 type cloneFunc[V any] func(V) V
 
 // cloneFnFactory returns a cloneFunc.
-// If V implements Cloner[V], the returned function performs a deep copy using Clone;
-// otherwise, it returns the value directly (shallow copy).
+// If V implements Cloner[V], the returned function should perform
+// a deep copy using Clone(), otherwise it returns nil.
 func cloneFnFactory[V any]() cloneFunc[V] {
 	var zero V
-	if isCloner(zero) {
+	if _, ok := any(zero).(Cloner[V]); ok {
 		return cloneVal[V]
 	}
 	return nil
@@ -34,8 +28,10 @@ func cloneVal[V any](val V) V {
 	return any(val).(Cloner[V]).Clone()
 }
 
-// cloneLeaf returns a cloned copy of the receiver leafNode
-// by applying cloneFn to its value.
+// cloneLeaf creates and returns a copy of the leafNode receiver.
+// If cloneFn is nil, the value is copied directly without modification.
+// Otherwise, cloneFn is applied to the value for deep cloning.
+// The prefix field is always copied as is.
 func (l *leafNode[V]) cloneLeaf(cloneFn cloneFunc[V]) *leafNode[V] {
 	if cloneFn == nil {
 		return &leafNode[V]{prefix: l.prefix, value: l.value}
@@ -43,8 +39,9 @@ func (l *leafNode[V]) cloneLeaf(cloneFn cloneFunc[V]) *leafNode[V] {
 	return &leafNode[V]{prefix: l.prefix, value: cloneFn(l.value)}
 }
 
-// cloneFringe returns a cloned copy of the receiver fringeNode
-// by applying cloneFn to its value.
+// cloneFringe creates and returns a copy of the fringeNode receiver.
+// If cloneFn is nil, the value is copied directly without modification.
+// Otherwise, cloneFn is applied to the value for deep cloning.
 func (l *fringeNode[V]) cloneFringe(cloneFn cloneFunc[V]) *fringeNode[V] {
 	if cloneFn == nil {
 		return &fringeNode[V]{value: l.value}
@@ -54,9 +51,14 @@ func (l *fringeNode[V]) cloneFringe(cloneFn cloneFunc[V]) *fringeNode[V] {
 
 // cloneFlat returns a shallow copy of the current node[V], optionally performing deep copies of values.
 //
-// This method performs a quick, non-recursive clone of the node itself. It copies the node’s fields,
-// applying deep cloning only to stored values using cloneFn, while cloning child nodes shallowly.
-// It does not recursively clone descendants beyond the immediate children.
+// If cloneFn is nil, the stored values in prefixes are copied directly without modification.
+// Otherwise, cloneFn is applied to each stored value for deep cloning.
+// Child nodes are cloned shallowly: leafNode and fringeNode children are cloned via their clone methods,
+// but child nodes of type *node[V] (subnodes) are assigned as-is without recursive cloning.
+// This method does not recursively clone descendants beyond the immediate children.
+//
+// Note: The returned node is a new instance with copied slices but only shallow copies of nested nodes,
+// except for leafNode and fringeNode children which are cloned according to cloneFn.
 func (n *node[V]) cloneFlat(cloneFn cloneFunc[V]) *node[V] {
 	if n == nil {
 		return nil
@@ -70,7 +72,7 @@ func (n *node[V]) cloneFlat(cloneFn cloneFunc[V]) *node[V] {
 	// copy ...
 	c.prefixes = *(n.prefixes.Copy())
 
-	// ... or deep clone
+	// ... and clone the values
 	if cloneFn != nil {
 		for i, v := range c.prefixes.Items {
 			c.prefixes.Items[i] = cloneFn(v)
@@ -80,14 +82,17 @@ func (n *node[V]) cloneFlat(cloneFn cloneFunc[V]) *node[V] {
 	// copy ...
 	c.children = *(n.children.Copy())
 
-	// ... and flat clone, not traversing the node levels
+	// Iterate over children to flat clone leaf/fringe nodes;
+	// for *node[V] children, keep shallow references (no recursive clone)
 	for i, anyKid := range c.children.Items {
 		switch kid := anyKid.(type) {
 		case *node[V]:
-			// no-op
+			// Shallow copy
 		case *leafNode[V]:
+			// Clone leaf nodes, applying cloneFn as needed
 			c.children.Items[i] = kid.cloneLeaf(cloneFn)
 		case *fringeNode[V]:
+			// Clone fringe nodes, applying cloneFn as needed
 			c.children.Items[i] = kid.cloneFringe(cloneFn)
 		default:
 			panic("logic error, wrong node type")
@@ -99,19 +104,28 @@ func (n *node[V]) cloneFlat(cloneFn cloneFunc[V]) *node[V] {
 
 // cloneRec performs a recursive deep copy of the node[V] and all its descendants.
 //
-// If the value type V implements the Cloner[V] interface, each value is deep-copied using cloneFn.
+// If cloneFn is nil, the stored values are copied directly without modification.
+// Otherwise cloneFn is applied to each stored value for deep cloning.
 //
-// The method clones the current node using cloneFlat, then recursively clones all child nodes of type *node[V].
+// This method first creates a shallow clone of the current node using cloneFlat,
+// applying cloneFn to values as described there. Then it recursively clones all
+// child nodes of type *node[V], performing a full deep clone down the subtree.
+//
+// Child nodes of type *leafNode[V] and *fringeNode[V] are already cloned
+// by cloneFlat.
+//
+// Returns a new instance of node[V] which is a complete deep clone of the
+// receiver node with all descendants.
 func (n *node[V]) cloneRec(cloneFn cloneFunc[V]) *node[V] {
 	if n == nil {
 		return nil
 	}
 
+	// Perform a flat clone of the current node.
 	c := n.cloneFlat(cloneFn)
 
-	// clone the child nodes rec-descent
+	// Recursively clone all child nodes of type *node[V]
 	for i, kidAny := range c.children.Items {
-		// leaves and fringes are already flat cloned
 		if kid, ok := kidAny.(*node[V]); ok {
 			c.children.Items[i] = kid.cloneRec(cloneFn)
 		}

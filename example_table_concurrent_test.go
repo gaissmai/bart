@@ -1,7 +1,6 @@
 package bart_test
 
 import (
-	"net/netip"
 	"sync"
 	"sync/atomic"
 
@@ -53,8 +52,7 @@ func ExampleTable_concurrent() {
 	go func() {
 		defer wg.Done()
 		for range 10_000_000 {
-			for _, s := range exampleIPs {
-				ip := netip.MustParseAddr(s)
+			for _, ip := range exampleIPs {
 				_, _ = tblAtomicPtr.Load().Lookup(ip)
 			}
 		}
@@ -64,16 +62,13 @@ func ExampleTable_concurrent() {
 	go func() {
 		defer wg.Done()
 		for range 10_000 {
-			for _, s := range examplePrefixes {
-				pfx := netip.MustParsePrefix(s)
-				tblMutex.Lock()
-
+			tblMutex.Lock() // lock for a batch of inserts
+			for _, pfx := range examplePrefixes {
 				oldTbl := tblAtomicPtr.Load()
 				newTbl := oldTbl.InsertPersist(pfx, &testVal{data: 0})
 				tblAtomicPtr.Store(newTbl)
-
-				tblMutex.Unlock()
 			}
+			tblMutex.Unlock()
 		}
 	}()
 
@@ -81,15 +76,13 @@ func ExampleTable_concurrent() {
 	go func() {
 		defer wg.Done()
 		for range 10_000 {
-			for _, s := range examplePrefixes {
-				pfx := netip.MustParsePrefix(s)
-
-				tblMutex.Lock()
+			tblMutex.Lock() // lock for a batch of deletes
+			for _, pfx := range examplePrefixes {
 				oldTbl := tblAtomicPtr.Load()
 				newTbl := oldTbl.DeletePersist(pfx)
 				tblAtomicPtr.Store(newTbl)
-				tblMutex.Unlock()
 			}
+			tblMutex.Unlock()
 		}
 	}()
 
