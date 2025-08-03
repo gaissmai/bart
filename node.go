@@ -216,7 +216,7 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 //
 // This allows multiple versions of the trie to coexist safely and efficiently, enabling purely functional
 // route updates with structural sharing where possible.
-func (n *node[V]) insertAtDepthPersist(pfx netip.Prefix, val V, depth int) (exists bool) {
+func (n *node[V]) insertAtDepthPersist(cloneFn cloneFunc[V], pfx netip.Prefix, val V, depth int) (exists bool) {
 	ip := pfx.Addr()
 	bits := pfx.Bits()
 	octets := ip.AsSlice()
@@ -247,7 +247,7 @@ func (n *node[V]) insertAtDepthPersist(pfx netip.Prefix, val V, depth int) (exis
 			// clone the traversed path
 
 			// kid points now to cloned kid
-			kid = kid.cloneFlat()
+			kid = kid.cloneFlat(cloneFn)
 
 			// replace kid with clone
 			n.children.InsertAt(octet, kid)
@@ -593,6 +593,10 @@ func (n *node[V]) allRecSorted(path stridePath, depth int, is4 bool, yield func(
 // Returns the number of duplicate prefixes that were overwritten during merging.
 func (n *node[V]) unionRec(o *node[V], depth int) (duplicates int) {
 	cloneFn := cloneFnFactory[V]()
+	if cloneFn == nil {
+		// just copy
+		cloneFn = func(val V) V { return val }
+	}
 
 	// for all prefixes in other node do ...
 	for i, oIdx := range o.prefixes.AsSlice(&[256]uint8{}) {
@@ -633,7 +637,7 @@ func (n *node[V]) unionRec(o *node[V], depth int) (duplicates int) {
 		if !thisExists { // NULL, ... slot at addr is empty
 			switch otherKid := o.children.Items[i].(type) {
 			case *node[V]: // NULL, node
-				n.children.InsertAt(addr, otherKid.cloneRec())
+				n.children.InsertAt(addr, otherKid.cloneRec(cloneFn))
 				continue
 
 			case *leafNode[V]: // NULL, leaf
@@ -654,7 +658,7 @@ func (n *node[V]) unionRec(o *node[V], depth int) (duplicates int) {
 			switch otherKid := o.children.Items[i].(type) {
 			case *node[V]: // node, node
 				// both childs have node at addr, call union rec-descent on child nodes
-				duplicates += thisKid.unionRec(otherKid.cloneRec(), depth+1)
+				duplicates += thisKid.unionRec(otherKid.cloneRec(cloneFn), depth+1)
 				continue
 
 			case *leafNode[V]: // node, leaf
@@ -687,7 +691,7 @@ func (n *node[V]) unionRec(o *node[V], depth int) (duplicates int) {
 				n.children.InsertAt(addr, nc)
 
 				// unionRec this new node with other kid node
-				duplicates += nc.unionRec(otherKid.cloneRec(), depth+1)
+				duplicates += nc.unionRec(otherKid.cloneRec(cloneFn), depth+1)
 				continue
 
 			case *leafNode[V]: // leaf, leaf
@@ -745,7 +749,7 @@ func (n *node[V]) unionRec(o *node[V], depth int) (duplicates int) {
 				n.children.InsertAt(addr, nc)
 
 				// unionRec this new node with other kid node
-				duplicates += nc.unionRec(otherKid.cloneRec(), depth+1)
+				duplicates += nc.unionRec(otherKid.cloneRec(cloneFn), depth+1)
 				continue
 
 			case *leafNode[V]: // fringe, leaf

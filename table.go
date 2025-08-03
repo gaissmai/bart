@@ -922,8 +922,10 @@ func (t *Table[V]) Clone() *Table[V] {
 
 	c := new(Table[V])
 
-	c.root4 = *t.root4.cloneRec()
-	c.root6 = *t.root6.cloneRec()
+	cloneFn := cloneFnFactory[V]()
+
+	c.root4 = *t.root4.cloneRec(cloneFn)
+	c.root6 = *t.root6.cloneRec(cloneFn)
 
 	c.size4 = t.size4
 	c.size6 = t.size6
