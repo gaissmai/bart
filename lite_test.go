@@ -676,6 +676,40 @@ func TestLiteUnion(t *testing.T) {
 	}
 }
 
+func TestLiteUnionPersist(t *testing.T) {
+	t.Parallel()
+
+	for range 10 {
+		t.Run("Union", func(t *testing.T) {
+			t.Parallel()
+			prng := rand.New(rand.NewPCG(42, 42))
+			pfx1 := randomRealWorldPrefixes(prng, 1_000)
+			pfx2 := randomRealWorldPrefixes(prng, 2_000)
+
+			golden := new(Lite)
+			for _, pfx := range append(pfx1, pfx2...) {
+				golden.Insert(pfx)
+			}
+
+			tbl1 := new(Lite)
+			for _, pfx := range pfx1 {
+				tbl1.Insert(pfx)
+			}
+
+			tbl2 := new(Lite)
+			for _, pfx := range pfx2 {
+				tbl2.Insert(pfx)
+			}
+
+			pTbl := tbl1.UnionPersist(tbl2)
+
+			if pTbl.dumpString() != golden.dumpString() {
+				t.Errorf("UnionPersist: got:\n%swant:\n%s", pTbl.dumpString(), golden.dumpString())
+			}
+		})
+	}
+}
+
 func TestLiteStringEmpty(t *testing.T) {
 	t.Parallel()
 	tbl := new(Lite)

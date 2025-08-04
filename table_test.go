@@ -2095,7 +2095,7 @@ func TestUnionEdgeCases(t *testing.T) {
 		}
 	})
 
-	t.Run("other empty", func(t *testing.T) {
+	t.Run("this empty", func(t *testing.T) {
 		t.Parallel()
 		aTbl := new(Table[int])
 		bTbl := new(Table[int])
@@ -2118,7 +2118,6 @@ func TestUnionEdgeCases(t *testing.T) {
 		aTbl := new(Table[string])
 		bTbl := new(Table[string])
 
-		// one empty table
 		aTbl.Insert(mpp("::/0"), "orig value")
 		bTbl.Insert(mpp("::/0"), "overwrite")
 
@@ -2179,6 +2178,117 @@ func TestUnionEdgeCases(t *testing.T) {
 	})
 }
 
+func TestUnionPersistEdgeCases(t *testing.T) {
+	t.Parallel()
+
+	t.Run("empty", func(t *testing.T) {
+		t.Parallel()
+		aTbl := new(Table[int])
+		bTbl := new(Table[int])
+
+		// union empty tables
+		cTbl := aTbl.UnionPersist(bTbl)
+
+		want := ""
+		got := cTbl.String()
+		if got != want {
+			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
+		}
+	})
+
+	t.Run("other empty", func(t *testing.T) {
+		t.Parallel()
+		aTbl := new(Table[int])
+		bTbl := new(Table[int])
+
+		// one empty table, b
+		aTbl.Insert(mpp("10.0.0.0/8"), 0)
+		aTbl.Insert(mpp("10.1.0.0/24"), 0)
+		aTbl.Insert(mpp("2001:db8::/64"), 0)
+		aTbl.Insert(mpp("2001:db8::1/128"), 0)
+
+		cTbl := aTbl.UnionPersist(bTbl)
+		want := `▼
+└─ 10.0.0.0/8 (0)
+   └─ 10.1.0.0/24 (0)
+▼
+└─ 2001:db8::/64 (0)
+   └─ 2001:db8::1/128 (0)
+`
+		got := cTbl.String()
+		if got != want {
+			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
+		}
+	})
+
+	t.Run("this empty", func(t *testing.T) {
+		t.Parallel()
+		aTbl := new(Table[int])
+		bTbl := new(Table[int])
+
+		bTbl.Insert(mpp("10.0.0.0/8"), 0)
+		bTbl.Insert(mpp("10.1.0.0/24"), 0)
+		bTbl.Insert(mpp("2001:db8::/64"), 0)
+		bTbl.Insert(mpp("2001:db8::1/128"), 0)
+
+		cTbl := aTbl.UnionPersist(bTbl)
+		want := `▼
+└─ 10.0.0.0/8 (0)
+   └─ 10.1.0.0/24 (0)
+▼
+└─ 2001:db8::/64 (0)
+   └─ 2001:db8::1/128 (0)
+`
+		got := cTbl.String()
+		if got != want {
+			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
+		}
+	})
+
+	t.Run("duplicate prefix", func(t *testing.T) {
+		t.Parallel()
+		aTbl := new(Table[string])
+		bTbl := new(Table[string])
+
+		aTbl.Insert(mpp("::/0"), "orig value")
+		bTbl.Insert(mpp("::/0"), "overwrite")
+
+		cTbl := aTbl.UnionPersist(bTbl)
+		want := `▼
+└─ ::/0 (overwrite)
+`
+		got := cTbl.String()
+		if got != want {
+			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
+		}
+	})
+
+	t.Run("same children", func(t *testing.T) {
+		t.Parallel()
+		aTbl := new(Table[int])
+		bTbl := new(Table[int])
+
+		aTbl.Insert(mpp("127.0.0.1/32"), 1)
+		aTbl.Insert(mpp("::1/128"), 1)
+
+		bTbl.Insert(mpp("127.0.0.2/32"), 2)
+		bTbl.Insert(mpp("::2/128"), 2)
+
+		cTbl := aTbl.UnionPersist(bTbl)
+		want := `▼
+├─ 127.0.0.1/32 (1)
+└─ 127.0.0.2/32 (2)
+▼
+├─ ::1/128 (1)
+└─ ::2/128 (2)
+`
+		got := cTbl.String()
+		if got != want {
+			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
+		}
+	})
+}
+
 // TestUnionMemoryAliasing tests that the Union method does not alias memory
 // between the two tables.
 func TestUnionMemoryAliasing(t *testing.T) {
@@ -2213,6 +2323,43 @@ func TestUnionMemoryAliasing(t *testing.T) {
 	}
 	if stable.OverlapsPrefix(mpp("0.0.1.1/32")) {
 		t.Error("stable should not overlap 0.0.1.1/32")
+	}
+}
+
+// TestUnionPersistMemoryAliasing tests that the Union method does not alias memory
+// between the tables.
+func TestUnionPersistMemoryAliasing(t *testing.T) {
+	t.Parallel()
+
+	newTable := func(pfx ...string) *Table[struct{}] {
+		t := new(Table[struct{}])
+		for _, s := range pfx {
+			t.Insert(mpp(s), struct{}{})
+		}
+		return t
+	}
+	// First create two tables with disjoint prefixes.
+	a := newTable("100.69.1.0/24")
+	b := newTable("0.0.0.0/24")
+
+	// Verify that the tables are disjoint.
+	if a.Overlaps(b) {
+		t.Error("this should not overlap other")
+	}
+
+	// Now union them with copy-on-write.
+	pTbl := a.UnionPersist(b)
+
+	// Add a new prefix to new union
+	pTbl.Insert(mpp("0.0.1.0/24"), struct{}{})
+
+	// Ensure that a is unchanged.
+	_, ok := a.Lookup(mpa("0.0.1.1"))
+	if ok {
+		t.Error("a should not contain 0.0.1.1")
+	}
+	if a.OverlapsPrefix(mpp("0.0.1.1/32")) {
+		t.Error("a should not overlap 0.0.1.1/32")
 	}
 }
 
@@ -2259,6 +2406,53 @@ func TestUnionCompare(t *testing.T) {
 		// check the size
 		if fast.Size() != len(*gold) {
 			t.Errorf("sizes differ, got: %d, want: %d", fast.Size(), len(*gold))
+		}
+	}
+}
+
+func TestUnionPersistCompare(t *testing.T) {
+	t.Parallel()
+	prng := rand.New(rand.NewPCG(42, 42))
+
+	const numEntries = 200
+
+	for range 100 {
+		pfxs := randomPrefixes(prng, numEntries)
+		fast := new(Table[int])
+		gold := new(goldTable[int]).insertMany(pfxs)
+
+		for _, pfx := range pfxs {
+			fast.Insert(pfx.pfx, pfx.val)
+		}
+
+		pfxs2 := randomPrefixes(prng, numEntries)
+		gold2 := new(goldTable[int]).insertMany(pfxs2)
+		fast2 := new(Table[int])
+		for _, pfx := range pfxs2 {
+			fast2.Insert(pfx.pfx, pfx.val)
+		}
+
+		gold.union(gold2)
+		pTbl := fast.UnionPersist(fast2)
+
+		// dump as slow table for comparison
+		fastAsGoldenTbl := pTbl.dumpAsGoldTable()
+
+		// sort for comparison
+		gold.sort()
+		fastAsGoldenTbl.sort()
+
+		for i := range *gold {
+			goldItem := (*gold)[i]
+			fastItem := fastAsGoldenTbl[i]
+			if goldItem != fastItem {
+				t.Fatalf("UnionPersist(...): items[%d] differ slow(%v) != fast(%v)", i, goldItem, fastItem)
+			}
+		}
+
+		// check the size
+		if pTbl.Size() != len(*gold) {
+			t.Errorf("sizes differ, got: %d, want: %d", pTbl.Size(), len(*gold))
 		}
 	}
 }

@@ -282,11 +282,6 @@ func overlapsTwoChilds[V any](nChild, oChild any, depth int) bool {
 	}
 }
 
-// overlapsPrefixAtDepth, returns true if node overlaps with prefix
-// starting with prefix octet at depth.
-//
-// Needed for path compressed prefix some level down in the node trie.
-
 // overlapsPrefixAtDepth returns true if any route in the subtree rooted at this node
 // overlaps with the given pfx, starting the comparison at the specified depth.
 //
