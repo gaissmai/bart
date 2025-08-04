@@ -38,21 +38,25 @@ func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V] {
 		size6: t.size6,
 	}
 
+	// Pointer to the root node we will modify in this operation.
+	var n *node[V]
+
 	// Create a cloning function for deep copying values;
 	// returns nil if V does not implement the Cloner interface.
 	cloneFn := cloneFnFactory[V]()
 
 	// Clone root node corresponding to the IP version, for copy-on-write.
 	if is4 {
-		pt.root4 = *t.root4.cloneFlat(cloneFn)
 		pt.root6 = t.root6
+		pt.root4 = *t.root4.cloneFlat(cloneFn)
+
+		n = &pt.root4
 	} else {
 		pt.root4 = t.root4
 		pt.root6 = *t.root6.cloneFlat(cloneFn)
-	}
 
-	// Get a pointer to the root node we will modify in this operation.
-	n := pt.rootNodeByVersion(is4)
+		n = &pt.root6
+	}
 
 	// Insert the prefix and value using the persist insert method that clones nodes
 	// along the path. If insertAtDepthPersist returns true, the prefix existed,
@@ -100,25 +104,29 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 		size6: t.size6,
 	}
 
+	// Pointer to the root node we will modify in this operation.
+	var n *node[V]
+
 	// Create a cloning function for deep copying values;
 	// returns nil if V does not implement the Cloner interface.
 	cloneFn := cloneFnFactory[V]()
 
 	// Clone root node corresponding to the IP version, for copy-on-write.
 	if is4 {
-		pt.root4 = *t.root4.cloneFlat(cloneFn)
 		pt.root6 = t.root6
+		pt.root4 = *t.root4.cloneFlat(cloneFn)
+
+		n = &pt.root4
 	} else {
 		pt.root4 = t.root4
 		pt.root6 = *t.root6.cloneFlat(cloneFn)
+
+		n = &pt.root6
 	}
 
 	// Prepare traversal info.
 	maxDepth, lastBits := maxDepthAndLastBits(bits)
 	octets := ip.AsSlice()
-
-	// Select the root node to operate on.
-	n := pt.rootNodeByVersion(is4)
 
 	// Traverse the trie by octets to find the node to update.
 	for depth, octet := range octets {
@@ -262,17 +270,24 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, e
 		size6: t.size6,
 	}
 
+	// Pointer to the root node we will modify in this operation.
+	var n *node[V]
+
 	// Create a cloning function for deep copying values;
 	// returns nil if V does not implement the Cloner interface.
 	cloneFn := cloneFnFactory[V]()
 
 	// Clone root node corresponding to the IP version, for copy-on-write.
 	if is4 {
-		pt.root4 = *t.root4.cloneFlat(cloneFn)
 		pt.root6 = t.root6
+		pt.root4 = *t.root4.cloneFlat(cloneFn)
+
+		n = &pt.root4
 	} else {
 		pt.root4 = t.root4
 		pt.root6 = *t.root6.cloneFlat(cloneFn)
+
+		n = &pt.root6
 	}
 
 	// Prepare traversal context.
@@ -282,9 +297,6 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, e
 	// Stack to keep track of cloned nodes along the path,
 	// needed for purge and path compression after delete.
 	stack := [maxTreeDepth]*node[V]{}
-
-	// Start at the root node for the given IP version.
-	n := pt.rootNodeByVersion(is4)
 
 	// Traverse the trie to locate the prefix to delete.
 	for depth, octet := range octets {
