@@ -71,6 +71,13 @@ func (l *Lite) Union(o *Lite) {
 	l.Table.Union(&o.Table)
 }
 
+// UnionPersist is an adapter for the underlying table.
+func (l *Lite) UnionPersist(o *Lite) *Lite {
+	tbl := l.Table.UnionPersist(&o.Table)
+	//nolint:govet // copy of *tbl is here by intention
+	return &Lite{*tbl}
+}
+
 // Overlaps4 is an adapter for the underlying table.
 func (l *Lite) Overlaps4(o *Lite) bool {
 	return l.Table.Overlaps4(&o.Table)

@@ -93,8 +93,9 @@ See the `ExampleLite_concurrent` and `ExampleTable_concurrent` tests for concret
   func (t *Table[V]) GetAndDelete(pfx netip.Prefix) (val V, ok bool)
   func (t *Table[V]) GetAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, ok bool)
 
-  func (t *Table[V]) Union(o *Table[V])
   func (t *Table[V]) Clone() *Table[V]
+  func (t *Table[V]) Union(o *Table[V])
+  func (t *Table[V]) UnionPersist(o *Table[V]) *Table[V]
 
   func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool
 
@@ -149,8 +150,9 @@ Some delegated methods are pointless without a payload.
    func (l *Lite) InsertPersist(pfx netip.Prefix) *Lite
    func (l *Lite) DeletePersist(pfx netip.Prefix) *Lite
 
-   func (l *Lite) Union(o *Lite)
    func (l *Lite) Clone() *Lite
+   func (l *Lite) Union(o *Lite)
+   func (l *Lite) UnionPersist(o *Lite) *Lite
 
    func (l *Lite) Overlaps(o *Lite) bool
    func (l *Lite) Overlaps4(o *Lite) bool

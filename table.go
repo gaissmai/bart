@@ -640,9 +640,6 @@ LOOP:
 	return
 }
 
-// Supernets returns an iterator over all CIDRs covering pfx.
-// The iteration is in reverse CIDR sort order, from longest-prefix-match to shortest-prefix-match.
-
 // Supernets returns an iterator over all supernet routes that cover the given prefix pfx.
 //
 // The traversal searches both exact-length and shorter (less specific) prefixes that
@@ -894,10 +891,6 @@ func (t *Table[V]) Overlaps6(o *Table[V]) bool {
 	return t.root6.overlaps(&o.root6, 0)
 }
 
-// Union combines two tables, changing the receiver table.
-// If there are duplicate entries, the payload of type V is shallow copied from the other table.
-// If type V implements the [Cloner] interface, the values are cloned, see also [Table.Clone].
-
 // Union merges another routing table into the receiver table, modifying it in-place.
 //
 // All prefixes and values from the other table (o) are inserted into the receiver.
@@ -905,8 +898,15 @@ func (t *Table[V]) Overlaps6(o *Table[V]) bool {
 // This duplicate is shallow-copied by default, but if the value type V implements the
 // Cloner interface, the value is deeply cloned before insertion. See also Table.Clone.
 func (t *Table[V]) Union(o *Table[V]) {
-	dup4 := t.root4.unionRec(&o.root4, 0)
-	dup6 := t.root6.unionRec(&o.root6, 0)
+	// Create a cloning function for deep copying values;
+	// returns nil if V does not implement the Cloner interface.
+	cloneFn := cloneFnFactory[V]()
+	if cloneFn == nil {
+		cloneFn = copyVal
+	}
+
+	dup4 := t.root4.unionRec(cloneFn, &o.root4, 0)
+	dup6 := t.root6.unionRec(cloneFn, &o.root6, 0)
 
 	t.size4 += o.size4 - dup4
 	t.size6 += o.size6 - dup6

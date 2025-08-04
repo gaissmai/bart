@@ -28,6 +28,11 @@ func cloneVal[V any](val V) V {
 	return any(val).(Cloner[V]).Clone()
 }
 
+// copyVal just copies the value.
+func copyVal[V any](val V) V {
+	return val
+}
+
 // cloneLeaf creates and returns a copy of the leafNode receiver.
 // If cloneFn is nil, the value is copied directly without modification.
 // Otherwise, cloneFn is applied to the value for deep cloning.
