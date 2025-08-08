@@ -64,12 +64,12 @@ func (l *fringeNode[V]) cloneFringe(cloneFn cloneFunc[V]) *fringeNode[V] {
 //
 // Note: The returned node is a new instance with copied slices but only shallow copies of nested nodes,
 // except for leafNode and fringeNode children which are cloned according to cloneFn.
-func (n *node[V]) cloneFlat(cloneFn cloneFunc[V]) *node[V] {
+func (n *bartNode[V]) cloneFlat(cloneFn cloneFunc[V]) *bartNode[V] {
 	if n == nil {
 		return nil
 	}
 
-	c := new(node[V])
+	c := new(bartNode[V])
 	if n.isEmpty() {
 		return c
 	}
@@ -91,7 +91,7 @@ func (n *node[V]) cloneFlat(cloneFn cloneFunc[V]) *node[V] {
 	// for *node[V] children, keep shallow references (no recursive clone)
 	for i, anyKid := range c.children.Items {
 		switch kid := anyKid.(type) {
-		case *node[V]:
+		case *bartNode[V]:
 			// Shallow copy
 		case *leafNode[V]:
 			// Clone leaf nodes, applying cloneFn as needed
@@ -121,7 +121,7 @@ func (n *node[V]) cloneFlat(cloneFn cloneFunc[V]) *node[V] {
 //
 // Returns a new instance of node[V] which is a complete deep clone of the
 // receiver node with all descendants.
-func (n *node[V]) cloneRec(cloneFn cloneFunc[V]) *node[V] {
+func (n *bartNode[V]) cloneRec(cloneFn cloneFunc[V]) *bartNode[V] {
 	if n == nil {
 		return nil
 	}
@@ -131,7 +131,7 @@ func (n *node[V]) cloneRec(cloneFn cloneFunc[V]) *node[V] {
 
 	// Recursively clone all child nodes of type *node[V]
 	for i, kidAny := range c.children.Items {
-		if kid, ok := kidAny.(*node[V]); ok {
+		if kid, ok := kidAny.(*bartNode[V]); ok {
 			c.children.Items[i] = kid.cloneRec(cloneFn)
 		}
 	}

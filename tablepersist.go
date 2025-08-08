@@ -43,7 +43,7 @@ func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V] {
 	}
 
 	// Pointer to the root node we will modify in this operation.
-	var n *node[V]
+	var n *bartNode[V]
 
 	// Create a cloning function for deep copying values;
 	// returns nil if V does not implement the Cloner interface.
@@ -96,7 +96,7 @@ func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V] {
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
-		case *node[V]:
+		case *bartNode[V]:
 			// clone the traversed path
 
 			// kid points now to cloned kid
@@ -121,7 +121,7 @@ func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V] {
 			// push the leaf down
 			// insert new child at current leaf position (addr)
 			// descend down, replace n with new child
-			newNode := new(node[V])
+			newNode := new(bartNode[V])
 			newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
 
 			n.children.InsertAt(octet, newNode)
@@ -140,7 +140,7 @@ func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V] {
 			// push the fringe down, it becomes a default route (idx=1)
 			// insert new child at current leaf position (addr)
 			// descend down, replace n with new child
-			newNode := new(node[V])
+			newNode := new(bartNode[V])
 			newNode.prefixes.InsertAt(1, kid.value)
 
 			n.children.InsertAt(octet, newNode)
@@ -188,7 +188,7 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 	}
 
 	// Pointer to the root node we will modify in this operation.
-	var n *node[V]
+	var n *bartNode[V]
 
 	// Create a cloning function for deep copying values;
 	// returns nil if V does not implement the Cloner interface.
@@ -244,7 +244,7 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 
 		// kid is node or leaf at addr
 		switch kid := kid.(type) {
-		case *node[V]:
+		case *bartNode[V]:
 			// Clone the node along the traversed path to respect copy-on-write.
 			kid = kid.cloneFlat(cloneFn)
 
@@ -268,7 +268,7 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 
 			// Prefixes differ - need to push existing leaf down the trie,
 			// create a new internal node, and insert the original leaf under it.
-			newNode := new(node[V])
+			newNode := new(bartNode[V])
 			newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
 
 			// Replace leaf with new node and descend.
@@ -286,7 +286,7 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 
 			// Else convert fringe node into an internal node with fringe value
 			// pushed down as default route (idx=1).
-			newNode := new(node[V])
+			newNode := new(bartNode[V])
 			newNode.prefixes.InsertAt(1, kid.value)
 
 			// Replace fringe with newly created internal node and descend.
@@ -354,7 +354,7 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, e
 	}
 
 	// Pointer to the root node we will modify in this operation.
-	var n *node[V]
+	var n *bartNode[V]
 
 	// Create a cloning function for deep copying values;
 	// returns nil if V does not implement the Cloner interface.
@@ -379,7 +379,7 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, e
 
 	// Stack to keep track of cloned nodes along the path,
 	// needed for purge and path compression after delete.
-	stack := [maxTreeDepth]*node[V]{}
+	stack := [maxTreeDepth]*bartNode[V]{}
 
 	// Traverse the trie to locate the prefix to delete.
 	for depth, octet := range octets {
@@ -414,7 +414,7 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, e
 		kid := n.children.MustGet(addr)
 
 		switch kid := kid.(type) {
-		case *node[V]:
+		case *bartNode[V]:
 			// Clone the internal node for copy-on-write.
 			kid = kid.cloneFlat(cloneFn)
 
