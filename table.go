@@ -47,8 +47,8 @@ type Table[V any] struct {
 	_ [0]sync.Mutex
 
 	// the root nodes, implemented as popcount compressed multibit tries
-	root4 node[V]
-	root6 node[V]
+	root4 bartNode[V]
+	root6 bartNode[V]
 
 	// the number of prefixes in the routing table
 	size4 int
@@ -56,7 +56,7 @@ type Table[V any] struct {
 }
 
 // rootNodeByVersion, root node getter for ip version.
-func (t *Table[V]) rootNodeByVersion(is4 bool) *node[V] {
+func (t *Table[V]) rootNodeByVersion(is4 bool) *bartNode[V] {
 	if is4 {
 		return &t.root4
 	}

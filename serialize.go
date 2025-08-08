@@ -28,7 +28,7 @@ type DumpListNode[V any] struct {
 // we collect this during the recursive descent.
 type trieItem[V any] struct {
 	// for traversing, path/depth/idx is needed to get the CIDR back from the trie.
-	n     *node[V]
+	n     *bartNode[V]
 	is4   bool
 	path  stridePath
 	depth int
@@ -113,7 +113,7 @@ func (t *Table[V]) fprint(w io.Writer, is4 bool) error {
 }
 
 // fprintRec, the output is a hierarchical CIDR tree covered starting with this node
-func (n *node[V]) fprintRec(w io.Writer, parent trieItem[V], pad string) error {
+func (n *bartNode[V]) fprintRec(w io.Writer, parent trieItem[V], pad string) error {
 	// recursion stop condition
 	if n == nil {
 		return nil
@@ -214,8 +214,8 @@ func (t *Table[V]) DumpList6() []DumpListNode[V] {
 }
 
 // dumpListRec, build the data structure rec-descent with the help
-// of directItemsRec.
-func (n *node[V]) dumpListRec(parentIdx uint8, path stridePath, depth int, is4 bool) []DumpListNode[V] {
+// of getDirectCoveredEntries()
+func (n *bartNode[V]) dumpListRec(parentIdx uint8, path stridePath, depth int, is4 bool) []DumpListNode[V] {
 	// recursion stop condition
 	if n == nil {
 		return nil
@@ -247,7 +247,7 @@ func (n *node[V]) dumpListRec(parentIdx uint8, path stridePath, depth int, is4 b
 // by heart to understand this function!
 //
 // See the  artlookup.pdf paper in the doc folder, the baseIndex function is the key.
-func (n *node[V]) directItemsRec(parentIdx uint8, path stridePath, depth int, is4 bool) (directItems []trieItem[V]) {
+func (n *bartNode[V]) directItemsRec(parentIdx uint8, path stridePath, depth int, is4 bool) (directItems []trieItem[V]) {
 	// recursion stop condition
 	if n == nil {
 		return nil
@@ -257,8 +257,7 @@ func (n *node[V]) directItemsRec(parentIdx uint8, path stridePath, depth int, is
 	// for all idx's (prefixes mapped by baseIndex) in this node
 	// do a longest-prefix-match
 	for i, idx := range n.prefixes.AsSlice(&[256]uint8{}) {
-		// tricky part, skip self
-		// test with next possible lpm (idx>>1), it's a complete binary tree
+		// tricky part, skip self, test with next possible lpm (idx>>1), it's a complete binary tree
 		nextIdx := idx >> 1
 
 		// fast skip, lpm not possible
@@ -304,7 +303,7 @@ func (n *node[V]) directItemsRec(parentIdx uint8, path stridePath, depth int, is
 		if lpm == parentIdx {
 			// child is directly covered by parent
 			switch kid := n.children.Items[i].(type) {
-			case *node[V]: // traverse rec-descent, call with next child node,
+			case *bartNode[V]: // traverse rec-descent, call with next child node,
 				// next trie level, set parentIdx to 0, adjust path and depth
 				path[depth&0xf] = addr
 				directItems = append(directItems, kid.directItemsRec(0, path, depth+1, is4)...)

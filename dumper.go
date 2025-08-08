@@ -56,7 +56,7 @@ func (t *Table[V]) dump(w io.Writer) {
 }
 
 // dumpRec, rec-descent the trie.
-func (n *node[V]) dumpRec(w io.Writer, path stridePath, depth int, is4 bool) {
+func (n *bartNode[V]) dumpRec(w io.Writer, path stridePath, depth int, is4 bool) {
 	// dump this node
 	n.dump(w, path, depth, is4)
 
@@ -64,14 +64,14 @@ func (n *node[V]) dumpRec(w io.Writer, path stridePath, depth int, is4 bool) {
 	for i, addr := range n.children.Bits() {
 		path[depth&15] = addr
 
-		if child, ok := n.children.Items[i].(*node[V]); ok {
+		if child, ok := n.children.Items[i].(*bartNode[V]); ok {
 			child.dumpRec(w, path, depth+1, is4)
 		}
 	}
 }
 
 // dump the node to w.
-func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
+func (n *bartNode[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 	bits := depth * strideLen
 	indent := strings.Repeat(".", depth)
 
@@ -119,7 +119,7 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 		// the node has recursive child nodes or path-compressed leaves
 		for i, addr := range n.children.Bits() {
 			switch n.children.Items[i].(type) {
-			case *node[V]:
+			case *bartNode[V]:
 				childAddrs = append(childAddrs, addr)
 				continue
 
@@ -194,7 +194,7 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 }
 
 // hasType returns the nodeType.
-func (n *node[V]) hasType() nodeType {
+func (n *bartNode[V]) hasType() nodeType {
 	s := n.nodeStats()
 
 	switch {
@@ -281,7 +281,7 @@ type stats struct {
 }
 
 // node statistics for this single node
-func (n *node[V]) nodeStats() stats {
+func (n *bartNode[V]) nodeStats() stats {
 	var s stats
 
 	s.pfxs = n.prefixes.Len()
@@ -289,7 +289,7 @@ func (n *node[V]) nodeStats() stats {
 
 	for i := range n.children.Bits() {
 		switch n.children.Items[i].(type) {
-		case *node[V]:
+		case *bartNode[V]:
 			s.nodes++
 
 		case *fringeNode[V]:
@@ -307,7 +307,7 @@ func (n *node[V]) nodeStats() stats {
 }
 
 // nodeStatsRec, calculate the number of pfxs, nodes and leaves under n, rec-descent.
-func (n *node[V]) nodeStatsRec() stats {
+func (n *bartNode[V]) nodeStatsRec() stats {
 	var s stats
 	if n == nil || n.isEmpty() {
 		return s
@@ -321,7 +321,7 @@ func (n *node[V]) nodeStatsRec() stats {
 
 	for _, kidAny := range n.children.Items {
 		switch kid := kidAny.(type) {
-		case *node[V]:
+		case *bartNode[V]:
 			// rec-descent
 			rs := kid.nodeStatsRec()
 
