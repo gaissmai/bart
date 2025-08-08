@@ -27,7 +27,7 @@ func TestZeroValue(t *testing.T) {
 	b.Clear(100)
 
 	b = BitSet256{}
-	b.popcount()
+	b.Size()
 
 	b = BitSet256{}
 	b.Rank(100)
@@ -502,39 +502,13 @@ func TestAsSlice(t *testing.T) {
 	}
 }
 
-func TestCount(t *testing.T) {
-	t.Parallel()
-	var b BitSet256
-
-	tot := uint8(255)
-	checkLast := true
-
-	for i := range tot {
-		sz := uint8(b.popcount())
-		if sz != i {
-			t.Logf("%v", b)
-			t.Errorf("Count reported as %d, but it should be %d", sz, i)
-			checkLast = false
-			break
-		}
-		b.Set(i)
-	}
-
-	if checkLast {
-		sz := uint8(b.popcount())
-		if sz != tot {
-			t.Errorf("After all bits set, size reported as %d, but it should be %d", sz, tot)
-		}
-	}
-}
-
 // test setting every 3rd bit, just in case something odd is happening
 func TestCount2(t *testing.T) {
 	t.Parallel()
 	var b BitSet256
 	tot := uint8(64*3 + 11)
 	for i := uint8(0); i < tot; i += 3 {
-		sz := uint8(b.popcount())
+		sz := uint8(b.Size())
 		if sz != i/3 {
 			t.Errorf("Count reported as %d, but it should be %d", sz, i)
 			break
@@ -564,11 +538,11 @@ func TestUnion(t *testing.T) {
 	d := b
 	d = d.Union(&a)
 
-	if c.popcount() != 200 {
-		t.Errorf("Union should have 200 bits set, but had %d", c.popcount())
+	if c.Size() != 200 {
+		t.Errorf("Union should have 200 bits set, but had %d", c.Size())
 	}
-	if d.popcount() != 200 {
-		t.Errorf("Union should have 200 bits set, but had %d", d.popcount())
+	if d.Size() != 200 {
+		t.Errorf("Union should have 200 bits set, but had %d", d.Size())
 	}
 }
 
@@ -590,11 +564,11 @@ func TestInplaceIntersection(t *testing.T) {
 
 	d := b
 	d = d.Intersection(&a)
-	if c.popcount() != 50 {
-		t.Errorf("Intersection should have 50 bits set, but had %d", c.popcount())
+	if c.Size() != 50 {
+		t.Errorf("Intersection should have 50 bits set, but had %d", c.Size())
 	}
-	if d.popcount() != 50 {
-		t.Errorf("Intersection should have 50 bits set, but had %d", d.popcount())
+	if d.Size() != 50 {
+		t.Errorf("Intersection should have 50 bits set, but had %d", d.Size())
 	}
 }
 
@@ -776,7 +750,7 @@ func BenchmarkPopcount(b *testing.B) {
 	aa := BitSet256{0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010}
 
 	for b.Loop() {
-		aa.popcount()
+		aa.Size()
 	}
 }
 
