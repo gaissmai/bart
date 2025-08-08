@@ -28,9 +28,9 @@ package bitset
 // can inline (*BitSet256).IsEmpty with cost 22
 // can inline (*BitSet256).LastSet with cost 37
 // can inline (*BitSet256).NextSet with cost 65
-// can inline (*BitSet256).popcnt with cost 33
 // can inline (*BitSet256).Rank with cost 57
 // can inline (*BitSet256).Set with cost 12
+// can inline (*BitSet256).Size with cost 33
 // can inline (*BitSet256).Test with cost 15
 // can inline (*BitSet256).Union with cost 53
 
@@ -307,8 +307,8 @@ func (b *BitSet256) Union(c *BitSet256) (bs BitSet256) {
 	return
 }
 
-// popcount is the number of set bits.
-func (b *BitSet256) popcount() (cnt int) {
+// Size is the number of set bits.
+func (b *BitSet256) Size() (cnt int) {
 	cnt += bits.OnesCount64(b[0])
 	cnt += bits.OnesCount64(b[1])
 	cnt += bits.OnesCount64(b[2])
