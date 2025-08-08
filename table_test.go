@@ -1787,7 +1787,7 @@ func TestDeleteButOne(t *testing.T) {
 			stats6.pfxs + stats6.leaves + stats6.fringes
 
 		if sum != 1 {
-			t.Fatalf("delete but one, onle one item must be left, but: %d\n%s", sum, tbl.dumpString())
+			t.Fatalf("delete but one, only one item must be left, but: %d\n%s", sum, tbl.dumpString())
 		}
 	}
 }
@@ -3427,56 +3427,30 @@ func TestWalkPersist(t *testing.T) {
 
 var benchRouteCount = []int{1, 2, 5, 10, 100, 1000, 10_000, 100_000, 200_000}
 
-func BenchmarkTableInsertRandom(b *testing.B) {
+func BenchmarkTableModifyRandom(b *testing.B) {
 	prng := rand.New(rand.NewPCG(42, 42))
-	for _, n := range []int{10_000, 100_000, 1_000_000, 2_000_000} {
+	for _, n := range benchRouteCount {
 		randomPfxs := randomRealWorldPrefixes(prng, n)
 
-		rt := new(Table[*MyInt])
+		rt := new(Table[int])
 		for i, pfx := range randomPfxs {
-			myInt := MyInt(i)
-			rt.Insert(pfx, &myInt)
+			rt.Insert(pfx, i)
 		}
 
 		prt := rt
 
-		probe := randomPrefix(prng)
-		myInt := MyInt(42)
+		probe := randomPfxs[prng.IntN(len(randomPfxs))]
 
 		b.Run(fmt.Sprintf("mutable into %d", n), func(b *testing.B) {
 			for b.Loop() {
-				rt.Insert(probe, &myInt)
+				rt.Modify(probe, func(int, bool) (int, bool) { return 42, false })
 			}
-
-			s4 := rt.root4.nodeStatsRec()
-			s6 := rt.root6.nodeStatsRec()
-			stats := stats{
-				s4.pfxs + s6.pfxs,
-				s4.childs + s6.childs,
-				s4.nodes + s6.nodes,
-				s4.leaves + s6.leaves,
-				s4.fringes + s6.fringes,
-			}
-
-			b.ReportMetric(float64(rt.Size())/float64(stats.nodes), "Prefix/Node")
 		})
 
 		b.Run(fmt.Sprintf("persist into %d", n), func(b *testing.B) {
 			for b.Loop() {
-				_ = prt.InsertPersist(probe, &myInt)
+				prt.ModifyPersist(probe, func(int, bool) (int, bool) { return 42, false })
 			}
-
-			s4 := rt.root4.nodeStatsRec()
-			s6 := rt.root6.nodeStatsRec()
-			stats := stats{
-				s4.pfxs + s6.pfxs,
-				s4.childs + s6.childs,
-				s4.nodes + s6.nodes,
-				s4.leaves + s6.leaves,
-				s4.fringes + s6.fringes,
-			}
-
-			b.ReportMetric(float64(rt.Size())/float64(stats.nodes), "Prefix/Node")
 		})
 
 	}
@@ -3673,11 +3647,12 @@ func BenchmarkMemIP4(b *testing.B) {
 			runtime.ReadMemStats(&endMem)
 
 			stats := rt.root4.nodeStatsRec()
-			b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/k), "bytes/pfx")
-			b.ReportMetric(float64(stats.nodes), "node")
+
+			b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/k), "bytes/route")
 			b.ReportMetric(float64(stats.pfxs), "pfxs")
-			b.ReportMetric(float64(stats.leaves), "leaf")
-			b.ReportMetric(float64(stats.fringes), "fringe")
+			b.ReportMetric(float64(stats.nodes), "nodes")
+			b.ReportMetric(float64(stats.leaves), "leaves")
+			b.ReportMetric(float64(stats.fringes), "fringes")
 			b.ReportMetric(0, "ns/op")
 		})
 	}
@@ -3704,11 +3679,12 @@ func BenchmarkMemIP6(b *testing.B) {
 			runtime.ReadMemStats(&endMem)
 
 			stats := rt.root6.nodeStatsRec()
-			b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/k), "bytes/pfx")
-			b.ReportMetric(float64(stats.nodes), "node")
+
+			b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/k), "bytes/route")
 			b.ReportMetric(float64(stats.pfxs), "pfxs")
-			b.ReportMetric(float64(stats.leaves), "leaf")
-			b.ReportMetric(float64(stats.fringes), "fringe")
+			b.ReportMetric(float64(stats.nodes), "nodes")
+			b.ReportMetric(float64(stats.leaves), "leaves")
+			b.ReportMetric(float64(stats.fringes), "fringes")
 			b.ReportMetric(0, "ns/op")
 		})
 	}
@@ -3744,11 +3720,11 @@ func BenchmarkMem(b *testing.B) {
 				s4.fringes + s6.fringes,
 			}
 
-			b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/k), "bytes/pfx")
-			b.ReportMetric(float64(stats.nodes), "node")
+			b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/k), "bytes/route")
 			b.ReportMetric(float64(stats.pfxs), "pfxs")
-			b.ReportMetric(float64(stats.leaves), "leaf")
-			b.ReportMetric(float64(stats.fringes), "fringe")
+			b.ReportMetric(float64(stats.nodes), "nodes")
+			b.ReportMetric(float64(stats.leaves), "leaves")
+			b.ReportMetric(float64(stats.fringes), "fringes")
 			b.ReportMetric(0, "ns/op")
 		})
 	}

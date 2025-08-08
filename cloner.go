@@ -66,12 +66,12 @@ func (l *fringeNode[V]) cloneFringe(cloneFn cloneFunc[V]) *fringeNode[V] {
 //
 // Note: The returned node is a new instance with copied slices but only shallow copies of nested nodes,
 // except for leafNode and fringeNode children which are cloned according to cloneFn.
-func (n *node[V]) cloneFlat(cloneFn cloneFunc[V]) *node[V] {
+func (n *bartNode[V]) cloneFlat(cloneFn cloneFunc[V]) *bartNode[V] {
 	if n == nil {
 		return nil
 	}
 
-	c := new(node[V])
+	c := new(bartNode[V])
 	if n.isEmpty() {
 		return c
 	}
@@ -93,7 +93,7 @@ func (n *node[V]) cloneFlat(cloneFn cloneFunc[V]) *node[V] {
 	// for *node[V] children, keep shallow references (no recursive clone)
 	for i, anyKid := range c.children.Items {
 		switch kid := anyKid.(type) {
-		case *node[V]:
+		case *bartNode[V]:
 			// Shallow copy
 		case *leafNode[V]:
 			// Clone leaf nodes, applying cloneFn as needed
@@ -123,7 +123,7 @@ func (n *node[V]) cloneFlat(cloneFn cloneFunc[V]) *node[V] {
 //
 // Returns a new instance of node[V] which is a complete deep clone of the
 // receiver node with all descendants.
-func (n *node[V]) cloneRec(cloneFn cloneFunc[V]) *node[V] {
+func (n *bartNode[V]) cloneRec(cloneFn cloneFunc[V]) *bartNode[V] {
 	if n == nil {
 		return nil
 	}
@@ -133,8 +133,89 @@ func (n *node[V]) cloneRec(cloneFn cloneFunc[V]) *node[V] {
 
 	// Recursively clone all child nodes of type *node[V]
 	for i, kidAny := range c.children.Items {
-		if kid, ok := kidAny.(*node[V]); ok {
+		if kid, ok := kidAny.(*bartNode[V]); ok {
 			c.children.Items[i] = kid.cloneRec(cloneFn)
+		}
+	}
+
+	return c
+}
+
+// cloneFlat TODO
+func (n *artNode[V]) cloneFlat(cloneFn cloneFunc[V]) *artNode[V] {
+	if n == nil {
+		return nil
+	}
+
+	c := new(artNode[V])
+	if n.prefixCount() == 0 && n.childCount() == 0 {
+		return c
+	}
+
+	// copy the bitsets
+	c.prefixesBitSet = n.prefixesBitSet
+	c.childrenBitSet = n.childrenBitSet
+
+	// it's a clone of the prefixes ...
+	// but the allot algorithm makes it more difficult
+	// see also insertPrefix
+	for _, idx := range n.prefixesBitSet.AsSlice(&[256]uint8{}) {
+		origValPtr := n.prefixes[idx]
+		newValPtr := new(V)
+
+		if cloneFn == nil {
+			*newValPtr = *origValPtr // just copy the value
+		} else {
+			*newValPtr = cloneFn(*origValPtr) // clone the value
+		}
+
+		oldValPtr := c.prefixes[idx]
+		c.allot(idx, oldValPtr, newValPtr)
+	}
+
+	// flat clone of the children
+	for _, octet := range n.childrenBitSet.AsSlice(&[256]uint8{}) {
+		kidAny := *n.children[octet]
+
+		switch kid := kidAny.(type) {
+		case *artNode[V]:
+			// just copy the pointer
+			c.children[octet] = n.children[octet]
+
+		case *leafNode[V]:
+			leafAny := any(kid.cloneLeaf(cloneFn))
+			c.children[octet] = &leafAny
+
+		case *fringeNode[V]:
+			fringeAny := any(kid.cloneFringe(cloneFn))
+			c.children[octet] = &fringeAny
+
+		default:
+			panic("logic error, wrong node type")
+		}
+
+	}
+
+	return c
+}
+
+// cloneRec TODO
+func (n *artNode[V]) cloneRec(cloneFn cloneFunc[V]) *artNode[V] {
+	if n == nil {
+		return nil
+	}
+
+	// Perform a flat clone of the current node.
+	c := n.cloneFlat(cloneFn)
+
+	// Recursively clone all child nodes of type *artNode[V]
+	for _, octet := range n.childrenBitSet.AsSlice(&[256]uint8{}) {
+		kidAny := *n.children[octet]
+
+		switch kid := kidAny.(type) {
+		case *artNode[V]:
+			nodeAny := any(kid.cloneRec(cloneFn))
+			c.children[octet] = &nodeAny
 		}
 	}
 
