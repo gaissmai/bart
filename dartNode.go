@@ -6,12 +6,20 @@ const (
 	numChildren  = 256
 )
 
+// artNode is a trie level node in the multibit routing table.
+//
+// Each artNode contains two conceptually different fixed sized arrays:
+//   - prefixes: representing routes, using a complete binary tree layout
+//     driven by the baseIndex() function from the ART algorithm.
+//   - children: holding subtries a branching factor of 256.
+//
+// See doc/artlookup.pdf for the mapping mechanics and prefix tree details.
 type artNode[V any] struct {
-	children [numChildren]any    // 256
 	prefixes [lastHostIdx + 1]*V // 512
+	children [numChildren]any    // 256
 
-	childCount  int16
 	prefixCount int16
+	childCount  int16
 }
 
 // TODO
@@ -34,12 +42,14 @@ func (n *artNode[V]) getChild(addr uint8) any {
 	return n.children[addr]
 }
 
-// deleteChild TODO
-func (n *artNode[V]) deleteChild(addr uint8) {
-	if n.children[addr] != nil {
-		n.childCount--
+func (n *artNode[V]) getOrCreateChild(addr uint8) any {
+	c := n.children[addr]
+	if c == nil {
+		c = &artNode[V]{}
+		n.children[addr] = c
+		n.childCount++
 	}
-	n.children[addr] = nil
+	return c
 }
 
 // setChild TODO
@@ -48,6 +58,14 @@ func (n *artNode[V]) setChild(addr uint8, child any) {
 		n.childCount++
 	}
 	n.children[addr] = child
+}
+
+// deleteChild TODO
+func (n *artNode[V]) deleteChild(addr uint8) {
+	if n.children[addr] != nil {
+		n.childCount--
+	}
+	n.children[addr] = nil
 }
 
 // insertPrefix adds the route addr/prefixLen to n, with value val.
@@ -74,23 +92,23 @@ func (n *artNode[V]) insertPrefix(addr uint8, prefixLen int, val V) (exists bool
 }
 
 // deletePrefix TODO
-func (n0 *artNode[V]) deletePrefix(addr uint8, prefixLen int) (exists bool) {
+func (n *artNode[V]) deletePrefix(addr uint8, prefixLen int) (val V, exists bool) {
 	idx := prefix2Index(addr, prefixLen)
-	if !n0.isStartIdx(idx) {
+	if !n.isStartIdx(idx) {
 		// Route entry doesn't exist
-		return false
+		return val, false
 	}
 
-	val := n0.prefixes[idx]
+	pv := n.prefixes[idx]
 	var parentVal *V
 	if parentIdx := parentIndex(idx); parentIdx != 0 {
-		parentVal = n0.prefixes[parentIdx]
+		parentVal = n.prefixes[parentIdx]
 	}
 
-	n0.allotRec(idx, val, parentVal)
-	n0.prefixCount--
+	n.allotRec(idx, pv, parentVal)
+	n.prefixCount--
 
-	return true
+	return *pv, true
 }
 
 // contains TODO
