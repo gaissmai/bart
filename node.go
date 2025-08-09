@@ -128,9 +128,7 @@ func (n *bartNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists 
 
 	// find the proper trie node to insert prefix
 	// start with prefix octet at depth
-	for ; depth < len(octets); depth++ {
-		octet := octets[depth]
-
+	for _, octet := range octets[depth:] {
 		// last masked octet: insert/override prefix/val into node
 		if depth == maxDepth {
 			return n.prefixes.InsertAt(art.PfxToIdx(octet, lastBits), val)
@@ -152,7 +150,7 @@ func (n *bartNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists 
 		switch kid := kid.(type) {
 		case *bartNode[V]:
 			n = kid
-			continue // descend down to next trie level
+			break // descend down to next trie level
 
 		case *leafNode[V]:
 			// reached a path compressed prefix
@@ -195,6 +193,8 @@ func (n *bartNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists 
 		default:
 			panic("logic error, wrong node type")
 		}
+
+		depth++
 	}
 
 	panic("unreachable")
