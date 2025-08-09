@@ -46,7 +46,7 @@ type Table[V any] struct {
 	// used by -copylocks checker from `go vet`.
 	_ [0]sync.Mutex
 
-	// the root nodes, implemented as popcount compressed multibit tries
+	// bart nodes are popcount compressed nodes in multibit tries
 	root4 bartNode[V]
 	root6 bartNode[V]
 
@@ -408,7 +408,7 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 		switch kid := kid.(type) {
 		case *bartNode[V]:
 			n = kid
-			continue // descend down to next trie level
+			break // descend down to next trie level
 
 		case *fringeNode[V]:
 			// fringe is the default-route for all possible octets below
