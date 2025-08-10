@@ -22,6 +22,11 @@ type artNode[V any] struct {
 	childCount  int16
 }
 
+// isEmpty returns true if node has neither prefixes nor children
+func (n *artNode[V]) isEmpty() bool {
+	return n.prefixCount == 0 && n.childCount == 0
+}
+
 // TODO
 func prefix2Index(addr uint8, prefixLen int) int {
 	return (int(addr) >> (8 - prefixLen)) + (1 << prefixLen)
@@ -89,6 +94,17 @@ func (n *artNode[V]) insertPrefix(addr uint8, prefixLen int, val V) (exists bool
 	n.allotRec(idx, old, p)
 
 	return
+}
+
+// getPrefix TODO
+func (n *artNode[V]) getPrefix(addr uint8, prefixLen int) (val V, exists bool) {
+	idx := prefix2Index(addr, prefixLen)
+	if n.isStartIdx(idx) {
+		pv := n.prefixes[idx]
+		return *pv, true
+	}
+	// Route entry doesn't exist
+	return val, false
 }
 
 // deletePrefix TODO
@@ -167,4 +183,51 @@ func (n *artNode[V]) isStartIdx(idx int) bool {
 		return true
 	}
 	return false
+}
+
+// nodeStatsRec, calculate the number of pfxs, nodes and leaves under n, rec-descent.
+func (n *artNode[V]) nodeStatsRec() stats {
+	var s stats
+	if n == nil || n.isEmpty() {
+		return s
+	}
+
+	s.pfxs = int(n.prefixCount)
+	s.childs = int(n.childCount)
+	s.nodes = 1 // this node
+	s.leaves = 0
+	s.fringes = 0
+
+	for _, kidAny := range n.children {
+		if kidAny == nil {
+			continue
+		}
+
+		switch kid := kidAny.(type) {
+		case *artNode[V]:
+			// rec-descent
+			rs := kid.nodeStatsRec()
+
+			s.pfxs += rs.pfxs
+			s.childs += rs.childs
+			s.nodes += rs.nodes
+			s.leaves += rs.leaves
+			s.fringes += rs.fringes
+
+		case *bartNode[V]:
+			// rec-descent
+			rs := kid.nodeStatsRec()
+
+			s.pfxs += rs.pfxs
+			s.childs += rs.childs
+			s.nodes += rs.nodes
+			s.leaves += rs.leaves
+			s.fringes += rs.fringes
+
+		default:
+			panic("logic error, wrong node type")
+		}
+	}
+
+	return s
 }

@@ -36,13 +36,12 @@ type Dart[V any] struct {
 	size6 int
 }
 
-// rootNodeByVersion, root node getter for ip version.
+// rootNodeByVersion, root node getter for ip version and ART levels.
 func (d *Dart[V]) rootNodeByVersion(is4 bool) (node *artNode[V], artLevels int) {
 	if is4 {
-		return &d.root4, 2 // IPv4 has two ART levels
+		return &d.root4, 2 // default
 	}
-
-	return &d.root6, 3 // IPv6 has three ART levels
+	return &d.root6, 4 // default
 }
 
 func (d *Dart[V]) Insert(pfx netip.Prefix, val V) {
@@ -61,30 +60,43 @@ func (d *Dart[V]) Insert(pfx netip.Prefix, val V) {
 
 	nArt, artLevels := d.rootNodeByVersion(is4)
 
-	var depth int
-	var octet byte
+	var nBart *bartNode[V]
 
 	// insert prefix into ART or fast forward over ART levels
-	for depth, octet = range octets[:artLevels] {
+	for depth, octet := range octets[:artLevels] {
+		levelBits := bits - (depth * 8)
+
 		// insert prefix and returen
-		if bits <= (depth+1)*8 {
-			if exists := nArt.insertPrefix(octet, bits-(depth*8), val); !exists {
+		if levelBits <= 8 {
+			if exists := nArt.insertPrefix(octet, levelBits, val); !exists {
 				d.sizeUpdate(is4, 1)
 			}
 			return
 		}
 
-		// move fast forward
-		if depth < artLevels-1 {
-			nArt = nArt.getOrCreateChild(octet).(*artNode[V])
-		}
-	}
+		// maybe nil
+		next := nArt.getChild(octet)
 
-	// get first BART node or create it
-	nBart, ok := nArt.getChild(octet).(*bartNode[V])
-	if !ok {
-		nBart = new(bartNode[V])
-		nArt.setChild(octet, nBart)
+		// last ART level
+		if depth == artLevels-1 {
+			if next != nil {
+				nBart = next.(*bartNode[V])
+				break
+			}
+
+			// create a child
+			nBart = new(bartNode[V])
+			nArt.setChild(octet, nBart)
+			break
+		}
+
+		// move fast forward within ART levels, but if ...
+		if next == nil {
+			// create a child
+			nArt = nArt.getOrCreateChild(octet).(*artNode[V])
+		} else {
+			nArt = next.(*artNode[V])
+		}
 	}
 
 	// insert prefix into BART
@@ -122,72 +134,71 @@ func (d *Dart[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 	octets := ip.AsSlice()
 	maxDepth, lastBits := maxDepthAndLastBits(bits)
 
-	// level 0
-	nArt, _ := d.rootNodeByVersion(is4)
-	if bits <= 8 {
-		val, exists = nArt.deletePrefix(octets[0], bits)
-		if !exists {
-			d.sizeUpdate(is4, -1)
-		}
-		return val, exists
-	}
+	nArt, artLevels := d.rootNodeByVersion(is4)
 
-	// level 1
-	if bits <= 16 {
-		n1, ok := nArt.getChild(octets[0]).(*artNode[V])
-		if !ok {
+	var nBart *bartNode[V]
+
+	// delete prefix from ART or fast forward over ART levels
+	for depth, octet := range octets[:artLevels] {
+		levelBits := bits - (depth * 8)
+
+		if levelBits <= 8 {
+			val, exists = nArt.deletePrefix(octet, levelBits)
+			if !exists {
+				d.sizeUpdate(is4, -1)
+			}
+			return val, exists
+		}
+
+		// get next child in ART levels, maybe nil
+		next := nArt.getChild(octet)
+		if next == nil {
 			// nothing to delete
 			return
 		}
 
-		val, exists = n1.deletePrefix(octets[1], bits-8)
-		if !exists {
-			d.sizeUpdate(is4, -1)
+		// last ART level, assert BART node and break loop
+		if depth == artLevels-1 {
+			nBart = next.(*bartNode[V])
+			break
 		}
-		return val, exists
-	}
 
-	// bits > 16, BART algorithm, fast forward to level 2
-
-	n := getFirstBartNode(nArt, octets[:2])
-	if n == nil {
-		return
+		// assert ART node and move forward
+		nArt = next.(*artNode[V])
 	}
 
 	// record the nodes on the path to the deleted node, needed to purge
 	// and/or path compress nodes after the deletion of a prefix
 	stack := [maxTreeDepth]*bartNode[V]{}
 
-	// find the BART trie node, start at level 2
-	for depth := 2; depth < len(octets); depth++ {
-		depth = depth & 0xf // BCE, Delete must be fast
-		octet := octets[depth]
-
+	// find the BART trie node
+	depth := artLevels
+	for _, octet := range octets[artLevels:] {
 		// push current node on stack for path recording
-		stack[depth] = n
+		stack[depth] = nBart
 
 		if depth == maxDepth {
 			// try to delete prefix in trie node
-			val, exists = n.prefixes.DeleteAt(art.PfxToIdx(octet, lastBits))
+			val, exists = nBart.prefixes.DeleteAt(art.PfxToIdx(octet, lastBits))
 			if !exists {
 				return
 			}
 
 			d.sizeUpdate(is4, -1)
-			n.purgeAndCompress(stack[:depth], octets, is4)
+			nBart.purgeAndCompress(stack[:depth], octets, is4)
 			return val, true
 		}
 
-		if !n.children.Test(octet) {
+		if !nBart.children.Test(octet) {
 			return
 		}
-		kid := n.children.MustGet(octet)
+		kid := nBart.children.MustGet(octet)
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
 		case *bartNode[V]:
-			n = kid
-			continue // descend down to next trie level
+			nBart = kid
+			break // descend down to next trie level
 
 		case *fringeNode[V]:
 			// if pfx is no fringe at this depth, fast exit
@@ -196,10 +207,10 @@ func (d *Dart[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 			}
 
 			// pfx is fringe at depth, delete fringe
-			n.children.DeleteAt(octet)
+			nBart.children.DeleteAt(octet)
 
 			d.sizeUpdate(is4, -1)
-			n.purgeAndCompress(stack[:depth], octets, is4)
+			nBart.purgeAndCompress(stack[:depth], octets, is4)
 
 			return kid.value, true
 
@@ -210,21 +221,111 @@ func (d *Dart[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 			}
 
 			// prefix is equal leaf, delete leaf
-			n.children.DeleteAt(octet)
+			nBart.children.DeleteAt(octet)
 
 			d.sizeUpdate(is4, -1)
-			n.purgeAndCompress(stack[:depth], octets, is4)
+			nBart.purgeAndCompress(stack[:depth], octets, is4)
 
 			return kid.value, true
 
 		default:
 			panic("logic error, wrong node type")
 		}
+
+		depth++
 	}
 
 	return
 }
 
+// Get returns the associated payload for prefix and true, or false if
+// prefix is not set in the routing table.
+func (d *Dart[V]) Get(pfx netip.Prefix) (val V, ok bool) {
+	if !pfx.IsValid() {
+		return
+	}
+
+	// canonicalize the prefix
+	pfx = pfx.Masked()
+
+	// values derived from pfx
+	ip := pfx.Addr()
+	is4 := ip.Is4()
+	bits := pfx.Bits()
+	octets := ip.AsSlice()
+	maxDepth, lastBits := maxDepthAndLastBits(bits)
+
+	nArt, artLevels := d.rootNodeByVersion(is4)
+
+	var nBart *bartNode[V]
+
+	// get prefix from ART or fast forward to BART
+	for depth, octet := range octets[:artLevels] {
+		levelBits := bits - (depth * 8)
+
+		if levelBits <= 8 {
+			return nArt.getPrefix(octet, levelBits)
+		}
+
+		// get next child in ART levels, maybe nil
+		next := nArt.getChild(octet)
+		if next == nil {
+			return
+		}
+
+		// last ART level, assert BART node and break loop
+		if depth == artLevels-1 {
+			nBart = next.(*bartNode[V])
+			break
+		}
+
+		// assert ART node and move forward
+		nArt = next.(*artNode[V])
+	}
+
+	depth := artLevels
+	// find the trie node
+	for _, octet := range octets[artLevels:] {
+		if depth == maxDepth {
+			return nBart.prefixes.Get(art.PfxToIdx(octet, lastBits))
+		}
+
+		if !nBart.children.Test(octet) {
+			return
+		}
+		kid := nBart.children.MustGet(octet)
+
+		// kid is node or leaf or fringe at octet
+		switch kid := kid.(type) {
+		case *bartNode[V]:
+			nBart = kid
+			break // descend down to next trie level
+
+		case *fringeNode[V]:
+			// reached a path compressed fringe, stop traversing
+			if isFringe(depth, bits) {
+				return kid.value, true
+			}
+			return
+
+		case *leafNode[V]:
+			// reached a path compressed prefix, stop traversing
+			if kid.prefix == pfx {
+				return kid.value, true
+			}
+			return
+
+		default:
+			panic("logic error, wrong node type")
+		}
+
+		depth++
+	}
+
+	panic("unreachable")
+}
+
+// Contains TODO
 func (d *Dart[V]) Contains(ip netip.Addr) bool {
 	if !ip.IsValid() {
 		return false
@@ -236,11 +337,9 @@ func (d *Dart[V]) Contains(ip netip.Addr) bool {
 	nArt, artLevels := d.rootNodeByVersion(is4)
 
 	var nBart *bartNode[V]
-	var depth int
-	var octet byte
 
 	// first test in ART levels and if not fount in BART levels
-	for depth, octet = range octets[:artLevels] {
+	for depth, octet := range octets[:artLevels] {
 		if nArt.contains(octet) {
 			return true
 		}
@@ -293,6 +392,7 @@ func (d *Dart[V]) Contains(ip netip.Addr) bool {
 	return false
 }
 
+// Lookup TODO
 func (d *Dart[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	if !ip.IsValid() {
 		return
@@ -304,11 +404,9 @@ func (d *Dart[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	nArt, artLevels := d.rootNodeByVersion(is4)
 
 	var nBart *bartNode[V]
-	var depth int
-	var octet byte
 
 	// fast forward to BART levels, but record LPM matches in ART
-	for depth, octet = range octets[:artLevels] {
+	for depth, octet := range octets[:artLevels] {
 
 		// save the current best LPM val, lookup is cheap in ART
 		if tmpVal, tmpOk := nArt.lookup(octet); tmpOk {
@@ -335,6 +433,7 @@ func (d *Dart[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	// stack of the traversed nodes for fast backtracking, if needed
 	stack := [maxTreeDepth]*bartNode[V]{}
 
+	depth := artLevels
 LOOP:
 	for _, octet := range octets[artLevels:] {
 		// push current node on stack for fast backtracking
@@ -414,18 +513,4 @@ func (d *Dart[V]) Size4() int {
 // Size6 returns the IPv6 prefix count.
 func (d *Dart[V]) Size6() int {
 	return d.size6
-}
-
-func getFirstBartNode[V any](n0 *artNode[V], octets []byte) *bartNode[V] {
-	n1, ok := n0.getChild(octets[0]).(*artNode[V])
-	if !ok {
-		return nil
-	}
-
-	n, ok := n1.getChild(octets[1]).(*bartNode[V])
-	if !ok {
-		return nil
-	}
-
-	return n
 }
