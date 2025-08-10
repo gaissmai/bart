@@ -82,15 +82,15 @@ func TestDartInvalid(t *testing.T) {
 }
 
 /*
-func TestInsert(t *testing.T) {
+func TestDartInsert(t *testing.T) {
 	t.Parallel()
 
-	tbl := new(Table[int])
+	tbl := new(Dart[int])
 
 	// Create a new leaf strideTable, with compressed path
 	tbl.Insert(mpp("192.168.0.1/32"), 1)
-	checkNumNodes(t, tbl, 1)
-	checkRoutes(t, tbl, []tableTest{
+	checkDartNumNodes(t, tbl, 3)
+	checkDartRoutes(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", -1},
 		{"192.168.0.3", -1},
@@ -105,8 +105,8 @@ func TestInsert(t *testing.T) {
 
 	// explode path compressed
 	tbl.Insert(mpp("192.168.0.2/32"), 2)
-	checkNumNodes(t, tbl, 4)
-	checkRoutes(t, tbl, []tableTest{
+	checkDartNumNodes(t, tbl, 4)
+	checkDartRoutes(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", 2},
 		{"192.168.0.3", -1},
@@ -121,8 +121,8 @@ func TestInsert(t *testing.T) {
 
 	// Insert into existing leaf
 	tbl.Insert(mpp("192.168.0.0/26"), 7)
-	checkNumNodes(t, tbl, 4)
-	checkRoutes(t, tbl, []tableTest{
+	checkDartNumNodes(t, tbl, 4)
+	checkDartRoutes(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", 2},
 		{"192.168.0.3", 7},
@@ -137,8 +137,8 @@ func TestInsert(t *testing.T) {
 
 	// Create a different leaf at root
 	tbl.Insert(mpp("10.0.0.0/27"), 3)
-	checkNumNodes(t, tbl, 4)
-	checkRoutes(t, tbl, []tableTest{
+	checkDartNumNodes(t, tbl, 6)
+	checkDartRoutes(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", 2},
 		{"192.168.0.3", 7},
@@ -153,8 +153,8 @@ func TestInsert(t *testing.T) {
 
 	// Insert that creates a new path compressed leaf
 	tbl.Insert(mpp("192.168.1.1/32"), 4)
-	checkNumNodes(t, tbl, 4)
-	checkRoutes(t, tbl, []tableTest{
+	checkDartNumNodes(t, tbl, 6)
+	checkDartRoutes(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", 2},
 		{"192.168.0.3", 7},
@@ -169,8 +169,8 @@ func TestInsert(t *testing.T) {
 
 	// Insert that creates a new path compressed leaf
 	tbl.Insert(mpp("192.170.0.0/16"), 5)
-	checkNumNodes(t, tbl, 4)
-	checkRoutes(t, tbl, []tableTest{
+	checkDartNumNodes(t, tbl, 6)
+	checkDartRoutes(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", 2},
 		{"192.168.0.3", 7},
@@ -186,8 +186,8 @@ func TestInsert(t *testing.T) {
 	// New leaf in a different subtree, so the next insert can test a
 	// variant of decompression.
 	tbl.Insert(mpp("192.180.0.1/32"), 8)
-	checkNumNodes(t, tbl, 4)
-	checkRoutes(t, tbl, []tableTest{
+	checkDartNumNodes(t, tbl, 7)
+	checkDartRoutes(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", 2},
 		{"192.168.0.3", 7},
@@ -202,8 +202,8 @@ func TestInsert(t *testing.T) {
 
 	// Insert that explodes the previous path compression
 	tbl.Insert(mpp("192.180.0.0/21"), 9)
-	checkNumNodes(t, tbl, 5)
-	checkRoutes(t, tbl, []tableTest{
+	checkDartNumNodes(t, tbl, 7)
+	checkDartRoutes(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", 2},
 		{"192.168.0.3", 7},
@@ -218,8 +218,8 @@ func TestInsert(t *testing.T) {
 
 	// Insert a default route, those have their own codepath.
 	tbl.Insert(mpp("0.0.0.0/0"), 6)
-	checkNumNodes(t, tbl, 5)
-	checkRoutes(t, tbl, []tableTest{
+	checkDartNumNodes(t, tbl, 7)
+	checkDartRoutes(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", 2},
 		{"192.168.0.3", 7},
@@ -236,8 +236,8 @@ func TestInsert(t *testing.T) {
 
 	// Create a new path compressed leaf
 	tbl.Insert(mpp("ff:aaaa::1/128"), 1)
-	checkNumNodes(t, tbl, 6)
-	checkRoutes(t, tbl, []tableTest{
+	checkDartNumNodes(t, tbl, 12)
+	checkDartRoutes(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", -1},
 		{"ff:aaaa::3", -1},
@@ -252,8 +252,8 @@ func TestInsert(t *testing.T) {
 
 	// Insert into previous leaf, explode v6 path compression
 	tbl.Insert(mpp("ff:aaaa::2/128"), 2)
-	checkNumNodes(t, tbl, 21)
-	checkRoutes(t, tbl, []tableTest{
+	checkDartNumNodes(t, tbl, 23)
+	checkDartRoutes(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", 2},
 		{"ff:aaaa::3", -1},
@@ -268,8 +268,8 @@ func TestInsert(t *testing.T) {
 
 	// Insert into previous node
 	tbl.Insert(mpp("ff:aaaa::/125"), 7)
-	checkNumNodes(t, tbl, 21)
-	checkRoutes(t, tbl, []tableTest{
+	checkDartNumNodes(t, tbl, 23)
+	checkDartRoutes(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", 2},
 		{"ff:aaaa::3", 7},
@@ -284,8 +284,8 @@ func TestInsert(t *testing.T) {
 
 	// Create a different leaf elsewhere
 	tbl.Insert(mpp("ffff:bbbb::/120"), 3)
-	checkNumNodes(t, tbl, 21)
-	checkRoutes(t, tbl, []tableTest{
+	checkDartNumNodes(t, tbl, 27)
+	checkDartRoutes(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", 2},
 		{"ff:aaaa::3", 7},
@@ -300,8 +300,8 @@ func TestInsert(t *testing.T) {
 
 	// Insert that creates a new path compressed leaf
 	tbl.Insert(mpp("ff:aaaa:aaaa::1/128"), 4)
-	checkNumNodes(t, tbl, 21)
-	checkRoutes(t, tbl, []tableTest{
+	checkDartNumNodes(t, tbl, 27)
+	checkDartRoutes(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", 2},
 		{"ff:aaaa::3", 7},
@@ -316,8 +316,8 @@ func TestInsert(t *testing.T) {
 
 	// Insert that creates a new path in tree
 	tbl.Insert(mpp("ff:aaaa:aaaa:bb00::/56"), 5)
-	checkNumNodes(t, tbl, 23)
-	checkRoutes(t, tbl, []tableTest{
+	checkDartNumNodes(t, tbl, 29)
+	checkDartRoutes(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", 2},
 		{"ff:aaaa::3", 7},
@@ -333,8 +333,8 @@ func TestInsert(t *testing.T) {
 	// New leaf in a different subtree, so the next insert can test a
 	// variant of decompression.
 	tbl.Insert(mpp("ff:cccc::1/128"), 8)
-	checkNumNodes(t, tbl, 23)
-	checkRoutes(t, tbl, []tableTest{
+	checkDartNumNodes(t, tbl, 31)
+	checkDartRoutes(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", 2},
 		{"ff:aaaa::3", 7},
@@ -349,8 +349,8 @@ func TestInsert(t *testing.T) {
 
 	// Insert that explodes a previous path compressed leaf
 	tbl.Insert(mpp("ff:cccc::/37"), 9)
-	checkNumNodes(t, tbl, 25)
-	checkRoutes(t, tbl, []tableTest{
+	checkDartNumNodes(t, tbl, 31)
+	checkDartRoutes(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", 2},
 		{"ff:aaaa::3", 7},
@@ -365,8 +365,8 @@ func TestInsert(t *testing.T) {
 
 	// Insert a default route, those have their own codepath.
 	tbl.Insert(mpp("::/0"), 6)
-	checkNumNodes(t, tbl, 25)
-	checkRoutes(t, tbl, []tableTest{
+	checkDartNumNodes(t, tbl, 31)
+	checkDartRoutes(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", 2},
 		{"ff:aaaa::3", 7},
@@ -380,332 +380,35 @@ func TestInsert(t *testing.T) {
 	})
 }
 
-func TestInsertPersist(t *testing.T) {
-	t.Parallel()
-
-	tbl := new(Table[int])
-
-	// Create a new leaf strideTable, with compressed path
-	tbl = tbl.InsertPersist(mpp("192.168.0.1/32"), 1)
-	checkNumNodes(t, tbl, 1)
-	checkRoutes(t, tbl, []tableTest{
-		{"192.168.0.1", 1},
-		{"192.168.0.2", -1},
-		{"192.168.0.3", -1},
-		{"192.168.0.255", -1},
-		{"192.168.1.1", -1},
-		{"192.170.1.1", -1},
-		{"192.180.0.1", -1},
-		{"192.180.3.5", -1},
-		{"10.0.0.5", -1},
-		{"10.0.0.15", -1},
-	})
-
-	// explode path compressed
-	tbl = tbl.InsertPersist(mpp("192.168.0.2/32"), 2)
-	checkNumNodes(t, tbl, 4)
-	checkRoutes(t, tbl, []tableTest{
-		{"192.168.0.1", 1},
-		{"192.168.0.2", 2},
-		{"192.168.0.3", -1},
-		{"192.168.0.255", -1},
-		{"192.168.1.1", -1},
-		{"192.170.1.1", -1},
-		{"192.180.0.1", -1},
-		{"192.180.3.5", -1},
-		{"10.0.0.5", -1},
-		{"10.0.0.15", -1},
-	})
-
-	// Insert into existing leaf
-	tbl = tbl.InsertPersist(mpp("192.168.0.0/26"), 7)
-	checkNumNodes(t, tbl, 4)
-	checkRoutes(t, tbl, []tableTest{
-		{"192.168.0.1", 1},
-		{"192.168.0.2", 2},
-		{"192.168.0.3", 7},
-		{"192.168.0.255", -1},
-		{"192.168.1.1", -1},
-		{"192.170.1.1", -1},
-		{"192.180.0.1", -1},
-		{"192.180.3.5", -1},
-		{"10.0.0.5", -1},
-		{"10.0.0.15", -1},
-	})
-
-	// Create a different leaf at root
-	tbl = tbl.InsertPersist(mpp("10.0.0.0/27"), 3)
-	checkNumNodes(t, tbl, 4)
-	checkRoutes(t, tbl, []tableTest{
-		{"192.168.0.1", 1},
-		{"192.168.0.2", 2},
-		{"192.168.0.3", 7},
-		{"192.168.0.255", -1},
-		{"192.168.1.1", -1},
-		{"192.170.1.1", -1},
-		{"192.180.0.1", -1},
-		{"192.180.3.5", -1},
-		{"10.0.0.5", 3},
-		{"10.0.0.15", 3},
-	})
-
-	// Insert that creates a new path compressed leaf
-	tbl = tbl.InsertPersist(mpp("192.168.1.1/32"), 4)
-	checkNumNodes(t, tbl, 4)
-	checkRoutes(t, tbl, []tableTest{
-		{"192.168.0.1", 1},
-		{"192.168.0.2", 2},
-		{"192.168.0.3", 7},
-		{"192.168.0.255", -1},
-		{"192.168.1.1", 4},
-		{"192.170.1.1", -1},
-		{"192.180.0.1", -1},
-		{"192.180.3.5", -1},
-		{"10.0.0.5", 3},
-		{"10.0.0.15", 3},
-	})
-
-	// Insert that creates a new path compressed leaf
-	tbl = tbl.InsertPersist(mpp("192.170.0.0/16"), 5)
-	checkNumNodes(t, tbl, 4)
-	checkRoutes(t, tbl, []tableTest{
-		{"192.168.0.1", 1},
-		{"192.168.0.2", 2},
-		{"192.168.0.3", 7},
-		{"192.168.0.255", -1},
-		{"192.168.1.1", 4},
-		{"192.170.1.1", 5},
-		{"192.180.0.1", -1},
-		{"192.180.3.5", -1},
-		{"10.0.0.5", 3},
-		{"10.0.0.15", 3},
-	})
-
-	// New leaf in a different subtree, so the next insert can test a
-	// variant of decompression.
-	tbl = tbl.InsertPersist(mpp("192.180.0.1/32"), 8)
-	checkNumNodes(t, tbl, 4)
-	checkRoutes(t, tbl, []tableTest{
-		{"192.168.0.1", 1},
-		{"192.168.0.2", 2},
-		{"192.168.0.3", 7},
-		{"192.168.0.255", -1},
-		{"192.168.1.1", 4},
-		{"192.170.1.1", 5},
-		{"192.180.0.1", 8},
-		{"192.180.3.5", -1},
-		{"10.0.0.5", 3},
-		{"10.0.0.15", 3},
-	})
-
-	// Insert that explodes the previous path compression
-	tbl = tbl.InsertPersist(mpp("192.180.0.0/21"), 9)
-	checkNumNodes(t, tbl, 5)
-	checkRoutes(t, tbl, []tableTest{
-		{"192.168.0.1", 1},
-		{"192.168.0.2", 2},
-		{"192.168.0.3", 7},
-		{"192.168.0.255", -1},
-		{"192.168.1.1", 4},
-		{"192.170.1.1", 5},
-		{"192.180.0.1", 8},
-		{"192.180.3.5", 9},
-		{"10.0.0.5", 3},
-		{"10.0.0.15", 3},
-	})
-
-	// Insert a default route, those have their own codepath.
-	tbl = tbl.InsertPersist(mpp("0.0.0.0/0"), 6)
-	checkNumNodes(t, tbl, 5)
-	checkRoutes(t, tbl, []tableTest{
-		{"192.168.0.1", 1},
-		{"192.168.0.2", 2},
-		{"192.168.0.3", 7},
-		{"192.168.0.255", 6},
-		{"192.168.1.1", 4},
-		{"192.170.1.1", 5},
-		{"192.180.0.1", 8},
-		{"192.180.3.5", 9},
-		{"10.0.0.5", 3},
-		{"10.0.0.15", 3},
-	})
-
-	// Now all of the above again, but for IPv6.
-
-	// Create a new path compressed leaf
-	tbl = tbl.InsertPersist(mpp("ff:aaaa::1/128"), 1)
-	checkNumNodes(t, tbl, 6)
-	checkRoutes(t, tbl, []tableTest{
-		{"ff:aaaa::1", 1},
-		{"ff:aaaa::2", -1},
-		{"ff:aaaa::3", -1},
-		{"ff:aaaa::255", -1},
-		{"ff:aaaa:aaaa::1", -1},
-		{"ff:aaaa:aaaa:bbbb::1", -1},
-		{"ff:cccc::1", -1},
-		{"ff:cccc::ff", -1},
-		{"ffff:bbbb::5", -1},
-		{"ffff:bbbb::15", -1},
-	})
-
-	// Insert into previous leaf, explode v6 path compression
-	tbl = tbl.InsertPersist(mpp("ff:aaaa::2/128"), 2)
-	checkNumNodes(t, tbl, 21)
-	checkRoutes(t, tbl, []tableTest{
-		{"ff:aaaa::1", 1},
-		{"ff:aaaa::2", 2},
-		{"ff:aaaa::3", -1},
-		{"ff:aaaa::255", -1},
-		{"ff:aaaa:aaaa::1", -1},
-		{"ff:aaaa:aaaa:bbbb::1", -1},
-		{"ff:cccc::1", -1},
-		{"ff:cccc::ff", -1},
-		{"ffff:bbbb::5", -1},
-		{"ffff:bbbb::15", -1},
-	})
-
-	// Insert into previous node
-	tbl = tbl.InsertPersist(mpp("ff:aaaa::/125"), 7)
-	checkNumNodes(t, tbl, 21)
-	checkRoutes(t, tbl, []tableTest{
-		{"ff:aaaa::1", 1},
-		{"ff:aaaa::2", 2},
-		{"ff:aaaa::3", 7},
-		{"ff:aaaa::255", -1},
-		{"ff:aaaa:aaaa::1", -1},
-		{"ff:aaaa:aaaa:bbbb::1", -1},
-		{"ff:cccc::1", -1},
-		{"ff:cccc::ff", -1},
-		{"ffff:bbbb::5", -1},
-		{"ffff:bbbb::15", -1},
-	})
-
-	// Create a different leaf elsewhere
-	tbl = tbl.InsertPersist(mpp("ffff:bbbb::/120"), 3)
-	checkNumNodes(t, tbl, 21)
-	checkRoutes(t, tbl, []tableTest{
-		{"ff:aaaa::1", 1},
-		{"ff:aaaa::2", 2},
-		{"ff:aaaa::3", 7},
-		{"ff:aaaa::255", -1},
-		{"ff:aaaa:aaaa::1", -1},
-		{"ff:aaaa:aaaa:bbbb::1", -1},
-		{"ff:cccc::1", -1},
-		{"ff:cccc::ff", -1},
-		{"ffff:bbbb::5", 3},
-		{"ffff:bbbb::15", 3},
-	})
-
-	// Insert that creates a new path compressed leaf
-	tbl = tbl.InsertPersist(mpp("ff:aaaa:aaaa::1/128"), 4)
-	checkNumNodes(t, tbl, 21)
-	checkRoutes(t, tbl, []tableTest{
-		{"ff:aaaa::1", 1},
-		{"ff:aaaa::2", 2},
-		{"ff:aaaa::3", 7},
-		{"ff:aaaa::255", -1},
-		{"ff:aaaa:aaaa::1", 4},
-		{"ff:aaaa:aaaa:bbbb::1", -1},
-		{"ff:cccc::1", -1},
-		{"ff:cccc::ff", -1},
-		{"ffff:bbbb::5", 3},
-		{"ffff:bbbb::15", 3},
-	})
-
-	// Insert that creates a new path in tree
-	tbl = tbl.InsertPersist(mpp("ff:aaaa:aaaa:bb00::/56"), 5)
-	checkNumNodes(t, tbl, 23)
-	checkRoutes(t, tbl, []tableTest{
-		{"ff:aaaa::1", 1},
-		{"ff:aaaa::2", 2},
-		{"ff:aaaa::3", 7},
-		{"ff:aaaa::255", -1},
-		{"ff:aaaa:aaaa::1", 4},
-		{"ff:aaaa:aaaa:bbbb::1", 5},
-		{"ff:cccc::1", -1},
-		{"ff:cccc::ff", -1},
-		{"ffff:bbbb::5", 3},
-		{"ffff:bbbb::15", 3},
-	})
-
-	// New leaf in a different subtree, so the next insert can test a
-	// variant of decompression.
-	tbl = tbl.InsertPersist(mpp("ff:cccc::1/128"), 8)
-	checkNumNodes(t, tbl, 23)
-	checkRoutes(t, tbl, []tableTest{
-		{"ff:aaaa::1", 1},
-		{"ff:aaaa::2", 2},
-		{"ff:aaaa::3", 7},
-		{"ff:aaaa::255", -1},
-		{"ff:aaaa:aaaa::1", 4},
-		{"ff:aaaa:aaaa:bbbb::1", 5},
-		{"ff:cccc::1", 8},
-		{"ff:cccc::ff", -1},
-		{"ffff:bbbb::5", 3},
-		{"ffff:bbbb::15", 3},
-	})
-
-	// Insert that explodes a previous path compressed leaf
-	tbl = tbl.InsertPersist(mpp("ff:cccc::/37"), 9)
-	checkNumNodes(t, tbl, 25)
-	checkRoutes(t, tbl, []tableTest{
-		{"ff:aaaa::1", 1},
-		{"ff:aaaa::2", 2},
-		{"ff:aaaa::3", 7},
-		{"ff:aaaa::255", -1},
-		{"ff:aaaa:aaaa::1", 4},
-		{"ff:aaaa:aaaa:bbbb::1", 5},
-		{"ff:cccc::1", 8},
-		{"ff:cccc::ff", 9},
-		{"ffff:bbbb::5", 3},
-		{"ffff:bbbb::15", 3},
-	})
-
-	// Insert a default route, those have their own codepath.
-	tbl = tbl.InsertPersist(mpp("::/0"), 6)
-	checkNumNodes(t, tbl, 25)
-	checkRoutes(t, tbl, []tableTest{
-		{"ff:aaaa::1", 1},
-		{"ff:aaaa::2", 2},
-		{"ff:aaaa::3", 7},
-		{"ff:aaaa::255", 6},
-		{"ff:aaaa:aaaa::1", 4},
-		{"ff:aaaa:aaaa:bbbb::1", 5},
-		{"ff:cccc::1", 8},
-		{"ff:cccc::ff", 9},
-		{"ffff:bbbb::5", 3},
-		{"ffff:bbbb::15", 3},
-	})
-}
-
-func TestDelete(t *testing.T) {
+func TestDartDelete(t *testing.T) {
 	t.Parallel()
 
 	t.Run("table_is_empty", func(t *testing.T) {
 		t.Parallel()
 		prng := rand.New(rand.NewPCG(42, 42))
 		// must not panic
-		tbl := new(Table[int])
-		checkNumNodes(t, tbl, 0)
+		tbl := new(Dart[int])
+
+		checkDartNumNodes(t, tbl, 0)
 		tbl.Delete(randomPrefix(prng))
-		checkNumNodes(t, tbl, 0)
+		checkDartNumNodes(t, tbl, 0)
 	})
 
 	t.Run("prefix_in_root", func(t *testing.T) {
 		t.Parallel()
 		// Add/remove prefix from root table.
-		tbl := new(Table[int])
-		checkNumNodes(t, tbl, 0)
+		tbl := new(Dart[int])
+		checkDartNumNodes(t, tbl, 0)
 
 		tbl.Insert(mpp("10.0.0.0/8"), 1)
-		checkNumNodes(t, tbl, 1)
-		checkRoutes(t, tbl, []tableTest{
+		checkDartNumNodes(t, tbl, 1)
+		checkDartRoutes(t, tbl, []tableTest{
 			{"10.0.0.1", 1},
 			{"255.255.255.255", -1},
 		})
 		tbl.Delete(mpp("10.0.0.0/8"))
-		checkNumNodes(t, tbl, 0)
-		checkRoutes(t, tbl, []tableTest{
+		checkDartNumNodes(t, tbl, 0)
+		checkDartRoutes(t, tbl, []tableTest{
 			{"10.0.0.1", -1},
 			{"255.255.255.255", -1},
 		})
@@ -714,19 +417,19 @@ func TestDelete(t *testing.T) {
 	t.Run("prefix_in_leaf", func(t *testing.T) {
 		t.Parallel()
 		// Create, then delete a single leaf table.
-		tbl := new(Table[int])
-		checkNumNodes(t, tbl, 0)
+		tbl := new(Dart[int])
+		checkDartNumNodes(t, tbl, 0)
 
 		tbl.Insert(mpp("192.168.0.1/32"), 1)
-		checkNumNodes(t, tbl, 1)
-		checkRoutes(t, tbl, []tableTest{
+		checkDartNumNodes(t, tbl, 1)
+		checkDartRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"255.255.255.255", -1},
 		})
 
 		tbl.Delete(mpp("192.168.0.1/32"))
-		checkNumNodes(t, tbl, 0)
-		checkRoutes(t, tbl, []tableTest{
+		checkDartNumNodes(t, tbl, 0)
+		checkDartRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", -1},
 			{"255.255.255.255", -1},
 		})
@@ -735,21 +438,21 @@ func TestDelete(t *testing.T) {
 	t.Run("intermediate_no_routes", func(t *testing.T) {
 		t.Parallel()
 		// Create an intermediate with 2 leaves, then delete one leaf.
-		tbl := new(Table[int])
-		checkNumNodes(t, tbl, 0)
+		tbl := new(Dart[int])
+		checkDartNumNodes(t, tbl, 0)
 
 		tbl.Insert(mpp("192.168.0.1/32"), 1)
 		tbl.Insert(mpp("192.180.0.1/32"), 2)
-		checkNumNodes(t, tbl, 2)
-		checkRoutes(t, tbl, []tableTest{
+		checkDartNumNodes(t, tbl, 2)
+		checkDartRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.180.0.1", 2},
 			{"192.40.0.1", -1},
 		})
 
 		tbl.Delete(mpp("192.180.0.1/32"))
-		checkNumNodes(t, tbl, 1)
-		checkRoutes(t, tbl, []tableTest{
+		checkDartNumNodes(t, tbl, 1)
+		checkDartRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.180.0.1", -1},
 			{"192.40.0.1", -1},
@@ -759,15 +462,15 @@ func TestDelete(t *testing.T) {
 	t.Run("intermediate_with_route", func(t *testing.T) {
 		t.Parallel()
 		// Same, but the intermediate carries a route as well.
-		tbl := new(Table[int])
-		checkNumNodes(t, tbl, 0)
+		tbl := new(Dart[int])
+		checkDartNumNodes(t, tbl, 0)
 
 		tbl.Insert(mpp("192.168.0.1/32"), 1)
 		tbl.Insert(mpp("192.180.0.1/32"), 2)
 		tbl.Insert(mpp("192.0.0.0/10"), 3)
 
-		checkNumNodes(t, tbl, 2)
-		checkRoutes(t, tbl, []tableTest{
+		checkDartNumNodes(t, tbl, 2)
+		checkDartRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.180.0.1", 2},
 			{"192.40.0.1", 3},
@@ -775,8 +478,8 @@ func TestDelete(t *testing.T) {
 		})
 
 		tbl.Delete(mpp("192.180.0.1/32"))
-		checkNumNodes(t, tbl, 2)
-		checkRoutes(t, tbl, []tableTest{
+		checkDartNumNodes(t, tbl, 2)
+		checkDartRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.180.0.1", -1},
 			{"192.40.0.1", 3},
@@ -787,15 +490,15 @@ func TestDelete(t *testing.T) {
 	t.Run("intermediate_many_leaves", func(t *testing.T) {
 		t.Parallel()
 		// Intermediate with 3 leaves, then delete one leaf.
-		tbl := new(Table[int])
-		checkNumNodes(t, tbl, 0)
+		tbl := new(Dart[int])
+		checkDartNumNodes(t, tbl, 0)
 
 		tbl.Insert(mpp("192.168.0.1/32"), 1)
 		tbl.Insert(mpp("192.180.0.1/32"), 2)
 		tbl.Insert(mpp("192.200.0.1/32"), 3)
 
-		checkNumNodes(t, tbl, 2)
-		checkRoutes(t, tbl, []tableTest{
+		checkDartNumNodes(t, tbl, 2)
+		checkDartRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.180.0.1", 2},
 			{"192.200.0.1", 3},
@@ -803,8 +506,8 @@ func TestDelete(t *testing.T) {
 		})
 
 		tbl.Delete(mpp("192.180.0.1/32"))
-		checkNumNodes(t, tbl, 2)
-		checkRoutes(t, tbl, []tableTest{
+		checkDartNumNodes(t, tbl, 2)
+		checkDartRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.180.0.1", -1},
 			{"192.200.0.1", 3},
@@ -815,19 +518,19 @@ func TestDelete(t *testing.T) {
 	t.Run("nosuchprefix_missing_child", func(t *testing.T) {
 		t.Parallel()
 		// Delete non-existent prefix
-		tbl := new(Table[int])
-		checkNumNodes(t, tbl, 0)
+		tbl := new(Dart[int])
+		checkDartNumNodes(t, tbl, 0)
 
 		tbl.Insert(mpp("192.168.0.1/32"), 1)
-		checkNumNodes(t, tbl, 1)
-		checkRoutes(t, tbl, []tableTest{
+		checkDartNumNodes(t, tbl, 1)
+		checkDartRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.255.0.1", -1},
 		})
 
 		tbl.Delete(mpp("200.0.0.0/32"))
-		checkNumNodes(t, tbl, 1)
-		checkRoutes(t, tbl, []tableTest{
+		checkDartNumNodes(t, tbl, 1)
+		checkDartRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.255.0.1", -1},
 		})
@@ -837,21 +540,21 @@ func TestDelete(t *testing.T) {
 		t.Parallel()
 		// Intermediate node loses its last route and becomes
 		// compactable.
-		tbl := new(Table[int])
-		checkNumNodes(t, tbl, 0)
+		tbl := new(Dart[int])
+		checkDartNumNodes(t, tbl, 0)
 
 		tbl.Insert(mpp("192.168.0.1/32"), 1)
 		tbl.Insert(mpp("192.168.0.0/22"), 2)
-		checkNumNodes(t, tbl, 3)
-		checkRoutes(t, tbl, []tableTest{
+		checkDartNumNodes(t, tbl, 3)
+		checkDartRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.168.0.2", 2},
 			{"192.255.0.1", -1},
 		})
 
 		tbl.Delete(mpp("192.168.0.0/22"))
-		checkNumNodes(t, tbl, 1)
-		checkRoutes(t, tbl, []tableTest{
+		checkDartNumNodes(t, tbl, 1)
+		checkDartRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.168.0.2", -1},
 			{"192.255.0.1", -1},
@@ -860,15 +563,15 @@ func TestDelete(t *testing.T) {
 
 	t.Run("default_route", func(t *testing.T) {
 		t.Parallel()
-		tbl := new(Table[int])
-		checkNumNodes(t, tbl, 0)
+		tbl := new(Dart[int])
+		checkDartNumNodes(t, tbl, 0)
 
 		tbl.Insert(mpp("0.0.0.0/0"), 1)
 		tbl.Insert(mpp("::/0"), 1)
 		tbl.Delete(mpp("0.0.0.0/0"))
 
-		checkNumNodes(t, tbl, 1)
-		checkRoutes(t, tbl, []tableTest{
+		checkDartNumNodes(t, tbl, 1)
+		checkDartRoutes(t, tbl, []tableTest{
 			{"1.2.3.4", -1},
 			{"::1", 1},
 		})
@@ -876,235 +579,22 @@ func TestDelete(t *testing.T) {
 
 	t.Run("path compressed purge", func(t *testing.T) {
 		t.Parallel()
-		tbl := new(Table[int])
-		checkNumNodes(t, tbl, 0)
+		tbl := new(Dart[int])
+		checkDartNumNodes(t, tbl, 0)
 
 		tbl.Insert(mpp("10.10.0.0/17"), 1)
 		tbl.Insert(mpp("10.20.0.0/17"), 2)
-		checkNumNodes(t, tbl, 2)
+		checkDartNumNodes(t, tbl, 2)
 
 		tbl.Delete(mpp("10.20.0.0/17"))
-		checkNumNodes(t, tbl, 1)
+		checkDartNumNodes(t, tbl, 1)
 
 		tbl.Delete(mpp("10.10.0.0/17"))
-		checkNumNodes(t, tbl, 0)
+		checkDartNumNodes(t, tbl, 0)
 	})
 }
 
-func TestDeletePersist(t *testing.T) {
-	t.Parallel()
-
-	t.Run("table_is_empty", func(t *testing.T) {
-		t.Parallel()
-		prng := rand.New(rand.NewPCG(42, 42))
-		// must not panic
-		tbl := new(Table[int])
-		checkNumNodes(t, tbl, 0)
-		tbl = tbl.DeletePersist(randomPrefix(prng))
-		checkNumNodes(t, tbl, 0)
-	})
-
-	t.Run("prefix_in_root", func(t *testing.T) {
-		t.Parallel()
-		// Add/remove prefix from root table.
-		tbl := new(Table[int])
-		checkNumNodes(t, tbl, 0)
-
-		tbl.Insert(mpp("10.0.0.0/8"), 1)
-		checkNumNodes(t, tbl, 1)
-		checkRoutes(t, tbl, []tableTest{
-			{"10.0.0.1", 1},
-			{"255.255.255.255", -1},
-		})
-		tbl = tbl.DeletePersist(mpp("10.0.0.0/8"))
-		checkNumNodes(t, tbl, 0)
-		checkRoutes(t, tbl, []tableTest{
-			{"10.0.0.1", -1},
-			{"255.255.255.255", -1},
-		})
-	})
-
-	t.Run("prefix_in_leaf", func(t *testing.T) {
-		t.Parallel()
-		// Create, then delete a single leaf table.
-		tbl := new(Table[int])
-		checkNumNodes(t, tbl, 0)
-
-		tbl.Insert(mpp("192.168.0.1/32"), 1)
-		checkNumNodes(t, tbl, 1)
-		checkRoutes(t, tbl, []tableTest{
-			{"192.168.0.1", 1},
-			{"255.255.255.255", -1},
-		})
-
-		tbl = tbl.DeletePersist(mpp("192.168.0.1/32"))
-		checkNumNodes(t, tbl, 0)
-		checkRoutes(t, tbl, []tableTest{
-			{"192.168.0.1", -1},
-			{"255.255.255.255", -1},
-		})
-	})
-
-	t.Run("intermediate_no_routes", func(t *testing.T) {
-		t.Parallel()
-		// Create an intermediate with 2 leaves, then delete one leaf.
-		tbl := new(Table[int])
-		checkNumNodes(t, tbl, 0)
-
-		tbl.Insert(mpp("192.168.0.1/32"), 1)
-		tbl.Insert(mpp("192.180.0.1/32"), 2)
-		checkNumNodes(t, tbl, 2)
-		checkRoutes(t, tbl, []tableTest{
-			{"192.168.0.1", 1},
-			{"192.180.0.1", 2},
-			{"192.40.0.1", -1},
-		})
-
-		tbl = tbl.DeletePersist(mpp("192.180.0.1/32"))
-		checkNumNodes(t, tbl, 1)
-		checkRoutes(t, tbl, []tableTest{
-			{"192.168.0.1", 1},
-			{"192.180.0.1", -1},
-			{"192.40.0.1", -1},
-		})
-	})
-
-	t.Run("intermediate_with_route", func(t *testing.T) {
-		t.Parallel()
-		// Same, but the intermediate carries a route as well.
-		tbl := new(Table[int])
-		checkNumNodes(t, tbl, 0)
-
-		tbl.Insert(mpp("192.168.0.1/32"), 1)
-		tbl.Insert(mpp("192.180.0.1/32"), 2)
-		tbl.Insert(mpp("192.0.0.0/10"), 3)
-
-		checkNumNodes(t, tbl, 2)
-		checkRoutes(t, tbl, []tableTest{
-			{"192.168.0.1", 1},
-			{"192.180.0.1", 2},
-			{"192.40.0.1", 3},
-			{"192.255.0.1", -1},
-		})
-
-		tbl = tbl.DeletePersist(mpp("192.180.0.1/32"))
-		checkNumNodes(t, tbl, 2)
-		checkRoutes(t, tbl, []tableTest{
-			{"192.168.0.1", 1},
-			{"192.180.0.1", -1},
-			{"192.40.0.1", 3},
-			{"192.255.0.1", -1},
-		})
-	})
-
-	t.Run("intermediate_many_leaves", func(t *testing.T) {
-		t.Parallel()
-		// Intermediate with 3 leaves, then delete one leaf.
-		tbl := new(Table[int])
-		checkNumNodes(t, tbl, 0)
-
-		tbl.Insert(mpp("192.168.0.1/32"), 1)
-		tbl.Insert(mpp("192.180.0.1/32"), 2)
-		tbl.Insert(mpp("192.200.0.1/32"), 3)
-
-		checkNumNodes(t, tbl, 2)
-		checkRoutes(t, tbl, []tableTest{
-			{"192.168.0.1", 1},
-			{"192.180.0.1", 2},
-			{"192.200.0.1", 3},
-			{"192.255.0.1", -1},
-		})
-
-		tbl = tbl.DeletePersist(mpp("192.180.0.1/32"))
-		checkNumNodes(t, tbl, 2)
-		checkRoutes(t, tbl, []tableTest{
-			{"192.168.0.1", 1},
-			{"192.180.0.1", -1},
-			{"192.200.0.1", 3},
-			{"192.255.0.1", -1},
-		})
-	})
-
-	t.Run("nosuchprefix_missing_child", func(t *testing.T) {
-		t.Parallel()
-		// Delete non-existent prefix
-		tbl := new(Table[int])
-		checkNumNodes(t, tbl, 0)
-
-		tbl.Insert(mpp("192.168.0.1/32"), 1)
-		checkNumNodes(t, tbl, 1)
-		checkRoutes(t, tbl, []tableTest{
-			{"192.168.0.1", 1},
-			{"192.255.0.1", -1},
-		})
-
-		tbl = tbl.DeletePersist(mpp("200.0.0.0/32"))
-		checkNumNodes(t, tbl, 1)
-		checkRoutes(t, tbl, []tableTest{
-			{"192.168.0.1", 1},
-			{"192.255.0.1", -1},
-		})
-	})
-
-	t.Run("intermediate_with_deleted_route", func(t *testing.T) {
-		t.Parallel()
-		// Intermediate node loses its last route and becomes
-		// compactable.
-		tbl := new(Table[int])
-		checkNumNodes(t, tbl, 0)
-
-		tbl.Insert(mpp("192.168.0.1/32"), 1)
-		tbl.Insert(mpp("192.168.0.0/22"), 2)
-		checkNumNodes(t, tbl, 3)
-		checkRoutes(t, tbl, []tableTest{
-			{"192.168.0.1", 1},
-			{"192.168.0.2", 2},
-			{"192.255.0.1", -1},
-		})
-
-		tbl = tbl.DeletePersist(mpp("192.168.0.0/22"))
-		checkNumNodes(t, tbl, 1)
-		checkRoutes(t, tbl, []tableTest{
-			{"192.168.0.1", 1},
-			{"192.168.0.2", -1},
-			{"192.255.0.1", -1},
-		})
-	})
-
-	t.Run("default_route", func(t *testing.T) {
-		t.Parallel()
-		tbl := new(Table[int])
-		checkNumNodes(t, tbl, 0)
-
-		tbl.Insert(mpp("0.0.0.0/0"), 1)
-		tbl.Insert(mpp("::/0"), 1)
-		tbl = tbl.DeletePersist(mpp("0.0.0.0/0"))
-
-		checkNumNodes(t, tbl, 1)
-		checkRoutes(t, tbl, []tableTest{
-			{"1.2.3.4", -1},
-			{"::1", 1},
-		})
-	})
-
-	t.Run("path compressed purge", func(t *testing.T) {
-		t.Parallel()
-		tbl := new(Table[int])
-		checkNumNodes(t, tbl, 0)
-
-		tbl.Insert(mpp("10.10.0.0/17"), 1)
-		tbl.Insert(mpp("10.20.0.0/17"), 2)
-		checkNumNodes(t, tbl, 2)
-
-		tbl = tbl.DeletePersist(mpp("10.20.0.0/17"))
-		checkNumNodes(t, tbl, 1)
-
-		tbl = tbl.DeletePersist(mpp("10.10.0.0/17"))
-		checkNumNodes(t, tbl, 0)
-	})
-}
-
-func TestContainsCompare(t *testing.T) {
+func TestDartContainsCompare(t *testing.T) {
 	// Create large route tables repeatedly, and compare Table's
 	// behavior to a naive and slow but correct implementation.
 	t.Parallel()
@@ -1112,7 +602,7 @@ func TestContainsCompare(t *testing.T) {
 	pfxs := randomPrefixes(prng, 10_000)
 
 	gold := new(goldTable[int]).insertMany(pfxs)
-	fast := new(Table[int])
+	fast := new(Dart[int])
 
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx, pfx.val)
@@ -1130,14 +620,14 @@ func TestContainsCompare(t *testing.T) {
 	}
 }
 
-func TestLookupCompare(t *testing.T) {
+func TestDartLookupCompare(t *testing.T) {
 	// Create large route tables repeatedly, and compare Table's
 	// behavior to a naive and slow but correct implementation.
 	t.Parallel()
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, 10_000)
 
-	fast := new(Table[int])
+	fast := new(Dart[int])
 	gold := new(goldTable[int]).insertMany(pfxs)
 
 	for _, pfx := range pfxs {
@@ -1176,159 +666,7 @@ func TestLookupCompare(t *testing.T) {
 	}
 }
 
-func TestLookupPrefixUnmasked(t *testing.T) {
-	// test that the pfx must not be masked on input for LookupPrefix
-	t.Parallel()
-
-	rt := new(Table[any])
-	rt.Insert(mpp("10.20.30.0/24"), nil)
-
-	// not normalized pfxs
-	tests := []struct {
-		probe   netip.Prefix
-		wantLPM netip.Prefix
-		wantOk  bool
-	}{
-		{
-			probe:   netip.MustParsePrefix("10.20.30.40/0"),
-			wantLPM: netip.Prefix{},
-			wantOk:  false,
-		},
-		{
-			probe:   netip.MustParsePrefix("10.20.30.40/23"),
-			wantLPM: netip.Prefix{},
-			wantOk:  false,
-		},
-		{
-			probe:   netip.MustParsePrefix("10.20.30.40/24"),
-			wantLPM: mpp("10.20.30.0/24"),
-			wantOk:  true,
-		},
-		{
-			probe:   netip.MustParsePrefix("10.20.30.40/25"),
-			wantLPM: mpp("10.20.30.0/24"),
-			wantOk:  true,
-		},
-		{
-			probe:   netip.MustParsePrefix("10.20.30.40/32"),
-			wantLPM: mpp("10.20.30.0/24"),
-			wantOk:  true,
-		},
-	}
-
-	for _, tc := range tests {
-		_, got := rt.LookupPrefix(tc.probe)
-		if got != tc.wantOk {
-			t.Errorf("LookupPrefix non canonical prefix (%s), got: %v, want: %v", tc.probe, got, tc.wantOk)
-		}
-
-		lpm, _, got := rt.LookupPrefixLPM(tc.probe)
-		if got != tc.wantOk {
-			t.Errorf("LookupPrefixLPM non canonical prefix (%s), got: %v, want: %v", tc.probe, got, tc.wantOk)
-		}
-		if lpm != tc.wantLPM {
-			t.Errorf("LookupPrefixLPM non canonical prefix (%s), got: %v, want: %v", tc.probe, lpm, tc.wantLPM)
-		}
-	}
-}
-
-func TestLookupPrefixCompare(t *testing.T) {
-	// Create large route tables repeatedly, and compare Table's
-	// behavior to a naive and slow but correct implementation.
-	t.Parallel()
-	prng := rand.New(rand.NewPCG(42, 42))
-	pfxs := randomPrefixes(prng, 10_000)
-
-	fast := new(Table[int])
-	gold := new(goldTable[int]).insertMany(pfxs)
-
-	for _, pfx := range pfxs {
-		fast.Insert(pfx.pfx, pfx.val)
-	}
-
-	seenVals4 := map[int]bool{}
-	seenVals6 := map[int]bool{}
-
-	for range 10_000 {
-		pfx := randomPrefix(prng)
-
-		goldVal, goldOK := gold.lookupPfx(pfx)
-		fastVal, fastOK := fast.LookupPrefix(pfx)
-
-		if !getsEqual(goldVal, goldOK, fastVal, fastOK) {
-			t.Fatalf("LookupPrefix(%q) = (%v, %v), want (%v, %v)", pfx, fastVal, fastOK, goldVal, goldOK)
-		}
-
-		if pfx.Addr().Is6() {
-			seenVals6[fastVal] = true
-		} else {
-			seenVals4[fastVal] = true
-		}
-	}
-
-	// Empirically, 10k probes into 5k v4 prefixes and 5k v6 prefixes results in
-	// ~1k distinct values for v4 and ~300 for v6. distinct routes. This sanity
-	// check that we didn't just return a single route for everything should be
-	// very generous indeed.
-	if cnt := len(seenVals4); cnt < 10 {
-		t.Fatalf("saw %d distinct v4 route results, statistically expected ~1000", cnt)
-	}
-	if cnt := len(seenVals6); cnt < 10 {
-		t.Fatalf("saw %d distinct v6 route results, statistically expected ~300", cnt)
-	}
-}
-
-func TestLookupPrefixLPMCompare(t *testing.T) {
-	// Create large route tables repeatedly, and compare Table's
-	// behavior to a naive and slow but correct implementation.
-	t.Parallel()
-	prng := rand.New(rand.NewPCG(42, 42))
-	pfxs := randomPrefixes(prng, 10_000)
-
-	fast := new(Table[int])
-	gold := new(goldTable[int]).insertMany(pfxs)
-
-	for _, pfx := range pfxs {
-		fast.Insert(pfx.pfx, pfx.val)
-	}
-
-	seenVals4 := map[int]bool{}
-	seenVals6 := map[int]bool{}
-
-	for range 10_000 {
-		pfx := randomPrefix(prng)
-
-		goldLPM, goldVal, goldOK := gold.lookupPfxLPM(pfx)
-		fastLPM, fastVal, fastOK := fast.LookupPrefixLPM(pfx)
-
-		if !getsEqual(goldVal, goldOK, fastVal, fastOK) {
-			t.Fatalf("LookupPrefixLPM(%q) = (%v, %v), want (%v, %v)", pfx, fastVal, fastOK, goldVal, goldOK)
-		}
-
-		if !getsEqual(goldLPM, goldOK, fastLPM, fastOK) {
-			t.Fatalf("LookupPrefixLPM(%q) = (%v, %v), want (%v, %v)", pfx, fastLPM, fastOK, goldLPM, goldOK)
-		}
-
-		if pfx.Addr().Is6() {
-			seenVals6[fastVal] = true
-		} else {
-			seenVals4[fastVal] = true
-		}
-	}
-
-	// Empirically, 10k probes into 5k v4 prefixes and 5k v6 prefixes results in
-	// ~1k distinct values for v4 and ~300 for v6. distinct routes. This sanity
-	// check that we didn't just return a single route for everything should be
-	// very generous indeed.
-	if cnt := len(seenVals4); cnt < 10 {
-		t.Fatalf("saw %d distinct v4 route results, statistically expected ~1000", cnt)
-	}
-	if cnt := len(seenVals6); cnt < 10 {
-		t.Fatalf("saw %d distinct v6 route results, statistically expected ~300", cnt)
-	}
-}
-
-func TestInsertShuffled(t *testing.T) {
+func TestDartInsertShuffled(t *testing.T) {
 	// The order in which you insert prefixes into a route table
 	// should not matter, as long as you're inserting the same set of
 	// routes.
@@ -1346,8 +684,8 @@ func TestInsertShuffled(t *testing.T) {
 			addrs = append(addrs, randomAddr(prng))
 		}
 
-		rt1 := new(Table[int])
-		rt2 := new(Table[int])
+		rt1 := new(Dart[int])
+		rt2 := new(Dart[int])
 
 		for _, pfx := range pfxs {
 			rt1.Insert(pfx.pfx, pfx.val)
@@ -1367,57 +705,7 @@ func TestInsertShuffled(t *testing.T) {
 	}
 }
 
-func TestInsertPersistShuffled(t *testing.T) {
-	// The order in which you insert prefixes into a route table
-	// should not matter, as long as you're inserting the same set of
-	// routes.
-	t.Parallel()
-	prng := rand.New(rand.NewPCG(42, 42))
-
-	pfxs := randomPrefixes(prng, 1000)
-
-	for range 10 {
-		pfxs2 := append([]goldTableItem[int](nil), pfxs...)
-		rand.Shuffle(len(pfxs2), func(i, j int) { pfxs2[i], pfxs2[j] = pfxs2[j], pfxs2[i] })
-
-		addrs := make([]netip.Addr, 0, 10_000)
-		for range 10_000 {
-			addrs = append(addrs, randomAddr(prng))
-		}
-
-		rt1 := new(Table[int])
-		rt2 := new(Table[int])
-
-		// rt1 is mutable
-		for _, pfx := range pfxs {
-			rt1.Insert(pfx.pfx, pfx.val)
-		}
-
-		// rt2 is persistent
-		for _, pfx := range pfxs2 {
-			rt2 = rt2.InsertPersist(pfx.pfx, pfx.val)
-		}
-
-		if rt1.String() != rt2.String() {
-			t.Fatal("mutable and immutable table have different string representation")
-		}
-
-		if rt1.dumpString() != rt2.dumpString() {
-			t.Fatal("mutable and immutable table have different dumpString representation")
-		}
-
-		for _, a := range addrs {
-			val1, ok1 := rt1.Lookup(a)
-			val2, ok2 := rt2.Lookup(a)
-
-			if !getsEqual(val1, ok1, val2, ok2) {
-				t.Fatalf("Lookup(%q) = (%v, %v), want (%v, %v)", a, val2, ok2, val1, ok1)
-			}
-		}
-	}
-}
-
-func TestDeleteCompare(t *testing.T) {
+func TestDartDeleteCompare(t *testing.T) {
 	// Create large route tables repeatedly, delete half of their
 	// prefixes, and compare Table's behavior to a naive and slow but
 	// correct implementation.
@@ -1441,7 +729,7 @@ func TestDeleteCompare(t *testing.T) {
 	toDelete := append([]goldTableItem[int](nil), all4[deleteCut:]...)
 	toDelete = append(toDelete, all6[deleteCut:]...)
 
-	fast := new(Table[int])
+	fast := new(Dart[int])
 	gold := new(goldTable[int]).insertMany(pfxs)
 
 	for _, pfx := range pfxs {
@@ -1486,7 +774,7 @@ func TestDeleteCompare(t *testing.T) {
 	}
 }
 
-func TestDeleteShuffled(t *testing.T) {
+func TestDartDeleteShuffled(t *testing.T) {
 	// The order in which you delete prefixes from a route table
 	// should not matter, as long as you're deleting the same set of
 	// routes.
@@ -1510,7 +798,7 @@ func TestDeleteShuffled(t *testing.T) {
 		toDelete := append([]goldTableItem[int](nil), all4[deleteCut:]...)
 		toDelete = append(toDelete, all6[deleteCut:]...)
 
-		rt1 := new(Table[int])
+		rt1 := new(Dart[int])
 
 		// insert
 		for _, pfx := range pfxs {
@@ -1529,7 +817,7 @@ func TestDeleteShuffled(t *testing.T) {
 		toDelete2 := append([]goldTableItem[int](nil), toDelete...)
 		rand.Shuffle(len(toDelete2), func(i, j int) { toDelete2[i], toDelete2[j] = toDelete2[j], toDelete2[i] })
 
-		rt2 := new(Table[int])
+		rt2 := new(Dart[int])
 
 		// insert
 		for _, pfx := range pfxs2 {
@@ -3061,38 +2349,26 @@ func BenchmarkMem(b *testing.B) {
 		})
 	}
 }
+*/
 
 // ##################### helpers ############################
 
-type tableOverlapsTest struct {
-	prefix string
-	want   bool
-}
-
-// checkOverlapsPrefix verifies that the overlaps lookups in tt return the
-// expected results on tbl.
-func checkOverlapsPrefix(t *testing.T, tbl *Table[int], tests []tableOverlapsTest) {
+func checkDartNumNodes(t *testing.T, tbl *Dart[int], want int) {
 	t.Helper()
-	for _, tt := range tests {
-		got := tbl.OverlapsPrefix(mpp(tt.prefix))
-		if got != tt.want {
-			t.Log(tbl.String())
-			t.Errorf("OverlapsPrefix(%v) = %v, want %v", mpp(tt.prefix), got, tt.want)
-		}
+
+	s4 := tbl.root4.nodeStatsRec()
+	s6 := tbl.root6.nodeStatsRec()
+	nodes := s4.nodes + s6.nodes
+
+	if got := nodes; got != want {
+		t.Errorf("wrong table dump, got %d nodes want %d", got, want)
+		t.Errorf("TODO: impl. Dart.dumpString")
 	}
 }
 
-type tableTest struct {
-	// addr is an IP address string to look up in a route table.
-	addr string
-	// want is the expected >=0 value associated with the route, or -1
-	// if we expect a lookup miss.
-	want int
-}
-
-// checkRoutes verifies that the route lookups in tt return the
+// checkDartRoutes verifies that the route lookups in tt return the
 // expected results on tbl.
-func checkRoutes(t *testing.T, tbl *Table[int], tt []tableTest) {
+func checkDartRoutes(t *testing.T, tbl *Dart[int], tt []tableTest) {
 	t.Helper()
 	for _, tc := range tt {
 		v, ok := tbl.Lookup(mpa(tc.addr))
@@ -3105,28 +2381,3 @@ func checkRoutes(t *testing.T, tbl *Table[int], tt []tableTest) {
 		}
 	}
 }
-
-func checkNumNodes(t *testing.T, tbl *Table[int], want int) {
-	t.Helper()
-
-	s4 := tbl.root4.nodeStatsRec()
-	s6 := tbl.root6.nodeStatsRec()
-	nodes := s4.nodes + s6.nodes
-
-	if got := nodes; got != want {
-		t.Errorf("wrong table dump, got %d nodes want %d", got, want)
-		t.Error(tbl.dumpString())
-	}
-}
-
-// dumpAsGoldTable, just a helper to compare with golden table.
-func (t *Table[V]) dumpAsGoldTable() goldTable[V] {
-	var tbl goldTable[V]
-
-	for p, v := range t.AllSorted() {
-		tbl = append(tbl, goldTableItem[V]{pfx: p, val: v})
-	}
-
-	return tbl
-}
-*/
