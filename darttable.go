@@ -57,6 +57,7 @@ func (d *Dart[V]) Insert(pfx netip.Prefix, val V) {
 	is4 := ip.Is4()
 	bits := pfx.Bits()
 	octets := ip.AsSlice()
+	maxDepth, lastBits := finalArt(bits)
 
 	nArt, artLevels := d.rootNodeByVersion(is4)
 
@@ -64,38 +65,64 @@ func (d *Dart[V]) Insert(pfx netip.Prefix, val V) {
 
 	// insert prefix into ART or fast forward over ART levels
 	for depth, octet := range octets[:artLevels] {
-		levelBits := bits - (depth * 8)
-
-		// insert prefix and returen
-		if levelBits <= 8 {
-			if exists := nArt.insertPrefix(octet, levelBits, val); !exists {
+		if depth == maxDepth {
+			if exists := nArt.insertPrefix(octet, lastBits, val); !exists {
 				d.sizeUpdate(is4, 1)
 			}
 			return
 		}
 
 		// maybe nil
-		next := nArt.getChild(octet)
+		kidAny := nArt.getChild(octet)
 
-		// last ART level
-		if depth == artLevels-1 {
-			if next != nil {
-				nBart = next.(*bartNode[V])
-				break
-			}
-
-			// create a child
-			nBart = new(bartNode[V])
-			nArt.setChild(octet, nBart)
-			break
+		// insert leafNode path compressed
+		if kidAny == nil {
+			nArt.insertChild(octet, newLeafNode(pfx, val))
+			d.sizeUpdate(is4, 1)
+			return
 		}
 
-		// move fast forward within ART levels, but if ...
-		if next == nil {
-			// create a child
-			nArt = nArt.getOrCreateChild(octet).(*artNode[V])
-		} else {
-			nArt = next.(*artNode[V])
+		switch kid := kidAny.(type) {
+		case *artNode[V]:
+			nArt = kid
+		case *bartNode[V]:
+			if depth != artLevels-1 {
+				panic("TODE REMOVE: logic error, bartNode on wrong ART level")
+			}
+			nBart = kid
+		case *leafNode[V]:
+			if kid.prefix == pfx {
+				kid.value = val
+				return
+			}
+
+			d.sizeUpdate(is4, 1)
+
+			if depth == artLevels-1 {
+				// create new node BART node
+				// push the leaf down, maybe as leaf or fringe
+				// insert new child at current leaf position (addr)
+				// descend down, replace node with new child
+				// exit ART loop
+				newNode := new(bartNode[V])
+				newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
+
+				nArt.insertChild(octet, newNode)
+				nBart = newNode
+			}
+
+			// create new node ART node
+			// push the leaf down, ART has no fringes, only leaves
+			// insert new child at current leaf position
+			// descend down, replace node with new child
+			newNode := new(artNode[V])
+			newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
+
+			nArt.insertChild(octet, newNode)
+			nArt = newNode
+
+		default:
+			panic("logic error, wrong node type in ART level")
 		}
 	}
 
@@ -513,4 +540,12 @@ func (d *Dart[V]) Size4() int {
 // Size6 returns the IPv6 prefix count.
 func (d *Dart[V]) Size6() int {
 	return d.size6
+}
+
+func finalArt(bits int) (maxDepth int, lastBits int) {
+	// maxDepth:  range from 0..3 or 0..15
+	// lastBits:  range from 0..8
+	maxDepth = (bits - 1) / 8
+	lastBits = bits - (maxDepth * 8)
+	return
 }
