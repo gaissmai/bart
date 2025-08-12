@@ -34,11 +34,11 @@ func (n *artNode[V]) isEmpty() bool {
 	return n.prefixCount == 0 && n.childCount == 0
 }
 
-func (n *artNode[V]) prefixesAsSlice() []uint8 {
-	res := make([]uint8, 0, 512)
-	for i, pv := range n.prefixes {
-		if pv != nil {
-			res = append(res, uint8(i))
+func (n *artNode[V]) prefixesAsSlice() []int {
+	res := make([]int, 0, 512)
+	for i := range n.prefixes {
+		if n.isStartIdx(i) {
+			res = append(res, i)
 		}
 	}
 	return res
@@ -74,22 +74,17 @@ func (n *artNode[V]) getChild(addr uint8) any {
 	return n.children[addr]
 }
 
-func (n *artNode[V]) getOrCreateChild(addr uint8) any {
-	c := n.children[addr]
-	if c == nil {
-		c = &artNode[V]{}
-		n.children[addr] = c
-		n.childCount++
-	}
-	return c
-}
-
 // insertChild TODO
-func (n *artNode[V]) insertChild(addr uint8, child any) {
+func (n *artNode[V]) insertChild(addr uint8, child any) (exists bool) {
 	if n.children[addr] == nil {
+		exists = false
 		n.childCount++
+	} else {
+		exists = true
 	}
+
 	n.children[addr] = child
+	return exists
 }
 
 // deleteChild TODO
@@ -123,7 +118,7 @@ func (n *artNode[V]) insertPrefix(addr uint8, prefixLen int, val V) (exists bool
 	return
 }
 
-func (n *artNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool) {
+func (nArt *artNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth, artLevels int) (exists bool) {
 	ip := pfx.Addr() // the pfx must be in canonical form
 	bits := pfx.Bits()
 	octets := ip.AsSlice()
@@ -134,19 +129,63 @@ func (n *artNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists b
 	for _, octet := range octets[depth:] {
 		// last masked octet: insert/override prefix/val into node
 		if depth == maxDepth {
-			return n.insertPrefix(octet, lastBits, val)
+			return nArt.insertPrefix(octet, lastBits, val)
 		}
 
-		// maybe nil
-		kidAny := n.getChild(octet)
-
-		// insert leafNode path compressed
+		kidAny := nArt.getChild(octet)
+		// reached end of trie path ...
 		if kidAny == nil {
-			n.insertChild(octet, newLeafNode(pfx, val))
-			return false
+			// insert prefix path compressed as leaf
+			return nArt.insertChild(octet, newLeafNode(pfx, val))
 		}
 
-		panic("TODO: insertAt fro ART nodes")
+		// kid is node or leaf at addr
+		switch kid := kidAny.(type) {
+		case *artNode[V]:
+			nArt = kid
+			break // descend down to next trie level
+
+		case *bartNode[V]:
+			// leave artLevels
+			return kid.insertAtDepth(pfx, val, depth)
+
+		case *leafNode[V]:
+			// reached a path compressed prefix
+			// override value in slot if prefixes are equal
+			if kid.prefix == pfx {
+				kid.value = val
+				// update
+				return true
+			}
+
+			if depth == artLevels-1 {
+
+				// create new BART node
+				// push the leaf down
+				// insert new child at current leaf position (addr)
+				// descend down, replace n with new child
+				newBart := new(bartNode[V])
+				newBart.insertAtDepth(kid.prefix, kid.value, depth+1)
+
+				nArt.insertChild(octet, newBart)
+				return newBart.insertAtDepth(pfx, val, depth+1)
+			}
+
+			// create new node ART node
+			// push the leaf down, ART has no fringes, only leaves
+			// insert new child at current leaf position
+			// descend down, replace node with new child
+			newArt := new(artNode[V])
+			newArt.insertAtDepth(kid.prefix, kid.value, depth+1, artLevels)
+
+			nArt.insertChild(octet, newArt)
+			nArt = newArt
+
+		default:
+			panic("logic error, wrong node type")
+		}
+
+		depth++
 	}
 
 	panic("unreachable")
@@ -303,7 +342,6 @@ func (n *artNode[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 		indent, n.hasType(), depth, ipStridePath(path, depth, is4), bits)
 
 	if nPfxCount := n.prefixCount; nPfxCount != 0 {
-		// no heap allocs
 		allIndices := n.prefixesAsSlice()
 
 		// print the baseIndices for this node.
@@ -485,13 +523,10 @@ func (n *artNode[V]) dumpRec(w io.Writer, path stridePath, depth int, is4 bool) 
 	n.dump(w, path, depth, is4)
 
 	// the node may have childs, rec-descent down
-	for addr, kidAny := range n.children {
-		if kidAny == nil {
-			continue
-		}
+	for _, addr := range n.childrenAsSlice() {
+		path[depth] = addr
 
-		path[depth&15] = uint8(addr)
-
+		kidAny := n.getChild(addr)
 		switch kid := kidAny.(type) {
 		case *artNode[V]:
 			kid.dumpRec(w, path, depth+1, is4)
