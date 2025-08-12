@@ -5,6 +5,8 @@ import (
 	"io"
 	"net/netip"
 	"strings"
+
+	"github.com/gaissmai/bart/internal/art"
 )
 
 const (
@@ -22,11 +24,11 @@ const (
 //
 // See doc/artlookup.pdf for the mapping mechanics and prefix tree details.
 type artNode[V any] struct {
-	prefixes [lastHostIdx + 1]*V // 512
-	children [numChildren]any    // 256
+	prefixes [maxItems]*V  // 256
+	children [maxItems]any // 256
 
-	prefixCount int16
-	childCount  int16
+	prefixCount uint8
+	childCount  uint8
 }
 
 // isEmpty returns true if node has neither prefixes nor children
@@ -34,18 +36,18 @@ func (n *artNode[V]) isEmpty() bool {
 	return n.prefixCount == 0 && n.childCount == 0
 }
 
-func (n *artNode[V]) prefixesAsSlice() []int {
-	res := make([]int, 0, 512)
+func (n *artNode[V]) prefixesAsSlice() []uint8 {
+	res := make([]uint8, 0, maxItems)
 	for i := range n.prefixes {
-		if n.isStartIdx(i) {
-			res = append(res, i)
+		if n.isStartIdx(uint8(i)) {
+			res = append(res, uint8(i))
 		}
 	}
 	return res
 }
 
 func (n *artNode[V]) childrenAsSlice() []uint8 {
-	res := make([]uint8, 0, 256)
+	res := make([]uint8, 0, maxItems)
 	for i, kid := range n.children {
 		if kid != nil {
 			res = append(res, uint8(i))
@@ -65,7 +67,7 @@ func hostIndex(addr uint8) int {
 }
 
 // TODO
-func parentIndex(idx int) int {
+func parentIndex(idx uint8) uint8 {
 	return idx >> 1
 }
 
@@ -96,10 +98,10 @@ func (n *artNode[V]) deleteChild(addr uint8) {
 }
 
 // insertPrefix adds the route addr/prefixLen to n, with value val.
-func (n *artNode[V]) insertPrefix(addr uint8, prefixLen int, val V) (exists bool) {
+func (n *artNode[V]) insertPrefix(addr uint8, prefixLen uint8, val V) (exists bool) {
 	exists = true
 
-	idx := prefix2Index(addr, prefixLen)
+	idx := art.PfxToIdx(addr, prefixLen)
 	if !n.isStartIdx(idx) {
 		// new prefix
 		exists = false
@@ -122,7 +124,7 @@ func (nArt *artNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth, artLevels 
 	ip := pfx.Addr() // the pfx must be in canonical form
 	bits := pfx.Bits()
 	octets := ip.AsSlice()
-	maxDepth, lastBits := finalArt(bits)
+	maxDepth, lastBits := maxDepthAndLastBits(bits)
 
 	// find the proper trie node to insert prefix
 	// start with prefix octet at depth
@@ -135,19 +137,21 @@ func (nArt *artNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth, artLevels 
 		kidAny := nArt.getChild(octet)
 		// reached end of trie path ...
 		if kidAny == nil {
-			// insert prefix path compressed as leaf
+			// insert prefix path compressed as leaf or fringe
+			if isFringe(depth, bits) {
+				return nArt.insertChild(octet, newFringeNode(val))
+			}
 			return nArt.insertChild(octet, newLeafNode(pfx, val))
 		}
 
 		// kid is node or leaf at addr
 		switch kid := kidAny.(type) {
 		case *artNode[V]:
-			nArt = kid
-			break // descend down to next trie level
+			nArt = kid // descend down to next trie level
 
 		case *bartNode[V]:
 			// leave artLevels
-			return kid.insertAtDepth(pfx, val, depth)
+			return kid.insertAtDepth(pfx, val, depth+1)
 
 		case *leafNode[V]:
 			// reached a path compressed prefix
@@ -171,12 +175,34 @@ func (nArt *artNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth, artLevels 
 				return newBart.insertAtDepth(pfx, val, depth+1)
 			}
 
+		case *fringeNode[V]:
+			// reached a path compressed fringe
+			// override value in slot if pfx is a fringe
+			if isFringe(depth, bits) {
+				kid.value = val
+				// exists
+				return true
+			}
+
+			if depth == artLevels-1 {
+
+				// create new node
+				// push the fringe down, it becomes a default route (idx=1)
+				// insert new child at current leaf position (addr)
+				// descend down, replace n with new child
+				newBart := new(bartNode[V])
+				newBart.prefixes.InsertAt(1, kid.value)
+
+				nArt.insertChild(octet, newBart)
+				return newBart.insertAtDepth(pfx, val, depth+1)
+			}
+
 			// create new node ART node
-			// push the leaf down, ART has no fringes, only leaves
-			// insert new child at current leaf position
-			// descend down, replace node with new child
+			// push the fringe down, it becomes a default route (idx=1)
+			// insert new child at current leaf position (addr)
+			// descend down, replace n with new child
 			newArt := new(artNode[V])
-			newArt.insertAtDepth(kid.prefix, kid.value, depth+1, artLevels)
+			nArt.insertPrefix(0, 0, val)
 
 			nArt.insertChild(octet, newArt)
 			nArt = newArt
@@ -194,7 +220,7 @@ func (nArt *artNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth, artLevels 
 // getPrefix TODO
 func (n *artNode[V]) getPrefix(addr uint8, prefixLen int) (val V, exists bool) {
 	idx := prefix2Index(addr, prefixLen)
-	if n.isStartIdx(idx) {
+	if n.isStartIdx(uint8(idx)) {
 		pv := n.prefixes[idx]
 		return *pv, true
 	}
@@ -203,9 +229,9 @@ func (n *artNode[V]) getPrefix(addr uint8, prefixLen int) (val V, exists bool) {
 }
 
 // deletePrefix TODO
-func (n *artNode[V]) deletePrefix(addr uint8, prefixLen int) (val V, exists bool) {
-	idx := prefix2Index(addr, prefixLen)
-	if !n.isStartIdx(idx) {
+func (n *artNode[V]) deletePrefix(addr uint8, prefixLen uint8) (val V, exists bool) {
+	idx := art.PfxToIdx(addr, prefixLen)
+	if !n.isStartIdx(uint8(idx)) {
 		// Route entry doesn't exist
 		return val, false
 	}
@@ -224,12 +250,12 @@ func (n *artNode[V]) deletePrefix(addr uint8, prefixLen int) (val V, exists bool
 
 // contains TODO
 func (n *artNode[V]) contains(addr uint8) (ok bool) {
-	return n.prefixes[hostIndex(addr)] != nil
+	return n.prefixes[hostIndex(addr)>>1] != nil
 }
 
 // lookup TODO
 func (n *artNode[V]) lookup(addr uint8) (ret V, ok bool) {
-	if val := n.prefixes[hostIndex(addr)]; val != nil {
+	if val := n.prefixes[hostIndex(addr)>>1]; val != nil {
 		return *val, true
 	}
 	return ret, false
@@ -239,7 +265,7 @@ func (n *artNode[V]) lookup(addr uint8) (ret V, ok bool) {
 // For each matching entry, it updates the prefix pointer to val.
 //
 // This function is central to the ART algorithm, efficiently supporting fast lookups.
-func (n *artNode[V]) allotRec(idx int, old, val *V) {
+func (n *artNode[V]) allotRec(idx uint8, old, val *V) {
 	if n.prefixes[idx] != old {
 		// This index doesn't match what we're looking for-likely a recursive call
 		// has reached a child node with a more specific route already in place.
@@ -247,8 +273,7 @@ func (n *artNode[V]) allotRec(idx int, old, val *V) {
 		return
 	}
 	n.prefixes[idx] = val
-	if idx >= firstHostIdx {
-		// updated a host route, we've reached a leaf node in the binary tree.
+	if idx >= maxItems/2 {
 		return
 	}
 
@@ -261,7 +286,7 @@ func (n *artNode[V]) allotRec(idx int, old, val *V) {
 }
 
 // isStartIdx TODO
-func (n *artNode[V]) isStartIdx(idx int) bool {
+func (n *artNode[V]) isStartIdx(idx uint8) bool {
 	val := n.prefixes[idx]
 	if val == nil {
 		return false
@@ -322,6 +347,9 @@ func (n *artNode[V]) nodeStatsRec() stats {
 		case *leafNode[V]:
 			s.leaves++
 
+		case *fringeNode[V]:
+			s.fringes++
+
 		default:
 			panic("logic error, wrong node type")
 		}
@@ -376,6 +404,7 @@ func (n *artNode[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 
 		childAddrs := make([]uint8, 0, maxItems)
 		leafAddrs := make([]uint8, 0, maxItems)
+		fringeAddrs := make([]uint8, 0, maxItems)
 
 		// the node has recursive child nodes or path-compressed leaves
 		for i, kid := range n.children {
@@ -393,6 +422,8 @@ func (n *artNode[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 				continue
 			case *leafNode[V]:
 				leafAddrs = append(leafAddrs, addr)
+			case *fringeNode[V]:
+				fringeAddrs = append(fringeAddrs, addr)
 
 			default:
 				panic("logic error, wrong node type")
@@ -416,6 +447,28 @@ func (n *artNode[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 					fmt.Fprintf(w, " %s:{%s}", addrFmt(addr, is4), pc.prefix)
 				default:
 					fmt.Fprintf(w, " %s:{%s, %v}", addrFmt(addr, is4), pc.prefix, pc.value)
+				}
+			}
+
+			fmt.Fprintln(w)
+		}
+
+		if fringeCount := len(fringeAddrs); fringeCount > 0 {
+			// print the pathcomp prefixes for this node
+			fmt.Fprintf(w, "%sfringe(#%d):", indent, fringeCount)
+
+			for _, addr := range fringeAddrs {
+				fringePfx := cidrForFringe(path[:], depth, is4, addr)
+
+				k := n.children[addr]
+				pc := k.(*fringeNode[V])
+
+				// Lite: val is the empty struct, don't print it
+				switch any(pc.value).(type) {
+				case struct{}:
+					fmt.Fprintf(w, " %s:{%s}", addrFmt(addr, is4), fringePfx)
+				default:
+					fmt.Fprintf(w, " %s:{%s, %v}", addrFmt(addr, is4), fringePfx, pc.value)
 				}
 			}
 
@@ -477,6 +530,9 @@ func (n *artNode[V]) nodeStats() stats {
 
 		case *leafNode[V]:
 			s.leaves++
+
+		case *fringeNode[V]:
+			s.fringes++
 
 		default:
 			panic("logic error, wrong node type")

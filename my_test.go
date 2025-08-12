@@ -2,141 +2,122 @@ package bart
 
 import (
 	"fmt"
-	"net/netip"
+	"math/rand/v2"
+	"runtime"
 	"testing"
-	"unsafe"
 )
 
-func TestFoo(t *testing.T) {
-	t.Errorf("%d", unsafe.Sizeof(netip.Prefix{}))
-}
-
-func TestPrefixContains(t *testing.T) {
-	tests := []struct {
-		name   string
-		prefix netip.Prefix
-		ip     netip.Addr
-		want   bool
-	}{
-		{
-			name:   "IPv4-Adresse innerhalb des Prefix",
-			prefix: mpp("192.168.0.0/24"),
-			ip:     mpa("192.168.0.42"),
-			want:   true,
-		},
-		{
-			name:   "IPv4-Adresse außerhalb des Prefix",
-			prefix: mpp("192.168.0.0/24"),
-			ip:     mpa("192.168.1.5"),
-			want:   false,
-		},
-		{
-			name:   "IPv6-Adresse innerhalb des Prefix",
-			prefix: mpp("2001:db8::/32"),
-			ip:     mpa("2001:db8::1"),
-			want:   true,
-		},
-		{
-			name:   "IPv6-Adresse außerhalb des Prefix",
-			prefix: mpp("2001:db8::/32"),
-			ip:     mpa("2001:dead::1"),
-			want:   false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			myPrefix := newPrefixBounds(tt.prefix)
-			got := myPrefix.contains(tt.ip.AsSlice())
-			if got != tt.want {
-				t.Errorf("Prefix.Contains(%q) = %v, erwartet %v", tt.ip, got, tt.want)
-			}
-		})
-	}
-}
-
-func BenchmarkPrefixContains(b *testing.B) {
-	tests := []struct {
-		name   string
-		prefix netip.Prefix
-		ip     netip.Addr
-	}{
-		{
-			name:   "IPv4",
-			prefix: netip.MustParsePrefix("192.168.1.0/24"),
-			ip:     netip.MustParseAddr("192.168.1.100"),
-		},
-		{
-			name:   "IPv6",
-			prefix: netip.MustParsePrefix("2001:db8::/32"),
-			ip:     netip.MustParseAddr("2001:db8::abcd"),
-		},
-	}
-
-	for _, tt := range tests {
-		b.Run(tt.name, func(b *testing.B) {
-			for i := 0; i < b.N; i++ {
-				_ = tt.prefix.Contains(tt.ip)
-			}
-		})
-	}
-}
-
-func BenchmarkPrefixContains2(b *testing.B) {
-	tests := []struct {
-		name   string
-		prefix netip.Prefix
-		ip     netip.Addr
-	}{
-		{
-			name:   "IPv4",
-			prefix: netip.MustParsePrefix("192.168.1.0/30"),
-			ip:     netip.MustParseAddr("192.168.1.100"),
-		},
-		{
-			name:   "IPv6",
-			prefix: netip.MustParsePrefix("2001:db8::/126"),
-			ip:     netip.MustParseAddr("2001:db8::4"),
-		},
-	}
-
-	for _, tt := range tests {
-		b.Run(tt.name, func(b *testing.B) {
-			pfx := newPrefixBounds(tt.prefix)
-			octets := tt.ip.AsSlice()
-			for i := 0; i < b.N; i++ {
-				_ = pfx.contains(octets)
-			}
-		})
-	}
-}
-
-func TestMyWorst(t *testing.T) {
-	tbl := new(Table[string])
-	for _, p := range worstCasePfxsIP4 {
-		tbl.Insert(p, p.String())
-		fmt.Println(tbl.dumpString())
-	}
-
-	_ = tbl.Contains(worstCaseProbeIP4)
-}
-
 func TestMy(t *testing.T) {
-	d := new(Dart[any])
+	prng := rand.New(rand.NewPCG(42, 42))
+	pfxs := randomPrefixes(prng, 10_000)
 
-	d.Insert(mpp("1.2.3.4/32"), nil)
-	d.Insert(mpp("1.2.3.5/32"), nil)
+	gold := new(goldTable[int]).insertMany(pfxs)
+	fast := new(Dart[int])
 
-	fmt.Printf("stats v4: %#v\n", d.root4.nodeStatsRec())
-	fmt.Println(d.dumpString())
+	for _, pfx := range pfxs {
+		fast.Insert(pfx.pfx, pfx.val)
+	}
 
-	b := new(Table[any])
+	for range 10_000 {
+		a := randomAddr(prng)
 
-	b.Insert(mpp("1.2.3.4/32"), nil)
-	b.Insert(mpp("1.2.3.5/32"), nil)
+		_, goldOK := gold.lookup(a)
+		fastOK := fast.Contains(a)
 
-	fmt.Printf("stats v4: %#v\n", d.root4.nodeStatsRec())
-	fmt.Println(b.dumpString())
+		if goldOK != fastOK {
+			t.Fatalf("Contains(%q) = %v, want %v", a, fastOK, goldOK)
+		}
+	}
+}
+
+func BenchmarkDartFullTableMemory4(b *testing.B) {
+	var startMem, endMem runtime.MemStats
+
+	rt := new(Dart[struct{}])
+	runtime.GC()
+	runtime.ReadMemStats(&startMem)
+
+	b.Run(fmt.Sprintf("Table[]: %d", len(routes4)), func(b *testing.B) {
+		for range b.N {
+			for _, route := range routes4 {
+				rt.Insert(route.CIDR, struct{}{})
+			}
+		}
+
+		runtime.GC()
+		runtime.ReadMemStats(&endMem)
+
+		stats := rt.root4.nodeStatsRec()
+		b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/stats.pfxs), "bytes/pfx")
+		b.ReportMetric(float64(stats.pfxs), "pfxs")
+		b.ReportMetric(float64(stats.nodes), "nodes")
+		b.ReportMetric(float64(stats.leaves), "leaves")
+		b.ReportMetric(float64(stats.fringes), "fringes")
+		b.ReportMetric(0, "ns/op")
+	})
+}
+
+func BenchmarkDartFullTableMemory6(b *testing.B) {
+	var startMem, endMem runtime.MemStats
+
+	rt := new(Dart[struct{}])
+	runtime.GC()
+	runtime.ReadMemStats(&startMem)
+
+	b.Run(fmt.Sprintf("Table[]: %d", len(routes6)), func(b *testing.B) {
+		for range b.N {
+			for _, route := range routes6 {
+				rt.Insert(route.CIDR, struct{}{})
+			}
+		}
+
+		runtime.GC()
+		runtime.ReadMemStats(&endMem)
+
+		stats := rt.root6.nodeStatsRec()
+		b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/stats.pfxs), "bytes/pfx")
+		b.ReportMetric(float64(stats.pfxs), "pfxs")
+		b.ReportMetric(float64(stats.nodes), "nodes")
+		b.ReportMetric(float64(stats.leaves), "leaves")
+		b.ReportMetric(float64(stats.fringes), "fringes")
+		b.ReportMetric(0, "ns/op")
+	})
+}
+
+func BenchmarkDartFullTableMemory(b *testing.B) {
+	var startMem, endMem runtime.MemStats
+
+	rt := new(Dart[struct{}])
+	runtime.GC()
+	runtime.ReadMemStats(&startMem)
+
+	b.Run(fmt.Sprintf("Table[]: %d", len(routes)), func(b *testing.B) {
+		for range b.N {
+			for _, route := range routes {
+				rt.Insert(route.CIDR, struct{}{})
+			}
+		}
+
+		runtime.GC()
+		runtime.ReadMemStats(&endMem)
+
+		s4 := rt.root4.nodeStatsRec()
+		s6 := rt.root6.nodeStatsRec()
+		stats := stats{
+			pfxs:    s4.pfxs + s6.pfxs,
+			childs:  s4.childs + s6.childs,
+			nodes:   s4.nodes + s6.nodes,
+			leaves:  s4.leaves + s6.leaves,
+			fringes: s4.fringes + s6.fringes,
+		}
+
+		b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/stats.pfxs), "bytes/pfx")
+		b.ReportMetric(float64(stats.pfxs), "pfxs")
+		b.ReportMetric(float64(stats.nodes), "nodes")
+		b.ReportMetric(float64(stats.leaves), "leaves")
+		b.ReportMetric(float64(stats.fringes), "fringes")
+		b.ReportMetric(0, "ns/op")
+	})
 }
 
 func BenchmarkDartFullMatch4(b *testing.B) {
@@ -190,10 +171,10 @@ func BenchmarkDartFullMatch6(b *testing.B) {
 }
 
 func BenchmarkDartFullMiss4(b *testing.B) {
-	rt := new(Dart[struct{}])
+	rt := new(Dart[int])
 
-	for _, route := range routes {
-		rt.Insert(route.CIDR, struct{}{})
+	for i, route := range routes {
+		rt.Insert(route.CIDR, i)
 	}
 
 	b.Log(missIP4)
@@ -209,16 +190,16 @@ func BenchmarkDartFullMiss4(b *testing.B) {
 	b.Run("Lookup", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
-			_, boolSink = rt.Lookup(missIP4)
+			intSink, boolSink = rt.Lookup(missIP4)
 		}
 	})
 }
 
 func BenchmarkDartFullMiss6(b *testing.B) {
-	rt := new(Dart[struct{}])
+	rt := new(Dart[int])
 
-	for _, route := range routes {
-		rt.Insert(route.CIDR, struct{}{})
+	for i, route := range routes {
+		rt.Insert(route.CIDR, i)
 	}
 
 	b.Log(missIP6)
@@ -234,7 +215,7 @@ func BenchmarkDartFullMiss6(b *testing.B) {
 	b.Run("Lookup", func(b *testing.B) {
 		b.ResetTimer()
 		for range b.N {
-			_, boolSink = rt.Lookup(missIP6)
+			intSink, boolSink = rt.Lookup(missIP6)
 		}
 	})
 }
