@@ -1,4 +1,4 @@
-package bart
+package prefix
 
 import (
 	"bytes"
@@ -25,11 +25,11 @@ import (
 // This format avoids re-computing mask logic in contains(), enabling the Go compiler
 // to inline the method for maximum speed.
 type prefixBounds struct {
-	ip      [16]byte // address bytes, only first 4 are used for IPv4
-	bits    uint8    // prefix length in bits
-	lastIdx uint8    // index of last byte affected by the prefix mask
-	lower   uint8    // min value allowed at lastIdx
-	upper   uint8    // max value allowed at lastIdx
+	ip    [16]byte // address bytes, only first 4 are used for IPv4
+	bits  uint8    // prefix length in bits
+	lower uint8    // min value allowed at lastIdx
+	upper uint8    // max value allowed at lastIdx
+	is4   bool
 }
 
 // newPrefixBounds converts a netip.Prefix into the compact tinyPrefix format.
@@ -49,11 +49,13 @@ func newPrefixBounds(p netip.Prefix) *prefixBounds {
 	bits := uint8(p.Bits()) // prefix length in bits
 	octets := ip.AsSlice()  // 4 bytes if IPv4, 16 bytes if IPv6
 
+	pfx.is4 = ip.Is4()
+	pfx.bits = bits
+
 	lastIdx := (bits - 1) >> 3        // divide by 8 to get index of last covered byte
 	lastBits := bits - (lastIdx << 3) // bits in that last byte
 
 	copy(pfx.ip[:], octets) // copy address bytes into pfx.ip
-	pfx.lastIdx = lastIdx
 
 	// lower bound: preserve only the network bits in the last covered byte
 	pfx.lower = octets[lastIdx] & art.NetMask(lastBits)
@@ -77,7 +79,9 @@ func newPrefixBounds(p netip.Prefix) *prefixBounds {
 //
 // This makes the method very fast and suitable for compiler inlining.
 func (pfx *prefixBounds) contains(octets []byte) bool {
-	return bytes.Equal(pfx.ip[:pfx.lastIdx], octets[:pfx.lastIdx]) &&
-		octets[pfx.lastIdx] >= pfx.lower &&
-		octets[pfx.lastIdx] <= pfx.upper
+	lastIdx := (pfx.bits - 1) >> 3
+
+	return bytes.Equal(pfx.ip[:lastIdx], octets[:lastIdx]) &&
+		octets[lastIdx] >= pfx.lower &&
+		octets[lastIdx] <= pfx.upper
 }
