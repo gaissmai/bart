@@ -1,7 +1,13 @@
-package bart
+package prefix
 
 import (
+	"net/netip"
 	"testing"
+)
+
+var (
+	mpp = netip.MustParsePrefix
+	mpa = netip.MustParseAddr
 )
 
 func TestPrefixBoundsContains(t *testing.T) {
