@@ -49,85 +49,13 @@ func (d *Dart[V]) Insert(pfx netip.Prefix, val V) {
 		return
 	}
 
-	// canonicalize prefix
-	pfx = pfx.Masked()
-
-	// values derived from pfx
 	ip := pfx.Addr()
 	is4 := ip.Is4()
-	bits := pfx.Bits()
-	octets := ip.AsSlice()
-	maxDepth, lastBits := finalArt(bits)
 
 	nArt, artLevels := d.rootNodeByVersion(is4)
 
-	var nBart *bartNode[V]
-
-	// insert prefix into ART or fast forward over ART levels
-	for depth, octet := range octets[:artLevels] {
-		if depth == maxDepth {
-			if exists := nArt.insertPrefix(octet, lastBits, val); !exists {
-				d.sizeUpdate(is4, 1)
-			}
-			return
-		}
-
-		// maybe nil
-		kidAny := nArt.getChild(octet)
-
-		// insert leafNode path compressed
-		if kidAny == nil {
-			nArt.insertChild(octet, newLeafNode(pfx, val))
-			d.sizeUpdate(is4, 1)
-			return
-		}
-
-		switch kid := kidAny.(type) {
-		case *artNode[V]:
-			nArt = kid
-		case *bartNode[V]:
-			if depth != artLevels-1 {
-				panic("TODE REMOVE: logic error, bartNode on wrong ART level")
-			}
-			nBart = kid
-		case *leafNode[V]:
-			if kid.prefix == pfx {
-				kid.value = val
-				return
-			}
-
-			d.sizeUpdate(is4, 1)
-
-			if depth == artLevels-1 {
-				// create new node BART node
-				// push the leaf down, maybe as leaf or fringe
-				// insert new child at current leaf position (addr)
-				// descend down, replace node with new child
-				// exit ART loop
-				newNode := new(bartNode[V])
-				newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
-
-				nArt.insertChild(octet, newNode)
-				nBart = newNode
-			}
-
-			// create new node ART node
-			// push the leaf down, ART has no fringes, only leaves
-			// insert new child at current leaf position
-			// descend down, replace node with new child
-			newNode := new(artNode[V])
-			newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
-
-			nArt.insertChild(octet, newNode)
-			nArt = newNode
-
-		default:
-			panic("logic error, wrong node type in ART level")
-		}
-	}
-
-	// insert prefix into BART
-	if exists := nBart.insertAtDepth(pfx, val, artLevels); exists {
+	// insert prefix
+	if exists := nArt.insertAtDepth(pfx, val, 0, artLevels); exists {
 		return
 	}
 
@@ -366,7 +294,7 @@ func (d *Dart[V]) Contains(ip netip.Addr) bool {
 	var nBart *bartNode[V]
 
 	// first test in ART levels and if not fount in BART levels
-	for depth, octet := range octets[:artLevels] {
+	for _, octet := range octets[:artLevels] {
 		if nArt.contains(octet) {
 			return true
 		}
@@ -376,14 +304,20 @@ func (d *Dart[V]) Contains(ip netip.Addr) bool {
 			return false
 		}
 
-		// last ART level, assert the BART node
-		if depth == artLevels-1 {
-			nBart = next.(*bartNode[V])
-			break
-		}
+		// kid is node or leaf or fringe at octet
+		switch kid := next.(type) {
+		case *artNode[V]:
+			nArt = kid
 
-		// proceed to next ART level
-		nArt = next.(*artNode[V])
+		case *bartNode[V]:
+			nBart = kid
+
+		case *leafNode[V]:
+			return kid.prefix.Contains(ip)
+
+		default:
+			panic("logic error, wrong node type")
+		}
 	}
 
 	for _, octet := range octets[artLevels:] {
@@ -433,7 +367,7 @@ func (d *Dart[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	var nBart *bartNode[V]
 
 	// fast forward to BART levels, but record LPM matches in ART
-	for depth, octet := range octets[:artLevels] {
+	for _, octet := range octets[:artLevels] {
 
 		// save the current best LPM val, lookup is cheap in ART
 		if tmpVal, tmpOk := nArt.lookup(octet); tmpOk {
@@ -441,20 +375,30 @@ func (d *Dart[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 			ok = tmpOk
 		}
 
-		next := nArt.getChild(octet)
-		if next == nil {
-			// get next node, or return
+		nextAny := nArt.getChild(octet)
+		if nextAny == nil {
+			// no next node
 			return val, ok
 		}
 
-		// last ART level, assert the BART node
-		if depth == artLevels-1 {
-			nBart = next.(*bartNode[V])
-			break
-		}
+		// next kid is ART, BART or leaf node.
+		switch kid := nextAny.(type) {
+		case *artNode[V]:
+			nArt = kid
 
-		// proceed to next ART level
-		nArt = next.(*artNode[V])
+		case *leafNode[V]:
+			if kid.prefix.Contains(ip) {
+				return kid.value, true
+			}
+			return // maybe there is a current best value from upper levels
+
+		case *bartNode[V]:
+			// invariant: must be last ART level, end of loop
+			nBart = kid
+
+		default:
+			panic("logic error, wrong node type")
+		}
 	}
 
 	// stack of the traversed nodes for fast backtracking, if needed
