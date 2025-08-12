@@ -147,7 +147,7 @@ func (nArt *artNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth, artLevels 
 
 		case *bartNode[V]:
 			// leave artLevels
-			return kid.insertAtDepth(pfx, val, depth)
+			return kid.insertAtDepth(pfx, val, depth+1)
 
 		case *leafNode[V]:
 			// reached a path compressed prefix
