@@ -1787,7 +1787,7 @@ func TestDeleteButOne(t *testing.T) {
 			stats6.pfxs + stats6.leaves + stats6.fringes
 
 		if sum != 1 {
-			t.Fatalf("delete but one, onle one item must be left, but: %d\n%s", sum, tbl.dumpString())
+			t.Fatalf("delete but one, only one item must be left, but: %d\n%s", sum, tbl.dumpString())
 		}
 	}
 }
