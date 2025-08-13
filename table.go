@@ -282,8 +282,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
 		case *bartNode[V]:
-			n = kid
-			continue // descend down to next trie level
+			n = kid // descend down to next trie level
 
 		case *fringeNode[V]:
 			// if pfx is no fringe at this depth, fast exit

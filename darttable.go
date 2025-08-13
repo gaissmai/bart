@@ -95,31 +95,59 @@ func (d *Dart[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 
 	// delete prefix from ART or fast forward over ART levels
 	for depth, octet := range octets[:artLevels] {
-		levelBits := bits - (depth * 8)
-
-		if levelBits <= 8 {
-			val, exists = nArt.deletePrefix(octet, levelBits)
+		if depth == maxDepth {
+			val, exists = nArt.deletePrefix(octet, lastBits)
 			if !exists {
-				d.sizeUpdate(is4, -1)
+				return
 			}
+			d.sizeUpdate(is4, -1)
+			// TODO: purge and compress in ART levels
 			return val, exists
 		}
 
 		// get next child in ART levels, maybe nil
-		next := nArt.getChild(octet)
-		if next == nil {
-			// nothing to delete
+		nextAny := nArt.getChild(octet)
+		if nextAny == nil {
 			return
 		}
 
-		// last ART level, assert BART node and break loop
-		if depth == artLevels-1 {
-			nBart = next.(*bartNode[V])
-			break
+		// next kid is ART, BART or leaf node.
+		switch kid := nextAny.(type) {
+		case *artNode[V]:
+			nArt = kid // descend down to next trie level
+
+		case *bartNode[V]:
+			// invariant: must be last ART level, end of loop
+			nBart = kid
+
+		case *fringeNode[V]:
+			// if pfx is no fringe at this depth, fast exit
+			if !isFringe(depth, bits) {
+				return
+			}
+
+			// pfx is fringe at depth, delete fringe
+			nArt.deleteChild(octet)
+			d.sizeUpdate(is4, -1)
+			// TODO: purge and compress in ART levels
+			return kid.value, true
+
+		case *leafNode[V]:
+			// Attention: pfx must be masked to be comparable!
+			if kid.prefix != pfx {
+				return
+			}
+
+			// prefix is equal leaf, delete leaf
+			nArt.deleteChild(octet)
+			d.sizeUpdate(is4, -1)
+			// TODO: purge and compress in ART levels
+			return kid.value, true
+
+		default:
+			panic("logic error, wrong node type")
 		}
 
-		// assert ART node and move forward
-		nArt = next.(*artNode[V])
 	}
 
 	// record the nodes on the path to the deleted node, needed to purge
@@ -312,6 +340,10 @@ func (d *Dart[V]) Contains(ip netip.Addr) bool {
 		case *bartNode[V]:
 			nBart = kid
 
+		case *fringeNode[V]:
+			// fringe is the default-route for all possible octets below
+			return true
+
 		case *leafNode[V]:
 			return kid.prefix.Contains(ip)
 
@@ -385,6 +417,10 @@ func (d *Dart[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 		switch kid := nextAny.(type) {
 		case *artNode[V]:
 			nArt = kid
+
+		case *fringeNode[V]:
+			// fringe is the default-route for all possible nodes below
+			return kid.value, true
 
 		case *leafNode[V]:
 			if kid.prefix.Contains(ip) {
