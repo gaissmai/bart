@@ -217,11 +217,6 @@ func (n *bartNode[V]) purgeAndCompress(stack []*bartNode[V], octets []uint8, is4
 	// unwind the stack
 	for depth := len(stack) - 1; depth >= 0; depth-- {
 		parent := stack[depth]
-		// with DART, the first to stack nodes may be nil, no compression in level 0 and 1
-		if parent == nil {
-			break
-		}
-
 		octet := octets[depth]
 
 		pfxCount := n.prefixes.Len()
