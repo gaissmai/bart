@@ -461,8 +461,7 @@ LOOP:
 		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
 		case *bartNode[V]:
-			n = kid
-			continue // descend down to next trie level
+			n = kid // descend down to next trie level
 
 		case *fringeNode[V]:
 			// fringe is the default-route for all possible nodes below

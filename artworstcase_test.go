@@ -10,7 +10,7 @@ func TestDartWorstCaseMatch4(t *testing.T) {
 	t.Run("Contains", func(t *testing.T) {
 		t.Parallel()
 
-		tbl := new(Dart[string])
+		tbl := new(ArtTable[string])
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
 		}
@@ -25,7 +25,7 @@ func TestDartWorstCaseMatch4(t *testing.T) {
 	t.Run("Lookup", func(t *testing.T) {
 		t.Parallel()
 
-		tbl := new(Dart[string])
+		tbl := new(ArtTable[string])
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
 		}
@@ -50,7 +50,7 @@ func TestDartWorstCaseMiss4(t *testing.T) {
 	t.Run("Contains", func(t *testing.T) {
 		t.Parallel()
 
-		tbl := new(Dart[string])
+		tbl := new(ArtTable[string])
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
 		}
@@ -67,7 +67,7 @@ func TestDartWorstCaseMiss4(t *testing.T) {
 	t.Run("Lookup", func(t *testing.T) {
 		t.Parallel()
 
-		tbl := new(Dart[string])
+		tbl := new(ArtTable[string])
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
 		}
@@ -88,7 +88,7 @@ func TestDartWorstCaseMatch6(t *testing.T) {
 	t.Run("Contains", func(t *testing.T) {
 		t.Parallel()
 
-		tbl := new(Dart[string])
+		tbl := new(ArtTable[string])
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())
 		}
@@ -103,7 +103,7 @@ func TestDartWorstCaseMatch6(t *testing.T) {
 	t.Run("Lookup", func(t *testing.T) {
 		t.Parallel()
 
-		tbl := new(Dart[string])
+		tbl := new(ArtTable[string])
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())
 		}
@@ -128,7 +128,7 @@ func TestDartWorstCaseMiss6(t *testing.T) {
 	t.Run("Contains", func(t *testing.T) {
 		t.Parallel()
 
-		tbl := new(Dart[string])
+		tbl := new(ArtTable[string])
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())
 		}
@@ -145,7 +145,7 @@ func TestDartWorstCaseMiss6(t *testing.T) {
 	t.Run("Lookup", func(t *testing.T) {
 		t.Parallel()
 
-		tbl := new(Dart[string])
+		tbl := new(ArtTable[string])
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())
 		}
@@ -162,7 +162,7 @@ func TestDartWorstCaseMiss6(t *testing.T) {
 
 func BenchmarkDartWorstCaseMatch4(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
-		tbl := new(Dart[string])
+		tbl := new(ArtTable[string])
 
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
@@ -175,7 +175,7 @@ func BenchmarkDartWorstCaseMatch4(b *testing.B) {
 	})
 
 	b.Run("Lookup", func(b *testing.B) {
-		tbl := new(Dart[string])
+		tbl := new(ArtTable[string])
 
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
@@ -192,7 +192,7 @@ func BenchmarkDartWorstCaseMatch4(b *testing.B) {
 
 func BenchmarkDartWorstCaseMiss4(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
-		tbl := new(Dart[string])
+		tbl := new(ArtTable[string])
 
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
@@ -207,7 +207,7 @@ func BenchmarkDartWorstCaseMiss4(b *testing.B) {
 	})
 
 	b.Run("Lookup", func(b *testing.B) {
-		tbl := new(Dart[string])
+		tbl := new(ArtTable[string])
 
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
@@ -224,7 +224,7 @@ func BenchmarkDartWorstCaseMiss4(b *testing.B) {
 
 func BenchmarkDartWorstCaseMatch6(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
-		tbl := new(Dart[string])
+		tbl := new(ArtTable[string])
 
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())
@@ -237,7 +237,7 @@ func BenchmarkDartWorstCaseMatch6(b *testing.B) {
 	})
 
 	b.Run("Lookup", func(b *testing.B) {
-		tbl := new(Dart[string])
+		tbl := new(ArtTable[string])
 
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())
@@ -254,7 +254,7 @@ func BenchmarkDartWorstCaseMatch6(b *testing.B) {
 
 func BenchmarkDartWorstCaseMiss6(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
-		tbl := new(Dart[string])
+		tbl := new(ArtTable[string])
 
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())
@@ -269,7 +269,7 @@ func BenchmarkDartWorstCaseMiss6(b *testing.B) {
 	})
 
 	b.Run("Lookup", func(b *testing.B) {
-		tbl := new(Dart[string])
+		tbl := new(ArtTable[string])
 
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())

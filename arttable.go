@@ -1,0 +1,330 @@
+package bart
+
+import (
+	"net/netip"
+	"sync"
+
+	"github.com/gaissmai/bart/internal/art"
+)
+
+// DART TODO
+type ArtTable[V any] struct {
+	// used by -copylocks checker from `go vet`.
+	_ [0]sync.Mutex
+
+	// the root nodes are ART nodes, fixed size arrays
+	root4 artNode[V]
+	root6 artNode[V]
+
+	// the number of prefixes in the routing table
+	size4 int
+	size6 int
+}
+
+// rootNodeByVersion, root node getter for ip version and ART levels.
+func (d *ArtTable[V]) rootNodeByVersion(is4 bool) *artNode[V] {
+	if is4 {
+		return &d.root4
+	}
+	return &d.root6
+}
+
+func (d *ArtTable[V]) Insert(pfx netip.Prefix, val V) {
+	if !pfx.IsValid() {
+		return
+	}
+
+	is4 := pfx.Addr().Is4()
+
+	n := d.rootNodeByVersion(is4)
+
+	// insert prefix
+	if exists := n.insertAtDepth(pfx, val, 0); exists {
+		return
+	}
+
+	// true insert, update size
+	d.sizeUpdate(is4, 1)
+}
+
+// Delete removes pfx from the tree, pfx does not have to be present.
+func (d *ArtTable[V]) Delete(pfx netip.Prefix) {
+	_, _ = d.getAndDelete(pfx)
+}
+
+// GetAndDelete deletes the prefix and returns the associated payload for prefix and true,
+// or the zero value and false if prefix is not set in the routing table.
+func (d *ArtTable[V]) GetAndDelete(pfx netip.Prefix) (val V, ok bool) {
+	return d.getAndDelete(pfx)
+}
+
+func (d *ArtTable[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
+	if !pfx.IsValid() {
+		return
+	}
+
+	// canonicalize prefix
+	pfx = pfx.Masked()
+
+	// values derived from pfx
+	ip := pfx.Addr()
+	is4 := ip.Is4()
+	bits := pfx.Bits()
+	octets := ip.AsSlice()
+	maxDepth, lastBits := maxDepthAndLastBits(bits)
+
+	n := d.rootNodeByVersion(is4)
+
+	// record the nodes on the path to the deleted node, needed to purge
+	// and/or path compress nodes after the deletion of a prefix
+	stack := [maxTreeDepth]*artNode[V]{}
+
+	// find the trie node
+	for depth, octet := range octets {
+		depth = depth & 0xf // BCE, Delete must be fast
+
+		// push current node on stack for path recording
+		stack[depth] = n
+
+		if depth == maxDepth {
+			// try to delete prefix in trie node
+			val, exists = n.deletePrefix(octet, lastBits)
+			if !exists {
+				return val, false
+			}
+
+			d.sizeUpdate(is4, -1)
+			n.purgeAndCompress(stack[:depth], octets, is4)
+			return val, true
+		}
+
+		kidAny := n.getChild(octet)
+		if kidAny == nil {
+			return
+		}
+
+		// kid is node or leaf or fringe at octet
+		switch kid := kidAny.(type) {
+		case *artNode[V]:
+			n = kid // descend down to next trie level
+
+		case *fringeNode[V]:
+			// if pfx is no fringe at this depth, fast exit
+			if !isFringe(depth, bits) {
+				return
+			}
+
+			// pfx is fringe at depth, delete fringe
+			n.deleteChild(octet)
+
+			d.sizeUpdate(is4, -1)
+			n.purgeAndCompress(stack[:depth], octets, is4)
+
+			return kid.value, true
+
+		case *leafNode[V]:
+			// Attention: pfx must be masked to be comparable!
+			if kid.prefix != pfx {
+				return
+			}
+
+			// prefix is equal leaf, delete leaf
+			n.deleteChild(octet)
+
+			d.sizeUpdate(is4, -1)
+			n.purgeAndCompress(stack[:depth], octets, is4)
+
+			return kid.value, true
+
+		default:
+			panic("logic error, wrong node type")
+		}
+	}
+
+	return
+}
+
+// Get returns the associated payload for prefix and true, or false if
+// prefix is not set in the routing table.
+func (d *ArtTable[V]) Get(pfx netip.Prefix) (val V, ok bool) {
+	if !pfx.IsValid() {
+		return
+	}
+
+	// canonicalize the prefix
+	pfx = pfx.Masked()
+
+	// values derived from pfx
+	ip := pfx.Addr()
+	is4 := ip.Is4()
+	bits := pfx.Bits()
+	octets := ip.AsSlice()
+	maxDepth, lastBits := maxDepthAndLastBits(bits)
+
+	n := d.rootNodeByVersion(is4)
+
+	// find the trie node
+	for depth, octet := range octets {
+		if depth == maxDepth {
+			return n.getPrefix(octet, lastBits)
+		}
+
+		kidAny := n.getChild(octet)
+		if kidAny == nil {
+			return
+		}
+
+		// kid is node or leaf or fringe at octet
+		switch kid := kidAny.(type) {
+		case *artNode[V]:
+			n = kid // descend down to next trie level
+
+		case *fringeNode[V]:
+			// reached a path compressed fringe, stop traversing
+			if isFringe(depth, bits) {
+				return kid.value, true
+			}
+			return
+
+		case *leafNode[V]:
+			// reached a path compressed prefix, stop traversing
+			if kid.prefix == pfx {
+				return kid.value, true
+			}
+			return
+
+		default:
+			panic("logic error, wrong node type")
+		}
+	}
+
+	panic("unreachable")
+}
+
+// Contains TODO
+func (d *ArtTable[V]) Contains(ip netip.Addr) bool {
+	if !ip.IsValid() {
+		return false
+	}
+
+	octets := ip.AsSlice()
+
+	var n *artNode[V]
+	if len(octets) == 4 {
+		n = &d.root4
+	} else {
+		n = &d.root6
+	}
+
+	for _, octet := range octets {
+		if n.contains(art.OctetToIdx(octet)) {
+			return true
+		}
+
+		next := n.getChild(octet)
+		if next == nil {
+			return false
+		}
+
+		// kid is node or leaf or fringe at octet
+		switch kid := next.(type) {
+		case *artNode[V]:
+			n = kid
+
+		case *fringeNode[V]:
+			// fringe is the default-route for all possible octets below
+			return true
+
+		case *leafNode[V]:
+			return kid.prefix.Contains(ip)
+
+		default:
+			panic("logic error, wrong node type")
+		}
+	}
+
+	return false
+}
+
+// Lookup TODO
+func (d *ArtTable[V]) Lookup(ip netip.Addr) (val V, ok bool) {
+	if !ip.IsValid() {
+		return
+	}
+
+	octets := ip.AsSlice()
+
+	var n *artNode[V]
+	if len(octets) == 4 {
+		n = &d.root4
+	} else {
+		n = &d.root6
+	}
+
+	for _, octet := range octets {
+		// save the current best LPM val, lookup is cheap in ART
+		if bestLPM, tmpOk := n.lookup(art.OctetToIdx(octet)); tmpOk {
+			val = bestLPM
+			ok = tmpOk
+		}
+
+		nextAny := n.getChild(octet)
+		if nextAny == nil {
+			// no next node
+			return val, ok
+		}
+
+		// next kid is ART, fringe or leaf node.
+		switch kid := nextAny.(type) {
+		case *artNode[V]:
+			n = kid
+
+		case *fringeNode[V]:
+			// fringe is the default-route for all possible nodes below
+			return kid.value, true
+
+		case *leafNode[V]:
+			if kid.prefix.Contains(ip) {
+				return kid.value, true
+			}
+			// maybe there is a current best value from upper levels
+			return val, ok
+
+		default:
+			panic("logic error, wrong node type")
+		}
+	}
+
+	panic("unreachable")
+}
+
+func (d *ArtTable[V]) sizeUpdate(is4 bool, n int) {
+	if is4 {
+		d.size4 += n
+		return
+	}
+	d.size6 += n
+}
+
+// Size returns the prefix count.
+func (d *ArtTable[V]) Size() int {
+	return d.size4 + d.size6
+}
+
+// Size4 returns the IPv4 prefix count.
+func (d *ArtTable[V]) Size4() int {
+	return d.size4
+}
+
+// Size6 returns the IPv6 prefix count.
+func (d *ArtTable[V]) Size6() int {
+	return d.size6
+}
+
+func finalArt(bits int) (maxDepth int, lastBits int) {
+	// maxDepth:  range from 0..3 or 0..15
+	// lastBits:  range from 0..8
+	maxDepth = (bits - 1) / 8
+	lastBits = bits - (maxDepth * 8)
+	return
+}
