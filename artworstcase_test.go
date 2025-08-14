@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-func TestDartWorstCaseMatch4(t *testing.T) {
+func TestArtWorstCaseMatch4(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Contains", func(t *testing.T) {
@@ -44,7 +44,7 @@ func TestDartWorstCaseMatch4(t *testing.T) {
 	})
 }
 
-func TestDartWorstCaseMiss4(t *testing.T) {
+func TestArtWorstCaseMiss4(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Contains", func(t *testing.T) {
@@ -82,7 +82,7 @@ func TestDartWorstCaseMiss4(t *testing.T) {
 	})
 }
 
-func TestDartWorstCaseMatch6(t *testing.T) {
+func TestArtWorstCaseMatch6(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Contains", func(t *testing.T) {
@@ -122,7 +122,7 @@ func TestDartWorstCaseMatch6(t *testing.T) {
 	})
 }
 
-func TestDartWorstCaseMiss6(t *testing.T) {
+func TestArtWorstCaseMiss6(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Contains", func(t *testing.T) {
@@ -160,7 +160,7 @@ func TestDartWorstCaseMiss6(t *testing.T) {
 	})
 }
 
-func BenchmarkDartWorstCaseMatch4(b *testing.B) {
+func BenchmarkArtWorstCaseMatch4(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
 		tbl := new(ArtTable[string])
 
@@ -190,7 +190,7 @@ func BenchmarkDartWorstCaseMatch4(b *testing.B) {
 	})
 }
 
-func BenchmarkDartWorstCaseMiss4(b *testing.B) {
+func BenchmarkArtWorstCaseMiss4(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
 		tbl := new(ArtTable[string])
 
@@ -222,7 +222,7 @@ func BenchmarkDartWorstCaseMiss4(b *testing.B) {
 	})
 }
 
-func BenchmarkDartWorstCaseMatch6(b *testing.B) {
+func BenchmarkArtWorstCaseMatch6(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
 		tbl := new(ArtTable[string])
 
@@ -252,7 +252,7 @@ func BenchmarkDartWorstCaseMatch6(b *testing.B) {
 	})
 }
 
-func BenchmarkDartWorstCaseMiss6(b *testing.B) {
+func BenchmarkArtWorstCaseMiss6(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
 		tbl := new(ArtTable[string])
 
