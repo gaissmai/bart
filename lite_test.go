@@ -795,6 +795,86 @@ func TestLiteStringSample(t *testing.T) {
 	checkLiteString(t, tbl, tt)
 }
 
+func TestLiteFilterPersist(t *testing.T) {
+	type testCase struct {
+		name       string
+		input      []string
+		shouldDel  func(netip.Prefix) bool
+		wantRemain []string
+	}
+
+	tests := []testCase{
+		{
+			name: "delete nothing",
+			input: []string{
+				"192.168.0.0/16",
+				"2001:db8::/32",
+			},
+			shouldDel: func(pfx netip.Prefix) bool {
+				return false // keep all
+			},
+			wantRemain: []string{"192.168.0.0/16", "2001:db8::/32"},
+		},
+		{
+			name: "delete all",
+			input: []string{
+				"10.0.0.0/8",
+				"fd00::/8",
+			},
+			shouldDel: func(pfx netip.Prefix) bool {
+				return true // remove everything
+			},
+			wantRemain: []string{},
+		},
+		{
+			name: "delete only IPv4",
+			input: []string{
+				"172.16.0.0/12",
+				"2001:db8:1::/48",
+			},
+			shouldDel: func(pfx netip.Prefix) bool {
+				return pfx.Addr().Is4()
+			},
+			wantRemain: []string{"2001:db8:1::/48"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// Build initial table.
+			tbl := new(Lite)
+			for _, pfx := range tc.input {
+				tbl.Insert(mpp(pfx))
+			}
+
+			// Apply FilterPersist.
+			got := tbl.FilterPersist(tc.shouldDel)
+
+			// Collect remaining prefixes from result.
+			gotRemain := []string{}
+			for pfx := range got.All() {
+				gotRemain = append(gotRemain, pfx.String())
+			}
+
+			// Compare lengths.
+			if len(gotRemain) != len(tc.wantRemain) {
+				t.Fatalf("expected %d entries, got %d: %v", len(tc.wantRemain), len(gotRemain), gotRemain)
+			}
+
+			// Compare sets (order is not guaranteed).
+			wantMap := map[string]bool{}
+			for _, w := range tc.wantRemain {
+				wantMap[w] = true
+			}
+			for _, g := range gotRemain {
+				if !wantMap[g] {
+					t.Errorf("unexpected remaining prefix: %s", g)
+				}
+			}
+		})
+	}
+}
+
 // ###################################################################
 
 func checkLiteNumNodes(t *testing.T, tbl *Lite, want int) {
