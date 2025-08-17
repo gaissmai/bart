@@ -2870,6 +2870,97 @@ func TestLastIdxLastBits(t *testing.T) {
 	}
 }
 
+func TestFilterPersist(t *testing.T) {
+	type testCase struct {
+		name       string
+		input      map[string]string
+		shouldDel  func(netip.Prefix, string) bool
+		wantRemain []string // expected entries after filtering, as string prefixes
+	}
+
+	tests := []testCase{
+		{
+			name: "delete nothing",
+			input: map[string]string{
+				"192.168.0.0/16": "netA",
+				"2001:db8::/32":  "netB",
+			},
+			shouldDel: func(pfx netip.Prefix, val string) bool {
+				return false // keep all
+			},
+			wantRemain: []string{"192.168.0.0/16", "2001:db8::/32"},
+		},
+		{
+			name: "delete all",
+			input: map[string]string{
+				"10.0.0.0/8": "internal",
+				"fd00::/8":   "ula",
+			},
+			shouldDel: func(pfx netip.Prefix, val string) bool {
+				return true // remove everything
+			},
+			wantRemain: []string{},
+		},
+		{
+			name: "delete only IPv4",
+			input: map[string]string{
+				"172.16.0.0/12":   "corp",
+				"2001:db8:1::/48": "testnet",
+			},
+			shouldDel: func(pfx netip.Prefix, val string) bool {
+				return pfx.Addr().Is4()
+			},
+			wantRemain: []string{"2001:db8:1::/48"},
+		},
+		{
+			name: "predicate based on value",
+			input: map[string]string{
+				"203.0.113.0/24":     "removeMe",
+				"2001:db8:dead::/48": "keepMe",
+			},
+			shouldDel: func(pfx netip.Prefix, val string) bool {
+				return val == "removeMe"
+			},
+			wantRemain: []string{"2001:db8:dead::/48"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// Build initial table.
+			tbl := new(Table[string])
+			for pfx, val := range tc.input {
+				tbl.Insert(mpp(pfx), val)
+			}
+
+			// Apply FilterPersist.
+			got := tbl.FilterPersist(tc.shouldDel)
+
+			// Collect remaining prefixes from result.
+			gotRemain := []string{}
+			for pfx := range got.All() {
+				gotRemain = append(gotRemain, pfx.String())
+			}
+
+			// Compare lengths.
+			if len(gotRemain) != len(tc.wantRemain) {
+				t.Fatalf("expected %d entries, got %d: %v", len(tc.wantRemain), len(gotRemain), gotRemain)
+			}
+
+			// Compare sets (order is not guaranteed).
+			wantMap := map[string]bool{}
+			for _, w := range tc.wantRemain {
+				wantMap[w] = true
+			}
+			for _, g := range gotRemain {
+				if !wantMap[g] {
+					t.Errorf("unexpected remaining prefix: %s", g)
+				}
+			}
+		})
+	}
+}
+
 // ############ benchmarks ################################
 
 var benchRouteCount = []int{1, 2, 5, 10, 100, 1000, 10_000, 100_000, 200_000}
@@ -3279,4 +3370,28 @@ func (t *Table[V]) dumpAsGoldTable() goldTable[V] {
 	}
 
 	return tbl
+}
+
+func BenchmarkFilterPersist(b *testing.B) {
+	prng := rand.New(rand.NewPCG(42, 42))
+
+	// Build a reasonably large table before benchmarking.
+	for _, n := range []int{10_000, 100_000, 500_000, 1_000_000} {
+		// Predicate: delete 1/10 der entries
+		shouldDel := func(_ netip.Prefix, val int) bool {
+			return val%10 == 0
+		}
+
+		b.Run(fmt.Sprintf("size(%d):filtered(%d)", n, n/10), func(b *testing.B) {
+			tbl := new(Table[int])
+			for i, pfx := range randomRealWorldPrefixes(prng, n) {
+				tbl.Insert(pfx, i)
+			}
+
+			b.ResetTimer()
+			for range b.N {
+				_ = tbl.FilterPersist(shouldDel)
+			}
+		})
+	}
 }

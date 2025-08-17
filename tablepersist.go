@@ -471,6 +471,41 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, e
 	panic("unreachable")
 }
 
+// FilterPersist returns a new table derived from the original one,
+// where all entries matching the given predicate are removed.
+//
+// The supplied function shouldDelete is called for every prefix-value pair
+// in the table. If shouldDelete returns true, the corresponding entry
+// is deleted in the resulting table.
+//
+// Unlike destructive operations, FilterPersist does not modify the
+// original table. Instead, it creates a new persistent copy with the
+// specified entries removed.
+//
+// Example:
+//
+//	ft := t.FilterPersist(func(pfx netip.Prefix, val V) bool {
+//	    return someCondition(pfx, val)
+//	})
+func (t *Table[V]) FilterPersist(shouldDelete func(netip.Prefix, V) bool) *Table[V] {
+	// new Table with root nodes just copied.
+	pt := &Table[V]{
+		root4: t.root4,
+		root6: t.root6,
+		//
+		size4: t.size4,
+		size6: t.size6,
+	}
+
+	for pfx, val := range t.All() {
+		if shouldDelete(pfx, val) {
+			pt = pt.DeletePersist(pfx)
+		}
+	}
+
+	return pt
+}
+
 // UnionPersist is similar to [Union] but the receiver isn't modified.
 //
 // All nodes touched during union are cloned and a new Table is returned.
