@@ -19,7 +19,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go-version }}
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: go test -v ./...      
       - run: go test -v -run='Persist' -race
       - run: go test -v -run='Example' -race
@@ -35,7 +35,7 @@ jobs:
   coverage:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4         
+      - uses: actions/checkout@v5         
       - uses: actions/setup-go@v5
         with:
           go-version: 1.23
@@ -50,7 +50,7 @@ jobs:
   linting:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-go@v5
         with:
           go-version: 1.23
