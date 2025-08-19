@@ -736,8 +736,7 @@ func BenchmarkTest(b *testing.B) {
 	aa := BitSet256{0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010}
 	for _, i := range []uint8{64*4 - 1, 64*3 - 11, 64*2 - 11, 64*1 - 11, 1, 0} {
 		b.Run(fmt.Sprintf("Test: for %d", i), func(b *testing.B) {
-			b.ResetTimer()
-			for range b.N {
+			for b.Loop() {
 				boolSink = aa.Test(i)
 			}
 		})
@@ -755,8 +754,7 @@ func BenchmarkIntersectsAny(b *testing.B) {
 		{},
 	} {
 		b.Run(fmt.Sprintf("Any: at %d", i), func(b *testing.B) {
-			b.ResetTimer()
-			for range b.N {
+			for b.Loop() {
 				boolSink = aa.Intersects(&bb)
 			}
 		})
@@ -767,8 +765,7 @@ func BenchmarkUnion(b *testing.B) {
 	b.Run("Union", func(b *testing.B) {
 		aa := &BitSet256{0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010}
 		bb := &BitSet256{0b1111_1111_1111, 0b1111_1111_1111, 0b1111_1111_1111, 0b1111_1111_1111}
-		b.ResetTimer()
-		for range b.N {
+		for b.Loop() {
 			bitsetSink = aa.Union(bb)
 		}
 	})
@@ -777,8 +774,7 @@ func BenchmarkUnion(b *testing.B) {
 func BenchmarkIntersection(b *testing.B) {
 	aa := &BitSet256{0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010}
 	bb := &BitSet256{0b1111_1111_1111, 0b1111_1111_1111, 0b1111_1111_1111, 0b1111_1111_1111}
-	b.ResetTimer()
-	for range b.N {
+	for b.Loop() {
 		bitsetSink = aa.Intersection(bb)
 	}
 }
@@ -786,8 +782,7 @@ func BenchmarkIntersection(b *testing.B) {
 func BenchmarkPopcount(b *testing.B) {
 	aa := BitSet256{0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010}
 
-	b.ResetTimer()
-	for range b.N {
+	for b.Loop() {
 		intSink = aa.popcount()
 	}
 }
@@ -796,8 +791,7 @@ func BenchmarkRank(b *testing.B) {
 	aa := BitSet256{0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010}
 	for _, i := range []uint8{64*4 - 1, 64*3 - 11, 64*2 - 11, 64*1 - 11, 1, 0} {
 		b.Run(fmt.Sprintf("for %d", i), func(b *testing.B) {
-			b.ResetTimer()
-			for range b.N {
+			for b.Loop() {
 				intSink = aa.Rank(i)
 			}
 		})
@@ -813,8 +807,7 @@ func BenchmarkIsEmpty(b *testing.B) {
 		{},
 	} {
 		b.Run(fmt.Sprintf("at %d", i), func(b *testing.B) {
-			b.ResetTimer()
-			for range b.N {
+			for b.Loop() {
 				boolSink = bb.IsEmpty()
 			}
 		})
@@ -830,8 +823,7 @@ func BenchmarkFirstSet(b *testing.B) {
 		{0, 0, 0, 0},
 	} {
 		b.Run(fmt.Sprintf("FirstSet, at %d", i), func(b *testing.B) {
-			b.ResetTimer()
-			for range b.N {
+			for b.Loop() {
 				_, boolSink = bb.FirstSet()
 			}
 		})
@@ -847,8 +839,7 @@ func BenchmarkNextSet(b *testing.B) {
 		{},
 	} {
 		b.Run(fmt.Sprintf("at %d", i), func(b *testing.B) {
-			b.ResetTimer()
-			for range b.N {
+			for b.Loop() {
 				_, boolSink = bb.NextSet(0)
 			}
 		})
@@ -864,8 +855,7 @@ func BenchmarkIntersectionTop(b *testing.B) {
 		{0, 0, 0, 1},
 	} {
 		b.Run(fmt.Sprintf("Top: at %d", i), func(b *testing.B) {
-			b.ResetTimer()
-			for range b.N {
+			for b.Loop() {
 				_, boolSink = aa.IntersectionTop(&aa)
 			}
 		})
@@ -881,8 +871,7 @@ func BenchmarkLastSet(b *testing.B) {
 		{0, 0, 0, 1},
 	} {
 		b.Run(fmt.Sprintf("Last: at %d", i), func(b *testing.B) {
-			b.ResetTimer()
-			for range b.N {
+			for b.Loop() {
 				_, boolSink = aa.LastSet()
 			}
 		})
@@ -898,8 +887,7 @@ func BenchmarkAsSlice(b *testing.B) {
 	} {
 		b.Run(fmt.Sprintf("sparse at %d", i), func(b *testing.B) {
 			var buf [256]uint8
-			b.ResetTimer()
-			for range b.N {
+			for b.Loop() {
 				uint8SliceSink = aa.AsSlice(&buf)
 			}
 		})
@@ -913,8 +901,7 @@ func BenchmarkAsSlice(b *testing.B) {
 	} {
 		b.Run(fmt.Sprintf("dense at %d", i), func(b *testing.B) {
 			var buf [256]uint8
-			b.ResetTimer()
-			for range b.N {
+			for b.Loop() {
 				uint8SliceSink = aa.AsSlice(&buf)
 			}
 		})
