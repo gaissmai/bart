@@ -388,8 +388,7 @@ func BenchmarkWorstCaseMatch4(b *testing.B) {
 			tbl.Insert(p, p.String())
 		}
 
-		b.ResetTimer()
-		for range b.N {
+		for b.Loop() {
 			boolSink = tbl.Contains(worstCaseProbeIP4)
 		}
 	})
@@ -402,8 +401,7 @@ func BenchmarkWorstCaseMatch4(b *testing.B) {
 		tbl.Insert(ipv4DefaultRoute, ipv4DefaultRoute.String())
 		tbl.Delete(worstCaseProbePfx4)
 
-		b.ResetTimer()
-		for range b.N {
+		for b.Loop() {
 			_, boolSink = tbl.Lookup(worstCaseProbeIP4)
 		}
 	})
@@ -416,8 +414,7 @@ func BenchmarkWorstCaseMatch4(b *testing.B) {
 		tbl.Insert(ipv4DefaultRoute, ipv4DefaultRoute.String())
 		tbl.Delete(worstCaseProbePfx4)
 
-		b.ResetTimer()
-		for range b.N {
+		for b.Loop() {
 			_, boolSink = tbl.LookupPrefix(worstCaseProbePfx4)
 		}
 	})
@@ -430,8 +427,7 @@ func BenchmarkWorstCaseMatch4(b *testing.B) {
 		tbl.Insert(ipv4DefaultRoute, ipv4DefaultRoute.String())
 		tbl.Delete(worstCaseProbePfx4)
 
-		b.ResetTimer()
-		for range b.N {
+		for b.Loop() {
 			_, _, boolSink = tbl.LookupPrefixLPM(worstCaseProbePfx4)
 		}
 	})
@@ -446,8 +442,7 @@ func BenchmarkWorstCaseMiss4(b *testing.B) {
 
 		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
 
-		b.ResetTimer()
-		for range b.N {
+		for b.Loop() {
 			boolSink = tbl.Contains(worstCaseProbeIP4)
 		}
 	})
@@ -460,8 +455,7 @@ func BenchmarkWorstCaseMiss4(b *testing.B) {
 
 		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
 
-		b.ResetTimer()
-		for range b.N {
+		for b.Loop() {
 			_, boolSink = tbl.Lookup(worstCaseProbeIP4)
 		}
 	})
@@ -474,8 +468,7 @@ func BenchmarkWorstCaseMiss4(b *testing.B) {
 
 		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
 
-		b.ResetTimer()
-		for range b.N {
+		for b.Loop() {
 			_, boolSink = tbl.LookupPrefix(worstCaseProbePfx4)
 		}
 	})
@@ -488,8 +481,7 @@ func BenchmarkWorstCaseMiss4(b *testing.B) {
 
 		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
 
-		b.ResetTimer()
-		for range b.N {
+		for b.Loop() {
 			_, _, boolSink = tbl.LookupPrefixLPM(worstCaseProbePfx4)
 		}
 	})
@@ -502,8 +494,7 @@ func BenchmarkWorstCaseMatch6(b *testing.B) {
 			tbl.Insert(p, p.String())
 		}
 
-		b.ResetTimer()
-		for range b.N {
+		for b.Loop() {
 			boolSink = tbl.Contains(worstCaseProbeIP6)
 		}
 	})
@@ -516,8 +507,7 @@ func BenchmarkWorstCaseMatch6(b *testing.B) {
 		tbl.Insert(ipv6DefaultRoute, ipv6DefaultRoute.String())
 		tbl.Delete(worstCaseProbePfx6)
 
-		b.ResetTimer()
-		for range b.N {
+		for b.Loop() {
 			_, boolSink = tbl.Lookup(worstCaseProbeIP6)
 		}
 	})
@@ -530,8 +520,7 @@ func BenchmarkWorstCaseMatch6(b *testing.B) {
 		tbl.Insert(ipv6DefaultRoute, ipv6DefaultRoute.String())
 		tbl.Delete(worstCaseProbePfx6)
 
-		b.ResetTimer()
-		for range b.N {
+		for b.Loop() {
 			_, boolSink = tbl.LookupPrefix(worstCaseProbePfx6)
 		}
 	})
@@ -544,8 +533,7 @@ func BenchmarkWorstCaseMatch6(b *testing.B) {
 		tbl.Insert(ipv6DefaultRoute, ipv6DefaultRoute.String())
 		tbl.Delete(worstCaseProbePfx6)
 
-		b.ResetTimer()
-		for range b.N {
+		for b.Loop() {
 			_, _, boolSink = tbl.LookupPrefixLPM(worstCaseProbePfx6)
 		}
 	})
@@ -560,8 +548,7 @@ func BenchmarkWorstCaseMiss6(b *testing.B) {
 
 		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
 
-		b.ResetTimer()
-		for range b.N {
+		for b.Loop() {
 			boolSink = tbl.Contains(worstCaseProbeIP6)
 		}
 	})
@@ -574,8 +561,7 @@ func BenchmarkWorstCaseMiss6(b *testing.B) {
 
 		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
 
-		b.ResetTimer()
-		for range b.N {
+		for b.Loop() {
 			_, boolSink = tbl.Lookup(worstCaseProbeIP6)
 		}
 	})
@@ -588,8 +574,7 @@ func BenchmarkWorstCaseMiss6(b *testing.B) {
 
 		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
 
-		b.ResetTimer()
-		for range b.N {
+		for b.Loop() {
 			_, boolSink = tbl.LookupPrefix(worstCaseProbePfx6)
 		}
 	})
@@ -602,8 +587,7 @@ func BenchmarkWorstCaseMiss6(b *testing.B) {
 
 		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
 
-		b.ResetTimer()
-		for range b.N {
+		for b.Loop() {
 			_, _, boolSink = tbl.LookupPrefixLPM(worstCaseProbePfx6)
 		}
 	})

@@ -1,7 +1,7 @@
 module github.com/gaissmai/bart
 
-go 1.23.0
+go 1.24.0
 
 retract v0.20.5 // introduced a bug in InsertPersist
 
-toolchain go1.23.8
+toolchain go1.24.5
