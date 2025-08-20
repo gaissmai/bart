@@ -88,6 +88,7 @@ See the `ExampleLite_concurrent` and `ExampleTable_concurrent` tests for concret
   func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V]
   func (t *Table[V]) DeletePersist(pfx netip.Prefix) *Table[V]
   func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (pt *Table[V], newVal V)
+  func (t *Table[V]) WalkPersist(fn func(*Table[V], netip.Prefix, V) (*Table[V], bool)) *Table[V]
 
   func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool)
   func (t *Table[V]) GetAndDelete(pfx netip.Prefix) (val V, ok bool)
@@ -149,6 +150,7 @@ Some delegated methods are pointless without a payload.
 
    func (l *Lite) InsertPersist(pfx netip.Prefix) *Lite
    func (l *Lite) DeletePersist(pfx netip.Prefix) *Lite
+   func (l *Lite) WalkPersist(fn func(*Lite, netip.Prefix) (*Lite, bool)) *Lite
 
    func (l *Lite) Clone() *Lite
    func (l *Lite) Union(o *Lite)

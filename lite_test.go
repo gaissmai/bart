@@ -795,11 +795,11 @@ func TestLiteStringSample(t *testing.T) {
 	checkLiteString(t, tbl, tt)
 }
 
-func TestLiteFilterPersist(t *testing.T) {
+func TestLiteWalkPersist(t *testing.T) {
 	type testCase struct {
 		name       string
 		input      []string
-		shouldDel  func(netip.Prefix) bool
+		fn         func(*Lite, netip.Prefix) (*Lite, bool)
 		wantRemain []string
 	}
 
@@ -810,8 +810,8 @@ func TestLiteFilterPersist(t *testing.T) {
 				"192.168.0.0/16",
 				"2001:db8::/32",
 			},
-			shouldDel: func(pfx netip.Prefix) bool {
-				return false // keep all
+			fn: func(l *Lite, pfx netip.Prefix) (*Lite, bool) {
+				return l, false // early exit
 			},
 			wantRemain: []string{"192.168.0.0/16", "2001:db8::/32"},
 		},
@@ -821,8 +821,8 @@ func TestLiteFilterPersist(t *testing.T) {
 				"10.0.0.0/8",
 				"fd00::/8",
 			},
-			shouldDel: func(pfx netip.Prefix) bool {
-				return true // remove everything
+			fn: func(pl *Lite, pfx netip.Prefix) (*Lite, bool) {
+				return pl.DeletePersist(pfx), true // remove everything
 			},
 			wantRemain: []string{},
 		},
@@ -832,8 +832,11 @@ func TestLiteFilterPersist(t *testing.T) {
 				"172.16.0.0/12",
 				"2001:db8:1::/48",
 			},
-			shouldDel: func(pfx netip.Prefix) bool {
-				return pfx.Addr().Is4()
+			fn: func(pl *Lite, pfx netip.Prefix) (*Lite, bool) {
+				if pfx.Addr().Is4() {
+					pl = pl.DeletePersist(pfx)
+				}
+				return pl, true
 			},
 			wantRemain: []string{"2001:db8:1::/48"},
 		},
@@ -848,7 +851,7 @@ func TestLiteFilterPersist(t *testing.T) {
 			}
 
 			// Apply FilterPersist.
-			got := tbl.FilterPersist(tc.shouldDel)
+			got := tbl.WalkPersist(tc.fn)
 
 			// Collect remaining prefixes from result.
 			gotRemain := []string{}

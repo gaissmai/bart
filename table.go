@@ -969,6 +969,13 @@ func (t *Table[V]) Size6() int {
 //
 // Under the hood, the loop body is passed as a yield function to the iterator.
 // If you break or return from the loop, iteration stops early as expected.
+//
+// IMPORTANT: Modifying or deleting entries during iteration is not allowed,
+// as this would interfere with the internal traversal and may corrupt or
+// prematurely terminate the iteration.
+//
+// If mutation of the table during traversal is required,
+// use [Table.WalkPersist] instead.
 func (t *Table[V]) All() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
 		_ = t.root4.allRec(stridePath{}, 0, true, yield) && t.root6.allRec(stridePath{}, 0, false, yield)
