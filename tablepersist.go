@@ -471,38 +471,55 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, e
 	panic("unreachable")
 }
 
-// FilterPersist returns a new table derived from the original one,
-// where all entries matching the given predicate are removed.
+// WalkPersist traverses all prefix/value pairs in the table and calls the
+// provided callback function for each entry. The callback receives the
+// current persistent table, the prefix, and the associated value.
 //
-// The supplied function shouldDelete is called for every prefix-value pair
-// in the table. If shouldDelete returns true, the corresponding entry
-// is deleted in the resulting table.
+// The callback must return a (potentially updated) persistent table and a
+// boolean flag indicating whether traversal should continue. Returning
+// false stops the iteration early.
 //
-// Unlike destructive operations, FilterPersist does not modify the
-// original table. Instead, it creates a new persistent copy with the
-// specified entries removed.
+// IMPORTANT: It is the responsibility of the callback implementation to only
+// use *persistent* Table operations (e.g. InsertPersist, DeletePersist,
+// UpdatePersist, ...). Using mutating methods like Update or Delete
+// inside the callback would break the iteration and may lead
+// to inconsistent results.
 //
 // Example:
 //
-//	ft := t.FilterPersist(func(pfx netip.Prefix, val V) bool {
-//	    return someCondition(pfx, val)
+//	pt := t.WalkPersist(func(pt *Table[int], pfx netip.Prefix, val int) (*Table[int], bool) {
+//		switch {
+//		case val < 0:
+//			// Stop iterating if value is <0
+//		  return pt, false
+//		case val == 0:
+//			// Delete entries with value 0
+//			pt = pt.DeletePersist(pfx)
+//		case val%2 == 0:
+//			// Update even values by doubling them
+//			pt, _ = pt.UpdatePersist(pfx, func(oldVal int, _ bool) int {
+//				return oldVal * 2
+//			})
+//		default:
+//			// Leave odd values unchanged, do nothing
+//		}
+//		return pt, true // continue iterating
 //	})
-func (t *Table[V]) FilterPersist(shouldDelete func(netip.Prefix, V) bool) *Table[V] {
-	// new Table with root nodes just copied.
+func (t *Table[V]) WalkPersist(fn func(*Table[V], netip.Prefix, V) (*Table[V], bool)) *Table[V] {
+	// create shallow persistent copy
 	pt := &Table[V]{
 		root4: t.root4,
 		root6: t.root6,
-		//
 		size4: t.size4,
 		size6: t.size6,
 	}
 
+	var proceed bool
 	for pfx, val := range t.All() {
-		if shouldDelete(pfx, val) {
-			pt = pt.DeletePersist(pfx)
+		if pt, proceed = fn(pt, pfx, val); !proceed {
+			break
 		}
 	}
-
 	return pt
 }
 

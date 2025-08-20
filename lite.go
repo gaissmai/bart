@@ -59,13 +59,18 @@ func (l *Lite) DeletePersist(pfx netip.Prefix) *Lite {
 	return &Lite{*tbl}
 }
 
-// FilterPersist is an adapter for the underlying table.
-func (l *Lite) FilterPersist(shouldDelete func(netip.Prefix) bool) *Lite {
-	tbl := l.Table.FilterPersist(func(pfx netip.Prefix, _ struct{}) bool {
-		return shouldDelete(pfx)
-	})
-	//nolint:govet // copy of *tbl is here by intention
-	return &Lite{*tbl}
+// WalkPersist is an adapter for the underlying table.
+func (l *Lite) WalkPersist(fn func(*Lite, netip.Prefix) (*Lite, bool)) *Lite {
+	//nolint:govet // shallow copy of Table is here by intention
+	pl := &Lite{l.Table}
+
+	var proceed bool
+	for pfx := range l.All() {
+		if pl, proceed = fn(pl, pfx); !proceed {
+			break
+		}
+	}
+	return pl
 }
 
 // Clone is an adapter for the underlying table.
