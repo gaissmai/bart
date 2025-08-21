@@ -16,6 +16,7 @@ type cloneFunc[V any] func(V) V
 // a deep copy using Clone(), otherwise it returns nil.
 func cloneFnFactory[V any]() cloneFunc[V] {
 	var zero V
+	// you can't assert directly on a type parameter
 	if _, ok := any(zero).(Cloner[V]); ok {
 		return cloneVal[V]
 	}
@@ -25,6 +26,7 @@ func cloneFnFactory[V any]() cloneFunc[V] {
 // cloneVal invokes the Clone method to deeply copy val.
 // Assumes that val implements Cloner[V].
 func cloneVal[V any](val V) V {
+	// you can't assert directly on a type parameter
 	return any(val).(Cloner[V]).Clone()
 }
 
