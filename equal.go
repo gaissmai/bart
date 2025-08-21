@@ -24,8 +24,8 @@ func equal[V any](v1, v2 V) bool {
 }
 
 // equalRec compares two nodes recursively.
-// It checks prefix counts, child counts, equality of children/prefixes via bitsets,
-// and recursively descends into sub-nodes or compares leaf/fringe node values.
+// It checks equality of children/prefixes via bitsets, and recursively
+// descends into sub-nodes or compares leaf/fringe node values.
 func (n *node[V]) equalRec(o *node[V]) bool {
 	if n.prefixes.BitSet256 != o.prefixes.BitSet256 {
 		return false
