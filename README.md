@@ -104,6 +104,8 @@ See the `ExampleLite_concurrent` and `ExampleTable_concurrent` tests for concret
   func (t *Table[V]) Overlaps4(o *Table[V]) bool
   func (t *Table[V]) Overlaps6(o *Table[V]) bool
 
+  func (t *Table[V]) Equal(o *Table[V])  bool
+
   func (t *Table[V]) Subnets(pfx netip.Prefix)   iter.Seq2[netip.Prefix, V]
   func (t *Table[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V]
 
@@ -159,6 +161,8 @@ Some delegated methods are pointless without a payload.
    func (l *Lite) Overlaps(o *Lite) bool
    func (l *Lite) Overlaps4(o *Lite) bool
    func (l *Lite) Overlaps6(o *Lite) bool
+
+   func (l *Lite) Equal(o *Lite) bool
 ```
 
 ## benchmarks

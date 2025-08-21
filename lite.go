@@ -106,3 +106,8 @@ func (l *Lite) Overlaps6(o *Lite) bool {
 func (l *Lite) Overlaps(o *Lite) bool {
 	return l.Table.Overlaps(&o.Table)
 }
+
+// Equal is an adapter for the underlying table.
+func (l *Lite) Equal(o *Lite) bool {
+	return l.Table.Equal(&o.Table)
+}
