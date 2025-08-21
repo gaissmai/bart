@@ -911,6 +911,17 @@ func (t *Table[V]) Union(o *Table[V]) {
 	t.size6 += o.size6 - dup6
 }
 
+// Equal checks whether two tables are structurally and semantically equal.
+// It ensures both trees (IPv4-based and IPv6-based) have the same sizes and
+// recursively compares their root nodes.
+func (t *Table[V]) Equal(o *Table[V]) bool {
+	if t.size4 != o.size4 || t.size6 != o.size6 {
+		return false
+	}
+
+	return t.root4.equalRec(&o.root4) && t.root6.equalRec(&o.root6)
+}
+
 // Clone returns a copy of the routing table.
 // The payload of type V is shallow copied, but if type V implements the [Cloner] interface,
 // the values are cloned.

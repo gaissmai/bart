@@ -318,6 +318,21 @@ func TestLiteContainsCompare(t *testing.T) {
 	}
 }
 
+func TestLiteEqual(t *testing.T) {
+	t.Parallel()
+	prng := rand.New(rand.NewPCG(42, 42))
+
+	rt := new(Lite)
+	for _, pfx := range randomRealWorldPrefixes(prng, 100_000) {
+		rt.Insert(pfx)
+	}
+
+	ct := rt.Clone()
+	if !rt.Equal(ct) {
+		t.Error("expected true, got false")
+	}
+}
+
 func TestLiteLookupPrefixUnmasked(t *testing.T) {
 	// test that the pfx must not be masked on input for LookupPrefix
 	t.Parallel()
