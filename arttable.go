@@ -30,6 +30,9 @@ func (d *ArtTable[V]) rootNodeByVersion(is4 bool) *artNode[V] {
 }
 
 func (d *ArtTable[V]) Insert(pfx netip.Prefix, val V) {
+	// rejectZeroSized enforces at compile-time that V is not zero-sized.
+	rejectZeroSized[V]()
+
 	if !pfx.IsValid() {
 		return
 	}
