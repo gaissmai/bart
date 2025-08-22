@@ -1199,7 +1199,7 @@ func BenchmarkArtMemIP4(b *testing.B) {
 			runtime.ReadMemStats(&endMem)
 
 			stats := rt.root4.nodeStatsRec()
-			b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/k), "bytes/pfx")
+			b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/k), "bytes/route")
 			b.ReportMetric(float64(stats.nodes), "node")
 			b.ReportMetric(float64(stats.pfxs), "pfxs")
 			b.ReportMetric(float64(stats.leaves), "leaf")
@@ -1230,7 +1230,7 @@ func BenchmarkArtMemIP6(b *testing.B) {
 			runtime.ReadMemStats(&endMem)
 
 			stats := rt.root6.nodeStatsRec()
-			b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/k), "bytes/pfx")
+			b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/k), "bytes/route")
 			b.ReportMetric(float64(stats.nodes), "node")
 			b.ReportMetric(float64(stats.pfxs), "pfxs")
 			b.ReportMetric(float64(stats.leaves), "leaf")
@@ -1270,7 +1270,7 @@ func BenchmarkArtMem(b *testing.B) {
 				s4.fringes + s6.fringes,
 			}
 
-			b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/k), "bytes/pfx")
+			b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/k), "bytes/route")
 			b.ReportMetric(float64(stats.nodes), "node")
 			b.ReportMetric(float64(stats.pfxs), "pfxs")
 			b.ReportMetric(float64(stats.leaves), "leaf")
@@ -1282,13 +1282,14 @@ func BenchmarkArtMem(b *testing.B) {
 
 func BenchmarkArtFullTableMemory4(b *testing.B) {
 	var startMem, endMem runtime.MemStats
+	nRoutes := len(routes4)
 
-	rt := new(ArtTable[struct{}])
-	runtime.GC()
-	runtime.ReadMemStats(&startMem)
+	b.Run(fmt.Sprintf("Table[]: %d", nRoutes), func(b *testing.B) {
+		rt := new(ArtTable[struct{}])
+		runtime.GC()
+		runtime.ReadMemStats(&startMem)
 
-	b.Run(fmt.Sprintf("Table[]: %d", len(routes4)), func(b *testing.B) {
-		for range b.N {
+		for b.Loop() {
 			for _, route := range routes4 {
 				rt.Insert(route.CIDR, struct{}{})
 			}
@@ -1298,7 +1299,7 @@ func BenchmarkArtFullTableMemory4(b *testing.B) {
 		runtime.ReadMemStats(&endMem)
 
 		stats := rt.root4.nodeStatsRec()
-		b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/stats.pfxs), "bytes/pfx")
+		b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/nRoutes), "bytes/route")
 		b.ReportMetric(float64(stats.pfxs), "pfxs")
 		b.ReportMetric(float64(stats.nodes), "nodes")
 		b.ReportMetric(float64(stats.leaves), "leaves")
@@ -1314,7 +1315,9 @@ func BenchmarkArtFullTableMemory6(b *testing.B) {
 	runtime.GC()
 	runtime.ReadMemStats(&startMem)
 
-	b.Run(fmt.Sprintf("Table[]: %d", len(routes6)), func(b *testing.B) {
+	nRoutes := len(routes6)
+
+	b.Run(fmt.Sprintf("Table[]: %d", nRoutes), func(b *testing.B) {
 		for range b.N {
 			for _, route := range routes6 {
 				rt.Insert(route.CIDR, struct{}{})
@@ -1325,7 +1328,7 @@ func BenchmarkArtFullTableMemory6(b *testing.B) {
 		runtime.ReadMemStats(&endMem)
 
 		stats := rt.root6.nodeStatsRec()
-		b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/stats.pfxs), "bytes/pfx")
+		b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/nRoutes), "bytes/route")
 		b.ReportMetric(float64(stats.pfxs), "pfxs")
 		b.ReportMetric(float64(stats.nodes), "nodes")
 		b.ReportMetric(float64(stats.leaves), "leaves")
@@ -1341,7 +1344,9 @@ func BenchmarkArtFullTableMemory(b *testing.B) {
 	runtime.GC()
 	runtime.ReadMemStats(&startMem)
 
-	b.Run(fmt.Sprintf("Table[]: %d", len(routes)), func(b *testing.B) {
+	nRoutes := len(routes)
+
+	b.Run(fmt.Sprintf("Table[]: %d", nRoutes), func(b *testing.B) {
 		for range b.N {
 			for _, route := range routes {
 				rt.Insert(route.CIDR, struct{}{})
@@ -1361,7 +1366,7 @@ func BenchmarkArtFullTableMemory(b *testing.B) {
 			fringes: s4.fringes + s6.fringes,
 		}
 
-		b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/stats.pfxs), "bytes/pfx")
+		b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/nRoutes), "bytes/route")
 		b.ReportMetric(float64(stats.pfxs), "pfxs")
 		b.ReportMetric(float64(stats.nodes), "nodes")
 		b.ReportMetric(float64(stats.leaves), "leaves")

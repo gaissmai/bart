@@ -51,6 +51,11 @@ func init() {
 	randRoute6 = routes6[prng.IntN(len(routes6))]
 }
 
+var (
+	intSink  int
+	boolSink bool
+)
+
 func init() {
 	prng := rand.New(rand.NewPCG(42, 42))
 	lt := new(Lite)
@@ -320,6 +325,7 @@ func BenchmarkFullTableClone(b *testing.B) {
 		rt4.Insert(route.CIDR, i)
 	}
 
+	b.ResetTimer()
 	b.Run("CloneIP4", func(b *testing.B) {
 		for b.Loop() {
 			_ = rt4.Clone()
@@ -332,6 +338,7 @@ func BenchmarkFullTableClone(b *testing.B) {
 		rt6.Insert(route.CIDR, i)
 	}
 
+	b.ResetTimer()
 	b.Run("CloneIP6", func(b *testing.B) {
 		for b.Loop() {
 			_ = rt6.Clone()
@@ -344,6 +351,7 @@ func BenchmarkFullTableClone(b *testing.B) {
 		rt.Insert(route.CIDR, i)
 	}
 
+	b.ResetTimer()
 	b.Run("Clone", func(b *testing.B) {
 		for b.Loop() {
 			_ = rt.Clone()
