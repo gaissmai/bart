@@ -11,15 +11,26 @@ import (
 // Each artNode contains two conceptually different fixed sized arrays:
 //   - prefixes: representing routes, using a complete binary tree layout
 //     driven by the baseIndex() function from the ART algorithm.
-//   - children: holding subtries a branching factor of 256.
+//   - children: holding subtries or path-compressed leaves or fringes.
 //
 // See doc/artlookup.pdf for the mapping mechanics and prefix tree details.
 type artNode[V any] struct {
-	prefixes [maxItems]*V  // 256
-	children [maxItems]any // 256
+	prefixes [maxItems]*wrappedVal[V]
+	children [maxItems]any // *artNode or path-compreassed *leaf- or *fringeNode
 
-	prefixCount uint8
-	childCount  uint8
+	prefixCount uint16
+	childCount  uint16
+}
+
+// wrappedVal wraps a value of type V to ensure that
+// each instance has a unique address, even if V is zero-sized.
+// This is necessary because in artNode, every distinct prefix
+// must refer to a unique value pointer.
+// Wrapping V in this struct guarantees that each inserted prefix
+// has its own distinct address in memory.
+type wrappedVal[V any] struct {
+	data V    // the wrapped value, which may be zero-sized
+	_    bool // a dummy field to ensure the struct is never zero-sized
 }
 
 // isEmpty returns true if node has neither prefixes nor children
@@ -30,7 +41,7 @@ func (n *artNode[V]) isEmpty() bool {
 func (n *artNode[V]) prefixesAsSlice() []uint8 {
 	res := make([]uint8, 0, maxItems)
 	for i := range n.prefixes {
-		if n.isStartIdx(uint8(i)) {
+		if n.idxIsRoot(uint8(i)) {
 			res = append(res, uint8(i))
 		}
 	}
@@ -40,7 +51,7 @@ func (n *artNode[V]) prefixesAsSlice() []uint8 {
 func (n *artNode[V]) mustFirstPrefixItem() (idx uint8, val V) {
 	for idx, valPtr := range n.prefixes {
 		if valPtr != nil {
-			return uint8(idx), *valPtr
+			return uint8(idx), (*valPtr).data
 		}
 	}
 	panic("empty prefixes")
@@ -93,11 +104,10 @@ func (n *artNode[V]) deleteChild(addr uint8) {
 
 // insertPrefix adds the route addr/prefixLen to n, with value val.
 func (n *artNode[V]) insertPrefix(addr uint8, prefixLen uint8, val V) (exists bool) {
-	exists = true
-
 	idx := art.PfxToIdx(addr, prefixLen)
-	if !n.isStartIdx(idx) {
-		// new prefix
+	if n.idxIsRoot(idx) {
+		exists = true
+	} else {
 		exists = false
 		n.prefixCount++
 	}
@@ -105,13 +115,106 @@ func (n *artNode[V]) insertPrefix(addr uint8, prefixLen uint8, val V) (exists bo
 	// To ensure allot works as intended, every unique prefix in the
 	// artNode must point to a distinct value pointer, even for identical values.
 	// Using new() and assignment guarantees each inserted prefix gets its own address.
-	p := new(V)
-	*p = val
+	valPtr := &wrappedVal[V]{data: val}
 
-	old := n.prefixes[idx]
-	n.allotRec(idx, old, p)
+	oldValPtr := n.prefixes[idx]
+	n.allotRec(idx, oldValPtr, valPtr)
 
 	return
+}
+
+// getPrefix TODO
+func (n *artNode[V]) getPrefix(addr uint8, prefixLen uint8) (val V, exists bool) {
+	idx := art.PfxToIdx(addr, prefixLen)
+	if n.idxIsRoot(idx) {
+		valPtr := n.prefixes[idx]
+		return (*valPtr).data, true
+	}
+	// Route entry doesn't exist
+	return val, false
+}
+
+// deletePrefix TODO
+func (n *artNode[V]) deletePrefix(addr uint8, prefixLen uint8) (val V, exists bool) {
+	idx := art.PfxToIdx(addr, prefixLen)
+	if !n.idxIsRoot(idx) {
+		// Route entry doesn't exist
+		return val, false
+	}
+
+	valPtr := n.prefixes[idx]
+
+	var parentValPtr *wrappedVal[V]
+	if parentIdx := idx >> 1; parentIdx != 0 {
+		parentValPtr = n.prefixes[parentIdx]
+	}
+
+	n.allotRec(idx, valPtr, parentValPtr)
+	n.prefixCount--
+
+	return (*valPtr).data, true
+}
+
+// contains TODO
+func (n *artNode[V]) contains(idx uint) (ok bool) {
+	return n.prefixes[uint8(idx>>1)] != nil
+}
+
+// lookup TODO
+func (n *artNode[V]) lookup(idx uint) (val V, ok bool) {
+	if valPtr := n.prefixes[uint8(idx>>1)]; valPtr != nil {
+		return (*valPtr).data, true
+	}
+	return val, false
+}
+
+// allotRec updates entries in the subtree rooted at idx whose stored prefix pointer equals old.
+// For each matching entry, it updates the prefix pointer to val.
+//
+// This function is central to the ART algorithm, efficiently supporting fast lookups.
+//
+// TODO: use a precalculated lookup table
+func (n *artNode[V]) allotRec(idx uint8, oldValPtr, valPtr *wrappedVal[V]) {
+	if n.prefixes[idx] != oldValPtr {
+		// This index doesn't match the old value, likely the recursive call
+		// has reached a child node with a more specific route already in place.
+		// Don't modify this branch.
+		return
+	}
+	n.prefixes[idx] = valPtr
+
+	// max idx is 255, so stop at 128:
+	// max leftChildIdx:  127<<1 = 254
+	// max rightChildIdx: 254 +1 = 255
+	if idx >= 128 {
+		return
+	}
+
+	// Continue updating in both child subtrees.
+	leftChildIdx := idx << 1
+	n.allotRec(leftChildIdx, oldValPtr, valPtr)
+
+	rightChildIdx := leftChildIdx + 1
+	n.allotRec(rightChildIdx, oldValPtr, valPtr)
+}
+
+// idxIsRoot TODO
+func (n *artNode[V]) idxIsRoot(idx uint8) bool {
+	valPtr := n.prefixes[idx]
+	if valPtr == nil {
+		return false
+	}
+
+	parentIdx := idx >> 1
+	if parentIdx == 0 {
+		// [idx] is non-nil, and is at the 0/0 route position (idx == 1).
+		return true
+	}
+	if parentValPtr := n.prefixes[parentIdx]; valPtr != parentValPtr {
+		// parent node in the tree isn't the same prefix
+		return true
+	}
+	return false
 }
 
 func (n *artNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool) {
@@ -157,9 +260,8 @@ func (n *artNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists b
 			// insert new child at current leaf position (addr)
 			// descend down, replace n with new child
 			newNode := new(artNode[V])
-			newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
-
-			n.insertChild(octet, newNode)
+			_ = newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
+			_ = n.insertChild(octet, newNode)
 			n = newNode
 
 		case *fringeNode[V]:
@@ -176,9 +278,8 @@ func (n *artNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists b
 			// insert new child at current leaf position (addr)
 			// descend down, replace n with new child
 			newNode := new(artNode[V])
-			newNode.insertPrefix(0, 0, kid.value)
-
-			n.insertChild(octet, newNode)
+			_ = newNode.insertPrefix(0, 0, kid.value)
+			_ = n.insertChild(octet, newNode)
 			n = newNode
 
 		default:
@@ -255,96 +356,4 @@ func (n *artNode[V]) purgeAndCompress(stack []*artNode[V], octets []uint8, is4 b
 		// climb up the stack
 		n = parent
 	}
-}
-
-// getPrefix TODO
-func (n *artNode[V]) getPrefix(addr uint8, prefixLen uint8) (val V, exists bool) {
-	idx := art.PfxToIdx(addr, prefixLen)
-	if n.isStartIdx(idx) {
-		pv := n.prefixes[idx]
-		return *pv, true
-	}
-	// Route entry doesn't exist
-	return val, false
-}
-
-// deletePrefix TODO
-func (n *artNode[V]) deletePrefix(addr uint8, prefixLen uint8) (val V, exists bool) {
-	idx := art.PfxToIdx(addr, prefixLen)
-	if !n.isStartIdx(uint8(idx)) {
-		// Route entry doesn't exist
-		return val, false
-	}
-
-	pv := n.prefixes[idx]
-	var parentVal *V
-	if parentIdx := idx >> 1; parentIdx != 0 {
-		parentVal = n.prefixes[parentIdx]
-	}
-
-	n.allotRec(idx, pv, parentVal)
-	n.prefixCount--
-
-	return *pv, true
-}
-
-// contains TODO
-func (n *artNode[V]) contains(idx uint) (ok bool) {
-	return n.prefixes[uint8(idx>>1)] != nil
-}
-
-// lookup TODO
-func (n *artNode[V]) lookup(idx uint) (ret V, ok bool) {
-	if val := n.prefixes[uint8(idx>>1)]; val != nil {
-		return *val, true
-	}
-	return ret, false
-}
-
-// allotRec updates entries in the subtree rooted at idx whose stored prefix pointer equals old.
-// For each matching entry, it updates the prefix pointer to val.
-//
-// This function is central to the ART algorithm, efficiently supporting fast lookups.
-//
-// TODO: use a precalculated lookup table
-func (n *artNode[V]) allotRec(idx uint8, old, val *V) {
-	if n.prefixes[idx] != old {
-		// This index doesn't match what we're looking for-likely a recursive call
-		// has reached a child node with a more specific route already in place.
-		// Don't modify this branch.
-		return
-	}
-	n.prefixes[idx] = val
-	// we use 0..7, 8..15, 16..23, ...
-	// max idx is 255
-	if idx >= maxItems>>1 {
-		return
-	}
-
-	// Continue updating in both child subtrees.
-	leftChildIdx := idx << 1
-	n.allotRec(leftChildIdx, old, val)
-
-	rightChildIdx := leftChildIdx + 1
-	n.allotRec(rightChildIdx, old, val)
-}
-
-// isStartIdx TODO
-func (n *artNode[V]) isStartIdx(idx uint8) bool {
-	val := n.prefixes[idx]
-	if val == nil {
-		return false
-	}
-
-	parentIdx := idx >> 1
-	if parentIdx == 0 {
-		// idx is non-nil, and is at the 0/0 route position.
-		return true
-	}
-	if parentVal := n.prefixes[parentIdx]; val != parentVal {
-		// parent node in the tree isn't the same prefix, so idx must
-		// be a startIdx
-		return true
-	}
-	return false
 }
