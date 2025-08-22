@@ -3527,11 +3527,12 @@ func BenchmarkMemIP4(b *testing.B) {
 			runtime.ReadMemStats(&endMem)
 
 			stats := rt.root4.nodeStatsRec()
-			b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/k), "bytes/pfx")
-			b.ReportMetric(float64(stats.nodes), "node")
+
+			b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/k), "bytes/route")
 			b.ReportMetric(float64(stats.pfxs), "pfxs")
-			b.ReportMetric(float64(stats.leaves), "leaf")
-			b.ReportMetric(float64(stats.fringes), "fringe")
+			b.ReportMetric(float64(stats.nodes), "nodes")
+			b.ReportMetric(float64(stats.leaves), "leaves")
+			b.ReportMetric(float64(stats.fringes), "fringes")
 			b.ReportMetric(0, "ns/op")
 		})
 	}
@@ -3558,11 +3559,12 @@ func BenchmarkMemIP6(b *testing.B) {
 			runtime.ReadMemStats(&endMem)
 
 			stats := rt.root6.nodeStatsRec()
-			b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/k), "bytes/pfx")
-			b.ReportMetric(float64(stats.nodes), "node")
+
+			b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/k), "bytes/route")
 			b.ReportMetric(float64(stats.pfxs), "pfxs")
-			b.ReportMetric(float64(stats.leaves), "leaf")
-			b.ReportMetric(float64(stats.fringes), "fringe")
+			b.ReportMetric(float64(stats.nodes), "nodes")
+			b.ReportMetric(float64(stats.leaves), "leaves")
+			b.ReportMetric(float64(stats.fringes), "fringes")
 			b.ReportMetric(0, "ns/op")
 		})
 	}
@@ -3598,11 +3600,11 @@ func BenchmarkMem(b *testing.B) {
 				s4.fringes + s6.fringes,
 			}
 
-			b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/k), "bytes/pfx")
-			b.ReportMetric(float64(stats.nodes), "node")
+			b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/k), "bytes/route")
 			b.ReportMetric(float64(stats.pfxs), "pfxs")
-			b.ReportMetric(float64(stats.leaves), "leaf")
-			b.ReportMetric(float64(stats.fringes), "fringe")
+			b.ReportMetric(float64(stats.nodes), "nodes")
+			b.ReportMetric(float64(stats.leaves), "leaves")
+			b.ReportMetric(float64(stats.fringes), "fringes")
 			b.ReportMetric(0, "ns/op")
 		})
 	}
