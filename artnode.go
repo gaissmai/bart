@@ -15,22 +15,11 @@ import (
 //
 // See doc/artlookup.pdf for the mapping mechanics and prefix tree details.
 type artNode[V any] struct {
-	prefixes [maxItems]*wrappedVal[V]
+	prefixes [maxItems]*V
 	children [maxItems]any // *artNode or path-compreassed *leaf- or *fringeNode
 
 	prefixCount uint16
 	childCount  uint16
-}
-
-// wrappedVal wraps a value of type V to ensure that
-// each instance has a unique address, even if V is zero-sized.
-// This is necessary because in artNode, every distinct prefix
-// must refer to a unique value pointer.
-// Wrapping V in this struct guarantees that each inserted prefix
-// has its own distinct address in memory.
-type wrappedVal[V any] struct {
-	data V    // the wrapped value, which may be zero-sized
-	_    bool // a dummy field to ensure the struct is never zero-sized
 }
 
 // isEmpty returns true if node has neither prefixes nor children
@@ -51,7 +40,7 @@ func (n *artNode[V]) prefixesAsSlice() []uint8 {
 func (n *artNode[V]) mustFirstPrefixItem() (idx uint8, val V) {
 	for idx, valPtr := range n.prefixes {
 		if valPtr != nil {
-			return uint8(idx), (*valPtr).data
+			return uint8(idx), *valPtr
 		}
 	}
 	panic("empty prefixes")
@@ -114,11 +103,13 @@ func (n *artNode[V]) insertPrefix(addr uint8, prefixLen uint8, val V) (exists bo
 
 	// To ensure allot works as intended, every unique prefix in the
 	// artNode must point to a distinct value pointer, even for identical values.
-	// Using new() and assignment guarantees each inserted prefix gets its own address.
-	valPtr := &wrappedVal[V]{data: val}
+	// Using new() and assignment guarantees each inserted prefix gets its own address,
+	// but only if V is not zero-sized!
+	valPtr := new(V)
+	*valPtr = val
 
 	oldValPtr := n.prefixes[idx]
-	n.allotRec(idx, oldValPtr, valPtr)
+	n.allot(idx, oldValPtr, valPtr)
 
 	return
 }
@@ -128,7 +119,7 @@ func (n *artNode[V]) getPrefix(addr uint8, prefixLen uint8) (val V, exists bool)
 	idx := art.PfxToIdx(addr, prefixLen)
 	if n.idxIsRoot(idx) {
 		valPtr := n.prefixes[idx]
-		return (*valPtr).data, true
+		return *valPtr, true
 	}
 	// Route entry doesn't exist
 	return val, false
@@ -144,15 +135,15 @@ func (n *artNode[V]) deletePrefix(addr uint8, prefixLen uint8) (val V, exists bo
 
 	valPtr := n.prefixes[idx]
 
-	var parentValPtr *wrappedVal[V]
+	var parentValPtr *V
 	if parentIdx := idx >> 1; parentIdx != 0 {
 		parentValPtr = n.prefixes[parentIdx]
 	}
 
-	n.allotRec(idx, valPtr, parentValPtr)
+	n.allot(idx, valPtr, parentValPtr)
 	n.prefixCount--
 
-	return (*valPtr).data, true
+	return *valPtr, true
 }
 
 // contains TODO
@@ -163,17 +154,12 @@ func (n *artNode[V]) contains(idx uint) (ok bool) {
 // lookup TODO
 func (n *artNode[V]) lookup(idx uint) (val V, ok bool) {
 	if valPtr := n.prefixes[uint8(idx>>1)]; valPtr != nil {
-		return (*valPtr).data, true
+		return *valPtr, true
 	}
 	return val, false
 }
 
-// allotRec updates entries in the subtree rooted at idx whose stored prefix pointer equals old.
-// For each matching entry, it updates the prefix pointer to val.
-//
-// This function is central to the ART algorithm, efficiently supporting fast lookups.
-//
-// TODO: use a precalculated lookup table
+/*
 func (n *artNode[V]) allotRec(idx uint8, oldValPtr, valPtr *wrappedVal[V]) {
 	if n.prefixes[idx] != oldValPtr {
 		// This index doesn't match the old value, likely the recursive call
@@ -196,6 +182,33 @@ func (n *artNode[V]) allotRec(idx uint8, oldValPtr, valPtr *wrappedVal[V]) {
 
 	rightChildIdx := leftChildIdx + 1
 	n.allotRec(rightChildIdx, oldValPtr, valPtr)
+}
+*/
+
+// allot updates the prefix pointers in the Knuth ART (Allotment Routing Table)
+// for the subtree rooted at `idx`.
+//
+// For every entry in `allotLookupTbl[idx]` whose current prefix pointer equals
+// `oldValPtr`, the pointer is reassigned to `valPtr`.
+//
+// Semantics:
+//   - Only slots that exactly match `oldValPtr` are updated.
+//   - Slots that already point elsewhere are left untouched, as they correspond
+//     to routes that have already been specialized to a different value.
+//
+// Role in ART (Allotment Routing Table):
+// This routine ensures that when a prefix mapping is changed, all affected
+// routing entries in the indexed subtree are consistently redirected.
+// It is central to maintaining the correctness of the ART mechanism, which
+// relies on fast pointer updates rather than restructuring the whole table.
+func (n *artNode[V]) allot(idx uint8, oldValPtr, valPtr *V) {
+	for _, idx := range allotLookupTbl[idx] {
+		if n.prefixes[idx] != oldValPtr {
+			// Skip: this idx already points to a more specific route.
+			continue
+		}
+		n.prefixes[idx] = valPtr
+	}
 }
 
 // idxIsRoot TODO
