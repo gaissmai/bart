@@ -325,7 +325,6 @@ func BenchmarkFullTableClone(b *testing.B) {
 		rt4.Insert(route.CIDR, i)
 	}
 
-	b.ResetTimer()
 	b.Run("CloneIP4", func(b *testing.B) {
 		for b.Loop() {
 			_ = rt4.Clone()
@@ -338,7 +337,6 @@ func BenchmarkFullTableClone(b *testing.B) {
 		rt6.Insert(route.CIDR, i)
 	}
 
-	b.ResetTimer()
 	b.Run("CloneIP6", func(b *testing.B) {
 		for b.Loop() {
 			_ = rt6.Clone()
@@ -351,7 +349,6 @@ func BenchmarkFullTableClone(b *testing.B) {
 		rt.Insert(route.CIDR, i)
 	}
 
-	b.ResetTimer()
 	b.Run("Clone", func(b *testing.B) {
 		for b.Loop() {
 			_ = rt.Clone()
