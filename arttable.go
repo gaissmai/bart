@@ -323,11 +323,3 @@ func (d *ArtTable[V]) Size4() int {
 func (d *ArtTable[V]) Size6() int {
 	return d.size6
 }
-
-func finalArt(bits int) (maxDepth int, lastBits int) {
-	// maxDepth:  range from 0..3 or 0..15
-	// lastBits:  range from 0..8
-	maxDepth = (bits - 1) / 8
-	lastBits = bits - (maxDepth * 8)
-	return
-}
