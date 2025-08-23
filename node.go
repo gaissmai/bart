@@ -149,8 +149,7 @@ func (n *bartNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists 
 		// kid is node or leaf at addr
 		switch kid := kid.(type) {
 		case *bartNode[V]:
-			n = kid
-			break // descend down to next trie level
+			n = kid // descend down to next trie level
 
 		case *leafNode[V]:
 			// reached a path compressed prefix
