@@ -170,8 +170,6 @@ func (n *artNode[V]) allotRec(idx uint8, oldValPtr, valPtr *wrappedVal[V]) {
 	n.prefixes[idx] = valPtr
 
 	// max idx is 255, so stop at 128:
-	// max leftChildIdx:  127<<1 = 254
-	// max rightChildIdx: 254 +1 = 255
 	if idx >= 128 {
 		return
 	}
@@ -185,29 +183,35 @@ func (n *artNode[V]) allotRec(idx uint8, oldValPtr, valPtr *wrappedVal[V]) {
 }
 */
 
-// allot updates the prefix pointers in the Knuth ART (Allotment Routing Table)
-// for the subtree rooted at `idx`.
+// allot updates entries whose stored valPtr matches oldValPtr, in the
+// subtree rooted at idx. Matching entries have their stored oldValPtr set to
+// valPtr, and their value set to val.
 //
-// For every entry in `allotLookupTbl[idx]` whose current prefix pointer equals
-// `oldValPtr`, the pointer is reassigned to `valPtr`.
+// allot is the core of the ART algorithm, enabling efficient insertion/deletion
+// while preserving very fast lookups.
 //
-// Semantics:
-//   - Only slots that exactly match `oldValPtr` are updated.
-//   - Slots that already point elsewhere are left untouched, as they correspond
-//     to routes that have already been specialized to a different value.
-//
-// Role in ART (Allotment Routing Table):
-// This routine ensures that when a prefix mapping is changed, all affected
-// routing entries in the indexed subtree are consistently redirected.
-// It is central to maintaining the correctness of the ART mechanism, which
-// relies on fast pointer updates rather than restructuring the whole table.
+// Using an iterative form ensures better inlining opportunities and avoids
+// unnecessary call overhead.
 func (n *artNode[V]) allot(idx uint8, oldValPtr, valPtr *V) {
-	for _, idx := range allotLookupTbl[idx] {
+	stack := make([]uint8, 0, 256)
+	stack = append(stack, idx)
+
+	for i := 0; i < len(stack); i++ {
+		idx = stack[i]
+
+		// Skip: this idx already points to a more specific route.
 		if n.prefixes[idx] != oldValPtr {
-			// Skip: this idx already points to a more specific route.
 			continue
 		}
 		n.prefixes[idx] = valPtr
+
+		// max idx is 255, so stop at 128
+		if idx >= 128 {
+			continue
+		}
+
+		left := idx << 1
+		stack = append(stack, left, left+1)
 	}
 }
 
