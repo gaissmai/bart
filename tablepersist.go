@@ -480,7 +480,7 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, e
 // false stops the iteration early.
 //
 // IMPORTANT: It is the responsibility of the callback implementation to only
-// use *persistent* Table operations (e.g. InsertPersist, DeletePersist,
+// use persistent Table operations (e.g. InsertPersist, DeletePersist,
 // UpdatePersist, ...). Using mutating methods like Update or Delete
 // inside the callback would break the iteration and may lead
 // to inconsistent results.
@@ -489,21 +489,27 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, e
 //
 //	pt := t.WalkPersist(func(pt *Table[int], pfx netip.Prefix, val int) (*Table[int], bool) {
 //		switch {
+//		// Stop iterating if value is <0
 //		case val < 0:
-//			// Stop iterating if value is <0
-//		  return pt, false
+//			return pt, false
+//
+//		// Delete entries with value 0
 //		case val == 0:
-//			// Delete entries with value 0
 //			pt = pt.DeletePersist(pfx)
+//
+//		// Update even values by doubling them
 //		case val%2 == 0:
-//			// Update even values by doubling them
 //			pt, _ = pt.UpdatePersist(pfx, func(oldVal int, _ bool) int {
 //				return oldVal * 2
 //			})
+//
+//		// Leave odd values unchanged
 //		default:
-//			// Leave odd values unchanged, do nothing
+//			// no-op
 //		}
-//		return pt, true // continue iterating
+//
+//		// Continue iterating
+//		return pt, true
 //	})
 func (t *Table[V]) WalkPersist(fn func(*Table[V], netip.Prefix, V) (*Table[V], bool)) *Table[V] {
 	// create shallow persistent copy
