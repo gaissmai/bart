@@ -51,11 +51,6 @@ func init() {
 	randRoute6 = routes6[prng.IntN(len(routes6))]
 }
 
-var (
-	intSink  int
-	boolSink bool
-)
-
 func init() {
 	prng := rand.New(rand.NewPCG(42, 42))
 	lt := new(Lite)
@@ -126,34 +121,27 @@ func BenchmarkFullMatch4(b *testing.B) {
 		rt.Insert(route.CIDR, struct{}{})
 	}
 
-	b.Log(matchIP4)
-	b.Log(matchPfx4)
-
 	b.Run("Contains", func(b *testing.B) {
-		b.ResetTimer()
-		for range b.N {
-			boolSink = rt.Contains(matchIP4)
+		for b.Loop() {
+			rt.Contains(matchIP4)
 		}
 	})
 
 	b.Run("Lookup", func(b *testing.B) {
-		b.ResetTimer()
-		for range b.N {
-			_, boolSink = rt.Lookup(matchIP4)
+		for b.Loop() {
+			rt.Lookup(matchIP4)
 		}
 	})
 
 	b.Run("LookupPrefix", func(b *testing.B) {
-		b.ResetTimer()
-		for range b.N {
-			_, boolSink = rt.LookupPrefix(matchPfx4)
+		for b.Loop() {
+			rt.LookupPrefix(matchPfx4)
 		}
 	})
 
 	b.Run("LookupPfxLPM", func(b *testing.B) {
-		b.ResetTimer()
-		for range b.N {
-			_, _, boolSink = rt.LookupPrefixLPM(matchPfx4)
+		for b.Loop() {
+			rt.LookupPrefixLPM(matchPfx4)
 		}
 	})
 }
@@ -165,34 +153,27 @@ func BenchmarkFullMatch6(b *testing.B) {
 		rt.Insert(route.CIDR, struct{}{})
 	}
 
-	b.Log(matchIP6)
-	b.Log(matchPfx6)
-
 	b.Run("Contains", func(b *testing.B) {
-		b.ResetTimer()
-		for range b.N {
-			boolSink = rt.Contains(matchIP6)
+		for b.Loop() {
+			rt.Contains(matchIP6)
 		}
 	})
 
 	b.Run("Lookup", func(b *testing.B) {
-		b.ResetTimer()
-		for range b.N {
-			_, boolSink = rt.Lookup(matchIP6)
+		for b.Loop() {
+			rt.Lookup(matchIP6)
 		}
 	})
 
 	b.Run("LookupPrefix", func(b *testing.B) {
-		b.ResetTimer()
-		for range b.N {
-			_, boolSink = rt.LookupPrefix(matchPfx6)
+		for b.Loop() {
+			rt.LookupPrefix(matchPfx6)
 		}
 	})
 
 	b.Run("LookupPfxLPM", func(b *testing.B) {
-		b.ResetTimer()
-		for range b.N {
-			_, _, boolSink = rt.LookupPrefixLPM(matchPfx6)
+		for b.Loop() {
+			rt.LookupPrefixLPM(matchPfx6)
 		}
 	})
 }
@@ -204,34 +185,27 @@ func BenchmarkFullMiss4(b *testing.B) {
 		rt.Insert(route.CIDR, i)
 	}
 
-	b.Log(missIP4)
-	b.Log(missPfx4)
-
 	b.Run("Contains", func(b *testing.B) {
-		b.ResetTimer()
-		for range b.N {
-			boolSink = rt.Contains(missIP4)
+		for b.Loop() {
+			rt.Contains(missIP4)
 		}
 	})
 
 	b.Run("Lookup", func(b *testing.B) {
-		b.ResetTimer()
-		for range b.N {
-			intSink, boolSink = rt.Lookup(missIP4)
+		for b.Loop() {
+			rt.Lookup(missIP4)
 		}
 	})
 
 	b.Run("LookupPrefix", func(b *testing.B) {
-		b.ResetTimer()
-		for range b.N {
-			intSink, boolSink = rt.LookupPrefix(missPfx4)
+		for b.Loop() {
+			rt.LookupPrefix(missPfx4)
 		}
 	})
 
 	b.Run("LookupPfxLPM", func(b *testing.B) {
-		b.ResetTimer()
-		for range b.N {
-			_, intSink, boolSink = rt.LookupPrefixLPM(missPfx4)
+		for b.Loop() {
+			rt.LookupPrefixLPM(missPfx4)
 		}
 	})
 }
@@ -243,34 +217,27 @@ func BenchmarkFullMiss6(b *testing.B) {
 		rt.Insert(route.CIDR, i)
 	}
 
-	b.Log(missIP6)
-	b.Log(missPfx6)
-
 	b.Run("Contains", func(b *testing.B) {
-		b.ResetTimer()
-		for range b.N {
-			boolSink = rt.Contains(missIP6)
+		for b.Loop() {
+			rt.Contains(missIP6)
 		}
 	})
 
 	b.Run("Lookup", func(b *testing.B) {
-		b.ResetTimer()
-		for range b.N {
-			intSink, boolSink = rt.Lookup(missIP6)
+		for b.Loop() {
+			rt.Lookup(missIP6)
 		}
 	})
 
 	b.Run("LookupPrefix", func(b *testing.B) {
-		b.ResetTimer()
-		for range b.N {
-			intSink, boolSink = rt.LookupPrefix(missPfx6)
+		for b.Loop() {
+			rt.LookupPrefix(missPfx6)
 		}
 	})
 
 	b.Run("LookupPfxLPM", func(b *testing.B) {
-		b.ResetTimer()
-		for range b.N {
-			_, intSink, boolSink = rt.LookupPrefixLPM(missPfx6)
+		for b.Loop() {
+			rt.LookupPrefixLPM(missPfx6)
 		}
 	})
 }
@@ -290,9 +257,8 @@ func BenchmarkFullTableOverlaps4(b *testing.B) {
 		}
 
 		b.Run(fmt.Sprintf("With_%4d", i), func(b *testing.B) {
-			b.ResetTimer()
-			for range b.N {
-				boolSink = lt.Overlaps(lt2)
+			for b.Loop() {
+				lt.Overlaps(lt2)
 			}
 		})
 	}
@@ -313,9 +279,8 @@ func BenchmarkFullTableOverlaps6(b *testing.B) {
 		}
 
 		b.Run(fmt.Sprintf("With_%4d", i), func(b *testing.B) {
-			b.ResetTimer()
-			for range b.N {
-				boolSink = lt.Overlaps(lt2)
+			for b.Loop() {
+				lt.Overlaps(lt2)
 			}
 		})
 	}
@@ -331,9 +296,8 @@ func BenchmarkFullTableOverlapsPrefix(b *testing.B) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfx := randomRealWorldPrefixes(prng, 1)[0]
 
-	b.ResetTimer()
-	for range b.N {
-		boolSink = lt.OverlapsPrefix(pfx)
+	for b.Loop() {
+		lt.OverlapsPrefix(pfx)
 	}
 }
 
@@ -344,9 +308,8 @@ func BenchmarkFullTableClone(b *testing.B) {
 		rt4.Insert(route.CIDR, i)
 	}
 
-	b.ResetTimer()
 	b.Run("CloneIP4", func(b *testing.B) {
-		for range b.N {
+		for b.Loop() {
 			_ = rt4.Clone()
 		}
 	})
@@ -357,9 +320,8 @@ func BenchmarkFullTableClone(b *testing.B) {
 		rt6.Insert(route.CIDR, i)
 	}
 
-	b.ResetTimer()
 	b.Run("CloneIP6", func(b *testing.B) {
-		for range b.N {
+		for b.Loop() {
 			_ = rt6.Clone()
 		}
 	})
@@ -370,9 +332,8 @@ func BenchmarkFullTableClone(b *testing.B) {
 		rt.Insert(route.CIDR, i)
 	}
 
-	b.ResetTimer()
 	b.Run("Clone", func(b *testing.B) {
-		for range b.N {
+		for b.Loop() {
 			_ = rt.Clone()
 		}
 	})
@@ -387,7 +348,7 @@ func BenchmarkFullTableMemory4(b *testing.B) {
 
 	nRoutes := len(routes4)
 	b.Run(fmt.Sprintf("Table[]: %d", nRoutes), func(b *testing.B) {
-		for range b.N {
+		for b.Loop() {
 			for _, route := range routes4 {
 				rt.Insert(route.CIDR, struct{}{})
 			}
@@ -415,7 +376,7 @@ func BenchmarkFullTableMemory6(b *testing.B) {
 
 	nRoutes := len(routes6)
 	b.Run(fmt.Sprintf("Table[]: %d", nRoutes), func(b *testing.B) {
-		for range b.N {
+		for b.Loop() {
 			for _, route := range routes6 {
 				rt.Insert(route.CIDR, struct{}{})
 			}
@@ -443,7 +404,7 @@ func BenchmarkFullTableMemory(b *testing.B) {
 
 	nRoutes := len(routes)
 	b.Run(fmt.Sprintf("Table[]: %d", nRoutes), func(b *testing.B) {
-		for range b.N {
+		for b.Loop() {
 			for _, route := range routes {
 				rt.Insert(route.CIDR, struct{}{})
 			}

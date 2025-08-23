@@ -536,8 +536,7 @@ func BenchmarkSubnets(b *testing.B) {
 
 	probe := mpp("42.150.112.0/20")
 	b.Run(fmt.Sprintf("Subnets(%q) from %d random pfxs", probe, n), func(b *testing.B) {
-		b.ResetTimer()
-		for range b.N {
+		for b.Loop() {
 			for range rtbl.Subnets(probe) {
 				continue
 			}
@@ -556,8 +555,7 @@ func BenchmarkSupernets(b *testing.B) {
 
 	probe := mpp("42.150.112.0/20")
 	b.Run(fmt.Sprintf("Supernets(%q) from %d random pfxs", probe, n), func(b *testing.B) {
-		b.ResetTimer()
-		for range b.N {
+		for b.Loop() {
 			for range rtbl.Supernets(probe) {
 				continue
 			}

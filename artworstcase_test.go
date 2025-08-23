@@ -168,9 +168,8 @@ func BenchmarkArtWorstCaseMatch4(b *testing.B) {
 			tbl.Insert(p, p.String())
 		}
 
-		b.ResetTimer()
-		for range b.N {
-			boolSink = tbl.Contains(worstCaseProbeIP4)
+		for b.Loop() {
+			tbl.Contains(worstCaseProbeIP4)
 		}
 	})
 
@@ -183,9 +182,8 @@ func BenchmarkArtWorstCaseMatch4(b *testing.B) {
 		tbl.Insert(ipv4DefaultRoute, ipv4DefaultRoute.String())
 		tbl.Delete(worstCaseProbePfx4)
 
-		b.ResetTimer()
-		for range b.N {
-			_, boolSink = tbl.Lookup(worstCaseProbeIP4)
+		for b.Loop() {
+			tbl.Lookup(worstCaseProbeIP4)
 		}
 	})
 }
@@ -200,9 +198,8 @@ func BenchmarkArtWorstCaseMiss4(b *testing.B) {
 
 		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
 
-		b.ResetTimer()
-		for range b.N {
-			boolSink = tbl.Contains(worstCaseProbeIP4)
+		for b.Loop() {
+			tbl.Contains(worstCaseProbeIP4)
 		}
 	})
 
@@ -215,9 +212,8 @@ func BenchmarkArtWorstCaseMiss4(b *testing.B) {
 
 		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
 
-		b.ResetTimer()
-		for range b.N {
-			_, boolSink = tbl.Lookup(worstCaseProbeIP4)
+		for b.Loop() {
+			tbl.Lookup(worstCaseProbeIP4)
 		}
 	})
 }
@@ -230,9 +226,8 @@ func BenchmarkArtWorstCaseMatch6(b *testing.B) {
 			tbl.Insert(p, p.String())
 		}
 
-		b.ResetTimer()
-		for range b.N {
-			boolSink = tbl.Contains(worstCaseProbeIP6)
+		for b.Loop() {
+			tbl.Contains(worstCaseProbeIP6)
 		}
 	})
 
@@ -245,9 +240,8 @@ func BenchmarkArtWorstCaseMatch6(b *testing.B) {
 		tbl.Insert(ipv6DefaultRoute, ipv6DefaultRoute.String())
 		tbl.Delete(worstCaseProbePfx6)
 
-		b.ResetTimer()
-		for range b.N {
-			_, boolSink = tbl.Lookup(worstCaseProbeIP6)
+		for b.Loop() {
+			tbl.Lookup(worstCaseProbeIP6)
 		}
 	})
 }
@@ -262,9 +256,8 @@ func BenchmarkArtWorstCaseMiss6(b *testing.B) {
 
 		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
 
-		b.ResetTimer()
-		for range b.N {
-			boolSink = tbl.Contains(worstCaseProbeIP6)
+		for b.Loop() {
+			tbl.Contains(worstCaseProbeIP6)
 		}
 	})
 
@@ -277,9 +270,8 @@ func BenchmarkArtWorstCaseMiss6(b *testing.B) {
 
 		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
 
-		b.ResetTimer()
-		for range b.N {
-			_, boolSink = tbl.Lookup(worstCaseProbeIP6)
+		for b.Loop() {
+			tbl.Lookup(worstCaseProbeIP6)
 		}
 	})
 }

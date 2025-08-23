@@ -1078,9 +1078,8 @@ func BenchmarkArtTableInsertRandom(b *testing.B) {
 		probe := randomPrefix(prng)
 		myInt := MyInt(42)
 
-		b.ResetTimer()
 		b.Run(fmt.Sprintf("mutable into %d", n), func(b *testing.B) {
-			for range b.N {
+			for b.Loop() {
 				rt.Insert(probe, &myInt)
 			}
 
@@ -1110,9 +1109,8 @@ func BenchmarkArtTableDelete(b *testing.B) {
 
 		probe := randomPrefix(prng)
 
-		b.ResetTimer()
 		b.Run(fmt.Sprintf("mutable from_%d", n), func(b *testing.B) {
-			for range b.N {
+			for b.Loop() {
 				rt.Delete(probe)
 			}
 		})
@@ -1135,10 +1133,9 @@ func BenchmarkArtTableGet(b *testing.B) {
 
 			probe := rng(prng, 1)[0]
 
-			b.ResetTimer()
 			b.Run(fmt.Sprintf("%s/From_%d", fam, nroutes), func(b *testing.B) {
-				for range b.N {
-					_, boolSink = rt.Get(probe.pfx)
+				for b.Loop() {
+					rt.Get(probe.pfx)
 				}
 			})
 		}
@@ -1161,17 +1158,15 @@ func BenchmarkArtTableLPM(b *testing.B) {
 
 			probe := rng(prng, 1)[0]
 
-			b.ResetTimer()
 			b.Run(fmt.Sprintf("%s/In_%6d/%s", fam, nroutes, "Contains"), func(b *testing.B) {
-				for range b.N {
-					boolSink = rt.Contains(probe.pfx.Addr())
+				for b.Loop() {
+					rt.Contains(probe.pfx.Addr())
 				}
 			})
 
-			b.ResetTimer()
 			b.Run(fmt.Sprintf("%s/In_%6d/%s", fam, nroutes, "Lookup"), func(b *testing.B) {
-				for range b.N {
-					_, boolSink = rt.Lookup(probe.pfx.Addr())
+				for b.Loop() {
+					rt.Lookup(probe.pfx.Addr())
 				}
 			})
 		}
@@ -1188,7 +1183,7 @@ func BenchmarkArtMemIP4(b *testing.B) {
 
 		b.Run(strconv.Itoa(k), func(b *testing.B) {
 			rt := new(ArtTable[struct{}])
-			for range b.N {
+			for b.Loop() {
 				rt = new(ArtTable[struct{}])
 				for _, pfx := range randomRealWorldPrefixes4(prng, k) {
 					rt.Insert(pfx, struct{}{})
@@ -1219,7 +1214,7 @@ func BenchmarkArtMemIP6(b *testing.B) {
 
 		b.Run(strconv.Itoa(k), func(b *testing.B) {
 			rt := new(ArtTable[struct{}])
-			for range b.N {
+			for b.Loop() {
 				rt = new(ArtTable[struct{}])
 				for _, pfx := range randomRealWorldPrefixes6(prng, k) {
 					rt.Insert(pfx, struct{}{})
@@ -1250,7 +1245,7 @@ func BenchmarkArtMem(b *testing.B) {
 
 		b.Run(strconv.Itoa(k), func(b *testing.B) {
 			rt := new(ArtTable[struct{}])
-			for range b.N {
+			for b.Loop() {
 				rt = new(ArtTable[struct{}])
 				for _, pfx := range randomRealWorldPrefixes(prng, k) {
 					rt.Insert(pfx, struct{}{})
@@ -1318,7 +1313,7 @@ func BenchmarkArtFullTableMemory6(b *testing.B) {
 	nRoutes := len(routes6)
 
 	b.Run(fmt.Sprintf("Table[]: %d", nRoutes), func(b *testing.B) {
-		for range b.N {
+		for b.Loop() {
 			for _, route := range routes6 {
 				rt.Insert(route.CIDR, struct{}{})
 			}
@@ -1347,7 +1342,7 @@ func BenchmarkArtFullTableMemory(b *testing.B) {
 	nRoutes := len(routes)
 
 	b.Run(fmt.Sprintf("Table[]: %d", nRoutes), func(b *testing.B) {
-		for range b.N {
+		for b.Loop() {
 			for _, route := range routes {
 				rt.Insert(route.CIDR, struct{}{})
 			}
@@ -1372,6 +1367,86 @@ func BenchmarkArtFullTableMemory(b *testing.B) {
 		b.ReportMetric(float64(stats.leaves), "leaves")
 		b.ReportMetric(float64(stats.fringes), "fringes")
 		b.ReportMetric(0, "ns/op")
+	})
+}
+
+func BenchmarkArtFullMatch4(b *testing.B) {
+	rt := new(ArtTable[any])
+
+	for _, route := range routes {
+		rt.Insert(route.CIDR, nil)
+	}
+
+	b.Run("Contains", func(b *testing.B) {
+		for b.Loop() {
+			rt.Contains(matchIP4)
+		}
+	})
+
+	b.Run("Lookup", func(b *testing.B) {
+		for b.Loop() {
+			rt.Lookup(matchIP4)
+		}
+	})
+}
+
+func BenchmarkArtFullMatch6(b *testing.B) {
+	rt := new(ArtTable[any])
+
+	for _, route := range routes {
+		rt.Insert(route.CIDR, nil)
+	}
+
+	b.Run("Contains", func(b *testing.B) {
+		for b.Loop() {
+			rt.Contains(matchIP6)
+		}
+	})
+
+	b.Run("Lookup", func(b *testing.B) {
+		for b.Loop() {
+			rt.Lookup(matchIP6)
+		}
+	})
+}
+
+func BenchmarkArtFullMiss4(b *testing.B) {
+	rt := new(ArtTable[any])
+
+	for _, route := range routes {
+		rt.Insert(route.CIDR, nil)
+	}
+
+	b.Run("Contains", func(b *testing.B) {
+		for b.Loop() {
+			rt.Contains(missIP4)
+		}
+	})
+
+	b.Run("Lookup", func(b *testing.B) {
+		for b.Loop() {
+			rt.Lookup(missIP4)
+		}
+	})
+}
+
+func BenchmarkArtFullMiss6(b *testing.B) {
+	rt := new(ArtTable[any])
+
+	for _, route := range routes {
+		rt.Insert(route.CIDR, nil)
+	}
+
+	b.Run("Contains", func(b *testing.B) {
+		for b.Loop() {
+			rt.Contains(missIP6)
+		}
+	})
+
+	b.Run("Lookup", func(b *testing.B) {
+		for b.Loop() {
+			rt.Lookup(missIP6)
+		}
 	})
 }
 

@@ -2890,9 +2890,8 @@ func BenchmarkTableInsertRandom(b *testing.B) {
 		probe := randomPrefix(prng)
 		myInt := MyInt(42)
 
-		b.ResetTimer()
 		b.Run(fmt.Sprintf("mutable into %d", n), func(b *testing.B) {
-			for range b.N {
+			for b.Loop() {
 				rt.Insert(probe, &myInt)
 			}
 
@@ -2909,9 +2908,8 @@ func BenchmarkTableInsertRandom(b *testing.B) {
 			b.ReportMetric(float64(rt.Size())/float64(stats.nodes), "Prefix/Node")
 		})
 
-		b.ResetTimer()
 		b.Run(fmt.Sprintf("persist into %d", n), func(b *testing.B) {
-			for range b.N {
+			for b.Loop() {
 				_ = prt.InsertPersist(probe, &myInt)
 			}
 
@@ -2943,16 +2941,14 @@ func BenchmarkTableDelete(b *testing.B) {
 		prt := rt
 		probe := randomPrefix(prng)
 
-		b.ResetTimer()
 		b.Run(fmt.Sprintf("mutable from_%d", n), func(b *testing.B) {
-			for range b.N {
+			for b.Loop() {
 				rt.Delete(probe)
 			}
 		})
 
-		b.ResetTimer()
 		b.Run(fmt.Sprintf("persist from_%d", n), func(b *testing.B) {
-			for range b.N {
+			for b.Loop() {
 				_ = prt.DeletePersist(probe)
 			}
 		})
@@ -2975,10 +2971,9 @@ func BenchmarkTableGet(b *testing.B) {
 
 			probe := rng(prng, 1)[0]
 
-			b.ResetTimer()
 			b.Run(fmt.Sprintf("%s/From_%d", fam, nroutes), func(b *testing.B) {
-				for range b.N {
-					_, boolSink = rt.Get(probe.pfx)
+				for b.Loop() {
+					rt.Get(probe.pfx)
 				}
 			})
 		}
@@ -3001,31 +2996,27 @@ func BenchmarkTableLPM(b *testing.B) {
 
 			probe := rng(prng, 1)[0]
 
-			b.ResetTimer()
 			b.Run(fmt.Sprintf("%s/In_%6d/%s", fam, nroutes, "Contains"), func(b *testing.B) {
-				for range b.N {
-					boolSink = rt.Contains(probe.pfx.Addr())
+				for b.Loop() {
+					rt.Contains(probe.pfx.Addr())
 				}
 			})
 
-			b.ResetTimer()
 			b.Run(fmt.Sprintf("%s/In_%6d/%s", fam, nroutes, "Lookup"), func(b *testing.B) {
-				for range b.N {
-					_, boolSink = rt.Lookup(probe.pfx.Addr())
+				for b.Loop() {
+					rt.Lookup(probe.pfx.Addr())
 				}
 			})
 
-			b.ResetTimer()
 			b.Run(fmt.Sprintf("%s/In_%6d/%s", fam, nroutes, "Prefix"), func(b *testing.B) {
-				for range b.N {
-					_, boolSink = rt.LookupPrefix(probe.pfx)
+				for b.Loop() {
+					rt.LookupPrefix(probe.pfx)
 				}
 			})
 
-			b.ResetTimer()
 			b.Run(fmt.Sprintf("%s/In_%6d/%s", fam, nroutes, "PrefixLPM"), func(b *testing.B) {
-				for range b.N {
-					_, _, boolSink = rt.LookupPrefixLPM(probe.pfx)
+				for b.Loop() {
+					rt.LookupPrefixLPM(probe.pfx)
 				}
 			})
 		}
@@ -3048,10 +3039,9 @@ func BenchmarkTableOverlapsPrefix(b *testing.B) {
 
 			probe := rng(prng, 1)[0]
 
-			b.ResetTimer()
 			b.Run(fmt.Sprintf("%s/With_%d", fam, nroutes), func(b *testing.B) {
-				for range b.N {
-					boolSink = rt.OverlapsPrefix(probe.pfx)
+				for b.Loop() {
+					rt.OverlapsPrefix(probe.pfx)
 				}
 			})
 		}
@@ -3077,10 +3067,9 @@ func BenchmarkTableOverlaps(b *testing.B) {
 				inter.Insert(route.pfx, route.val)
 			}
 
-			b.ResetTimer()
 			b.Run(fmt.Sprintf("%s/%d_with_%d", fam, nroutes, nroutes), func(b *testing.B) {
-				for range b.N {
-					boolSink = rt.Overlaps(inter)
+				for b.Loop() {
+					rt.Overlaps(inter)
 				}
 			})
 		}
@@ -3101,9 +3090,8 @@ func BenchmarkTableClone(b *testing.B) {
 				rt.Insert(route.pfx, route.val)
 			}
 
-			b.ResetTimer()
 			b.Run(fmt.Sprintf("%s/%d", fam, nroutes), func(b *testing.B) {
-				for range b.N {
+				for b.Loop() {
 					rt.Clone()
 				}
 			})
@@ -3121,7 +3109,7 @@ func BenchmarkMemIP4(b *testing.B) {
 
 		b.Run(strconv.Itoa(k), func(b *testing.B) {
 			rt := new(Table[struct{}])
-			for range b.N {
+			for b.Loop() {
 				rt = new(Table[struct{}])
 				for _, pfx := range randomRealWorldPrefixes4(prng, k) {
 					rt.Insert(pfx, struct{}{})
@@ -3153,7 +3141,7 @@ func BenchmarkMemIP6(b *testing.B) {
 
 		b.Run(strconv.Itoa(k), func(b *testing.B) {
 			rt := new(Table[struct{}])
-			for range b.N {
+			for b.Loop() {
 				rt = new(Table[struct{}])
 				for _, pfx := range randomRealWorldPrefixes6(prng, k) {
 					rt.Insert(pfx, struct{}{})
@@ -3185,7 +3173,7 @@ func BenchmarkMem(b *testing.B) {
 
 		b.Run(strconv.Itoa(k), func(b *testing.B) {
 			rt := new(Table[struct{}])
-			for range b.N {
+			for b.Loop() {
 				rt = new(Table[struct{}])
 				for _, pfx := range randomRealWorldPrefixes(prng, k) {
 					rt.Insert(pfx, struct{}{})
