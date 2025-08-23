@@ -406,8 +406,7 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
 		case *bartNode[V]:
-			n = kid
-			break // descend down to next trie level
+			n = kid // descend down to next trie level
 
 		case *fringeNode[V]:
 			// fringe is the default-route for all possible octets below
