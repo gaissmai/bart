@@ -104,7 +104,7 @@ func (n *artNode[V]) insertPrefix(addr uint8, prefixLen uint8, val V) (exists bo
 	// To ensure allot works as intended, every unique prefix in the
 	// artNode must point to a distinct value pointer, even for identical values.
 	// Using new() and assignment guarantees each inserted prefix gets its own address,
-	// but only if V is not zero-sized!
+	// but only if V IS NOT zero-sized!
 	valPtr := new(V)
 	*valPtr = val
 
@@ -159,30 +159,6 @@ func (n *artNode[V]) lookup(idx uint) (val V, ok bool) {
 	return val, false
 }
 
-/*
-func (n *artNode[V]) allotRec(idx uint8, oldValPtr, valPtr *wrappedVal[V]) {
-	if n.prefixes[idx] != oldValPtr {
-		// This index doesn't match the old value, likely the recursive call
-		// has reached a child node with a more specific route already in place.
-		// Don't modify this branch.
-		return
-	}
-	n.prefixes[idx] = valPtr
-
-	// max idx is 255, so stop at 128:
-	if idx >= 128 {
-		return
-	}
-
-	// Continue updating in both child subtrees.
-	leftChildIdx := idx << 1
-	n.allotRec(leftChildIdx, oldValPtr, valPtr)
-
-	rightChildIdx := leftChildIdx + 1
-	n.allotRec(rightChildIdx, oldValPtr, valPtr)
-}
-*/
-
 // allot updates entries whose stored valPtr matches oldValPtr, in the
 // subtree rooted at idx. Matching entries have their stored oldValPtr set to
 // valPtr, and their value set to val.
@@ -190,28 +166,42 @@ func (n *artNode[V]) allotRec(idx uint8, oldValPtr, valPtr *wrappedVal[V]) {
 // allot is the core of the ART algorithm, enabling efficient insertion/deletion
 // while preserving very fast lookups.
 //
-// Using an iterative form ensures better inlining opportunities and avoids
-// unnecessary call overhead.
+// See doc/artlookup.pdf for the mapping mechanics and prefix tree details.
+//
+// Example of (uninterrupted) allotment sequence:
+//
+//	addr/bits: 0/5 -> {0/5, 0/6, 4/6, 0/7, 2/7, 4/7, 6/7}
+//	                    ╭────╮╭─────────┬────╮
+//	       idx: 32 ->  32    64   65   128  129 130  131
+//	                    ╰─────────╯╰─────────────┴────╯
+//
+// Using an iterative form ensures better inlining opportunities.
 func (n *artNode[V]) allot(idx uint8, oldValPtr, valPtr *V) {
+	// iteration with stack instead of recursion
 	stack := make([]uint8, 0, 256)
+
+	// start idx
 	stack = append(stack, idx)
 
 	for i := 0; i < len(stack); i++ {
 		idx = stack[i]
 
-		// Skip: this idx already points to a more specific route.
+		// stop this allot path, idx already points to a more specific route.
 		if n.prefixes[idx] != oldValPtr {
 			continue
 		}
 		n.prefixes[idx] = valPtr
 
-		// max idx is 255, so stop at 128
+		// max idx is 255, so stop the duplication at 128 and above
 		if idx >= 128 {
 			continue
 		}
 
+		// duplicate and duplicate+1
 		left := idx << 1
-		stack = append(stack, left, left+1)
+		right := left + 1
+
+		stack = append(stack, left, right)
 	}
 }
 
