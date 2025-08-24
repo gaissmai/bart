@@ -51,11 +51,6 @@ func init() {
 	randRoute6 = routes6[prng.IntN(len(routes6))]
 }
 
-var (
-	intSink  int
-	boolSink bool
-)
-
 func init() {
 	prng := rand.New(rand.NewPCG(42, 42))
 	lt := new(Lite)
@@ -131,25 +126,25 @@ func BenchmarkFullMatch4(b *testing.B) {
 
 	b.Run("Contains", func(b *testing.B) {
 		for b.Loop() {
-			boolSink = rt.Contains(matchIP4)
+			rt.Contains(matchIP4)
 		}
 	})
 
 	b.Run("Lookup", func(b *testing.B) {
 		for b.Loop() {
-			_, boolSink = rt.Lookup(matchIP4)
+			rt.Lookup(matchIP4)
 		}
 	})
 
 	b.Run("LookupPrefix", func(b *testing.B) {
 		for b.Loop() {
-			_, boolSink = rt.LookupPrefix(matchPfx4)
+			rt.LookupPrefix(matchPfx4)
 		}
 	})
 
 	b.Run("LookupPfxLPM", func(b *testing.B) {
 		for b.Loop() {
-			_, _, boolSink = rt.LookupPrefixLPM(matchPfx4)
+			rt.LookupPrefixLPM(matchPfx4)
 		}
 	})
 }
@@ -166,25 +161,25 @@ func BenchmarkFullMatch6(b *testing.B) {
 
 	b.Run("Contains", func(b *testing.B) {
 		for b.Loop() {
-			boolSink = rt.Contains(matchIP6)
+			rt.Contains(matchIP6)
 		}
 	})
 
 	b.Run("Lookup", func(b *testing.B) {
 		for b.Loop() {
-			_, boolSink = rt.Lookup(matchIP6)
+			rt.Lookup(matchIP6)
 		}
 	})
 
 	b.Run("LookupPrefix", func(b *testing.B) {
 		for b.Loop() {
-			_, boolSink = rt.LookupPrefix(matchPfx6)
+			rt.LookupPrefix(matchPfx6)
 		}
 	})
 
 	b.Run("LookupPfxLPM", func(b *testing.B) {
 		for b.Loop() {
-			_, _, boolSink = rt.LookupPrefixLPM(matchPfx6)
+			rt.LookupPrefixLPM(matchPfx6)
 		}
 	})
 }
@@ -201,25 +196,25 @@ func BenchmarkFullMiss4(b *testing.B) {
 
 	b.Run("Contains", func(b *testing.B) {
 		for b.Loop() {
-			boolSink = rt.Contains(missIP4)
+			rt.Contains(missIP4)
 		}
 	})
 
 	b.Run("Lookup", func(b *testing.B) {
 		for b.Loop() {
-			intSink, boolSink = rt.Lookup(missIP4)
+			rt.Lookup(missIP4)
 		}
 	})
 
 	b.Run("LookupPrefix", func(b *testing.B) {
 		for b.Loop() {
-			intSink, boolSink = rt.LookupPrefix(missPfx4)
+			rt.LookupPrefix(missPfx4)
 		}
 	})
 
 	b.Run("LookupPfxLPM", func(b *testing.B) {
 		for b.Loop() {
-			_, intSink, boolSink = rt.LookupPrefixLPM(missPfx4)
+			rt.LookupPrefixLPM(missPfx4)
 		}
 	})
 }
@@ -236,25 +231,25 @@ func BenchmarkFullMiss6(b *testing.B) {
 
 	b.Run("Contains", func(b *testing.B) {
 		for b.Loop() {
-			boolSink = rt.Contains(missIP6)
+			rt.Contains(missIP6)
 		}
 	})
 
 	b.Run("Lookup", func(b *testing.B) {
 		for b.Loop() {
-			intSink, boolSink = rt.Lookup(missIP6)
+			rt.Lookup(missIP6)
 		}
 	})
 
 	b.Run("LookupPrefix", func(b *testing.B) {
 		for b.Loop() {
-			intSink, boolSink = rt.LookupPrefix(missPfx6)
+			rt.LookupPrefix(missPfx6)
 		}
 	})
 
 	b.Run("LookupPfxLPM", func(b *testing.B) {
 		for b.Loop() {
-			_, intSink, boolSink = rt.LookupPrefixLPM(missPfx6)
+			rt.LookupPrefixLPM(missPfx6)
 		}
 	})
 }
@@ -275,7 +270,7 @@ func BenchmarkFullTableOverlaps4(b *testing.B) {
 
 		b.Run(fmt.Sprintf("With_%4d", i), func(b *testing.B) {
 			for b.Loop() {
-				boolSink = lt.Overlaps(lt2)
+				lt.Overlaps(lt2)
 			}
 		})
 	}
@@ -297,7 +292,7 @@ func BenchmarkFullTableOverlaps6(b *testing.B) {
 
 		b.Run(fmt.Sprintf("With_%4d", i), func(b *testing.B) {
 			for b.Loop() {
-				boolSink = lt.Overlaps(lt2)
+				lt.Overlaps(lt2)
 			}
 		})
 	}
@@ -314,7 +309,7 @@ func BenchmarkFullTableOverlapsPrefix(b *testing.B) {
 	pfx := randomRealWorldPrefixes(prng, 1)[0]
 
 	for b.Loop() {
-		boolSink = lt.OverlapsPrefix(pfx)
+		lt.OverlapsPrefix(pfx)
 	}
 }
 

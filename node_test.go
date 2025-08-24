@@ -17,8 +17,6 @@ import (
 	"github.com/gaissmai/bart/internal/art"
 )
 
-var uint8SliceSink []uint8
-
 func TestInverseIndex(t *testing.T) {
 	t.Parallel()
 	for i := range maxItems {
@@ -169,7 +167,7 @@ func BenchmarkNodePrefixInsert(b *testing.B) {
 			idx := art.PfxToIdx(route.octet, route.bits)
 
 			for b.Loop() {
-				boolSink = this.prefixes.InsertAt(idx, 0)
+				this.prefixes.InsertAt(idx, 0)
 			}
 		})
 	}
@@ -194,7 +192,7 @@ func BenchmarkNodePrefixUpdate(b *testing.B) {
 			idx := art.PfxToIdx(route.octet, route.bits)
 
 			for b.Loop() {
-				_, boolSink = this.prefixes.UpdateAt(idx, func(int, bool) int { return 1 })
+				this.prefixes.UpdateAt(idx, func(int, bool) int { return 1 })
 			}
 		})
 	}
@@ -219,7 +217,7 @@ func BenchmarkNodePrefixDelete(b *testing.B) {
 			idx := art.PfxToIdx(route.octet, route.bits)
 
 			for b.Loop() {
-				_, boolSink = this.prefixes.DeleteAt(idx)
+				this.prefixes.DeleteAt(idx)
 			}
 		})
 	}
@@ -244,7 +242,7 @@ func BenchmarkNodePrefixLPM(b *testing.B) {
 			idx := art.PfxToIdx(route.octet, route.bits)
 
 			for b.Loop() {
-				_, _, boolSink = this.lpmGet(uint(idx))
+				this.lpmGet(uint(idx))
 			}
 		})
 
@@ -253,7 +251,7 @@ func BenchmarkNodePrefixLPM(b *testing.B) {
 			idx := art.PfxToIdx(route.octet, route.bits)
 
 			for b.Loop() {
-				boolSink = this.lpmTest(uint(idx))
+				this.lpmTest(uint(idx))
 			}
 		})
 	}
@@ -272,7 +270,7 @@ func BenchmarkNodePrefixesAsSlice(b *testing.B) {
 		b.Run(fmt.Sprintf("Set %d", nPrefixes), func(b *testing.B) {
 			var buf [256]uint8
 			for b.Loop() {
-				uint8SliceSink = this.prefixes.AsSlice(&buf)
+				this.prefixes.AsSlice(&buf)
 			}
 		})
 	}
@@ -285,12 +283,12 @@ func BenchmarkNodePrefixesAll(b *testing.B) {
 
 		for range nPrefixes {
 			idx := byte(prng.IntN(maxItems))
-			boolSink = this.prefixes.InsertAt(idx, nil)
+			this.prefixes.InsertAt(idx, nil)
 		}
 
 		b.Run(fmt.Sprintf("Set %d", nPrefixes), func(b *testing.B) {
 			for b.Loop() {
-				uint8SliceSink = this.prefixes.Bits()
+				this.prefixes.Bits()
 			}
 		})
 
@@ -311,7 +309,7 @@ func BenchmarkNodeChildInsert(b *testing.B) {
 			octet := prng.IntN(maxItems)
 
 			for b.Loop() {
-				boolSink = this.children.InsertAt(uint8(octet), nil)
+				this.children.InsertAt(uint8(octet), nil)
 			}
 		})
 	}
@@ -331,7 +329,7 @@ func BenchmarkNodeChildDelete(b *testing.B) {
 			octet := prng.IntN(maxItems)
 
 			for b.Loop() {
-				_, boolSink = this.children.DeleteAt(uint8(octet))
+				this.children.DeleteAt(uint8(octet))
 			}
 		})
 	}
@@ -350,7 +348,7 @@ func BenchmarkNodeChildrenAsSlice(b *testing.B) {
 		b.Run(fmt.Sprintf("Set %d", nchilds), func(b *testing.B) {
 			var buf [256]uint8
 			for b.Loop() {
-				uint8SliceSink = this.children.AsSlice(&buf)
+				this.children.AsSlice(&buf)
 			}
 		})
 	}
@@ -368,7 +366,7 @@ func BenchmarkNodeChildrenAll(b *testing.B) {
 
 		b.Run(fmt.Sprintf("Set %d", nchilds), func(b *testing.B) {
 			for b.Loop() {
-				uint8SliceSink = this.children.Bits()
+				this.children.Bits()
 			}
 		})
 	}
