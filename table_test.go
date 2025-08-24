@@ -3070,7 +3070,7 @@ func BenchmarkTableGet(b *testing.B) {
 
 			b.Run(fmt.Sprintf("%s/From_%d", fam, nroutes), func(b *testing.B) {
 				for b.Loop() {
-					_, boolSink = rt.Get(probe.pfx)
+					rt.Get(probe.pfx)
 				}
 			})
 		}
@@ -3095,25 +3095,25 @@ func BenchmarkTableLPM(b *testing.B) {
 
 			b.Run(fmt.Sprintf("%s/In_%6d/%s", fam, nroutes, "Contains"), func(b *testing.B) {
 				for b.Loop() {
-					boolSink = rt.Contains(probe.pfx.Addr())
+					rt.Contains(probe.pfx.Addr())
 				}
 			})
 
 			b.Run(fmt.Sprintf("%s/In_%6d/%s", fam, nroutes, "Lookup"), func(b *testing.B) {
 				for b.Loop() {
-					_, boolSink = rt.Lookup(probe.pfx.Addr())
+					rt.Lookup(probe.pfx.Addr())
 				}
 			})
 
 			b.Run(fmt.Sprintf("%s/In_%6d/%s", fam, nroutes, "Prefix"), func(b *testing.B) {
 				for b.Loop() {
-					_, boolSink = rt.LookupPrefix(probe.pfx)
+					rt.LookupPrefix(probe.pfx)
 				}
 			})
 
 			b.Run(fmt.Sprintf("%s/In_%6d/%s", fam, nroutes, "PrefixLPM"), func(b *testing.B) {
 				for b.Loop() {
-					_, _, boolSink = rt.LookupPrefixLPM(probe.pfx)
+					rt.LookupPrefixLPM(probe.pfx)
 				}
 			})
 		}
@@ -3138,7 +3138,7 @@ func BenchmarkTableOverlapsPrefix(b *testing.B) {
 
 			b.Run(fmt.Sprintf("%s/With_%d", fam, nroutes), func(b *testing.B) {
 				for b.Loop() {
-					boolSink = rt.OverlapsPrefix(probe.pfx)
+					rt.OverlapsPrefix(probe.pfx)
 				}
 			})
 		}
@@ -3166,7 +3166,7 @@ func BenchmarkTableOverlaps(b *testing.B) {
 
 			b.Run(fmt.Sprintf("%s/%d_with_%d", fam, nroutes, nroutes), func(b *testing.B) {
 				for b.Loop() {
-					boolSink = rt.Overlaps(inter)
+					rt.Overlaps(inter)
 				}
 			})
 		}
