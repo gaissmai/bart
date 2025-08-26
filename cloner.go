@@ -140,3 +140,84 @@ func (n *bartNode[V]) cloneRec(cloneFn cloneFunc[V]) *bartNode[V] {
 
 	return c
 }
+
+// cloneFlat TODO
+func (n *artNode[V]) cloneFlat(cloneFn cloneFunc[V]) *artNode[V] {
+	if n == nil {
+		return nil
+	}
+
+	c := new(artNode[V])
+	if n.isEmpty() {
+		return c
+	}
+
+	c.prefixCount = n.prefixCount
+	c.childCount = n.childCount
+
+	// it's a clone of the prefixes ... but allot makres it more difficult
+	if n.prefixCount != 0 {
+		for idx, valPtr := range n.prefixes {
+			if !n.idxIsRoot(uint8(idx)) {
+				continue
+			}
+
+			cloneValPtr := new(V)
+			*cloneValPtr = cloneFn(*valPtr)
+
+			cloneOldValPtr := c.prefixes[idx]
+			c.allot(uint8(idx), cloneOldValPtr, cloneValPtr)
+		}
+	}
+
+	if n.childCount != 0 {
+		// Iterate over children to flat clone leaf/fringe nodes;
+		// for *node[V] children, keep shallow references (no recursive clone)
+		for i, anyKid := range n.children {
+			if anyKid == nil {
+				continue
+			}
+
+			switch kid := anyKid.(type) {
+			case *artNode[V]:
+				// Shallow copy
+				c.children[i] = kid
+			case *leafNode[V]:
+				// Clone leaf nodes, applying cloneFn as needed
+				c.children[i] = kid.cloneLeaf(cloneFn)
+			case *fringeNode[V]:
+				// Clone fringe nodes, applying cloneFn as needed
+				c.children[i] = kid.cloneFringe(cloneFn)
+			default:
+				panic("logic error, wrong node type")
+			}
+		}
+	}
+
+	return c
+}
+
+// cloneRec TODO
+func (n *artNode[V]) cloneRec(cloneFn cloneFunc[V]) *artNode[V] {
+	if n == nil {
+		return nil
+	}
+
+	// Perform a flat clone of the current node.
+	c := n.cloneFlat(cloneFn)
+
+	// Recursively clone all child nodes of type *node[V]
+	if c.childCount != 0 {
+		for i, kidAny := range c.children {
+			if kidAny == nil {
+				continue
+			}
+
+			if kid, ok := kidAny.(*artNode[V]); ok {
+				c.children[i] = kid.cloneRec(cloneFn)
+			}
+		}
+	}
+
+	return c
+}

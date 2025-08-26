@@ -6,8 +6,104 @@ import (
 	"net/netip"
 	"runtime"
 	"strconv"
+	"strings"
 	"testing"
 )
+
+func TestArtCloneFlat(t *testing.T) {
+	cloneFn := copyVal[int] // just copy
+
+	tests := []struct {
+		name    string
+		prepare func() *artNode[int]
+		check   func(t *testing.T, got, orig *artNode[int])
+	}{
+		{
+			name: "nil node returns nil",
+			prepare: func() *artNode[int] {
+				return nil
+			},
+			check: func(t *testing.T, got, orig *artNode[int]) {
+				if got != nil {
+					t.Errorf("expected nil, got %+v", got)
+				}
+			},
+		},
+		{
+			name: "empty node",
+			prepare: func() *artNode[int] {
+				return &artNode[int]{}
+			},
+			check: func(t *testing.T, got, orig *artNode[int]) {
+				if got == nil {
+					t.Fatal("got is nil")
+				}
+				if got.prefixCount != 0 || got.childCount != 0 {
+					t.Errorf("expected empty clone, got %+v", got)
+				}
+			},
+		},
+		{
+			name: "node with prefix",
+			prepare: func() *artNode[int] {
+				n := &artNode[int]{}
+				pfx := mpp("8.0.0.0/6")
+				val := 42
+				n.insertAtDepth(pfx, val, 0)
+				return n
+			},
+			check: func(t *testing.T, got, orig *artNode[int]) {
+				gotBuf := &strings.Builder{}
+				origBuf := &strings.Builder{}
+
+				got.dumpRec(gotBuf, stridePath{}, 0, true)
+				orig.dumpRec(origBuf, stridePath{}, 0, true)
+
+				if gotBuf.String() != origBuf.String() {
+					t.Errorf("dump is different\norig:%sgot:%s", origBuf.String(), gotBuf.String())
+				}
+			},
+		},
+		{
+			name: "node with prefixes",
+			prepare: func() *artNode[int] {
+				n := &artNode[int]{}
+				pfx := mpp("8.0.0.0/6")
+				val := 6
+				n.insertAtDepth(pfx, val, 0)
+
+				pfx = mpp("8.0.0.0/8")
+				val = 8
+				n.insertAtDepth(pfx, val, 0)
+
+				pfx = mpp("16.0.0.0/27")
+				val = 27
+				n.insertAtDepth(pfx, val, 0)
+
+				return n
+			},
+			check: func(t *testing.T, got, orig *artNode[int]) {
+				gotBuf := &strings.Builder{}
+				origBuf := &strings.Builder{}
+
+				got.dumpRec(gotBuf, stridePath{}, 0, true)
+				orig.dumpRec(origBuf, stridePath{}, 0, true)
+
+				if gotBuf.String() != origBuf.String() {
+					t.Errorf("dump is different\norig:%sgot:%s", origBuf.String(), gotBuf.String())
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			orig := tt.prepare()
+			got := orig.cloneFlat(cloneFn)
+			tt.check(t, got, orig)
+		})
+	}
+}
 
 func TestArtInvalid(t *testing.T) {
 	t.Parallel()
