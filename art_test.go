@@ -1158,6 +1158,120 @@ func TestArtGetCompare(t *testing.T) {
 	}
 }
 
+func TestArtCloneEdgeCases(t *testing.T) {
+	t.Parallel()
+
+	tbl := new(Table[int])
+	clone := tbl.Clone()
+	if tbl.dumpString() != clone.dumpString() {
+		t.Errorf("empty Clone: got:\n%swant:\n%s", clone.dumpString(), tbl.dumpString())
+	}
+
+	tbl.Insert(mpp("10.0.0.1/32"), 1)
+	tbl.Insert(mpp("::1/128"), 1)
+	clone = tbl.Clone()
+	if tbl.dumpString() != clone.dumpString() {
+		t.Errorf("Clone: got:\n%swant:\n%s", clone.dumpString(), tbl.dumpString())
+	}
+
+	// overwrite value
+	tbl.Insert(mpp("::1/128"), 2)
+	if tbl.dumpString() == clone.dumpString() {
+		t.Errorf("overwrite, clone must be different: clone:\n%sorig:\n%s", clone.dumpString(), tbl.dumpString())
+	}
+
+	tbl.Delete(mpp("10.0.0.1/32"))
+	if tbl.dumpString() == clone.dumpString() {
+		t.Errorf("delete, clone must be different: clone:\n%sorig:\n%s", clone.dumpString(), tbl.dumpString())
+	}
+}
+
+func TestArtClone(t *testing.T) {
+	t.Parallel()
+	prng := rand.New(rand.NewPCG(42, 42))
+
+	pfxs := randomPrefixes(prng, 2)
+
+	golden := new(ArtTable[int])
+	tbl := new(ArtTable[int])
+
+	for _, pfx := range pfxs {
+		golden.Insert(pfx.pfx, pfx.val)
+		tbl.Insert(pfx.pfx, pfx.val)
+	}
+	clone := tbl.Clone()
+
+	if golden.dumpString() != clone.dumpString() {
+		t.Errorf("Clone: got:\n%swant:\n%s", clone.dumpString(), golden.dumpString())
+	}
+
+	if tbl.dumpString() != clone.dumpString() {
+		t.Errorf("Clone: got:\n%swant:\n%s", clone.dumpString(), tbl.dumpString())
+	}
+}
+
+func TestArtCloneShallow(t *testing.T) {
+	t.Parallel()
+
+	tbl := new(ArtTable[*int])
+	clone := tbl.Clone()
+	if tbl.dumpString() != clone.dumpString() {
+		t.Errorf("empty Clone: got:\n%swant:\n%s", clone.dumpString(), tbl.dumpString())
+	}
+
+	val := 1
+	pfx := mpp("10.0.0.1/32")
+	tbl.Insert(pfx, &val)
+
+	clone = tbl.Clone()
+	want, _ := tbl.Get(pfx)
+	got, _ := clone.Get(pfx)
+
+	if *got != *want || got != want {
+		t.Errorf("shallow copy, values and pointers must be equal:\nvalues(%d, %d)\n(ptr(%v, %v)", *got, *want, got, want)
+	}
+
+	// update value, shallow copy of values, clone must be equal
+	val = 2
+	want, _ = tbl.Get(pfx)
+	got, _ = clone.Get(pfx)
+
+	if *got != *want {
+		t.Errorf("memory aliasing after shallow copy, values must be equal:\nvalues(%d, %d)", *got, *want)
+	}
+}
+
+func TestArtCloneDeep(t *testing.T) {
+	t.Parallel()
+
+	tbl := new(ArtTable[*MyInt])
+	clone := tbl.Clone()
+	if tbl.dumpString() != clone.dumpString() {
+		t.Errorf("empty Clone: got:\n%swant:\n%s", clone.dumpString(), tbl.dumpString())
+	}
+
+	val := MyInt(1)
+	pfx := mpp("10.0.0.1/32")
+	tbl.Insert(pfx, &val)
+
+	clone = tbl.Clone()
+	want, _ := tbl.Get(pfx)
+	got, _ := clone.Get(pfx)
+
+	if *got != *want || got == want {
+		t.Errorf("value with Cloner interface, pointers must be different:\nvalues(%d, %d)\n(ptr(%v, %v)", *got, *want, got, want)
+	}
+
+	// update value, deep copy of values, cloned value must now be different
+	val = 2
+	want, _ = tbl.Get(pfx)
+	got, _ = clone.Get(pfx)
+
+	if *got == *want {
+		t.Errorf("memory aliasing after deep copy, values must be different:\nvalues(%d, %d)", *got, *want)
+	}
+}
+
 // ############ benchmarks ################################
 
 func BenchmarkArtTableInsertRandom(b *testing.B) {
