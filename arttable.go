@@ -50,6 +50,100 @@ func (d *ArtTable[V]) Insert(pfx netip.Prefix, val V) {
 	d.sizeUpdate(is4, 1)
 }
 
+// Update TODO
+func (d *ArtTable[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V) {
+	var zero V
+
+	if !pfx.IsValid() {
+		return
+	}
+
+	// canonicalize prefix
+	pfx = pfx.Masked()
+
+	// values derived from pfx
+	ip := pfx.Addr()
+	is4 := ip.Is4()
+	bits := pfx.Bits()
+	octets := ip.AsSlice()
+	maxDepth, lastBits := maxDepthAndLastBits(bits)
+
+	n := d.rootNodeByVersion(is4)
+
+	// find the proper trie node to update prefix
+	for depth, octet := range octets {
+		// last octet from prefix, update/insert prefix into node
+		if depth == maxDepth {
+			val, exists := n.updatePrefix(octet, lastBits, cb)
+			if !exists {
+				d.sizeUpdate(is4, 1)
+			}
+			return val
+		}
+
+		kidAny := n.getChild(octet)
+
+		// reached end of trie path ...
+		// insert prefix path compressed
+		if kidAny == nil {
+			newVal = cb(zero, false)
+
+			if isFringe(depth, bits) {
+				n.insertChild(octet, newFringeNode(newVal))
+			} else {
+				n.insertChild(octet, newLeafNode(pfx, newVal))
+			}
+
+			d.sizeUpdate(is4, 1)
+			return newVal
+		}
+
+		switch kid := kidAny.(type) {
+		case *artNode[V]:
+			n = kid // descend down to next trie level
+
+		case *leafNode[V]:
+			// reached a path compressed prefix
+			// update value in slot if prefixes are equal
+			if kid.prefix == pfx {
+				kid.value = cb(kid.value, true)
+				return kid.value
+			}
+
+			// create new node
+			// push the leaf down
+			// insert new child at current leaf position (addr)
+			// descend down, replace n with new child
+			newNode := new(artNode[V])
+			_ = newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
+			_ = n.insertChild(octet, newNode)
+			n = newNode
+
+		case *fringeNode[V]:
+			// reached a path compressed fringe
+			// update value in slot if pfx is a fringe
+			if isFringe(depth, bits) {
+				kid.value = cb(kid.value, true)
+				return kid.value
+			}
+
+			// create new node ART node
+			// push the fringe down, it becomes a default route (idx=1)
+			// insert new child at current leaf position (addr)
+			// descend down, replace n with new child
+			newNode := new(artNode[V])
+			_ = newNode.insertPrefix(0, 0, kid.value)
+			_ = n.insertChild(octet, newNode)
+			n = newNode
+
+		default:
+			panic("logic error, wrong node type")
+		}
+	}
+
+	panic("unreachable")
+}
+
 // Delete removes pfx from the tree, pfx does not have to be present.
 func (d *ArtTable[V]) Delete(pfx netip.Prefix) {
 	_, _ = d.getAndDelete(pfx)
