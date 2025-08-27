@@ -155,41 +155,48 @@ func (n *artNode[V]) cloneFlat(cloneFn cloneFunc[V]) *artNode[V] {
 	c.prefixCount = n.prefixCount
 	c.childCount = n.childCount
 
-	// it's a clone of the prefixes ... but allot makres it more difficult
+	// it's a clone of the prefixes ...
+	// but the allot algorithm makes it more difficult
+	// see also insertPrefix
 	if n.prefixCount != 0 {
-		for idx, valPtr := range n.prefixes {
+		for idx, origValPtr := range n.prefixes {
 			if !n.idxIsRoot(uint8(idx)) {
 				continue
 			}
 
-			cloneValPtr := new(V)
-			*cloneValPtr = cloneFn(*valPtr)
+			newValPtr := new(V)
+			if cloneFn == nil {
+				*newValPtr = *origValPtr // just copy the value
+			} else {
+				*newValPtr = cloneFn(*origValPtr) // clone the value
+			}
 
-			cloneOldValPtr := c.prefixes[idx]
-			c.allot(uint8(idx), cloneOldValPtr, cloneValPtr)
+			oldValPtr := c.prefixes[idx]
+			c.allot(uint8(idx), oldValPtr, newValPtr)
 		}
 	}
 
-	if n.childCount != 0 {
+	// first make a copy of all the nodes
+	c.children = n.children
+
+	if cloneFn == nil {
+		return c
+	}
+
+	if c.childCount != 0 {
 		// Iterate over children to flat clone leaf/fringe nodes;
-		// for *node[V] children, keep shallow references (no recursive clone)
-		for i, anyKid := range n.children {
+		for i, anyKid := range c.children {
 			if anyKid == nil {
 				continue
 			}
 
 			switch kid := anyKid.(type) {
 			case *artNode[V]:
-				// Shallow copy
-				c.children[i] = kid
+				// no-op, already copied
 			case *leafNode[V]:
-				// Clone leaf nodes, applying cloneFn as needed
 				c.children[i] = kid.cloneLeaf(cloneFn)
 			case *fringeNode[V]:
-				// Clone fringe nodes, applying cloneFn as needed
 				c.children[i] = kid.cloneFringe(cloneFn)
-			default:
-				panic("logic error, wrong node type")
 			}
 		}
 	}

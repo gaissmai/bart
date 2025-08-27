@@ -301,6 +301,25 @@ func (d *ArtTable[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	panic("unreachable")
 }
 
+// Clone TODO
+func (d *ArtTable[V]) Clone() *ArtTable[V] {
+	if d == nil {
+		return nil
+	}
+
+	c := new(ArtTable[V])
+
+	cloneFn := cloneFnFactory[V]()
+
+	c.root4 = *d.root4.cloneRec(cloneFn)
+	c.root6 = *d.root6.cloneRec(cloneFn)
+
+	c.size4 = d.size4
+	c.size6 = d.size6
+
+	return c
+}
+
 func (d *ArtTable[V]) sizeUpdate(is4 bool, n int) {
 	if is4 {
 		d.size4 += n
