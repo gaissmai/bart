@@ -114,6 +114,27 @@ func (n *artNode[V]) insertPrefix(addr uint8, prefixLen uint8, val V) (exists bo
 	return
 }
 
+func (n *artNode[V]) updatePrefix(addr uint8, prefixLen uint8, cb func(V, bool) V) (newVal V, exists bool) {
+	idx := art.PfxToIdx(addr, prefixLen)
+	if n.idxIsRoot(idx) {
+		// exists, update value
+		valPtr := n.prefixes[idx]
+		*valPtr = cb(*valPtr, true)
+		return *valPtr, true
+	}
+
+	// insert new prefix
+
+	valPtr := new(V)
+	*valPtr = cb(*valPtr, false)
+
+	oldValPtr := n.prefixes[idx]
+	n.allot(idx, oldValPtr, valPtr)
+
+	n.prefixCount++
+	return *valPtr, false
+}
+
 // getPrefix TODO
 func (n *artNode[V]) getPrefix(addr uint8, prefixLen uint8) (val V, exists bool) {
 	idx := art.PfxToIdx(addr, prefixLen)
