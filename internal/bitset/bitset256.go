@@ -235,7 +235,7 @@ func (b *BitSet256) Bits() []uint8 {
 // IntersectionTop computes the intersection of base set with the compare set.
 // If the result set isn't empty, it returns the top most set bit and true.
 func (b *BitSet256) IntersectionTop(c *BitSet256) (top uint8, ok bool) {
-	for wIdx := 4 - 1; wIdx >= 0; wIdx-- {
+	for wIdx := 3; wIdx >= 0; wIdx-- {
 		if word := b[wIdx] & c[wIdx]; word != 0 {
 			return uint8(wIdx<<6+bits.Len64(word)) - 1, true
 		}
