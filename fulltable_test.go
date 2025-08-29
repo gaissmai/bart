@@ -51,11 +51,6 @@ func init() {
 	randRoute6 = routes6[prng.IntN(len(routes6))]
 }
 
-var (
-	intSink  int
-	boolSink bool
-)
-
 func init() {
 	prng := rand.New(rand.NewPCG(42, 42))
 	lt := new(Lite)

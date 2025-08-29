@@ -4,6 +4,8 @@
 package bart
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/netip"
@@ -142,10 +144,9 @@ func (n *artNode[V]) fprintRec(w io.Writer, parent artTrieItem[V], pad string) e
 	return nil
 }
 
-/*
 // MarshalText implements the [encoding.TextMarshaler] interface,
 // just a wrapper for [Table.Fprint].
-func (t *Table[V]) MarshalText() ([]byte, error) {
+func (t *ArtTable[V]) MarshalText() ([]byte, error) {
 	w := new(bytes.Buffer)
 	if err := t.Fprint(w); err != nil {
 		return nil, err
@@ -156,7 +157,7 @@ func (t *Table[V]) MarshalText() ([]byte, error) {
 
 // MarshalJSON dumps the table into two sorted lists: for ipv4 and ipv6.
 // Every root and subnet is an array, not a map, because the order matters.
-func (t *Table[V]) MarshalJSON() ([]byte, error) {
+func (t *ArtTable[V]) MarshalJSON() ([]byte, error) {
 	if t == nil {
 		return nil, nil
 	}
@@ -179,7 +180,7 @@ func (t *Table[V]) MarshalJSON() ([]byte, error) {
 
 // DumpList4 dumps the ipv4 tree into a list of roots and their subnets.
 // It can be used to analyze the tree or build the text or json serialization.
-func (t *Table[V]) DumpList4() []DumpListNode[V] {
+func (t *ArtTable[V]) DumpList4() []DumpListNode[V] {
 	if t == nil {
 		return nil
 	}
@@ -188,7 +189,7 @@ func (t *Table[V]) DumpList4() []DumpListNode[V] {
 
 // DumpList6 dumps the ipv6 tree into a list of roots and their subnets.
 // It can be used to analyze the tree or build custom json representation.
-func (t *Table[V]) DumpList6() []DumpListNode[V] {
+func (t *ArtTable[V]) DumpList6() []DumpListNode[V] {
 	if t == nil {
 		return nil
 	}
@@ -196,8 +197,8 @@ func (t *Table[V]) DumpList6() []DumpListNode[V] {
 }
 
 // dumpListRec, build the data structure rec-descent with the help
-// of getDirectCoveredEntries()
-func (n *bartNode[V]) dumpListRec(parentIdx uint8, path stridePath, depth int, is4 bool) []DumpListNode[V] {
+// of directItemsRec.
+func (n *artNode[V]) dumpListRec(parentIdx uint8, path stridePath, depth int, is4 bool) []DumpListNode[V] {
 	// recursion stop condition
 	if n == nil {
 		return nil
@@ -206,7 +207,7 @@ func (n *bartNode[V]) dumpListRec(parentIdx uint8, path stridePath, depth int, i
 	directItems := n.directItemsRec(parentIdx, path, depth, is4)
 
 	// sort the items by prefix
-	slices.SortFunc(directItems, func(a, b trieItem[V]) int {
+	slices.SortFunc(directItems, func(a, b artTrieItem[V]) int {
 		return cmpPrefix(a.cidr, b.cidr)
 	})
 
@@ -223,7 +224,6 @@ func (n *bartNode[V]) dumpListRec(parentIdx uint8, path stridePath, depth int, i
 
 	return nodes
 }
-*/
 
 // directItemsRec, returns the direct covered items by parent.
 // It's a complex recursive function, you have to know the data structure
