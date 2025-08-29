@@ -5,6 +5,7 @@ package bart
 
 import (
 	"bytes"
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -330,4 +331,14 @@ func (n *bartNode[V]) directItemsRec(parentIdx uint8, path stridePath, depth int
 	}
 
 	return directItems
+}
+
+// cmpPrefix, helper function, compare func for prefix sort,
+// all cidrs are already normalized
+func cmpPrefix(a, b netip.Prefix) int {
+	if cmp := a.Addr().Compare(b.Addr()); cmp != 0 {
+		return cmp
+	}
+
+	return cmp.Compare(a.Bits(), b.Bits())
 }
