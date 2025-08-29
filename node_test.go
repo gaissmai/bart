@@ -17,8 +17,6 @@ import (
 	"github.com/gaissmai/bart/internal/art"
 )
 
-var uint8SliceSink []uint8
-
 func TestInverseIndex(t *testing.T) {
 	t.Parallel()
 	for i := range maxItems {

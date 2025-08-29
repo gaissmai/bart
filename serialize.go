@@ -214,7 +214,7 @@ func (t *Table[V]) DumpList6() []DumpListNode[V] {
 }
 
 // dumpListRec, build the data structure rec-descent with the help
-// of getDirectCoveredEntries()
+// of directItemsRec.
 func (n *bartNode[V]) dumpListRec(parentIdx uint8, path stridePath, depth int, is4 bool) []DumpListNode[V] {
 	// recursion stop condition
 	if n == nil {
