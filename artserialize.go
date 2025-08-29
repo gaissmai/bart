@@ -4,7 +4,6 @@
 package bart
 
 import (
-	"cmp"
 	"fmt"
 	"io"
 	"net/netip"
@@ -237,95 +236,87 @@ func (n *artNode[V]) directItemsRec(parentIdx uint8, path stridePath, depth int,
 		return nil
 	}
 
-	// get direct prefix items for parentIdx
-	if n.prefixCount != 0 {
-		for i := uint(parentIdx + 1); i < 256; i++ {
-			idx := uint8(i)
+	// used to compare the LPM match, maybe nil for parentIdx == 0
+	parentValPtr := n.prefixes[parentIdx]
 
-			if !n.idxIsRoot(idx) {
-				continue
+	// if n.prefixCount > 0 {
+	// get direct prefix items for parentIdx
+	// start with j > parentIdx
+	for j := uint(parentIdx + 1); j < 256; j++ {
+		idx := uint8(j)
+
+		if !n.idxIsRoot(idx) {
+			continue
+		}
+
+		// if prefix is directly covered by parentIdx ...
+		valPtr := n.prefixes[idx>>1]
+
+		// both maybe nil
+		if valPtr == parentValPtr {
+
+			item := artTrieItem[V]{
+				n:     n,
+				is4:   is4,
+				path:  path,
+				depth: depth,
+				idx:   idx,
+				// get the prefix back from trie
+				cidr: cidrFromPath(path, depth, is4, idx),
+				val:  *n.prefixes[idx],
 			}
 
-			// if prefix is directly covered by parent ...
-			if idx>>1 == parentIdx {
-				item := artTrieItem[V]{
-					n:     n,
-					is4:   is4,
-					path:  path,
-					depth: depth,
-					idx:   idx,
-					// get the prefix back from trie
-					cidr: cidrFromPath(path, depth, is4, idx),
-					val:  *n.prefixes[idx],
-				}
+			directItems = append(directItems, item)
+		}
+	}
+	//}
 
+	// get direct child items for parentIdx
+	for octet, kidAny := range n.children {
+		if kidAny == nil {
+			continue
+		}
+
+		hostIdx := uint8(art.OctetToIdx(uint8(octet)) >> 1)
+
+		// skip
+		if hostIdx < parentIdx {
+			continue
+		}
+
+		// lookup
+		valPtr := n.prefixes[hostIdx] // maybe nil
+		if valPtr == parentValPtr {
+			switch kid := kidAny.(type) {
+			case *artNode[V]:
+				// traverse rec-descent, call with next child node,
+				// next trie level, set parentIdx to 0, adjust path and depth
+				path[depth] = uint8(octet)
+				directItems = append(directItems, kid.directItemsRec(0, path, depth+1, is4)...)
+
+			case *leafNode[V]:
+				// path-compressed child, stop's recursion for this child
+				item := artTrieItem[V]{
+					n:    nil,
+					is4:  is4,
+					cidr: kid.prefix,
+					val:  kid.value,
+				}
+				directItems = append(directItems, item)
+
+			case *fringeNode[V]:
+				// path-compressed fringe, stop's recursion for this child
+				item := artTrieItem[V]{
+					n:   nil,
+					is4: is4,
+					// get the prefix back from trie
+					cidr: cidrForFringe(path[:], depth, is4, uint8(octet)),
+					val:  kid.value,
+				}
 				directItems = append(directItems, item)
 			}
 		}
 	}
 
-	// get direct childe items for parentIdx
-	if n.childCount != 0 {
-		parentValPtr := n.prefixes[parentIdx] // maybe nil for parentIdx == 0
-
-		for addr := range n.children {
-			if n.children(addr) == nil {
-				continue
-			}
-
-			hostIdx := art.OctetToIdx(addr)
-
-			// fast skip
-			if hostIdx < uint(parentIdx) {
-				continue
-			}
-
-			// lookup
-			valPtr := n.prefixes[uint8(i>>1)]
-			if valPtr == parentValPtr {
-			}
-
-			// be aware, 0 is here a possible value for parentIdx and lpm (if not found)
-			if lpm == parentIdx {
-				// child is directly covered by parent
-				switch kid := n.children.Items[i].(type) {
-				case *bartNode[V]: // traverse rec-descent, call with next child node,
-					// next trie level, set parentIdx to 0, adjust path and depth
-					path[depth&0xf] = addr
-					directItems = append(directItems, kid.directItemsRec(0, path, depth+1, is4)...)
-
-				case *leafNode[V]: // path-compressed child, stop's recursion for this child
-					item := trieItem[V]{
-						n:    nil,
-						is4:  is4,
-						cidr: kid.prefix,
-						val:  kid.value,
-					}
-					directItems = append(directItems, item)
-
-				case *fringeNode[V]: // path-compressed fringe, stop's recursion for this child
-					item := trieItem[V]{
-						n:   nil,
-						is4: is4,
-						// get the prefix back from trie
-						cidr: cidrForFringe(path[:], depth, is4, addr),
-						val:  kid.value,
-					}
-					directItems = append(directItems, item)
-				}
-			}
-		}
-	}
-
 	return directItems
-}
-
-// cmpPrefix, helper function, compare func for prefix sort,
-// all cidrs are already normalized
-func cmpPrefix(a, b netip.Prefix) int {
-	if cmp := a.Addr().Compare(b.Addr()); cmp != 0 {
-		return cmp
-	}
-
-	return cmp.Compare(a.Bits(), b.Bits())
 }
