@@ -96,27 +96,22 @@ func (a *Array256[T]) MustGet(i uint8) T {
 //   - a boolean indicating whether i was already set
 //
 // It must return a new value which is inserted into the sparse array.
-//
-//	newVal, existed := a.UpdateAt(5, func(prev T, wasSet bool) T {
-//	    if wasSet { return modify(prev) }
-//	    return newEntry()
-//	})
-func (a *Array256[T]) UpdateAt(i uint8, cb func(T, bool) T) (newValue T, wasPresent bool) {
+func (a *Array256[T]) UpdateAt(i uint8, cb func(T, bool) T) (newValue T, existed bool) {
 	// if already set, get current value
 	var oldValue T
 
 	rank0 := a.Rank(i) - 1
-	if wasPresent = a.Test(i); wasPresent {
+	if existed = a.Test(i); existed {
 		oldValue = a.Items[rank0]
 	}
 
 	// callback function to get updated or new value
-	newValue = cb(oldValue, wasPresent)
+	newValue = cb(oldValue, existed)
 
 	// already set, update and return value
-	if wasPresent {
+	if existed {
 		a.Items[rank0] = newValue
-		return newValue, wasPresent
+		return newValue, existed
 	}
 
 	// insert into bitset ...
@@ -128,7 +123,63 @@ func (a *Array256[T]) UpdateAt(i uint8, cb func(T, bool) T) (newValue T, wasPres
 	// ... and insert value into slice
 	a.insertItem(rank0, newValue)
 
-	return newValue, wasPresent
+	return newValue, existed
+}
+
+// UpdateAtOrDelete updates the element at the given index or deletes
+// it from the Array256.
+//
+// The method uses a callback function which receives the
+// current value (if present) and a boolean indicating presence,
+// and returns a new value and a boolean flag indicating whether
+// the element should be deleted.
+//
+// If the delete flag is true, the element at index i is removed from
+// the array and the bitset is updated accordingly.
+//
+// If the element exists and is not marked for deletion, it is updated
+// with the new value.
+//
+// If the element does not exist and is not marked for deletion, the
+// new value is inserted at the correct position, and the bitset is
+// updated to reflect the insertion.
+//
+// Returns the new value, whether the element was previously present,
+// and whether it was deleted during the call.
+func (a *Array256[T]) UpdateAtOrDelete(i uint8, cb func(T, bool) (T, bool)) (newVal T, existed, deleted bool) {
+	// if already set, get current value
+	var oldValue T
+
+	rank0 := a.Rank(i) - 1
+	if existed = a.Test(i); existed {
+		oldValue = a.Items[rank0]
+	}
+
+	// callback function to get updated/new value or the flag to delete it at all.
+	newVal, erase := cb(oldValue, existed)
+
+	// delete the item
+	if erase {
+		_, existed = a.DeleteAt(i)
+		return newVal, existed, true
+	}
+
+	// already set, update and return value
+	if existed {
+		a.Items[rank0] = newVal
+		return newVal, existed, false
+	}
+
+	// insert into bitset ...
+	a.BitSet256.Set(i)
+
+	// Rank(i) is now one more
+	rank0++
+
+	// ... and insert value into slice
+	a.insertItem(rank0, newVal)
+
+	return newVal, existed, false
 }
 
 // Len returns the number of items in sparse array.

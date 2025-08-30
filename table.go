@@ -154,8 +154,8 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 	for depth, octet := range octets {
 		// last octet from prefix, update/insert prefix into node
 		if depth == maxDepth {
-			newVal, exists := n.prefixes.UpdateAt(art.PfxToIdx(octet, lastBits), cb)
-			if !exists {
+			newVal, existed := n.prefixes.UpdateAt(art.PfxToIdx(octet, lastBits), cb)
+			if !existed {
 				t.sizeUpdate(is4, 1)
 			}
 			return newVal
@@ -223,6 +223,153 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 	panic("unreachable")
 }
 
+// UpdateOrDelete updates, inserts, or deletes a value associated with the given network prefix in the table.
+// It returns the new value after the operation and a boolean indicating whether the prefix was deleted.
+// If the prefix is deleted, the returned value is the zero value of the type.
+//
+// The method looks up the provided prefix in the trie and either updates its value or deletes it,
+// depending on the result of the provided callback function.
+//
+// The callback function receives the current value and a boolean indicating if the prefix exists,
+// and returns a new value along with a flag indicating whether to delete the prefix
+func (t *Table[V]) UpdateOrDelete(pfx netip.Prefix, cb func(val V, found bool) (newVal V, del bool)) (newVal V, deleted bool) {
+	var zero V
+
+	if !pfx.IsValid() {
+		return
+	}
+
+	// canonicalize prefix
+	pfx = pfx.Masked()
+
+	// values derived from pfx
+	ip := pfx.Addr()
+	is4 := ip.Is4()
+	bits := pfx.Bits()
+	octets := ip.AsSlice()
+	maxDepth, lastBits := maxDepthAndLastBits(bits)
+
+	n := t.rootNodeByVersion(is4)
+
+	// record the nodes on the path to the deleted node, needed to purge
+	// and/or path compress nodes after the deletion of a prefix
+	stack := [maxTreeDepth]*node[V]{}
+
+	// find the proper trie node to update prefix
+	for depth, octet := range octets {
+		// push current node on stack for path recording
+		stack[depth] = n
+
+		// last octet from prefix, update/insert prefix into node
+		if depth == maxDepth {
+			newVal, existed, deleted := n.prefixes.UpdateAtOrDelete(art.PfxToIdx(octet, lastBits), cb)
+
+			// update size if necessary
+			switch {
+			case existed && deleted:
+				t.sizeUpdate(is4, -1)
+				n.purgeAndCompress(stack[:depth], octets, is4)
+			case !existed && !deleted: // inserted
+				t.sizeUpdate(is4, 1)
+			}
+
+			if deleted {
+				return zero, true
+			}
+
+			return newVal, false
+		}
+
+		// go down in tight loop to last octet
+		if !n.children.Test(octet) {
+			// insert prefix path compressed
+			newVal, del := cb(zero, false)
+
+			// callback returns del, but nothing to delete
+			if del {
+				return newVal, false
+			}
+
+			if isFringe(depth, bits) {
+				n.children.InsertAt(octet, newFringeNode(newVal))
+			} else {
+				n.children.InsertAt(octet, newLeafNode(pfx, newVal))
+			}
+
+			t.sizeUpdate(is4, 1)
+			return newVal, false
+		}
+
+		kid := n.children.MustGet(octet)
+
+		// kid is node or leaf or fringe at octet
+		switch kid := kid.(type) {
+		case *node[V]:
+			n = kid
+			continue // descend down to next trie level
+
+		case *leafNode[V]:
+			// update existing value if prefixes are equal
+			if kid.prefix == pfx {
+				newVal, del := cb(kid.value, true)
+				if !del {
+					kid.value = newVal
+					return newVal, false
+				}
+
+				n.children.DeleteAt(octet)
+
+				t.sizeUpdate(is4, -1)
+				n.purgeAndCompress(stack[:depth], octets, is4)
+
+				return zero, true
+			}
+
+			// create new node
+			// push the leaf down
+			// insert new child at current leaf position (octet
+			// descend down, replace n with new child
+			newNode := new(node[V])
+			newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
+
+			n.children.InsertAt(octet, newNode)
+			n = newNode
+
+		case *fringeNode[V]:
+			// update existing value if prefix is fringe
+			if isFringe(depth, bits) {
+				newVal, del := cb(kid.value, true)
+				if !del {
+					kid.value = newVal
+					return newVal, false
+				}
+
+				n.children.DeleteAt(octet)
+
+				t.sizeUpdate(is4, -1)
+				n.purgeAndCompress(stack[:depth], octets, is4)
+
+				return zero, true
+			}
+
+			// create new node
+			// push the fringe down, it becomes a default route (idx=1)
+			// insert new child at current leaf position (octet
+			// descend down, replace n with new child
+			newNode := new(node[V])
+			newNode.prefixes.InsertAt(1, kid.value)
+
+			n.children.InsertAt(octet, newNode)
+			n = newNode
+
+		default:
+			panic("logic error, wrong node type")
+		}
+	}
+
+	panic("unreachable")
+}
+
 // Delete removes pfx from the tree, pfx does not have to be present.
 func (t *Table[V]) Delete(pfx netip.Prefix) {
 	_, _ = t.getAndDelete(pfx)
@@ -234,7 +381,7 @@ func (t *Table[V]) GetAndDelete(pfx netip.Prefix) (val V, ok bool) {
 	return t.getAndDelete(pfx)
 }
 
-func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
+func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, existed bool) {
 	if !pfx.IsValid() {
 		return
 	}
@@ -264,8 +411,8 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 
 		if depth == maxDepth {
 			// try to delete prefix in trie node
-			val, exists = n.prefixes.DeleteAt(art.PfxToIdx(octet, lastBits))
-			if !exists {
+			val, existed = n.prefixes.DeleteAt(art.PfxToIdx(octet, lastBits))
+			if !existed {
 				return
 			}
 

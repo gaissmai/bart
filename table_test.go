@@ -104,7 +104,19 @@ func TestInvalid(t *testing.T) {
 			}
 		}(testname)
 
-		_ = tbl.Update(zeroPfx, func(v any, _ bool) any { return v })
+		_ = tbl.Update(zeroPfx, func(any, bool) any { return nil })
+	})
+
+	testname = "UpdateOrDelete"
+	t.Run(testname, func(t *testing.T) {
+		t.Parallel()
+		defer func(testname string) {
+			if r := recover(); r != nil {
+				t.Fatalf("%s panics on invalid prefix input", testname)
+			}
+		}(testname)
+
+		_, _ = tbl.UpdateOrDelete(zeroPfx, func(any, bool) (any, bool) { return nil, false })
 	})
 
 	testname = "UpdatePersist"
@@ -218,18 +230,6 @@ func TestInvalid(t *testing.T) {
 		}(testname)
 
 		tbl.OverlapsPrefix(zeroPfx)
-	})
-
-	testname = "Contains"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid ip input", testname)
-			}
-		}(testname)
-
-		tbl.Contains(zeroIP)
 	})
 }
 
@@ -1945,6 +1945,48 @@ func TestUpdateCompare(t *testing.T) {
 	}
 }
 
+func TestUpdateOrDeleteCompare(t *testing.T) {
+	t.Parallel()
+
+	prng := rand.New(rand.NewPCG(42, 42))
+	pfxs := randomPrefixes(prng, 10_000)
+
+	fast := new(Table[int])
+	gold := new(goldTable[int]).insertMany(pfxs)
+
+	// Update as insert
+	for _, pfx := range pfxs {
+		fast.UpdateOrDelete(pfx.pfx, func(int, bool) (int, bool) { return pfx.val, false })
+	}
+
+	for _, pfx := range pfxs {
+		goldVal, goldOK := gold.get(pfx.pfx)
+		fastVal, fastOK := fast.Get(pfx.pfx)
+
+		if !getsEqual(goldVal, goldOK, fastVal, fastOK) {
+			t.Fatalf("Get(%q) = (%v, %v), want (%v, %v)", pfx.pfx, fastVal, fastOK, goldVal, goldOK)
+		}
+	}
+
+	cb1 := func(val int, _ bool) int { return val + 1 }
+	cb2 := func(val int, _ bool) (int, bool) { return val + 1, false }
+
+	// Update as update
+	for _, pfx := range pfxs[:len(pfxs)/2] {
+		gold.update(pfx.pfx, cb1)
+		fast.UpdateOrDelete(pfx.pfx, cb2)
+	}
+
+	for _, pfx := range pfxs {
+		goldVal, goldOK := gold.get(pfx.pfx)
+		fastVal, fastOK := fast.Get(pfx.pfx)
+
+		if !getsEqual(goldVal, goldOK, fastVal, fastOK) {
+			t.Fatalf("Get(%q) = (%v, %v), want (%v, %v)", pfx.pfx, fastVal, fastOK, goldVal, goldOK)
+		}
+	}
+}
+
 func TestUpdatePersistCompare(t *testing.T) {
 	t.Parallel()
 	prng := rand.New(rand.NewPCG(42, 42))
@@ -2056,6 +2098,150 @@ func TestUpdate(t *testing.T) {
 				t.Errorf("%s: got=%v, expected: %v", tt.name, got, 1)
 			}
 		})
+	}
+}
+
+//nolint:tparallel
+func TestUpdateOrDelete(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		pfx  netip.Prefix
+	}{
+		{
+			name: "default route v4",
+			pfx:  mpp("0.0.0.0/0"),
+		},
+		{
+			name: "default route v6",
+			pfx:  mpp("::/0"),
+		},
+		{
+			name: "set v4 fringe",
+			pfx:  mpp("0.0.0.0/8"),
+		},
+		{
+			name: "set v4",
+			pfx:  mpp("1.2.3.4/32"),
+		},
+		{
+			name: "set v6",
+			pfx:  mpp("2001:db8::/32"),
+		},
+	}
+
+	rt := new(Table[int])
+
+	// just increment val
+	cb := func(val int, ok bool) (int, bool) {
+		if ok {
+			return val + 1, false
+		}
+		return 0, false
+	}
+
+	// update as insert
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("insert: %s", tt.name), func(t *testing.T) {
+			val, _ := rt.UpdateOrDelete(tt.pfx, cb)
+			got, ok := rt.Get(tt.pfx)
+
+			if !ok {
+				t.Errorf("%s: ok=%v, expected: %v", tt.name, ok, true)
+			}
+
+			if got != 0 || got != val {
+				t.Errorf("%s: got=%v, expected: %v", tt.name, got, 0)
+			}
+		})
+	}
+
+	// update as update
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("update: %s", tt.name), func(t *testing.T) {
+			val, _ := rt.UpdateOrDelete(tt.pfx, cb)
+			got, ok := rt.Get(tt.pfx)
+
+			if !ok {
+				t.Errorf("%s: ok=%v, expected: %v", tt.name, ok, true)
+			}
+
+			if got != 1 || got != val {
+				t.Errorf("%s: got=%v, expected: %v", tt.name, got, 1)
+			}
+		})
+	}
+}
+
+func TestIpdateOrDeleteShuffled(t *testing.T) {
+	// The order in which you delete prefixes from a route table
+	// should not matter, as long as you're deleting the same set of
+	// routes.
+	t.Parallel()
+	prng := rand.New(rand.NewPCG(42, 42))
+
+	const (
+		numPrefixes  = 10_000 // prefixes to insert (test deletes 50% of them)
+		numPerFamily = numPrefixes / 2
+		deleteCut    = numPerFamily / 2
+	)
+
+	for range 10 {
+		// We have to do this little dance instead of just using allPrefixes,
+		// because we want pfxs and toDelete to be non-overlapping sets.
+		all4, all6 := randomPrefixes4(prng, numPerFamily), randomPrefixes6(prng, numPerFamily)
+
+		pfxs := append([]goldTableItem[int](nil), all4[:deleteCut]...)
+		pfxs = append(pfxs, all6[:deleteCut]...)
+
+		toDelete := append([]goldTableItem[int](nil), all4[deleteCut:]...)
+		toDelete = append(toDelete, all6[deleteCut:]...)
+
+		rt1 := new(Table[int])
+
+		// insert
+		for _, pfx := range pfxs {
+			rt1.Insert(pfx.pfx, pfx.val)
+		}
+		for _, pfx := range toDelete {
+			rt1.Insert(pfx.pfx, pfx.val)
+		}
+
+		// this callback deletes unconditionally
+		cb := func(int, bool) (int, bool) { return 0, true }
+
+		// delete
+		for _, pfx := range toDelete {
+			rt1.UpdateOrDelete(pfx.pfx, cb)
+		}
+
+		pfxs2 := append([]goldTableItem[int](nil), pfxs...)
+		toDelete2 := append([]goldTableItem[int](nil), toDelete...)
+		rand.Shuffle(len(toDelete2), func(i, j int) { toDelete2[i], toDelete2[j] = toDelete2[j], toDelete2[i] })
+
+		rt2 := new(Table[int])
+
+		// insert
+		for _, pfx := range pfxs2 {
+			rt2.Insert(pfx.pfx, pfx.val)
+		}
+		for _, pfx := range toDelete2 {
+			rt2.Insert(pfx.pfx, pfx.val)
+		}
+
+		// delete
+		for _, pfx := range toDelete2 {
+			rt2.UpdateOrDelete(pfx.pfx, cb)
+		}
+
+		if rt1.String() != rt2.String() {
+			t.Fatal("shuffled table has different string representation")
+		}
+
+		if rt1.dumpString() != rt2.dumpString() {
+			t.Fatal("shuffled table has different dumpString representation")
+		}
 	}
 }
 
