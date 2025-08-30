@@ -83,13 +83,12 @@ See the `ExampleLite_concurrent` and `ExampleTable_concurrent` tests for concret
 
   func (t *Table[V]) Insert(pfx netip.Prefix, val V)
   func (t *Table[V]) Delete(pfx netip.Prefix)
-  func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V)
-  func (t *Table[V]) UpdateOrDelete(pfx netip.Prefix, cb func(val V, found bool) (newVal V, del bool)) (newVal V, deleted bool)
+  func (t *Table[V]) UpdateOrDelete(pfx netip.Prefix, func(V, bool) (V, bool)) (V, bool)
 
   func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V]
   func (t *Table[V]) DeletePersist(pfx netip.Prefix) *Table[V]
-  func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (pt *Table[V], newVal V)
-  func (t *Table[V]) WalkPersist(fn func(*Table[V], netip.Prefix, V) (*Table[V], bool)) *Table[V]
+  func (t *Table[V]) UpdatePersist(pfx netip.Prefix, func(V, bool) V) (*Table[V], V)
+  func (t *Table[V]) WalkPersist(func(*Table[V], netip.Prefix, V) (*Table[V], bool)) *Table[V]
 
   func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool)
   func (t *Table[V]) GetAndDelete(pfx netip.Prefix) (val V, ok bool)

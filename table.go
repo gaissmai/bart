@@ -127,6 +127,8 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	t.sizeUpdate(is4, 1)
 }
 
+// Deprecated: use [Table.UpdateOrDelete] instead.
+//
 // Update or set the value at pfx with a callback function.
 // The callback function is called with (value, found) and returns a new value.
 //
