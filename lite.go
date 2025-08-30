@@ -18,6 +18,7 @@ import (
 //   - GetAndDelete
 //   - GetAndDeletePersist
 //   - Update
+//   - UpdateOrDelete
 //   - UpdatePersist
 type Lite struct {
 	Table[struct{}]
