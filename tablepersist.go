@@ -155,6 +155,8 @@ func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V] {
 	panic("unreachable")
 }
 
+// Deprecated: use [Table.UpdateOrDeletePersist] instead.
+//
 // UpdatePersist is similar to Update but does not modify the receiver.
 //
 // It performs a copy-on-write update, cloning all nodes touched during the update,
@@ -295,6 +297,187 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 
 		default:
 			// Unexpected node type indicates logic error.
+			panic("logic error, wrong node type")
+		}
+	}
+
+	// Should never reach here: the loop should always return or panic.
+	panic("unreachable")
+}
+
+// UpdateOrDeletePersist is similar to UpdateOrDelete but does not modify the receiver.
+//
+// It performs a copy-on-write update, cloning all nodes touched during the update,
+// and returns a new Table instance reflecting the update.
+// Untouched nodes remain shared between the original and returned Tables.
+//
+// If the payload type V contains pointers or needs deep copying,
+// it must implement the [bart.Cloner] interface to support correct cloning.
+//
+// Due to cloning overhead, UpdateOrDeletePersist is significantly slower than UpdateOrDelete,
+// typically taking μsec instead of nsec.
+func (t *Table[V]) UpdateOrDeletePersist(pfx netip.Prefix, cb func(val V, ok bool) (newVal V, del bool)) (pt *Table[V], newVal V, deleted bool) {
+	var zero V // zero value of V for default initialization
+
+	if !pfx.IsValid() {
+		return t, zero, false
+	}
+
+	// canonicalize prefix
+	pfx = pfx.Masked()
+
+	// Extract address, version info and prefix length.
+	ip := pfx.Addr()
+	is4 := ip.Is4()
+	bits := pfx.Bits()
+
+	// share size counters; root nodes cloned selectively.
+	pt = &Table[V]{
+		size4: t.size4,
+		size6: t.size6,
+	}
+
+	// Pointer to the root node we will modify in this operation.
+	var n *node[V]
+
+	// Create a cloning function for deep copying values;
+	// returns nil if V does not implement the Cloner interface.
+	cloneFn := cloneFnFactory[V]()
+
+	// Clone root node corresponding to the IP version, for copy-on-write.
+	if is4 {
+		pt.root6 = t.root6
+		pt.root4 = *t.root4.cloneFlat(cloneFn)
+
+		n = &pt.root4
+	} else {
+		pt.root4 = t.root4
+		pt.root6 = *t.root6.cloneFlat(cloneFn)
+
+		n = &pt.root6
+	}
+
+	// Prepare traversal info.
+	maxDepth, lastBits := maxDepthAndLastBits(bits)
+	octets := ip.AsSlice()
+
+	// record the nodes on the path to the deleted node, needed to purge
+	// and/or path compress nodes after the deletion of a prefix
+	stack := [maxTreeDepth]*node[V]{}
+
+	// find the proper trie node to update prefix
+	for depth, octet := range octets {
+		// push current node on stack for path recording
+		stack[depth] = n
+
+		// last octet from prefix, update/insert/delete prefix
+		if depth == maxDepth {
+			newVal, existed, deleted := n.prefixes.UpdateAtOrDelete(art.PfxToIdx(octet, lastBits), cb)
+
+			// update size if necessary
+			switch {
+			case existed && deleted:
+				pt.sizeUpdate(is4, -1)
+				n.purgeAndCompress(stack[:depth], octets, is4)
+			case !existed && !deleted: // inserted
+				pt.sizeUpdate(is4, 1)
+			}
+
+			if deleted {
+				return pt, zero, true
+			}
+
+			return pt, newVal, false
+		}
+
+		// go down in tight loop to last octet
+		if !n.children.Test(octet) {
+			// insert prefix path compressed
+
+			newVal, del := cb(zero, false)
+			if del {
+				panic("callback returned del=true for non-existent prefix")
+			}
+
+			if isFringe(depth, bits) {
+				n.children.InsertAt(octet, newFringeNode(newVal))
+			} else {
+				n.children.InsertAt(octet, newLeafNode(pfx, newVal))
+			}
+
+			pt.sizeUpdate(is4, 1)
+			return pt, newVal, false
+		}
+
+		// Child exists - retrieve it.
+		kid := n.children.MustGet(octet)
+
+		// kid is node or leaf or fringe at octet
+		switch kid := kid.(type) {
+		case *node[V]:
+			// Clone the node along the traversed path to respect copy-on-write.
+			kid = kid.cloneFlat(cloneFn)
+
+			// Replace original child with the cloned child.
+			n.children.InsertAt(octet, kid)
+
+			n = kid // descend down to next trie level
+
+		case *leafNode[V]:
+			// update existing value if prefixes are equal
+			if kid.prefix == pfx {
+				newVal, del := cb(kid.value, true)
+				if !del {
+					kid.value = newVal
+					return pt, newVal, false
+				}
+
+				n.children.DeleteAt(octet)
+
+				pt.sizeUpdate(is4, -1)
+				n.purgeAndCompress(stack[:depth], octets, is4)
+
+				return pt, zero, true
+			}
+
+			// create new node
+			// push the leaf down
+			// insert new child at current leaf position (octet
+			// descend down, replace n with new child
+			newNode := new(node[V])
+			newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
+
+			n.children.InsertAt(octet, newNode)
+			n = newNode
+
+		case *fringeNode[V]:
+			// update existing value if prefix is fringe
+			if isFringe(depth, bits) {
+				newVal, del := cb(kid.value, true)
+				if !del {
+					kid.value = newVal
+					return pt, newVal, false
+				}
+
+				n.children.DeleteAt(octet)
+
+				pt.sizeUpdate(is4, -1)
+				n.purgeAndCompress(stack[:depth], octets, is4)
+
+				return pt, zero, true
+			}
+
+			// create new node
+			// push the fringe down, it becomes a default route (idx=1)
+			// insert new child at current leaf position (octet
+			// descend down, replace n with new child
+			newNode := new(node[V])
+			newNode.prefixes.InsertAt(1, kid.value)
+
+			n.children.InsertAt(octet, newNode)
+			n = newNode
+
+		default:
 			panic("logic error, wrong node type")
 		}
 	}

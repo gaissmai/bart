@@ -87,7 +87,7 @@ See the `ExampleLite_concurrent` and `ExampleTable_concurrent` tests for concret
 
   func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V]
   func (t *Table[V]) DeletePersist(pfx netip.Prefix) *Table[V]
-  func (t *Table[V]) UpdatePersist(pfx netip.Prefix, func(V, bool) V) (*Table[V], V)
+  func (t *Table[V]) UpdateOrDeletePersist(pfx netip.Prefix, func(val V, ok bool) (V, bool)) (*Table[V], V, bool)
   func (t *Table[V]) WalkPersist(func(*Table[V], netip.Prefix, V) (*Table[V], bool)) *Table[V]
 
   func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool)
