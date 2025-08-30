@@ -128,10 +128,10 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 }
 
 // Update or set the value at pfx with a callback function.
-// The callback function is called with (value, ok) and returns a new value.
+// The callback function is called with (value, found) and returns a new value.
 //
 // If the pfx does not already exist, it is set with the new value.
-func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V) {
+func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, found bool) V) (newVal V) {
 	var zero V
 
 	if !pfx.IsValid() {
