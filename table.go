@@ -283,7 +283,7 @@ func (t *Table[V]) UpdateOrDelete(pfx netip.Prefix, cb func(val V, found bool) (
 		// push current node on stack for path recording
 		stack[depth] = n
 
-		// last octet from prefix, update/insert prefix into node
+		// last octet from prefix, update/insert/delte prefix
 		if depth == maxDepth {
 			newVal, existed, deleted := n.prefixes.UpdateAtOrDelete(art.PfxToIdx(octet, lastBits), cb)
 

@@ -131,6 +131,18 @@ func TestInvalid(t *testing.T) {
 		_, _ = tbl.UpdatePersist(zeroPfx, func(v any, _ bool) any { return v })
 	})
 
+	testname = "UpdateOrDeletePersist"
+	t.Run(testname, func(t *testing.T) {
+		t.Parallel()
+		defer func(testname string) {
+			if r := recover(); r != nil {
+				t.Fatalf("%s panics on invalid prefix input", testname)
+			}
+		}(testname)
+
+		_, _, _ = tbl.UpdateOrDeletePersist(zeroPfx, func(any, bool) (any, bool) { return nil, false })
+	})
+
 	testname = "Get"
 	t.Run(testname, func(t *testing.T) {
 		t.Parallel()
@@ -2028,6 +2040,47 @@ func TestUpdatePersistCompare(t *testing.T) {
 	}
 }
 
+func TestUpdateOrDeletePersistCompare(t *testing.T) {
+	t.Parallel()
+	prng := rand.New(rand.NewPCG(42, 42))
+
+	pfxs := randomPrefixes(prng, 10_000)
+	imu := new(Table[int])
+	mut := new(Table[int])
+
+	// Update as insert
+	for _, pfx := range pfxs {
+		imu, _, _ = imu.UpdateOrDeletePersist(pfx.pfx, func(int, bool) (int, bool) { return pfx.val, false })
+		mut.UpdateOrDelete(pfx.pfx, func(int, bool) (int, bool) { return pfx.val, false })
+	}
+
+	for _, pfx := range pfxs {
+		imuVal, imuOk := imu.Get(pfx.pfx)
+		mutVal, mutOk := mut.Get(pfx.pfx)
+
+		if !getsEqual(mutVal, mutOk, imuVal, imuOk) {
+			t.Fatalf("Get(%q) = (%v, %v), want (%v, %v)", pfx.pfx, imuVal, imuOk, mutVal, mutOk)
+		}
+	}
+
+	cb := func(val int, _ bool) (int, bool) { return val + 1, false }
+
+	// Update as update
+	for _, pfx := range pfxs[:len(pfxs)/2] {
+		imu, _, _ = imu.UpdateOrDeletePersist(pfx.pfx, cb)
+		mut.UpdateOrDelete(pfx.pfx, cb)
+	}
+
+	for _, pfx := range pfxs {
+		bartVal, bartOK := mut.Get(pfx.pfx)
+		immuVal, immuOK := imu.Get(pfx.pfx)
+
+		if !getsEqual(bartVal, bartOK, immuVal, immuOK) {
+			t.Fatalf("Get(%q) = (%v, %v), want (%v, %v)", pfx.pfx, immuVal, immuOK, bartVal, bartOK)
+		}
+	}
+}
+
 //nolint:tparallel
 func TestUpdate(t *testing.T) {
 	t.Parallel()
@@ -2174,7 +2227,7 @@ func TestUpdateOrDelete(t *testing.T) {
 	}
 }
 
-func TestIpdateOrDeleteShuffled(t *testing.T) {
+func TestUpdateOrDeleteShuffled(t *testing.T) {
 	// The order in which you delete prefixes from a route table
 	// should not matter, as long as you're deleting the same set of
 	// routes.
@@ -2233,6 +2286,77 @@ func TestIpdateOrDeleteShuffled(t *testing.T) {
 		// delete
 		for _, pfx := range toDelete2 {
 			rt2.UpdateOrDelete(pfx.pfx, cb)
+		}
+
+		if rt1.String() != rt2.String() {
+			t.Fatal("shuffled table has different string representation")
+		}
+
+		if rt1.dumpString() != rt2.dumpString() {
+			t.Fatal("shuffled table has different dumpString representation")
+		}
+	}
+}
+
+func TestUpdateOrDeletePersistShuffled(t *testing.T) {
+	// The order in which you delete prefixes from a route table
+	// should not matter, as long as you're deleting the same set of
+	// routes.
+	t.Parallel()
+	prng := rand.New(rand.NewPCG(42, 42))
+
+	const (
+		numPrefixes  = 10_000 // prefixes to insert (test deletes 50% of them)
+		numPerFamily = numPrefixes / 2
+		deleteCut    = numPerFamily / 2
+	)
+
+	for range 10 {
+		// We have to do this little dance instead of just using allPrefixes,
+		// because we want pfxs and toDelete to be non-overlapping sets.
+		all4, all6 := randomPrefixes4(prng, numPerFamily), randomPrefixes6(prng, numPerFamily)
+
+		pfxs := append([]goldTableItem[int](nil), all4[:deleteCut]...)
+		pfxs = append(pfxs, all6[:deleteCut]...)
+
+		toDelete := append([]goldTableItem[int](nil), all4[deleteCut:]...)
+		toDelete = append(toDelete, all6[deleteCut:]...)
+
+		rt1 := new(Table[int])
+
+		// insert
+		for _, pfx := range pfxs {
+			rt1.Insert(pfx.pfx, pfx.val)
+		}
+		for _, pfx := range toDelete {
+			rt1.Insert(pfx.pfx, pfx.val)
+		}
+
+		// this callback deletes unconditionally
+		cb := func(int, bool) (int, bool) { return 0, true }
+
+		// delete
+		for _, pfx := range toDelete {
+			rt1, _, _ = rt1.UpdateOrDeletePersist(pfx.pfx, cb)
+		}
+
+		pfxs2 := append([]goldTableItem[int](nil), pfxs...)
+		toDelete2 := append([]goldTableItem[int](nil), toDelete...)
+		rand.Shuffle(len(toDelete2), func(i, j int) { toDelete2[i], toDelete2[j] = toDelete2[j], toDelete2[i] })
+
+		rt2 := new(Table[int])
+
+		// insert
+		for _, pfx := range pfxs2 {
+			rt2.Insert(pfx.pfx, pfx.val)
+		}
+		for _, pfx := range toDelete2 {
+			rt2.Insert(pfx.pfx, pfx.val)
+		}
+
+		// delete
+		for _, pfx := range toDelete2 {
+			rt2, _, _ = rt2.UpdateOrDeletePersist(pfx.pfx, cb)
 		}
 
 		if rt1.String() != rt2.String() {
