@@ -214,7 +214,7 @@ func (t *Table[V]) DumpList6() []DumpListNode[V] {
 }
 
 // dumpListRec, build the data structure rec-descent with the help
-// of getDirectCoveredEntries()
+// of directItemsRec.
 func (n *node[V]) dumpListRec(parentIdx uint8, path stridePath, depth int, is4 bool) []DumpListNode[V] {
 	// recursion stop condition
 	if n == nil {
@@ -257,7 +257,8 @@ func (n *node[V]) directItemsRec(parentIdx uint8, path stridePath, depth int, is
 	// for all idx's (prefixes mapped by baseIndex) in this node
 	// do a longest-prefix-match
 	for i, idx := range n.prefixes.AsSlice(&[256]uint8{}) {
-		// tricky part, skip self, test with next possible lpm (idx>>1), it's a complete binary tree
+		// tricky part, skip self
+		// test with next possible lpm (idx>>1), it's a complete binary tree
 		nextIdx := idx >> 1
 
 		// fast skip, lpm not possible
