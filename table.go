@@ -178,8 +178,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V
 		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
 		case *node[V]:
-			n = kid
-			continue // descend down to next trie level
+			n = kid // descend down to next trie level
 
 		case *leafNode[V]:
 			// update existing value if prefixes are equal
@@ -305,8 +304,7 @@ func (t *Table[V]) UpdateOrDelete(pfx netip.Prefix, cb func(val V, found bool) (
 		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
 		case *node[V]:
-			n = kid
-			continue // descend down to next trie level
+			n = kid // descend down to next trie level
 
 		case *leafNode[V]:
 			// update existing value if prefixes are equal
@@ -429,8 +427,7 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, existed bool) {
 		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
 		case *node[V]:
-			n = kid
-			continue // descend down to next trie level
+			n = kid // descend down to next trie level
 
 		case *fringeNode[V]:
 			// if pfx is no fringe at this depth, fast exit
@@ -503,8 +500,7 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
 		case *node[V]:
-			n = kid
-			continue // descend down to next trie level
+			n = kid // descend down to next trie level
 
 		case *fringeNode[V]:
 			// reached a path compressed fringe, stop traversing
@@ -609,7 +605,7 @@ LOOP:
 		switch kid := kid.(type) {
 		case *node[V]:
 			n = kid
-			continue // descend down to next trie level
+			continue LOOP // descend down to next trie level
 
 		case *fringeNode[V]:
 			// fringe is the default-route for all possible nodes below
