@@ -222,15 +222,37 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, found bool) V) (newVa
 	panic("unreachable")
 }
 
-// UpdateOrDelete updates, inserts, or deletes a value associated with the given network prefix in the table.
+// UpdateOrDelete updates, inserts, or deletes a value associated with the given prefix in the table.
 // It returns the new value after the operation and a boolean indicating whether the prefix was deleted.
 // If the prefix is deleted, the returned value is the zero value of the type.
 //
 // The method looks up the provided prefix in the trie and either updates its value or deletes it,
 // depending on the result of the provided callback function.
 //
-// The callback function receives the current value and a boolean indicating if the prefix exists,
-// and returns a new value along with a flag indicating whether to delete the prefix
+// The callback function is invoked with the current value (or the zero value if the prefix
+// does not exist) and a boolean `found` that indicates whether the prefix currently exists.
+// It must return a new value along with a boolean `del` flag:
+//
+//   - If found == true:
+//
+//   - Returning del == true deletes the prefix and removes it from the table.
+//
+//   - Returning del == false updates the value with the returned one.
+//
+//   - If found == false:
+//
+//   - Returning del == false inserts the returned value as a new entry.
+//
+//   - Returning del == true is invalid, since there is no existing value to delete,
+//     and will cause the method to panic with:
+//
+//     "callback returned del=true for non-existent prefix"
+//
+// In summary:
+//   - Insert:   (zero, false) -> (newVal, false)
+//   - Update:   (oldVal, true) -> (newVal, false)
+//   - Delete:   (oldVal, true) -> (_, true)
+//   - Invalid:  (zero, false) -> (_, true)  // triggers panic
 func (t *Table[V]) UpdateOrDelete(pfx netip.Prefix, cb func(val V, found bool) (newVal V, del bool)) (newVal V, deleted bool) {
 	var zero V
 
@@ -282,11 +304,10 @@ func (t *Table[V]) UpdateOrDelete(pfx netip.Prefix, cb func(val V, found bool) (
 		// go down in tight loop to last octet
 		if !n.children.Test(octet) {
 			// insert prefix path compressed
-			newVal, del := cb(zero, false)
 
-			// callback returns del, but nothing to delete
+			newVal, del := cb(zero, false)
 			if del {
-				return newVal, false
+				panic("callback returned del=true for non-existent prefix")
 			}
 
 			if isFringe(depth, bits) {
