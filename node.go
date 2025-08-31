@@ -659,6 +659,8 @@ func cmpIndexRank(aIdx, bIdx uint8) int {
 // get prefix back from stride path, depth and idx.
 // The prefix is solely defined by the position in the trie and the baseIndex.
 func cidrFromPath(path stridePath, depth int, is4 bool, idx uint8) netip.Prefix {
+	depth = depth & 0xf // BCE
+
 	octet, pfxLen := art.IdxToPfx(idx)
 
 	// set masked byte in path at depth
@@ -686,6 +688,8 @@ func cidrFromPath(path stridePath, depth int, is4 bool, idx uint8) netip.Prefix 
 // get prefix back from octets path, depth, IP version and last octet.
 // The prefix of a fringe is solely defined by the position in the trie.
 func cidrForFringe(octets []byte, depth int, is4 bool, lastOctet uint8) netip.Prefix {
+	depth = depth & 0xf // BCE
+
 	path := stridePath{}
 	copy(path[:], octets[:depth+1])
 
