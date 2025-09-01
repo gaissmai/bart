@@ -229,38 +229,39 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, found bool) V) (newVa
 	panic("unreachable")
 }
 
-// Modify updates, inserts or deletes a value associated with the given prefix in the table.
-// It returns the new value after the operation and a boolean indicating whether the prefix was deleted.
-// If the prefix is deleted, the returned value is the zero value of the type.
+// Modify applies an insert, update, or delete operation for the value
+// associated with the given prefix. The supplied callback decides the
+// operation: it is called with the current value (or zero if not found)
+// and a boolean indicating whether the prefix exists. The callback must
+// return a new value and a delete flag: del == false inserts or updates,
+// del == true deletes the entry if it exists (otherwise no-op). Modify
+// returns the resulting value and a boolean indicating whether the
+// entry was actually deleted.
 //
-// The method looks up the provided prefix in the trie and either inserts or updates its value
-// or deletes it, depending on the result of the provided callback function.
+// The operation is determined by the callback function, which is called with:
 //
-// The callback function is invoked with the current value (or the zero value if the prefix
-// does not exist) and a boolean `found` that indicates whether the prefix currently exists.
-// It must return a new value along with a boolean `del` flag:
+//	val:   the current value (or zero value if not found)
+//	found: true if the prefix currently exists, false otherwise
 //
-//   - If found == true:
+// The callback returns:
 //
-//   - Returning del == true deletes the prefix and removes it from the table.
+//	val: the new value to insert or update (ignored if del == true)
+//	del: true to delete the entry, false to insert or update
 //
-//   - Returning del == false updates the value with the returned one.
+// Modify returns:
 //
-//   - If found == false:
+//	val:     the zero, old, or new value depending on the operation (see table)
+//	deleted: true if the entry was deleted, false otherwise
 //
-//   - Returning del == false inserts the returned value as a new entry.
+// Summary:
 //
-//   - Returning del == true is invalid, since there is no existing value to delete,
-//     and will cause the method to panic with:
-//
-//     "callback returned del=true for non-existent prefix"
-//
-// In summary:
-//   - Insert:   (zero, false) -> (newVal, false)
-//   - Update:   (oldVal, true) -> (newVal, false)
-//   - Delete:   (oldVal, true) -> (_, true)
-//   - Invalid:  (zero, false) -> (_, true)  // triggers panic
-func (t *Table[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (newVal V, del bool)) (newVal V, deleted bool) {
+//	Operation | cb-input       | cb-return       | Modify-return
+//	-----------------------------------------------------------
+//	Delete:   | (oldVal, true) | (_, true)       | (oldVal, true)
+//	Insert:   | (zero, false)  | (newVal, false) | (newVal, false)
+//	Update:   | (oldVal, true) | (newVal, false) | (newVal, false)
+//	No-op:    | (zero, false)  | (_, true)       | (zero,   false)
+func (t *Table[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del bool)) (_ V, deleted bool) {
 	var zero V
 
 	if !pfx.IsValid() {
@@ -297,14 +298,14 @@ func (t *Table[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (newVal V
 
 			// update size if necessary
 			switch {
-			case !existed && del:
-				panic("callback returned del=true for non-existent prefix")
+			case !existed && del: // no-op
+				return zero, false
 
-			case existed && del:
+			case existed && del: // delete
 				n.prefixes.DeleteAt(idx)
 				t.sizeUpdate(is4, -1)
 				n.purgeAndCompress(stack[:depth], octets, is4)
-				return zero, true
+				return oldVal, true
 
 			case !existed: // insert
 				n.prefixes.InsertAt(idx, newVal)
@@ -327,9 +328,10 @@ func (t *Table[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (newVal V
 
 			newVal, del := cb(zero, false)
 			if del {
-				panic("callback returned del=true for non-existent prefix")
+				return zero, false // no-op
 			}
 
+			// insert
 			if isFringe(depth, bits) {
 				n.children.InsertAt(octet, newFringeNode(newVal))
 			} else {
@@ -353,15 +355,16 @@ func (t *Table[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (newVal V
 				newVal, del := cb(kid.value, true)
 				if !del {
 					kid.value = newVal
-					return newVal, false
+					return newVal, false // update
 				}
 
+				// delete
 				n.children.DeleteAt(octet)
 
 				t.sizeUpdate(is4, -1)
 				n.purgeAndCompress(stack[:depth], octets, is4)
 
-				return zero, true
+				return kid.value, true
 			}
 
 			// create new node
@@ -380,15 +383,16 @@ func (t *Table[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (newVal V
 				newVal, del := cb(kid.value, true)
 				if !del {
 					kid.value = newVal
-					return newVal, false
+					return newVal, false // update
 				}
 
+				// delete
 				n.children.DeleteAt(octet)
 
 				t.sizeUpdate(is4, -1)
 				n.purgeAndCompress(stack[:depth], octets, is4)
 
-				return zero, true
+				return kid.value, true
 			}
 
 			// create new node

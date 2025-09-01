@@ -1957,6 +1957,17 @@ func TestUpdateCompare(t *testing.T) {
 	}
 }
 
+func TestModifyNotExist(t *testing.T) {
+	t.Parallel()
+
+	pfx := mpp("2001:db8:1::/64")
+	cb := func(int, bool) (int, bool) { return 0, true }
+
+	rt := new(Table[int])
+	rt.Modify(pfx, cb)        // MUST NOT panic
+	rt.ModifyPersist(pfx, cb) // MUST NOT panic
+}
+
 func TestModifyCompare(t *testing.T) {
 	t.Parallel()
 
