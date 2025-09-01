@@ -89,14 +89,14 @@ func (d *ArtTable[V]) Modify(pfx netip.Prefix, cb func(val V, ok bool) (newVal V
 
 			// update size if necessary
 			switch {
-			case !existed && del:
-				panic("callback returned del=true for non-existent prefix")
+			case !existed && del: // no-op
+				return zero, false
 
-			case existed && del:
+			case existed && del: // delete
 				n.deletePrefix(idx)
 				d.sizeUpdate(is4, -1)
 				n.purgeAndCompress(stack[:depth], octets, is4)
-				return zero, true
+				return oldVal, true
 
 			case !existed: // insert
 				n.insertPrefix(idx, newVal)
@@ -105,7 +105,7 @@ func (d *ArtTable[V]) Modify(pfx netip.Prefix, cb func(val V, ok bool) (newVal V
 
 			case existed: // update
 				n.insertPrefix(idx, newVal)
-				return newVal, false
+				return oldVal, false
 
 			default:
 				panic("unreachable")
@@ -118,9 +118,10 @@ func (d *ArtTable[V]) Modify(pfx netip.Prefix, cb func(val V, ok bool) (newVal V
 
 			newVal, del := cb(zero, false)
 			if del {
-				panic("callback returned del=true for non-existent prefix")
+				return zero, false // no-op
 			}
 
+			// insert
 			if isFringe(depth, bits) {
 				n.insertChild(octet, newFringeNode(newVal))
 			} else {
@@ -137,20 +138,23 @@ func (d *ArtTable[V]) Modify(pfx netip.Prefix, cb func(val V, ok bool) (newVal V
 			n = kid // descend down to next trie level
 
 		case *fringeNode[V]:
+			oldVal := kid.value
+
 			// update existing value if prefix is fringe
 			if isFringe(depth, bits) {
 				newVal, del := cb(kid.value, true)
 				if !del {
 					kid.value = newVal
-					return newVal, false
+					return oldVal, false // update
 				}
 
+				// delete
 				n.deleteChild(octet)
 
 				d.sizeUpdate(is4, -1)
 				n.purgeAndCompress(stack[:depth], octets, is4)
 
-				return zero, true
+				return oldVal, true // delete
 			}
 
 			// create new node ART node
@@ -163,20 +167,23 @@ func (d *ArtTable[V]) Modify(pfx netip.Prefix, cb func(val V, ok bool) (newVal V
 			n = newNode
 
 		case *leafNode[V]:
+			oldVal := kid.value
+
 			// update existing value if prefixes are equal
 			if kid.prefix == pfx {
 				newVal, del := cb(kid.value, true)
 				if !del {
 					kid.value = newVal
-					return newVal, false
+					return oldVal, false // update
 				}
 
+				// delete
 				n.deleteChild(octet)
 
 				d.sizeUpdate(is4, -1)
 				n.purgeAndCompress(stack[:depth], octets, is4)
 
-				return zero, true
+				return oldVal, true // delete
 			}
 
 			// create new node
