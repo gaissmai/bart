@@ -117,7 +117,7 @@ func TestSparseArrayMustGetPanic(t *testing.T) {
 	a.MustGet(0)
 }
 
-func TestSparseArrayUpdate(t *testing.T) {
+func TestSparseArrayModifyAt(t *testing.T) {
 	t.Parallel()
 	a := new(Array256[int])
 
@@ -127,41 +127,7 @@ func TestSparseArrayUpdate(t *testing.T) {
 
 	// mult all values * 2
 	for i := 150; i >= 0; i-- {
-		a.UpdateAt(uint8(i), func(oldVal int, existsOld bool) int {
-			newVal := i * 3
-			if existsOld {
-				newVal = oldVal * 2
-			}
-			return newVal
-		})
-	}
-
-	for i := range 100 {
-		v, _ := a.Get(uint8(i))
-		if v != 2*i {
-			t.Errorf("UpdateAt, expected %d, got %d", 2*i, v)
-		}
-	}
-
-	for i := 100; i <= 150; i++ {
-		v, _ := a.Get(uint8(i))
-		if v != 3*i {
-			t.Errorf("UpdateAt, expected %d, got %d", 3*i, v)
-		}
-	}
-}
-
-func TestSparseArrayUpdateOrDelete(t *testing.T) {
-	t.Parallel()
-	a := new(Array256[int])
-
-	for i := range 100 {
-		a.InsertAt(uint8(i), i)
-	}
-
-	// mult all values * 2
-	for i := 150; i >= 0; i-- {
-		a.UpdateAtOrDelete(uint8(i), func(oldVal int, existsOld bool) (int, bool) {
+		a.ModifyAt(uint8(i), func(oldVal int, existsOld bool) (int, bool) {
 			newVal := i * 3
 			if existsOld {
 				newVal = oldVal * 2
@@ -173,27 +139,27 @@ func TestSparseArrayUpdateOrDelete(t *testing.T) {
 	for i := range 100 {
 		v, _ := a.Get(uint8(i))
 		if v != 2*i {
-			t.Errorf("UpdateAtOrDelete, expected %d, got %d", 2*i, v)
+			t.Errorf("ModifyAt, expected %d, got %d", 2*i, v)
 		}
 	}
 
 	for i := 100; i <= 150; i++ {
 		v, _ := a.Get(uint8(i))
 		if v != 3*i {
-			t.Errorf("UpdateAtOrDelete, expected %d, got %d", 3*i, v)
+			t.Errorf("ModifyAt, expected %d, got %d", 3*i, v)
 		}
 	}
 
 	// delete all items
 	for i := range 151 {
-		a.UpdateAtOrDelete(uint8(i), func(_ int, _ bool) (int, bool) {
+		a.ModifyAt(uint8(i), func(_ int, _ bool) (int, bool) {
 			// always delete
 			return 0, true
 		})
 	}
 
 	if a.Len() != 0 {
-		t.Errorf("UpdateAtOrDelete, Len(), expected %d, got %d", 0, a.Len())
+		t.Errorf("ModifyAt, Len(), expected %d, got %d", 0, a.Len())
 	}
 }
 
