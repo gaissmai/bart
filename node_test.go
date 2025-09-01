@@ -173,31 +173,6 @@ func BenchmarkNodePrefixInsert(b *testing.B) {
 	}
 }
 
-func BenchmarkNodePrefixModifyAt(b *testing.B) {
-	prng := rand.New(rand.NewPCG(42, 42))
-	routes := shuffleStridePfxs(allStridePfxs())
-
-	for _, nroutes := range prefixCount {
-		this := new(node[int])
-
-		for i, route := range routes {
-			if i >= nroutes {
-				break
-			}
-			this.prefixes.InsertAt(art.PfxToIdx(route.octet, route.bits), 0)
-		}
-
-		b.Run(fmt.Sprintf("In %d", nroutes), func(b *testing.B) {
-			route := routes[prng.IntN(len(routes))]
-			idx := art.PfxToIdx(route.octet, route.bits)
-
-			for b.Loop() {
-				this.prefixes.ModifyAt(idx, func(int, bool) (int, bool) { return 1, false })
-			}
-		})
-	}
-}
-
 func BenchmarkNodePrefixDelete(b *testing.B) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	routes := shuffleStridePfxs(allStridePfxs())

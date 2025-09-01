@@ -117,52 +117,6 @@ func TestSparseArrayMustGetPanic(t *testing.T) {
 	a.MustGet(0)
 }
 
-func TestSparseArrayModifyAt(t *testing.T) {
-	t.Parallel()
-	a := new(Array256[int])
-
-	for i := range 100 {
-		a.InsertAt(uint8(i), i)
-	}
-
-	// mult all values * 2
-	for i := 150; i >= 0; i-- {
-		a.ModifyAt(uint8(i), func(oldVal int, existsOld bool) (int, bool) {
-			newVal := i * 3
-			if existsOld {
-				newVal = oldVal * 2
-			}
-			return newVal, false
-		})
-	}
-
-	for i := range 100 {
-		v, _ := a.Get(uint8(i))
-		if v != 2*i {
-			t.Errorf("ModifyAt, expected %d, got %d", 2*i, v)
-		}
-	}
-
-	for i := 100; i <= 150; i++ {
-		v, _ := a.Get(uint8(i))
-		if v != 3*i {
-			t.Errorf("ModifyAt, expected %d, got %d", 3*i, v)
-		}
-	}
-
-	// delete all items
-	for i := range 151 {
-		a.ModifyAt(uint8(i), func(_ int, _ bool) (int, bool) {
-			// always delete
-			return 0, true
-		})
-	}
-
-	if a.Len() != 0 {
-		t.Errorf("ModifyAt, Len(), expected %d, got %d", 0, a.Len())
-	}
-}
-
 func TestSparseArrayCopy(t *testing.T) {
 	type testCase struct {
 		name  string

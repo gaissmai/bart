@@ -88,61 +88,6 @@ func (a *Array256[T]) MustGet(i uint8) T {
 	return a.Items[a.Rank(i)-1]
 }
 
-// ModifyAt inserts, updates or deletes the element at the given index.
-//
-// The method uses a callback function which receives the
-// current value (if present) and a boolean indicating presence,
-// and returns a new value and a boolean flag indicating whether
-// the element should be deleted.
-//
-// If the delete flag is true, the element at index i is removed from
-// the array and the bitset is updated accordingly.
-//
-// If the element exists and is not marked for deletion, it is updated
-// with the new value.
-//
-// If the element does not exist and is not marked for deletion, the
-// new value is inserted at the correct position, and the bitset is
-// updated to reflect the insertion.
-//
-// Returns the new value, whether the element was previously present,
-// and whether it was deleted during the call.
-func (a *Array256[T]) ModifyAt(i uint8, cb func(T, bool) (T, bool)) (newVal T, existed, deleted bool) {
-	// if already set, get current value
-	var oldValue T
-
-	rank0 := a.Rank(i) - 1
-	if existed = a.Test(i); existed {
-		oldValue = a.Items[rank0]
-	}
-
-	// callback function to get updated/new value or the flag to delete it at all.
-	newVal, erase := cb(oldValue, existed)
-
-	// delete the item
-	if erase {
-		_, existed = a.DeleteAt(i)
-		return newVal, existed, true
-	}
-
-	// already set, update and return value
-	if existed {
-		a.Items[rank0] = newVal
-		return newVal, existed, false
-	}
-
-	// insert into bitset ...
-	a.BitSet256.Set(i)
-
-	// Rank(i) is now one more
-	rank0++
-
-	// ... and insert value into slice
-	a.insertItem(rank0, newVal)
-
-	return newVal, existed, false
-}
-
 // Len returns the number of items in sparse array.
 func (a *Array256[T]) Len() int {
 	return len(a.Items)
