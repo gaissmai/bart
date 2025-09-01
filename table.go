@@ -127,7 +127,7 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	t.sizeUpdate(is4, 1)
 }
 
-// Deprecated: use [Table.UpdateOrDelete] instead.
+// Deprecated: use [Table.Modify] instead.
 //
 // Update or set the value at pfx with a callback function.
 // The callback function is called with (value, found) and returns a new value.
@@ -224,12 +224,12 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, found bool) V) (newVa
 	panic("unreachable")
 }
 
-// UpdateOrDelete updates, inserts, or deletes a value associated with the given prefix in the table.
+// Modify updates, inserts or deletes a value associated with the given prefix in the table.
 // It returns the new value after the operation and a boolean indicating whether the prefix was deleted.
 // If the prefix is deleted, the returned value is the zero value of the type.
 //
-// The method looks up the provided prefix in the trie and either updates its value or deletes it,
-// depending on the result of the provided callback function.
+// The method looks up the provided prefix in the trie and either inserts or updates its value
+// or deletes it, depending on the result of the provided callback function.
 //
 // The callback function is invoked with the current value (or the zero value if the prefix
 // does not exist) and a boolean `found` that indicates whether the prefix currently exists.
@@ -255,7 +255,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, found bool) V) (newVa
 //   - Update:   (oldVal, true) -> (newVal, false)
 //   - Delete:   (oldVal, true) -> (_, true)
 //   - Invalid:  (zero, false) -> (_, true)  // triggers panic
-func (t *Table[V]) UpdateOrDelete(pfx netip.Prefix, cb func(val V, found bool) (newVal V, del bool)) (newVal V, deleted bool) {
+func (t *Table[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (newVal V, del bool)) (newVal V, deleted bool) {
 	var zero V
 
 	if !pfx.IsValid() {
