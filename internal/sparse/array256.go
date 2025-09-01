@@ -50,7 +50,7 @@ type Array256[T any] struct {
 }
 
 // Set panics. The bitset is internally coupled with Items[].
-// Use InsertAt or UpdateAt instead.
+// Use InsertAt or ModifyAt instead.
 func (a *Array256[T]) Set(uint) {
 	panic("forbidden, use InsertAt")
 }
@@ -88,46 +88,7 @@ func (a *Array256[T]) MustGet(i uint8) T {
 	return a.Items[a.Rank(i)-1]
 }
 
-// UpdateAt or set the value at i via callback. The new value is returned
-// and true if the value was already present.
-
-// The callback receives:
-//   - the existing value (if present)
-//   - a boolean indicating whether i was already set
-//
-// It must return a new value which is inserted into the sparse array.
-func (a *Array256[T]) UpdateAt(i uint8, cb func(T, bool) T) (newValue T, existed bool) {
-	// if already set, get current value
-	var oldValue T
-
-	rank0 := a.Rank(i) - 1
-	if existed = a.Test(i); existed {
-		oldValue = a.Items[rank0]
-	}
-
-	// callback function to get updated or new value
-	newValue = cb(oldValue, existed)
-
-	// already set, update and return value
-	if existed {
-		a.Items[rank0] = newValue
-		return newValue, existed
-	}
-
-	// insert into bitset ...
-	a.BitSet256.Set(i)
-
-	// Rank(i) is now one more
-	rank0++
-
-	// ... and insert value into slice
-	a.insertItem(rank0, newValue)
-
-	return newValue, existed
-}
-
-// UpdateAtOrDelete updates the element at the given index or deletes
-// it from the Array256.
+// ModifyAt inserts, updates or deletes the element at the given index.
 //
 // The method uses a callback function which receives the
 // current value (if present) and a boolean indicating presence,
@@ -146,7 +107,7 @@ func (a *Array256[T]) UpdateAt(i uint8, cb func(T, bool) T) (newValue T, existed
 //
 // Returns the new value, whether the element was previously present,
 // and whether it was deleted during the call.
-func (a *Array256[T]) UpdateAtOrDelete(i uint8, cb func(T, bool) (T, bool)) (newVal T, existed, deleted bool) {
+func (a *Array256[T]) ModifyAt(i uint8, cb func(T, bool) (T, bool)) (newVal T, existed, deleted bool) {
 	// if already set, get current value
 	var oldValue T
 

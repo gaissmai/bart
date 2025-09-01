@@ -136,6 +136,11 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, found bool) V) (newVal V) {
 	var zero V
 
+	// wrap cb with old signature until Update is removed from API
+	cbWrap := func(val V, found bool) (V, bool) {
+		return cb(val, found), false
+	}
+
 	if !pfx.IsValid() {
 		return
 	}
@@ -156,7 +161,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, found bool) V) (newVa
 	for depth, octet := range octets {
 		// last octet from prefix, update/insert prefix into node
 		if depth == maxDepth {
-			newVal, existed := n.prefixes.UpdateAt(art.PfxToIdx(octet, lastBits), cb)
+			newVal, existed, _ := n.prefixes.ModifyAt(art.PfxToIdx(octet, lastBits), cbWrap)
 			if !existed {
 				t.sizeUpdate(is4, 1)
 			}
@@ -166,7 +171,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, found bool) V) (newVa
 		// go down in tight loop to last octet
 		if !n.children.Test(octet) {
 			// insert prefix path compressed
-			newVal := cb(zero, false)
+			newVal, _ := cbWrap(zero, false)
 			if isFringe(depth, bits) {
 				n.children.InsertAt(octet, newFringeNode(newVal))
 			} else {
@@ -185,7 +190,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, found bool) V) (newVa
 		case *leafNode[V]:
 			// update existing value if prefixes are equal
 			if kid.prefix == pfx {
-				kid.value = cb(kid.value, true)
+				kid.value, _ = cbWrap(kid.value, true)
 				return kid.value
 			}
 
@@ -202,7 +207,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, found bool) V) (newVa
 		case *fringeNode[V]:
 			// update existing value if prefix is fringe
 			if isFringe(depth, bits) {
-				kid.value = cb(kid.value, true)
+				kid.value, _ = cbWrap(kid.value, true)
 				return kid.value
 			}
 
@@ -285,7 +290,7 @@ func (t *Table[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (newVal V
 
 		// last octet from prefix, update/insert/delte prefix
 		if depth == maxDepth {
-			newVal, existed, deleted := n.prefixes.UpdateAtOrDelete(art.PfxToIdx(octet, lastBits), cb)
+			newVal, existed, deleted := n.prefixes.ModifyAt(art.PfxToIdx(octet, lastBits), cb)
 
 			// update size if necessary
 			switch {

@@ -171,6 +171,11 @@ func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V] {
 func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (pt *Table[V], newVal V) {
 	var zero V // zero value of V for default initialization
 
+	// wrap cb with old signature until Update is removed from API
+	cbWrap := func(val V, found bool) (V, bool) {
+		return cb(val, found), false
+	}
+
 	if !pfx.IsValid() {
 		return t, zero
 	}
@@ -217,7 +222,7 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 	for depth, octet := range octets {
 		// If at the last relevant octet, update or insert the prefix in this node.
 		if depth == maxDepth {
-			newVal, exists := n.prefixes.UpdateAt(art.PfxToIdx(octet, lastBits), cb)
+			newVal, exists, _ := n.prefixes.ModifyAt(art.PfxToIdx(octet, lastBits), cbWrap)
 			// If prefix did not previously exist, increment size counter.
 			if !exists {
 				pt.sizeUpdate(is4, 1)
@@ -229,7 +234,7 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 
 		// If child node for this address does not exist, insert new leaf or fringe.
 		if !n.children.Test(addr) {
-			newVal := cb(zero, false)
+			newVal, _ := cbWrap(zero, false)
 			if isFringe(depth, bits) {
 				n.children.InsertAt(addr, newFringeNode(newVal))
 			} else {
@@ -260,7 +265,7 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 		case *leafNode[V]:
 			// If the leaf's prefix matches, update the value using callback.
 			if kid.prefix == pfx {
-				newVal = cb(kid.value, true)
+				newVal, _ = cbWrap(kid.value, true)
 
 				// Replace the existing leaf with an updated one.
 				n.children.InsertAt(addr, newLeafNode(pfx, newVal))
@@ -280,7 +285,7 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 		case *fringeNode[V]:
 			// If current node corresponds to a fringe prefix, update its value.
 			if isFringe(depth, bits) {
-				newVal = cb(kid.value, true)
+				newVal, _ = cbWrap(kid.value, true)
 				// Replace fringe node with updated value.
 				n.children.InsertAt(addr, newFringeNode(newVal))
 				return pt, newVal
@@ -372,7 +377,7 @@ func (t *Table[V]) ModifyPersist(pfx netip.Prefix, cb func(val V, ok bool) (newV
 
 		// last octet from prefix, update/insert/delete prefix
 		if depth == maxDepth {
-			newVal, existed, deleted := n.prefixes.UpdateAtOrDelete(art.PfxToIdx(octet, lastBits), cb)
+			newVal, existed, deleted := n.prefixes.ModifyAt(art.PfxToIdx(octet, lastBits), cb)
 
 			// update size if necessary
 			switch {

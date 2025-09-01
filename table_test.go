@@ -107,7 +107,7 @@ func TestInvalid(t *testing.T) {
 		_ = tbl.Update(zeroPfx, func(any, bool) any { return nil })
 	})
 
-	testname = "UpdateOrDelete"
+	testname = "Mofify"
 	t.Run(testname, func(t *testing.T) {
 		t.Parallel()
 		defer func(testname string) {
@@ -131,7 +131,7 @@ func TestInvalid(t *testing.T) {
 		_, _ = tbl.UpdatePersist(zeroPfx, func(v any, _ bool) any { return v })
 	})
 
-	testname = "UpdateOrDeletePersist"
+	testname = "ModifyPersist"
 	t.Run(testname, func(t *testing.T) {
 		t.Parallel()
 		defer func(testname string) {
@@ -1957,7 +1957,7 @@ func TestUpdateCompare(t *testing.T) {
 	}
 }
 
-func TestUpdateOrDeleteCompare(t *testing.T) {
+func TestModifyCompare(t *testing.T) {
 	t.Parallel()
 
 	prng := rand.New(rand.NewPCG(42, 42))
@@ -2040,7 +2040,7 @@ func TestUpdatePersistCompare(t *testing.T) {
 	}
 }
 
-func TestUpdateOrDeletePersistCompare(t *testing.T) {
+func TestModifyPersistCompare(t *testing.T) {
 	t.Parallel()
 	prng := rand.New(rand.NewPCG(42, 42))
 
@@ -2155,7 +2155,7 @@ func TestUpdate(t *testing.T) {
 }
 
 //nolint:tparallel
-func TestUpdateOrDelete(t *testing.T) {
+func TestModify(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -2227,7 +2227,7 @@ func TestUpdateOrDelete(t *testing.T) {
 	}
 }
 
-func TestUpdateOrDeleteShuffled(t *testing.T) {
+func TestModifyShuffled(t *testing.T) {
 	// The order in which you delete prefixes from a route table
 	// should not matter, as long as you're deleting the same set of
 	// routes.
@@ -2298,7 +2298,7 @@ func TestUpdateOrDeleteShuffled(t *testing.T) {
 	}
 }
 
-func TestUpdateOrDeletePersistShuffled(t *testing.T) {
+func TestModifyPersistShuffled(t *testing.T) {
 	// The order in which you delete prefixes from a route table
 	// should not matter, as long as you're deleting the same set of
 	// routes.
