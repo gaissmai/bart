@@ -50,8 +50,8 @@ func (d *ArtTable[V]) Insert(pfx netip.Prefix, val V) {
 	d.sizeUpdate(is4, 1)
 }
 
-// Update TODO
-func (d *ArtTable[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVal V) {
+// Modify TODO
+func (d *ArtTable[V]) Modify(pfx netip.Prefix, cb func(val V, ok bool) (newVal V, del bool)) (newVal V, deleted bool) {
 	var zero V
 
 	if !pfx.IsValid() {
@@ -70,23 +70,56 @@ func (d *ArtTable[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVa
 
 	n := d.rootNodeByVersion(is4)
 
-	// find the proper trie node to update prefix
+	// record the nodes on the path to the deleted node, needed to purge
+	// and/or path compress nodes after the deletion of a prefix
+	stack := [maxTreeDepth]*artNode[V]{}
+
+	// find the trie node
 	for depth, octet := range octets {
-		// last octet from prefix, update/insert prefix into node
+		depth = depth & 0xf // BCE
+
+		// push current node on stack for path recording
+		stack[depth] = n
+
 		if depth == maxDepth {
-			val, exists := n.updatePrefix(octet, lastBits, cb)
-			if !exists {
+			idx := art.PfxToIdx(octet, lastBits)
+
+			oldVal, existed := n.getPrefix(idx)
+			newVal, del := cb(oldVal, existed)
+
+			// update size if necessary
+			switch {
+			case !existed && del:
+				panic("callback returned del=true for non-existent prefix")
+
+			case existed && del:
+				n.deletePrefix(idx)
+				d.sizeUpdate(is4, -1)
+				n.purgeAndCompress(stack[:depth], octets, is4)
+				return zero, true
+
+			case !existed: // insert
+				n.insertPrefix(idx, newVal)
 				d.sizeUpdate(is4, 1)
+				return newVal, false
+
+			case existed: // update
+				n.insertPrefix(idx, newVal)
+				return newVal, false
+
+			default:
+				panic("unreachable")
 			}
-			return val
 		}
 
 		kidAny := n.getChild(octet)
-
-		// reached end of trie path ...
-		// insert prefix path compressed
 		if kidAny == nil {
-			newVal = cb(zero, false)
+			// insert prefix path compressed
+
+			newVal, del := cb(zero, false)
+			if del {
+				panic("callback returned del=true for non-existent prefix")
+			}
 
 			if isFringe(depth, bits) {
 				n.insertChild(octet, newFringeNode(newVal))
@@ -95,19 +128,55 @@ func (d *ArtTable[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVa
 			}
 
 			d.sizeUpdate(is4, 1)
-			return newVal
+			return newVal, false
 		}
 
+		// kid is node or leaf or fringe at octet
 		switch kid := kidAny.(type) {
 		case *artNode[V]:
 			n = kid // descend down to next trie level
 
+		case *fringeNode[V]:
+			// update existing value if prefix is fringe
+			if isFringe(depth, bits) {
+				newVal, del := cb(kid.value, true)
+				if !del {
+					kid.value = newVal
+					return newVal, false
+				}
+
+				n.deleteChild(octet)
+
+				d.sizeUpdate(is4, -1)
+				n.purgeAndCompress(stack[:depth], octets, is4)
+
+				return zero, true
+			}
+
+			// create new node ART node
+			// push the fringe down, it becomes a default route (idx=1)
+			// insert new child at current leaf position (addr)
+			// descend down, replace n with new child
+			newNode := new(artNode[V])
+			_ = newNode.insertPrefix(1, kid.value)
+			_ = n.insertChild(octet, newNode)
+			n = newNode
+
 		case *leafNode[V]:
-			// reached a path compressed prefix
-			// update value in slot if prefixes are equal
+			// update existing value if prefixes are equal
 			if kid.prefix == pfx {
-				kid.value = cb(kid.value, true)
-				return kid.value
+				newVal, del := cb(kid.value, true)
+				if !del {
+					kid.value = newVal
+					return newVal, false
+				}
+
+				n.deleteChild(octet)
+
+				d.sizeUpdate(is4, -1)
+				n.purgeAndCompress(stack[:depth], octets, is4)
+
+				return zero, true
 			}
 
 			// create new node
@@ -119,29 +188,12 @@ func (d *ArtTable[V]) Update(pfx netip.Prefix, cb func(val V, ok bool) V) (newVa
 			_ = n.insertChild(octet, newNode)
 			n = newNode
 
-		case *fringeNode[V]:
-			// reached a path compressed fringe
-			// update value in slot if pfx is a fringe
-			if isFringe(depth, bits) {
-				kid.value = cb(kid.value, true)
-				return kid.value
-			}
-
-			// create new node ART node
-			// push the fringe down, it becomes a default route (idx=1)
-			// insert new child at current leaf position (addr)
-			// descend down, replace n with new child
-			newNode := new(artNode[V])
-			_ = newNode.insertPrefix(0, 0, kid.value)
-			_ = n.insertChild(octet, newNode)
-			n = newNode
-
 		default:
 			panic("logic error, wrong node type")
 		}
 	}
 
-	panic("unreachable")
+	return
 }
 
 // Delete removes pfx from the tree, pfx does not have to be present.
@@ -185,7 +237,7 @@ func (d *ArtTable[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
 
 		if depth == maxDepth {
 			// try to delete prefix in trie node
-			val, exists = n.deletePrefix(octet, lastBits)
+			val, exists = n.deletePrefix(art.PfxToIdx(octet, lastBits))
 			if !exists {
 				return val, false
 			}
@@ -263,7 +315,7 @@ func (d *ArtTable[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 	// find the trie node
 	for depth, octet := range octets {
 		if depth == maxDepth {
-			return n.getPrefix(octet, lastBits)
+			return n.getPrefix(art.PfxToIdx(octet, lastBits))
 		}
 
 		kidAny := n.getChild(octet)

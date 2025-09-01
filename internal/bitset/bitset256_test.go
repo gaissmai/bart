@@ -27,6 +27,9 @@ func TestZeroValue(t *testing.T) {
 	b.Clear(100)
 
 	b = BitSet256{}
+	b.Size()
+
+	b = BitSet256{}
 	b.popcount()
 
 	b = BitSet256{}
@@ -502,7 +505,7 @@ func TestAsSlice(t *testing.T) {
 	}
 }
 
-func TestCount(t *testing.T) {
+func TestSize(t *testing.T) {
 	t.Parallel()
 	var b BitSet256
 
@@ -510,7 +513,7 @@ func TestCount(t *testing.T) {
 	checkLast := true
 
 	for i := range tot {
-		sz := uint8(b.popcount())
+		sz := uint8(b.Size())
 		if sz != i {
 			t.Logf("%v", b)
 			t.Errorf("Count reported as %d, but it should be %d", sz, i)
@@ -521,7 +524,7 @@ func TestCount(t *testing.T) {
 	}
 
 	if checkLast {
-		sz := uint8(b.popcount())
+		sz := uint8(b.Size())
 		if sz != tot {
 			t.Errorf("After all bits set, size reported as %d, but it should be %d", sz, tot)
 		}

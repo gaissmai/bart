@@ -4,6 +4,7 @@ import (
 	"net/netip"
 
 	"github.com/gaissmai/bart/internal/art"
+	"github.com/gaissmai/bart/internal/bitset"
 )
 
 // artNode is a trie level node in the multibit routing table.
@@ -15,54 +16,26 @@ import (
 //
 // See doc/artlookup.pdf for the mapping mechanics and prefix tree details.
 type artNode[V any] struct {
-	prefixes [maxItems]*V
-	children [maxItems]any // *artNode or path-compreassed *leaf- or *fringeNode
+	prefixes [256]*V
+	children [256]any // *artNode or path-compreassed *leaf- or *fringeNode
 
-	prefixCount uint16
-	childCount  uint16
+	prefixesBitSet bitset.BitSet256
+	childrenBitSet bitset.BitSet256
+}
+
+// TODO
+func (n *artNode[V]) prefixCount() int {
+	return n.prefixesBitSet.Size()
+}
+
+// TODO
+func (n *artNode[V]) childCount() int {
+	return n.childrenBitSet.Size()
 }
 
 // isEmpty returns true if node has neither prefixes nor children
 func (n *artNode[V]) isEmpty() bool {
-	return n.prefixCount == 0 && n.childCount == 0
-}
-
-func (n *artNode[V]) prefixesAsSlice() []uint8 {
-	res := make([]uint8, 0, maxItems)
-	for i := range n.prefixes {
-		if n.idxIsRoot(uint8(i)) {
-			res = append(res, uint8(i))
-		}
-	}
-	return res
-}
-
-func (n *artNode[V]) mustFirstPrefixItem() (idx uint8, val V) {
-	for idx, valPtr := range n.prefixes {
-		if valPtr != nil {
-			return uint8(idx), *valPtr
-		}
-	}
-	panic("empty prefixes")
-}
-
-func (n *artNode[V]) childrenAsSlice() []uint8 {
-	res := make([]uint8, 0, maxItems)
-	for i, kid := range n.children {
-		if kid != nil {
-			res = append(res, uint8(i))
-		}
-	}
-	return res
-}
-
-func (n *artNode[V]) mustFirstChildItem() (octet uint8, child any) {
-	for i, child := range n.children {
-		if child != nil {
-			return uint8(i), child
-		}
-	}
-	panic("empty children")
+	return n.prefixCount() == 0 && n.childCount() == 0
 }
 
 // getChild TODO
@@ -74,7 +47,7 @@ func (n *artNode[V]) getChild(addr uint8) any {
 func (n *artNode[V]) insertChild(addr uint8, child any) (exists bool) {
 	if n.children[addr] == nil {
 		exists = false
-		n.childCount++
+		n.childrenBitSet.Set(addr)
 	} else {
 		exists = true
 	}
@@ -86,20 +59,18 @@ func (n *artNode[V]) insertChild(addr uint8, child any) (exists bool) {
 // deleteChild TODO
 func (n *artNode[V]) deleteChild(addr uint8) {
 	if n.children[addr] != nil {
-		n.childCount--
+		n.childrenBitSet.Clear(addr)
 	}
 	n.children[addr] = nil
 }
 
 // insertPrefix adds the route addr/prefixLen to n, with value val.
-func (n *artNode[V]) insertPrefix(addr uint8, prefixLen uint8, val V) (exists bool) {
-	idx := art.PfxToIdx(addr, prefixLen)
-	if n.idxIsRoot(idx) {
-		exists = true
-	} else {
-		exists = false
-		n.prefixCount++
+func (n *artNode[V]) insertPrefix(idx uint8, val V) (exists bool) {
+	if exists = n.prefixesBitSet.Test(idx); !exists {
+		n.prefixesBitSet.Set(idx)
 	}
+
+	// insert or overwrite
 
 	// To ensure allot works as intended, every unique prefix in the
 	// artNode must point to a distinct value pointer, even for identical values.
@@ -109,60 +80,36 @@ func (n *artNode[V]) insertPrefix(addr uint8, prefixLen uint8, val V) (exists bo
 	*valPtr = val
 
 	oldValPtr := n.prefixes[idx]
+
+	// overwrite oldValPtr with valPtr
 	n.allot(idx, oldValPtr, valPtr)
 
 	return
 }
 
-func (n *artNode[V]) updatePrefix(addr uint8, prefixLen uint8, cb func(V, bool) V) (newVal V, exists bool) {
-	idx := art.PfxToIdx(addr, prefixLen)
-	if n.idxIsRoot(idx) {
-		// exists, update value
-		valPtr := n.prefixes[idx]
-		*valPtr = cb(*valPtr, true)
-		return *valPtr, true
-	}
-
-	// insert new prefix
-
-	valPtr := new(V)
-	*valPtr = cb(*valPtr, false)
-
-	oldValPtr := n.prefixes[idx]
-	n.allot(idx, oldValPtr, valPtr)
-
-	n.prefixCount++
-	return *valPtr, false
-}
-
 // getPrefix TODO
-func (n *artNode[V]) getPrefix(addr uint8, prefixLen uint8) (val V, exists bool) {
-	idx := art.PfxToIdx(addr, prefixLen)
-	if n.idxIsRoot(idx) {
-		valPtr := n.prefixes[idx]
-		return *valPtr, true
+func (n *artNode[V]) getPrefix(idx uint8) (val V, exists bool) {
+	if exists = n.prefixesBitSet.Test(idx); exists {
+		val = *n.prefixes[idx]
 	}
-	// Route entry doesn't exist
-	return val, false
+	return
 }
 
 // deletePrefix TODO
-func (n *artNode[V]) deletePrefix(addr uint8, prefixLen uint8) (val V, exists bool) {
-	idx := art.PfxToIdx(addr, prefixLen)
-	if !n.idxIsRoot(idx) {
+// func (n *artNode[V]) deletePrefix(addr uint8, prefixLen uint8) (val V, exists bool) {
+func (n *artNode[V]) deletePrefix(idx uint8) (val V, exists bool) {
+	if exists = n.prefixesBitSet.Test(idx); !exists {
 		// Route entry doesn't exist
-		return val, false
+		return
 	}
 
 	valPtr := n.prefixes[idx]
+	parentValPtr := n.prefixes[idx>>1]
 
-	var parentValPtr *V
-	if parentIdx := idx >> 1; parentIdx != 0 {
-		parentValPtr = n.prefixes[parentIdx]
-	}
-
+	// overwrite valPtr with parentValPtr
 	n.allot(idx, valPtr, parentValPtr)
-	n.prefixCount--
+
+	n.prefixesBitSet.Clear(idx)
 
 	return *valPtr, true
 }
@@ -226,25 +173,6 @@ func (n *artNode[V]) allot(idx uint8, oldValPtr, valPtr *V) {
 	}
 }
 
-// idxIsRoot TODO
-func (n *artNode[V]) idxIsRoot(idx uint8) bool {
-	valPtr := n.prefixes[idx]
-	if valPtr == nil {
-		return false
-	}
-
-	parentIdx := idx >> 1
-	if parentIdx == 0 {
-		// [idx] is non-nil, and is at the 0/0 route position (idx == 1).
-		return true
-	}
-	if parentValPtr := n.prefixes[parentIdx]; valPtr != parentValPtr {
-		// parent node in the tree isn't the same prefix
-		return true
-	}
-	return false
-}
-
 func (n *artNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool) {
 	ip := pfx.Addr() // the pfx must be in canonical form
 	bits := pfx.Bits()
@@ -256,7 +184,7 @@ func (n *artNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists b
 	for _, octet := range octets[depth:] {
 		// last masked octet: insert/override prefix/val into node
 		if depth == maxDepth {
-			return n.insertPrefix(octet, lastBits, val)
+			return n.insertPrefix(art.PfxToIdx(octet, lastBits), val)
 		}
 
 		kidAny := n.getChild(octet)
@@ -306,7 +234,7 @@ func (n *artNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists b
 			// insert new child at current leaf position (addr)
 			// descend down, replace n with new child
 			newNode := new(artNode[V])
-			_ = newNode.insertPrefix(0, 0, kid.value)
+			_ = newNode.insertPrefix(1, kid.value)
 			_ = n.insertChild(octet, newNode)
 			n = newNode
 
@@ -326,16 +254,17 @@ func (n *artNode[V]) purgeAndCompress(stack []*artNode[V], octets []uint8, is4 b
 		parent := stack[depth]
 		octet := octets[depth]
 
-		pfxCount := n.prefixCount
-		childCount := n.childCount
+		pfxCount := n.prefixCount()
+		childCount := n.childCount()
 
 		switch {
-		case n.isEmpty():
+		case n.prefixCount() == 0 && n.childCount() == 0:
 			// just delete this empty node from parent
 			parent.deleteChild(octet)
 
 		case pfxCount == 0 && childCount == 1:
-			_, kidAny := n.mustFirstChildItem() // single child must be first child
+			addr, _ := n.childrenBitSet.FirstSet() // single child must be first child
+			kidAny := n.children[addr]
 
 			switch kid := kidAny.(type) {
 			case *artNode[V]:
@@ -352,12 +281,9 @@ func (n *artNode[V]) purgeAndCompress(stack []*artNode[V], octets []uint8, is4 b
 				// just one fringe, delete this node and reinsert the fringe as leaf above
 				parent.deleteChild(octet)
 
-				// get the last fringe octet back, the only item is also the first item
-				lastFringeOctet, _ := n.mustFirstChildItem()
-
 				// rebuild the prefix with octets, depth, ip version and addr
 				// depth is the parent's depth, so add +1 here for the kid
-				fringePfx := cidrForFringe(octets, depth+1, is4, lastFringeOctet)
+				fringePfx := cidrForFringe(octets, depth+1, is4, addr)
 
 				// ... (re)reinsert prefix/value at parents depth
 				parent.insertAtDepth(fringePfx, kid.value, depth)
@@ -368,7 +294,8 @@ func (n *artNode[V]) purgeAndCompress(stack []*artNode[V], octets []uint8, is4 b
 			parent.deleteChild(octet)
 
 			// get prefix/val back from idx ...
-			idx, val := n.mustFirstPrefixItem() // single idx must be first prefix
+			idx, _ := n.prefixesBitSet.FirstSet() // single idx must be first bit set
+			val := *n.prefixes[idx]
 
 			// ... and octet path
 			path := stridePath{}

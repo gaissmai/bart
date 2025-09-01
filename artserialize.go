@@ -239,18 +239,17 @@ func (n *artNode[V]) directItemsRec(parentIdx uint8, path stridePath, depth int,
 	// used to compare the LPM match, maybe nil for parentIdx == 0
 	parentValPtr := n.prefixes[parentIdx]
 
-	// if n.prefixCount > 0 {
-	// get direct prefix items for parentIdx
-	// start with j > parentIdx
-	for j := uint(parentIdx + 1); j < 256; j++ {
-		idx := uint8(j)
+	for _, idx := range n.prefixesBitSet.AsSlice(&[256]uint8{}) {
+		// tricky part, skip self, test with next possible lpm (idx>>1), it's a complete binary tree
+		nextIdx := idx >> 1
 
-		if !n.idxIsRoot(idx) {
+		// fast skip, lpm not possible
+		if nextIdx < parentIdx {
 			continue
 		}
 
 		// if prefix is directly covered by parentIdx ...
-		valPtr := n.prefixes[idx>>1]
+		valPtr := n.prefixes[nextIdx]
 
 		// both maybe nil
 		if valPtr == parentValPtr {
@@ -269,29 +268,26 @@ func (n *artNode[V]) directItemsRec(parentIdx uint8, path stridePath, depth int,
 			directItems = append(directItems, item)
 		}
 	}
-	//}
 
-	// get direct child items for parentIdx
-	for octet, kidAny := range n.children {
-		if kidAny == nil {
-			continue
-		}
+	// children:
+	for _, octet := range n.childrenBitSet.AsSlice(&[256]uint8{}) {
+		hostIdx := art.OctetToIdx(octet) >> 1
 
-		hostIdx := uint8(art.OctetToIdx(uint8(octet)) >> 1)
-
-		// skip
-		if hostIdx < parentIdx {
+		// fast skip, lpm not possible
+		if hostIdx < uint(parentIdx) {
 			continue
 		}
 
 		// lookup
 		valPtr := n.prefixes[hostIdx] // maybe nil
 		if valPtr == parentValPtr {
+			kidAny := n.children[octet]
+
 			switch kid := kidAny.(type) {
 			case *artNode[V]:
 				// traverse rec-descent, call with next child node,
 				// next trie level, set parentIdx to 0, adjust path and depth
-				path[depth] = uint8(octet)
+				path[depth] = octet
 				directItems = append(directItems, kid.directItemsRec(0, path, depth+1, is4)...)
 
 			case *leafNode[V]:
@@ -310,7 +306,7 @@ func (n *artNode[V]) directItemsRec(parentIdx uint8, path stridePath, depth int,
 					n:   nil,
 					is4: is4,
 					// get the prefix back from trie
-					cidr: cidrForFringe(path[:], depth, is4, uint8(octet)),
+					cidr: cidrForFringe(path[:], depth, is4, octet),
 					val:  kid.value,
 				}
 				directItems = append(directItems, item)

@@ -17,8 +17,8 @@ func (n *artNode[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 	fmt.Fprintf(w, "\n%s[%s] depth:  %d path: [%s] / %d\n",
 		indent, n.hasType(), depth, ipStridePath(path, depth, is4), bits)
 
-	if nPfxCount := n.prefixCount; nPfxCount != 0 {
-		allIndices := n.prefixesAsSlice()
+	if nPfxCount := n.prefixCount(); nPfxCount != 0 {
+		allIndices := n.prefixesBitSet.AsSlice(&[256]uint8{})
 
 		// print the baseIndices for this node.
 		fmt.Fprintf(w, "%sindexs(#%d): %v\n", indent, nPfxCount, allIndices)
@@ -47,7 +47,7 @@ func (n *artNode[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 		}
 	}
 
-	if n.childCount != 0 {
+	if n.childCount() != 0 {
 
 		childAddrs := make([]uint8, 0, maxItems)
 		leafAddrs := make([]uint8, 0, maxItems)
@@ -75,7 +75,7 @@ func (n *artNode[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 		}
 
 		// print the children for this node.
-		fmt.Fprintf(w, "%soctets(#%d): %v\n", indent, n.childCount, n.childrenAsSlice())
+		fmt.Fprintf(w, "%soctets(#%d): %v\n", indent, n.childCount(), n.childrenBitSet.AsSlice(&[256]uint8{}))
 
 		if leafCount := len(leafAddrs); leafCount > 0 {
 			// print the pathcomp prefixes for this node
@@ -157,8 +157,8 @@ func (n *artNode[V]) hasType() nodeType {
 func (n *artNode[V]) nodeStats() stats {
 	var s stats
 
-	s.pfxs = int(n.prefixCount)
-	s.childs = int(n.childCount)
+	s.pfxs = n.prefixCount()
+	s.childs = n.childCount()
 
 	for _, kid := range n.children {
 		if kid == nil {
@@ -220,7 +220,7 @@ func (n *artNode[V]) dumpRec(w io.Writer, path stridePath, depth int, is4 bool) 
 	n.dump(w, path, depth, is4)
 
 	// the node may have childs, rec-descent down
-	for _, addr := range n.childrenAsSlice() {
+	for _, addr := range n.childrenBitSet.AsSlice(&[256]uint8{}) {
 		path[depth] = addr
 
 		if kid, ok := n.getChild(addr).(*artNode[V]); ok {
@@ -236,8 +236,8 @@ func (n *artNode[V]) nodeStatsRec() stats {
 		return s
 	}
 
-	s.pfxs = int(n.prefixCount)
-	s.childs = int(n.childCount)
+	s.pfxs = n.prefixCount()
+	s.childs = n.childCount()
 	s.nodes = 1 // this node
 	s.leaves = 0
 	s.fringes = 0

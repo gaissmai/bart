@@ -11,6 +11,8 @@ import (
 )
 
 func TestArtCloneFlat(t *testing.T) {
+	t.Parallel()
+
 	cloneFn := copyVal[int] // just copy
 
 	tests := []struct {
@@ -38,7 +40,7 @@ func TestArtCloneFlat(t *testing.T) {
 				if got == nil {
 					t.Fatal("got is nil")
 				}
-				if got.prefixCount != 0 || got.childCount != 0 {
+				if got.prefixCount() != 0 || got.childCount() != 0 {
 					t.Errorf("expected empty clone, got %+v", got)
 				}
 			},
@@ -98,6 +100,8 @@ func TestArtCloneFlat(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			orig := tt.prepare()
 			got := orig.cloneFlat(cloneFn)
 			tt.check(t, got, orig)
@@ -715,7 +719,7 @@ func TestArtDelete(t *testing.T) {
 }
 
 //nolint:tparallel
-func TestArtUpdate(t *testing.T) {
+func TestArtModify(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -747,17 +751,17 @@ func TestArtUpdate(t *testing.T) {
 	rt := new(ArtTable[int])
 
 	// just increment val
-	cb := func(val int, ok bool) int {
+	cb := func(val int, ok bool) (int, bool) {
 		if ok {
-			return val + 1
+			return val + 1, false
 		}
-		return 0
+		return 0, false
 	}
 
 	// update as insert
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("insert: %s", tt.name), func(t *testing.T) {
-			val := rt.Update(tt.pfx, cb)
+			val, _ := rt.Modify(tt.pfx, cb)
 			got, ok := rt.Get(tt.pfx)
 
 			if !ok {
@@ -773,7 +777,7 @@ func TestArtUpdate(t *testing.T) {
 	// update as update
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("update: %s", tt.name), func(t *testing.T) {
-			val := rt.Update(tt.pfx, cb)
+			val, _ := rt.Modify(tt.pfx, cb)
 			got, ok := rt.Get(tt.pfx)
 
 			if !ok {
@@ -797,7 +801,7 @@ func TestArtUpdateCompare(t *testing.T) {
 
 	// Update as insert
 	for _, pfx := range pfxs {
-		fast.Update(pfx.pfx, func(int, bool) int { return pfx.val })
+		fast.Modify(pfx.pfx, func(int, bool) (int, bool) { return pfx.val, false })
 	}
 
 	for _, pfx := range pfxs {
@@ -809,12 +813,13 @@ func TestArtUpdateCompare(t *testing.T) {
 		}
 	}
 
-	cb := func(val int, _ bool) int { return val + 1 }
+	cb1 := func(val int, _ bool) int { return val + 1 }
+	cb2 := func(val int, _ bool) (int, bool) { return val + 1, false }
 
 	// Update as update
 	for _, pfx := range pfxs[:len(pfxs)/2] {
-		gold.update(pfx.pfx, cb)
-		fast.Update(pfx.pfx, cb)
+		gold.update(pfx.pfx, cb1)
+		fast.Modify(pfx.pfx, cb2)
 	}
 
 	for _, pfx := range pfxs {
@@ -1387,40 +1392,6 @@ func TestArtCloneDeep(t *testing.T) {
 
 // ############ benchmarks ################################
 
-func BenchmarkArtTableInsertRandom(b *testing.B) {
-	prng := rand.New(rand.NewPCG(42, 42))
-	for _, n := range []int{10_000, 100_000, 1_000_000, 2_000_000} {
-		randomPfxs := randomRealWorldPrefixes(prng, n)
-
-		rt := new(ArtTable[*MyInt])
-		for i, pfx := range randomPfxs {
-			myInt := MyInt(i)
-			rt.Insert(pfx, &myInt)
-		}
-
-		probe := randomPrefix(prng)
-		myInt := MyInt(42)
-
-		b.Run(fmt.Sprintf("mutable into %d", n), func(b *testing.B) {
-			for b.Loop() {
-				rt.Insert(probe, &myInt)
-			}
-
-			s4 := rt.root4.nodeStatsRec()
-			s6 := rt.root6.nodeStatsRec()
-			stats := stats{
-				s4.pfxs + s6.pfxs,
-				s4.childs + s6.childs,
-				s4.nodes + s6.nodes,
-				s4.leaves + s6.leaves,
-				s4.fringes + s6.fringes,
-			}
-
-			b.ReportMetric(float64(rt.Size())/float64(stats.nodes), "Prefix/Node")
-		})
-	}
-}
-
 func BenchmarkArtTableDelete(b *testing.B) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, n := range benchRouteCount {
@@ -1505,11 +1476,11 @@ func BenchmarkArtMemIP4(b *testing.B) {
 		runtime.ReadMemStats(&startMem)
 
 		b.Run(strconv.Itoa(k), func(b *testing.B) {
-			rt := new(ArtTable[struct{}])
+			rt := new(ArtTable[any])
 			for b.Loop() {
-				rt = new(ArtTable[struct{}])
+				rt = new(ArtTable[any])
 				for _, pfx := range randomRealWorldPrefixes4(prng, k) {
-					rt.Insert(pfx, struct{}{})
+					rt.Insert(pfx, nil)
 				}
 			}
 
@@ -1536,11 +1507,11 @@ func BenchmarkArtMemIP6(b *testing.B) {
 		runtime.ReadMemStats(&startMem)
 
 		b.Run(strconv.Itoa(k), func(b *testing.B) {
-			rt := new(ArtTable[struct{}])
+			rt := new(ArtTable[any])
 			for b.Loop() {
-				rt = new(ArtTable[struct{}])
+				rt = new(ArtTable[any])
 				for _, pfx := range randomRealWorldPrefixes6(prng, k) {
-					rt.Insert(pfx, struct{}{})
+					rt.Insert(pfx, nil)
 				}
 			}
 
@@ -1567,11 +1538,11 @@ func BenchmarkArtMem(b *testing.B) {
 		runtime.ReadMemStats(&startMem)
 
 		b.Run(strconv.Itoa(k), func(b *testing.B) {
-			rt := new(ArtTable[struct{}])
+			rt := new(ArtTable[any])
 			for b.Loop() {
-				rt = new(ArtTable[struct{}])
+				rt = new(ArtTable[any])
 				for _, pfx := range randomRealWorldPrefixes(prng, k) {
-					rt.Insert(pfx, struct{}{})
+					rt.Insert(pfx, nil)
 				}
 			}
 
@@ -1603,13 +1574,13 @@ func BenchmarkArtFullTableMemory4(b *testing.B) {
 	nRoutes := len(routes4)
 
 	b.Run(fmt.Sprintf("Table[]: %d", nRoutes), func(b *testing.B) {
-		rt := new(ArtTable[struct{}])
+		rt := new(ArtTable[any])
 		runtime.GC()
 		runtime.ReadMemStats(&startMem)
 
 		for b.Loop() {
 			for _, route := range routes4 {
-				rt.Insert(route.CIDR, struct{}{})
+				rt.Insert(route.CIDR, nil)
 			}
 		}
 
@@ -1629,7 +1600,7 @@ func BenchmarkArtFullTableMemory4(b *testing.B) {
 func BenchmarkArtFullTableMemory6(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 
-	rt := new(ArtTable[struct{}])
+	rt := new(ArtTable[any])
 	runtime.GC()
 	runtime.ReadMemStats(&startMem)
 
@@ -1638,7 +1609,7 @@ func BenchmarkArtFullTableMemory6(b *testing.B) {
 	b.Run(fmt.Sprintf("Table[]: %d", nRoutes), func(b *testing.B) {
 		for b.Loop() {
 			for _, route := range routes6 {
-				rt.Insert(route.CIDR, struct{}{})
+				rt.Insert(route.CIDR, nil)
 			}
 		}
 
@@ -1658,7 +1629,7 @@ func BenchmarkArtFullTableMemory6(b *testing.B) {
 func BenchmarkArtFullTableMemory(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 
-	rt := new(ArtTable[struct{}])
+	rt := new(ArtTable[any])
 	runtime.GC()
 	runtime.ReadMemStats(&startMem)
 
@@ -1667,7 +1638,7 @@ func BenchmarkArtFullTableMemory(b *testing.B) {
 	b.Run(fmt.Sprintf("Table[]: %d", nRoutes), func(b *testing.B) {
 		for b.Loop() {
 			for _, route := range routes {
-				rt.Insert(route.CIDR, struct{}{})
+				rt.Insert(route.CIDR, nil)
 			}
 		}
 

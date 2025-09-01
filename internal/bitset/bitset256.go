@@ -31,6 +31,7 @@ package bitset
 // can inline (*BitSet256).popcnt with cost 33
 // can inline (*BitSet256).Rank with cost 57
 // can inline (*BitSet256).Set with cost 12
+// can inline (*BitSet256).Size with cost 36
 // can inline (*BitSet256).Test with cost 15
 // can inline (*BitSet256).Union with cost 53
 
@@ -58,6 +59,11 @@ import (
 
 // BitSet256 represents a fixed size bitset from [0..255]
 type BitSet256 [4]uint64
+
+// Size is the number of set bits.
+func (b *BitSet256) Size() int {
+	return b.popcount()
+}
 
 // String implements fmt.Stringer.
 func (b *BitSet256) String() string {

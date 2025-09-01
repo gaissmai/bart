@@ -3427,25 +3427,23 @@ func TestWalkPersist(t *testing.T) {
 
 var benchRouteCount = []int{1, 2, 5, 10, 100, 1000, 10_000, 100_000, 200_000}
 
-func BenchmarkTableInsertRandom(b *testing.B) {
+func BenchmarkTableModifyRandom(b *testing.B) {
 	prng := rand.New(rand.NewPCG(42, 42))
-	for _, n := range []int{10_000, 100_000, 1_000_000, 2_000_000} {
+	for _, n := range benchRouteCount {
 		randomPfxs := randomRealWorldPrefixes(prng, n)
 
-		rt := new(Table[*MyInt])
+		rt := new(Table[int])
 		for i, pfx := range randomPfxs {
-			myInt := MyInt(i)
-			rt.Insert(pfx, &myInt)
+			rt.Insert(pfx, i)
 		}
 
 		prt := rt
 
-		probe := randomPrefix(prng)
-		myInt := MyInt(42)
+		probe := randomPfxs[prng.IntN(len(randomPfxs))]
 
 		b.Run(fmt.Sprintf("mutable into %d", n), func(b *testing.B) {
 			for b.Loop() {
-				rt.Insert(probe, &myInt)
+				rt.Modify(probe, func(int, bool) (int, bool) { return 42, false })
 			}
 
 			s4 := rt.root4.nodeStatsRec()
@@ -3463,7 +3461,7 @@ func BenchmarkTableInsertRandom(b *testing.B) {
 
 		b.Run(fmt.Sprintf("persist into %d", n), func(b *testing.B) {
 			for b.Loop() {
-				_ = prt.InsertPersist(probe, &myInt)
+				prt.ModifyPersist(probe, func(int, bool) (int, bool) { return 42, false })
 			}
 
 			s4 := rt.root4.nodeStatsRec()

@@ -148,23 +148,24 @@ func (n *artNode[V]) cloneFlat(cloneFn cloneFunc[V]) *artNode[V] {
 	}
 
 	c := new(artNode[V])
-	if n.isEmpty() {
+	if n.prefixCount() == 0 && n.childCount() == 0 {
 		return c
 	}
 
-	c.prefixCount = n.prefixCount
-	c.childCount = n.childCount
+	// copy the bitsets
+	c.prefixesBitSet = n.prefixesBitSet
+	c.childrenBitSet = n.childrenBitSet
 
 	// it's a clone of the prefixes ...
 	// but the allot algorithm makes it more difficult
 	// see also insertPrefix
-	if n.prefixCount != 0 {
-		for idx, origValPtr := range n.prefixes {
-			if !n.idxIsRoot(uint8(idx)) {
-				continue
-			}
-
+	var idx uint8
+	ok := true
+	for ok {
+		if idx, ok = n.prefixesBitSet.NextSet(idx); ok {
+			origValPtr := n.prefixes[idx]
 			newValPtr := new(V)
+
 			if cloneFn == nil {
 				*newValPtr = *origValPtr // just copy the value
 			} else {
@@ -172,31 +173,47 @@ func (n *artNode[V]) cloneFlat(cloneFn cloneFunc[V]) *artNode[V] {
 			}
 
 			oldValPtr := c.prefixes[idx]
-			c.allot(uint8(idx), oldValPtr, newValPtr)
+			c.allot(idx, oldValPtr, newValPtr)
+
+			// stop, don't overflow uint8!
+			if idx == 255 {
+				ok = false
+			} else {
+				idx++
+			}
 		}
 	}
 
-	// first make a copy of all the nodes
+	// first make a flat copy of all the nodes
 	c.children = n.children
 
 	if cloneFn == nil {
 		return c
 	}
 
-	if c.childCount != 0 {
-		// Iterate over children to flat clone leaf/fringe nodes;
-		for i, anyKid := range c.children {
-			if anyKid == nil {
-				continue
-			}
+	var octet uint8
+	ok = true
+
+	for ok {
+		if octet, ok = c.childrenBitSet.NextSet(octet); ok {
+			anyKid := c.children[octet]
 
 			switch kid := anyKid.(type) {
 			case *artNode[V]:
-				// no-op, already copied
+				// no-op, already flat copied
 			case *leafNode[V]:
-				c.children[i] = kid.cloneLeaf(cloneFn)
+				c.children[octet] = kid.cloneLeaf(cloneFn)
 			case *fringeNode[V]:
-				c.children[i] = kid.cloneFringe(cloneFn)
+				c.children[octet] = kid.cloneFringe(cloneFn)
+			default:
+				panic("logic error, wrong node type")
+			}
+
+			// stop, don't overflow uint8!
+			if octet == 255 {
+				ok = false
+			} else {
+				octet++
 			}
 		}
 	}
@@ -214,17 +231,40 @@ func (n *artNode[V]) cloneRec(cloneFn cloneFunc[V]) *artNode[V] {
 	c := n.cloneFlat(cloneFn)
 
 	// Recursively clone all child nodes of type *node[V]
-	if c.childCount != 0 {
-		for i, kidAny := range c.children {
-			if kidAny == nil {
-				continue
+	var octet uint8
+	ok := true
+	for ok {
+		if octet, ok = c.childrenBitSet.NextSet(octet); ok {
+			kidAny := c.children[octet]
+
+			if kid, isArtNode := kidAny.(*artNode[V]); isArtNode {
+				c.children[octet] = kid.cloneRec(cloneFn)
 			}
 
-			if kid, ok := kidAny.(*artNode[V]); ok {
-				c.children[i] = kid.cloneRec(cloneFn)
+			// stop, don't overflow uint8!
+			if octet == 255 {
+				ok = false
+			} else {
+				octet++
 			}
+
 		}
 	}
+
+	/*
+		// Recursively clone all child nodes of type *node[V]
+		if c.childCount() != 0 {
+			for i, kidAny := range c.children {
+				if kidAny == nil {
+					continue
+				}
+
+				if kid, ok := kidAny.(*artNode[V]); ok {
+					c.children[i] = kid.cloneRec(cloneFn)
+				}
+			}
+		}
+	*/
 
 	return c
 }
