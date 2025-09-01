@@ -383,14 +383,14 @@ func (t *Table[V]) ModifyPersist(pfx netip.Prefix, cb func(val V, ok bool) (newV
 
 			// update size if necessary
 			switch {
-			case !existed && del:
-				panic("callback returned del=true for non-existent prefix")
+			case !existed && del: // no-op
+				return pt, zero, false
 
-			case existed && del:
+			case existed && del: // delete
 				n.prefixes.DeleteAt(idx)
 				pt.sizeUpdate(is4, -1)
 				n.purgeAndCompress(stack[:depth], octets, is4)
-				return pt, zero, true
+				return pt, oldVal, true
 
 			case !existed: // insert
 				n.prefixes.InsertAt(idx, newVal)
@@ -411,10 +411,11 @@ func (t *Table[V]) ModifyPersist(pfx netip.Prefix, cb func(val V, ok bool) (newV
 			// insert prefix path compressed
 
 			newVal, del := cb(zero, false)
-			if del {
-				panic("callback returned del=true for non-existent prefix")
+			if del { // no-op
+				return pt, zero, false
 			}
 
+			// insert
 			if isFringe(depth, bits) {
 				n.children.InsertAt(octet, newFringeNode(newVal))
 			} else {
@@ -445,15 +446,16 @@ func (t *Table[V]) ModifyPersist(pfx netip.Prefix, cb func(val V, ok bool) (newV
 				newVal, del := cb(kid.value, true)
 				if !del {
 					kid.value = newVal
-					return pt, newVal, false
+					return pt, newVal, false // update
 				}
 
+				// delete
 				n.children.DeleteAt(octet)
 
 				pt.sizeUpdate(is4, -1)
 				n.purgeAndCompress(stack[:depth], octets, is4)
 
-				return pt, zero, true
+				return pt, kid.value, true
 			}
 
 			// create new node
@@ -472,15 +474,16 @@ func (t *Table[V]) ModifyPersist(pfx netip.Prefix, cb func(val V, ok bool) (newV
 				newVal, del := cb(kid.value, true)
 				if !del {
 					kid.value = newVal
-					return pt, newVal, false
+					return pt, newVal, false // update
 				}
 
+				// delete
 				n.children.DeleteAt(octet)
 
 				pt.sizeUpdate(is4, -1)
 				n.purgeAndCompress(stack[:depth], octets, is4)
 
-				return pt, zero, true
+				return pt, kid.value, true
 			}
 
 			// create new node
