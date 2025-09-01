@@ -116,7 +116,7 @@ func TestInvalid(t *testing.T) {
 			}
 		}(testname)
 
-		_, _ = tbl.UpdateOrDelete(zeroPfx, func(any, bool) (any, bool) { return nil, false })
+		_, _ = tbl.Modify(zeroPfx, func(any, bool) (any, bool) { return nil, false })
 	})
 
 	testname = "UpdatePersist"
@@ -140,7 +140,7 @@ func TestInvalid(t *testing.T) {
 			}
 		}(testname)
 
-		_, _, _ = tbl.UpdateOrDeletePersist(zeroPfx, func(any, bool) (any, bool) { return nil, false })
+		_, _, _ = tbl.ModifyPersist(zeroPfx, func(any, bool) (any, bool) { return nil, false })
 	})
 
 	testname = "Get"
@@ -1968,7 +1968,7 @@ func TestUpdateOrDeleteCompare(t *testing.T) {
 
 	// Update as insert
 	for _, pfx := range pfxs {
-		fast.UpdateOrDelete(pfx.pfx, func(int, bool) (int, bool) { return pfx.val, false })
+		fast.Modify(pfx.pfx, func(int, bool) (int, bool) { return pfx.val, false })
 	}
 
 	for _, pfx := range pfxs {
@@ -1986,7 +1986,7 @@ func TestUpdateOrDeleteCompare(t *testing.T) {
 	// Update as update
 	for _, pfx := range pfxs[:len(pfxs)/2] {
 		gold.update(pfx.pfx, cb1)
-		fast.UpdateOrDelete(pfx.pfx, cb2)
+		fast.Modify(pfx.pfx, cb2)
 	}
 
 	for _, pfx := range pfxs {
@@ -2050,8 +2050,8 @@ func TestUpdateOrDeletePersistCompare(t *testing.T) {
 
 	// Update as insert
 	for _, pfx := range pfxs {
-		imu, _, _ = imu.UpdateOrDeletePersist(pfx.pfx, func(int, bool) (int, bool) { return pfx.val, false })
-		mut.UpdateOrDelete(pfx.pfx, func(int, bool) (int, bool) { return pfx.val, false })
+		imu, _, _ = imu.ModifyPersist(pfx.pfx, func(int, bool) (int, bool) { return pfx.val, false })
+		mut.Modify(pfx.pfx, func(int, bool) (int, bool) { return pfx.val, false })
 	}
 
 	for _, pfx := range pfxs {
@@ -2067,8 +2067,8 @@ func TestUpdateOrDeletePersistCompare(t *testing.T) {
 
 	// Update as update
 	for _, pfx := range pfxs[:len(pfxs)/2] {
-		imu, _, _ = imu.UpdateOrDeletePersist(pfx.pfx, cb)
-		mut.UpdateOrDelete(pfx.pfx, cb)
+		imu, _, _ = imu.ModifyPersist(pfx.pfx, cb)
+		mut.Modify(pfx.pfx, cb)
 	}
 
 	for _, pfx := range pfxs {
@@ -2197,7 +2197,7 @@ func TestUpdateOrDelete(t *testing.T) {
 	// update as insert
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("insert: %s", tt.name), func(t *testing.T) {
-			val, _ := rt.UpdateOrDelete(tt.pfx, cb)
+			val, _ := rt.Modify(tt.pfx, cb)
 			got, ok := rt.Get(tt.pfx)
 
 			if !ok {
@@ -2213,7 +2213,7 @@ func TestUpdateOrDelete(t *testing.T) {
 	// update as update
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("update: %s", tt.name), func(t *testing.T) {
-			val, _ := rt.UpdateOrDelete(tt.pfx, cb)
+			val, _ := rt.Modify(tt.pfx, cb)
 			got, ok := rt.Get(tt.pfx)
 
 			if !ok {
@@ -2266,7 +2266,7 @@ func TestUpdateOrDeleteShuffled(t *testing.T) {
 
 		// delete
 		for _, pfx := range toDelete {
-			rt1.UpdateOrDelete(pfx.pfx, cb)
+			rt1.Modify(pfx.pfx, cb)
 		}
 
 		pfxs2 := append([]goldTableItem[int](nil), pfxs...)
@@ -2285,7 +2285,7 @@ func TestUpdateOrDeleteShuffled(t *testing.T) {
 
 		// delete
 		for _, pfx := range toDelete2 {
-			rt2.UpdateOrDelete(pfx.pfx, cb)
+			rt2.Modify(pfx.pfx, cb)
 		}
 
 		if rt1.String() != rt2.String() {
@@ -2337,7 +2337,7 @@ func TestUpdateOrDeletePersistShuffled(t *testing.T) {
 
 		// delete
 		for _, pfx := range toDelete {
-			rt1, _, _ = rt1.UpdateOrDeletePersist(pfx.pfx, cb)
+			rt1, _, _ = rt1.ModifyPersist(pfx.pfx, cb)
 		}
 
 		pfxs2 := append([]goldTableItem[int](nil), pfxs...)
@@ -2356,7 +2356,7 @@ func TestUpdateOrDeletePersistShuffled(t *testing.T) {
 
 		// delete
 		for _, pfx := range toDelete2 {
-			rt2, _, _ = rt2.UpdateOrDeletePersist(pfx.pfx, cb)
+			rt2, _, _ = rt2.ModifyPersist(pfx.pfx, cb)
 		}
 
 		if rt1.String() != rt2.String() {

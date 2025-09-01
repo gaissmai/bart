@@ -155,7 +155,7 @@ func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V] {
 	panic("unreachable")
 }
 
-// Deprecated: use [Table.UpdateOrDeletePersist] instead.
+// Deprecated: use [Table.ModifyPersist] instead.
 //
 // UpdatePersist is similar to Update but does not modify the receiver.
 //
@@ -305,7 +305,7 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 	panic("unreachable")
 }
 
-// UpdateOrDeletePersist is similar to UpdateOrDelete but does not modify the receiver.
+// ModifyPersist is similar to Modify but does not modify the receiver.
 //
 // It performs a copy-on-write update, cloning all nodes touched during the update,
 // and returns a new Table instance reflecting the update.
@@ -314,9 +314,9 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 // If the payload type V contains pointers or needs deep copying,
 // it must implement the [bart.Cloner] interface to support correct cloning.
 //
-// Due to cloning overhead, UpdateOrDeletePersist is significantly slower than UpdateOrDelete,
+// Due to cloning overhead, ModifyPersist is significantly slower than Modify,
 // typically taking μsec instead of nsec.
-func (t *Table[V]) UpdateOrDeletePersist(pfx netip.Prefix, cb func(val V, ok bool) (newVal V, del bool)) (pt *Table[V], newVal V, deleted bool) {
+func (t *Table[V]) ModifyPersist(pfx netip.Prefix, cb func(val V, ok bool) (newVal V, del bool)) (pt *Table[V], newVal V, deleted bool) {
 	var zero V // zero value of V for default initialization
 
 	if !pfx.IsValid() {
