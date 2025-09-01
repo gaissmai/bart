@@ -171,11 +171,6 @@ func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V] {
 func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (pt *Table[V], newVal V) {
 	var zero V // zero value of V for default initialization
 
-	// wrap cb with old signature until Update is removed from API
-	cbWrap := func(val V, found bool) (V, bool) {
-		return cb(val, found), false
-	}
-
 	if !pfx.IsValid() {
 		return t, zero
 	}
@@ -222,9 +217,13 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 	for depth, octet := range octets {
 		// If at the last relevant octet, update or insert the prefix in this node.
 		if depth == maxDepth {
-			newVal, exists, _ := n.prefixes.ModifyAt(art.PfxToIdx(octet, lastBits), cbWrap)
-			// If prefix did not previously exist, increment size counter.
-			if !exists {
+			idx := art.PfxToIdx(octet, lastBits)
+
+			oldVal, existed := n.prefixes.Get(idx)
+			newVal := cb(oldVal, existed)
+			n.prefixes.InsertAt(idx, newVal)
+
+			if !existed {
 				pt.sizeUpdate(is4, 1)
 			}
 			return pt, newVal
@@ -234,7 +233,7 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 
 		// If child node for this address does not exist, insert new leaf or fringe.
 		if !n.children.Test(addr) {
-			newVal, _ := cbWrap(zero, false)
+			newVal := cb(zero, false)
 			if isFringe(depth, bits) {
 				n.children.InsertAt(addr, newFringeNode(newVal))
 			} else {
@@ -265,7 +264,7 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 		case *leafNode[V]:
 			// If the leaf's prefix matches, update the value using callback.
 			if kid.prefix == pfx {
-				newVal, _ = cbWrap(kid.value, true)
+				newVal = cb(kid.value, true)
 
 				// Replace the existing leaf with an updated one.
 				n.children.InsertAt(addr, newLeafNode(pfx, newVal))
@@ -285,7 +284,7 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 		case *fringeNode[V]:
 			// If current node corresponds to a fringe prefix, update its value.
 			if isFringe(depth, bits) {
-				newVal, _ = cbWrap(kid.value, true)
+				newVal = cb(kid.value, true)
 				// Replace fringe node with updated value.
 				n.children.InsertAt(addr, newFringeNode(newVal))
 				return pt, newVal
@@ -377,22 +376,34 @@ func (t *Table[V]) ModifyPersist(pfx netip.Prefix, cb func(val V, ok bool) (newV
 
 		// last octet from prefix, update/insert/delete prefix
 		if depth == maxDepth {
-			newVal, existed, deleted := n.prefixes.ModifyAt(art.PfxToIdx(octet, lastBits), cb)
+			idx := art.PfxToIdx(octet, lastBits)
+
+			oldVal, existed := n.prefixes.Get(idx)
+			newVal, del := cb(oldVal, existed)
 
 			// update size if necessary
 			switch {
-			case existed && deleted:
+			case !existed && del:
+				panic("callback returned del=true for non-existent prefix")
+
+			case existed && del:
+				n.prefixes.DeleteAt(idx)
 				pt.sizeUpdate(is4, -1)
 				n.purgeAndCompress(stack[:depth], octets, is4)
-			case !existed && !deleted: // inserted
-				pt.sizeUpdate(is4, 1)
-			}
-
-			if deleted {
 				return pt, zero, true
-			}
 
-			return pt, newVal, false
+			case !existed: // insert
+				n.prefixes.InsertAt(idx, newVal)
+				pt.sizeUpdate(is4, 1)
+				return pt, newVal, false
+
+			case existed: // update
+				n.prefixes.InsertAt(idx, newVal)
+				return pt, newVal, false
+
+			default:
+				panic("unreachable")
+			}
 		}
 
 		// go down in tight loop to last octet

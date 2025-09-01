@@ -136,11 +136,6 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, found bool) V) (newVal V) {
 	var zero V
 
-	// wrap cb with old signature until Update is removed from API
-	cbWrap := func(val V, found bool) (V, bool) {
-		return cb(val, found), false
-	}
-
 	if !pfx.IsValid() {
 		return
 	}
@@ -161,7 +156,12 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, found bool) V) (newVa
 	for depth, octet := range octets {
 		// last octet from prefix, update/insert prefix into node
 		if depth == maxDepth {
-			newVal, existed, _ := n.prefixes.ModifyAt(art.PfxToIdx(octet, lastBits), cbWrap)
+			idx := art.PfxToIdx(octet, lastBits)
+
+			oldVal, existed := n.prefixes.Get(idx)
+			newVal := cb(oldVal, existed)
+			n.prefixes.InsertAt(idx, newVal)
+
 			if !existed {
 				t.sizeUpdate(is4, 1)
 			}
@@ -171,7 +171,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, found bool) V) (newVa
 		// go down in tight loop to last octet
 		if !n.children.Test(octet) {
 			// insert prefix path compressed
-			newVal, _ := cbWrap(zero, false)
+			newVal := cb(zero, false)
 			if isFringe(depth, bits) {
 				n.children.InsertAt(octet, newFringeNode(newVal))
 			} else {
@@ -190,7 +190,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, found bool) V) (newVa
 		case *leafNode[V]:
 			// update existing value if prefixes are equal
 			if kid.prefix == pfx {
-				kid.value, _ = cbWrap(kid.value, true)
+				kid.value = cb(kid.value, true)
 				return kid.value
 			}
 
@@ -207,7 +207,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, found bool) V) (newVa
 		case *fringeNode[V]:
 			// update existing value if prefix is fringe
 			if isFringe(depth, bits) {
-				kid.value, _ = cbWrap(kid.value, true)
+				kid.value = cb(kid.value, true)
 				return kid.value
 			}
 
@@ -288,24 +288,37 @@ func (t *Table[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (newVal V
 		// push current node on stack for path recording
 		stack[depth] = n
 
-		// last octet from prefix, update/insert/delte prefix
+		// last octet from prefix, update/insert/delete prefix
 		if depth == maxDepth {
-			newVal, existed, deleted := n.prefixes.ModifyAt(art.PfxToIdx(octet, lastBits), cb)
+			idx := art.PfxToIdx(octet, lastBits)
+
+			oldVal, existed := n.prefixes.Get(idx)
+			newVal, del := cb(oldVal, existed)
 
 			// update size if necessary
 			switch {
-			case existed && deleted:
+			case !existed && del:
+				panic("callback returned del=true for non-existent prefix")
+
+			case existed && del:
+				n.prefixes.DeleteAt(idx)
 				t.sizeUpdate(is4, -1)
 				n.purgeAndCompress(stack[:depth], octets, is4)
-			case !existed && !deleted: // inserted
-				t.sizeUpdate(is4, 1)
-			}
-
-			if deleted {
 				return zero, true
+
+			case !existed: // insert
+				n.prefixes.InsertAt(idx, newVal)
+				t.sizeUpdate(is4, 1)
+				return newVal, false
+
+			case existed: // update
+				n.prefixes.InsertAt(idx, newVal)
+				return newVal, false
+
+			default:
+				panic("unreachable")
 			}
 
-			return newVal, false
 		}
 
 		// go down in tight loop to last octet
