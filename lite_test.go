@@ -76,7 +76,7 @@ func TestLiteInvalid(t *testing.T) {
 			}
 		}(testname)
 
-		_ = tbl1.DeletePersist(zeroPfx)
+		_, _ = tbl1.DeletePersist(zeroPfx)
 	})
 
 	testname = "Contains"
@@ -160,7 +160,7 @@ func TestLiteDeletePersist(t *testing.T) {
 		// must not panic
 		tbl := new(Lite)
 		checkLiteNumNodes(t, tbl, 0)
-		tbl = tbl.DeletePersist(randomPrefix(prng))
+		tbl, _ = tbl.DeletePersist(randomPrefix(prng))
 		checkLiteNumNodes(t, tbl, 0)
 	})
 
@@ -172,7 +172,7 @@ func TestLiteDeletePersist(t *testing.T) {
 
 		tbl.Insert(mpp("10.0.0.0/8"))
 		checkLiteNumNodes(t, tbl, 1)
-		tbl = tbl.DeletePersist(mpp("10.0.0.0/8"))
+		tbl, _ = tbl.DeletePersist(mpp("10.0.0.0/8"))
 		checkLiteNumNodes(t, tbl, 0)
 	})
 
@@ -185,7 +185,7 @@ func TestLiteDeletePersist(t *testing.T) {
 		tbl.Insert(mpp("192.168.0.1/32"))
 		checkLiteNumNodes(t, tbl, 1)
 
-		tbl = tbl.DeletePersist(mpp("192.168.0.1/32"))
+		tbl, _ = tbl.DeletePersist(mpp("192.168.0.1/32"))
 		checkLiteNumNodes(t, tbl, 0)
 	})
 
@@ -199,7 +199,7 @@ func TestLiteDeletePersist(t *testing.T) {
 		tbl.Insert(mpp("192.180.0.1/32"))
 		checkLiteNumNodes(t, tbl, 2)
 
-		tbl = tbl.DeletePersist(mpp("192.180.0.1/32"))
+		tbl, _ = tbl.DeletePersist(mpp("192.180.0.1/32"))
 		checkLiteNumNodes(t, tbl, 1)
 	})
 
@@ -215,7 +215,7 @@ func TestLiteDeletePersist(t *testing.T) {
 
 		checkLiteNumNodes(t, tbl, 2)
 
-		tbl = tbl.DeletePersist(mpp("192.180.0.1/32"))
+		tbl, _ = tbl.DeletePersist(mpp("192.180.0.1/32"))
 		checkLiteNumNodes(t, tbl, 2)
 	})
 
@@ -231,7 +231,7 @@ func TestLiteDeletePersist(t *testing.T) {
 
 		checkLiteNumNodes(t, tbl, 2)
 
-		tbl = tbl.DeletePersist(mpp("192.180.0.1/32"))
+		tbl, _ = tbl.DeletePersist(mpp("192.180.0.1/32"))
 		checkLiteNumNodes(t, tbl, 2)
 	})
 
@@ -244,7 +244,7 @@ func TestLiteDeletePersist(t *testing.T) {
 		tbl.Insert(mpp("192.168.0.1/32"))
 		checkLiteNumNodes(t, tbl, 1)
 
-		tbl = tbl.DeletePersist(mpp("200.0.0.0/32"))
+		tbl, _ = tbl.DeletePersist(mpp("200.0.0.0/32"))
 		checkLiteNumNodes(t, tbl, 1)
 	})
 
@@ -259,7 +259,7 @@ func TestLiteDeletePersist(t *testing.T) {
 		tbl.Insert(mpp("192.168.0.0/22"))
 		checkLiteNumNodes(t, tbl, 3)
 
-		tbl = tbl.DeletePersist(mpp("192.168.0.0/22"))
+		tbl, _ = tbl.DeletePersist(mpp("192.168.0.0/22"))
 		checkLiteNumNodes(t, tbl, 1)
 	})
 
@@ -270,7 +270,7 @@ func TestLiteDeletePersist(t *testing.T) {
 
 		tbl.Insert(mpp("0.0.0.0/0"))
 		tbl.Insert(mpp("::/0"))
-		tbl = tbl.DeletePersist(mpp("0.0.0.0/0"))
+		tbl, _ = tbl.DeletePersist(mpp("0.0.0.0/0"))
 
 		checkLiteNumNodes(t, tbl, 1)
 	})
@@ -284,10 +284,10 @@ func TestLiteDeletePersist(t *testing.T) {
 		tbl.Insert(mpp("10.20.0.0/17"))
 		checkLiteNumNodes(t, tbl, 2)
 
-		tbl = tbl.DeletePersist(mpp("10.20.0.0/17"))
+		tbl, _ = tbl.DeletePersist(mpp("10.20.0.0/17"))
 		checkLiteNumNodes(t, tbl, 1)
 
-		tbl = tbl.DeletePersist(mpp("10.10.0.0/17"))
+		tbl, _ = tbl.DeletePersist(mpp("10.10.0.0/17"))
 		checkLiteNumNodes(t, tbl, 0)
 	})
 }
@@ -837,7 +837,8 @@ func TestLiteWalkPersist(t *testing.T) {
 				"fd00::/8",
 			},
 			fn: func(pl *Lite, pfx netip.Prefix) (*Lite, bool) {
-				return pl.DeletePersist(pfx), true // remove everything
+				prt, _ := pl.DeletePersist(pfx)
+				return prt, true // remove everything
 			},
 			wantRemain: []string{},
 		},
@@ -849,7 +850,7 @@ func TestLiteWalkPersist(t *testing.T) {
 			},
 			fn: func(pl *Lite, pfx netip.Prefix) (*Lite, bool) {
 				if pfx.Addr().Is4() {
-					pl = pl.DeletePersist(pfx)
+					pl, _ = pl.DeletePersist(pfx)
 				}
 				return pl, true
 			},

@@ -509,6 +509,11 @@ func (t *Table[V]) ModifyPersist(pfx netip.Prefix, cb func(val V, ok bool) (newV
 	panic("unreachable")
 }
 
+// Deprecated: use [Table.DeletePersist] instead.
+func (t *Table[V]) GetAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, found bool) {
+	return t.DeletePersist(pfx)
+}
+
 // DeletePersist is similar to Delete but does not modify the receiver.
 //
 // It performs a copy-on-write delete operation, cloning all nodes touched during
@@ -519,28 +524,7 @@ func (t *Table[V]) ModifyPersist(pfx netip.Prefix, cb func(val V, ok bool) (newV
 //
 // Due to cloning overhead, DeletePersist is significantly slower than Delete,
 // typically taking μsec instead of nsec.
-func (t *Table[V]) DeletePersist(pfx netip.Prefix) *Table[V] {
-	pt, _, _ := t.getAndDeletePersist(pfx)
-	return pt
-}
-
-// GetAndDeletePersist is similar to GetAndDelete but does not modify the receiver.
-//
-// It performs a copy-on-write delete operation, cloning all nodes touched during
-// deletion and returning a new Table reflecting the change.
-//
-// If the payload type V contains pointers or requires deep copying,
-// it must implement the [bart.Cloner] interface for correct cloning.
-//
-// Due to cloning overhead, GetAndDeletePersist is significantly slower than GetAndDelete,
-// typically taking μsec instead of nsec.
-func (t *Table[V]) GetAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, ok bool) {
-	return t.getAndDeletePersist(pfx)
-}
-
-// getAndDeletePersist is the internal implementation of GetAndDeletePersist,
-// performing the copy-on-write delete without modifying the receiver.
-func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, exists bool) {
+func (t *Table[V]) DeletePersist(pfx netip.Prefix) (pt *Table[V], val V, found bool) {
 	if !pfx.IsValid() {
 		return t, val, false
 	}
@@ -594,8 +578,8 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, e
 
 		if depth == maxDepth {
 			// Attempt to delete the prefix from the node's prefixes.
-			val, exists = n.prefixes.DeleteAt(art.PfxToIdx(octet, lastBits))
-			if !exists {
+			val, found = n.prefixes.DeleteAt(art.PfxToIdx(octet, lastBits))
+			if !found {
 				// Prefix not found, nothing deleted.
 				return pt, val, false
 			}
@@ -606,7 +590,7 @@ func (t *Table[V]) getAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, e
 			// After deletion, purge nodes and compress the path if needed.
 			n.purgeAndCompress(stack[:depth], octets, is4)
 
-			return pt, val, exists
+			return pt, val, true
 		}
 
 		addr := octet

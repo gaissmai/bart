@@ -92,7 +92,7 @@ func TestInvalid(t *testing.T) {
 			}
 		}(testname)
 
-		_ = tbl.DeletePersist(zeroPfx)
+		_, _, _ = tbl.DeletePersist(zeroPfx)
 	})
 
 	testname = "Update"
@@ -1063,7 +1063,7 @@ func TestDeletePersist(t *testing.T) {
 		// must not panic
 		tbl := new(Table[int])
 		checkNumNodes(t, tbl, 0)
-		tbl = tbl.DeletePersist(randomPrefix(prng))
+		tbl, _, _ = tbl.DeletePersist(randomPrefix(prng))
 		checkNumNodes(t, tbl, 0)
 	})
 
@@ -1079,7 +1079,7 @@ func TestDeletePersist(t *testing.T) {
 			{"10.0.0.1", 1},
 			{"255.255.255.255", -1},
 		})
-		tbl = tbl.DeletePersist(mpp("10.0.0.0/8"))
+		tbl, _, _ = tbl.DeletePersist(mpp("10.0.0.0/8"))
 		checkNumNodes(t, tbl, 0)
 		checkRoutes(t, tbl, []tableTest{
 			{"10.0.0.1", -1},
@@ -1100,7 +1100,7 @@ func TestDeletePersist(t *testing.T) {
 			{"255.255.255.255", -1},
 		})
 
-		tbl = tbl.DeletePersist(mpp("192.168.0.1/32"))
+		tbl, _, _ = tbl.DeletePersist(mpp("192.168.0.1/32"))
 		checkNumNodes(t, tbl, 0)
 		checkRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", -1},
@@ -1123,7 +1123,7 @@ func TestDeletePersist(t *testing.T) {
 			{"192.40.0.1", -1},
 		})
 
-		tbl = tbl.DeletePersist(mpp("192.180.0.1/32"))
+		tbl, _, _ = tbl.DeletePersist(mpp("192.180.0.1/32"))
 		checkNumNodes(t, tbl, 1)
 		checkRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
@@ -1150,7 +1150,7 @@ func TestDeletePersist(t *testing.T) {
 			{"192.255.0.1", -1},
 		})
 
-		tbl = tbl.DeletePersist(mpp("192.180.0.1/32"))
+		tbl, _, _ = tbl.DeletePersist(mpp("192.180.0.1/32"))
 		checkNumNodes(t, tbl, 2)
 		checkRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
@@ -1178,7 +1178,7 @@ func TestDeletePersist(t *testing.T) {
 			{"192.255.0.1", -1},
 		})
 
-		tbl = tbl.DeletePersist(mpp("192.180.0.1/32"))
+		tbl, _, _ = tbl.DeletePersist(mpp("192.180.0.1/32"))
 		checkNumNodes(t, tbl, 2)
 		checkRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
@@ -1201,7 +1201,7 @@ func TestDeletePersist(t *testing.T) {
 			{"192.255.0.1", -1},
 		})
 
-		tbl = tbl.DeletePersist(mpp("200.0.0.0/32"))
+		tbl, _, _ = tbl.DeletePersist(mpp("200.0.0.0/32"))
 		checkNumNodes(t, tbl, 1)
 		checkRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
@@ -1225,7 +1225,7 @@ func TestDeletePersist(t *testing.T) {
 			{"192.255.0.1", -1},
 		})
 
-		tbl = tbl.DeletePersist(mpp("192.168.0.0/22"))
+		tbl, _, _ = tbl.DeletePersist(mpp("192.168.0.0/22"))
 		checkNumNodes(t, tbl, 1)
 		checkRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
@@ -1241,7 +1241,7 @@ func TestDeletePersist(t *testing.T) {
 
 		tbl.Insert(mpp("0.0.0.0/0"), 1)
 		tbl.Insert(mpp("::/0"), 1)
-		tbl = tbl.DeletePersist(mpp("0.0.0.0/0"))
+		tbl, _, _ = tbl.DeletePersist(mpp("0.0.0.0/0"))
 
 		checkNumNodes(t, tbl, 1)
 		checkRoutes(t, tbl, []tableTest{
@@ -1259,10 +1259,10 @@ func TestDeletePersist(t *testing.T) {
 		tbl.Insert(mpp("10.20.0.0/17"), 2)
 		checkNumNodes(t, tbl, 2)
 
-		tbl = tbl.DeletePersist(mpp("10.20.0.0/17"))
+		tbl, _, _ = tbl.DeletePersist(mpp("10.20.0.0/17"))
 		checkNumNodes(t, tbl, 1)
 
-		tbl = tbl.DeletePersist(mpp("10.10.0.0/17"))
+		tbl, _, _ = tbl.DeletePersist(mpp("10.10.0.0/17"))
 		checkNumNodes(t, tbl, 0)
 	})
 }
@@ -3352,7 +3352,8 @@ func TestWalkPersist(t *testing.T) {
 				"fd00::/8":   "ula",
 			},
 			fn: func(pt *Table[string], pfx netip.Prefix, val string) (*Table[string], bool) {
-				return pt.DeletePersist(pfx), true // remove everything
+				prt, _, _ := pt.DeletePersist(pfx)
+				return prt, true // remove everything
 			},
 			wantRemain: []string{},
 		},
@@ -3364,7 +3365,7 @@ func TestWalkPersist(t *testing.T) {
 			},
 			fn: func(pt *Table[string], pfx netip.Prefix, val string) (*Table[string], bool) {
 				if pfx.Addr().Is4() {
-					pt = pt.DeletePersist(pfx)
+					pt, _, _ = pt.DeletePersist(pfx)
 				}
 				return pt, true
 			},
@@ -3378,7 +3379,7 @@ func TestWalkPersist(t *testing.T) {
 			},
 			fn: func(pt *Table[string], pfx netip.Prefix, val string) (*Table[string], bool) {
 				if val == "removeMe" {
-					pt = pt.DeletePersist(pfx)
+					pt, _, _ = pt.DeletePersist(pfx)
 				}
 				return pt, true
 			},
@@ -3501,7 +3502,7 @@ func BenchmarkTableDelete(b *testing.B) {
 
 		b.Run(fmt.Sprintf("persist from_%d", n), func(b *testing.B) {
 			for b.Loop() {
-				_ = prt.DeletePersist(probe)
+				_, _, _ = prt.DeletePersist(probe)
 			}
 		})
 	}
@@ -3829,7 +3830,7 @@ func BenchmarkWalkPersist(b *testing.B) {
 		// callback: delete 1/10 of the entries
 		fn := func(pt *Table[int], pfx netip.Prefix, val int) (*Table[int], bool) {
 			if val%10 == 0 {
-				pt = pt.DeletePersist(pfx)
+				pt, _, _ = pt.DeletePersist(pfx)
 			}
 			return pt, true
 		}

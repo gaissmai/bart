@@ -76,23 +76,21 @@ See the `ExampleLite_concurrent` and `ExampleTable_concurrent` tests for concret
   }
 
   func (t *Table[V]) Contains(ip netip.Addr) bool
-  func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool)
+  func (t *Table[V]) Lookup(ip netip.Addr) (V, bool)
 
-  func (t *Table[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool)
-  func (t *Table[V]) LookupPrefixLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool)
+  func (t *Table[V]) LookupPrefix(pfx netip.Prefix) (V, bool)
+  func (t *Table[V]) LookupPrefixLPM(pfx netip.Prefix) (netip.Prefix, V, bool)
 
   func (t *Table[V]) Insert(pfx netip.Prefix, val V)
-  func (t *Table[V]) Delete(pfx netip.Prefix)
   func (t *Table[V]) Modify(pfx netip.Prefix, func(V, bool) (V, bool)) (V, bool)
+  func (t *Table[V]) Delete(pfx netip.Prefix) (V, bool)
+  func (t *Table[V]) Get(pfx netip.Prefix) (V, bool)
 
   func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V]
-  func (t *Table[V]) DeletePersist(pfx netip.Prefix) *Table[V]
   func (t *Table[V]) ModifyPersist(pfx netip.Prefix, func(val V, ok bool) (V, bool)) (*Table[V], V, bool)
+  func (t *Table[V]) DeletePersist(pfx netip.Prefix) (*Table[V], V, bool)
   func (t *Table[V]) WalkPersist(func(*Table[V], netip.Prefix, V) (*Table[V], bool)) *Table[V]
 
-  func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool)
-  func (t *Table[V]) GetAndDelete(pfx netip.Prefix) (val V, ok bool)
-  func (t *Table[V]) GetAndDeletePersist(pfx netip.Prefix) (pt *Table[V], val V, ok bool)
 
   func (t *Table[V]) Clone() *Table[V]
   func (t *Table[V]) Union(o *Table[V])
@@ -151,7 +149,7 @@ Some delegated methods are pointless without a payload.
    func (l *Lite) Delete(pfx netip.Prefix)
 
    func (l *Lite) InsertPersist(pfx netip.Prefix) *Lite
-   func (l *Lite) DeletePersist(pfx netip.Prefix) *Lite
+   func (l *Lite) DeletePersist(pfx netip.Prefix) (*Lite, bool)
    func (l *Lite) WalkPersist(fn func(*Lite, netip.Prefix) (*Lite, bool)) *Lite
 
    func (l *Lite) Clone() *Lite
