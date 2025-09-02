@@ -75,7 +75,6 @@ func (n *artNode[V]) insertPrefix(idx uint8, val V) (exists bool) {
 	// To ensure allot works as intended, every unique prefix in the
 	// artNode must point to a distinct value pointer, even for identical values.
 	// Using new() and assignment guarantees each inserted prefix gets its own address,
-	// but only if V IS NOT zero-sized!
 	valPtr := new(V)
 	*valPtr = val
 

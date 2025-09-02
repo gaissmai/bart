@@ -1406,8 +1406,10 @@ func TestArtCloneDeep(t *testing.T) {
 
 func BenchmarkArtTableDelete(b *testing.B) {
 	prng := rand.New(rand.NewPCG(42, 42))
+
 	for _, n := range benchRouteCount {
 		rt := new(ArtTable[*MyInt])
+
 		for i, route := range randomPrefixes(prng, n) {
 			myInt := MyInt(i)
 			rt.Insert(route.pfx, &myInt)

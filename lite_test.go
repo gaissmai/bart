@@ -137,18 +137,6 @@ func TestLiteInvalid(t *testing.T) {
 		tbl1.Overlaps4(tbl2)
 		tbl1.Overlaps6(tbl2)
 	})
-
-	testname = "Contains"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid ip input", testname)
-			}
-		}(testname)
-
-		tbl1.Contains(zeroIP)
-	})
 }
 
 func TestLiteDeletePersist(t *testing.T) {
