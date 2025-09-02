@@ -418,18 +418,14 @@ func (t *Table[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del
 	panic("unreachable")
 }
 
-// Delete removes pfx from the tree, pfx does not have to be present.
-func (t *Table[V]) Delete(pfx netip.Prefix) {
-	_, _ = t.getAndDelete(pfx)
+// Deprecated: use [Table.Delete] instead.
+func (t *Table[V]) GetAndDelete(pfx netip.Prefix) (val V, found bool) {
+	return t.Delete(pfx)
 }
 
-// GetAndDelete deletes the prefix and returns the associated payload for prefix and true,
+// Delete the prefix and returns the associated payload for prefix and true if found
 // or the zero value and false if prefix is not set in the routing table.
-func (t *Table[V]) GetAndDelete(pfx netip.Prefix) (val V, ok bool) {
-	return t.getAndDelete(pfx)
-}
-
-func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, existed bool) {
+func (t *Table[V]) Delete(pfx netip.Prefix) (val V, found bool) {
 	if !pfx.IsValid() {
 		return
 	}
@@ -459,8 +455,8 @@ func (t *Table[V]) getAndDelete(pfx netip.Prefix) (val V, existed bool) {
 
 		if depth == maxDepth {
 			// try to delete prefix in trie node
-			val, existed = n.prefixes.DeleteAt(art.PfxToIdx(octet, lastBits))
-			if !existed {
+			val, found = n.prefixes.DeleteAt(art.PfxToIdx(octet, lastBits))
+			if !found {
 				return
 			}
 

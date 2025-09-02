@@ -64,7 +64,7 @@ func ExampleLite_concurrent() {
 
 			// batch of deletes
 			for _, pfx := range examplePrefixes {
-				tbl = tbl.DeletePersist(pfx)
+				tbl, _ = tbl.DeletePersist(pfx)
 			}
 
 			liteAtomicPtr.Store(tbl)

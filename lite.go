@@ -15,8 +15,6 @@ import (
 // The following methods are pointless without a payload:
 //   - Lookup (use Contains)
 //   - Get (use Exists)
-//   - GetAndDelete
-//   - GetAndDeletePersist
 //   - Modify
 //   - ModifyPersist
 type Lite struct {
@@ -48,15 +46,16 @@ func (l *Lite) InsertPersist(pfx netip.Prefix) *Lite {
 }
 
 // Delete is a wrapper for the underlying table.
-func (l *Lite) Delete(pfx netip.Prefix) {
-	l.Table.Delete(pfx)
+func (l *Lite) Delete(pfx netip.Prefix) bool {
+	_, found := l.Table.Delete(pfx)
+	return found
 }
 
 // DeletePersist is an adapter for the underlying table.
-func (l *Lite) DeletePersist(pfx netip.Prefix) *Lite {
-	tbl := l.Table.DeletePersist(pfx)
+func (l *Lite) DeletePersist(pfx netip.Prefix) (*Lite, bool) {
+	tbl, _, found := l.Table.DeletePersist(pfx)
 	//nolint:govet // copy of *tbl is here by intention
-	return &Lite{*tbl}
+	return &Lite{*tbl}, found
 }
 
 // WalkPersist is an adapter for the underlying table.

@@ -123,7 +123,7 @@ func TestDeletePersistTable(t *testing.T) {
 
 	clone := orig
 	for _, pfx := range pfxs {
-		clone = clone.DeletePersist(pfx)
+		clone, _, _ = clone.DeletePersist(pfx)
 
 		// Deleted prefix should be absent in clone
 		_, ok := clone.Get(pfx)
@@ -198,7 +198,7 @@ func TestDeletePersistLite(t *testing.T) {
 
 	clone := orig
 	for i, pfx := range pfxs {
-		clone = clone.DeletePersist(pfx)
+		clone, _ = clone.DeletePersist(pfx)
 
 		// test for existence
 		if ok := orig.Exists(pfx); !ok {
