@@ -203,18 +203,9 @@ func (d *ArtTable[V]) Modify(pfx netip.Prefix, cb func(val V, ok bool) (newVal V
 	return
 }
 
-// Delete removes pfx from the tree, pfx does not have to be present.
-func (d *ArtTable[V]) Delete(pfx netip.Prefix) {
-	_, _ = d.getAndDelete(pfx)
-}
-
-// GetAndDelete deletes the prefix and returns the associated payload for prefix and true,
+// Delete deletes the prefix and returns the associated payload for prefix and true,
 // or the zero value and false if prefix is not set in the routing table.
-func (d *ArtTable[V]) GetAndDelete(pfx netip.Prefix) (val V, ok bool) {
-	return d.getAndDelete(pfx)
-}
-
-func (d *ArtTable[V]) getAndDelete(pfx netip.Prefix) (val V, exists bool) {
+func (d *ArtTable[V]) Delete(pfx netip.Prefix) (val V, exists bool) {
 	if !pfx.IsValid() {
 		return
 	}

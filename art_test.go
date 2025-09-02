@@ -138,7 +138,7 @@ func TestArtInvalid(t *testing.T) {
 			}
 		}(testname)
 
-		tbl.Delete(zeroPfx)
+		_, _ = tbl.Delete(zeroPfx)
 	})
 
 	testname = "Get"
@@ -151,18 +151,6 @@ func TestArtInvalid(t *testing.T) {
 		}(testname)
 
 		_, _ = tbl.Get(zeroPfx)
-	})
-
-	testname = "GetAndDelete"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid prefix input", testname)
-			}
-		}(testname)
-
-		_, _ = tbl.GetAndDelete(zeroPfx)
 	})
 
 	testname = "Contains"
@@ -192,18 +180,6 @@ func TestArtInvalid(t *testing.T) {
 		if got != false {
 			t.Errorf("%s returns true on invalid IP input, expected false", testname)
 		}
-	})
-
-	testname = "Contains"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid ip input", testname)
-			}
-		}(testname)
-
-		tbl.Contains(zeroIP)
 	})
 }
 
@@ -505,7 +481,7 @@ func TestArtInsert(t *testing.T) {
 	})
 }
 
-func TestArtDelete(t *testing.T) {
+func TestArtDeleteEdgeCases(t *testing.T) {
 	t.Parallel()
 
 	t.Run("table_is_empty", func(t *testing.T) {
@@ -1187,7 +1163,7 @@ func TestArtDeleteButOne(t *testing.T) {
 	}
 }
 
-func TestArtGetAndDelete(t *testing.T) {
+func TestArtDelete(t *testing.T) {
 	t.Parallel()
 	prng := rand.New(rand.NewPCG(42, 42))
 	// Insert N prefixes, then delete those same prefixes in shuffled
@@ -1209,19 +1185,19 @@ func TestArtGetAndDelete(t *testing.T) {
 
 	for _, p := range prefixes {
 		want, _ := tbl.Get(p.pfx)
-		val, ok := tbl.GetAndDelete(p.pfx)
+		val, ok := tbl.Delete(p.pfx)
 
 		if !ok {
-			t.Errorf("GetAndDelete, expected true, got %v", ok)
+			t.Errorf("Delete, expected true, got %v", ok)
 		}
 
 		if val != want {
-			t.Errorf("GetAndDelete, expected %v, got %v", want, val)
+			t.Errorf("Delete, expected %v, got %v", want, val)
 		}
 
-		val, ok = tbl.GetAndDelete(p.pfx)
+		val, ok = tbl.Delete(p.pfx)
 		if ok {
-			t.Errorf("GetAndDelete, expected false, got (%v, %v)", val, ok)
+			t.Errorf("Delete, expected false, got (%v, %v)", val, ok)
 		}
 	}
 }
