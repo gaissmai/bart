@@ -12,6 +12,7 @@ import "unsafe"
 // This breaks assumptions in the allotment algorithm where a
 // value’s memory address (pointer identity) must serve as a
 // unique identifier for that object.
+
 func rejectZeroSized[V any]() {
 	var zero V
 	if unsafe.Sizeof(zero) == 0 {
