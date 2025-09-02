@@ -399,7 +399,7 @@ func (t *Table[V]) ModifyPersist(pfx netip.Prefix, cb func(val V, ok bool) (newV
 
 			case existed: // update
 				n.prefixes.InsertAt(idx, newVal)
-				return pt, newVal, false
+				return pt, oldVal, false
 
 			default:
 				panic("unreachable")
@@ -441,12 +441,14 @@ func (t *Table[V]) ModifyPersist(pfx netip.Prefix, cb func(val V, ok bool) (newV
 			n = kid // descend down to next trie level
 
 		case *leafNode[V]:
+			oldVal := kid.value
+
 			// update existing value if prefixes are equal
 			if kid.prefix == pfx {
-				newVal, del := cb(kid.value, true)
+				newVal, del := cb(oldVal, true)
 				if !del {
 					kid.value = newVal
-					return pt, newVal, false // update
+					return pt, oldVal, false // update
 				}
 
 				// delete
@@ -455,7 +457,7 @@ func (t *Table[V]) ModifyPersist(pfx netip.Prefix, cb func(val V, ok bool) (newV
 				pt.sizeUpdate(is4, -1)
 				n.purgeAndCompress(stack[:depth], octets, is4)
 
-				return pt, kid.value, true
+				return pt, oldVal, true
 			}
 
 			// create new node
@@ -469,12 +471,14 @@ func (t *Table[V]) ModifyPersist(pfx netip.Prefix, cb func(val V, ok bool) (newV
 			n = newNode
 
 		case *fringeNode[V]:
+			oldVal := kid.value
+
 			// update existing value if prefix is fringe
 			if isFringe(depth, bits) {
-				newVal, del := cb(kid.value, true)
+				newVal, del := cb(oldVal, true)
 				if !del {
 					kid.value = newVal
-					return pt, newVal, false // update
+					return pt, oldVal, false // update
 				}
 
 				// delete
@@ -483,7 +487,7 @@ func (t *Table[V]) ModifyPersist(pfx netip.Prefix, cb func(val V, ok bool) (newV
 				pt.sizeUpdate(is4, -1)
 				n.purgeAndCompress(stack[:depth], octets, is4)
 
-				return pt, kid.value, true
+				return pt, oldVal, true
 			}
 
 			// create new node

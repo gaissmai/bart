@@ -1957,15 +1957,222 @@ func TestUpdateCompare(t *testing.T) {
 	}
 }
 
-func TestModifyNotExist(t *testing.T) {
+// TestModifySemantics
+//
+// Operation | cb-input        | cb-return       | Modify-return
+// ---------------------------------------------------------------
+// No-op:    | (zero,   false) | (_,      true)  | (zero,   false)
+// Insert:   | (zero,   false) | (newVal, false) | (newVal, false)
+// Update:   | (oldVal, true)  | (newVal, false) | (oldVal, false)
+// Delete:   | (oldVal, true)  | (_,      true)  | (oldVal, true)
+func TestModifySemantics(t *testing.T) {
 	t.Parallel()
 
-	pfx := mpp("2001:db8:1::/64")
-	cb := func(int, bool) (int, bool) { return 0, true }
+	type args struct {
+		pfx netip.Prefix
+		cb  func(val int, found bool) (_ int, del bool)
+	}
 
-	rt := new(Table[int])
-	rt.Modify(pfx, cb)        // MUST NOT panic
-	rt.ModifyPersist(pfx, cb) // MUST NOT panic
+	type want struct {
+		val     int
+		deleted bool
+	}
+
+	tests := []struct {
+		name      string
+		prepare   map[netip.Prefix]int // entries to pre-populate the table
+		args      args
+		want      want
+		finalData map[netip.Prefix]int // expected table contents after the operation
+	}{
+		{
+			name:    "Delete existing entry",
+			prepare: map[netip.Prefix]int{mpp("10.0.0.0/8"): 42, mpp("2001:db8::/32"): 4242},
+			args: args{
+				pfx: mpp("10.0.0.0/8"),
+				cb:  func(val int, found bool) (_ int, del bool) { return 0, true },
+			},
+			want:      want{val: 42, deleted: true},
+			finalData: map[netip.Prefix]int{mpp("2001:db8::/32"): 4242},
+		},
+
+		{
+			name:    "Insert new entry",
+			prepare: map[netip.Prefix]int{mpp("10.0.0.0/8"): 42},
+			args: args{
+				pfx: mpp("2001:db8::/32"),
+				cb:  func(val int, found bool) (_ int, del bool) { return 4242, false },
+			},
+			want:      want{val: 4242, deleted: false},
+			finalData: map[netip.Prefix]int{mpp("10.0.0.0/8"): 42, mpp("2001:db8::/32"): 4242},
+		},
+
+		{
+			// For update, the callback gets oldVal, returns newVal, but Modify returns oldVal
+			name:    "Update existing entry",
+			prepare: map[netip.Prefix]int{mpp("10.0.0.0/8"): 42, mpp("2001:db8::/32"): 4242},
+			args: args{
+				pfx: mpp("10.0.0.0/8"),
+				cb:  func(val int, found bool) (_ int, del bool) { return -1, false },
+			},
+			want:      want{val: 42, deleted: false},
+			finalData: map[netip.Prefix]int{mpp("10.0.0.0/8"): -1, mpp("2001:db8::/32"): 4242},
+		},
+
+		{
+			name:    "No-op on missing entry",
+			prepare: map[netip.Prefix]int{mpp("10.0.0.0/8"): 42},
+			args: args{
+				pfx: mpp("2001:db8::/32"),
+				cb:  func(val int, found bool) (_ int, del bool) { return 0, true },
+			},
+			want:      want{val: 0, deleted: false},
+			finalData: map[netip.Prefix]int{mpp("10.0.0.0/8"): 42},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			rt := new(Table[int])
+
+			// Insert initial entries using Modify
+			for pfx, v := range tt.prepare {
+				rt.Modify(pfx, func(_ int, _ bool) (_ int, del bool) { return v, false })
+			}
+
+			got, deleted := rt.Modify(tt.args.pfx, tt.args.cb)
+			if got != tt.want.val || deleted != tt.want.deleted {
+				t.Errorf("[%s] Modify() = (%v, %v), want (%v, %v)", tt.name, got, deleted, tt.want.val, tt.want.deleted)
+			}
+
+			// Check the final state of the table using Get, compares expected and actual table
+			for pfx, wantVal := range tt.finalData {
+				gotVal, ok := rt.Get(pfx)
+				if !ok || gotVal != wantVal {
+					t.Errorf("[%s] final table: key %v = %v (ok=%v), want %v (ok=true)", tt.name, pfx, gotVal, ok, wantVal)
+				}
+			}
+			// Ensure there are no unexpected entries
+			for pfx := range tt.prepare {
+				if _, expect := tt.finalData[pfx]; !expect {
+					if _, ok := rt.Get(pfx); ok {
+						t.Errorf("[%s] final table: key %v should not be present", tt.name, pfx)
+					}
+				}
+			}
+		})
+	}
+}
+
+// TestModifyPersistSemantics
+//
+// Operation | cb-input        | cb-return       | Modify-return
+// ---------------------------------------------------------------
+// No-op:    | (zero,   false) | (_,      true)  | (zero,   false)
+// Insert:   | (zero,   false) | (newVal, false) | (newVal, false)
+// Update:   | (oldVal, true)  | (newVal, false) | (oldVal, false)
+// Delete:   | (oldVal, true)  | (_,      true)  | (oldVal, true)
+func TestTableModifyPersistSemantics(t *testing.T) {
+	t.Parallel()
+
+	type args struct {
+		pfx netip.Prefix
+		cb  func(val int, found bool) (_ int, del bool)
+	}
+
+	type want struct {
+		val     int
+		deleted bool
+	}
+
+	tests := []struct {
+		name      string
+		prepare   map[netip.Prefix]int // entries to pre-populate the table
+		args      args
+		want      want
+		finalData map[netip.Prefix]int // expected table contents after the operation
+	}{
+		{
+			name:    "Delete existing entry",
+			prepare: map[netip.Prefix]int{mpp("10.0.0.0/8"): 42, mpp("2001:db8::/32"): 4242},
+			args: args{
+				pfx: mpp("10.0.0.0/8"),
+				cb:  func(val int, found bool) (_ int, del bool) { return 0, true },
+			},
+			want:      want{val: 42, deleted: true},
+			finalData: map[netip.Prefix]int{mpp("2001:db8::/32"): 4242},
+		},
+
+		{
+			name:    "Insert new entry",
+			prepare: map[netip.Prefix]int{mpp("10.0.0.0/8"): 42},
+			args: args{
+				pfx: mpp("2001:db8::/32"),
+				cb:  func(val int, found bool) (_ int, del bool) { return 4242, false },
+			},
+			want:      want{val: 4242, deleted: false},
+			finalData: map[netip.Prefix]int{mpp("10.0.0.0/8"): 42, mpp("2001:db8::/32"): 4242},
+		},
+
+		{
+			// For update, the callback gets oldVal, returns newVal, but Modify returns oldVal
+			name:    "Update existing entry",
+			prepare: map[netip.Prefix]int{mpp("10.0.0.0/8"): 42, mpp("2001:db8::/32"): 4242},
+			args: args{
+				pfx: mpp("10.0.0.0/8"),
+				cb:  func(val int, found bool) (_ int, del bool) { return -1, false },
+			},
+			want:      want{val: 42, deleted: false},
+			finalData: map[netip.Prefix]int{mpp("10.0.0.0/8"): -1, mpp("2001:db8::/32"): 4242},
+		},
+
+		{
+			name:    "No-op on missing entry",
+			prepare: map[netip.Prefix]int{mpp("10.0.0.0/8"): 42},
+			args: args{
+				pfx: mpp("2001:db8::/32"),
+				cb:  func(val int, found bool) (_ int, del bool) { return 0, true },
+			},
+			want:      want{val: 0, deleted: false},
+			finalData: map[netip.Prefix]int{mpp("10.0.0.0/8"): 42},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			rt := new(Table[int])
+
+			// Insert initial entries using Modify
+			for pfx, v := range tt.prepare {
+				rt.Modify(pfx, func(_ int, _ bool) (_ int, del bool) { return v, false })
+			}
+
+			prt, got, deleted := rt.ModifyPersist(tt.args.pfx, tt.args.cb)
+			if got != tt.want.val || deleted != tt.want.deleted {
+				t.Errorf("[%s] Modify() = (%v, %v), want (%v, %v)", tt.name, got, deleted, tt.want.val, tt.want.deleted)
+			}
+
+			// Check the final state of the table using Get, compares expected and actual table
+			for pfx, wantVal := range tt.finalData {
+				gotVal, ok := prt.Get(pfx)
+				if !ok || gotVal != wantVal {
+					t.Errorf("[%s] final table: key %v = %v (ok=%v), want %v (ok=true)", tt.name, pfx, gotVal, ok, wantVal)
+				}
+			}
+			// Ensure there are no unexpected entries
+			for pfx := range tt.prepare {
+				if _, expect := tt.finalData[pfx]; !expect {
+					if _, ok := prt.Get(pfx); ok {
+						t.Errorf("[%s] final table: key %v should not be present", tt.name, pfx)
+					}
+				}
+			}
+		})
+	}
 }
 
 func TestModifyCompare(t *testing.T) {
@@ -2152,79 +2359,6 @@ func TestUpdate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("update: %s", tt.name), func(t *testing.T) {
 			val := rt.Update(tt.pfx, cb)
-			got, ok := rt.Get(tt.pfx)
-
-			if !ok {
-				t.Errorf("%s: ok=%v, expected: %v", tt.name, ok, true)
-			}
-
-			if got != 1 || got != val {
-				t.Errorf("%s: got=%v, expected: %v", tt.name, got, 1)
-			}
-		})
-	}
-}
-
-//nolint:tparallel
-func TestModify(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name string
-		pfx  netip.Prefix
-	}{
-		{
-			name: "default route v4",
-			pfx:  mpp("0.0.0.0/0"),
-		},
-		{
-			name: "default route v6",
-			pfx:  mpp("::/0"),
-		},
-		{
-			name: "set v4 fringe",
-			pfx:  mpp("0.0.0.0/8"),
-		},
-		{
-			name: "set v4",
-			pfx:  mpp("1.2.3.4/32"),
-		},
-		{
-			name: "set v6",
-			pfx:  mpp("2001:db8::/32"),
-		},
-	}
-
-	rt := new(Table[int])
-
-	// just increment val
-	cb := func(val int, ok bool) (int, bool) {
-		if ok {
-			return val + 1, false
-		}
-		return 0, false
-	}
-
-	// update as insert
-	for _, tt := range tests {
-		t.Run(fmt.Sprintf("insert: %s", tt.name), func(t *testing.T) {
-			val, _ := rt.Modify(tt.pfx, cb)
-			got, ok := rt.Get(tt.pfx)
-
-			if !ok {
-				t.Errorf("%s: ok=%v, expected: %v", tt.name, ok, true)
-			}
-
-			if got != 0 || got != val {
-				t.Errorf("%s: got=%v, expected: %v", tt.name, got, 0)
-			}
-		})
-	}
-
-	// update as update
-	for _, tt := range tests {
-		t.Run(fmt.Sprintf("update: %s", tt.name), func(t *testing.T) {
-			val, _ := rt.Modify(tt.pfx, cb)
 			got, ok := rt.Get(tt.pfx)
 
 			if !ok {
