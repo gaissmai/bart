@@ -109,8 +109,8 @@ func (d *ArtTable[V]) Modify(pfx netip.Prefix, cb func(val V, ok bool) (newVal V
 			}
 		}
 
-		kidAny := n.getChild(octet)
-		if kidAny == nil {
+		anyPtr := n.getChild(octet)
+		if anyPtr == nil {
 			// insert prefix path compressed
 
 			newVal, del := cb(zero, false)
@@ -130,7 +130,8 @@ func (d *ArtTable[V]) Modify(pfx netip.Prefix, cb func(val V, ok bool) (newVal V
 		}
 
 		// kid is node or leaf or fringe at octet
-		switch kid := (*kidAny).(type) {
+		kidAny := *anyPtr
+		switch kid := kidAny.(type) {
 		case *artNode[V]:
 			n = kid // descend down to next trie level
 
@@ -242,13 +243,14 @@ func (d *ArtTable[V]) Delete(pfx netip.Prefix) (val V, exists bool) {
 			return val, true
 		}
 
-		kidAny := n.getChild(octet)
-		if kidAny == nil {
+		anyPtr := n.getChild(octet)
+		if anyPtr == nil {
 			return
 		}
+		kidAny := *anyPtr
 
 		// kid is node or leaf or fringe at octet
-		switch kid := (*kidAny).(type) {
+		switch kid := kidAny.(type) {
 		case *artNode[V]:
 			n = kid // descend down to next trie level
 
@@ -313,13 +315,14 @@ func (d *ArtTable[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 			return n.getPrefix(art.PfxToIdx(octet, lastBits))
 		}
 
-		kidAny := n.getChild(octet)
-		if kidAny == nil {
+		anyPtr := n.getChild(octet)
+		if anyPtr == nil {
 			return
 		}
+		kidAny := *anyPtr
 
 		// kid is node or leaf or fringe at octet
-		switch kid := (*kidAny).(type) {
+		switch kid := kidAny.(type) {
 		case *artNode[V]:
 			n = kid // descend down to next trie level
 
@@ -365,13 +368,15 @@ func (d *ArtTable[V]) Contains(ip netip.Addr) bool {
 			return true
 		}
 
-		nextAny := n.getChild(octet)
-		if nextAny == nil {
+		anyPtr := n.getChild(octet)
+		if anyPtr == nil {
+			// no next node
 			return false
 		}
+		kidAny := *anyPtr
 
 		// kid is node or leaf or fringe at octet
-		switch kid := (*nextAny).(type) {
+		switch kid := kidAny.(type) {
 		case *artNode[V]:
 			n = kid
 
@@ -412,14 +417,15 @@ func (d *ArtTable[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 			ok = tmpOk
 		}
 
-		nextAny := n.getChild(octet)
-		if nextAny == nil {
+		anyPtr := n.getChild(octet)
+		if anyPtr == nil {
 			// no next node
 			return val, ok
 		}
+		kidAny := *anyPtr
 
 		// next kid is ART, fringe or leaf node.
-		switch kid := (*nextAny).(type) {
+		switch kid := kidAny.(type) {
 		case *artNode[V]:
 			n = kid
 

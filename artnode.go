@@ -17,7 +17,16 @@ import (
 // See doc/artlookup.pdf for the mapping mechanics and prefix tree details.
 type artNode[V any] struct {
 	prefixes [256]*V
-	children [256]*any // *artNode or path-compreassed *leaf- or *fringeNode
+	children [256]*any // **artNode or path-compreassed **leaf- or **fringeNode
+	// is an array of pointers to the empty interface,
+	// and not an array of empty interfaces.
+	//
+	// - any  ( interface{}) takes 2 words, even if nil.
+	// - *any (*interface{}) requires only 1 word when nil.
+	//
+	// Since many slots are nil, this reduces memory by 30%.
+	// The added indirection does not have a measurable performance impact,
+	// just makes the code uglier.
 
 	prefixesBitSet bitset.BitSet256 // for count and fast bitset operations
 	childrenBitSet bitset.BitSet256 // for count and fast bitset operations
@@ -187,9 +196,9 @@ func (n *artNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists b
 			return n.insertPrefix(art.PfxToIdx(octet, lastBits), val)
 		}
 
-		kidAny := n.getChild(octet)
+		anyPtr := n.getChild(octet)
 		// reached end of trie path ...
-		if kidAny == nil {
+		if anyPtr == nil {
 			// insert prefix path compressed as leaf or fringe
 			if isFringe(depth, bits) {
 				return n.insertChild(octet, newFringeNode(val))
@@ -198,7 +207,8 @@ func (n *artNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists b
 		}
 
 		// kid is node or leaf at addr
-		switch kid := (*kidAny).(type) {
+		kidAny := *anyPtr
+		switch kid := kidAny.(type) {
 		case *artNode[V]:
 			n = kid // descend down to next trie level
 
@@ -264,9 +274,9 @@ func (n *artNode[V]) purgeAndCompress(stack []*artNode[V], octets []uint8, is4 b
 
 		case pfxCount == 0 && childCount == 1:
 			addr, _ := n.childrenBitSet.FirstSet() // single child must be first child
-			kidAny := n.children[addr]
+			kidAny := *n.children[addr]
 
-			switch kid := (*kidAny).(type) {
+			switch kid := kidAny.(type) {
 			case *artNode[V]:
 				// fast exit, we are at an intermediate path node
 				// no further delete/compress upwards the stack is possible

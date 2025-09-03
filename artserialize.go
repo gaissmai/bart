@@ -281,9 +281,9 @@ func (n *artNode[V]) directItemsRec(parentIdx uint8, path stridePath, depth int,
 		// lookup
 		valPtr := n.prefixes[hostIdx] // maybe nil
 		if valPtr == parentValPtr {
-			kidAny := n.children[octet]
+			kidAny := *n.children[octet]
 
-			switch kid := (*kidAny).(type) {
+			switch kid := kidAny.(type) {
 			case *artNode[V]:
 				// traverse rec-descent, call with next child node,
 				// next trie level, set parentIdx to 0, adjust path and depth

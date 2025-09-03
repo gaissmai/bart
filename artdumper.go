@@ -54,13 +54,15 @@ func (n *artNode[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 		fringeAddrs := make([]uint8, 0, maxItems)
 
 		// the node has recursive child nodes or path-compressed leaves
-		for i, kid := range n.children {
-			if kid == nil {
+		for i, anyPtr := range n.children {
+			if anyPtr == nil {
 				continue
 			}
+			kidAny := *anyPtr
+
 			addr := uint8(i)
 
-			switch (*kid).(type) {
+			switch kidAny.(type) {
 			case *artNode[V]:
 				childAddrs = append(childAddrs, addr)
 				continue
@@ -82,8 +84,8 @@ func (n *artNode[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 			fmt.Fprintf(w, "%sleaves(#%d):", indent, leafCount)
 
 			for _, addr := range leafAddrs {
-				k := n.children[addr]
-				pc := (*k).(*leafNode[V])
+				k := *n.children[addr]
+				pc := k.(*leafNode[V])
 
 				// Lite: val is the empty struct, don't print it
 				switch any(pc.value).(type) {
@@ -104,10 +106,10 @@ func (n *artNode[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 			for _, addr := range fringeAddrs {
 				fringePfx := cidrForFringe(path[:], depth, is4, addr)
 
-				k := n.children[addr]
-				pc := (*k).(*fringeNode[V])
+				k := *n.children[addr]
+				pc := k.(*fringeNode[V])
 
-				// Lite: val is the empty struct, don't print it
+				// val is the empty struct, don't print it
 				switch any(pc.value).(type) {
 				case struct{}:
 					fmt.Fprintf(w, " %s:{%s}", addrFmt(addr, is4), fringePfx)
@@ -160,12 +162,13 @@ func (n *artNode[V]) nodeStats() stats {
 	s.pfxs = n.prefixCount()
 	s.childs = n.childCount()
 
-	for _, kid := range n.children {
-		if kid == nil {
+	for _, anyPtr := range n.children {
+		if anyPtr == nil {
 			continue
 		}
 
-		switch (*kid).(type) {
+		kidAny := *anyPtr
+		switch kidAny.(type) {
 		case *artNode[V]:
 			s.nodes++
 
@@ -242,12 +245,13 @@ func (n *artNode[V]) nodeStatsRec() stats {
 	s.leaves = 0
 	s.fringes = 0
 
-	for _, kidAny := range n.children {
-		if kidAny == nil {
+	for _, anyPtr := range n.children {
+		if anyPtr == nil {
 			continue
 		}
 
-		switch kid := (*kidAny).(type) {
+		kidAny := *anyPtr
+		switch kid := kidAny.(type) {
 		case *artNode[V]:
 			// rec-descent
 			rs := kid.nodeStatsRec()
