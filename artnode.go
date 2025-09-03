@@ -17,7 +17,7 @@ import (
 // See doc/artlookup.pdf for the mapping mechanics and prefix tree details.
 type artNode[V any] struct {
 	prefixes [256]*V
-	children [256]any // *artNode or path-compreassed *leaf- or *fringeNode
+	children [256]*any // *artNode or path-compreassed *leaf- or *fringeNode
 
 	prefixesBitSet bitset.BitSet256 // for count and fast bitset operations
 	childrenBitSet bitset.BitSet256 // for count and fast bitset operations
@@ -39,7 +39,7 @@ func (n *artNode[V]) isEmpty() bool {
 }
 
 // getChild TODO
-func (n *artNode[V]) getChild(addr uint8) any {
+func (n *artNode[V]) getChild(addr uint8) *any {
 	return n.children[addr]
 }
 
@@ -52,7 +52,7 @@ func (n *artNode[V]) insertChild(addr uint8, child any) (exists bool) {
 		exists = true
 	}
 
-	n.children[addr] = child
+	n.children[addr] = &child
 	return exists
 }
 
@@ -198,7 +198,7 @@ func (n *artNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists b
 		}
 
 		// kid is node or leaf at addr
-		switch kid := kidAny.(type) {
+		switch kid := (*kidAny).(type) {
 		case *artNode[V]:
 			n = kid // descend down to next trie level
 
@@ -266,7 +266,7 @@ func (n *artNode[V]) purgeAndCompress(stack []*artNode[V], octets []uint8, is4 b
 			addr, _ := n.childrenBitSet.FirstSet() // single child must be first child
 			kidAny := n.children[addr]
 
-			switch kid := kidAny.(type) {
+			switch kid := (*kidAny).(type) {
 			case *artNode[V]:
 				// fast exit, we are at an intermediate path node
 				// no further delete/compress upwards the stack is possible

@@ -130,7 +130,7 @@ func (d *ArtTable[V]) Modify(pfx netip.Prefix, cb func(val V, ok bool) (newVal V
 		}
 
 		// kid is node or leaf or fringe at octet
-		switch kid := kidAny.(type) {
+		switch kid := (*kidAny).(type) {
 		case *artNode[V]:
 			n = kid // descend down to next trie level
 
@@ -248,7 +248,7 @@ func (d *ArtTable[V]) Delete(pfx netip.Prefix) (val V, exists bool) {
 		}
 
 		// kid is node or leaf or fringe at octet
-		switch kid := kidAny.(type) {
+		switch kid := (*kidAny).(type) {
 		case *artNode[V]:
 			n = kid // descend down to next trie level
 
@@ -319,7 +319,7 @@ func (d *ArtTable[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 		}
 
 		// kid is node or leaf or fringe at octet
-		switch kid := kidAny.(type) {
+		switch kid := (*kidAny).(type) {
 		case *artNode[V]:
 			n = kid // descend down to next trie level
 
@@ -365,13 +365,13 @@ func (d *ArtTable[V]) Contains(ip netip.Addr) bool {
 			return true
 		}
 
-		next := n.getChild(octet)
-		if next == nil {
+		nextAny := n.getChild(octet)
+		if nextAny == nil {
 			return false
 		}
 
 		// kid is node or leaf or fringe at octet
-		switch kid := next.(type) {
+		switch kid := (*nextAny).(type) {
 		case *artNode[V]:
 			n = kid
 
@@ -419,7 +419,7 @@ func (d *ArtTable[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 		}
 
 		// next kid is ART, fringe or leaf node.
-		switch kid := nextAny.(type) {
+		switch kid := (*nextAny).(type) {
 		case *artNode[V]:
 			n = kid
 

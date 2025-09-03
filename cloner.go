@@ -198,13 +198,15 @@ func (n *artNode[V]) cloneFlat(cloneFn cloneFunc[V]) *artNode[V] {
 		if octet, ok = c.childrenBitSet.NextSet(octet); ok {
 			anyKid := c.children[octet]
 
-			switch kid := anyKid.(type) {
+			switch kid := (*anyKid).(type) {
 			case *artNode[V]:
 				// no-op, already flat copied
 			case *leafNode[V]:
-				c.children[octet] = kid.cloneLeaf(cloneFn)
+				anyLeaf := any(kid.cloneLeaf(cloneFn))
+				c.children[octet] = &anyLeaf
 			case *fringeNode[V]:
-				c.children[octet] = kid.cloneFringe(cloneFn)
+				anyFringe := any(kid.cloneFringe(cloneFn))
+				c.children[octet] = &anyFringe
 			default:
 				panic("logic error, wrong node type")
 			}
@@ -237,8 +239,9 @@ func (n *artNode[V]) cloneRec(cloneFn cloneFunc[V]) *artNode[V] {
 		if octet, ok = c.childrenBitSet.NextSet(octet); ok {
 			kidAny := c.children[octet]
 
-			if kid, isArtNode := kidAny.(*artNode[V]); isArtNode {
-				c.children[octet] = kid.cloneRec(cloneFn)
+			if kid, isArtNode := (*kidAny).(*artNode[V]); isArtNode {
+				anyArtNode := any(kid.cloneRec(cloneFn))
+				c.children[octet] = &anyArtNode
 			}
 
 			// stop, don't overflow uint8!

@@ -60,7 +60,7 @@ func (n *artNode[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 			}
 			addr := uint8(i)
 
-			switch kid.(type) {
+			switch (*kid).(type) {
 			case *artNode[V]:
 				childAddrs = append(childAddrs, addr)
 				continue
@@ -83,7 +83,7 @@ func (n *artNode[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 
 			for _, addr := range leafAddrs {
 				k := n.children[addr]
-				pc := k.(*leafNode[V])
+				pc := (*k).(*leafNode[V])
 
 				// Lite: val is the empty struct, don't print it
 				switch any(pc.value).(type) {
@@ -105,7 +105,7 @@ func (n *artNode[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 				fringePfx := cidrForFringe(path[:], depth, is4, addr)
 
 				k := n.children[addr]
-				pc := k.(*fringeNode[V])
+				pc := (*k).(*fringeNode[V])
 
 				// Lite: val is the empty struct, don't print it
 				switch any(pc.value).(type) {
@@ -165,7 +165,7 @@ func (n *artNode[V]) nodeStats() stats {
 			continue
 		}
 
-		switch kid.(type) {
+		switch (*kid).(type) {
 		case *artNode[V]:
 			s.nodes++
 
@@ -223,7 +223,7 @@ func (n *artNode[V]) dumpRec(w io.Writer, path stridePath, depth int, is4 bool) 
 	for _, addr := range n.childrenBitSet.AsSlice(&[256]uint8{}) {
 		path[depth] = addr
 
-		if kid, ok := n.getChild(addr).(*artNode[V]); ok {
+		if kid, ok := (*n.getChild(addr)).(*artNode[V]); ok {
 			kid.dumpRec(w, path, depth+1, is4)
 		}
 	}
@@ -247,7 +247,7 @@ func (n *artNode[V]) nodeStatsRec() stats {
 			continue
 		}
 
-		switch kid := kidAny.(type) {
+		switch kid := (*kidAny).(type) {
 		case *artNode[V]:
 			// rec-descent
 			rs := kid.nodeStatsRec()
