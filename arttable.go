@@ -7,7 +7,7 @@ import (
 	"github.com/gaissmai/bart/internal/art"
 )
 
-// DART TODO
+// TODO bitset ART
 type ArtTable[V any] struct {
 	// used by -copylocks checker from `go vet`.
 	_ [0]sync.Mutex

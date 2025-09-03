@@ -19,8 +19,8 @@ type artNode[V any] struct {
 	prefixes [256]*V
 	children [256]any // *artNode or path-compreassed *leaf- or *fringeNode
 
-	prefixesBitSet bitset.BitSet256
-	childrenBitSet bitset.BitSet256
+	prefixesBitSet bitset.BitSet256 // for count and fast bitset operations
+	childrenBitSet bitset.BitSet256 // for count and fast bitset operations
 }
 
 // TODO
@@ -167,10 +167,9 @@ func (n *artNode[V]) allot(idx uint8, oldValPtr, valPtr *V) {
 		}
 
 		// child nodes, it's a complete binary tree
-		leftIdx := idx << 1     // n*2
-		rightIdx := leftIdx + 1 // n*2+1
-
-		stack = append(stack, leftIdx, rightIdx)
+		// left:  idx*2
+		// right: idx*2+1
+		stack = append(stack, idx<<1, idx<<1+1)
 	}
 }
 
