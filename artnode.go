@@ -105,7 +105,7 @@ func (n *artNode[V]) deletePrefix(idx uint8) (val V, exists bool) {
 	valPtr := n.prefixes[idx]
 	parentValPtr := n.prefixes[idx>>1]
 
-	// overwrite valPtr with parentValPtr
+	// delete -> overwrite valPtr with parentValPtr
 	n.allot(idx, valPtr, parentValPtr)
 
 	n.prefixesBitSet.Clear(idx)
@@ -155,8 +155,10 @@ func (n *artNode[V]) allot(idx uint8, oldValPtr, valPtr *V) {
 
 		// stop this allot path, idx already points to a more specific route.
 		if n.prefixes[idx] != oldValPtr {
-			continue
+			continue // take next path from stack
 		}
+
+		// overwrite
 		n.prefixes[idx] = valPtr
 
 		// max idx is 255, so stop the duplication at 128 and above
@@ -164,11 +166,11 @@ func (n *artNode[V]) allot(idx uint8, oldValPtr, valPtr *V) {
 			continue
 		}
 
-		// duplicate and duplicate+1
-		left := idx << 1
-		right := left + 1
+		// child nodes, it's a complete binary tree
+		leftIdx := idx << 1     // n*2
+		rightIdx := leftIdx + 1 // n*2+1
 
-		stack = append(stack, left, right)
+		stack = append(stack, leftIdx, rightIdx)
 	}
 }
 
