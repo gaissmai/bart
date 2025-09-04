@@ -53,23 +53,18 @@ func (n *artNode[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 		leafAddrs := make([]uint8, 0, maxItems)
 		fringeAddrs := make([]uint8, 0, maxItems)
 
-		// the node has recursive child nodes or path-compressed leaves
-		for i, anyPtr := range n.children {
-			if anyPtr == nil {
-				continue
-			}
-			kidAny := *anyPtr
-
-			addr := uint8(i)
+		for _, octet := range n.childrenBitSet.AsSlice(&[256]uint8{}) {
+			// the node has recursive child nodes or path-compressed leaves
+			kidAny := *n.children[octet]
 
 			switch kidAny.(type) {
 			case *artNode[V]:
-				childAddrs = append(childAddrs, addr)
+				childAddrs = append(childAddrs, octet)
 				continue
 			case *leafNode[V]:
-				leafAddrs = append(leafAddrs, addr)
+				leafAddrs = append(leafAddrs, octet)
 			case *fringeNode[V]:
-				fringeAddrs = append(fringeAddrs, addr)
+				fringeAddrs = append(fringeAddrs, octet)
 
 			default:
 				panic("logic error, wrong node type")
@@ -245,12 +240,8 @@ func (n *artNode[V]) nodeStatsRec() stats {
 	s.leaves = 0
 	s.fringes = 0
 
-	for _, anyPtr := range n.children {
-		if anyPtr == nil {
-			continue
-		}
-
-		kidAny := *anyPtr
+	for _, octet := range n.childrenBitSet.AsSlice(&[256]uint8{}) {
+		kidAny := *n.children[octet]
 		switch kid := kidAny.(type) {
 		case *artNode[V]:
 			// rec-descent

@@ -159,62 +159,41 @@ func (n *artNode[V]) cloneFlat(cloneFn cloneFunc[V]) *artNode[V] {
 	// it's a clone of the prefixes ...
 	// but the allot algorithm makes it more difficult
 	// see also insertPrefix
-	var idx uint8
-	ok := true
-	for ok {
-		if idx, ok = n.prefixesBitSet.NextSet(idx); ok {
-			origValPtr := n.prefixes[idx]
-			newValPtr := new(V)
+	for _, idx := range n.prefixesBitSet.AsSlice(&[256]uint8{}) {
+		origValPtr := n.prefixes[idx]
+		newValPtr := new(V)
 
-			if cloneFn == nil {
-				*newValPtr = *origValPtr // just copy the value
-			} else {
-				*newValPtr = cloneFn(*origValPtr) // clone the value
-			}
-
-			oldValPtr := c.prefixes[idx]
-			c.allot(idx, oldValPtr, newValPtr)
-
-			// stop, don't overflow uint8!
-			if idx == 255 {
-				ok = false
-			} else {
-				idx++
-			}
+		if cloneFn == nil {
+			*newValPtr = *origValPtr // just copy the value
+		} else {
+			*newValPtr = cloneFn(*origValPtr) // clone the value
 		}
+
+		oldValPtr := c.prefixes[idx]
+		c.allot(idx, oldValPtr, newValPtr)
 	}
 
-	var octet uint8
-	ok = true
+	// flat clone of the children
+	for _, octet := range n.childrenBitSet.AsSlice(&[256]uint8{}) {
+		kidAny := *n.children[octet]
 
-	for ok {
-		if octet, ok = n.childrenBitSet.NextSet(octet); ok {
-			kidAny := *n.children[octet]
+		switch kid := kidAny.(type) {
+		case *artNode[V]:
+			// just copy the pointer
+			c.children[octet] = n.children[octet]
 
-			switch kid := kidAny.(type) {
-			case *artNode[V]:
-				kidAny := any(kid)
-				c.children[octet] = &kidAny
+		case *leafNode[V]:
+			leafAny := any(kid.cloneLeaf(cloneFn))
+			c.children[octet] = &leafAny
 
-			case *leafNode[V]:
-				leafAny := any(kid.cloneLeaf(cloneFn))
-				c.children[octet] = &leafAny
+		case *fringeNode[V]:
+			fringeAny := any(kid.cloneFringe(cloneFn))
+			c.children[octet] = &fringeAny
 
-			case *fringeNode[V]:
-				fringeAny := any(kid.cloneFringe(cloneFn))
-				c.children[octet] = &fringeAny
-
-			default:
-				panic("logic error, wrong node type")
-			}
-
-			// stop, don't overflow uint8!
-			if octet == 255 {
-				ok = false
-			} else {
-				octet++
-			}
+		default:
+			panic("logic error, wrong node type")
 		}
+
 	}
 
 	return c
@@ -229,25 +208,14 @@ func (n *artNode[V]) cloneRec(cloneFn cloneFunc[V]) *artNode[V] {
 	// Perform a flat clone of the current node.
 	c := n.cloneFlat(cloneFn)
 
-	// Recursively clone all child nodes of type *node[V]
-	var octet uint8
-	ok := true
-	for ok {
-		if octet, ok = c.childrenBitSet.NextSet(octet); ok {
-			kidAny := *c.children[octet]
+	// Recursively clone all child nodes of type *artNode[V]
+	for _, octet := range n.childrenBitSet.AsSlice(&[256]uint8{}) {
+		kidAny := *n.children[octet]
 
-			if kid, isArtNode := kidAny.(*artNode[V]); isArtNode {
-				nodeAny := any(kid.cloneRec(cloneFn))
-				c.children[octet] = &nodeAny
-			}
-
-			// stop, don't overflow uint8!
-			if octet == 255 {
-				ok = false
-			} else {
-				octet++
-			}
-
+		switch kid := kidAny.(type) {
+		case *artNode[V]:
+			nodeAny := any(kid.cloneRec(cloneFn))
+			c.children[octet] = &nodeAny
 		}
 	}
 
