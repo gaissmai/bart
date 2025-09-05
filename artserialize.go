@@ -5,7 +5,7 @@ package bart
 
 import (
 	"bytes"
-	"encoding/json"
+	"cmp"
 	"fmt"
 	"io"
 	"net/netip"
@@ -155,76 +155,6 @@ func (t *ArtTable[V]) MarshalText() ([]byte, error) {
 	return w.Bytes(), nil
 }
 
-// MarshalJSON dumps the table into two sorted lists: for ipv4 and ipv6.
-// Every root and subnet is an array, not a map, because the order matters.
-func (t *ArtTable[V]) MarshalJSON() ([]byte, error) {
-	if t == nil {
-		return nil, nil
-	}
-
-	result := struct {
-		Ipv4 []DumpListNode[V] `json:"ipv4,omitempty"`
-		Ipv6 []DumpListNode[V] `json:"ipv6,omitempty"`
-	}{
-		Ipv4: t.DumpList4(),
-		Ipv6: t.DumpList6(),
-	}
-
-	buf, err := json.Marshal(result)
-	if err != nil {
-		return nil, err
-	}
-
-	return buf, nil
-}
-
-// DumpList4 dumps the ipv4 tree into a list of roots and their subnets.
-// It can be used to analyze the tree or build the text or json serialization.
-func (t *ArtTable[V]) DumpList4() []DumpListNode[V] {
-	if t == nil {
-		return nil
-	}
-	return t.root4.dumpListRec(0, stridePath{}, 0, true)
-}
-
-// DumpList6 dumps the ipv6 tree into a list of roots and their subnets.
-// It can be used to analyze the tree or build custom json representation.
-func (t *ArtTable[V]) DumpList6() []DumpListNode[V] {
-	if t == nil {
-		return nil
-	}
-	return t.root6.dumpListRec(0, stridePath{}, 0, false)
-}
-
-// dumpListRec, build the data structure rec-descent with the help
-// of directItemsRec.
-func (n *artNode[V]) dumpListRec(parentIdx uint8, path stridePath, depth int, is4 bool) []DumpListNode[V] {
-	// recursion stop condition
-	if n == nil {
-		return nil
-	}
-
-	directItems := n.directItemsRec(parentIdx, path, depth, is4)
-
-	// sort the items by prefix
-	slices.SortFunc(directItems, func(a, b artTrieItem[V]) int {
-		return cmpPrefix(a.cidr, b.cidr)
-	})
-
-	nodes := make([]DumpListNode[V], 0, len(directItems))
-
-	for _, item := range directItems {
-		nodes = append(nodes, DumpListNode[V]{
-			CIDR:  item.cidr,
-			Value: item.val,
-			// build it rec-descent
-			Subnets: item.n.dumpListRec(item.idx, item.path, item.depth, is4),
-		})
-	}
-
-	return nodes
-}
-
 // directItemsRec, returns the direct covered items by parent.
 // It's a complex recursive function, you have to know the data structure
 // by heart to understand this function!
@@ -315,4 +245,14 @@ func (n *artNode[V]) directItemsRec(parentIdx uint8, path stridePath, depth int,
 	}
 
 	return directItems
+}
+
+// cmpPrefix, helper function, compare func for prefix sort,
+// all cidrs are already normalized
+func cmpPrefix(a, b netip.Prefix) int {
+	if cmp := a.Addr().Compare(b.Addr()); cmp != 0 {
+		return cmp
+	}
+
+	return cmp.Compare(a.Bits(), b.Bits())
 }

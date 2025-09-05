@@ -7,6 +7,15 @@ import (
 	"github.com/gaissmai/bart/internal/bitset"
 )
 
+const (
+	strideLen    = 8   // byte, a multibit trie with stride len 8
+	maxTreeDepth = 16  // max 16 bytes for IPv6
+	maxItems     = 256 // max 256 prefixes or children in node
+)
+
+// stridePath, max 16 octets deep
+type stridePath [maxTreeDepth]uint8
+
 // artNode is a trie level node in the multibit routing table.
 //
 // Each artNode contains two conceptually different fixed sized arrays:
@@ -30,6 +39,62 @@ type artNode[V any] struct {
 
 	prefixesBitSet bitset.BitSet256 // for count and fast bitset operations
 	childrenBitSet bitset.BitSet256 // for count and fast bitset operations
+}
+
+// leafNode is a prefix with value, used as a path compressed child.
+type leafNode[V any] struct {
+	prefix netip.Prefix
+	value  V
+}
+
+func newLeafNode[V any](pfx netip.Prefix, val V) *leafNode[V] {
+	return &leafNode[V]{prefix: pfx, value: val}
+}
+
+// fringeNode is a path-compressed leaf with value but without a prefix.
+// The prefix of a fringe is solely defined by the position in the trie.
+// The fringe-compressiion (no stored prefix) saves a lot of memory,
+// but the algorithm is more complex.
+type fringeNode[V any] struct {
+	value V
+}
+
+func newFringeNode[V any](val V) *fringeNode[V] {
+	return &fringeNode[V]{value: val}
+}
+
+// isFringe determines whether a prefix qualifies as a "fringe node" -
+// that is, a special kind of path-compressed leaf inserted at the final
+// possible trie level (depth == maxDepth - 1).
+//
+// Both "leaves" and "fringes" are path-compressed terminal entries;
+// the distinction lies in their position within the trie:
+//
+//   - A leaf is inserted at any intermediate level if no further stride
+//     boundary matches (depth < maxDepth - 1).
+//
+//   - A fringe is inserted at the last possible stride level
+//     (depth == maxDepth - 1) before a prefix would otherwise land
+//     as a direct prefix (depth == maxDepth).
+//
+// Special property:
+//   - A fringe acts as a default route for all downstream bit patterns
+//     extending beyond its prefix.
+//
+// Examples:
+//
+//	e.g. prefix is addr/8, or addr/16, or ... addr/128
+//	depth <  maxDepth-1 : a leaf, path-compressed
+//	depth == maxDepth-1 : a fringe, path-compressed
+//	depth == maxDepth   : a prefix with octet/pfx == 0/0 => idx == 1, a strides default route
+//
+// Logic:
+//   - A prefix qualifies as a fringe if:
+//     depth == maxDepth - 1 &&
+//     lastBits == 0 (i.e., aligned on stride boundary, /8, /16, ... /128 bits)
+func isFringe(depth, bits int) bool {
+	maxDepth, lastBits := maxDepthAndLastBits(bits)
+	return depth == maxDepth-1 && lastBits == 0
 }
 
 // TODO
@@ -321,4 +386,82 @@ func (n *artNode[V]) purgeAndCompress(stack []*artNode[V], octets []uint8, is4 b
 		// climb up the stack
 		n = parent
 	}
+}
+
+// cmpIndexRank, sort indexes in prefix sort order.
+func cmpIndexRank(aIdx, bIdx uint8) int {
+	// convert idx [1..255] to prefix
+	aOctet, aBits := art.IdxToPfx(aIdx)
+	bOctet, bBits := art.IdxToPfx(bIdx)
+
+	// cmp the prefixes, first by address and then by bits
+	if aOctet == bOctet {
+		if aBits <= bBits {
+			return -1
+		}
+
+		return 1
+	}
+
+	if aOctet < bOctet {
+		return -1
+	}
+
+	return 1
+}
+
+// cidrFromPath, helper function,
+// get prefix back from stride path, depth and idx.
+// The prefix is solely defined by the position in the trie and the baseIndex.
+func cidrFromPath(path stridePath, depth int, is4 bool, idx uint8) netip.Prefix {
+	depth = depth & 0xf // BCE
+
+	octet, pfxLen := art.IdxToPfx(idx)
+
+	// set masked byte in path at depth
+	path[depth] = octet
+
+	// zero/mask the bytes after prefix bits
+	clear(path[depth+1:])
+
+	// make ip addr from octets
+	var ip netip.Addr
+	if is4 {
+		ip = netip.AddrFrom4([4]byte(path[:4]))
+	} else {
+		ip = netip.AddrFrom16(path)
+	}
+
+	// calc bits with pathLen and pfxLen
+	bits := depth<<3 + int(pfxLen)
+
+	// return a normalized prefix from ip/bits
+	return netip.PrefixFrom(ip, bits)
+}
+
+// cidrForFringe, helper function,
+// get prefix back from octets path, depth, IP version and last octet.
+// The prefix of a fringe is solely defined by the position in the trie.
+func cidrForFringe(octets []byte, depth int, is4 bool, lastOctet uint8) netip.Prefix {
+	depth = depth & 0xf // BCE
+
+	path := stridePath{}
+	copy(path[:], octets[:depth+1])
+
+	// replace last octet
+	path[depth] = lastOctet
+
+	// make ip addr from octets
+	var ip netip.Addr
+	if is4 {
+		ip = netip.AddrFrom4([4]byte(path[:4]))
+	} else {
+		ip = netip.AddrFrom16(path)
+	}
+
+	// it's a fringe, bits are alway /8, /16, /24, ...
+	bits := (depth + 1) << 3
+
+	// return a (normalized) prefix from ip/bits
+	return netip.PrefixFrom(ip, bits)
 }

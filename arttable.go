@@ -21,6 +21,12 @@ type ArtTable[V any] struct {
 	size6 int
 }
 
+func maxDepthAndLastBits(bits int) (maxDepth int, lastBits uint8) {
+	// maxDepth:  range from 0..4 or 0..16 !ATTENTION: not 0..3 or 0..15
+	// lastBits:  range from 0..7
+	return bits >> 3, uint8(bits & 7)
+}
+
 // rootNodeByVersion, root node getter for ip version and ART levels.
 func (d *ArtTable[V]) rootNodeByVersion(is4 bool) *artNode[V] {
 	if is4 {
@@ -446,25 +452,6 @@ func (d *ArtTable[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	}
 
 	panic("unreachable")
-}
-
-// Clone TODO
-func (d *ArtTable[V]) Clone() *ArtTable[V] {
-	if d == nil {
-		return nil
-	}
-
-	c := new(ArtTable[V])
-
-	cloneFn := cloneFnFactory[V]()
-
-	c.root4 = *d.root4.cloneRec(cloneFn)
-	c.root6 = *d.root6.cloneRec(cloneFn)
-
-	c.size4 = d.size4
-	c.size6 = d.size6
-
-	return c
 }
 
 func (d *ArtTable[V]) sizeUpdate(is4 bool, n int) {
