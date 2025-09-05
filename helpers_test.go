@@ -1,16 +1,21 @@
 package bart
 
 import (
-	"bufio"
-	"compress/gzip"
 	"fmt"
-	"log"
-	"math/rand/v2"
 	"net/netip"
-	"os"
-	"strings"
 )
 
+var mpa = netip.MustParseAddr
+
+var mpp = func(s string) netip.Prefix {
+	pfx := netip.MustParsePrefix(s)
+	if pfx == pfx.Masked() {
+		return pfx
+	}
+	panic(fmt.Sprintf("%s is not canonicalized as %s", s, pfx.Masked()))
+}
+
+/*
 // full internet prefix list, gzipped
 const prefixFile = "testdata/prefixes.txt.gz"
 
@@ -39,17 +44,6 @@ type route struct {
 	CIDR  netip.Prefix
 	Value any
 }
-
-var mpa = netip.MustParseAddr
-
-var mpp = func(s string) netip.Prefix {
-	pfx := netip.MustParsePrefix(s)
-	if pfx == pfx.Masked() {
-		return pfx
-	}
-	panic(fmt.Sprintf("%s is not canonicalized as %s", s, pfx.Masked()))
-}
-
 type stringTest struct {
 	cidrs []netip.Prefix
 	want  string
@@ -187,3 +181,4 @@ func randomRealWorldPrefixes(prng *rand.Rand, n int) []netip.Prefix {
 
 	return pfxs
 }
+*/

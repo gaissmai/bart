@@ -7,54 +7,98 @@ import (
 	"github.com/gaissmai/bart/internal/art"
 )
 
-// TODO bitset ART
-type ArtTable[V any] struct {
+// Table TODO
+type Table[V any] struct {
 	// used by -copylocks checker from `go vet`.
 	_ [0]sync.Mutex
 
-	// the root nodes are ART nodes, fixed size arrays
-	root4 artNode[V]
-	root6 artNode[V]
+	// the root nodes
+	root4 node[V]
+	root6 node[V]
 
 	// the number of prefixes in the routing table
 	size4 int
 	size6 int
 }
 
-func maxDepthAndLastBits(bits int) (maxDepth int, lastBits uint8) {
-	// maxDepth:  range from 0..4 or 0..16 !ATTENTION: not 0..3 or 0..15
-	// lastBits:  range from 0..7
-	return bits >> 3, uint8(bits & 7)
-}
-
-// rootNodeByVersion, root node getter for ip version and ART levels.
-func (d *ArtTable[V]) rootNodeByVersion(is4 bool) *artNode[V] {
-	if is4 {
-		return &d.root4
-	}
-	return &d.root6
-}
-
-func (d *ArtTable[V]) Insert(pfx netip.Prefix, val V) {
+func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	if !pfx.IsValid() {
 		return
 	}
 
-	is4 := pfx.Addr().Is4()
+	// canonicalize prefix
+	pfx = pfx.Masked()
 
-	n := d.rootNodeByVersion(is4)
+	// values derived from pfx
+	ip := pfx.Addr()
+	is4 := ip.Is4()
+	bits := pfx.Bits()
+	maxDepth, lastBits := maxDepthAndLastBits(bits)
+	octets := ip.AsSlice()
+	lastOctet := octets[maxDepth]
 
-	// insert prefix
-	if exists := n.insertAtDepth(pfx, val, 0); exists {
-		return
+	n := t.rootNodeByVersion(is4)
+	n.initOnceRootPath(is4)
+
+	// find the trie node
+	idx := 0
+	for idx < len(octets) {
+		octet := octets[idx]
+
+		// insert this prefix
+		if idx == maxDepth {
+			if exists := n.insertPrefix(art.PfxToIdx(lastOctet, lastBits), val); !exists {
+				t.sizeUpdate(is4, 1)
+			}
+			return
+		}
+
+		// proceed to next trie level
+		kid := n.getChild(octet)
+
+		// insert new path compressed node for this prefix
+		if kid == nil {
+			kid = newNode[V](pfx, idx)
+			// insert this prefix into new kid
+			kid.insertPrefix(art.PfxToIdx(lastOctet, lastBits), val)
+
+			// insert new kid into n's children
+			n.insertChild(octet, kid)
+
+			t.sizeUpdate(is4, 1)
+			return
+		}
+
+		// kid already exists and share same octet path
+		if kid.containsPrefix(pfx) {
+
+			// pfx is in kids trie level
+			if pfx.Bits()-kid.path.Bits() < 8 {
+				if exists := kid.insertPrefix(art.PfxToIdx(lastOctet, lastBits), val); !exists {
+					t.sizeUpdate(is4, 1)
+				}
+				return
+			}
+
+			// pfx is some levels deeper
+			idx = kid.path.Bits() / 8
+			n = kid // proceed with this kid
+			continue
+		}
+
+		panic("not implemented")
+		// TODO
+		// get common prefix bits
+		// make intermediate node
+		// insert this kid
+		// insert this pfx
+		// size update
 	}
-
-	// true insert, update size
-	d.sizeUpdate(is4, 1)
 }
 
+/*
 // Modify TODO
-func (d *ArtTable[V]) Modify(pfx netip.Prefix, cb func(val V, ok bool) (newVal V, del bool)) (newVal V, deleted bool) {
+func (t *Table[V]) Modify(pfx netip.Prefix, cb func(val V, ok bool) (newVal V, del bool)) (newVal V, deleted bool) {
 	var zero V
 
 	if !pfx.IsValid() {
@@ -75,7 +119,7 @@ func (d *ArtTable[V]) Modify(pfx netip.Prefix, cb func(val V, ok bool) (newVal V
 
 	// record the nodes on the path to the deleted node, needed to purge
 	// and/or path compress nodes after the deletion of a prefix
-	stack := [maxTreeDepth]*artNode[V]{}
+	stack := [maxTreeDepth]*node[V]{}
 
 	// find the trie node
 	for depth, octet := range octets {
@@ -138,7 +182,7 @@ func (d *ArtTable[V]) Modify(pfx netip.Prefix, cb func(val V, ok bool) (newVal V
 		// kid is node or leaf or fringe at octet
 		kidAny := *anyPtr
 		switch kid := kidAny.(type) {
-		case *artNode[V]:
+		case *node[V]:
 			n = kid // descend down to next trie level
 
 		case *fringeNode[V]:
@@ -165,7 +209,7 @@ func (d *ArtTable[V]) Modify(pfx netip.Prefix, cb func(val V, ok bool) (newVal V
 			// push the fringe down, it becomes a default route (idx=1)
 			// insert new child at current leaf position (addr)
 			// descend down, replace n with new child
-			newNode := new(artNode[V])
+			newNode := new(node[V])
 			_ = newNode.insertPrefix(1, kid.value)
 			_ = n.insertChild(octet, newNode)
 			n = newNode
@@ -194,7 +238,7 @@ func (d *ArtTable[V]) Modify(pfx netip.Prefix, cb func(val V, ok bool) (newVal V
 			// push the leaf down
 			// insert new child at current leaf position (addr)
 			// descend down, replace n with new child
-			newNode := new(artNode[V])
+			newNode := new(node[V])
 			_ = newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
 			_ = n.insertChild(octet, newNode)
 			n = newNode
@@ -209,7 +253,7 @@ func (d *ArtTable[V]) Modify(pfx netip.Prefix, cb func(val V, ok bool) (newVal V
 
 // Delete deletes the prefix and returns the associated payload for prefix and true,
 // or the zero value and false if prefix is not set in the routing table.
-func (d *ArtTable[V]) Delete(pfx netip.Prefix) (val V, exists bool) {
+func (t *Table[V]) Delete(pfx netip.Prefix) (val V, exists bool) {
 	if !pfx.IsValid() {
 		return
 	}
@@ -228,7 +272,7 @@ func (d *ArtTable[V]) Delete(pfx netip.Prefix) (val V, exists bool) {
 
 	// record the nodes on the path to the deleted node, needed to purge
 	// and/or path compress nodes after the deletion of a prefix
-	stack := [maxTreeDepth]*artNode[V]{}
+	stack := [maxTreeDepth]*node[V]{}
 
 	// find the trie node
 	for depth, octet := range octets {
@@ -257,7 +301,7 @@ func (d *ArtTable[V]) Delete(pfx netip.Prefix) (val V, exists bool) {
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kidAny.(type) {
-		case *artNode[V]:
+		case *node[V]:
 			n = kid // descend down to next trie level
 
 		case *fringeNode[V]:
@@ -298,7 +342,7 @@ func (d *ArtTable[V]) Delete(pfx netip.Prefix) (val V, exists bool) {
 
 // Get returns the associated payload for prefix and true, or false if
 // prefix is not set in the routing table.
-func (d *ArtTable[V]) Get(pfx netip.Prefix) (val V, ok bool) {
+func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 	if !pfx.IsValid() {
 		return
 	}
@@ -329,7 +373,7 @@ func (d *ArtTable[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kidAny.(type) {
-		case *artNode[V]:
+		case *node[V]:
 			n = kid // descend down to next trie level
 
 		case *fringeNode[V]:
@@ -355,14 +399,14 @@ func (d *ArtTable[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 }
 
 // Contains TODO
-func (d *ArtTable[V]) Contains(ip netip.Addr) bool {
+func (t *Table[V]) Contains(ip netip.Addr) bool {
 	if !ip.IsValid() {
 		return false
 	}
 
 	octets := ip.AsSlice()
 
-	var n *artNode[V]
+	var n *node[V]
 	if len(octets) == 4 {
 		n = &d.root4
 	} else {
@@ -383,7 +427,7 @@ func (d *ArtTable[V]) Contains(ip netip.Addr) bool {
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kidAny.(type) {
-		case *artNode[V]:
+		case *node[V]:
 			n = kid
 
 		case *fringeNode[V]:
@@ -402,14 +446,14 @@ func (d *ArtTable[V]) Contains(ip netip.Addr) bool {
 }
 
 // Lookup TODO
-func (d *ArtTable[V]) Lookup(ip netip.Addr) (val V, ok bool) {
+func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	if !ip.IsValid() {
 		return
 	}
 
 	octets := ip.AsSlice()
 
-	var n *artNode[V]
+	var n *node[V]
 	if len(octets) == 4 {
 		n = &d.root4
 	} else {
@@ -432,7 +476,7 @@ func (d *ArtTable[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 
 		// next kid is ART, fringe or leaf node.
 		switch kid := kidAny.(type) {
-		case *artNode[V]:
+		case *node[V]:
 			n = kid
 
 		case *fringeNode[V]:
@@ -453,26 +497,41 @@ func (d *ArtTable[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 
 	panic("unreachable")
 }
+*/
 
-func (d *ArtTable[V]) sizeUpdate(is4 bool, n int) {
+func (t *Table[V]) sizeUpdate(is4 bool, n int) {
 	if is4 {
-		d.size4 += n
+		t.size4 += n
 		return
 	}
-	d.size6 += n
+	t.size6 += n
 }
 
 // Size returns the prefix count.
-func (d *ArtTable[V]) Size() int {
-	return d.size4 + d.size6
+func (t *Table[V]) Size() int {
+	return t.size4 + t.size6
 }
 
 // Size4 returns the IPv4 prefix count.
-func (d *ArtTable[V]) Size4() int {
-	return d.size4
+func (t *Table[V]) Size4() int {
+	return t.size4
 }
 
 // Size6 returns the IPv6 prefix count.
-func (d *ArtTable[V]) Size6() int {
-	return d.size6
+func (t *Table[V]) Size6() int {
+	return t.size6
+}
+
+func maxDepthAndLastBits(bits int) (maxDepth int, lastBits uint8) {
+	// maxDepth:  range from 0..4 or 0..16 !ATTENTION: not 0..3 or 0..15
+	// lastBits:  range from 0..7
+	return bits >> 3, uint8(bits & 7)
+}
+
+// rootNodeByVersion, root node getter for ip version and ART levels.
+func (t *Table[V]) rootNodeByVersion(is4 bool) *node[V] {
+	if is4 {
+		return &t.root4
+	}
+	return &t.root6
 }

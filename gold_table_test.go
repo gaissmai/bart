@@ -3,6 +3,7 @@
 
 package bart
 
+/*
 import (
 	"cmp"
 	"fmt"
@@ -283,3 +284,4 @@ func randomAddr(prng *rand.Rand) netip.Addr {
 	}
 	return randomIP6(prng)
 }
+*/

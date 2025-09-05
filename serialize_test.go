@@ -3,16 +3,13 @@
 
 package bart
 
-import (
-	"net/netip"
-	"testing"
-)
+/*
 
 // #########################################################
 
 func TestArtStringEmpty(t *testing.T) {
 	t.Parallel()
-	tbl := new(ArtTable[any])
+	tbl := new(Table[any])
 	want := ""
 	got := tbl.String()
 	if got != want {
@@ -32,7 +29,7 @@ func TestArtStringDefaultRouteV4(t *testing.T) {
 `,
 	}
 
-	tbl := new(ArtTable[any])
+	tbl := new(Table[any])
 	checkArtString(t, tbl, tt)
 }
 
@@ -48,7 +45,7 @@ func TestArtStringDefaultRouteV6(t *testing.T) {
 `,
 	}
 
-	tbl := new(ArtTable[any])
+	tbl := new(Table[any])
 	checkArtString(t, tbl, tt)
 }
 
@@ -80,7 +77,7 @@ func TestArtStringSampleV4(t *testing.T) {
 `,
 	}
 
-	tbl := new(ArtTable[any])
+	tbl := new(Table[any])
 	checkArtString(t, tbl, tt)
 }
 
@@ -101,7 +98,7 @@ func TestArtStringSampleV6(t *testing.T) {
 `,
 	}
 
-	tbl := new(ArtTable[any])
+	tbl := new(Table[any])
 	checkArtString(t, tbl, tt)
 }
 
@@ -144,11 +141,11 @@ func TestArtStringSample(t *testing.T) {
 `,
 	}
 
-	tbl := new(ArtTable[any])
+	tbl := new(Table[any])
 	checkArtString(t, tbl, tt)
 }
 
-func checkArtString(t *testing.T, tbl *ArtTable[any], tt stringTest) {
+func checkArtString(t *testing.T, tbl *Table[any], tt stringTest) {
 	t.Helper()
 
 	for _, cidr := range tt.cidrs {
@@ -168,3 +165,4 @@ func checkArtString(t *testing.T, tbl *ArtTable[any], tt stringTest) {
 		t.Errorf("MarshalText got:\n%swant:\n%s", gotBytes, tt.want)
 	}
 }
+*/

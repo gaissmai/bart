@@ -3,6 +3,8 @@
 
 package bart
 
+/*
+
 import (
 	"bytes"
 	"cmp"
@@ -256,3 +258,4 @@ func cmpPrefix(a, b netip.Prefix) int {
 
 	return cmp.Compare(a.Bits(), b.Bits())
 }
+*/
