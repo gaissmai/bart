@@ -30,10 +30,12 @@ func (n *node[V]) cidrFromIdx(idx uint8) netip.Prefix {
 	octet, pfxLen := art.IdxToPfx(idx)
 
 	// set masked byte in path at depth
-	path[depth] = octet
+	if depth < len(path) {
+		path[depth] = octet
 
-	// zero/mask the bytes after prefix bits
-	clear(path[depth+1:])
+		// zero/mask the bytes after prefix bits
+		clear(path[depth+1:])
+	}
 
 	// make ip addr from octets
 	var ip netip.Addr

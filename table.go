@@ -35,7 +35,10 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	bits := pfx.Bits()
 	maxDepth, lastBits := maxDepthAndLastBits(bits)
 	octets := ip.AsSlice()
-	lastOctet := octets[maxDepth]
+	lastOctet := uint8(0)
+	if maxDepth < len(octets) {
+		lastOctet = octets[maxDepth]
+	}
 
 	n := t.rootNodeByVersion(is4)
 	n.initOnceRootPath(is4)
@@ -397,6 +400,7 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 
 	panic("unreachable")
 }
+*/
 
 // Contains TODO
 func (t *Table[V]) Contains(ip netip.Addr) bool {
@@ -408,9 +412,9 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 
 	var n *node[V]
 	if len(octets) == 4 {
-		n = &d.root4
+		n = &t.root4
 	} else {
-		n = &d.root6
+		n = &t.root6
 	}
 
 	for _, octet := range octets {
@@ -418,31 +422,16 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 			return true
 		}
 
-		anyPtr := n.getChild(octet)
-		if anyPtr == nil {
+		kid := n.getChild(octet)
+		if kid == nil {
 			// no next node
 			return false
 		}
-		kidAny := *anyPtr
-
-		// kid is node or leaf or fringe at octet
-		switch kid := kidAny.(type) {
-		case *node[V]:
-			n = kid
-
-		case *fringeNode[V]:
-			// fringe is the default-route for all possible octets below
-			return true
-
-		case *leafNode[V]:
-			return kid.prefix.Contains(ip)
-
-		default:
-			panic("logic error, wrong node type")
-		}
+		n = kid
 	}
 
-	return false
+	// last kid has default route
+	return true
 }
 
 // Lookup TODO
@@ -455,49 +444,48 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 
 	var n *node[V]
 	if len(octets) == 4 {
-		n = &d.root4
+		n = &t.root4
 	} else {
-		n = &d.root6
+		n = &t.root6
 	}
 
-	for _, octet := range octets {
-		// save the current best LPM val, lookup is cheap in ART
-		if bestLPM, tmpOk := n.lookup(art.OctetToIdx(octet)); tmpOk {
-			val = bestLPM
-			ok = tmpOk
+	var stack []*node[V]
+	if len(octets) == 4 {
+		stack = make([]*node[V], 0, 4)
+	} else {
+		stack = make([]*node[V], 0, 16)
+	}
+
+	i := 0
+	for {
+		// last finge node is default route
+		if i == len(octets) {
+			return *n.prefixes[1], true
 		}
 
-		anyPtr := n.getChild(octet)
-		if anyPtr == nil {
-			// no next node
-			return val, ok
+		octet := octets[i]
+		stack = append(stack, n)
+
+		n = n.getChild(octet)
+		if n == nil { // no next node
+			break
 		}
-		kidAny := *anyPtr
 
-		// next kid is ART, fringe or leaf node.
-		switch kid := kidAny.(type) {
-		case *node[V]:
-			n = kid
+		// fast forward if path compressed
+		i = n.path.Bits() / 8
+	}
 
-		case *fringeNode[V]:
-			// fringe is the default-route for all possible nodes below
-			return kid.value, true
-
-		case *leafNode[V]:
-			if kid.prefix.Contains(ip) {
-				return kid.value, true
+	for k := len(stack) - 1; k >= 0; k-- {
+		if n = stack[k]; n.path.Contains(ip) {
+			octet := octets[k]
+			if val, ok := n.lookup(art.OctetToIdx(octet)); ok {
+				return val, true
 			}
-			// maybe there is a current best value from upper levels
-			return val, ok
-
-		default:
-			panic("logic error, wrong node type")
 		}
 	}
 
-	panic("unreachable")
+	return
 }
-*/
 
 func (t *Table[V]) sizeUpdate(is4 bool, n int) {
 	if is4 {
