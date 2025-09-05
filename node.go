@@ -31,8 +31,8 @@ type node[V any] struct {
 // newNode TODO
 func newNode[V any](pfx netip.Prefix, depth int) *node[V] {
 	n := new(node[V])
-	mod8 := pfx.Bits() / 8
-	n.path = netip.PrefixFrom(pfx.Addr(), mod8*8)
+	div8 := pfx.Bits() >> 3
+	n.path = netip.PrefixFrom(pfx.Addr(), div8<<3)
 	return n
 }
 

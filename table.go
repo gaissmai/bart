@@ -417,8 +417,14 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 		n = &t.root6
 	}
 
-	for _, octet := range octets {
-		if n.contains(art.OctetToIdx(octet)) {
+	var octet uint8
+	var idx int
+	var last int
+
+	for idx >= 0 && idx < len(octets) {
+		octet = octets[idx]
+
+		if n.contains(uint(octet) + 256) {
 			return true
 		}
 
@@ -428,6 +434,18 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 			return false
 		}
 		n = kid
+
+		// fast forward for path compression
+		last = idx
+		idx = n.path.Bits() >> 3
+
+		// big step, path compression, check for contains
+		if idx > last+1 {
+			if !n.path.Contains(ip) {
+				return false
+			}
+		}
+
 	}
 
 	// last kid has default route
@@ -449,42 +467,40 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 		n = &t.root6
 	}
 
-	var stack []*node[V]
-	if len(octets) == 4 {
-		stack = make([]*node[V], 0, 4)
-	} else {
-		stack = make([]*node[V], 0, 16)
-	}
+	var octet uint8
+	var idx int
+	var last int
 
-	i := 0
-	for {
-		// last finge node is default route
-		if i == len(octets) {
-			return *n.prefixes[1], true
+	for idx >= 0 && idx < len(octets) {
+		octet = octets[idx]
+
+		// get and save current LPM val
+		if tmpVal, tmpOk := n.lookup(uint(octet) + 256); tmpOk {
+			val = tmpVal
+			ok = tmpOk
 		}
 
-		octet := octets[i]
-		stack = append(stack, n)
-
+		// go to next trie level
 		n = n.getChild(octet)
 		if n == nil { // no next node
-			break
+			return
 		}
 
-		// fast forward if path compressed
-		i = n.path.Bits() / 8
-	}
+		// fast forward for path compression
+		last = idx
+		idx = n.path.Bits() >> 3
 
-	for k := len(stack) - 1; k >= 0; k-- {
-		if n = stack[k]; n.path.Contains(ip) {
-			octet := octets[k]
-			if val, ok := n.lookup(art.OctetToIdx(octet)); ok {
-				return val, true
+		// big step, path compression, check for contains
+		if idx > last+1 {
+			if !n.path.Contains(ip) {
+				return val, ok // old best value
 			}
 		}
+
 	}
 
-	return
+	// last fringe node is default route
+	return *n.prefixes[1], true
 }
 
 func (t *Table[V]) sizeUpdate(is4 bool, n int) {
