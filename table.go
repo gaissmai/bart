@@ -35,8 +35,9 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	bits := pfx.Bits()
 	maxDepth, lastBits := maxDepthAndLastBits(bits)
 	octets := ip.AsSlice()
-	lastOctet := uint8(0)
-	if maxDepth < len(octets) {
+
+	var lastOctet uint8
+	if maxDepth < uint(len(octets)) {
 		lastOctet = octets[maxDepth]
 	}
 
@@ -44,8 +45,8 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	n.initOnceRootPath(is4)
 
 	// find the trie node
-	idx := 0
-	for idx < len(octets) {
+	idx := uint(0) // uint for BCE
+	for idx < uint(len(octets)) {
 		octet := octets[idx]
 
 		// insert this prefix
@@ -84,7 +85,7 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 			}
 
 			// pfx is some levels deeper
-			idx = kid.basePath.Bits() / 8
+			idx = uint(kid.basePath.Bits() >> 3)
 			n = kid // proceed with this kid
 			continue
 		}
@@ -515,10 +516,10 @@ func (t *Table[V]) Size6() int {
 	return t.size6
 }
 
-func maxDepthAndLastBits(bits int) (maxDepth int, lastBits uint8) {
+func maxDepthAndLastBits(bits int) (maxDepth uint, lastBits uint8) {
 	// maxDepth:  range from 0..4 or 0..16 !ATTENTION: not 0..3 or 0..15
 	// lastBits:  range from 0..7
-	return bits >> 3, uint8(bits & 7)
+	return uint(bits >> 3), uint8(bits & 7)
 }
 
 // rootNodeByVersion, root node getter for ip version and ART levels.

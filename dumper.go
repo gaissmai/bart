@@ -14,19 +14,17 @@ type nodeType byte
 
 const (
 	nullNode nodeType = iota // empty node
-	fullNode                 // prefixes and children or path-compressed prefixes
-	halfNode                 // no prefixes, only children and path-compressed prefixes
-	pathNode                 // only children, no prefix nor path-compressed prefixes
-	stopNode                 // no children, only prefixes or path-compressed prefixes
+	fullNode                 // both prefixes and children
+	imedNode                 // intermediate, no prefixes
+	stopNode                 // only prefixes
 )
-
-type stridePath [16]uint8
 
 // cidrFromIdx, helper function,
 func (n *node[V]) cidrFromIdx(idx uint8) netip.Prefix {
 	is4 := n.basePath.Addr().Is4()
 	path := n.basePath.Addr().AsSlice()
-	depth := n.basePath.Bits() / 8
+	depth := n.basePath.Bits() >> 3
+
 	octet, pfxLen := art.IdxToPfx(idx)
 
 	// set masked byte in path at depth
@@ -57,7 +55,6 @@ func addrFmt(addr byte, is4 bool) string {
 	if is4 {
 		return fmt.Sprintf("%d", addr)
 	}
-
 	return fmt.Sprintf("0x%02x", addr)
 }
 
@@ -65,30 +62,19 @@ func addrFmt(addr byte, is4 bool) string {
 //
 //	127.0.0
 //	2001:0d
-func (n *node[V]) fmtStridePath(depth int) string {
+func (n *node[V]) fmtStridePath(octetPath []byte, depth int) string {
 	buf := new(strings.Builder)
-
-	path := n.basePath.Addr().AsSlice()
-
 	is4 := n.basePath.Addr().Is4()
-	if is4 {
-		for i, b := range path[:depth] {
-			if i != 0 {
-				buf.WriteString(".")
-			}
 
+	buf.WriteString("●")
+	for _, b := range octetPath[:depth] {
+		buf.WriteString("➔")
+
+		if is4 {
 			buf.WriteString(strconv.Itoa(int(b)))
+		} else {
+			fmt.Fprintf(buf, "0x%02x", b)
 		}
-
-		return buf.String()
-	}
-
-	for i, b := range path[:depth] {
-		if i != 0 && i%2 == 0 {
-			buf.WriteString(":")
-		}
-
-		fmt.Fprintf(buf, "%02x", b)
 	}
 
 	return buf.String()
@@ -101,10 +87,8 @@ func (nt nodeType) String() string {
 		return "NULL"
 	case fullNode:
 		return "FULL"
-	case halfNode:
-		return "HALF"
-	case pathNode:
-		return "PATH"
+	case imedNode:
+		return "IMED"
 	case stopNode:
 		return "STOP"
 	default:
@@ -120,15 +104,16 @@ type stats struct {
 }
 
 // dump the node to w.
-func (n *node[V]) dump(w io.Writer, depth int) {
+func (n *node[V]) dump(w io.Writer, octetPath []byte, depth int) {
 	var zero V
 
 	is4 := n.basePath.Addr().Is4()
+	pcLevel := n.basePath.Bits() >> 3
 	indent := strings.Repeat(".", depth)
 
 	// node type with depth and octet path and bits.
-	fmt.Fprintf(w, "\n%s[%s] depth(%d), path(%s), basePath(%s)\n",
-		indent, n.hasType(), depth, n.fmtStridePath(depth), n.basePath)
+	fmt.Fprintf(w, "\n%s[%s] depth(%d), octetPath(%s), pcLevel(%d), basePath(%s)\n",
+		indent, n.hasType(), depth, n.fmtStridePath(octetPath, depth), pcLevel, n.basePath)
 
 	allIndices := n.prefixesBitSet.AsSlice(&[256]uint8{})
 	if nPfxCount := len(allIndices); nPfxCount != 0 {
@@ -181,12 +166,10 @@ func (n *node[V]) hasType() nodeType {
 		return nullNode
 	case s.childs == 0:
 		return stopNode
-	case s.childs > 0 && s.pfxs == 0:
-		return halfNode
-	case s.pfxs > 0 && s.childs > 0:
+	case s.childs > 0 && s.pfxs > 0:
 		return fullNode
 	case s.pfxs == 0 && s.childs > 0:
-		return pathNode
+		return imedNode
 	default:
 		panic(fmt.Sprintf("UNREACHABLE: pfx: %d, chld: %d", s.pfxs, s.childs))
 	}
@@ -213,30 +196,26 @@ func (t *Table[V]) dump(w io.Writer) {
 		return
 	}
 
-	if t.size4 > 0 {
-		stats := t.root4.nodeStatsRec()
-		fmt.Fprintln(w)
-		fmt.Fprintf(w, "### IPv4: size(%d), nodes(%d), pfxs(%d),", t.size4, stats.nodes, stats.pfxs)
-		t.root4.dumpRec(w, 0)
-	}
+	stats := t.root4.nodeStatsRec()
+	fmt.Fprintln(w)
+	fmt.Fprintf(w, "### IPv4: size(%d), nodes(%d), pfxs(%d),", t.size4, stats.nodes, stats.pfxs)
+	t.root4.dumpRec(w, []byte{}, 0)
 
-	if t.size6 > 0 {
-		stats := t.root6.nodeStatsRec()
-		fmt.Fprintln(w)
-		fmt.Fprintf(w, "### IPv6: size(%d), nodes(%d), pfxs(%d),", t.size6, stats.nodes, stats.pfxs)
-		t.root6.dumpRec(w, 0)
-	}
+	stats = t.root6.nodeStatsRec()
+	fmt.Fprintln(w)
+	fmt.Fprintf(w, "### IPv6: size(%d), nodes(%d), pfxs(%d),", t.size6, stats.nodes, stats.pfxs)
+	t.root6.dumpRec(w, []byte{}, 0)
 }
 
 // dumpRec, rec-descent the trie.
-func (n *node[V]) dumpRec(w io.Writer, depth int) {
+func (n *node[V]) dumpRec(w io.Writer, octetPath []byte, depth int) {
 	// dump this node
-	n.dump(w, depth)
+	n.dump(w, octetPath, depth)
 
 	// the node may have childs, rec-descent down
 	for _, addr := range n.childrenBitSet.AsSlice(&[256]uint8{}) {
 		kid := n.getChild(addr)
-		kid.dumpRec(w, depth+1)
+		kid.dumpRec(w, append(octetPath[:depth:depth], addr), depth+1)
 	}
 }
 
