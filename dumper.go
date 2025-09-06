@@ -24,9 +24,9 @@ type stridePath [16]uint8
 
 // cidrFromIdx, helper function,
 func (n *node[V]) cidrFromIdx(idx uint8) netip.Prefix {
-	is4 := n.path.Addr().Is4()
-	path := n.path.Addr().AsSlice()
-	depth := n.path.Bits() / 8
+	is4 := n.basePath.Addr().Is4()
+	path := n.basePath.Addr().AsSlice()
+	depth := n.basePath.Bits() / 8
 	octet, pfxLen := art.IdxToPfx(idx)
 
 	// set masked byte in path at depth
@@ -68,9 +68,9 @@ func addrFmt(addr byte, is4 bool) string {
 func (n *node[V]) fmtStridePath(depth int) string {
 	buf := new(strings.Builder)
 
-	path := n.path.Addr().AsSlice()
+	path := n.basePath.Addr().AsSlice()
 
-	is4 := n.path.Addr().Is4()
+	is4 := n.basePath.Addr().Is4()
 	if is4 {
 		for i, b := range path[:depth] {
 			if i != 0 {
@@ -123,12 +123,12 @@ type stats struct {
 func (n *node[V]) dump(w io.Writer, depth int) {
 	var zero V
 
-	is4 := n.path.Addr().Is4()
+	is4 := n.basePath.Addr().Is4()
 	indent := strings.Repeat(".", depth)
 
 	// node type with depth and octet path and bits.
-	fmt.Fprintf(w, "\n%s[%s] depth(%d), path(%s), basePrefix(%s)\n",
-		indent, n.hasType(), depth, n.fmtStridePath(depth), n.path)
+	fmt.Fprintf(w, "\n%s[%s] depth(%d), path(%s), basePath(%s)\n",
+		indent, n.hasType(), depth, n.fmtStridePath(depth), n.basePath)
 
 	allIndices := n.prefixesBitSet.AsSlice(&[256]uint8{})
 	if nPfxCount := len(allIndices); nPfxCount != 0 {

@@ -13,8 +13,8 @@ const (
 )
 
 var (
-	base4Path = netip.MustParsePrefix("0.0.0.0/0")
-	base6Path = netip.MustParsePrefix("::/0")
+	basePathIP4 = netip.MustParsePrefix("0.0.0.0/0")
+	basePathIP6 = netip.MustParsePrefix("::/0")
 )
 
 // node TODO
@@ -25,27 +25,27 @@ type node[V any] struct {
 	prefixesBitSet bitset.BitSet256 // for count and fast bitset operations
 	childrenBitSet bitset.BitSet256 // for count and fast bitset operations
 
-	path netip.Prefix
+	basePath netip.Prefix // the base path always contains all routes under this prefix
 }
 
 // newNode TODO
-func newNode[V any](pfx netip.Prefix, depth int) *node[V] {
+func newNode[V any](pfx netip.Prefix) *node[V] {
 	n := new(node[V])
 	div8 := pfx.Bits() >> 3
-	n.path = netip.PrefixFrom(pfx.Addr(), div8<<3)
+	n.basePath = netip.PrefixFrom(pfx.Addr(), div8<<3)
 	return n
 }
 
 // initOnceRootPath TODO, make it really Once()
 func (n *node[V]) initOnceRootPath(is4 bool) {
-	if n.path.IsValid() {
+	if n.basePath.IsValid() {
 		return
 	}
 
 	if is4 {
-		n.path = base4Path
+		n.basePath = basePathIP4
 	} else {
-		n.path = base6Path
+		n.basePath = basePathIP6
 	}
 }
 
@@ -61,7 +61,7 @@ func (n *node[V]) childCount() int {
 
 // containsPrefix TODO
 func (n *node[V]) containsPrefix(pfx netip.Prefix) bool {
-	return n.path.Overlaps(pfx) && n.path.Bits() <= pfx.Bits()
+	return n.basePath.Overlaps(pfx) && n.basePath.Bits() <= pfx.Bits()
 }
 
 // isEmpty returns true if node has neither prefixes nor children

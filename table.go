@@ -61,7 +61,7 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 
 		// insert new path compressed node for this prefix
 		if kid == nil {
-			kid = newNode[V](pfx, idx)
+			kid = newNode[V](pfx)
 			// insert this prefix into new kid
 			kid.insertPrefix(art.PfxToIdx(lastOctet, lastBits), val)
 
@@ -76,7 +76,7 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 		if kid.containsPrefix(pfx) {
 
 			// pfx is in kids trie level
-			if pfx.Bits()-kid.path.Bits() < 8 {
+			if pfx.Bits()-kid.basePath.Bits() < 8 {
 				if exists := kid.insertPrefix(art.PfxToIdx(lastOctet, lastBits), val); !exists {
 					t.sizeUpdate(is4, 1)
 				}
@@ -84,7 +84,7 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 			}
 
 			// pfx is some levels deeper
-			idx = kid.path.Bits() / 8
+			idx = kid.basePath.Bits() / 8
 			n = kid // proceed with this kid
 			continue
 		}
@@ -417,12 +417,9 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 		n = &t.root6
 	}
 
-	var octet uint8
-	var idx int
-	var last int
-
-	for idx >= 0 && idx < len(octets) {
-		octet = octets[idx]
+	idx := uint(0) // use uint for BCE
+	for idx < uint(len(octets)) {
+		octet := octets[idx]
 
 		if n.contains(uint(octet) + 256) {
 			return true
@@ -435,17 +432,14 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 		}
 		n = kid
 
-		// fast forward for path compression
-		last = idx
-		idx = n.path.Bits() >> 3
-
-		// big step, path compression, check for contains
-		if idx > last+1 {
-			if !n.path.Contains(ip) {
+		idx++ // proceed to next octet, but ...
+		if next := n.basePath.Bits() >> 3; next > int(idx) {
+			// fast forward for path compression?
+			if !n.basePath.Contains(ip) {
 				return false
 			}
+			idx = uint(next) // larger step
 		}
-
 	}
 
 	// last kid has default route
@@ -467,12 +461,9 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 		n = &t.root6
 	}
 
-	var octet uint8
-	var idx int
-	var last int
-
-	for idx >= 0 && idx < len(octets) {
-		octet = octets[idx]
+	idx := uint(0) // use uint for BCE
+	for idx < uint(len(octets)) {
+		octet := octets[idx]
 
 		// get and save current LPM val
 		if tmpVal, tmpOk := n.lookup(uint(octet) + 256); tmpOk {
@@ -486,15 +477,13 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 			return
 		}
 
-		// fast forward for path compression
-		last = idx
-		idx = n.path.Bits() >> 3
-
-		// big step, path compression, check for contains
-		if idx > last+1 {
-			if !n.path.Contains(ip) {
-				return val, ok // old best value
+		idx++ // proceed to next octet, but ...
+		if next := n.basePath.Bits() >> 3; next > int(idx) {
+			// fast forward for path compression?
+			if !n.basePath.Contains(ip) {
+				return val, ok // return current best LPM val
 			}
+			idx = uint(next) // larger step
 		}
 
 	}
