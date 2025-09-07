@@ -351,17 +351,11 @@ func (d *ArtTable[V]) Contains(ip netip.Addr) bool {
 		return false
 	}
 
-	octets := ip.AsSlice()
+	is4 := ip.Is4()
+	n := d.rootNodeByVersion(is4)
 
-	var n *artNode[V]
-	if len(octets) == 4 {
-		n = &d.root4
-	} else {
-		n = &d.root6
-	}
-
-	for _, octet := range octets {
-		if n.contains(art.OctetToIdx(octet)) {
+	for _, octet := range ip.AsSlice() {
+		if n.contains(uint(octet) + 256) {
 			return true
 		}
 
@@ -374,13 +368,15 @@ func (d *ArtTable[V]) Contains(ip netip.Addr) bool {
 		// kid is node or leaf or fringe at octet
 		switch kid := kidAny.(type) {
 		case *artNode[V]:
-			n = kid
+			n = kid // continue
 
 		case *fringeNode[V]:
 			// fringe is the default-route for all possible octets below
 			return true
 
 		case *leafNode[V]:
+			// due to path compression, the octet path between
+			// leaf and prefix may diverge
 			return kid.prefix.Contains(ip)
 
 		default:
@@ -397,18 +393,12 @@ func (d *ArtTable[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 		return
 	}
 
-	octets := ip.AsSlice()
+	is4 := ip.Is4()
+	n := d.rootNodeByVersion(is4)
 
-	var n *artNode[V]
-	if len(octets) == 4 {
-		n = &d.root4
-	} else {
-		n = &d.root6
-	}
-
-	for _, octet := range octets {
+	for _, octet := range ip.AsSlice() {
 		// save the current best LPM val, lookup is cheap in ART
-		if bestLPM, tmpOk := n.lookup(art.OctetToIdx(octet)); tmpOk {
+		if bestLPM, tmpOk := n.lookup(uint(octet) + 256); tmpOk {
 			val = bestLPM
 			ok = tmpOk
 		}
@@ -429,6 +419,8 @@ func (d *ArtTable[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 			return kid.value, true
 
 		case *leafNode[V]:
+			// due to path compression, the octet path between
+			// leaf and prefix may diverge
 			if kid.prefix.Contains(ip) {
 				return kid.value, true
 			}
