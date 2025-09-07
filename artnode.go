@@ -18,7 +18,7 @@ import (
 type artNode[V any] struct {
 	prefixes [256]*V
 	children [256]*any // **artNode or path-compreassed **leaf- or **fringeNode
-	// is an array of pointers to the empty interface,
+	// an array of "pointers to" the empty interface,
 	// and not an array of empty interfaces.
 	//
 	// - any  ( interface{}) takes 2 words, even if nil.
@@ -26,7 +26,7 @@ type artNode[V any] struct {
 	//
 	// Since many slots are nil, this reduces memory by 30%.
 	// The added indirection does not have a measurable performance impact,
-	// just makes the code uglier.
+	// but makes the code uglier.
 
 	prefixesBitSet bitset.BitSet256 // for count and fast bitset operations
 	childrenBitSet bitset.BitSet256 // for count and fast bitset operations
@@ -44,7 +44,7 @@ func (n *artNode[V]) childCount() int {
 
 // isEmpty returns true if node has neither prefixes nor children
 func (n *artNode[V]) isEmpty() bool {
-	return n.prefixCount() == 0 && n.childCount() == 0
+	return (n.prefixesBitSet.Size() + n.childrenBitSet.Size()) == 0
 }
 
 // getChild TODO
