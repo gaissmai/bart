@@ -42,7 +42,7 @@ For maximum performance, specify the CPU feature set when compiling.
 See the [Go minimum requirements](https://go.dev/wiki/MinimumRequirements#architectures) for details.
 
 ```bash
-# On `ARM64`, Go auto-selects CPU instructions.
+# On ARM64, Go auto-selects CPU instructions.
 # Example for amd64, choose v2/v3/v4 to match your CPU features.
 GOAMD64=v3 go build
 ```
