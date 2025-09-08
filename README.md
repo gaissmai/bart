@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 [![Stand With Ukraine](https://raw.githubusercontent.com/vshymanskyy/StandWithUkraine/main/badges/StandWithUkraine.svg)](https://stand-with-ukraine.pp.ua)
 
-## package bart
+# package bart
 
 The bart package provides a **Balanced Routing Table (BART)** for extremely
 fast IP-to-CIDR lookups and related tasks such as:
@@ -24,7 +24,7 @@ IP prefix matching.
 
 BART is balanced in terms of both memory usage and lookup time for longest-prefix matches.
 It is implemented as a multibit trie with a fixed stride of 8 bits, using a fast mapping
-function derived from Donald E. Knuth’s Allotment-Routing-Table (ART) algorithm, to map
+function derived from Donald E. Knuth’s Allotment Routing Table (ART) algorithm, to map
 the possible prefixes at each level into a complete binary tree.
 
 This binary tree is represented with popcount‑compressed sparse arrays for **level compression**.
@@ -232,9 +232,9 @@ Standing on the shoulders of giants.
 
 Credits for many inspirations go to
 
-- the clever folks at tailscale,
+- the clever folks at Tailscale,
 - to Daniel Lemire for his inspiring blog,
-- to Donald E. Knuth for the Allotment Routing Algorithm (ART) and
+- to Donald E. Knuth for the Allotment Routing Table (ART) algorithm and
 - to Yoichi Hariguchi who deciphered it for us mere mortals
 
 And last but not least to the Go team who do a wonderful job!
