@@ -34,7 +34,7 @@ while delivering even faster lookup times for prefix searches (see linked benchm
 
 ## Usage and Compilation
 
-The algorithm is based on fixed-size bit vectors and precomputed lookup tables.
+The BART algorithm is based on fixed-size bit vectors and precomputed lookup tables.
 Lookups are executed entirely with fast, cache-resident bitmask operations, which
 modern CPUs accelerate using specialized instructions such as POPCNT, LZCNT, and TZCNT.
 
