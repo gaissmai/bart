@@ -26,7 +26,9 @@ reviews:
   auto_assign_reviewers: false
   poem: false
   labeling_instructions: []
-  path_filters: []
+  path_filters:
+    - '!**/doc/**'
+    - '!**/testdata/**'
   path_instructions: []
   abort_on_close: true
   disable_cache: false
@@ -55,15 +57,6 @@ reviews:
     issue_assessment:
       mode: warning
   tools:
-    ast-grep:
-      rule_dirs: []
-      util_dirs: []
-      essential_rules: true
-      packages: []
-    shellcheck:
-      enabled: true
-    ruff:
-      enabled: true
     markdownlint:
       enabled: true
     github-checks:
@@ -77,81 +70,23 @@ reviews:
       disabled_categories: []
       enabled_only: false
       level: default
-    biome:
-      enabled: true
-    hadolint:
-      enabled: true
-    swiftlint:
-      enabled: true
-    phpstan:
-      enabled: true
-      level: default
-    phpmd:
-      enabled: true
-    phpcs:
-      enabled: true
     golangci-lint:
       enabled: true
+      config_file: .golangci.yml
     yamllint:
       enabled: true
     gitleaks:
       enabled: true
-    checkov:
-      enabled: true
-    detekt:
-      enabled: true
-    eslint:
-      enabled: true
-    flake8:
-      enabled: true
-    rubocop:
-      enabled: true
-    buf:
-      enabled: true
-    regal:
-      enabled: true
     actionlint:
       enabled: true
-    pmd:
-      enabled: true
-    cppcheck:
-      enabled: true
     semgrep:
-      enabled: true
-    circleci:
-      enabled: true
-    clippy:
-      enabled: true
-    sqlfluff:
-      enabled: true
-    prismaLint:
-      enabled: true
-    pylint:
-      enabled: true
-    oxc:
-      enabled: true
-    shopifyThemeCheck:
-      enabled: true
-    luacheck:
-      enabled: true
-    brakeman:
-      enabled: true
-    dotenvLint:
-      enabled: true
-    htmlhint:
-      enabled: true
-    checkmake:
       enabled: true
     osvScanner:
       enabled: true
 chat:
-  art: true
+  art: false
   auto_reply: true
   integrations:
-    jira:
-      usage: disabled
-    linear:
-      usage: disabled
 knowledge_base:
   opt_out: false
   web_search:
@@ -160,7 +95,7 @@ knowledge_base:
     enabled: true
     filePatterns: []
   learnings:
-    scope: global
+    scope: auto
   issues:
     scope: auto
   jira:
@@ -180,4 +115,3 @@ code_generation:
     path_instructions: []
   unit_tests:
     path_instructions: []
-
