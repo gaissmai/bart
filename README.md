@@ -168,7 +168,7 @@ Some delegated methods are pointless without a payload.
    func (l *Lite) Contains(pfx netip.Prefix) bool
 
    func (l *Lite) Insert(pfx netip.Prefix)
-   func (l *Lite) Delete(pfx netip.Prefix)
+   func (l *Lite) Delete(pfx netip.Prefix) bool
 
    func (l *Lite) InsertPersist(pfx netip.Prefix) *Lite
    func (l *Lite) DeletePersist(pfx netip.Prefix) (*Lite, bool)
