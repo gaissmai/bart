@@ -1,5 +1,3 @@
-# package bart
-
 ![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/gaissmai/bart)
 [![Go Reference](https://pkg.go.dev/badge/github.com/gaissmai/bart.svg)](https://pkg.go.dev/github.com/gaissmai/bart#section-documentation)
 [![Mentioned in Awesome Go](https://awesome.re/mentioned-badge-flat.svg)](https://github.com/avelino/awesome-go)
@@ -9,33 +7,49 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 [![Stand With Ukraine](https://raw.githubusercontent.com/vshymanskyy/StandWithUkraine/main/badges/StandWithUkraine.svg)](https://stand-with-ukraine.pp.ua)
 
+## package bart
+
+The bart package provides a **Balanced Routing Table (BART)** for extremely
+fast IP-to-CIDR lookups and related tasks such as:
+
+- **ACL** fast checks, quickly determine whether an IP address matches any of millions of CIDR rules.
+- **RIB** efficient storage, handle very large routing tables with low memory overhead, while keeping lookups fast.
+- **FIB** high-speed lookups, achieve LPM in constant-time for packet forwarding in the datapath.
+
+BART is designed for workloads where both speed and memory efficiency matter,
+making it a good fit for firewalls, routers, or any system that needs large-scale
+IP prefix matching.
+
 ## Overview
 
-`package bart` provides a Balanced-Routing-Table (BART) for very fast IP to CIDR lookups and more.
+BART is balanced in terms of both memory usage and lookup time for longest-prefix matches.
+It is implemented as a multibit trie with a fixed stride of 8 bits, using a fast mapping
+function derived from Donald E. Knuth’s Allotment-Routing-Table (ART) algorithm, to map
+the possible prefixes at each level into a complete binary tree.
 
-BART is balanced in terms of memory usage and lookup time for the longest-prefix
-match.
+This binary tree is represented with popcount‑compressed sparse arrays for **level compression**.
+Combined with a **novel path compression**, this design reduces memory consumption by nearly
+two [orders of magnitude](https://github.com/gaissmai/iprbench) compared to ART,
+while delivering even faster lookup times for prefix searches.
 
-BART is a multibit-trie with fixed stride length of 8 bits, using a fast mapping
-function (based on Donald E. Knuths ART algorithm) to map the 256 prefixes in each level
-node to form a complete-binary-tree.
+## Usage and Compilation
 
-This complete binary tree is implemented with popcount compressed sparse arrays
-together with path compression. This reduces storage consumption by almost two
-orders of magnitude in comparison to ART, with even better lookup times for the
-longest prefix match.
+The algorithm is based on fixed-size bit vectors and precomputed lookup tables.
+Lookups are executed entirely with fast, cache-resident bitmask operations, which
+modern CPUs accelerate using specialized instructions such as POPCNT, LZCNT, and TZCNT.
 
-The BART algorithm is based on fixed size bit vectors and precalculated
-lookup tables. The lookup is performed entirely by fast,
-cache-friendly bitmask operations, which in modern CPUs are performed
-by advanced bit manipulation instruction sets (POPCNT, LZCNT, TZCNT, ...).
+For maximum performance, specify the CPU feature set when compiling.
+See the [Go minimum requirements](https://go.dev/wiki/MinimumRequirements#architectures) for details.
 
-You should specify the CPU feature set when compiling, e.g. GOAMD64=v3 for 
-maximum performance, see also https://go.dev/wiki/MinimumRequirements#architectures
+Tested with recent Go versions.
+Example (amd64): `GOAMD64=v3 go build`  (choose v2/v3/v4 to match your CPU features)
+On ARM64, Go auto-selects CPU instructions.
 
-The algorithm was specially developed so that it can always work with a fixed
-length of 256 bits. This means that the bitset fit very well in a cache line and
-that loops over the bitset in hot paths can be accelerated by loop unrolling, e.g.
+## Bitset Efficiency
+
+Due to the novel path compression, BART always operates on a fixed internal 256-bit length.
+Critical loops over these bitsets can be unrolled for additional speed,
+ensuring predictable memory access and efficient use of CPU pipelines.
 
 ```go
 func (b *BitSet256) popcnt() (cnt int) {
@@ -46,13 +60,11 @@ func (b *BitSet256) popcnt() (cnt int) {
 	return
 }
 ```
-A future Go version that supports SIMD intrinsics for the `[4]uint64` vectors will
-probably allow the algorithm to be made even faster on suitable hardware.
 
-The BART algorithm is also excellent for determining whether two tables
-contain overlapping IP addresses, just in a few nanoseconds.
+Future Go versions with SIMD intrinsics for `uint64` vectors may unlock
+additional speedups on compatible hardware.
 
-## lock-free concurrency
+## Concurrency model
 
 There are examples demonstrating how to use bart concurrently with multiple readers and writers.
 Readers can access the table always lock-free, while writers may synchronize using a mutex to ensure
@@ -64,11 +76,21 @@ provides clear advantages for any routing daemon.
 
 But as always, it depends on the specific use case.
 
-See the `ExampleLite_concurrent` and `ExampleTable_concurrent` tests for concrete examples of this pattern.
+See the concurrent tests for concrete examples of this pattern:
+- [ExampleLite](example_lite_concurrent_test.go)
+- [ExampleTable](example_table_concurrent_test.go)
+
+
+## Additional Use Cases
+
+Beyond high-performance prefix matching, BART also excels at detecting overlaps
+between two routing tables.
+In internal benchmarks `BenchmarkTableOverlaps` the check runs in a few nanoseconds
+per query with zero heap allocations on a modern CPU.
 
 ## API
 
-```golang
+```go
   import "github.com/gaissmai/bart"
   
   type Table[V any] struct {
@@ -137,7 +159,7 @@ Lite wraps or adapts some methods where needed and delegates almost all
 other methods unmodified to the underlying Table.
 Some delegated methods are pointless without a payload.
 
-```golang
+```go
    type Lite struct {
      Table[struct{}]
    }
@@ -163,7 +185,7 @@ Some delegated methods are pointless without a payload.
    func (l *Lite) Equal(o *Lite) bool
 ```
 
-## benchmarks
+## Benchmarks
 
 Please see the extensive [benchmarks](https://github.com/gaissmai/iprbench) comparing `bart` with other IP routing table implementations.
 
@@ -200,19 +222,19 @@ to be revisited to better support the use cases that the library solves for.
 
 These occurrences are expected to be rare in frequency and the API is already quite stable.
 
-## CONTRIBUTION
+## Contribution
 
 Please open an issue for discussion before sending a pull request.
 
-## CREDIT
+## Credit
 
 Standing on the shoulders of giants.
 
 Credits for many inspirations go to
 
-- the clever guys at tailscale,
+- the clever folks at tailscale,
 - to Daniel Lemire for his inspiring blog,
-- to Donald E. Knuth for the **ART** routing algorithm and
+- to Donald E. Knuth for the Allotment Routing Algorithm (ART) and
 - to Yoichi Hariguchi who deciphered it for us mere mortals
 
 And last but not least to the Go team who do a wonderful job!
