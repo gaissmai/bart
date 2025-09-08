@@ -41,9 +41,12 @@ modern CPUs accelerate using specialized instructions such as POPCNT, LZCNT, and
 For maximum performance, specify the CPU feature set when compiling.
 See the [Go minimum requirements](https://go.dev/wiki/MinimumRequirements#architectures) for details.
 
-Tested with recent Go versions.
-Example (amd64): `GOAMD64=v3 go build`  (choose v2/v3/v4 to match your CPU features)
-On ARM64, Go auto-selects CPU instructions.
+```bash
+# On `ARM64`, Go auto-selects CPU instructions.
+# Example for amd64, choose v2/v3/v4 to match your CPU features.
+GOAMD64=v3 go build
+```
+
 
 ## Bitset Efficiency
 
