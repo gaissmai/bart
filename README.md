@@ -24,7 +24,7 @@ IP prefix matching.
 
 BART is balanced in terms of both memory usage and lookup time for longest-prefix matches.
 It is implemented as a multibit trie with a fixed stride of 8 bits, using a fast mapping
-function derived from Donald E. Knuth’s Allotment Routing Table (ART) algorithm, to map
+function derived from Donald E. Knuth’s **Allotment Routing Table** (ART) algorithm, to map
 the possible prefixes at each level into a complete binary tree.
 
 This binary tree is represented with popcount‑compressed sparse arrays for **level compression**.
@@ -43,7 +43,7 @@ See the [Go minimum requirements](https://go.dev/wiki/MinimumRequirements#archit
 
 ```bash
 # On ARM64, Go auto-selects CPU instructions.
-# Example for amd64, choose v2/v3/v4 to match your CPU features.
+# Example for AMD64, choose v2/v3/v4 to match your CPU features.
 GOAMD64=v3 go build
 ```
 
