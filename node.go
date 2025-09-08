@@ -53,7 +53,9 @@ type node[V any] struct {
 	children sparse.Array256[any]
 }
 
-// isEmpty returns true if node has neither prefixes nor children
+// isEmpty returns true if the node contains no routing entries (prefixes)
+// and no child nodes. Empty nodes are candidates for compression or removal
+// during trie optimization.
 func (n *node[V]) isEmpty() bool {
 	return n.prefixes.Len() == 0 && n.children.Len() == 0
 }
@@ -199,19 +201,18 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 	panic("unreachable")
 }
 
-// purgeAndCompress traverses the deletion path upward and removes empty or compressible nodes
-// in the trie.
+// purgeAndCompress performs bottom-up compression of the trie by removing
+// empty nodes and converting sparse branches into compressed leaf/fringe nodes.
+// It unwinds the provided stack of parent nodes, checking each level for
+// compression opportunities based on child count and prefix distribution.
 //
-// After a route deletion, this function walks back through the recorded traversal stack
-// and optimizes the trie by eliminating redundant intermediate nodes. A node is purged if it is empty,
-// and compressed if it contains only a single leaf, fringe, or prefix.
+// The compression may convert:
+//   - Nodes with single prefix into leafNode (path compression)
+//   - Nodes at maxDepth-1 with single prefix into fringeNode
+//   - Empty intermediate nodes are removed entirely
 //
-// Compressible cases are handled by removing the node and reinserting its content (prefix or value)
-// one level higher, preserving routing semantics while reducing structural depth. The child is then
-// replaced in the parent, effectively flattening the trie where appropriate.
-//
-// The reconstruction of prefixes for fringe or prefix entries is based on
-// the original `octets` traversal path and the parent´s depth.
+// The reconstruction of prefixes for compressed nodes uses the traversal
+// path stored in octets and the parent's depth information.
 func (n *node[V]) purgeAndCompress(stack []*node[V], octets []uint8, is4 bool) {
 	// unwind the stack
 	for depth := len(stack) - 1; depth >= 0; depth-- {
@@ -384,9 +385,16 @@ func (n *node[V]) allRec(path stridePath, depth int, is4 bool, yield func(netip.
 // Prefixes are reconstructed on-the-fly from the traversal path, and iteration includes all child types:
 // inner nodes (recursive descent), leaf nodes, and fringe (compressed) prefixes.
 //
-// If the yield callback returns false at any point, traversal stops early and false is returned,
-// allowing for efficient filtered iteration. The order is stable and predictable, making the function
-// suitable for use cases like table exports, comparisons, or serialization.
+// The order is stable and predictable, making the function suitable for use cases
+// like table exports, comparisons or serialization.
+//
+// Parameters:
+//   - path: the current traversal path through the trie
+//   - depth: current depth in the trie (0-based)
+//   - is4: true for IPv4 processing, false for IPv6
+//   - yield: callback function invoked for each prefix/value pair
+//
+// Returns false if yield function requests early termination.
 func (n *node[V]) allRecSorted(path stridePath, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
 	// get slice of all child octets, sorted by addr
 	allChildAddrs := n.children.AsSlice(&[256]uint8{})

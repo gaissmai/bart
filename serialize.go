@@ -112,7 +112,9 @@ func (t *Table[V]) fprint(w io.Writer, is4 bool) error {
 	return n.fprintRec(w, startParent, "")
 }
 
-// fprintRec, the output is a hierarchical CIDR tree covered starting with this node
+// fprintRec recursively prints a hierarchical CIDR tree representation
+// starting from this node to the provided writer. The output shows the
+// routing table structure in human-readable format for debugging and analysis.
 func (n *node[V]) fprintRec(w io.Writer, parent trieItem[V], pad string) error {
 	// recursion stop condition
 	if n == nil {

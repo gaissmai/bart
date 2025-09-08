@@ -55,12 +55,12 @@ func (t *Table[V]) dump(w io.Writer) {
 	}
 }
 
-// dumpRec, rec-descent the trie.
+// dumpRec recursively descends the trie
 func (n *node[V]) dumpRec(w io.Writer, path stridePath, depth int, is4 bool) {
 	// dump this node
 	n.dump(w, path, depth, is4)
 
-	// the node may have childs, rec-descent down
+	// node may have children, rec-descent down
 	for i, addr := range n.children.Bits() {
 		path[depth&15] = addr
 
