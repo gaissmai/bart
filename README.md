@@ -30,7 +30,7 @@ the possible prefixes at each level into a complete binary tree.
 This binary tree is represented with popcount‑compressed sparse arrays for **level compression**.
 Combined with a **novel path compression**, this design reduces memory consumption by nearly
 two [orders of magnitude](https://github.com/gaissmai/iprbench) compared to ART,
-while delivering even faster lookup times for prefix searches.
+while delivering even faster lookup times for prefix searches (see linked benchmarks).
 
 ## Usage and Compilation
 
@@ -67,9 +67,9 @@ additional speedups on compatible hardware.
 ## Concurrency model
 
 There are examples demonstrating how to use bart concurrently with multiple readers and writers.
-Readers can access the table always lock-free, while writers may synchronize using a mutex to ensure
-that only one writer can modify the table persistent at a time, not using Compare-and-Swap (CAS)
-with all the known problems for multiple long-running writers.
+Readers can always access the table lock‑free. Writers synchronize with a mutex so that only one writer
+modifies the persistent table at a time, without relying on CAS, which can be problematic with multiple
+long‑running writers.
 
 The combination of lock-free concurrency, fast lookup and update times and low memory consumption
 provides clear advantages for any routing daemon.
