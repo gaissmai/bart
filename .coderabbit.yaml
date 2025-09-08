@@ -86,7 +86,7 @@ reviews:
 chat:
   art: false
   auto_reply: true
-  integrations:
+  integrations: {}
 knowledge_base:
   opt_out: false
   web_search:
