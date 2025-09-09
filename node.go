@@ -21,9 +21,9 @@ const (
 // stridePath, max 16 octets deep
 type stridePath [maxTreeDepth]uint8
 
-// bartNode is a trie level node in the multibit routing table.
+// node is a trie level node in the multibit routing table.
 //
-// Each bartNode contains two conceptually different arrays:
+// Each node contains two conceptually different arrays:
 //   - prefixes: representing routes, using a complete binary tree layout
 //     driven by the baseIndex() function from the ART algorithm.
 //   - children: holding subtries or path-compressed leaves/fringes with
@@ -34,7 +34,7 @@ type stridePath [maxTreeDepth]uint8
 // and lookup rely on fast bitset operations and precomputed rank indexes.
 //
 // See doc/artlookup.pdf for the mapping mechanics and prefix tree details.
-type bartNode[V any] struct {
+type node[V any] struct {
 	// prefixes stores routing entries (prefix -> value),
 	// laid out as a complete binary tree using baseIndex().
 	prefixes sparse.Array256[V]
@@ -54,7 +54,7 @@ type bartNode[V any] struct {
 }
 
 // isEmpty returns true if node has neither prefixes nor children
-func (n *bartNode[V]) isEmpty() bool {
+func (n *node[V]) isEmpty() bool {
 	return n.prefixes.Len() == 0 && n.children.Len() == 0
 }
 
@@ -120,7 +120,7 @@ func isFringe(depth, bits int) bool {
 // The function walks the prefix address from the given depth and inserts the value either directly into
 // the node´s prefix table or as a compressed leaf or fringe node. If a conflicting leaf or fringe exists,
 // it is pushed down via a new intermediate node. Existing entries with the same prefix are overwritten.
-func (n *bartNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool) {
+func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool) {
 	ip := pfx.Addr() // the pfx must be in canonical form
 	bits := pfx.Bits()
 	octets := ip.AsSlice()
@@ -148,7 +148,7 @@ func (n *bartNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists 
 
 		// kid is node or leaf at addr
 		switch kid := kid.(type) {
-		case *bartNode[V]:
+		case *node[V]:
 			n = kid // descend down to next trie level
 
 		case *leafNode[V]:
@@ -164,7 +164,7 @@ func (n *bartNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists 
 			// push the leaf down
 			// insert new child at current leaf position (addr)
 			// descend down, replace n with new child
-			newNode := new(bartNode[V])
+			newNode := new(node[V])
 			newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
 
 			n.children.InsertAt(octet, newNode)
@@ -183,7 +183,7 @@ func (n *bartNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists 
 			// push the fringe down, it becomes a default route (idx=1)
 			// insert new child at current leaf position (addr)
 			// descend down, replace n with new child
-			newNode := new(bartNode[V])
+			newNode := new(node[V])
 			newNode.prefixes.InsertAt(1, kid.value)
 
 			n.children.InsertAt(octet, newNode)
@@ -212,7 +212,7 @@ func (n *bartNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists 
 //
 // The reconstruction of prefixes for fringe or prefix entries is based on
 // the original `octets` traversal path and the parent´s depth.
-func (n *bartNode[V]) purgeAndCompress(stack []*bartNode[V], octets []uint8, is4 bool) {
+func (n *node[V]) purgeAndCompress(stack []*node[V], octets []uint8, is4 bool) {
 	// unwind the stack
 	for depth := len(stack) - 1; depth >= 0; depth-- {
 		parent := stack[depth]
@@ -228,7 +228,7 @@ func (n *bartNode[V]) purgeAndCompress(stack []*bartNode[V], octets []uint8, is4
 
 		case pfxCount == 0 && childCount == 1:
 			switch kid := n.children.Items[0].(type) {
-			case *bartNode[V]:
+			case *node[V]:
 				// fast exit, we are at an intermediate path node
 				// no further delete/compress upwards the stack is possible
 				return
@@ -287,7 +287,7 @@ func (n *bartNode[V]) purgeAndCompress(stack []*bartNode[V], octets []uint8, is4
 // via the baseIndex function. Unlike the original ART algorithm, this implementation
 // does not use an allotment-based approach. Instead, it performs CBT backtracking
 // using a bitset-based operation with a precomputed backtracking pattern specific to idx.
-func (n *bartNode[V]) lpmGet(idx uint) (baseIdx uint8, val V, ok bool) {
+func (n *node[V]) lpmGet(idx uint) (baseIdx uint8, val V, ok bool) {
 	// top is the idx of the longest-prefix-match
 	if top, ok := n.prefixes.IntersectionTop(lpm.BackTrackingBitset(idx)); ok {
 		return top, n.prefixes.MustGet(top), true
@@ -307,7 +307,7 @@ func (n *bartNode[V]) lpmGet(idx uint) (baseIdx uint8, val V, ok bool) {
 // The prefix table is structured as a complete binary tree (CBT), and LPM testing
 // is done via a bitset operation that maps the traversal path from the given index
 // toward its possible ancestors.
-func (n *bartNode[V]) lpmTest(idx uint) bool {
+func (n *node[V]) lpmTest(idx uint) bool {
 	return n.prefixes.Intersects(lpm.BackTrackingBitset(idx))
 }
 
@@ -325,7 +325,7 @@ func (n *bartNode[V]) lpmTest(idx uint) bool {
 //
 // The traversal order is not defined. This implementation favors simplicity
 // and runtime efficiency over consistency of iteration sequence.
-func (n *bartNode[V]) allRec(path stridePath, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
+func (n *node[V]) allRec(path stridePath, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
 	for _, idx := range n.prefixes.AsSlice(&[256]uint8{}) {
 		cidr := cidrFromPath(path, depth, is4, idx)
 
@@ -339,7 +339,7 @@ func (n *bartNode[V]) allRec(path stridePath, depth int, is4 bool, yield func(ne
 	// for all children (nodes and leaves) in this node do ...
 	for i, addr := range n.children.AsSlice(&[256]uint8{}) {
 		switch kid := n.children.Items[i].(type) {
-		case *bartNode[V]:
+		case *node[V]:
 			// rec-descent with this node
 			path[depth] = addr
 			if !kid.allRec(path, depth+1, is4, yield) {
@@ -387,7 +387,7 @@ func (n *bartNode[V]) allRec(path stridePath, depth int, is4 bool, yield func(ne
 // If the yield callback returns false at any point, traversal stops early and false is returned,
 // allowing for efficient filtered iteration. The order is stable and predictable, making the function
 // suitable for use cases like table exports, comparisons, or serialization.
-func (n *bartNode[V]) allRecSorted(path stridePath, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
+func (n *node[V]) allRecSorted(path stridePath, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
 	// get slice of all child octets, sorted by addr
 	allChildAddrs := n.children.AsSlice(&[256]uint8{})
 
@@ -413,7 +413,7 @@ func (n *bartNode[V]) allRecSorted(path stridePath, depth int, is4 bool, yield f
 
 			// yield the node (rec-descent) or leaf
 			switch kid := n.children.Items[j].(type) {
-			case *bartNode[V]:
+			case *node[V]:
 				path[depth] = childAddr
 				if !kid.allRecSorted(path, depth+1, is4, yield) {
 					return false
@@ -449,7 +449,7 @@ func (n *bartNode[V]) allRecSorted(path stridePath, depth int, is4 bool, yield f
 	for j := childCursor; j < len(allChildAddrs); j++ {
 		addr := allChildAddrs[j]
 		switch kid := n.children.Items[j].(type) {
-		case *bartNode[V]:
+		case *node[V]:
 			path[depth] = addr
 			if !kid.allRecSorted(path, depth+1, is4, yield) {
 				return false
@@ -488,7 +488,7 @@ func (n *bartNode[V]) allRecSorted(path stridePath, depth int, is4 bool, yield f
 //
 // This function is intended for internal use during supernet traversal and
 // does not descend the trie further.
-func (n *bartNode[V]) eachLookupPrefix(octets []byte, depth int, is4 bool, pfxIdx uint, yield func(netip.Prefix, V) bool) (ok bool) {
+func (n *node[V]) eachLookupPrefix(octets []byte, depth int, is4 bool, pfxIdx uint, yield func(netip.Prefix, V) bool) (ok bool) {
 	// path needed below more than once in loop
 	var path stridePath
 	copy(path[:], octets)
@@ -525,7 +525,7 @@ func (n *bartNode[V]) eachLookupPrefix(octets []byte, depth int, is4 bool, pfxId
 //
 // This function is intended for internal use by Subnets(), and it assumes the
 // current node is positioned at the point in the trie corresponding to the parent prefix.
-func (n *bartNode[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxIdx uint8, yield func(netip.Prefix, V) bool) bool {
+func (n *node[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxIdx uint8, yield func(netip.Prefix, V) bool) bool {
 	// octets as array, needed below more than once
 	var path stridePath
 	copy(path[:], octets)
@@ -570,7 +570,7 @@ func (n *bartNode[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxIdx uint
 
 			// yield the node or leaf?
 			switch kid := n.children.MustGet(addr).(type) {
-			case *bartNode[V]:
+			case *node[V]:
 				path[depth] = addr
 				if !kid.allRecSorted(path, depth+1, is4, yield) {
 					return false
@@ -608,7 +608,7 @@ func (n *bartNode[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxIdx uint
 	for _, addr := range allCoveredChildAddrs[addrCursor:] {
 		// yield the node or leaf?
 		switch kid := n.children.MustGet(addr).(type) {
-		case *bartNode[V]:
+		case *node[V]:
 			path[depth] = addr
 			if !kid.allRecSorted(path, depth+1, is4, yield) {
 				return false

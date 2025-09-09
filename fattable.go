@@ -7,29 +7,29 @@ import (
 	"github.com/gaissmai/bart/internal/art"
 )
 
-// TODO bitset ART
-type ArtTable[V any] struct {
+// TODO
+type Fat[V any] struct {
 	// used by -copylocks checker from `go vet`.
 	_ [0]sync.Mutex
 
-	// the root nodes are ART nodes, fixed size arrays
-	root4 artNode[V]
-	root6 artNode[V]
+	// the root nodes are fat nodes with fixed size arrays
+	root4 fatNode[V]
+	root6 fatNode[V]
 
 	// the number of prefixes in the routing table
 	size4 int
 	size6 int
 }
 
-// rootNodeByVersion, root node getter for ip version and ART levels.
-func (d *ArtTable[V]) rootNodeByVersion(is4 bool) *artNode[V] {
+// rootNodeByVersion, root node getter for ip version and trie levels.
+func (d *Fat[V]) rootNodeByVersion(is4 bool) *fatNode[V] {
 	if is4 {
 		return &d.root4
 	}
 	return &d.root6
 }
 
-func (d *ArtTable[V]) Insert(pfx netip.Prefix, val V) {
+func (d *Fat[V]) Insert(pfx netip.Prefix, val V) {
 	if !pfx.IsValid() {
 		return
 	}
@@ -48,7 +48,7 @@ func (d *ArtTable[V]) Insert(pfx netip.Prefix, val V) {
 }
 
 // Modify TODO
-func (d *ArtTable[V]) Modify(pfx netip.Prefix, cb func(val V, ok bool) (newVal V, del bool)) (newVal V, deleted bool) {
+func (d *Fat[V]) Modify(pfx netip.Prefix, cb func(val V, ok bool) (newVal V, del bool)) (newVal V, deleted bool) {
 	var zero V
 
 	if !pfx.IsValid() {
@@ -69,7 +69,7 @@ func (d *ArtTable[V]) Modify(pfx netip.Prefix, cb func(val V, ok bool) (newVal V
 
 	// record the nodes on the path to the deleted node, needed to purge
 	// and/or path compress nodes after the deletion of a prefix
-	stack := [maxTreeDepth]*artNode[V]{}
+	stack := [maxTreeDepth]*fatNode[V]{}
 
 	// find the trie node
 	for depth, octet := range octets {
@@ -131,7 +131,7 @@ func (d *ArtTable[V]) Modify(pfx netip.Prefix, cb func(val V, ok bool) (newVal V
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kidAny.(type) {
-		case *artNode[V]:
+		case *fatNode[V]:
 			n = kid // descend down to next trie level
 
 		case *fringeNode[V]:
@@ -154,11 +154,11 @@ func (d *ArtTable[V]) Modify(pfx netip.Prefix, cb func(val V, ok bool) (newVal V
 				return oldVal, true // delete
 			}
 
-			// create new node ART node
+			// create new node
 			// push the fringe down, it becomes a default route (idx=1)
 			// insert new child at current leaf position (addr)
 			// descend down, replace n with new child
-			newNode := new(artNode[V])
+			newNode := new(fatNode[V])
 			_ = newNode.insertPrefix(1, kid.value)
 			_ = n.insertChild(octet, newNode)
 			n = newNode
@@ -187,7 +187,7 @@ func (d *ArtTable[V]) Modify(pfx netip.Prefix, cb func(val V, ok bool) (newVal V
 			// push the leaf down
 			// insert new child at current leaf position (addr)
 			// descend down, replace n with new child
-			newNode := new(artNode[V])
+			newNode := new(fatNode[V])
 			_ = newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
 			_ = n.insertChild(octet, newNode)
 			n = newNode
@@ -202,7 +202,7 @@ func (d *ArtTable[V]) Modify(pfx netip.Prefix, cb func(val V, ok bool) (newVal V
 
 // Delete deletes the prefix and returns the associated payload for prefix and true,
 // or the zero value and false if prefix is not set in the routing table.
-func (d *ArtTable[V]) Delete(pfx netip.Prefix) (val V, exists bool) {
+func (d *Fat[V]) Delete(pfx netip.Prefix) (val V, exists bool) {
 	if !pfx.IsValid() {
 		return
 	}
@@ -221,7 +221,7 @@ func (d *ArtTable[V]) Delete(pfx netip.Prefix) (val V, exists bool) {
 
 	// record the nodes on the path to the deleted node, needed to purge
 	// and/or path compress nodes after the deletion of a prefix
-	stack := [maxTreeDepth]*artNode[V]{}
+	stack := [maxTreeDepth]*fatNode[V]{}
 
 	// find the trie node
 	for depth, octet := range octets {
@@ -249,7 +249,7 @@ func (d *ArtTable[V]) Delete(pfx netip.Prefix) (val V, exists bool) {
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kidAny.(type) {
-		case *artNode[V]:
+		case *fatNode[V]:
 			n = kid // descend down to next trie level
 
 		case *fringeNode[V]:
@@ -290,7 +290,7 @@ func (d *ArtTable[V]) Delete(pfx netip.Prefix) (val V, exists bool) {
 
 // Get returns the associated payload for prefix and true, or false if
 // prefix is not set in the routing table.
-func (d *ArtTable[V]) Get(pfx netip.Prefix) (val V, ok bool) {
+func (d *Fat[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 	if !pfx.IsValid() {
 		return
 	}
@@ -320,7 +320,7 @@ func (d *ArtTable[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kidAny.(type) {
-		case *artNode[V]:
+		case *fatNode[V]:
 			n = kid // descend down to next trie level
 
 		case *fringeNode[V]:
@@ -346,7 +346,7 @@ func (d *ArtTable[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 }
 
 // Contains TODO
-func (d *ArtTable[V]) Contains(ip netip.Addr) bool {
+func (d *Fat[V]) Contains(ip netip.Addr) bool {
 	if !ip.IsValid() {
 		return false
 	}
@@ -367,7 +367,7 @@ func (d *ArtTable[V]) Contains(ip netip.Addr) bool {
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kidAny.(type) {
-		case *artNode[V]:
+		case *fatNode[V]:
 			n = kid // continue
 
 		case *fringeNode[V]:
@@ -388,7 +388,7 @@ func (d *ArtTable[V]) Contains(ip netip.Addr) bool {
 }
 
 // Lookup TODO
-func (d *ArtTable[V]) Lookup(ip netip.Addr) (val V, ok bool) {
+func (d *Fat[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	if !ip.IsValid() {
 		return
 	}
@@ -397,7 +397,7 @@ func (d *ArtTable[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	n := d.rootNodeByVersion(is4)
 
 	for _, octet := range ip.AsSlice() {
-		// save the current best LPM val, lookup is cheap in ART
+		// save the current best LPM val, lookup is cheap in Fat
 		if bestLPM, tmpOk := n.lookup(uint(octet) + 256); tmpOk {
 			val = bestLPM
 			ok = tmpOk
@@ -409,9 +409,9 @@ func (d *ArtTable[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 			return val, ok
 		}
 
-		// next kid is ART, fringe or leaf node.
+		// next kid is fat, fringe or leaf node.
 		switch kid := kidAny.(type) {
-		case *artNode[V]:
+		case *fatNode[V]:
 			n = kid
 
 		case *fringeNode[V]:
@@ -436,12 +436,12 @@ func (d *ArtTable[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 }
 
 // Clone TODO
-func (d *ArtTable[V]) Clone() *ArtTable[V] {
+func (d *Fat[V]) Clone() *Fat[V] {
 	if d == nil {
 		return nil
 	}
 
-	c := new(ArtTable[V])
+	c := new(Fat[V])
 
 	cloneFn := cloneFnFactory[V]()
 
@@ -454,7 +454,7 @@ func (d *ArtTable[V]) Clone() *ArtTable[V] {
 	return c
 }
 
-func (d *ArtTable[V]) sizeUpdate(is4 bool, n int) {
+func (d *Fat[V]) sizeUpdate(is4 bool, n int) {
 	if is4 {
 		d.size4 += n
 		return
@@ -463,16 +463,16 @@ func (d *ArtTable[V]) sizeUpdate(is4 bool, n int) {
 }
 
 // Size returns the prefix count.
-func (d *ArtTable[V]) Size() int {
+func (d *Fat[V]) Size() int {
 	return d.size4 + d.size6
 }
 
 // Size4 returns the IPv4 prefix count.
-func (d *ArtTable[V]) Size4() int {
+func (d *Fat[V]) Size4() int {
 	return d.size4
 }
 
 // Size6 returns the IPv6 prefix count.
-func (d *ArtTable[V]) Size6() int {
+func (d *Fat[V]) Size6() int {
 	return d.size6
 }
