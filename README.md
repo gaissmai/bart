@@ -38,6 +38,8 @@ The BART algorithm is based on fixed-size bit vectors and precomputed lookup tab
 Lookups are executed entirely with fast, cache-resident bitmask operations, which
 modern CPUs accelerate using specialized instructions such as POPCNT, LZCNT, and TZCNT.
 
+(hier fehlt noch ein einfaches Beispiel mit bart.Lite und ACLs)
+
 For maximum performance, specify the CPU feature set when compiling.
 See the [Go minimum requirements](https://go.dev/wiki/MinimumRequirements#architectures) for details.
 
