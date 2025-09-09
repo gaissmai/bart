@@ -34,6 +34,42 @@ while delivering even faster lookup times for prefix searches (see linked benchm
 
 ## Usage and Compilation
 
+Example: simple ACL
+
+```go
+package main
+
+import (
+  "net/netip"
+
+  "github.com/gaissmai/bart"
+)
+
+func main() {
+  // Simple ACL with bart.Lite
+  allowlist := new(bart.Lite)
+
+  // Add allowed networks
+  allowlist.Insert(netip.MustParsePrefix("192.168.0.0/16"))
+  allowlist.Insert(netip.MustParsePrefix("2001:db8::/32"))
+
+  // Test some IPs
+  testIPs := []netip.Addr{
+    netip.MustParseAddr("192.168.1.100"), // allowed
+    netip.MustParseAddr("2001:db8::1"),   // allowed
+    netip.MustParseAddr("172.16.0.1"),    // denied
+  }
+
+  for _, ip := range testIPs {
+    if allowlist.Contains(ip) {
+      // ALLOWED
+    } else {
+      // DENIED
+    }
+  }
+}
+```
+
 The BART algorithm is based on fixed-size bit vectors and precomputed lookup tables.
 Lookups are executed entirely with fast, cache-resident bitmask operations, which
 modern CPUs accelerate using specialized instructions such as POPCNT, LZCNT, and TZCNT.
