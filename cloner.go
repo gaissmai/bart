@@ -26,6 +26,10 @@ func cloneFnFactory[V any]() cloneFunc[V] {
 // cloneVal invokes the Clone method to deeply copy val.
 // Assumes that val implements Cloner[V].
 func cloneVal[V any](val V) V {
+	if val == nil {
+		return nil
+	}
+
 	// you can't assert directly on a type parameter
 	return any(val).(Cloner[V]).Clone()
 }
