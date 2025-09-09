@@ -19,36 +19,43 @@ concurrency:
 jobs:
   test:
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         go-version: ['stable', 'oldstable']
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ matrix.go-version }}
+          cache: true
+      - run: go test -v ./...
+      - run: go test -v -run='Persist' -race
+      - run: go test -v -run='Example' -race
+
+  govulncheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - id: go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ matrix.go-version }}
+          cache: true
+      - uses: golang/govulncheck-action@v1
+        with:
+          go-version-input: ${{ steps.go.outputs.go-version }}
+          check-latest: true
+
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
       - uses: actions/setup-go@v6
         with:
           go-version: stable
           cache: true
-      - uses: actions/checkout@v5
-      - run: go test -v ./...      
-      - run: go test -v -run='Persist' -race
-      - run: go test -v -run='Example' -race
-  
-  govulncheck:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: golang/govulncheck-action@v1
-        with:
-          go-version-input: 1.24
-          check-latest: true
-      
-  coverage:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5         
-      - uses: actions/setup-go@v6
-        with:
-          go-version: 1.24
 
       - name: Test Coverage
         run: go test -v -coverprofile=profile.cov ./...
