@@ -7,7 +7,7 @@ import (
 )
 
 // dump the node to w.
-func (n *artNode[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
+func (n *fatNode[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 	var zero V
 
 	bits := depth * strideLen
@@ -58,7 +58,7 @@ func (n *artNode[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 			kidAny := *n.children[addr]
 
 			switch kidAny.(type) {
-			case *artNode[V]:
+			case *fatNode[V]:
 				childAddrs = append(childAddrs, addr)
 				continue
 			case *leafNode[V]:
@@ -130,7 +130,7 @@ func (n *artNode[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 }
 
 // hasType returns the nodeType.
-func (n *artNode[V]) hasType() nodeType {
+func (n *fatNode[V]) hasType() nodeType {
 	s := n.nodeStats()
 
 	switch {
@@ -151,7 +151,7 @@ func (n *artNode[V]) hasType() nodeType {
 }
 
 // node statistics for this single node
-func (n *artNode[V]) nodeStats() stats {
+func (n *fatNode[V]) nodeStats() stats {
 	var s stats
 
 	s.pfxs = n.prefixCount()
@@ -160,7 +160,7 @@ func (n *artNode[V]) nodeStats() stats {
 	for _, addr := range n.childrenBitSet.AsSlice(&[256]uint8{}) {
 		kidAny := *n.children[addr]
 		switch kidAny.(type) {
-		case *artNode[V]:
+		case *fatNode[V]:
 			s.nodes++
 
 		case *leafNode[V]:
@@ -178,7 +178,7 @@ func (n *artNode[V]) nodeStats() stats {
 }
 
 // dumpString is just a wrapper for dump.
-func (d *ArtTable[V]) dumpString() string {
+func (d *Fat[V]) dumpString() string {
 	w := new(strings.Builder)
 	d.dump(w)
 
@@ -186,7 +186,7 @@ func (d *ArtTable[V]) dumpString() string {
 }
 
 // dump the table structure and all the nodes to w.
-func (d *ArtTable[V]) dump(w io.Writer) {
+func (d *Fat[V]) dump(w io.Writer) {
 	if d == nil {
 		return
 	}
@@ -209,7 +209,7 @@ func (d *ArtTable[V]) dump(w io.Writer) {
 }
 
 // dumpRec, rec-descent the trie.
-func (n *artNode[V]) dumpRec(w io.Writer, path stridePath, depth int, is4 bool) {
+func (n *fatNode[V]) dumpRec(w io.Writer, path stridePath, depth int, is4 bool) {
 	// dump this node
 	n.dump(w, path, depth, is4)
 
@@ -217,14 +217,14 @@ func (n *artNode[V]) dumpRec(w io.Writer, path stridePath, depth int, is4 bool) 
 	for _, addr := range n.childrenBitSet.AsSlice(&[256]uint8{}) {
 		path[depth] = addr
 
-		if kid, ok := (*n.children[addr]).(*artNode[V]); ok {
+		if kid, ok := (*n.children[addr]).(*fatNode[V]); ok {
 			kid.dumpRec(w, path, depth+1, is4)
 		}
 	}
 }
 
 // nodeStatsRec, calculate the number of pfxs, nodes and leaves under n, rec-descent.
-func (n *artNode[V]) nodeStatsRec() stats {
+func (n *fatNode[V]) nodeStatsRec() stats {
 	var s stats
 	if n == nil || n.isEmpty() {
 		return s
@@ -239,7 +239,7 @@ func (n *artNode[V]) nodeStatsRec() stats {
 	for _, addr := range n.childrenBitSet.AsSlice(&[256]uint8{}) {
 		kidAny := *n.children[addr]
 		switch kid := kidAny.(type) {
-		case *artNode[V]:
+		case *fatNode[V]:
 			// rec-descent
 			rs := kid.nodeStatsRec()
 
