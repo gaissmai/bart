@@ -35,7 +35,7 @@ reviews:
   auto_review:
     enabled: true
     auto_incremental_review: true
-    ignore_title_keywords: [wip, WIP, Wip]
+    ignore_title_keywords: ['skip ci']
     labels: []
     drafts: false
     base_branches: []
