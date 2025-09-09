@@ -4,13 +4,13 @@ import (
 	"testing"
 )
 
-func TestArtWorstCaseMatch4(t *testing.T) {
+func TestFatWorstCaseMatch4(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Contains", func(t *testing.T) {
 		t.Parallel()
 
-		tbl := new(ArtTable[string])
+		tbl := new(Fat[string])
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
 		}
@@ -25,7 +25,7 @@ func TestArtWorstCaseMatch4(t *testing.T) {
 	t.Run("Lookup", func(t *testing.T) {
 		t.Parallel()
 
-		tbl := new(ArtTable[string])
+		tbl := new(Fat[string])
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
 		}
@@ -44,13 +44,13 @@ func TestArtWorstCaseMatch4(t *testing.T) {
 	})
 }
 
-func TestArtWorstCaseMiss4(t *testing.T) {
+func TestFatWorstCaseMiss4(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Contains", func(t *testing.T) {
 		t.Parallel()
 
-		tbl := new(ArtTable[string])
+		tbl := new(Fat[string])
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
 		}
@@ -67,7 +67,7 @@ func TestArtWorstCaseMiss4(t *testing.T) {
 	t.Run("Lookup", func(t *testing.T) {
 		t.Parallel()
 
-		tbl := new(ArtTable[string])
+		tbl := new(Fat[string])
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
 		}
@@ -82,13 +82,13 @@ func TestArtWorstCaseMiss4(t *testing.T) {
 	})
 }
 
-func TestArtWorstCaseMatch6(t *testing.T) {
+func TestFatWorstCaseMatch6(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Contains", func(t *testing.T) {
 		t.Parallel()
 
-		tbl := new(ArtTable[string])
+		tbl := new(Fat[string])
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())
 		}
@@ -103,7 +103,7 @@ func TestArtWorstCaseMatch6(t *testing.T) {
 	t.Run("Lookup", func(t *testing.T) {
 		t.Parallel()
 
-		tbl := new(ArtTable[string])
+		tbl := new(Fat[string])
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())
 		}
@@ -122,13 +122,13 @@ func TestArtWorstCaseMatch6(t *testing.T) {
 	})
 }
 
-func TestArtWorstCaseMiss6(t *testing.T) {
+func TestFatWorstCaseMiss6(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Contains", func(t *testing.T) {
 		t.Parallel()
 
-		tbl := new(ArtTable[string])
+		tbl := new(Fat[string])
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())
 		}
@@ -145,7 +145,7 @@ func TestArtWorstCaseMiss6(t *testing.T) {
 	t.Run("Lookup", func(t *testing.T) {
 		t.Parallel()
 
-		tbl := new(ArtTable[string])
+		tbl := new(Fat[string])
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())
 		}
@@ -160,9 +160,9 @@ func TestArtWorstCaseMiss6(t *testing.T) {
 	})
 }
 
-func BenchmarkArtWorstCaseMatch4(b *testing.B) {
+func BenchmarkFatWorstCaseMatch4(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
-		tbl := new(ArtTable[string])
+		tbl := new(Fat[string])
 
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
@@ -174,7 +174,7 @@ func BenchmarkArtWorstCaseMatch4(b *testing.B) {
 	})
 
 	b.Run("Lookup", func(b *testing.B) {
-		tbl := new(ArtTable[string])
+		tbl := new(Fat[string])
 
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
@@ -188,9 +188,9 @@ func BenchmarkArtWorstCaseMatch4(b *testing.B) {
 	})
 }
 
-func BenchmarkArtWorstCaseMiss4(b *testing.B) {
+func BenchmarkFatWorstCaseMiss4(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
-		tbl := new(ArtTable[string])
+		tbl := new(Fat[string])
 
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
@@ -204,7 +204,7 @@ func BenchmarkArtWorstCaseMiss4(b *testing.B) {
 	})
 
 	b.Run("Lookup", func(b *testing.B) {
-		tbl := new(ArtTable[string])
+		tbl := new(Fat[string])
 
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
@@ -218,9 +218,9 @@ func BenchmarkArtWorstCaseMiss4(b *testing.B) {
 	})
 }
 
-func BenchmarkArtWorstCaseMatch6(b *testing.B) {
+func BenchmarkFatWorstCaseMatch6(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
-		tbl := new(ArtTable[string])
+		tbl := new(Fat[string])
 
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())
@@ -232,7 +232,7 @@ func BenchmarkArtWorstCaseMatch6(b *testing.B) {
 	})
 
 	b.Run("Lookup", func(b *testing.B) {
-		tbl := new(ArtTable[string])
+		tbl := new(Fat[string])
 
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())
@@ -246,9 +246,9 @@ func BenchmarkArtWorstCaseMatch6(b *testing.B) {
 	})
 }
 
-func BenchmarkArtWorstCaseMiss6(b *testing.B) {
+func BenchmarkFatWorstCaseMiss6(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
-		tbl := new(ArtTable[string])
+		tbl := new(Fat[string])
 
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())
@@ -262,7 +262,7 @@ func BenchmarkArtWorstCaseMiss6(b *testing.B) {
 	})
 
 	b.Run("Lookup", func(b *testing.B) {
-		tbl := new(ArtTable[string])
+		tbl := new(Fat[string])
 
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())

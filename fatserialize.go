@@ -19,7 +19,7 @@ import (
 // we collect this during the recursive descent.
 type artTrieItem[V any] struct {
 	// for traversing, path/depth/idx is needed to get the CIDR back from the trie.
-	n     *artNode[V]
+	n     *fatNode[V]
 	is4   bool
 	path  stridePath
 	depth int
@@ -33,7 +33,7 @@ type artTrieItem[V any] struct {
 // String returns a hierarchical tree diagram of the ordered CIDRs
 // as string, just a wrapper for [Table.Fprint].
 // If Fprint returns an error, String panics.
-func (t *ArtTable[V]) String() string {
+func (t *Fat[V]) String() string {
 	w := new(strings.Builder)
 	if err := t.Fprint(w); err != nil {
 		panic(err)
@@ -64,7 +64,7 @@ func (t *ArtTable[V]) String() string {
 //	   ├─ 2000::/3 (V)
 //	   │  └─ 2001:db8::/32 (V)
 //	   └─ fe80::/10 (V)
-func (t *ArtTable[V]) Fprint(w io.Writer) error {
+func (t *Fat[V]) Fprint(w io.Writer) error {
 	if t == nil || w == nil {
 		return nil
 	}
@@ -83,7 +83,7 @@ func (t *ArtTable[V]) Fprint(w io.Writer) error {
 }
 
 // fprint is the version dependent adapter to fprintRec.
-func (t *ArtTable[V]) fprint(w io.Writer, is4 bool) error {
+func (t *Fat[V]) fprint(w io.Writer, is4 bool) error {
 	n := t.rootNodeByVersion(is4)
 	if n.isEmpty() {
 		return nil
@@ -104,7 +104,7 @@ func (t *ArtTable[V]) fprint(w io.Writer, is4 bool) error {
 }
 
 // fprintRec, the output is a hierarchical CIDR tree covered starting with this node
-func (n *artNode[V]) fprintRec(w io.Writer, parent artTrieItem[V], pad string) error {
+func (n *fatNode[V]) fprintRec(w io.Writer, parent artTrieItem[V], pad string) error {
 	// recursion stop condition
 	if n == nil {
 		return nil
@@ -146,7 +146,7 @@ func (n *artNode[V]) fprintRec(w io.Writer, parent artTrieItem[V], pad string) e
 
 // MarshalText implements the [encoding.TextMarshaler] interface,
 // just a wrapper for [Table.Fprint].
-func (t *ArtTable[V]) MarshalText() ([]byte, error) {
+func (t *Fat[V]) MarshalText() ([]byte, error) {
 	w := new(bytes.Buffer)
 	if err := t.Fprint(w); err != nil {
 		return nil, err
@@ -157,7 +157,7 @@ func (t *ArtTable[V]) MarshalText() ([]byte, error) {
 
 // MarshalJSON dumps the table into two sorted lists: for ipv4 and ipv6.
 // Every root and subnet is an array, not a map, because the order matters.
-func (t *ArtTable[V]) MarshalJSON() ([]byte, error) {
+func (t *Fat[V]) MarshalJSON() ([]byte, error) {
 	if t == nil {
 		return nil, nil
 	}
@@ -180,7 +180,7 @@ func (t *ArtTable[V]) MarshalJSON() ([]byte, error) {
 
 // DumpList4 dumps the ipv4 tree into a list of roots and their subnets.
 // It can be used to analyze the tree or build the text or json serialization.
-func (t *ArtTable[V]) DumpList4() []DumpListNode[V] {
+func (t *Fat[V]) DumpList4() []DumpListNode[V] {
 	if t == nil {
 		return nil
 	}
@@ -189,7 +189,7 @@ func (t *ArtTable[V]) DumpList4() []DumpListNode[V] {
 
 // DumpList6 dumps the ipv6 tree into a list of roots and their subnets.
 // It can be used to analyze the tree or build custom json representation.
-func (t *ArtTable[V]) DumpList6() []DumpListNode[V] {
+func (t *Fat[V]) DumpList6() []DumpListNode[V] {
 	if t == nil {
 		return nil
 	}
@@ -198,7 +198,7 @@ func (t *ArtTable[V]) DumpList6() []DumpListNode[V] {
 
 // dumpListRec, build the data structure rec-descent with the help
 // of directItemsRec.
-func (n *artNode[V]) dumpListRec(parentIdx uint8, path stridePath, depth int, is4 bool) []DumpListNode[V] {
+func (n *fatNode[V]) dumpListRec(parentIdx uint8, path stridePath, depth int, is4 bool) []DumpListNode[V] {
 	// recursion stop condition
 	if n == nil {
 		return nil
@@ -230,7 +230,7 @@ func (n *artNode[V]) dumpListRec(parentIdx uint8, path stridePath, depth int, is
 // by heart to understand this function!
 //
 // See the  artlookup.pdf paper in the doc folder, the baseIndex function is the key.
-func (n *artNode[V]) directItemsRec(parentIdx uint8, path stridePath, depth int, is4 bool) (directItems []artTrieItem[V]) {
+func (n *fatNode[V]) directItemsRec(parentIdx uint8, path stridePath, depth int, is4 bool) (directItems []artTrieItem[V]) {
 	// recursion stop condition
 	if n == nil {
 		return nil
@@ -284,7 +284,7 @@ func (n *artNode[V]) directItemsRec(parentIdx uint8, path stridePath, depth int,
 			kidAny := *n.children[octet]
 
 			switch kid := kidAny.(type) {
-			case *artNode[V]:
+			case *fatNode[V]:
 				// traverse rec-descent, call with next child node,
 				// next trie level, set parentIdx to 0, adjust path and depth
 				path[depth] = octet
