@@ -10,22 +10,22 @@ import (
 	"testing"
 )
 
-func TestArtCloneFlat(t *testing.T) {
+func TestFatCloneFlat(t *testing.T) {
 	t.Parallel()
 
 	cloneFn := copyVal[int] // just copy
 
 	tests := []struct {
 		name    string
-		prepare func() *artNode[int]
-		check   func(t *testing.T, got, orig *artNode[int])
+		prepare func() *fatNode[int]
+		check   func(t *testing.T, got, orig *fatNode[int])
 	}{
 		{
 			name: "nil node returns nil",
-			prepare: func() *artNode[int] {
+			prepare: func() *fatNode[int] {
 				return nil
 			},
-			check: func(t *testing.T, got, orig *artNode[int]) {
+			check: func(t *testing.T, got, orig *fatNode[int]) {
 				if got != nil {
 					t.Errorf("expected nil, got %+v", got)
 				}
@@ -33,10 +33,10 @@ func TestArtCloneFlat(t *testing.T) {
 		},
 		{
 			name: "empty node",
-			prepare: func() *artNode[int] {
-				return &artNode[int]{}
+			prepare: func() *fatNode[int] {
+				return &fatNode[int]{}
 			},
-			check: func(t *testing.T, got, orig *artNode[int]) {
+			check: func(t *testing.T, got, orig *fatNode[int]) {
 				if got == nil {
 					t.Fatal("got is nil")
 				}
@@ -47,14 +47,14 @@ func TestArtCloneFlat(t *testing.T) {
 		},
 		{
 			name: "node with prefix",
-			prepare: func() *artNode[int] {
-				n := &artNode[int]{}
+			prepare: func() *fatNode[int] {
+				n := &fatNode[int]{}
 				pfx := mpp("8.0.0.0/6")
 				val := 42
 				n.insertAtDepth(pfx, val, 0)
 				return n
 			},
-			check: func(t *testing.T, got, orig *artNode[int]) {
+			check: func(t *testing.T, got, orig *fatNode[int]) {
 				gotBuf := &strings.Builder{}
 				origBuf := &strings.Builder{}
 
@@ -68,8 +68,8 @@ func TestArtCloneFlat(t *testing.T) {
 		},
 		{
 			name: "node with prefixes",
-			prepare: func() *artNode[int] {
-				n := &artNode[int]{}
+			prepare: func() *fatNode[int] {
+				n := &fatNode[int]{}
 				pfx := mpp("8.0.0.0/6")
 				val := 6
 				n.insertAtDepth(pfx, val, 0)
@@ -84,7 +84,7 @@ func TestArtCloneFlat(t *testing.T) {
 
 				return n
 			},
-			check: func(t *testing.T, got, orig *artNode[int]) {
+			check: func(t *testing.T, got, orig *fatNode[int]) {
 				gotBuf := &strings.Builder{}
 				origBuf := &strings.Builder{}
 
@@ -109,10 +109,10 @@ func TestArtCloneFlat(t *testing.T) {
 	}
 }
 
-func TestArtInvalid(t *testing.T) {
+func TestFatInvalid(t *testing.T) {
 	t.Parallel()
 
-	tbl := new(ArtTable[any])
+	tbl := new(Fat[any])
 	var zeroPfx netip.Prefix
 	var zeroIP netip.Addr
 	var testname string
@@ -183,15 +183,15 @@ func TestArtInvalid(t *testing.T) {
 	})
 }
 
-func TestArtInsert(t *testing.T) {
+func TestFatInsert(t *testing.T) {
 	t.Parallel()
 
-	tbl := new(ArtTable[int])
+	tbl := new(Fat[int])
 
 	// Create a new leaf strideTable, with compressed path
 	tbl.Insert(mpp("192.168.0.1/32"), 1)
-	checkArtNumNodes(t, tbl, 1)
-	checkArtRoutes(t, tbl, []tableTest{
+	checkFatNumNodes(t, tbl, 1)
+	checkFatRoutes(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", -1},
 		{"192.168.0.3", -1},
@@ -206,8 +206,8 @@ func TestArtInsert(t *testing.T) {
 
 	// explode path compressed
 	tbl.Insert(mpp("192.168.0.2/32"), 2)
-	checkArtNumNodes(t, tbl, 4)
-	checkArtRoutes(t, tbl, []tableTest{
+	checkFatNumNodes(t, tbl, 4)
+	checkFatRoutes(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", 2},
 		{"192.168.0.3", -1},
@@ -222,8 +222,8 @@ func TestArtInsert(t *testing.T) {
 
 	// Insert into existing leaf
 	tbl.Insert(mpp("192.168.0.0/26"), 7)
-	checkArtNumNodes(t, tbl, 4)
-	checkArtRoutes(t, tbl, []tableTest{
+	checkFatNumNodes(t, tbl, 4)
+	checkFatRoutes(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", 2},
 		{"192.168.0.3", 7},
@@ -238,8 +238,8 @@ func TestArtInsert(t *testing.T) {
 
 	// Create a different leaf at root
 	tbl.Insert(mpp("10.0.0.0/27"), 3)
-	checkArtNumNodes(t, tbl, 4)
-	checkArtRoutes(t, tbl, []tableTest{
+	checkFatNumNodes(t, tbl, 4)
+	checkFatRoutes(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", 2},
 		{"192.168.0.3", 7},
@@ -254,8 +254,8 @@ func TestArtInsert(t *testing.T) {
 
 	// Insert that creates a new path compressed leaf
 	tbl.Insert(mpp("192.168.1.1/32"), 4)
-	checkArtNumNodes(t, tbl, 4)
-	checkArtRoutes(t, tbl, []tableTest{
+	checkFatNumNodes(t, tbl, 4)
+	checkFatRoutes(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", 2},
 		{"192.168.0.3", 7},
@@ -270,8 +270,8 @@ func TestArtInsert(t *testing.T) {
 
 	// Insert that creates a new path compressed leaf
 	tbl.Insert(mpp("192.170.0.0/16"), 5)
-	checkArtNumNodes(t, tbl, 4)
-	checkArtRoutes(t, tbl, []tableTest{
+	checkFatNumNodes(t, tbl, 4)
+	checkFatRoutes(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", 2},
 		{"192.168.0.3", 7},
@@ -287,8 +287,8 @@ func TestArtInsert(t *testing.T) {
 	// New leaf in a different subtree, so the next insert can test a
 	// variant of decompression.
 	tbl.Insert(mpp("192.180.0.1/32"), 8)
-	checkArtNumNodes(t, tbl, 4)
-	checkArtRoutes(t, tbl, []tableTest{
+	checkFatNumNodes(t, tbl, 4)
+	checkFatRoutes(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", 2},
 		{"192.168.0.3", 7},
@@ -303,8 +303,8 @@ func TestArtInsert(t *testing.T) {
 
 	// Insert that explodes the previous path compression
 	tbl.Insert(mpp("192.180.0.0/21"), 9)
-	checkArtNumNodes(t, tbl, 5)
-	checkArtRoutes(t, tbl, []tableTest{
+	checkFatNumNodes(t, tbl, 5)
+	checkFatRoutes(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", 2},
 		{"192.168.0.3", 7},
@@ -319,8 +319,8 @@ func TestArtInsert(t *testing.T) {
 
 	// Insert a default route, those have their own codepath.
 	tbl.Insert(mpp("0.0.0.0/0"), 6)
-	checkArtNumNodes(t, tbl, 5)
-	checkArtRoutes(t, tbl, []tableTest{
+	checkFatNumNodes(t, tbl, 5)
+	checkFatRoutes(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", 2},
 		{"192.168.0.3", 7},
@@ -337,8 +337,8 @@ func TestArtInsert(t *testing.T) {
 
 	// Create a new path compressed leaf
 	tbl.Insert(mpp("ff:aaaa::1/128"), 1)
-	checkArtNumNodes(t, tbl, 6)
-	checkArtRoutes(t, tbl, []tableTest{
+	checkFatNumNodes(t, tbl, 6)
+	checkFatRoutes(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", -1},
 		{"ff:aaaa::3", -1},
@@ -353,8 +353,8 @@ func TestArtInsert(t *testing.T) {
 
 	// Insert into previous leaf, explode v6 path compression
 	tbl.Insert(mpp("ff:aaaa::2/128"), 2)
-	checkArtNumNodes(t, tbl, 21)
-	checkArtRoutes(t, tbl, []tableTest{
+	checkFatNumNodes(t, tbl, 21)
+	checkFatRoutes(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", 2},
 		{"ff:aaaa::3", -1},
@@ -369,8 +369,8 @@ func TestArtInsert(t *testing.T) {
 
 	// Insert into previous node
 	tbl.Insert(mpp("ff:aaaa::/125"), 7)
-	checkArtNumNodes(t, tbl, 21)
-	checkArtRoutes(t, tbl, []tableTest{
+	checkFatNumNodes(t, tbl, 21)
+	checkFatRoutes(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", 2},
 		{"ff:aaaa::3", 7},
@@ -385,8 +385,8 @@ func TestArtInsert(t *testing.T) {
 
 	// Create a different leaf elsewhere
 	tbl.Insert(mpp("ffff:bbbb::/120"), 3)
-	checkArtNumNodes(t, tbl, 21)
-	checkArtRoutes(t, tbl, []tableTest{
+	checkFatNumNodes(t, tbl, 21)
+	checkFatRoutes(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", 2},
 		{"ff:aaaa::3", 7},
@@ -401,8 +401,8 @@ func TestArtInsert(t *testing.T) {
 
 	// Insert that creates a new path compressed leaf
 	tbl.Insert(mpp("ff:aaaa:aaaa::1/128"), 4)
-	checkArtNumNodes(t, tbl, 21)
-	checkArtRoutes(t, tbl, []tableTest{
+	checkFatNumNodes(t, tbl, 21)
+	checkFatRoutes(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", 2},
 		{"ff:aaaa::3", 7},
@@ -417,8 +417,8 @@ func TestArtInsert(t *testing.T) {
 
 	// Insert that creates a new path in tree
 	tbl.Insert(mpp("ff:aaaa:aaaa:bb00::/56"), 5)
-	checkArtNumNodes(t, tbl, 23)
-	checkArtRoutes(t, tbl, []tableTest{
+	checkFatNumNodes(t, tbl, 23)
+	checkFatRoutes(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", 2},
 		{"ff:aaaa::3", 7},
@@ -434,8 +434,8 @@ func TestArtInsert(t *testing.T) {
 	// New leaf in a different subtree, so the next insert can test a
 	// variant of decompression.
 	tbl.Insert(mpp("ff:cccc::1/128"), 8)
-	checkArtNumNodes(t, tbl, 23)
-	checkArtRoutes(t, tbl, []tableTest{
+	checkFatNumNodes(t, tbl, 23)
+	checkFatRoutes(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", 2},
 		{"ff:aaaa::3", 7},
@@ -450,8 +450,8 @@ func TestArtInsert(t *testing.T) {
 
 	// Insert that explodes a previous path compressed leaf
 	tbl.Insert(mpp("ff:cccc::/37"), 9)
-	checkArtNumNodes(t, tbl, 25)
-	checkArtRoutes(t, tbl, []tableTest{
+	checkFatNumNodes(t, tbl, 25)
+	checkFatRoutes(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", 2},
 		{"ff:aaaa::3", 7},
@@ -466,8 +466,8 @@ func TestArtInsert(t *testing.T) {
 
 	// Insert a default route, those have their own codepath.
 	tbl.Insert(mpp("::/0"), 6)
-	checkArtNumNodes(t, tbl, 25)
-	checkArtRoutes(t, tbl, []tableTest{
+	checkFatNumNodes(t, tbl, 25)
+	checkFatRoutes(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", 2},
 		{"ff:aaaa::3", 7},
@@ -481,34 +481,34 @@ func TestArtInsert(t *testing.T) {
 	})
 }
 
-func TestArtDeleteEdgeCases(t *testing.T) {
+func TestFatDeleteEdgeCases(t *testing.T) {
 	t.Parallel()
 
 	t.Run("table_is_empty", func(t *testing.T) {
 		t.Parallel()
 		prng := rand.New(rand.NewPCG(42, 42))
 		// must not panic
-		tbl := new(ArtTable[int])
-		checkArtNumNodes(t, tbl, 0)
+		tbl := new(Fat[int])
+		checkFatNumNodes(t, tbl, 0)
 		tbl.Delete(randomPrefix(prng))
-		checkArtNumNodes(t, tbl, 0)
+		checkFatNumNodes(t, tbl, 0)
 	})
 
 	t.Run("prefix_in_root", func(t *testing.T) {
 		t.Parallel()
 		// Add/remove prefix from root table.
-		tbl := new(ArtTable[int])
-		checkArtNumNodes(t, tbl, 0)
+		tbl := new(Fat[int])
+		checkFatNumNodes(t, tbl, 0)
 
 		tbl.Insert(mpp("10.0.0.0/8"), 1)
-		checkArtNumNodes(t, tbl, 1)
-		checkArtRoutes(t, tbl, []tableTest{
+		checkFatNumNodes(t, tbl, 1)
+		checkFatRoutes(t, tbl, []tableTest{
 			{"10.0.0.1", 1},
 			{"255.255.255.255", -1},
 		})
 		tbl.Delete(mpp("10.0.0.0/8"))
-		checkArtNumNodes(t, tbl, 0)
-		checkArtRoutes(t, tbl, []tableTest{
+		checkFatNumNodes(t, tbl, 0)
+		checkFatRoutes(t, tbl, []tableTest{
 			{"10.0.0.1", -1},
 			{"255.255.255.255", -1},
 		})
@@ -517,19 +517,19 @@ func TestArtDeleteEdgeCases(t *testing.T) {
 	t.Run("prefix_in_leaf", func(t *testing.T) {
 		t.Parallel()
 		// Create, then delete a single leaf table.
-		tbl := new(ArtTable[int])
-		checkArtNumNodes(t, tbl, 0)
+		tbl := new(Fat[int])
+		checkFatNumNodes(t, tbl, 0)
 
 		tbl.Insert(mpp("192.168.0.1/32"), 1)
-		checkArtNumNodes(t, tbl, 1)
-		checkArtRoutes(t, tbl, []tableTest{
+		checkFatNumNodes(t, tbl, 1)
+		checkFatRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"255.255.255.255", -1},
 		})
 
 		tbl.Delete(mpp("192.168.0.1/32"))
-		checkArtNumNodes(t, tbl, 0)
-		checkArtRoutes(t, tbl, []tableTest{
+		checkFatNumNodes(t, tbl, 0)
+		checkFatRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", -1},
 			{"255.255.255.255", -1},
 		})
@@ -538,21 +538,21 @@ func TestArtDeleteEdgeCases(t *testing.T) {
 	t.Run("intermediate_no_routes", func(t *testing.T) {
 		t.Parallel()
 		// Create an intermediate with 2 leaves, then delete one leaf.
-		tbl := new(ArtTable[int])
-		checkArtNumNodes(t, tbl, 0)
+		tbl := new(Fat[int])
+		checkFatNumNodes(t, tbl, 0)
 
 		tbl.Insert(mpp("192.168.0.1/32"), 1)
 		tbl.Insert(mpp("192.180.0.1/32"), 2)
-		checkArtNumNodes(t, tbl, 2)
-		checkArtRoutes(t, tbl, []tableTest{
+		checkFatNumNodes(t, tbl, 2)
+		checkFatRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.180.0.1", 2},
 			{"192.40.0.1", -1},
 		})
 
 		tbl.Delete(mpp("192.180.0.1/32"))
-		checkArtNumNodes(t, tbl, 1)
-		checkArtRoutes(t, tbl, []tableTest{
+		checkFatNumNodes(t, tbl, 1)
+		checkFatRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.180.0.1", -1},
 			{"192.40.0.1", -1},
@@ -562,15 +562,15 @@ func TestArtDeleteEdgeCases(t *testing.T) {
 	t.Run("intermediate_with_route", func(t *testing.T) {
 		t.Parallel()
 		// Same, but the intermediate carries a route as well.
-		tbl := new(ArtTable[int])
-		checkArtNumNodes(t, tbl, 0)
+		tbl := new(Fat[int])
+		checkFatNumNodes(t, tbl, 0)
 
 		tbl.Insert(mpp("192.168.0.1/32"), 1)
 		tbl.Insert(mpp("192.180.0.1/32"), 2)
 		tbl.Insert(mpp("192.0.0.0/10"), 3)
 
-		checkArtNumNodes(t, tbl, 2)
-		checkArtRoutes(t, tbl, []tableTest{
+		checkFatNumNodes(t, tbl, 2)
+		checkFatRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.180.0.1", 2},
 			{"192.40.0.1", 3},
@@ -578,8 +578,8 @@ func TestArtDeleteEdgeCases(t *testing.T) {
 		})
 
 		tbl.Delete(mpp("192.180.0.1/32"))
-		checkArtNumNodes(t, tbl, 2)
-		checkArtRoutes(t, tbl, []tableTest{
+		checkFatNumNodes(t, tbl, 2)
+		checkFatRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.180.0.1", -1},
 			{"192.40.0.1", 3},
@@ -590,15 +590,15 @@ func TestArtDeleteEdgeCases(t *testing.T) {
 	t.Run("intermediate_many_leaves", func(t *testing.T) {
 		t.Parallel()
 		// Intermediate with 3 leaves, then delete one leaf.
-		tbl := new(ArtTable[int])
-		checkArtNumNodes(t, tbl, 0)
+		tbl := new(Fat[int])
+		checkFatNumNodes(t, tbl, 0)
 
 		tbl.Insert(mpp("192.168.0.1/32"), 1)
 		tbl.Insert(mpp("192.180.0.1/32"), 2)
 		tbl.Insert(mpp("192.200.0.1/32"), 3)
 
-		checkArtNumNodes(t, tbl, 2)
-		checkArtRoutes(t, tbl, []tableTest{
+		checkFatNumNodes(t, tbl, 2)
+		checkFatRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.180.0.1", 2},
 			{"192.200.0.1", 3},
@@ -606,8 +606,8 @@ func TestArtDeleteEdgeCases(t *testing.T) {
 		})
 
 		tbl.Delete(mpp("192.180.0.1/32"))
-		checkArtNumNodes(t, tbl, 2)
-		checkArtRoutes(t, tbl, []tableTest{
+		checkFatNumNodes(t, tbl, 2)
+		checkFatRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.180.0.1", -1},
 			{"192.200.0.1", 3},
@@ -618,19 +618,19 @@ func TestArtDeleteEdgeCases(t *testing.T) {
 	t.Run("nosuchprefix_missing_child", func(t *testing.T) {
 		t.Parallel()
 		// Delete non-existent prefix
-		tbl := new(ArtTable[int])
-		checkArtNumNodes(t, tbl, 0)
+		tbl := new(Fat[int])
+		checkFatNumNodes(t, tbl, 0)
 
 		tbl.Insert(mpp("192.168.0.1/32"), 1)
-		checkArtNumNodes(t, tbl, 1)
-		checkArtRoutes(t, tbl, []tableTest{
+		checkFatNumNodes(t, tbl, 1)
+		checkFatRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.255.0.1", -1},
 		})
 
 		tbl.Delete(mpp("200.0.0.0/32"))
-		checkArtNumNodes(t, tbl, 1)
-		checkArtRoutes(t, tbl, []tableTest{
+		checkFatNumNodes(t, tbl, 1)
+		checkFatRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.255.0.1", -1},
 		})
@@ -640,21 +640,21 @@ func TestArtDeleteEdgeCases(t *testing.T) {
 		t.Parallel()
 		// Intermediate node loses its last route and becomes
 		// compactable.
-		tbl := new(ArtTable[int])
-		checkArtNumNodes(t, tbl, 0)
+		tbl := new(Fat[int])
+		checkFatNumNodes(t, tbl, 0)
 
 		tbl.Insert(mpp("192.168.0.1/32"), 1)
 		tbl.Insert(mpp("192.168.0.0/22"), 2)
-		checkArtNumNodes(t, tbl, 3)
-		checkArtRoutes(t, tbl, []tableTest{
+		checkFatNumNodes(t, tbl, 3)
+		checkFatRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.168.0.2", 2},
 			{"192.255.0.1", -1},
 		})
 
 		tbl.Delete(mpp("192.168.0.0/22"))
-		checkArtNumNodes(t, tbl, 1)
-		checkArtRoutes(t, tbl, []tableTest{
+		checkFatNumNodes(t, tbl, 1)
+		checkFatRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.168.0.2", -1},
 			{"192.255.0.1", -1},
@@ -663,15 +663,15 @@ func TestArtDeleteEdgeCases(t *testing.T) {
 
 	t.Run("default_route", func(t *testing.T) {
 		t.Parallel()
-		tbl := new(ArtTable[int])
-		checkArtNumNodes(t, tbl, 0)
+		tbl := new(Fat[int])
+		checkFatNumNodes(t, tbl, 0)
 
 		tbl.Insert(mpp("0.0.0.0/0"), 1)
 		tbl.Insert(mpp("::/0"), 1)
 		tbl.Delete(mpp("0.0.0.0/0"))
 
-		checkArtNumNodes(t, tbl, 1)
-		checkArtRoutes(t, tbl, []tableTest{
+		checkFatNumNodes(t, tbl, 1)
+		checkFatRoutes(t, tbl, []tableTest{
 			{"1.2.3.4", -1},
 			{"::1", 1},
 		})
@@ -679,22 +679,22 @@ func TestArtDeleteEdgeCases(t *testing.T) {
 
 	t.Run("path compressed purge", func(t *testing.T) {
 		t.Parallel()
-		tbl := new(ArtTable[int])
-		checkArtNumNodes(t, tbl, 0)
+		tbl := new(Fat[int])
+		checkFatNumNodes(t, tbl, 0)
 
 		tbl.Insert(mpp("10.10.0.0/17"), 1)
 		tbl.Insert(mpp("10.20.0.0/17"), 2)
-		checkArtNumNodes(t, tbl, 2)
+		checkFatNumNodes(t, tbl, 2)
 
 		tbl.Delete(mpp("10.20.0.0/17"))
-		checkArtNumNodes(t, tbl, 1)
+		checkFatNumNodes(t, tbl, 1)
 
 		tbl.Delete(mpp("10.10.0.0/17"))
-		checkArtNumNodes(t, tbl, 0)
+		checkFatNumNodes(t, tbl, 0)
 	})
 }
 
-// TestArtModifySemantics
+// TestFatModifySemantics
 //
 // Operation | cb-input        | cb-return       | Modify-return
 // ---------------------------------------------------------------
@@ -702,7 +702,7 @@ func TestArtDeleteEdgeCases(t *testing.T) {
 // Insert:   | (zero,   false) | (newVal, false) | (newVal, false)
 // Update:   | (oldVal, true)  | (newVal, false) | (oldVal, false)
 // Delete:   | (oldVal, true)  | (_,      true)  | (oldVal, true)
-func TestArtModifySemantics(t *testing.T) {
+func TestFatModifySemantics(t *testing.T) {
 	t.Parallel()
 
 	type args struct {
@@ -772,7 +772,7 @@ func TestArtModifySemantics(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			rt := new(ArtTable[int])
+			rt := new(Fat[int])
 
 			// Insert initial entries using Modify
 			for pfx, v := range tt.prepare {
@@ -803,12 +803,12 @@ func TestArtModifySemantics(t *testing.T) {
 	}
 }
 
-func TestArtUpdateCompare(t *testing.T) {
+func TestFatUpdateCompare(t *testing.T) {
 	t.Parallel()
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, 10_000)
-	fast := new(ArtTable[int])
+	fast := new(Fat[int])
 	gold := new(goldTable[int]).insertMany(pfxs)
 
 	// Update as insert
@@ -844,7 +844,7 @@ func TestArtUpdateCompare(t *testing.T) {
 	}
 }
 
-func TestArtContainsCompare(t *testing.T) {
+func TestFatContainsCompare(t *testing.T) {
 	// Create large route tables repeatedly, and compare Table's
 	// behavior to a naive and slow but correct implementation.
 	t.Parallel()
@@ -852,7 +852,7 @@ func TestArtContainsCompare(t *testing.T) {
 	pfxs := randomPrefixes(prng, 10_000)
 
 	gold := new(goldTable[int]).insertMany(pfxs)
-	fast := new(ArtTable[int])
+	fast := new(Fat[int])
 
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx, pfx.val)
@@ -870,14 +870,14 @@ func TestArtContainsCompare(t *testing.T) {
 	}
 }
 
-func TestArtLookupCompare(t *testing.T) {
+func TestFatLookupCompare(t *testing.T) {
 	// Create large route tables repeatedly, and compare Table's
 	// behavior to a naive and slow but correct implementation.
 	t.Parallel()
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, 10_000)
 
-	fast := new(ArtTable[int])
+	fast := new(Fat[int])
 	gold := new(goldTable[int]).insertMany(pfxs)
 
 	for _, pfx := range pfxs {
@@ -916,7 +916,7 @@ func TestArtLookupCompare(t *testing.T) {
 	}
 }
 
-func TestArtInsertShuffled(t *testing.T) {
+func TestFatInsertShuffled(t *testing.T) {
 	// The order in which you insert prefixes into a route table
 	// should not matter, as long as you're inserting the same set of
 	// routes.
@@ -934,8 +934,8 @@ func TestArtInsertShuffled(t *testing.T) {
 			addrs = append(addrs, randomAddr(prng))
 		}
 
-		rt1 := new(ArtTable[int])
-		rt2 := new(ArtTable[int])
+		rt1 := new(Fat[int])
+		rt2 := new(Fat[int])
 
 		for _, pfx := range pfxs {
 			rt1.Insert(pfx.pfx, pfx.val)
@@ -955,7 +955,7 @@ func TestArtInsertShuffled(t *testing.T) {
 	}
 }
 
-func TestArtDeleteCompare(t *testing.T) {
+func TestFatDeleteCompare(t *testing.T) {
 	// Create large route tables repeatedly, delete half of their
 	// prefixes, and compare Table's behavior to a naive and slow but
 	// correct implementation.
@@ -979,7 +979,7 @@ func TestArtDeleteCompare(t *testing.T) {
 	toDelete := append([]goldTableItem[int](nil), all4[deleteCut:]...)
 	toDelete = append(toDelete, all6[deleteCut:]...)
 
-	fast := new(ArtTable[int])
+	fast := new(Fat[int])
 	gold := new(goldTable[int]).insertMany(pfxs)
 
 	for _, pfx := range pfxs {
@@ -1024,7 +1024,7 @@ func TestArtDeleteCompare(t *testing.T) {
 	}
 }
 
-func TestArtDeleteShuffled(t *testing.T) {
+func TestFatDeleteShuffled(t *testing.T) {
 	// The order in which you delete prefixes from a route table
 	// should not matter, as long as you're deleting the same set of
 	// routes.
@@ -1048,7 +1048,7 @@ func TestArtDeleteShuffled(t *testing.T) {
 		toDelete := append([]goldTableItem[int](nil), all4[deleteCut:]...)
 		toDelete = append(toDelete, all6[deleteCut:]...)
 
-		rt1 := new(ArtTable[int])
+		rt1 := new(Fat[int])
 
 		// insert
 		for _, pfx := range pfxs {
@@ -1067,7 +1067,7 @@ func TestArtDeleteShuffled(t *testing.T) {
 		toDelete2 := append([]goldTableItem[int](nil), toDelete...)
 		rand.Shuffle(len(toDelete2), func(i, j int) { toDelete2[i], toDelete2[j] = toDelete2[j], toDelete2[i] })
 
-		rt2 := new(ArtTable[int])
+		rt2 := new(Fat[int])
 
 		// insert
 		for _, pfx := range pfxs2 {
@@ -1088,7 +1088,7 @@ func TestArtDeleteShuffled(t *testing.T) {
 	}
 }
 
-func TestArtDeleteIsReverseOfInsert(t *testing.T) {
+func TestFatDeleteIsReverseOfInsert(t *testing.T) {
 	t.Parallel()
 	prng := rand.New(rand.NewPCG(42, 42))
 	// Insert N prefixes, then delete those same prefixes in reverse
@@ -1096,7 +1096,7 @@ func TestArtDeleteIsReverseOfInsert(t *testing.T) {
 	// changes that each insert did.
 	const N = 10_000
 
-	tbl := new(ArtTable[int])
+	tbl := new(Fat[int])
 	want := tbl.dumpString()
 
 	prefixes := randomPrefixes(prng, N)
@@ -1119,7 +1119,7 @@ func TestArtDeleteIsReverseOfInsert(t *testing.T) {
 	}
 }
 
-func TestArtDeleteButOne(t *testing.T) {
+func TestFatDeleteButOne(t *testing.T) {
 	t.Parallel()
 	prng := rand.New(rand.NewPCG(42, 42))
 	// Insert N prefixes, then delete all but one
@@ -1127,7 +1127,7 @@ func TestArtDeleteButOne(t *testing.T) {
 
 	for range 1_000 {
 
-		tbl := new(ArtTable[int])
+		tbl := new(Fat[int])
 		prefixes := randomPrefixes(prng, N)
 
 		for _, p := range prefixes {
@@ -1163,14 +1163,14 @@ func TestArtDeleteButOne(t *testing.T) {
 	}
 }
 
-func TestArtDelete(t *testing.T) {
+func TestFatDelete(t *testing.T) {
 	t.Parallel()
 	prng := rand.New(rand.NewPCG(42, 42))
 	// Insert N prefixes, then delete those same prefixes in shuffled
 	// order.
 	const N = 10_000
 
-	tbl := new(ArtTable[int])
+	tbl := new(Fat[int])
 	prefixes := randomPrefixes(prng, N)
 
 	// insert the prefixes
@@ -1202,14 +1202,14 @@ func TestArtDelete(t *testing.T) {
 	}
 }
 
-func TestArtGet(t *testing.T) {
+func TestFatGet(t *testing.T) {
 	t.Parallel()
 
 	t.Run("empty table", func(t *testing.T) {
 		t.Parallel()
 		prng := rand.New(rand.NewPCG(42, 42))
 
-		rt := new(ArtTable[int])
+		rt := new(Fat[int])
 		pfx := randomPrefix(prng)
 		_, ok := rt.Get(pfx)
 
@@ -1245,7 +1245,7 @@ func TestArtGet(t *testing.T) {
 		},
 	}
 
-	rt := new(ArtTable[int])
+	rt := new(Fat[int])
 	for _, tt := range tests {
 		rt.Insert(tt.pfx, tt.val)
 	}
@@ -1266,12 +1266,12 @@ func TestArtGet(t *testing.T) {
 	}
 }
 
-func TestArtGetCompare(t *testing.T) {
+func TestFatGetCompare(t *testing.T) {
 	t.Parallel()
 	prng := rand.New(rand.NewPCG(42, 42))
 
 	pfxs := randomPrefixes(prng, 10_000)
-	fast := new(ArtTable[int])
+	fast := new(Fat[int])
 	gold := new(goldTable[int]).insertMany(pfxs)
 
 	for _, pfx := range pfxs {
@@ -1288,7 +1288,7 @@ func TestArtGetCompare(t *testing.T) {
 	}
 }
 
-func TestArtCloneEdgeCases(t *testing.T) {
+func TestFatCloneEdgeCases(t *testing.T) {
 	t.Parallel()
 
 	tbl := new(Table[int])
@@ -1316,14 +1316,14 @@ func TestArtCloneEdgeCases(t *testing.T) {
 	}
 }
 
-func TestArtClone(t *testing.T) {
+func TestFatClone(t *testing.T) {
 	t.Parallel()
 	prng := rand.New(rand.NewPCG(42, 42))
 
 	pfxs := randomPrefixes(prng, 2)
 
-	golden := new(ArtTable[int])
-	tbl := new(ArtTable[int])
+	golden := new(Fat[int])
+	tbl := new(Fat[int])
 
 	for _, pfx := range pfxs {
 		golden.Insert(pfx.pfx, pfx.val)
@@ -1340,10 +1340,10 @@ func TestArtClone(t *testing.T) {
 	}
 }
 
-func TestArtCloneShallow(t *testing.T) {
+func TestFatCloneShallow(t *testing.T) {
 	t.Parallel()
 
-	tbl := new(ArtTable[*int])
+	tbl := new(Fat[*int])
 	clone := tbl.Clone()
 	if tbl.dumpString() != clone.dumpString() {
 		t.Errorf("empty Clone: got:\n%swant:\n%s", clone.dumpString(), tbl.dumpString())
@@ -1371,10 +1371,10 @@ func TestArtCloneShallow(t *testing.T) {
 	}
 }
 
-func TestArtCloneDeep(t *testing.T) {
+func TestFatCloneDeep(t *testing.T) {
 	t.Parallel()
 
-	tbl := new(ArtTable[*MyInt])
+	tbl := new(Fat[*MyInt])
 	clone := tbl.Clone()
 	if tbl.dumpString() != clone.dumpString() {
 		t.Errorf("empty Clone: got:\n%swant:\n%s", clone.dumpString(), tbl.dumpString())
@@ -1404,11 +1404,11 @@ func TestArtCloneDeep(t *testing.T) {
 
 // ############ benchmarks ################################
 
-func BenchmarkArtTableDelete(b *testing.B) {
+func BenchmarkFatTableDelete(b *testing.B) {
 	prng := rand.New(rand.NewPCG(42, 42))
 
 	for _, n := range benchRouteCount {
-		rt := new(ArtTable[*MyInt])
+		rt := new(Fat[*MyInt])
 
 		for i, route := range randomPrefixes(prng, n) {
 			myInt := MyInt(i)
@@ -1425,7 +1425,7 @@ func BenchmarkArtTableDelete(b *testing.B) {
 	}
 }
 
-func BenchmarkArtTableGet(b *testing.B) {
+func BenchmarkFatTableGet(b *testing.B) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, fam := range []string{"ipv4", "ipv6"} {
 		rng := randomPrefixes4
@@ -1434,7 +1434,7 @@ func BenchmarkArtTableGet(b *testing.B) {
 		}
 
 		for _, nroutes := range benchRouteCount {
-			rt := new(ArtTable[int])
+			rt := new(Fat[int])
 			for _, route := range rng(prng, nroutes) {
 				rt.Insert(route.pfx, route.val)
 			}
@@ -1450,7 +1450,7 @@ func BenchmarkArtTableGet(b *testing.B) {
 	}
 }
 
-func BenchmarkArtTableLPM(b *testing.B) {
+func BenchmarkFatTableLPM(b *testing.B) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, fam := range []string{"ipv4", "ipv6"} {
 		rng := randomPrefixes4
@@ -1459,7 +1459,7 @@ func BenchmarkArtTableLPM(b *testing.B) {
 		}
 
 		for _, nroutes := range benchRouteCount {
-			rt := new(ArtTable[int])
+			rt := new(Fat[int])
 			for _, route := range rng(prng, nroutes) {
 				rt.Insert(route.pfx, route.val)
 			}
@@ -1481,7 +1481,7 @@ func BenchmarkArtTableLPM(b *testing.B) {
 	}
 }
 
-func BenchmarkArtMemIP4(b *testing.B) {
+func BenchmarkFatMemIP4(b *testing.B) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, k := range []int{1_000, 10_000, 100_000, 1_000_000} {
 		var startMem, endMem runtime.MemStats
@@ -1490,9 +1490,9 @@ func BenchmarkArtMemIP4(b *testing.B) {
 		runtime.ReadMemStats(&startMem)
 
 		b.Run(strconv.Itoa(k), func(b *testing.B) {
-			rt := new(ArtTable[any])
+			rt := new(Fat[any])
 			for b.Loop() {
-				rt = new(ArtTable[any])
+				rt = new(Fat[any])
 				for _, pfx := range randomRealWorldPrefixes4(prng, k) {
 					rt.Insert(pfx, nil)
 				}
@@ -1512,7 +1512,7 @@ func BenchmarkArtMemIP4(b *testing.B) {
 	}
 }
 
-func BenchmarkArtMemIP6(b *testing.B) {
+func BenchmarkFatMemIP6(b *testing.B) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, k := range []int{1_000, 10_000, 100_000, 1_000_000} {
 		var startMem, endMem runtime.MemStats
@@ -1521,9 +1521,9 @@ func BenchmarkArtMemIP6(b *testing.B) {
 		runtime.ReadMemStats(&startMem)
 
 		b.Run(strconv.Itoa(k), func(b *testing.B) {
-			rt := new(ArtTable[any])
+			rt := new(Fat[any])
 			for b.Loop() {
-				rt = new(ArtTable[any])
+				rt = new(Fat[any])
 				for _, pfx := range randomRealWorldPrefixes6(prng, k) {
 					rt.Insert(pfx, nil)
 				}
@@ -1543,7 +1543,7 @@ func BenchmarkArtMemIP6(b *testing.B) {
 	}
 }
 
-func BenchmarkArtMem(b *testing.B) {
+func BenchmarkFatMem(b *testing.B) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, k := range []int{1_000, 10_000, 100_000, 1_000_000} {
 		var startMem, endMem runtime.MemStats
@@ -1552,9 +1552,9 @@ func BenchmarkArtMem(b *testing.B) {
 		runtime.ReadMemStats(&startMem)
 
 		b.Run(strconv.Itoa(k), func(b *testing.B) {
-			rt := new(ArtTable[any])
+			rt := new(Fat[any])
 			for b.Loop() {
-				rt = new(ArtTable[any])
+				rt = new(Fat[any])
 				for _, pfx := range randomRealWorldPrefixes(prng, k) {
 					rt.Insert(pfx, nil)
 				}
@@ -1583,12 +1583,12 @@ func BenchmarkArtMem(b *testing.B) {
 	}
 }
 
-func BenchmarkArtFullTableMemory4(b *testing.B) {
+func BenchmarkFatFullTableMemory4(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 	nRoutes := len(routes4)
 
 	b.Run(fmt.Sprintf("Table[]: %d", nRoutes), func(b *testing.B) {
-		rt := new(ArtTable[any])
+		rt := new(Fat[any])
 		runtime.GC()
 		runtime.ReadMemStats(&startMem)
 
@@ -1611,10 +1611,10 @@ func BenchmarkArtFullTableMemory4(b *testing.B) {
 	})
 }
 
-func BenchmarkArtFullTableMemory6(b *testing.B) {
+func BenchmarkFatFullTableMemory6(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 
-	rt := new(ArtTable[any])
+	rt := new(Fat[any])
 	runtime.GC()
 	runtime.ReadMemStats(&startMem)
 
@@ -1640,10 +1640,10 @@ func BenchmarkArtFullTableMemory6(b *testing.B) {
 	})
 }
 
-func BenchmarkArtFullTableMemory(b *testing.B) {
+func BenchmarkFatFullTableMemory(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 
-	rt := new(ArtTable[any])
+	rt := new(Fat[any])
 	runtime.GC()
 	runtime.ReadMemStats(&startMem)
 
@@ -1678,8 +1678,8 @@ func BenchmarkArtFullTableMemory(b *testing.B) {
 	})
 }
 
-func BenchmarkArtFullMatch4(b *testing.B) {
-	rt := new(ArtTable[any])
+func BenchmarkFatFullMatch4(b *testing.B) {
+	rt := new(Fat[any])
 
 	for _, route := range routes {
 		rt.Insert(route.CIDR, nil)
@@ -1698,8 +1698,8 @@ func BenchmarkArtFullMatch4(b *testing.B) {
 	})
 }
 
-func BenchmarkArtFullMatch6(b *testing.B) {
-	rt := new(ArtTable[any])
+func BenchmarkFatFullMatch6(b *testing.B) {
+	rt := new(Fat[any])
 
 	for _, route := range routes {
 		rt.Insert(route.CIDR, nil)
@@ -1718,8 +1718,8 @@ func BenchmarkArtFullMatch6(b *testing.B) {
 	})
 }
 
-func BenchmarkArtFullMiss4(b *testing.B) {
-	rt := new(ArtTable[any])
+func BenchmarkFatFullMiss4(b *testing.B) {
+	rt := new(Fat[any])
 
 	for _, route := range routes {
 		rt.Insert(route.CIDR, nil)
@@ -1738,8 +1738,8 @@ func BenchmarkArtFullMiss4(b *testing.B) {
 	})
 }
 
-func BenchmarkArtFullMiss6(b *testing.B) {
-	rt := new(ArtTable[any])
+func BenchmarkFatFullMiss6(b *testing.B) {
+	rt := new(Fat[any])
 
 	for _, route := range routes {
 		rt.Insert(route.CIDR, nil)
@@ -1758,7 +1758,7 @@ func BenchmarkArtFullMiss6(b *testing.B) {
 	})
 }
 
-func checkArtNumNodes(t *testing.T, tbl *ArtTable[int], want int) {
+func checkFatNumNodes(t *testing.T, tbl *Fat[int], want int) {
 	t.Helper()
 
 	s4 := tbl.root4.nodeStatsRec()
@@ -1771,7 +1771,7 @@ func checkArtNumNodes(t *testing.T, tbl *ArtTable[int], want int) {
 	}
 }
 
-func checkArtRoutes(t *testing.T, tbl *ArtTable[int], tt []tableTest) {
+func checkFatRoutes(t *testing.T, tbl *Fat[int], tt []tableTest) {
 	t.Helper()
 	for _, tc := range tt {
 		v, ok := tbl.Lookup(mpa(tc.addr))
