@@ -26,8 +26,8 @@ func cloneFnFactory[V any]() cloneFunc[V] {
 // cloneVal invokes the Clone method to deeply copy val.
 // Assumes that val implements Cloner[V].
 func cloneVal[V any](val V) V {
-	if val == nil {
-		return nil
+	if any(val) == nil {
+		return val
 	}
 
 	// you can't assert directly on a type parameter
@@ -145,14 +145,20 @@ func (n *node[V]) cloneRec(cloneFn cloneFunc[V]) *node[V] {
 	return c
 }
 
-// cloneFlat TODO
+// cloneFlat returns a shallow copy of the current fatNode[V],
+// optionally performing deep copies of values.
+//
+// If cloneFn is nil, the stored values in prefixes are copied directly without modification.
+// Otherwise, cloneFn is applied to each stored value for deep cloning.
+// Child nodes are cloned shallowly: leafNode and fringeNode children are cloned via their clone methods,
+// but child nodes of type *fatNode[V] are assigned as-is without recursive cloning.
 func (n *fatNode[V]) cloneFlat(cloneFn cloneFunc[V]) *fatNode[V] {
 	if n == nil {
 		return nil
 	}
 
 	c := new(fatNode[V])
-	if n.prefixCount() == 0 && n.childCount() == 0 {
+	if n.isEmpty() {
 		return c
 	}
 

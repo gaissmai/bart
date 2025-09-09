@@ -122,7 +122,7 @@ func TestFatInvalid(t *testing.T) {
 		t.Parallel()
 		defer func(testname string) {
 			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid prefix input", testname)
+				t.Fatalf("%s should not panic on invalid prefix input", testname)
 			}
 		}(testname)
 
@@ -134,7 +134,7 @@ func TestFatInvalid(t *testing.T) {
 		t.Parallel()
 		defer func(testname string) {
 			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid prefix input", testname)
+				t.Fatalf("%s should not panic on invalid prefix input", testname)
 			}
 		}(testname)
 
@@ -146,7 +146,7 @@ func TestFatInvalid(t *testing.T) {
 		t.Parallel()
 		defer func(testname string) {
 			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid prefix input", testname)
+				t.Fatalf("%s should not panic on invalid prefix input", testname)
 			}
 		}(testname)
 
@@ -158,7 +158,7 @@ func TestFatInvalid(t *testing.T) {
 		t.Parallel()
 		defer func(testname string) {
 			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid IP input", testname)
+				t.Fatalf("%s should not panic on invalid IP input", testname)
 			}
 		}(testname)
 
@@ -172,7 +172,7 @@ func TestFatInvalid(t *testing.T) {
 		t.Parallel()
 		defer func(testname string) {
 			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid IP input", testname)
+				t.Fatalf("%s should not panic on invalid IP input", testname)
 			}
 		}(testname)
 
@@ -1291,7 +1291,7 @@ func TestFatGetCompare(t *testing.T) {
 func TestFatCloneEdgeCases(t *testing.T) {
 	t.Parallel()
 
-	tbl := new(Table[int])
+	tbl := new(Fat[int])
 	clone := tbl.Clone()
 	if tbl.dumpString() != clone.dumpString() {
 		t.Errorf("empty Clone: got:\n%swant:\n%s", clone.dumpString(), tbl.dumpString())
