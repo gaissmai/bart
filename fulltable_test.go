@@ -49,12 +49,8 @@ func init() {
 
 	randRoute4 = routes4[prng.IntN(len(routes4))]
 	randRoute6 = routes6[prng.IntN(len(routes6))]
-}
 
-func init() {
-	prng := rand.New(rand.NewPCG(42, 42))
 	lt := new(Lite)
-
 	for _, route := range routes {
 		lt.Insert(route.CIDR)
 	}
@@ -369,7 +365,11 @@ func BenchmarkFullTableMemory4(b *testing.B) {
 		runtime.ReadMemStats(&endMem)
 
 		stats := rt.root4.nodeStatsRec()
-		b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/stats.pfxs), "bytes/pfx")
+		if stats.pfxs == 0 {
+			b.Skip("No prefixes inserted")
+		}
+
+		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc)/float64(stats.pfxs), "bytes/pfx")
 		b.ReportMetric(float64(stats.pfxs), "pfxs")
 		b.ReportMetric(float64(stats.nodes), "nodes")
 		b.ReportMetric(float64(stats.leaves), "leaves")
@@ -396,7 +396,10 @@ func BenchmarkFullTableMemory6(b *testing.B) {
 		runtime.ReadMemStats(&endMem)
 
 		stats := rt.root6.nodeStatsRec()
-		b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/stats.pfxs), "bytes/pfx")
+		if stats.pfxs == 0 {
+			b.Skip("No prefixes inserted")
+		}
+		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc)/float64(stats.pfxs), "bytes/pfx")
 		b.ReportMetric(float64(stats.pfxs), "pfxs")
 		b.ReportMetric(float64(stats.nodes), "nodes")
 		b.ReportMetric(float64(stats.leaves), "leaves")
@@ -432,7 +435,10 @@ func BenchmarkFullTableMemory(b *testing.B) {
 			fringes: s4.fringes + s6.fringes,
 		}
 
-		b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/stats.pfxs), "bytes/pfx")
+		if stats.pfxs == 0 {
+			b.Skip("No prefixes inserted")
+		}
+		b.ReportMetric(float64(endMem.HeapAlloc-startMem.HeapAlloc)/float64(stats.pfxs), "bytes/pfx")
 		b.ReportMetric(float64(stats.pfxs), "pfxs")
 		b.ReportMetric(float64(stats.nodes), "nodes")
 		b.ReportMetric(float64(stats.leaves), "leaves")
@@ -446,11 +452,13 @@ func fillRouteTables() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer file.Close()
 
 	rgz, err := gzip.NewReader(file)
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer rgz.Close()
 
 	scanner := bufio.NewScanner(rgz)
 	for scanner.Scan() {

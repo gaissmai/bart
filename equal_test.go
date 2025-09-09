@@ -68,6 +68,22 @@ func TestTableEqual(t *testing.T) {
 			},
 			wantEqual: false,
 		},
+		{
+			name: "same entries, different insert order",
+			buildA: func() *Table[stringVal] {
+				tbl := new(Table[stringVal])
+				tbl.Insert(mpp("192.0.2.0/24"), "foo")
+				tbl.Insert(mpp("198.51.100.0/24"), "bar")
+				return tbl
+			},
+			buildB: func() *Table[stringVal] {
+				tbl := new(Table[stringVal])
+				tbl.Insert(mpp("198.51.100.0/24"), "bar")
+				tbl.Insert(mpp("192.0.2.0/24"), "foo")
+				return tbl
+			},
+			wantEqual: true,
+		},
 	}
 
 	for _, tc := range tests {
@@ -92,24 +108,24 @@ func TestFullTableEqual(t *testing.T) {
 		at.Insert(r.CIDR, i)
 	}
 
-	ct := at.Clone()
 	t.Run("clone", func(t *testing.T) {
 		t.Parallel()
-
-		if at.Equal(ct) {
-			t.Error("expected false, got true")
+		bt := at.Clone()
+		if !at.Equal(bt) {
+			t.Error("expected true, got false")
 		}
 	})
 
-	for i, r := range routes {
-		// update value
-		if i%42 == 0 {
-			ct.Update(r.CIDR, func(oldVal int, _ bool) int { return oldVal + 1 })
-		}
-	}
-
 	t.Run("update", func(t *testing.T) {
 		t.Parallel()
+		ct := at.Clone()
+
+		for i, r := range routes {
+			// update value
+			if i%42 == 0 {
+				ct.Modify(r.CIDR, func(oldVal int, _ bool) (int, bool) { return oldVal + 1, false })
+			}
+		}
 
 		if at.Equal(ct) {
 			t.Error("expected false, got true")
