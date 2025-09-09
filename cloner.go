@@ -66,12 +66,12 @@ func (l *fringeNode[V]) cloneFringe(cloneFn cloneFunc[V]) *fringeNode[V] {
 //
 // Note: The returned node is a new instance with copied slices but only shallow copies of nested nodes,
 // except for leafNode and fringeNode children which are cloned according to cloneFn.
-func (n *bartNode[V]) cloneFlat(cloneFn cloneFunc[V]) *bartNode[V] {
+func (n *node[V]) cloneFlat(cloneFn cloneFunc[V]) *node[V] {
 	if n == nil {
 		return nil
 	}
 
-	c := new(bartNode[V])
+	c := new(node[V])
 	if n.isEmpty() {
 		return c
 	}
@@ -93,7 +93,7 @@ func (n *bartNode[V]) cloneFlat(cloneFn cloneFunc[V]) *bartNode[V] {
 	// for *node[V] children, keep shallow references (no recursive clone)
 	for i, anyKid := range c.children.Items {
 		switch kid := anyKid.(type) {
-		case *bartNode[V]:
+		case *node[V]:
 			// Shallow copy
 		case *leafNode[V]:
 			// Clone leaf nodes, applying cloneFn as needed
@@ -123,7 +123,7 @@ func (n *bartNode[V]) cloneFlat(cloneFn cloneFunc[V]) *bartNode[V] {
 //
 // Returns a new instance of node[V] which is a complete deep clone of the
 // receiver node with all descendants.
-func (n *bartNode[V]) cloneRec(cloneFn cloneFunc[V]) *bartNode[V] {
+func (n *node[V]) cloneRec(cloneFn cloneFunc[V]) *node[V] {
 	if n == nil {
 		return nil
 	}
@@ -133,7 +133,7 @@ func (n *bartNode[V]) cloneRec(cloneFn cloneFunc[V]) *bartNode[V] {
 
 	// Recursively clone all child nodes of type *node[V]
 	for i, kidAny := range c.children.Items {
-		if kid, ok := kidAny.(*bartNode[V]); ok {
+		if kid, ok := kidAny.(*node[V]); ok {
 			c.children.Items[i] = kid.cloneRec(cloneFn)
 		}
 	}
@@ -142,12 +142,12 @@ func (n *bartNode[V]) cloneRec(cloneFn cloneFunc[V]) *bartNode[V] {
 }
 
 // cloneFlat TODO
-func (n *artNode[V]) cloneFlat(cloneFn cloneFunc[V]) *artNode[V] {
+func (n *fatNode[V]) cloneFlat(cloneFn cloneFunc[V]) *fatNode[V] {
 	if n == nil {
 		return nil
 	}
 
-	c := new(artNode[V])
+	c := new(fatNode[V])
 	if n.prefixCount() == 0 && n.childCount() == 0 {
 		return c
 	}
@@ -178,7 +178,7 @@ func (n *artNode[V]) cloneFlat(cloneFn cloneFunc[V]) *artNode[V] {
 		kidAny := *n.children[octet]
 
 		switch kid := kidAny.(type) {
-		case *artNode[V]:
+		case *fatNode[V]:
 			// just copy the pointer
 			c.children[octet] = n.children[octet]
 
@@ -200,7 +200,7 @@ func (n *artNode[V]) cloneFlat(cloneFn cloneFunc[V]) *artNode[V] {
 }
 
 // cloneRec TODO
-func (n *artNode[V]) cloneRec(cloneFn cloneFunc[V]) *artNode[V] {
+func (n *fatNode[V]) cloneRec(cloneFn cloneFunc[V]) *fatNode[V] {
 	if n == nil {
 		return nil
 	}
@@ -213,7 +213,7 @@ func (n *artNode[V]) cloneRec(cloneFn cloneFunc[V]) *artNode[V] {
 		kidAny := *n.children[octet]
 
 		switch kid := kidAny.(type) {
-		case *artNode[V]:
+		case *fatNode[V]:
 			nodeAny := any(kid.cloneRec(cloneFn))
 			c.children[octet] = &nodeAny
 		}

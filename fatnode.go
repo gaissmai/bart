@@ -7,15 +7,15 @@ import (
 	"github.com/gaissmai/bart/internal/bitset"
 )
 
-// artNode is a trie level node in the multibit routing table.
+// fatNode is a trie level node in the multibit routing table.
 //
-// Each artNode contains two conceptually different fixed sized arrays:
+// Each fatNode contains two conceptually different fixed sized arrays:
 //   - prefixes: representing routes, using a complete binary tree layout
 //     driven by the baseIndex() function from the ART algorithm.
 //   - children: holding subtries or path-compressed leaves or fringes.
 //
 // See doc/artlookup.pdf for the mapping mechanics and prefix tree details.
-type artNode[V any] struct {
+type fatNode[V any] struct {
 	prefixes [256]*V
 	children [256]*any // **artNode or path-compreassed **leaf- or **fringeNode
 	// an array of "pointers to" the empty interface,
@@ -33,22 +33,22 @@ type artNode[V any] struct {
 }
 
 // TODO
-func (n *artNode[V]) prefixCount() int {
+func (n *fatNode[V]) prefixCount() int {
 	return n.prefixesBitSet.Size()
 }
 
 // TODO
-func (n *artNode[V]) childCount() int {
+func (n *fatNode[V]) childCount() int {
 	return n.childrenBitSet.Size()
 }
 
 // isEmpty returns true if node has neither prefixes nor children
-func (n *artNode[V]) isEmpty() bool {
+func (n *fatNode[V]) isEmpty() bool {
 	return (n.prefixesBitSet.Size() + n.childrenBitSet.Size()) == 0
 }
 
 // getChild TODO
-func (n *artNode[V]) getChild(addr uint8) (any, bool) {
+func (n *fatNode[V]) getChild(addr uint8) (any, bool) {
 	if anyPtr := n.children[addr]; anyPtr != nil {
 		return *anyPtr, true
 	}
@@ -56,7 +56,7 @@ func (n *artNode[V]) getChild(addr uint8) (any, bool) {
 }
 
 // insertChild TODO
-func (n *artNode[V]) insertChild(addr uint8, child any) (exists bool) {
+func (n *fatNode[V]) insertChild(addr uint8, child any) (exists bool) {
 	if n.children[addr] == nil {
 		exists = false
 		n.childrenBitSet.Set(addr)
@@ -69,7 +69,7 @@ func (n *artNode[V]) insertChild(addr uint8, child any) (exists bool) {
 }
 
 // deleteChild TODO
-func (n *artNode[V]) deleteChild(addr uint8) {
+func (n *fatNode[V]) deleteChild(addr uint8) {
 	if n.children[addr] != nil {
 		n.childrenBitSet.Clear(addr)
 	}
@@ -77,7 +77,7 @@ func (n *artNode[V]) deleteChild(addr uint8) {
 }
 
 // insertPrefix adds the route addr/prefixLen to n, with value val.
-func (n *artNode[V]) insertPrefix(idx uint8, val V) (exists bool) {
+func (n *fatNode[V]) insertPrefix(idx uint8, val V) (exists bool) {
 	if exists = n.prefixesBitSet.Test(idx); !exists {
 		n.prefixesBitSet.Set(idx)
 	}
@@ -99,7 +99,7 @@ func (n *artNode[V]) insertPrefix(idx uint8, val V) (exists bool) {
 }
 
 // getPrefix TODO
-func (n *artNode[V]) getPrefix(idx uint8) (val V, exists bool) {
+func (n *fatNode[V]) getPrefix(idx uint8) (val V, exists bool) {
 	if exists = n.prefixesBitSet.Test(idx); exists {
 		val = *n.prefixes[idx]
 	}
@@ -108,7 +108,7 @@ func (n *artNode[V]) getPrefix(idx uint8) (val V, exists bool) {
 
 // deletePrefix TODO
 // func (n *artNode[V]) deletePrefix(addr uint8, prefixLen uint8) (val V, exists bool) {
-func (n *artNode[V]) deletePrefix(idx uint8) (val V, exists bool) {
+func (n *fatNode[V]) deletePrefix(idx uint8) (val V, exists bool) {
 	if exists = n.prefixesBitSet.Test(idx); !exists {
 		// Route entry doesn't exist
 		return
@@ -126,12 +126,12 @@ func (n *artNode[V]) deletePrefix(idx uint8) (val V, exists bool) {
 }
 
 // contains TODO
-func (n *artNode[V]) contains(idx uint) (ok bool) {
+func (n *fatNode[V]) contains(idx uint) (ok bool) {
 	return n.prefixes[uint8(idx>>1)] != nil
 }
 
 // lookup TODO
-func (n *artNode[V]) lookup(idx uint) (val V, ok bool) {
+func (n *fatNode[V]) lookup(idx uint) (val V, ok bool) {
 	if valPtr := n.prefixes[uint8(idx>>1)]; valPtr != nil {
 		return *valPtr, true
 	}
@@ -155,7 +155,7 @@ func (n *artNode[V]) lookup(idx uint) (val V, ok bool) {
 //	                    ╰─────────╯╰─────────────┴────╯
 //
 // Using an iterative form ensures better inlining opportunities.
-func (n *artNode[V]) allot(idx uint8, oldValPtr, valPtr *V) {
+func (n *fatNode[V]) allot(idx uint8, oldValPtr, valPtr *V) {
 	// iteration with stack instead of recursion
 	stack := make([]uint8, 0, 256)
 
@@ -185,7 +185,7 @@ func (n *artNode[V]) allot(idx uint8, oldValPtr, valPtr *V) {
 	}
 }
 
-func (n *artNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool) {
+func (n *fatNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool) {
 	ip := pfx.Addr() // the pfx must be in canonical form
 	bits := pfx.Bits()
 	octets := ip.AsSlice()
@@ -211,7 +211,7 @@ func (n *artNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists b
 
 		// kid is node or leaf at addr
 		switch kid := kidAny.(type) {
-		case *artNode[V]:
+		case *fatNode[V]:
 			n = kid // descend down to next trie level
 
 		case *leafNode[V]:
@@ -227,7 +227,7 @@ func (n *artNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists b
 			// push the leaf down
 			// insert new child at current leaf position (addr)
 			// descend down, replace n with new child
-			newNode := new(artNode[V])
+			newNode := new(fatNode[V])
 			_ = newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
 			_ = n.insertChild(octet, newNode)
 			n = newNode
@@ -241,11 +241,11 @@ func (n *artNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists b
 				return true
 			}
 
-			// create new node ART node
+			// create new node
 			// push the fringe down, it becomes a default route (idx=1)
 			// insert new child at current leaf position (addr)
 			// descend down, replace n with new child
-			newNode := new(artNode[V])
+			newNode := new(fatNode[V])
 			_ = newNode.insertPrefix(1, kid.value)
 			_ = n.insertChild(octet, newNode)
 			n = newNode
@@ -260,7 +260,7 @@ func (n *artNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists b
 	panic("unreachable")
 }
 
-func (n *artNode[V]) purgeAndCompress(stack []*artNode[V], octets []uint8, is4 bool) {
+func (n *fatNode[V]) purgeAndCompress(stack []*fatNode[V], octets []uint8, is4 bool) {
 	// unwind the stack
 	for depth := len(stack) - 1; depth >= 0; depth-- {
 		parent := stack[depth]
@@ -279,7 +279,7 @@ func (n *artNode[V]) purgeAndCompress(stack []*artNode[V], octets []uint8, is4 b
 			kidAny := *n.children[addr]
 
 			switch kid := kidAny.(type) {
-			case *artNode[V]:
+			case *fatNode[V]:
 				// fast exit, we are at an intermediate path node
 				// no further delete/compress upwards the stack is possible
 				return
