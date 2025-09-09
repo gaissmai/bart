@@ -1491,11 +1491,8 @@ func BenchmarkFatMemIP4(b *testing.B) {
 
 		b.Run(strconv.Itoa(k), func(b *testing.B) {
 			rt := new(Fat[any])
-			for b.Loop() {
-				rt = new(Fat[any])
-				for _, pfx := range randomRealWorldPrefixes4(prng, k) {
-					rt.Insert(pfx, nil)
-				}
+			for _, pfx := range randomRealWorldPrefixes4(prng, k) {
+				rt.Insert(pfx, nil)
 			}
 
 			runtime.GC()
@@ -1522,11 +1519,8 @@ func BenchmarkFatMemIP6(b *testing.B) {
 
 		b.Run(strconv.Itoa(k), func(b *testing.B) {
 			rt := new(Fat[any])
-			for b.Loop() {
-				rt = new(Fat[any])
-				for _, pfx := range randomRealWorldPrefixes6(prng, k) {
-					rt.Insert(pfx, nil)
-				}
+			for _, pfx := range randomRealWorldPrefixes6(prng, k) {
+				rt.Insert(pfx, nil)
 			}
 
 			runtime.GC()
@@ -1553,11 +1547,8 @@ func BenchmarkFatMem(b *testing.B) {
 
 		b.Run(strconv.Itoa(k), func(b *testing.B) {
 			rt := new(Fat[any])
-			for b.Loop() {
-				rt = new(Fat[any])
-				for _, pfx := range randomRealWorldPrefixes(prng, k) {
-					rt.Insert(pfx, nil)
-				}
+			for _, pfx := range randomRealWorldPrefixes(prng, k) {
+				rt.Insert(pfx, nil)
 			}
 
 			runtime.GC()
@@ -1592,10 +1583,8 @@ func BenchmarkFatFullTableMemory4(b *testing.B) {
 		runtime.GC()
 		runtime.ReadMemStats(&startMem)
 
-		for b.Loop() {
-			for _, route := range routes4 {
-				rt.Insert(route.CIDR, nil)
-			}
+		for _, route := range routes4 {
+			rt.Insert(route.CIDR, nil)
 		}
 
 		runtime.GC()
@@ -1621,10 +1610,8 @@ func BenchmarkFatFullTableMemory6(b *testing.B) {
 	nRoutes := len(routes6)
 
 	b.Run(fmt.Sprintf("Table[]: %d", nRoutes), func(b *testing.B) {
-		for b.Loop() {
-			for _, route := range routes6 {
-				rt.Insert(route.CIDR, nil)
-			}
+		for _, route := range routes6 {
+			rt.Insert(route.CIDR, nil)
 		}
 
 		runtime.GC()
@@ -1650,10 +1637,8 @@ func BenchmarkFatFullTableMemory(b *testing.B) {
 	nRoutes := len(routes)
 
 	b.Run(fmt.Sprintf("Table[]: %d", nRoutes), func(b *testing.B) {
-		for b.Loop() {
-			for _, route := range routes {
-				rt.Insert(route.CIDR, nil)
-			}
+		for _, route := range routes {
+			rt.Insert(route.CIDR, nil)
 		}
 
 		runtime.GC()
