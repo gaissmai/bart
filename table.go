@@ -47,8 +47,8 @@ type Table[V any] struct {
 	_ [0]sync.Mutex
 
 	// the root nodes, implemented as popcount compressed multibit tries
-	root4 bartNode[V]
-	root6 bartNode[V]
+	root4 node[V]
+	root6 node[V]
 
 	// the number of prefixes in the routing table
 	size4 int
@@ -56,7 +56,7 @@ type Table[V any] struct {
 }
 
 // rootNodeByVersion, root node getter for ip version.
-func (t *Table[V]) rootNodeByVersion(is4 bool) *bartNode[V] {
+func (t *Table[V]) rootNodeByVersion(is4 bool) *node[V] {
 	if is4 {
 		return &t.root4
 	}
@@ -184,7 +184,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, found bool) V) (newVa
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
-		case *bartNode[V]:
+		case *node[V]:
 			n = kid // descend down to next trie level
 
 		case *leafNode[V]:
@@ -198,7 +198,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, found bool) V) (newVa
 			// push the leaf down
 			// insert new child at current leaf position (octet
 			// descend down, replace n with new child
-			newNode := new(bartNode[V])
+			newNode := new(node[V])
 			newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
 
 			n.children.InsertAt(octet, newNode)
@@ -215,7 +215,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, found bool) V) (newVa
 			// push the fringe down, it becomes a default route (idx=1)
 			// insert new child at current leaf position (octet
 			// descend down, replace n with new child
-			newNode := new(bartNode[V])
+			newNode := new(node[V])
 			newNode.prefixes.InsertAt(1, kid.value)
 
 			n.children.InsertAt(octet, newNode)
@@ -282,7 +282,7 @@ func (t *Table[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del
 
 	// record the nodes on the path to the deleted node, needed to purge
 	// and/or path compress nodes after the deletion of a prefix
-	stack := [maxTreeDepth]*bartNode[V]{}
+	stack := [maxTreeDepth]*node[V]{}
 
 	// find the proper trie node to update prefix
 	for depth, octet := range octets {
@@ -346,7 +346,7 @@ func (t *Table[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
-		case *bartNode[V]:
+		case *node[V]:
 			n = kid // descend down to next trie level
 
 		case *leafNode[V]:
@@ -374,7 +374,7 @@ func (t *Table[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del
 			// push the leaf down
 			// insert new child at current leaf position (octet
 			// descend down, replace n with new child
-			newNode := new(bartNode[V])
+			newNode := new(node[V])
 			newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
 
 			n.children.InsertAt(octet, newNode)
@@ -404,7 +404,7 @@ func (t *Table[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del
 			// push the fringe down, it becomes a default route (idx=1)
 			// insert new child at current leaf position (octet
 			// descend down, replace n with new child
-			newNode := new(bartNode[V])
+			newNode := new(node[V])
 			newNode.prefixes.InsertAt(1, kid.value)
 
 			n.children.InsertAt(octet, newNode)
@@ -444,7 +444,7 @@ func (t *Table[V]) Delete(pfx netip.Prefix) (val V, found bool) {
 
 	// record the nodes on the path to the deleted node, needed to purge
 	// and/or path compress nodes after the deletion of a prefix
-	stack := [maxTreeDepth]*bartNode[V]{}
+	stack := [maxTreeDepth]*node[V]{}
 
 	// find the trie node
 	for depth, octet := range octets {
@@ -472,7 +472,7 @@ func (t *Table[V]) Delete(pfx netip.Prefix) (val V, found bool) {
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
-		case *bartNode[V]:
+		case *node[V]:
 			n = kid // descend down to next trie level
 
 		case *fringeNode[V]:
@@ -545,7 +545,7 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
-		case *bartNode[V]:
+		case *node[V]:
 			n = kid // descend down to next trie level
 
 		case *fringeNode[V]:
@@ -595,7 +595,7 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
-		case *bartNode[V]:
+		case *node[V]:
 			n = kid // descend down to next trie level
 
 		case *fringeNode[V]:
@@ -626,7 +626,7 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	n := t.rootNodeByVersion(is4)
 
 	// stack of the traversed nodes for fast backtracking, if needed
-	stack := [maxTreeDepth]*bartNode[V]{}
+	stack := [maxTreeDepth]*node[V]{}
 
 	// run variable, used after for loop
 	var depth int
@@ -649,7 +649,7 @@ LOOP:
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
-		case *bartNode[V]:
+		case *node[V]:
 			n = kid
 			continue LOOP // descend down to next trie level
 
@@ -726,7 +726,7 @@ func (t *Table[V]) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpmPfx netip
 	n := t.rootNodeByVersion(is4)
 
 	// record path to leaf node
-	stack := [maxTreeDepth]*bartNode[V]{}
+	stack := [maxTreeDepth]*node[V]{}
 
 	var depth int
 	var octet byte
@@ -751,7 +751,7 @@ LOOP:
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
-		case *bartNode[V]:
+		case *node[V]:
 			n = kid
 			continue LOOP // descend down to next trie level
 
@@ -866,7 +866,7 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 		n := t.rootNodeByVersion(is4)
 
 		// stack of the traversed nodes for reverse ordering of supernets
-		stack := [maxTreeDepth]*bartNode[V]{}
+		stack := [maxTreeDepth]*node[V]{}
 
 		// run variable, used after for loop
 		var depth int
@@ -890,7 +890,7 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 
 			// kid is node or leaf or fringe at octet
 			switch kid := kid.(type) {
-			case *bartNode[V]:
+			case *node[V]:
 				n = kid
 				continue LOOP // descend down to next trie level
 
@@ -999,7 +999,7 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 
 			// kid is node or leaf or fringe at octet
 			switch kid := kid.(type) {
-			case *bartNode[V]:
+			case *node[V]:
 				n = kid
 				continue // descend down to next trie level
 
