@@ -11,8 +11,8 @@ import "github.com/gaissmai/bart/internal/bitset"
 //
 // This structure is functionally identical to IdxToPrefixRoutes,
 // but applies only to the fringe part of the trie.
-func IdxToFringeRoutes(idx uint8) *bitset.BitSet256 {
-	return &fringeRoutesLookupTbl[idx]
+func IdxToFringeRoutes(idx uint8) bitset.BitSet256 {
+	return fringeRoutesLookupTbl[idx]
 }
 
 // fringeRoutesLookupTbl, the second 256 Bits, see also the pfxRoutesLookupTbl for the first 256 Bits
