@@ -103,7 +103,7 @@ func (t *Table[V]) rootNodeByVersion(is4 bool) *node[V] {
 func maxDepthAndLastBits(bits int) (maxDepth int, lastBits uint8) {
 	// maxDepth:  range from 0..4 or 0..16 !ATTENTION: not 0..3 or 0..15
 	// lastBits:  range from 0..7
-	//nolint:gosec
+	//nolint:gosec  // G115: integer overflow conversion int -> uint
 	return bits >> 3, uint8(bits & 7)
 }
 

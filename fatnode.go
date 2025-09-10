@@ -127,13 +127,13 @@ func (n *fatNode[V]) deletePrefix(idx uint8) (val V, exists bool) {
 
 // contains TODO
 func (n *fatNode[V]) contains(idx uint) (ok bool) {
-	//nolint:gosec
+	//nolint:gosec  // G115: integer overflow conversion int -> uint
 	return n.prefixes[uint8(idx>>1)] != nil
 }
 
 // lookup TODO
 func (n *fatNode[V]) lookup(idx uint) (val V, ok bool) {
-	//nolint:gosec
+	//nolint:gosec  // G115: integer overflow conversion int -> uint
 	if valPtr := n.prefixes[uint8(idx>>1)]; valPtr != nil {
 		return *valPtr, true
 	}
