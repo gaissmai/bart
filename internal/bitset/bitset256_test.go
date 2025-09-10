@@ -511,7 +511,7 @@ func TestCount2(t *testing.T) {
 		//nolint:gosec
 		sz := uint8(b.Size())
 		if sz != i/3 {
-			t.Errorf("Count reported as %d, but it should be %d", sz, i)
+			t.Errorf("Count reported as %d, but it should be %d", sz, i/3)
 			break
 		}
 		b.Set(i)
