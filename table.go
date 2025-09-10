@@ -130,6 +130,11 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 
 // Deprecated: use [Table.Modify] instead.
 //
+// Migration example:
+//
+//	Old: t.Update(pfx, func(val V, found bool) V { return newVal })
+//	New: t.Modify(pfx, func(val V, found bool) (V, bool) { return newVal, false })
+//
 // Update or set the value at pfx with a callback function.
 // The callback function is called with (value, found) and returns a new value.
 //
