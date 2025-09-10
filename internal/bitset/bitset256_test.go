@@ -77,7 +77,7 @@ func TestString(t *testing.T) {
 	want := "[0 42 255]"
 	got := bs.String()
 	if got != want {
-		t.Errorf("String(), expectet: %s, got: %s", want, got)
+		t.Errorf("String(), expected: %s, got: %s", want, got)
 	}
 }
 
