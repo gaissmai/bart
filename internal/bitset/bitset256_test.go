@@ -508,6 +508,7 @@ func TestCount2(t *testing.T) {
 	var b BitSet256
 	tot := uint8(64*3 + 11)
 	for i := uint8(0); i < tot; i += 3 {
+		//nolint:gosec
 		sz := uint8(b.Size())
 		if sz != i/3 {
 			t.Errorf("Count reported as %d, but it should be %d", sz, i)

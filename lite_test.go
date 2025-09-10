@@ -142,6 +142,7 @@ func TestLiteInvalid(t *testing.T) {
 func TestLiteDeletePersist(t *testing.T) {
 	t.Parallel()
 
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	t.Run("table_is_empty", func(t *testing.T) {
 		t.Parallel()
@@ -284,6 +285,7 @@ func TestLiteContainsCompare(t *testing.T) {
 	// Create large route tables repeatedly, and compare Table's
 	// behavior to a naive and slow but correct implementation.
 	t.Parallel()
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, 10_000)
 
@@ -308,6 +310,7 @@ func TestLiteContainsCompare(t *testing.T) {
 
 func TestLiteEqual(t *testing.T) {
 	t.Parallel()
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 
 	rt := new(Lite)
@@ -381,6 +384,7 @@ func TestLiteLookupPrefixCompare(t *testing.T) {
 	// Create large route tables repeatedly, and compare Table's
 	// behavior to a naive and slow but correct implementation.
 	t.Parallel()
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, 10_000)
 
@@ -408,6 +412,7 @@ func TestLiteLookupPrefixLPMCompare(t *testing.T) {
 	// Create large route tables repeatedly, and compare Table's
 	// behavior to a naive and slow but correct implementation.
 	t.Parallel()
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, 10_000)
 
@@ -436,6 +441,7 @@ func TestLiteInsertPersistShuffled(t *testing.T) {
 	// should not matter, as long as you're inserting the same set of
 	// routes.
 	t.Parallel()
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 
 	pfxs := randomPrefixes(prng, 1000)
@@ -486,6 +492,7 @@ func TestLiteDeleteCompare(t *testing.T) {
 	// prefixes, and compare Table's behavior to a naive and slow but
 	// correct implementation.
 	t.Parallel()
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 
 	const (
@@ -536,6 +543,7 @@ func TestLiteDeleteShuffled(t *testing.T) {
 	// should not matter, as long as you're deleting the same set of
 	// routes.
 	t.Parallel()
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 
 	const (
@@ -593,6 +601,7 @@ func TestLiteDeleteShuffled(t *testing.T) {
 
 func TestLiteDeleteIsReverseOfInsert(t *testing.T) {
 	t.Parallel()
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	// Insert N prefixes, then delete those same prefixes in reverse
 	// order. Each deletion should exactly undo the internal structure
@@ -624,6 +633,7 @@ func TestLiteDeleteIsReverseOfInsert(t *testing.T) {
 
 func TestLiteClone(t *testing.T) {
 	t.Parallel()
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 
 	pfxs := randomPrefixes(prng, 100_000)
@@ -651,6 +661,7 @@ func TestLiteUnion(t *testing.T) {
 	for range 10 {
 		t.Run("Union", func(t *testing.T) {
 			t.Parallel()
+			//nolint:gosec
 			prng := rand.New(rand.NewPCG(42, 42))
 			pfx1 := randomRealWorldPrefixes(prng, 1_000)
 			pfx2 := randomRealWorldPrefixes(prng, 2_000)
@@ -685,6 +696,7 @@ func TestLiteUnionPersist(t *testing.T) {
 	for range 10 {
 		t.Run("Union", func(t *testing.T) {
 			t.Parallel()
+			//nolint:gosec
 			prng := rand.New(rand.NewPCG(42, 42))
 			pfx1 := randomRealWorldPrefixes(prng, 1_000)
 			pfx2 := randomRealWorldPrefixes(prng, 2_000)

@@ -1,9 +1,13 @@
-version: "2"
+version: 2
 linters:
+  run:
+    timeout: 5m
   enable:
     - decorder
     - errorlint
     - gocyclo
+    - govet
+    - gosec
     - gosmopolitan
     - intrange
     - misspell
