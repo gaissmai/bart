@@ -14,11 +14,11 @@ func TestNewArray(t *testing.T) {
 	a := new(Array256[int])
 
 	if c := a.Len(); c != 0 {
-		t.Errorf("Count, expected 0, got %d", c)
+		t.Errorf("Len, expected 0, got %d", c)
 	}
 }
 
-func TestSparseArrayCount(t *testing.T) {
+func TestSparseArrayLen(t *testing.T) {
 	t.Parallel()
 	a := new(Array256[uint8])
 
@@ -28,7 +28,7 @@ func TestSparseArrayCount(t *testing.T) {
 		a.InsertAt(i, i)
 	}
 	if c := a.Len(); c != 255 {
-		t.Errorf("Count, expected 255, got %d", c)
+		t.Errorf("Len, expected 255, got %d", c)
 	}
 
 	for i = range 128 {
@@ -36,7 +36,7 @@ func TestSparseArrayCount(t *testing.T) {
 		a.DeleteAt(i)
 	}
 	if c := a.Len(); c != 127 {
-		t.Errorf("Count, expected 127, got %d", c)
+		t.Errorf("Len, expected 127, got %d", c)
 	}
 }
 
