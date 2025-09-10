@@ -747,7 +747,7 @@ func BenchmarkIntersection(b *testing.B) {
 	}
 }
 
-func BenchmarkPopcount(b *testing.B) {
+func BenchmarkSize(b *testing.B) {
 	aa := BitSet256{0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010}
 
 	for b.Loop() {
