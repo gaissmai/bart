@@ -7,11 +7,6 @@ import (
 	"github.com/gaissmai/bart"
 )
 
-var (
-	liteAtomicPtr atomic.Pointer[bart.Lite]
-	liteMutex     sync.Mutex
-)
-
 // ExampleLite_concurrent demonstrates safe concurrent usage of bart.
 //
 // This example is intended to be run with the Go race detector enabled
@@ -24,6 +19,9 @@ var (
 // or take a long time in comparison to reads,
 // providing high performance for concurrent workloads.
 func ExampleLite_concurrent() {
+	var liteAtomicPtr atomic.Pointer[bart.Lite]
+	var liteMutex sync.Mutex
+
 	baseTbl := new(bart.Lite)
 	liteAtomicPtr.Store(baseTbl)
 
@@ -32,8 +30,9 @@ func ExampleLite_concurrent() {
 	go func() {
 		defer wg.Done()
 		for range 10_000 {
+			tbl := liteAtomicPtr.Load()
 			for _, ip := range exampleIPs {
-				_ = liteAtomicPtr.Load().Contains(ip)
+				_ = tbl.Contains(ip)
 			}
 		}
 	}()
