@@ -92,11 +92,11 @@ ensuring predictable memory access and efficient use of CPU pipelines.
 
 ```go
 func (b *BitSet256) popcnt() (cnt int) {
-	cnt += bits.OnesCount64(b[0])
-	cnt += bits.OnesCount64(b[1])
-	cnt += bits.OnesCount64(b[2])
-	cnt += bits.OnesCount64(b[3])
-	return
+  cnt += bits.OnesCount64(b[0])
+  cnt += bits.OnesCount64(b[1])
+  cnt += bits.OnesCount64(b[2])
+  cnt += bits.OnesCount64(b[3])
+  return
 }
 ```
 
