@@ -35,7 +35,7 @@ func TestSparseArrayLen(t *testing.T) {
 		a.DeleteAt(i)
 	}
 	if c := a.Len(); c != 128 {
-		t.Errorf("Len, expected 127, got %d", c)
+		t.Errorf("Len, expected 128, got %d", c)
 	}
 }
 
