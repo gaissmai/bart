@@ -7,7 +7,7 @@ on:
       - '**.yml'
       - '**.yaml'
   pull_request:
-    branches: ["main"]
+    branches: ["main", "devel"]
 
 permissions:
   contents: read
