@@ -4,6 +4,7 @@
 package bart
 
 import (
+	"fmt"
 	"math/rand/v2"
 	"net/netip"
 	"testing"
@@ -607,8 +608,8 @@ func TestLiteClone(t *testing.T) {
 func TestLiteUnion(t *testing.T) {
 	t.Parallel()
 
-	for range 10 {
-		t.Run("Union", func(t *testing.T) {
+	for i := range 10 {
+		t.Run(fmt.Sprintf("Union-%d", i), func(t *testing.T) {
 			t.Parallel()
 			//nolint:gosec
 			prng := rand.New(rand.NewPCG(42, 42))
@@ -633,7 +634,7 @@ func TestLiteUnion(t *testing.T) {
 			tbl1.Union(tbl2)
 
 			if tbl1.dumpString() != golden.dumpString() {
-				t.Errorf("Union: got:\n%swant:\n%s", tbl1.dumpString(), golden.dumpString())
+				t.Errorf("got:\n%swant:\n%s", tbl1.dumpString(), golden.dumpString())
 			}
 		})
 	}
@@ -642,8 +643,8 @@ func TestLiteUnion(t *testing.T) {
 func TestLiteUnionPersist(t *testing.T) {
 	t.Parallel()
 
-	for range 10 {
-		t.Run("Union", func(t *testing.T) {
+	for i := range 10 {
+		t.Run(fmt.Sprintf("UnionPersist-%d", i), func(t *testing.T) {
 			t.Parallel()
 			//nolint:gosec
 			prng := rand.New(rand.NewPCG(42, 42))
@@ -668,7 +669,7 @@ func TestLiteUnionPersist(t *testing.T) {
 			pTbl := tbl1.UnionPersist(tbl2)
 
 			if pTbl.dumpString() != golden.dumpString() {
-				t.Errorf("UnionPersist: got:\n%swant:\n%s", pTbl.dumpString(), golden.dumpString())
+				t.Errorf("got:\n%swant:\n%s", pTbl.dumpString(), golden.dumpString())
 			}
 		})
 	}
