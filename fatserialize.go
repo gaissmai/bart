@@ -122,24 +122,24 @@ func (n *fatNode[V]) fprintRec(w io.Writer, parent fatTrieItem[V], pad string) e
 	})
 
 	// symbols used in tree
-	glyphe := "├─ "
-	spacer := "│  "
+	glyph := "├─ "
+	space := "│  "
 
 	// for all direct item under this node ...
 	for i, item := range directItems {
 		// ... treat last kid special
 		if i == len(directItems)-1 {
-			glyphe = "└─ "
-			spacer = "   "
+			glyph = "└─ "
+			space = "   "
 		}
 
 		var err error
 		// val is the empty struct, don't print it
 		switch {
 		case !shouldPrintValues[V]():
-			_, err = fmt.Fprintf(w, "%s%s\n", pad+glyphe, item.cidr)
+			_, err = fmt.Fprintf(w, "%s%s\n", pad+glyph, item.cidr)
 		default:
-			_, err = fmt.Fprintf(w, "%s%s (%v)\n", pad+glyphe, item.cidr, item.val)
+			_, err = fmt.Fprintf(w, "%s%s (%v)\n", pad+glyph, item.cidr, item.val)
 		}
 
 		if err != nil {
@@ -147,7 +147,7 @@ func (n *fatNode[V]) fprintRec(w io.Writer, parent fatTrieItem[V], pad string) e
 		}
 
 		// rec-descent with this item as parent
-		if err = item.n.fprintRec(w, item, pad+spacer); err != nil {
+		if err = item.n.fprintRec(w, item, pad+space); err != nil {
 			return err
 		}
 	}
