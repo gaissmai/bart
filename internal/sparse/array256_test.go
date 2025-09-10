@@ -77,7 +77,7 @@ func TestSparseArraySetPanic(t *testing.T) {
 	t.Parallel()
 	defer func() {
 		if r := recover(); r == nil {
-			t.Errorf("MustSet, expected panic")
+			t.Errorf("Set, expected panic")
 		}
 	}()
 
@@ -91,7 +91,7 @@ func TestSparseArrayClearPanic(t *testing.T) {
 	t.Parallel()
 	defer func() {
 		if r := recover(); r == nil {
-			t.Errorf("MustClear, expected panic")
+			t.Errorf("Clear, expected panic")
 		}
 	}()
 
@@ -117,7 +117,7 @@ func TestSparseArrayMustGetPanic(t *testing.T) {
 		a.InsertAt(i, i)
 	}
 
-	// must panic, runtime error: index out of range [-1]
+	// must panic for index out of range
 	a.MustGet(0)
 }
 
@@ -191,6 +191,16 @@ func TestSparseArrayCopy(t *testing.T) {
 				if &aCopy.Items[0] == &original.Items[0] {
 					t.Error("Items backing array not copied, pointers are equal")
 				}
+			}
+
+			// mutate copy and ensure original is unchanged
+			if len(aCopy.Items) > 0 {
+				old := aCopy.Items[0]
+				aCopy.Items[0] = old + 1
+				if original.Items[0] == aCopy.Items[0] {
+					t.Error("Copy mutation leaked into original")
+				}
+				aCopy.Items[0] = old
 			}
 		})
 	}
