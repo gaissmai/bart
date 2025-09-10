@@ -194,16 +194,18 @@ func (d *Fat[V]) dump(w io.Writer) {
 	if d.size4 > 0 {
 		stats := d.root4.nodeStatsRec()
 		fmt.Fprintln(w)
-		fmt.Fprintf(w, "### IPv4: size(%d), nodes(%d), pfxs(%d), leaves(%d), fringes(%d),",
+		fmt.Fprintf(w, "### IPv4: size(%d), nodes(%d), pfxs(%d), leaves(%d), fringes(%d)",
 			d.size4, stats.nodes, stats.pfxs, stats.leaves, stats.fringes)
+
 		d.root4.dumpRec(w, stridePath{}, 0, true)
 	}
 
 	if d.size6 > 0 {
 		stats := d.root6.nodeStatsRec()
 		fmt.Fprintln(w)
-		fmt.Fprintf(w, "### IPv6: size(%d), nodes(%d), pfxs(%d), leaves(%d), fringes(%d),",
+		fmt.Fprintf(w, "### IPv6: size(%d), nodes(%d), pfxs(%d), leaves(%d), fringes(%d)",
 			d.size6, stats.nodes, stats.pfxs, stats.leaves, stats.fringes)
+
 		d.root6.dumpRec(w, stridePath{}, 0, false)
 	}
 }
