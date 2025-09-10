@@ -320,8 +320,13 @@ func TestLiteEqual(t *testing.T) {
 	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 
+	count := 100_000
+	if testing.Short() {
+		count = 10_000
+	}
+
 	rt := new(Lite)
-	for _, pfx := range randomRealWorldPrefixes(prng, 100_000) {
+	for _, pfx := range randomRealWorldPrefixes(prng, count) {
 		rt.Insert(pfx)
 	}
 
@@ -638,18 +643,19 @@ func TestLiteDeleteIsReverseOfInsert(t *testing.T) {
 	t.Parallel()
 	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
-	// Insert N prefixes, then delete those same prefixes in reverse
+	// Insert count prefixes, then delete those same prefixes in reverse
 	// order. Each deletion should exactly undo the internal structure
 	// changes that each insert did.
-	n := 10_000
+
+	count := 10_000
 	if testing.Short() {
-		n = 1_000
+		count = 1_000
 	}
 
 	tbl := new(Lite)
 	want := tbl.dumpString()
 
-	prefixes := randomPrefixes(prng, n)
+	prefixes := randomPrefixes(prng, count)
 
 	defer func() {
 		if t.Failed() {
@@ -674,7 +680,12 @@ func TestLiteClone(t *testing.T) {
 	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 
-	pfxs := randomPrefixes(prng, 100_000)
+	count := 10_000
+	if testing.Short() {
+		count = 1_000
+	}
+
+	pfxs := randomPrefixes(prng, count)
 
 	golden := new(Lite)
 	tbl := new(Lite)
