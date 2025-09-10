@@ -5,7 +5,7 @@ package art
 
 import "testing"
 
-func TestHostIdx(t *testing.T) {
+func TestOctetToIdx(t *testing.T) {
 	testCases := []struct {
 		octet uint8
 		want  uint
@@ -23,7 +23,7 @@ func TestHostIdx(t *testing.T) {
 	for _, tc := range testCases {
 		got := OctetToIdx(tc.octet)
 		if got != tc.want {
-			t.Errorf("HostIdx(%d), want: %d, got: %d", tc.octet, tc.want, got)
+			t.Errorf("OctetToIdx(%d), want: %d, got: %d", tc.octet, tc.want, got)
 		}
 	}
 }
