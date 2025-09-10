@@ -374,7 +374,7 @@ func TestLiteInsertPersistShuffled(t *testing.T) {
 
 	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
-	pfxs := randomPrefixes(prng, 1000)
+	pfxs := randomPrefixes(prng, n)
 
 	for range 10 {
 		pfxs2 := append([]goldTableItem[int](nil), pfxs...)
