@@ -48,6 +48,10 @@ func init() {
 	prng := rand.New(rand.NewPCG(42, 42))
 	fillRouteTables()
 
+	if len(routes4) == 0 || len(routes6) == 0 {
+		log.Fatal("no routes loaded from " + prefixFile)
+	}
+
 	randRoute4 = routes4[prng.IntN(len(routes4))]
 	randRoute6 = routes6[prng.IntN(len(routes6))]
 
@@ -479,7 +483,7 @@ func fillRouteTables() {
 	}
 
 	if err = scanner.Err(); err != nil {
-		log.Printf("reading from %v, %v", rgz, err)
+		log.Fatalf("reading from %v, %v", rgz, err)
 	}
 }
 
@@ -497,7 +501,7 @@ func randomRealWorldPrefixes4(prng *rand.Rand, n int) []netip.Prefix {
 			continue
 		}
 
-		// skip reserved/experimental ranges (e.g., 240.0.0.0/8
+		// skip reserved/experimental ranges (e.g., 240.0.0.0/8)
 		if pfx.Overlaps(mpp("240.0.0.0/8")) {
 			continue
 		}
