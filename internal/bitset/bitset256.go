@@ -107,19 +107,19 @@ func (b *BitSet256) FirstSet() (first uint8, ok bool) {
 	x3 := bits.TrailingZeros64(b[3])
 
 	if x0 != 64 {
-		//nolint:gosec
+		//nolint:gosec  // G115: integer overflow conversion int -> uint
 		return uint8(x0), true
 	}
 	if x1 != 64 {
-		//nolint:gosec
+		//nolint:gosec  // G115: integer overflow conversion int -> uint
 		return uint8(x1 + 64), true
 	}
 	if x2 != 64 {
-		//nolint:gosec
+		//nolint:gosec  // G115: integer overflow conversion int -> uint
 		return uint8(x2 + 128), true
 	}
 	if x3 != 64 {
-		//nolint:gosec
+		//nolint:gosec  // G115: integer overflow conversion int -> uint
 		return uint8(x3 + 192), true
 	}
 
@@ -148,14 +148,14 @@ func (b *BitSet256) NextSet(bit uint8) (next uint8, ok bool) {
 	// process the first (maybe partial) word
 	first := b[wIdx] >> (bit & 63)
 	if first != 0 {
-		//nolint:gosec
+		//nolint:gosec  // G115: integer overflow conversion int -> uint
 		return bit + uint8(bits.TrailingZeros64(first)), true
 	}
 
 	// process the following words until next bit is set
 	for wIdx++; wIdx < 4; wIdx++ {
 		if next := b[wIdx]; next != 0 {
-			//nolint:gosec
+			//nolint:gosec  // G115: integer overflow conversion int -> uint
 			return uint8(wIdx<<6 + bits.TrailingZeros64(next)), true
 		}
 	}
@@ -200,7 +200,7 @@ func (b *BitSet256) LastSet() (last uint8, ok bool) {
 
 	for wIdx := 3; wIdx >= 0; wIdx-- {
 		if word := b[wIdx]; word != 0 {
-			//nolint:gosec
+			//nolint:gosec  // G115: integer overflow conversion int -> uint
 			return uint8(wIdx<<6+bits.Len64(word)) - 1, true
 		}
 	}
@@ -217,7 +217,7 @@ func (b *BitSet256) AsSlice(buf *[256]uint8) []uint8 {
 	size := 0
 	for wIdx, word := range b {
 		for ; word != 0; size++ {
-			//nolint:gosec
+			//nolint:gosec  // G115: integer overflow conversion int -> uint
 			buf[size] = uint8(wIdx<<6 + bits.TrailingZeros64(word))
 			word &= word - 1 // clear the rightmost set bit
 		}
@@ -245,7 +245,7 @@ func (b *BitSet256) Bits() []uint8 {
 func (b *BitSet256) IntersectionTop(c *BitSet256) (top uint8, ok bool) {
 	for wIdx := 3; wIdx >= 0; wIdx-- {
 		if word := b[wIdx] & c[wIdx]; word != 0 {
-			//nolint:gosec
+			//nolint:gosec  // G115: integer overflow conversion int -> uint
 			return uint8(wIdx<<6+bits.Len64(word)) - 1, true
 		}
 	}

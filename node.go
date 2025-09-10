@@ -505,7 +505,7 @@ func (n *node[V]) eachLookupPrefix(octets []byte, depth int, is4 bool, pfxIdx ui
 	if pfxIdx > 255 {
 		pfxIdx >>= 1
 	}
-	//nolint:gosec
+	//nolint:gosec  // G115: integer overflow conversion int -> uint
 	idx := uint8(pfxIdx) // now it fits into uint8
 
 	for ; idx > 0; idx >>= 1 {
