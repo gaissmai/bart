@@ -9,6 +9,8 @@ import (
 )
 
 func TestIdxToFringeRoutes(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		idx  uint8
 		want []uint8
@@ -49,6 +51,8 @@ func TestIdxToFringeRoutes(t *testing.T) {
 }
 
 func TestIdxToPrefixRoutes(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		idx  uint8
 		want []uint8
