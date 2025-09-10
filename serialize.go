@@ -187,7 +187,7 @@ func (t *Table[V]) MarshalText() ([]byte, error) {
 // Every root and subnet is an array, not a map, because the order matters.
 func (t *Table[V]) MarshalJSON() ([]byte, error) {
 	if t == nil {
-		return nil, nil
+		return []byte("null"), nil
 	}
 
 	result := struct {
