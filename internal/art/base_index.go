@@ -47,7 +47,9 @@ func IdxToPfx(idx uint8) (octet, pfxLen uint8) {
 	// The prefix length corresponds to the number of leading bits in idx.
 	// bits.Len8 returns the number of bits needed to represent idx as binary,
 	// so we subtract 1 to recover the prefix length (which is always >= 0).
-	//nolint:gosec
+	// Invariant: idx==0 is invalid
+
+	//nolint:gosec  //G115: integer overflow conversion int -> uint8 (gosec)
 	pfxLen = uint8(bits.Len8(idx)) - 1
 
 	// Compute the number of bits to shift back to obtain the original octet.
@@ -79,11 +81,11 @@ func PfxBits(depth int, idx uint8) uint8 {
 	// subtract 1 to get the actual prefix length used in this stride
 	pfxLenInStride := bits.Len8(idx) - 1
 
-	// Each trie level represents 8 bits (an octet)
+	// Each trie level represents 8 bits (an octet), max depth is 16
 	baseBits := depth << 3 // same as depth * 8
 
-	// Total prefix length in bits = full bytes before + prefix bits in this byte
-	//nolint:gosec
+	// Total prefix length in bits, [0..128]
+	//nolint:gosec   // G115: integer overflow conversion int -> uint8
 	return uint8(baseBits + pfxLenInStride)
 }
 
