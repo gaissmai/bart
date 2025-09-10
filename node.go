@@ -650,18 +650,9 @@ func cmpIndexRank(aIdx, bIdx uint8) int {
 
 	// cmp the prefixes, first by address and then by bits
 	if aOctet == bOctet {
-		if aBits <= bBits {
-			return -1
-		}
-
-		return 1
+		return int(aBits) - int(bBits)
 	}
-
-	if aOctet < bOctet {
-		return -1
-	}
-
-	return 1
+	return int(aOctet) - int(bOctet)
 }
 
 // cidrFromPath, helper function,
