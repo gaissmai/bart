@@ -218,9 +218,9 @@ func (n *fatNode[V]) cloneRec(cloneFn cloneFunc[V]) *fatNode[V] {
 	// Perform a flat clone of the current node.
 	c := n.cloneFlat(cloneFn)
 
-	// Recursively clone all child nodes of type *artNode[V]
-	for _, octet := range n.childrenBitSet.AsSlice(&[256]uint8{}) {
-		kidAny := *n.children[octet]
+	// Recursively clone all child nodes of type *fatNode[V]
+	for _, octet := range c.childrenBitSet.AsSlice(&[256]uint8{}) {
+		kidAny := *c.children[octet]
 
 		switch kid := kidAny.(type) {
 		case *fatNode[V]:
