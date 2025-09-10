@@ -35,22 +35,15 @@ jobs:
         run: go test -v -race -run='(Persist|Example)'
 
   govulncheck:
-    strategy:
-      fail-fast: false
-      matrix:
-        go-version: ['stable', 'oldstable']
-        os: ubuntu-latest
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - id: go
-        uses: actions/setup-go@v6
+      - uses: actions/setup-go@v6
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version: stable
           cache: true
       - uses: golang/govulncheck-action@v1
-        with:
-          go-version-input: ${{ steps.go.outputs.go-version }}
-          check-latest: true
+        id: govulncheck
 
   coverage:
     runs-on: ubuntu-latest
