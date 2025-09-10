@@ -811,7 +811,9 @@ func TestFatUpdateCompare(t *testing.T) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, 10_000)
 	fast := new(Fat[int])
-	gold := new(goldTable[int]).insertMany(pfxs)
+
+	gold := new(goldTable[int])
+	gold.insertMany(pfxs)
 
 	// Update as insert
 	for _, pfx := range pfxs {
@@ -854,9 +856,10 @@ func TestFatContainsCompare(t *testing.T) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, 10_000)
 
-	gold := new(goldTable[int]).insertMany(pfxs)
-	fast := new(Fat[int])
+	gold := new(goldTable[int])
+	gold.insertMany(pfxs)
 
+	fast := new(Fat[int])
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx, pfx.val)
 	}
@@ -881,9 +884,10 @@ func TestFatLookupCompare(t *testing.T) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, 10_000)
 
-	fast := new(Fat[int])
-	gold := new(goldTable[int]).insertMany(pfxs)
+	gold := new(goldTable[int])
+	gold.insertMany(pfxs)
 
+	fast := new(Fat[int])
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx, pfx.val)
 	}
@@ -985,9 +989,10 @@ func TestFatDeleteCompare(t *testing.T) {
 	toDelete := append([]goldTableItem[int](nil), all4[deleteCut:]...)
 	toDelete = append(toDelete, all6[deleteCut:]...)
 
-	fast := new(Fat[int])
-	gold := new(goldTable[int]).insertMany(pfxs)
+	gold := new(goldTable[int])
+	gold.insertMany(pfxs)
 
+	fast := new(Fat[int])
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx, pfx.val)
 	}
@@ -1283,9 +1288,11 @@ func TestFatGetCompare(t *testing.T) {
 	prng := rand.New(rand.NewPCG(42, 42))
 
 	pfxs := randomPrefixes(prng, 10_000)
-	fast := new(Fat[int])
-	gold := new(goldTable[int]).insertMany(pfxs)
 
+	gold := new(goldTable[int])
+	gold.insertMany(pfxs)
+
+	fast := new(Fat[int])
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx, pfx.val)
 	}
