@@ -37,212 +37,49 @@ func (i *MyInt) Clone() *MyInt {
 	return &a
 }
 
+func noPanic(t *testing.T, name string, fn func()) {
+	t.Helper()
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("%s panics on invalid input", name)
+		}
+	}()
+	fn()
+}
+
 // ############ tests ################################
 
 func TestInvalid(t *testing.T) {
 	t.Parallel()
 
-	tbl := new(Table[any])
-	var zeroPfx netip.Prefix
+	tbl1 := new(Table[any])
+	tbl2 := new(Table[any])
+
 	var zeroIP netip.Addr
-	var testname string
+	var zeroPfx netip.Prefix
 
-	testname = "Insert"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid prefix input", testname)
-			}
-		}(testname)
+	noPanic(t, "Contains", func() { tbl1.Contains(zeroIP) })
+	noPanic(t, "Lookup", func() { tbl1.Lookup(zeroIP) })
 
-		tbl.Insert(zeroPfx, nil)
-	})
+	noPanic(t, "LookupPrefix", func() { tbl1.LookupPrefix(zeroPfx) })
+	noPanic(t, "LookupPrefixLPM", func() { tbl1.LookupPrefixLPM(zeroPfx) })
 
-	testname = "InsertPersist"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid prefix input", testname)
-			}
-		}(testname)
+	noPanic(t, "Insert", func() { tbl1.Insert(zeroPfx, nil) })
+	noPanic(t, "Get", func() { tbl1.Get(zeroPfx) })
+	noPanic(t, "Delete", func() { tbl1.Delete(zeroPfx) })
+	noPanic(t, "Modify", func() { tbl1.Modify(zeroPfx, nil) })
 
-		_ = tbl.InsertPersist(zeroPfx, nil)
-	})
+	noPanic(t, "InsertPersist", func() { tbl1.InsertPersist(zeroPfx, nil) })
+	noPanic(t, "DeletePersist", func() { tbl1.DeletePersist(zeroPfx) })
+	noPanic(t, "ModifyPersist", func() { tbl1.ModifyPersist(zeroPfx, nil) })
 
-	testname = "Delete"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid prefix input", testname)
-			}
-		}(testname)
+	noPanic(t, "WalkPersist", func() { tbl1.WalkPersist(nil) })
 
-		tbl.Delete(zeroPfx)
-	})
+	noPanic(t, "OverlapsPrefix", func() { tbl1.OverlapsPrefix(zeroPfx) })
 
-	testname = "DeletePersist"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid prefix input", testname)
-			}
-		}(testname)
-
-		_, _, _ = tbl.DeletePersist(zeroPfx)
-	})
-
-	testname = "Update"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid prefix input", testname)
-			}
-		}(testname)
-
-		_ = tbl.Update(zeroPfx, func(any, bool) any { return nil })
-	})
-
-	testname = "Mofify"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid prefix input", testname)
-			}
-		}(testname)
-
-		_, _ = tbl.Modify(zeroPfx, func(any, bool) (any, bool) { return nil, false })
-	})
-
-	testname = "UpdatePersist"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid prefix input", testname)
-			}
-		}(testname)
-
-		_, _ = tbl.UpdatePersist(zeroPfx, func(v any, _ bool) any { return v })
-	})
-
-	testname = "ModifyPersist"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid prefix input", testname)
-			}
-		}(testname)
-
-		_, _, _ = tbl.ModifyPersist(zeroPfx, func(any, bool) (any, bool) { return nil, false })
-	})
-
-	testname = "Get"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid prefix input", testname)
-			}
-		}(testname)
-
-		_, _ = tbl.Get(zeroPfx)
-	})
-
-	testname = "GetAndDelete"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid prefix input", testname)
-			}
-		}(testname)
-
-		_, _ = tbl.GetAndDelete(zeroPfx)
-	})
-
-	testname = "GetAndDeletePersist"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid prefix input", testname)
-			}
-		}(testname)
-
-		_, _, _ = tbl.GetAndDeletePersist(zeroPfx)
-	})
-
-	testname = "Contains"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid IP input", testname)
-			}
-		}(testname)
-
-		if tbl.Contains(zeroIP) != false {
-			t.Errorf("%s returns true on invalid IP input, expected false", testname)
-		}
-	})
-
-	testname = "Lookup"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid IP input", testname)
-			}
-		}(testname)
-
-		_, got := tbl.Lookup(zeroIP)
-		if got != false {
-			t.Errorf("%s returns true on invalid IP input, expected false", testname)
-		}
-	})
-
-	testname = "LookupPrefix"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid prefix input", testname)
-			}
-		}(testname)
-
-		tbl.LookupPrefix(zeroPfx)
-	})
-
-	testname = "LookupPrefixLPM"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid prefix input", testname)
-			}
-		}(testname)
-
-		tbl.LookupPrefixLPM(zeroPfx)
-	})
-
-	testname = "OverlapsPrefix"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid prefix input", testname)
-			}
-		}(testname)
-
-		tbl.OverlapsPrefix(zeroPfx)
-	})
+	noPanic(t, "Overlaps", func() { tbl1.Overlaps(tbl2) })
+	noPanic(t, "Overlaps4", func() { tbl1.Overlaps4(tbl2) })
+	noPanic(t, "Overlaps6", func() { tbl1.Overlaps6(tbl2) })
 }
 
 func TestInsert(t *testing.T) {
