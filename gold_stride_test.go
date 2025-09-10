@@ -42,7 +42,7 @@ func (t *goldStrideTbl[V]) lpm(octet byte) (ret V, ok bool) {
 	const noMatch = -1
 	longest := noMatch
 	for _, e := range *t {
-		if octet&pfxMask(e.bits) == e.octet && int(e.bits) >= longest {
+		if octet&art.NetMask(e.bits) == e.octet && int(e.bits) >= longest {
 			ret = e.val
 			longest = int(e.bits)
 		}
@@ -73,16 +73,12 @@ func (ta *goldStrideTbl[V]) strideOverlaps(tb *goldStrideTbl[V]) bool {
 			if bItem.bits < minBits {
 				minBits = bItem.bits
 			}
-			if aItem.octet&pfxMask(minBits) == bItem.octet&pfxMask(minBits) {
+			if aItem.octet&art.NetMask(minBits) == bItem.octet&art.NetMask(minBits) {
 				return true
 			}
 		}
 	}
 	return false
-}
-
-func pfxMask(pfxLen uint8) uint8 {
-	return 0xFF << (8 - pfxLen)
 }
 
 func allStridePfxs() []goldStrideItem[int] {
