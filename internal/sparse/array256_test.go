@@ -11,7 +11,7 @@ import (
 
 func TestNewArray(t *testing.T) {
 	t.Parallel()
-	a := new(Array256[int])
+	a := new(Array256[uint8])
 
 	if c := a.Len(); c != 0 {
 		t.Errorf("Len, expected 0, got %d", c)
