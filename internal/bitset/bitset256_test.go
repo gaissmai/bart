@@ -43,7 +43,7 @@ func TestZeroValue(t *testing.T) {
 
 	b = BitSet256{}
 	c := BitSet256{}
-	b = b.Union(&c)
+	b.Union(&c)
 
 	b = BitSet256{}
 	c = BitSet256{}
@@ -534,10 +534,10 @@ func TestUnion(t *testing.T) {
 	}
 
 	c := a
-	c = c.Union(&b)
+	c.Union(&b)
 
 	d := b
-	d = d.Union(&a)
+	d.Union(&a)
 
 	if c.Size() != 200 {
 		t.Errorf("Union should have 200 bits set, but had %d", c.Size())
