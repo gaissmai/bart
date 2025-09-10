@@ -189,7 +189,7 @@ func (n *node[V]) overlapsChildrenIn(o *node[V]) bool {
 	// union all pre alloted bitsets
 	for _, idx := range allIndices {
 		fringeRoutes := allot.IdxToFringeRoutes(idx)
-		hostRoutes = hostRoutes.Union(&fringeRoutes)
+		hostRoutes.Union(&fringeRoutes)
 	}
 
 	return hostRoutes.Intersects(&o.children.BitSet256)
