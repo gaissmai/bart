@@ -34,13 +34,7 @@ func TestPfxLen256(t *testing.T) {
 		idx   uint8
 		want  uint8
 	}{
-		/*
-			{
-				depth: 0,
-				idx:   0,  // invalid
-				want:  -1, // invalid
-			},
-		*/
+		// idx: 0 is invalid
 		{
 			depth: 0,
 			idx:   1,
@@ -113,13 +107,7 @@ func TestIdxToPfx256(t *testing.T) {
 		wantOctet  uint8
 		wantPfxLen uint8
 	}{
-		/*
-			{
-				idx:        0,  // invalid
-				wantOctet:  0,  // invalid
-				wantPfxLen: -1, // invalid
-			},
-		*/
+		// idx: 0 is invalid
 		{
 			idx:        1,
 			wantOctet:  0,
@@ -151,13 +139,7 @@ func TestIdxToRange256(t *testing.T) {
 		wantFirst uint8
 		wantLast  uint8
 	}{
-		/*
-			{
-				idx:       0, // invalid
-				wantFirst: 0,
-				wantLast:  255,
-			},
-		*/
+		// idx: 0 is invalid
 		{
 			idx:       1,
 			wantFirst: 0,
