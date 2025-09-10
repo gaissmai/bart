@@ -295,9 +295,10 @@ func TestLiteContainsCompare(t *testing.T) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, n)
 
-	gold := new(goldTable[int]).insertMany(pfxs)
-	fast := new(Lite)
+	gold := new(goldTable[int])
+	gold.insertMany(pfxs)
 
+	fast := new(Lite)
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx)
 	}
@@ -400,9 +401,10 @@ func TestLiteLookupPrefixCompare(t *testing.T) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, n)
 
-	fast := new(Lite)
-	gold := new(goldTable[int]).insertMany(pfxs)
+	gold := new(goldTable[int])
+	gold.insertMany(pfxs)
 
+	fast := new(Lite)
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx)
 	}
@@ -433,9 +435,10 @@ func TestLiteLookupPrefixLPMCompare(t *testing.T) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, n)
 
-	fast := new(Lite)
-	gold := new(goldTable[int]).insertMany(pfxs)
+	gold := new(goldTable[int])
+	gold.insertMany(pfxs)
 
+	fast := new(Lite)
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx)
 	}
@@ -539,9 +542,10 @@ func TestLiteDeleteCompare(t *testing.T) {
 	toDelete := append([]goldTableItem[int](nil), all4[deleteCut:]...)
 	toDelete = append(toDelete, all6[deleteCut:]...)
 
-	fast := new(Lite)
-	gold := new(goldTable[int]).insertMany(pfxs)
+	gold := new(goldTable[int])
+	gold.insertMany(pfxs)
 
+	fast := new(Lite)
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx)
 	}
