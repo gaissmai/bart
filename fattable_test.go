@@ -932,7 +932,7 @@ func TestFatInsertShuffled(t *testing.T) {
 
 	for range 10 {
 		pfxs2 := append([]goldTableItem[int](nil), pfxs...)
-		rand.Shuffle(len(pfxs2), func(i, j int) { pfxs2[i], pfxs2[j] = pfxs2[j], pfxs2[i] })
+		prng.Shuffle(len(pfxs2), func(i, j int) { pfxs2[i], pfxs2[j] = pfxs2[j], pfxs2[i] })
 
 		addrs := make([]netip.Addr, 0, 10_000)
 		for range 10_000 {
@@ -1072,7 +1072,7 @@ func TestFatDeleteShuffled(t *testing.T) {
 
 		pfxs2 := append([]goldTableItem[int](nil), pfxs...)
 		toDelete2 := append([]goldTableItem[int](nil), toDelete...)
-		rand.Shuffle(len(toDelete2), func(i, j int) { toDelete2[i], toDelete2[j] = toDelete2[j], toDelete2[i] })
+		prng.Shuffle(len(toDelete2), func(i, j int) { toDelete2[i], toDelete2[j] = toDelete2[j], toDelete2[i] })
 
 		rt2 := new(Fat[int])
 
@@ -1144,7 +1144,7 @@ func TestFatDeleteButOne(t *testing.T) {
 		}
 
 		// shuffle the prefixes
-		rand.Shuffle(N, func(i, j int) {
+		prng.Shuffle(N, func(i, j int) {
 			prefixes[i], prefixes[j] = prefixes[j], prefixes[i]
 		})
 
@@ -1189,7 +1189,7 @@ func TestFatDelete(t *testing.T) {
 	}
 
 	// shuffle the prefixes
-	rand.Shuffle(N, func(i, j int) {
+	prng.Shuffle(N, func(i, j int) {
 		prefixes[i], prefixes[j] = prefixes[j], prefixes[i]
 	})
 
