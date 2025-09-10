@@ -348,8 +348,8 @@ func (n *node[V]) directItemsRec(parentIdx uint8, path stridePath, depth int, is
 // cmpPrefix, helper function, compare func for prefix sort,
 // all cidrs are already normalized
 func cmpPrefix(a, b netip.Prefix) int {
-	if cmp := a.Addr().Compare(b.Addr()); cmp != 0 {
-		return cmp
+	if cmpAddr := a.Addr().Compare(b.Addr()); cmpAddr != 0 {
+		return cmpAddr
 	}
 
 	return cmp.Compare(a.Bits(), b.Bits())
