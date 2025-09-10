@@ -41,7 +41,7 @@ func noPanic(t *testing.T, name string, fn func()) {
 	t.Helper()
 	defer func() {
 		if r := recover(); r != nil {
-			t.Fatalf("%s panics on invalid input", name)
+			t.Fatalf("%s panicked: %v", name, r)
 		}
 	}()
 	fn()
