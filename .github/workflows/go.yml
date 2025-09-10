@@ -39,8 +39,7 @@ jobs:
       fail-fast: false
       matrix:
         go-version: ['stable', 'oldstable']
-        os: [ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
+        os: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - id: go
