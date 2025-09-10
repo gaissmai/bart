@@ -8,8 +8,6 @@ import (
 
 // dump the node to w.
 func (n *fatNode[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
-	var zero V
-
 	bits := depth * strideLen
 	indent := strings.Repeat(".", depth)
 
@@ -34,7 +32,7 @@ func (n *fatNode[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 		fmt.Fprintln(w)
 
 		// skip values if the payload is the empty struct
-		if _, ok := any(zero).(struct{}); !ok {
+		if shouldPrintValues[V]() {
 
 			// print the values for this node
 			fmt.Fprintf(w, "%svalues(#%d):", indent, nPfxCount)
@@ -82,9 +80,9 @@ func (n *fatNode[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 				k := *n.children[addr]
 				pc := k.(*leafNode[V])
 
-				// Lite: val is the empty struct, don't print it
-				switch any(pc.value).(type) {
-				case struct{}:
+				// val is the empty struct, don't print it
+				switch {
+				case !shouldPrintValues[V]():
 					fmt.Fprintf(w, " %s:{%s}", addrFmt(addr, is4), pc.prefix)
 				default:
 					fmt.Fprintf(w, " %s:{%s, %v}", addrFmt(addr, is4), pc.prefix, pc.value)
@@ -105,8 +103,8 @@ func (n *fatNode[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 				pc := k.(*fringeNode[V])
 
 				// val is the empty struct, don't print it
-				switch any(pc.value).(type) {
-				case struct{}:
+				switch {
+				case !shouldPrintValues[V]():
 					fmt.Fprintf(w, " %s:{%s}", addrFmt(addr, is4), fringePfx)
 				default:
 					fmt.Fprintf(w, " %s:{%s, %v}", addrFmt(addr, is4), fringePfx, pc.value)
