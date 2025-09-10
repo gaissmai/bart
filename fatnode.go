@@ -64,7 +64,9 @@ func (n *fatNode[V]) insertChild(addr uint8, child any) (exists bool) {
 		exists = true
 	}
 
-	n.children[addr] = &child
+	c := child // force clear ownership; address escapes to heap
+	n.children[addr] = &c
+
 	return exists
 }
 
