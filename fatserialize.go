@@ -298,7 +298,7 @@ func (n *fatNode[V]) directItemsRec(parentIdx uint8, path stridePath, depth int,
 			case *fatNode[V]:
 				// traverse rec-descent, call with next child node,
 				// next trie level, set parentIdx to 0, adjust path and depth
-				path[depth] = octet
+				path[depth&0xf] = octet
 				directItems = append(directItems, kid.directItemsRec(0, path, depth+1, is4)...)
 
 			case *leafNode[V]:
