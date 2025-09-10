@@ -47,7 +47,9 @@ func TestPrefixInsert(t *testing.T) {
 	}
 
 	for i := range 256 {
+		//nolint:gosec
 		octet := byte(i)
+		//nolint:gosec
 		addr := uint8(i)
 		goldVal, goldOK := gold.lpm(octet)
 		_, fastVal, fastOK := fast.lpmGet(art.OctetToIdx(addr))
@@ -80,7 +82,9 @@ func TestPrefixDelete(t *testing.T) {
 	}
 
 	for i := range 256 {
+		//nolint:gosec
 		octet := byte(i)
+		//nolint:gosec
 		addr := uint8(i)
 		goldVal, goldOK := gold.lpm(octet)
 		_, fastVal, fastOK := fast.lpmGet(art.OctetToIdx(addr))
@@ -149,6 +153,7 @@ var (
 )
 
 func BenchmarkNodePrefixInsert(b *testing.B) {
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	routes := shuffleStridePfxs(allStridePfxs())
 
@@ -174,6 +179,7 @@ func BenchmarkNodePrefixInsert(b *testing.B) {
 }
 
 func BenchmarkNodePrefixDelete(b *testing.B) {
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	routes := shuffleStridePfxs(allStridePfxs())
 
@@ -199,6 +205,7 @@ func BenchmarkNodePrefixDelete(b *testing.B) {
 }
 
 func BenchmarkNodePrefixLPM(b *testing.B) {
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	routes := shuffleStridePfxs(allStridePfxs())
 
@@ -233,6 +240,7 @@ func BenchmarkNodePrefixLPM(b *testing.B) {
 }
 
 func BenchmarkNodePrefixesAsSlice(b *testing.B) {
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, nPrefixes := range prefixCount {
 		this := new(node[any])
@@ -252,6 +260,7 @@ func BenchmarkNodePrefixesAsSlice(b *testing.B) {
 }
 
 func BenchmarkNodePrefixesAll(b *testing.B) {
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, nPrefixes := range prefixCount {
 		this := new(node[any])
@@ -271,46 +280,53 @@ func BenchmarkNodePrefixesAll(b *testing.B) {
 }
 
 func BenchmarkNodeChildInsert(b *testing.B) {
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, nchilds := range childCount {
 		this := new(node[int])
 
 		for range nchilds {
-			octet := prng.IntN(maxItems)
-			this.children.InsertAt(uint8(octet), nil)
+			//nolint:gosec
+			octet := uint8(prng.IntN(maxItems))
+			this.children.InsertAt(octet, nil)
 		}
 
 		b.Run(fmt.Sprintf("Into %d", nchilds), func(b *testing.B) {
-			octet := prng.IntN(maxItems)
+			//nolint:gosec
+			octet := uint8(prng.IntN(maxItems))
 
 			for b.Loop() {
-				this.children.InsertAt(uint8(octet), nil)
+				this.children.InsertAt(octet, nil)
 			}
 		})
 	}
 }
 
 func BenchmarkNodeChildDelete(b *testing.B) {
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, nchilds := range childCount {
 		this := new(node[int])
 
 		for range nchilds {
-			octet := prng.IntN(maxItems)
-			this.children.InsertAt(uint8(octet), nil)
+			//nolint:gosec
+			octet := uint8(prng.IntN(maxItems))
+			this.children.InsertAt(octet, nil)
 		}
 
 		b.Run(fmt.Sprintf("From %d", nchilds), func(b *testing.B) {
-			octet := prng.IntN(maxItems)
+			//nolint:gosec
+			octet := uint8(prng.IntN(maxItems))
 
 			for b.Loop() {
-				this.children.DeleteAt(uint8(octet))
+				this.children.DeleteAt(octet)
 			}
 		})
 	}
 }
 
 func BenchmarkNodeChildrenAsSlice(b *testing.B) {
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, nchilds := range childCount {
 		this := new(node[int])
@@ -330,6 +346,7 @@ func BenchmarkNodeChildrenAsSlice(b *testing.B) {
 }
 
 func BenchmarkNodeChildrenAll(b *testing.B) {
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, nchilds := range childCount {
 		this := new(node[int])

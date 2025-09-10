@@ -47,6 +47,7 @@ func IdxToPfx(idx uint8) (octet, pfxLen uint8) {
 	// The prefix length corresponds to the number of leading bits in idx.
 	// bits.Len8 returns the number of bits needed to represent idx as binary,
 	// so we subtract 1 to recover the prefix length (which is always >= 0).
+	//nolint:gosec
 	pfxLen = uint8(bits.Len8(idx)) - 1
 
 	// Compute the number of bits to shift back to obtain the original octet.
@@ -82,6 +83,7 @@ func PfxBits(depth int, idx uint8) uint8 {
 	baseBits := depth << 3 // same as depth * 8
 
 	// Total prefix length in bits = full bytes before + prefix bits in this byte
+	//nolint:gosec
 	return uint8(baseBits + pfxLenInStride)
 }
 

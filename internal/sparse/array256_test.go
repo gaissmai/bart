@@ -20,19 +20,20 @@ func TestNewArray(t *testing.T) {
 
 func TestSparseArrayCount(t *testing.T) {
 	t.Parallel()
-	a := new(Array256[int])
+	a := new(Array256[uint8])
 
-	for i := range 255 {
-		a.InsertAt(uint8(i), i)
-		a.InsertAt(uint8(i), i)
+	var i uint8
+	for i = range 255 {
+		a.InsertAt(i, i)
+		a.InsertAt(i, i)
 	}
 	if c := a.Len(); c != 255 {
 		t.Errorf("Count, expected 255, got %d", c)
 	}
 
-	for i := range 128 {
-		a.DeleteAt(uint8(i))
-		a.DeleteAt(uint8(i))
+	for i = range 128 {
+		a.DeleteAt(i)
+		a.DeleteAt(i)
 	}
 	if c := a.Len(); c != 127 {
 		t.Errorf("Count, expected 127, got %d", c)
@@ -41,15 +42,17 @@ func TestSparseArrayCount(t *testing.T) {
 
 func TestSparseArrayGet(t *testing.T) {
 	t.Parallel()
-	a := new(Array256[int])
+	a := new(Array256[uint8])
 
-	for i := range 255 {
-		a.InsertAt(uint8(i), i)
+	var i uint8
+	for i = range 255 {
+		a.InsertAt(i, i)
 	}
 
 	for range 100 {
-		i := rand.IntN(100)
-		v, ok := a.Get(uint8(i))
+		//nolint:gosec
+		i := uint8(rand.IntN(100))
+		v, ok := a.Get(i)
 		if !ok {
 			t.Errorf("Get, expected true, got %v", ok)
 		}
@@ -57,7 +60,7 @@ func TestSparseArrayGet(t *testing.T) {
 			t.Errorf("Get, expected %d, got %d", i, v)
 		}
 
-		v = a.MustGet(uint8(i))
+		v = a.MustGet(i)
 		if v != i {
 			t.Errorf("MustGet, expected %d, got %d", i, v)
 		}
@@ -107,10 +110,11 @@ func TestSparseArrayMustGetPanic(t *testing.T) {
 		}
 	}()
 
-	a := new(Array256[int])
+	a := new(Array256[uint8])
 
-	for i := 5; i <= 10; i++ {
-		a.InsertAt(uint8(i), i)
+	var i uint8
+	for i = 5; i <= 10; i++ {
+		a.InsertAt(i, i)
 	}
 
 	// must panic, runtime error: index out of range [-1]
