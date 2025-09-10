@@ -133,13 +133,21 @@ func (n *fatNode[V]) fprintRec(w io.Writer, parent fatTrieItem[V], pad string) e
 			spacer = "   "
 		}
 
-		_, err := fmt.Fprintf(w, "%s%s (%v)\n", pad+glyphe, item.cidr, item.val)
+		var err error
+		// val is the empty struct, don't print it
+		switch {
+		case !shouldPrintValues[V]():
+			_, err = fmt.Fprintf(w, "%s%s\n", pad+glyphe, item.cidr)
+		default:
+			_, err = fmt.Fprintf(w, "%s%s (%v)\n", pad+glyphe, item.cidr, item.val)
+		}
+
 		if err != nil {
 			return err
 		}
 
 		// rec-descent with this item as parent
-		if err := item.n.fprintRec(w, item, pad+spacer); err != nil {
+		if err = item.n.fprintRec(w, item, pad+spacer); err != nil {
 			return err
 		}
 	}

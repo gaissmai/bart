@@ -164,7 +164,7 @@ func (n *node[V]) fprintRec(w io.Writer, parent trieItem[V], pad string) error {
 		}
 
 		// rec-descent with this item as parent
-		if err := item.n.fprintRec(w, item, pad+spacer); err != nil {
+		if err = item.n.fprintRec(w, item, pad+spacer); err != nil {
 			return err
 		}
 	}
