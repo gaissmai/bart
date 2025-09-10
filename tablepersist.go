@@ -702,6 +702,11 @@ func (t *Table[V]) DeletePersist(pfx netip.Prefix) (pt *Table[V], val V, found b
 //		return pt, true
 //	})
 func (t *Table[V]) WalkPersist(fn func(*Table[V], netip.Prefix, V) (*Table[V], bool)) *Table[V] {
+	// no-op, callback is nil
+	if fn == nil {
+		return t
+	}
+
 	// create shallow persistent copy
 	pt := &Table[V]{
 		root4: t.root4,
