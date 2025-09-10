@@ -16,6 +16,12 @@ import (
 	"github.com/gaissmai/bart/internal/art"
 )
 
+func shouldPrintValues[V any]() bool {
+	var zero V
+	_, isEmptyStruct := any(zero).(struct{})
+	return !isEmptyStruct
+}
+
 // DumpListNode contains CIDR, Value and Subnets, representing the trie
 // in a sorted, recursive representation, especially useful for serialization.
 type DumpListNode[V any] struct {
@@ -142,9 +148,9 @@ func (n *node[V]) fprintRec(w io.Writer, parent trieItem[V], pad string) error {
 		}
 
 		var err error
-		// Lite: val is the empty struct, don't print it
-		switch any(item.val).(type) {
-		case struct{}:
+		// val is the empty struct, don't print it
+		switch {
+		case !shouldPrintValues[V]():
 			_, err = fmt.Fprintf(w, "%s%s\n", pad+glyphe, item.cidr)
 		default:
 			_, err = fmt.Fprintf(w, "%s%s (%v)\n", pad+glyphe, item.cidr, item.val)
