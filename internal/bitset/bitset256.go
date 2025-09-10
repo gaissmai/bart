@@ -33,6 +33,7 @@ package bitset
 // can inline (*BitSet256).Size with cost 33
 // can inline (*BitSet256).Test with cost 15
 // can inline (*BitSet256).Union with cost 53
+// can inline (*BitSet256).UnionInPlace with cost 36
 
 import (
 	"fmt"
@@ -306,14 +307,13 @@ func (b *BitSet256) Intersection(c *BitSet256) (bs BitSet256) {
 	return
 }
 
-// Union creates the union of base set with compare set.
+// Union creates inplace the union of base set with compare set.
 // This is the BitSet equivalent of | (or).
-func (b *BitSet256) Union(c *BitSet256) (bs BitSet256) {
-	bs[0] = b[0] | c[0]
-	bs[1] = b[1] | c[1]
-	bs[2] = b[2] | c[2]
-	bs[3] = b[3] | c[3]
-	return
+func (b *BitSet256) Union(c *BitSet256) {
+	b[0] |= c[0]
+	b[1] |= c[1]
+	b[2] |= c[2]
+	b[3] |= c[3]
 }
 
 // Size is the number of set bits.
