@@ -41,16 +41,18 @@ func (t *Table[V]) dump(w io.Writer) {
 	if t.size4 > 0 {
 		stats := t.root4.nodeStatsRec()
 		fmt.Fprintln(w)
-		fmt.Fprintf(w, "### IPv4: size(%d), nodes(%d), pfxs(%d), leaves(%d), fringes(%d),",
+		fmt.Fprintf(w, "### IPv4: size(%d), nodes(%d), pfxs(%d), leaves(%d), fringes(%d)",
 			t.size4, stats.nodes, stats.pfxs, stats.leaves, stats.fringes)
+
 		t.root4.dumpRec(w, stridePath{}, 0, true)
 	}
 
 	if t.size6 > 0 {
 		stats := t.root6.nodeStatsRec()
 		fmt.Fprintln(w)
-		fmt.Fprintf(w, "### IPv6: size(%d), nodes(%d), pfxs(%d), leaves(%d), fringes(%d),",
+		fmt.Fprintf(w, "### IPv6: size(%d), nodes(%d), pfxs(%d), leaves(%d), fringes(%d)",
 			t.size6, stats.nodes, stats.pfxs, stats.leaves, stats.fringes)
+
 		t.root6.dumpRec(w, stridePath{}, 0, false)
 	}
 }
