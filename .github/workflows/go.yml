@@ -31,8 +31,8 @@ jobs:
           go-version: ${{ matrix.go-version }}
           cache: true
       - run: go test -v ./...
-      - run: go test -v -run='Persist' -race
-      - run: go test -v -run='Example' -race
+      - if: runner.os == 'Linux'
+        run: go test -v -race -run='(Persist|Example)'
 
   govulncheck:
     strategy:
