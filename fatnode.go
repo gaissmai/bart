@@ -32,12 +32,12 @@ type fatNode[V any] struct {
 	childrenBitSet bitset.BitSet256 // for count and fast bitset operations
 }
 
-// TODO
+// prefixCount returns the number of prefixes stored in this node.
 func (n *fatNode[V]) prefixCount() int {
 	return n.prefixesBitSet.Size()
 }
 
-// TODO
+// childCount returns the number of slots used in this node.
 func (n *fatNode[V]) childCount() int {
 	return n.childrenBitSet.Size()
 }
