@@ -17,7 +17,7 @@ func TestFatStringEmpty(t *testing.T) {
 	want := ""
 	got := tbl.String()
 	if got != want {
-		t.Errorf("table is nil, expected %q, got %q", want, got)
+		t.Errorf("empty table, expected %q, got %q", want, got)
 	}
 }
 
@@ -163,7 +163,7 @@ func checkFatString(t *testing.T, tbl *Fat[any], tt stringTest) {
 
 	gotBytes, err := tbl.MarshalText()
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 	if tt.want != string(gotBytes) {
 		t.Errorf("MarshalText got:\n%swant:\n%s", gotBytes, tt.want)
@@ -381,7 +381,7 @@ func checkFatJSON(t *testing.T, tbl *Fat[any], tt jsonTest) {
 
 	jsonBuffer, err := json.Marshal(tbl)
 	if err != nil {
-		t.Errorf("Json marshal got error: %s", err)
+		t.Fatalf("JSON marshal got error: %s", err)
 	}
 
 	got := string(jsonBuffer)
