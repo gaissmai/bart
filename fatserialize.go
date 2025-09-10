@@ -15,9 +15,9 @@ import (
 	"github.com/gaissmai/bart/internal/art"
 )
 
-// artTrieItem, a node has no path information about its predecessors,
+// fatTrieItem, a node has no path information about its predecessors,
 // we collect this during the recursive descent.
-type artTrieItem[V any] struct {
+type fatTrieItem[V any] struct {
 	// for traversing, path/depth/idx is needed to get the CIDR back from the trie.
 	n     *fatNode[V]
 	is4   bool
@@ -93,7 +93,7 @@ func (t *Fat[V]) fprint(w io.Writer, is4 bool) error {
 		return err
 	}
 
-	startParent := artTrieItem[V]{
+	startParent := fatTrieItem[V]{
 		n:    nil,
 		idx:  0,
 		path: stridePath{},
@@ -104,7 +104,7 @@ func (t *Fat[V]) fprint(w io.Writer, is4 bool) error {
 }
 
 // fprintRec, the output is a hierarchical CIDR tree covered starting with this node
-func (n *fatNode[V]) fprintRec(w io.Writer, parent artTrieItem[V], pad string) error {
+func (n *fatNode[V]) fprintRec(w io.Writer, parent fatTrieItem[V], pad string) error {
 	// recursion stop condition
 	if n == nil {
 		return nil
@@ -114,7 +114,7 @@ func (n *fatNode[V]) fprintRec(w io.Writer, parent artTrieItem[V], pad string) e
 	directItems := n.directItemsRec(parent.idx, parent.path, parent.depth, parent.is4)
 
 	// sort them by netip.Prefix, not by baseIndex
-	slices.SortFunc(directItems, func(a, b artTrieItem[V]) int {
+	slices.SortFunc(directItems, func(a, b fatTrieItem[V]) int {
 		return cmpPrefix(a.cidr, b.cidr)
 	})
 
@@ -207,7 +207,7 @@ func (n *fatNode[V]) dumpListRec(parentIdx uint8, path stridePath, depth int, is
 	directItems := n.directItemsRec(parentIdx, path, depth, is4)
 
 	// sort the items by prefix
-	slices.SortFunc(directItems, func(a, b artTrieItem[V]) int {
+	slices.SortFunc(directItems, func(a, b fatTrieItem[V]) int {
 		return cmpPrefix(a.cidr, b.cidr)
 	})
 
@@ -230,7 +230,7 @@ func (n *fatNode[V]) dumpListRec(parentIdx uint8, path stridePath, depth int, is
 // by heart to understand this function!
 //
 // See the  artlookup.pdf paper in the doc folder, the baseIndex function is the key.
-func (n *fatNode[V]) directItemsRec(parentIdx uint8, path stridePath, depth int, is4 bool) (directItems []artTrieItem[V]) {
+func (n *fatNode[V]) directItemsRec(parentIdx uint8, path stridePath, depth int, is4 bool) (directItems []fatTrieItem[V]) {
 	// recursion stop condition
 	if n == nil {
 		return nil
@@ -254,7 +254,7 @@ func (n *fatNode[V]) directItemsRec(parentIdx uint8, path stridePath, depth int,
 		// both maybe nil
 		if valPtr == parentValPtr {
 
-			item := artTrieItem[V]{
+			item := fatTrieItem[V]{
 				n:     n,
 				is4:   is4,
 				path:  path,
@@ -292,7 +292,7 @@ func (n *fatNode[V]) directItemsRec(parentIdx uint8, path stridePath, depth int,
 
 			case *leafNode[V]:
 				// path-compressed child, stop's recursion for this child
-				item := artTrieItem[V]{
+				item := fatTrieItem[V]{
 					n:    nil,
 					is4:  is4,
 					cidr: kid.prefix,
@@ -302,7 +302,7 @@ func (n *fatNode[V]) directItemsRec(parentIdx uint8, path stridePath, depth int,
 
 			case *fringeNode[V]:
 				// path-compressed fringe, stop's recursion for this child
-				item := artTrieItem[V]{
+				item := fatTrieItem[V]{
 					n:   nil,
 					is4: is4,
 					// get the prefix back from trie
