@@ -82,9 +82,9 @@ func (a *Array256[T]) Get(i uint8) (value T, ok bool) {
 
 // MustGet returns the value at index i without checking if it exists.
 //
-// Use only after ensuring that i is set (via Test()), otherwise the result
-// is 'undefined' and may only lead to a panic later. Only acceptable in
-// tight validated loops.
+// Use only after ensuring that i is set (via Test(i)). Otherwise behavior is
+// undefined: it may return an incorrect value or panic now or later.
+// Intended only for tight validated loops.
 func (a *Array256[T]) MustGet(i uint8) T {
 	return a.Items[a.Rank(i)-1]
 }
@@ -150,10 +150,6 @@ func (a *Array256[T]) DeleteAt(i uint8) (value T, exists bool) {
 
 	return value, true
 }
-
-// insertItem inserts the item at index i, shift the rest one pos right
-//
-// It panics if i is out of range.
 
 // insertItem inserts a new element at the given index position i in the Items slice,
 // shifting all following elements one position to the right to make space.
