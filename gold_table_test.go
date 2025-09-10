@@ -36,15 +36,15 @@ func (t *goldTable[V]) insert(pfx netip.Prefix, val V) {
 	*t = append(*t, goldTableItem[V]{pfx, val})
 }
 
-func (t *goldTable[V]) insertMany(pfxs []goldTableItem[V]) *goldTable[V] {
-	conv := goldTable[V](pfxs)
-	t = &conv
-	return t
+func (t *goldTable[V]) insertMany(pfxs []goldTableItem[V]) {
+	for _, it := range pfxs {
+		t.insert(it.pfx, it.val) // ensures Masked + de-dupe
+	}
 }
 
-func (t *goldTable[V]) get(pfx netip.Prefix) (val V, ok bool) {
+func (t goldTable[V]) get(pfx netip.Prefix) (val V, ok bool) {
 	pfx = pfx.Masked()
-	for _, ent := range *t {
+	for _, ent := range t {
 		if ent.pfx == pfx {
 			return ent.val, true
 		}
@@ -84,10 +84,10 @@ func (ta *goldTable[V]) union(tb *goldTable[V]) {
 	}
 }
 
-func (t *goldTable[V]) lookup(addr netip.Addr) (val V, ok bool) {
+func (t goldTable[V]) lookup(addr netip.Addr) (val V, ok bool) {
 	bestLen := -1
 
-	for _, item := range *t {
+	for _, item := range t {
 		if item.pfx.Contains(addr) && item.pfx.Bits() > bestLen {
 			val = item.val
 			ok = true
@@ -97,10 +97,10 @@ func (t *goldTable[V]) lookup(addr netip.Addr) (val V, ok bool) {
 	return
 }
 
-func (t *goldTable[V]) lookupPfx(pfx netip.Prefix) (val V, ok bool) {
+func (t goldTable[V]) lookupPfx(pfx netip.Prefix) (val V, ok bool) {
 	bestLen := -1
 
-	for _, item := range *t {
+	for _, item := range t {
 		if item.pfx.Overlaps(pfx) && item.pfx.Bits() <= pfx.Bits() && item.pfx.Bits() > bestLen {
 			val = item.val
 			ok = true
@@ -110,10 +110,10 @@ func (t *goldTable[V]) lookupPfx(pfx netip.Prefix) (val V, ok bool) {
 	return
 }
 
-func (t *goldTable[V]) lookupPfxLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) {
+func (t goldTable[V]) lookupPfxLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) {
 	bestLen := -1
 
-	for _, item := range *t {
+	for _, item := range t {
 		if item.pfx.Overlaps(pfx) && item.pfx.Bits() <= pfx.Bits() && item.pfx.Bits() > bestLen {
 			val = item.val
 			lpm = item.pfx
@@ -124,10 +124,10 @@ func (t *goldTable[V]) lookupPfxLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, 
 	return
 }
 
-func (t *goldTable[V]) subnets(pfx netip.Prefix) []netip.Prefix {
+func (t goldTable[V]) subnets(pfx netip.Prefix) []netip.Prefix {
 	var result []netip.Prefix
 
-	for _, item := range *t {
+	for _, item := range t {
 		if pfx.Overlaps(item.pfx) && pfx.Bits() <= item.pfx.Bits() {
 			result = append(result, item.pfx)
 		}
@@ -136,10 +136,10 @@ func (t *goldTable[V]) subnets(pfx netip.Prefix) []netip.Prefix {
 	return result
 }
 
-func (t *goldTable[V]) supernets(pfx netip.Prefix) []netip.Prefix {
+func (t goldTable[V]) supernets(pfx netip.Prefix) []netip.Prefix {
 	var result []netip.Prefix
 
-	for _, item := range *t {
+	for _, item := range t {
 		if item.pfx.Overlaps(pfx) && item.pfx.Bits() <= pfx.Bits() {
 			result = append(result, item.pfx)
 		}
@@ -149,8 +149,8 @@ func (t *goldTable[V]) supernets(pfx netip.Prefix) []netip.Prefix {
 	return result
 }
 
-func (t *goldTable[V]) overlapsPrefix(pfx netip.Prefix) bool {
-	for _, p := range *t {
+func (t goldTable[V]) overlapsPrefix(pfx netip.Prefix) bool {
+	for _, p := range t {
 		if p.pfx.Overlaps(pfx) {
 			return true
 		}

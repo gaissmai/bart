@@ -1277,9 +1277,10 @@ func TestContainsCompare(t *testing.T) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, 10_000)
 
-	gold := new(goldTable[int]).insertMany(pfxs)
-	fast := new(Table[int])
+	gold := new(goldTable[int])
+	gold.insertMany(pfxs)
 
+	fast := new(Table[int])
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx, pfx.val)
 	}
@@ -1304,9 +1305,10 @@ func TestLookupCompare(t *testing.T) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, 10_000)
 
-	fast := new(Table[int])
-	gold := new(goldTable[int]).insertMany(pfxs)
+	gold := new(goldTable[int])
+	gold.insertMany(pfxs)
 
+	fast := new(Table[int])
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx, pfx.val)
 	}
@@ -1407,9 +1409,10 @@ func TestLookupPrefixCompare(t *testing.T) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, 10_000)
 
-	fast := new(Table[int])
-	gold := new(goldTable[int]).insertMany(pfxs)
+	gold := new(goldTable[int])
+	gold.insertMany(pfxs)
 
+	fast := new(Table[int])
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx, pfx.val)
 	}
@@ -1454,9 +1457,10 @@ func TestLookupPrefixLPMCompare(t *testing.T) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, 10_000)
 
-	fast := new(Table[int])
-	gold := new(goldTable[int]).insertMany(pfxs)
+	gold := new(goldTable[int])
+	gold.insertMany(pfxs)
 
+	fast := new(Table[int])
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx, pfx.val)
 	}
@@ -1613,9 +1617,10 @@ func TestDeleteCompare(t *testing.T) {
 	toDelete := append([]goldTableItem[int](nil), all4[deleteCut:]...)
 	toDelete = append(toDelete, all6[deleteCut:]...)
 
-	fast := new(Table[int])
-	gold := new(goldTable[int]).insertMany(pfxs)
+	gold := new(goldTable[int])
+	gold.insertMany(pfxs)
 
+	fast := new(Table[int])
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx, pfx.val)
 	}
@@ -1915,9 +1920,11 @@ func TestGetCompare(t *testing.T) {
 	prng := rand.New(rand.NewPCG(42, 42))
 
 	pfxs := randomPrefixes(prng, 10_000)
-	fast := new(Table[int])
-	gold := new(goldTable[int]).insertMany(pfxs)
 
+	gold := new(goldTable[int])
+	gold.insertMany(pfxs)
+
+	fast := new(Table[int])
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx, pfx.val)
 	}
@@ -1938,9 +1945,11 @@ func TestUpdateCompare(t *testing.T) {
 	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, 10_000)
-	fast := new(Table[int])
-	gold := new(goldTable[int]).insertMany(pfxs)
 
+	gold := new(goldTable[int])
+	gold.insertMany(pfxs)
+
+	fast := new(Table[int])
 	// Update as insert
 	for _, pfx := range pfxs {
 		fast.Update(pfx.pfx, func(int, bool) int { return pfx.val })
@@ -2198,10 +2207,11 @@ func TestModifyCompare(t *testing.T) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, 10_000)
 
-	fast := new(Table[int])
-	gold := new(goldTable[int]).insertMany(pfxs)
+	gold := new(goldTable[int])
+	gold.insertMany(pfxs)
 
 	// Update as insert
+	fast := new(Table[int])
 	for _, pfx := range pfxs {
 		fast.Modify(pfx.pfx, func(int, bool) (int, bool) { return pfx.val, false })
 	}
@@ -2848,15 +2858,20 @@ func TestUnionCompare(t *testing.T) {
 
 	for range 100 {
 		pfxs := randomPrefixes(prng, numEntries)
-		fast := new(Table[int])
-		gold := new(goldTable[int]).insertMany(pfxs)
 
+		gold := new(goldTable[int])
+		gold.insertMany(pfxs)
+
+		fast := new(Table[int])
 		for _, pfx := range pfxs {
 			fast.Insert(pfx.pfx, pfx.val)
 		}
 
 		pfxs2 := randomPrefixes(prng, numEntries)
-		gold2 := new(goldTable[int]).insertMany(pfxs2)
+
+		gold2 := new(goldTable[int])
+		gold2.insertMany(pfxs2)
+
 		fast2 := new(Table[int])
 		for _, pfx := range pfxs2 {
 			fast2.Insert(pfx.pfx, pfx.val)
@@ -2896,15 +2911,20 @@ func TestUnionPersistCompare(t *testing.T) {
 
 	for range 100 {
 		pfxs := randomPrefixes(prng, numEntries)
-		fast := new(Table[int])
-		gold := new(goldTable[int]).insertMany(pfxs)
 
+		gold := new(goldTable[int])
+		gold.insertMany(pfxs)
+
+		fast := new(Table[int])
 		for _, pfx := range pfxs {
 			fast.Insert(pfx.pfx, pfx.val)
 		}
 
 		pfxs2 := randomPrefixes(prng, numEntries)
-		gold2 := new(goldTable[int]).insertMany(pfxs2)
+
+		gold2 := new(goldTable[int])
+		gold2.insertMany(pfxs2)
+
 		fast2 := new(Table[int])
 		for _, pfx := range pfxs2 {
 			fast2.Insert(pfx.pfx, pfx.val)
