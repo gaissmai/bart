@@ -478,7 +478,7 @@ func TestLiteInsertPersistShuffled(t *testing.T) {
 
 	for range 10 {
 		pfxs2 := append([]goldTableItem[int](nil), pfxs...)
-		rand.Shuffle(len(pfxs2), func(i, j int) { pfxs2[i], pfxs2[j] = pfxs2[j], pfxs2[i] })
+		prng.Shuffle(len(pfxs2), func(i, j int) { pfxs2[i], pfxs2[j] = pfxs2[j], pfxs2[i] })
 
 		addrs := make([]netip.Addr, 0, n)
 		for range n {
@@ -617,7 +617,7 @@ func TestLiteDeleteShuffled(t *testing.T) {
 	for range 10 {
 		pfxs2 := append([]goldTableItem[int](nil), pfxs...)
 		toDelete2 := append([]goldTableItem[int](nil), toDelete...)
-		rand.Shuffle(len(toDelete2), func(i, j int) { toDelete2[i], toDelete2[j] = toDelete2[j], toDelete2[i] })
+		prng.Shuffle(len(toDelete2), func(i, j int) { toDelete2[i], toDelete2[j] = toDelete2[j], toDelete2[i] })
 		rt2 := new(Lite)
 		for _, pfx := range pfxs2 {
 			rt2.Insert(pfx.pfx)
