@@ -131,7 +131,7 @@ func TestOverlapsChildren(t *testing.T) {
 		mpp("12.0.0.0/8"),
 		mpp("13.0.0.0/8"),
 		mpp("14.0.0.0/8"),
-		// chi5dren
+		// children
 		mpp("10.100.0.0/17"),
 		mpp("11.100.0.0/17"),
 		mpp("12.100.0.0/17"),
