@@ -50,7 +50,7 @@ type Array256[T any] struct {
 }
 
 // Set panics. The bitset is internally coupled with Items[].
-// Use InsertAt or ModifyAt instead.
+// Use InsertAt to add or overwrite at index i.
 func (a *Array256[T]) Set(uint) {
 	panic("forbidden, use InsertAt")
 }
