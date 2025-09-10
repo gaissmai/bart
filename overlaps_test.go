@@ -63,6 +63,7 @@ func TestRegressionOverlaps(t *testing.T) {
 
 func TestOverlapsCompare(t *testing.T) {
 	t.Parallel()
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 
 	// Empirically, between 5 and 6 routes per table results in ~50%
@@ -100,6 +101,7 @@ func TestOverlapsCompare(t *testing.T) {
 
 func TestOverlapsPrefixCompare(t *testing.T) {
 	t.Parallel()
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, 100_000)
 

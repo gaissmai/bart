@@ -486,6 +486,7 @@ func TestFatDeleteEdgeCases(t *testing.T) {
 
 	t.Run("table_is_empty", func(t *testing.T) {
 		t.Parallel()
+		//nolint:gosec
 		prng := rand.New(rand.NewPCG(42, 42))
 		// must not panic
 		tbl := new(Fat[int])
@@ -806,6 +807,7 @@ func TestFatModifySemantics(t *testing.T) {
 func TestFatUpdateCompare(t *testing.T) {
 	t.Parallel()
 
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, 10_000)
 	fast := new(Fat[int])
@@ -848,6 +850,7 @@ func TestFatContainsCompare(t *testing.T) {
 	// Create large route tables repeatedly, and compare Table's
 	// behavior to a naive and slow but correct implementation.
 	t.Parallel()
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, 10_000)
 
@@ -874,6 +877,7 @@ func TestFatLookupCompare(t *testing.T) {
 	// Create large route tables repeatedly, and compare Table's
 	// behavior to a naive and slow but correct implementation.
 	t.Parallel()
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, 10_000)
 
@@ -922,6 +926,7 @@ func TestFatInsertShuffled(t *testing.T) {
 	// routes.
 	t.Parallel()
 
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, 1000)
 
@@ -960,6 +965,7 @@ func TestFatDeleteCompare(t *testing.T) {
 	// prefixes, and compare Table's behavior to a naive and slow but
 	// correct implementation.
 	t.Parallel()
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 
 	const (
@@ -1029,6 +1035,7 @@ func TestFatDeleteShuffled(t *testing.T) {
 	// should not matter, as long as you're deleting the same set of
 	// routes.
 	t.Parallel()
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 
 	const (
@@ -1090,6 +1097,7 @@ func TestFatDeleteShuffled(t *testing.T) {
 
 func TestFatDeleteIsReverseOfInsert(t *testing.T) {
 	t.Parallel()
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	// Insert N prefixes, then delete those same prefixes in reverse
 	// order. Each deletion should exactly undo the internal structure
@@ -1121,6 +1129,7 @@ func TestFatDeleteIsReverseOfInsert(t *testing.T) {
 
 func TestFatDeleteButOne(t *testing.T) {
 	t.Parallel()
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	// Insert N prefixes, then delete all but one
 	const N = 100
@@ -1165,6 +1174,7 @@ func TestFatDeleteButOne(t *testing.T) {
 
 func TestFatDelete(t *testing.T) {
 	t.Parallel()
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	// Insert N prefixes, then delete those same prefixes in shuffled
 	// order.
@@ -1207,6 +1217,7 @@ func TestFatGet(t *testing.T) {
 
 	t.Run("empty table", func(t *testing.T) {
 		t.Parallel()
+		//nolint:gosec
 		prng := rand.New(rand.NewPCG(42, 42))
 
 		rt := new(Fat[int])
@@ -1268,6 +1279,7 @@ func TestFatGet(t *testing.T) {
 
 func TestFatGetCompare(t *testing.T) {
 	t.Parallel()
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 
 	pfxs := randomPrefixes(prng, 10_000)
@@ -1318,6 +1330,7 @@ func TestFatCloneEdgeCases(t *testing.T) {
 
 func TestFatClone(t *testing.T) {
 	t.Parallel()
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 
 	pfxs := randomPrefixes(prng, 2)
@@ -1405,6 +1418,7 @@ func TestFatCloneDeep(t *testing.T) {
 // ############ benchmarks ################################
 
 func BenchmarkFatTableDelete(b *testing.B) {
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 
 	for _, n := range benchRouteCount {
@@ -1426,6 +1440,7 @@ func BenchmarkFatTableDelete(b *testing.B) {
 }
 
 func BenchmarkFatTableGet(b *testing.B) {
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, fam := range []string{"ipv4", "ipv6"} {
 		rng := randomPrefixes4
@@ -1451,6 +1466,7 @@ func BenchmarkFatTableGet(b *testing.B) {
 }
 
 func BenchmarkFatTableLPM(b *testing.B) {
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, fam := range []string{"ipv4", "ipv6"} {
 		rng := randomPrefixes4
@@ -1482,6 +1498,7 @@ func BenchmarkFatTableLPM(b *testing.B) {
 }
 
 func BenchmarkFatMemIP4(b *testing.B) {
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, k := range []int{1_000, 10_000, 100_000, 1_000_000} {
 		var startMem, endMem runtime.MemStats
@@ -1499,6 +1516,7 @@ func BenchmarkFatMemIP4(b *testing.B) {
 			runtime.ReadMemStats(&endMem)
 
 			stats := rt.root4.nodeStatsRec()
+			//nolint:gosec
 			b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/k), "bytes/route")
 			b.ReportMetric(float64(stats.nodes), "node")
 			b.ReportMetric(float64(stats.pfxs), "pfxs")
@@ -1510,6 +1528,7 @@ func BenchmarkFatMemIP4(b *testing.B) {
 }
 
 func BenchmarkFatMemIP6(b *testing.B) {
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, k := range []int{1_000, 10_000, 100_000, 1_000_000} {
 		var startMem, endMem runtime.MemStats
@@ -1527,6 +1546,7 @@ func BenchmarkFatMemIP6(b *testing.B) {
 			runtime.ReadMemStats(&endMem)
 
 			stats := rt.root6.nodeStatsRec()
+			//nolint:gosec
 			b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/k), "bytes/route")
 			b.ReportMetric(float64(stats.nodes), "node")
 			b.ReportMetric(float64(stats.pfxs), "pfxs")
@@ -1538,6 +1558,7 @@ func BenchmarkFatMemIP6(b *testing.B) {
 }
 
 func BenchmarkFatMem(b *testing.B) {
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, k := range []int{1_000, 10_000, 100_000, 1_000_000} {
 		var startMem, endMem runtime.MemStats
@@ -1564,6 +1585,7 @@ func BenchmarkFatMem(b *testing.B) {
 				s4.fringes + s6.fringes,
 			}
 
+			//nolint:gosec
 			b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/k), "bytes/route")
 			b.ReportMetric(float64(stats.nodes), "node")
 			b.ReportMetric(float64(stats.pfxs), "pfxs")
@@ -1591,6 +1613,7 @@ func BenchmarkFatFullTableMemory4(b *testing.B) {
 		runtime.ReadMemStats(&endMem)
 
 		stats := rt.root4.nodeStatsRec()
+		//nolint:gosec
 		b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/nRoutes), "bytes/route")
 		b.ReportMetric(float64(stats.pfxs), "pfxs")
 		b.ReportMetric(float64(stats.nodes), "nodes")
@@ -1618,6 +1641,7 @@ func BenchmarkFatFullTableMemory6(b *testing.B) {
 		runtime.ReadMemStats(&endMem)
 
 		stats := rt.root6.nodeStatsRec()
+		//nolint:gosec
 		b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/nRoutes), "bytes/route")
 		b.ReportMetric(float64(stats.pfxs), "pfxs")
 		b.ReportMetric(float64(stats.nodes), "nodes")
@@ -1654,6 +1678,7 @@ func BenchmarkFatFullTableMemory(b *testing.B) {
 			fringes: s4.fringes + s6.fringes,
 		}
 
+		//nolint:gosec
 		b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/nRoutes), "bytes/route")
 		b.ReportMetric(float64(stats.pfxs), "pfxs")
 		b.ReportMetric(float64(stats.nodes), "nodes")

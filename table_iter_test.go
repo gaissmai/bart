@@ -13,6 +13,7 @@ import (
 
 func TestAll4RangeOverFunc(t *testing.T) {
 	t.Parallel()
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes4(prng, 10_000)
 	seen := make(map[netip.Prefix]int, 10_000)
@@ -65,6 +66,7 @@ func TestAll4RangeOverFunc(t *testing.T) {
 
 func TestAll6RangeOverFunc(t *testing.T) {
 	t.Parallel()
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes6(prng, 10_000)
 	seen := make(map[netip.Prefix]int, 10_000)
@@ -117,6 +119,7 @@ func TestAll6RangeOverFunc(t *testing.T) {
 
 func TestAllRangeOverFunc(t *testing.T) {
 	t.Parallel()
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, 10_000)
 	seen := make(map[netip.Prefix]int, 10_000)
@@ -169,6 +172,7 @@ func TestAllRangeOverFunc(t *testing.T) {
 
 func TestAll4SortedIter(t *testing.T) {
 	t.Parallel()
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes4(prng, 10_000)
 	seen := make(map[netip.Prefix]int, 10_000)
@@ -221,6 +225,7 @@ func TestAll4SortedIter(t *testing.T) {
 
 func TestAll6SortedRangeOverFunc(t *testing.T) {
 	t.Parallel()
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes6(prng, 10_000)
 	seen := make(map[netip.Prefix]int, 10_000)
@@ -273,6 +278,7 @@ func TestAll6SortedRangeOverFunc(t *testing.T) {
 
 func TestAllSortedRangeOverFunc(t *testing.T) {
 	t.Parallel()
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, 10_000)
 	seen := make(map[netip.Prefix]int, 10_000)
@@ -371,6 +377,7 @@ func TestSupernetsEdgeCase(t *testing.T) {
 
 func TestSupernetsCompare(t *testing.T) {
 	t.Parallel()
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 
 	pfxs := randomRealWorldPrefixes(prng, 1_000)
@@ -443,6 +450,7 @@ func TestSubnets(t *testing.T) {
 	})
 
 	t.Run("default gateway", func(t *testing.T) {
+		//nolint:gosec
 		prng := rand.New(rand.NewPCG(42, 42))
 		want4 := 95_555
 		want6 := 105_555
@@ -480,6 +488,7 @@ func TestSubnets(t *testing.T) {
 
 func TestSubnetsCompare(t *testing.T) {
 	t.Parallel()
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 
 	pfxs := randomRealWorldPrefixes(prng, 1_000)
@@ -526,6 +535,7 @@ func (t *goldTable[V]) lookupPrefixReverse(pfx netip.Prefix) []netip.Prefix {
 }
 
 func BenchmarkSubnets(b *testing.B) {
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	n := 1_000_000
 
@@ -545,6 +555,7 @@ func BenchmarkSubnets(b *testing.B) {
 }
 
 func BenchmarkSupernets(b *testing.B) {
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	n := 1_000_000
 

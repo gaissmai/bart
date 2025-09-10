@@ -44,6 +44,7 @@ type route struct {
 }
 
 func init() {
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	fillRouteTables()
 
@@ -258,6 +259,7 @@ func BenchmarkFullTableOverlaps4(b *testing.B) {
 	}
 
 	for i := 1; i <= 1<<20; i *= 2 {
+		//nolint:gosec
 		prng := rand.New(rand.NewPCG(42, 42))
 		lt2 := new(Lite)
 		for _, pfx := range randomRealWorldPrefixes4(prng, i) {
@@ -280,6 +282,7 @@ func BenchmarkFullTableOverlaps6(b *testing.B) {
 	}
 
 	for i := 1; i <= 1<<20; i *= 2 {
+		//nolint:gosec
 		prng := rand.New(rand.NewPCG(42, 42))
 		lt2 := new(Lite)
 		for _, pfx := range randomRealWorldPrefixes6(prng, i) {
@@ -301,6 +304,7 @@ func BenchmarkFullTableOverlapsPrefix(b *testing.B) {
 		lt.Insert(route.CIDR)
 	}
 
+	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfx := randomRealWorldPrefixes(prng, 1)[0]
 
@@ -367,6 +371,7 @@ func BenchmarkFullTableMemory4(b *testing.B) {
 			b.Skip("No prefixes inserted")
 		}
 
+		//nolint:gosec
 		b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/stats.pfxs), "bytes/route")
 		b.ReportMetric(float64(stats.pfxs), "pfxs")
 		b.ReportMetric(float64(stats.nodes), "nodes")
@@ -395,6 +400,7 @@ func BenchmarkFullTableMemory6(b *testing.B) {
 		if stats.pfxs == 0 {
 			b.Skip("No prefixes inserted")
 		}
+		//nolint:gosec
 		b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/stats.pfxs), "bytes/route")
 		b.ReportMetric(float64(stats.pfxs), "pfxs")
 		b.ReportMetric(float64(stats.nodes), "nodes")
@@ -432,6 +438,7 @@ func BenchmarkFullTableMemory(b *testing.B) {
 		if stats.pfxs == 0 {
 			b.Skip("No prefixes inserted")
 		}
+		//nolint:gosec
 		b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/stats.pfxs), "bytes/route")
 		b.ReportMetric(float64(stats.pfxs), "pfxs")
 		b.ReportMetric(float64(stats.nodes), "nodes")
