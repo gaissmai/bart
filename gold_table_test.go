@@ -98,6 +98,7 @@ func (t goldTable[V]) lookup(addr netip.Addr) (val V, ok bool) {
 }
 
 func (t goldTable[V]) lookupPfx(pfx netip.Prefix) (val V, ok bool) {
+	pfx = pfx.Masked()
 	bestLen := -1
 
 	for _, item := range t {
@@ -111,6 +112,7 @@ func (t goldTable[V]) lookupPfx(pfx netip.Prefix) (val V, ok bool) {
 }
 
 func (t goldTable[V]) lookupPfxLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) {
+	pfx = pfx.Masked()
 	bestLen := -1
 
 	for _, item := range t {
@@ -125,6 +127,7 @@ func (t goldTable[V]) lookupPfxLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, o
 }
 
 func (t goldTable[V]) subnets(pfx netip.Prefix) []netip.Prefix {
+	pfx = pfx.Masked()
 	var result []netip.Prefix
 
 	for _, item := range t {
@@ -137,6 +140,7 @@ func (t goldTable[V]) subnets(pfx netip.Prefix) []netip.Prefix {
 }
 
 func (t goldTable[V]) supernets(pfx netip.Prefix) []netip.Prefix {
+	pfx = pfx.Masked()
 	var result []netip.Prefix
 
 	for _, item := range t {
@@ -150,6 +154,7 @@ func (t goldTable[V]) supernets(pfx netip.Prefix) []netip.Prefix {
 }
 
 func (t goldTable[V]) overlapsPrefix(pfx netip.Prefix) bool {
+	pfx = pfx.Masked()
 	for _, p := range t {
 		if p.pfx.Overlaps(pfx) {
 			return true
