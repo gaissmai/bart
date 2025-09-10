@@ -33,7 +33,8 @@ func (d *Fat[V]) Insert(pfx netip.Prefix, val V) {
 	if !pfx.IsValid() {
 		return
 	}
-
+	// canonicalize prefix
+	pfx = pfx.Masked()
 	is4 := pfx.Addr().Is4()
 
 	n := d.rootNodeByVersion(is4)
