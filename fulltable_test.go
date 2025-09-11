@@ -373,7 +373,8 @@ func BenchmarkFullTableMemory4(b *testing.B) {
 		}
 
 		bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
-		b.ReportMetric(roundFloat64(bytes/float64(stats.pfxs)), "bytes/route")
+		b.ReportMetric(roundFloat64(bytes/float64(rt.Size())), "bytes/route")
+
 		b.ReportMetric(float64(stats.pfxs), "pfxs")
 		b.ReportMetric(float64(stats.nodes), "nodes")
 		b.ReportMetric(float64(stats.leaves), "leaves")
@@ -403,7 +404,8 @@ func BenchmarkFullTableMemory6(b *testing.B) {
 		}
 
 		bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
-		b.ReportMetric(roundFloat64(bytes/float64(stats.pfxs)), "bytes/route")
+		b.ReportMetric(roundFloat64(bytes/float64(rt.Size())), "bytes/route")
+
 		b.ReportMetric(float64(stats.pfxs), "pfxs")
 		b.ReportMetric(float64(stats.nodes), "nodes")
 		b.ReportMetric(float64(stats.leaves), "leaves")
@@ -442,7 +444,8 @@ func BenchmarkFullTableMemory(b *testing.B) {
 		}
 
 		bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
-		b.ReportMetric(roundFloat64(bytes/float64(stats.pfxs)), "bytes/route")
+		b.ReportMetric(roundFloat64(bytes/float64(rt.Size())), "bytes/route")
+
 		b.ReportMetric(float64(stats.pfxs), "pfxs")
 		b.ReportMetric(float64(stats.nodes), "nodes")
 		b.ReportMetric(float64(stats.leaves), "leaves")
