@@ -3524,8 +3524,8 @@ func BenchmarkMemIP4(b *testing.B) {
 
 			stats := rt.root4.nodeStatsRec()
 
-			//nolint:gosec
-			b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/k), "bytes/route")
+			bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
+			b.ReportMetric(roundFloat64(bytes/float64(stats.pfxs)), "bytes/route")
 			b.ReportMetric(float64(stats.pfxs), "pfxs")
 			b.ReportMetric(float64(stats.nodes), "nodes")
 			b.ReportMetric(float64(stats.leaves), "leaves")
@@ -3557,8 +3557,8 @@ func BenchmarkMemIP6(b *testing.B) {
 
 			stats := rt.root6.nodeStatsRec()
 
-			//nolint:gosec
-			b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/k), "bytes/route")
+			bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
+			b.ReportMetric(roundFloat64(bytes/float64(stats.pfxs)), "bytes/route")
 			b.ReportMetric(float64(stats.pfxs), "pfxs")
 			b.ReportMetric(float64(stats.nodes), "nodes")
 			b.ReportMetric(float64(stats.leaves), "leaves")
@@ -3598,8 +3598,8 @@ func BenchmarkMem(b *testing.B) {
 				s4.fringes + s6.fringes,
 			}
 
-			//nolint:gosec
-			b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/k), "bytes/route")
+			bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
+			b.ReportMetric(roundFloat64(bytes/float64(stats.pfxs)), "bytes/route")
 			b.ReportMetric(float64(stats.pfxs), "pfxs")
 			b.ReportMetric(float64(stats.nodes), "nodes")
 			b.ReportMetric(float64(stats.leaves), "leaves")
