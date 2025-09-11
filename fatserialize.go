@@ -33,9 +33,9 @@ type fatTrieItem[V any] struct {
 // String returns a hierarchical tree diagram of the ordered CIDRs
 // as string, just a wrapper for [Fat.Fprint].
 // If Fprint returns an error, String panics.
-func (t *Fat[V]) String() string {
+func (f *Fat[V]) String() string {
 	w := new(strings.Builder)
-	if err := t.Fprint(w); err != nil {
+	if err := f.Fprint(w); err != nil {
 		panic(err)
 	}
 
@@ -64,8 +64,8 @@ func (t *Fat[V]) String() string {
 //	   ├─ 2000::/3 (V)
 //	   │  └─ 2001:db8::/32 (V)
 //	   └─ fe80::/10 (V)
-func (t *Fat[V]) Fprint(w io.Writer) error {
-	if t == nil {
+func (f *Fat[V]) Fprint(w io.Writer) error {
+	if f == nil {
 		return nil
 	}
 	if w == nil {
@@ -73,12 +73,12 @@ func (t *Fat[V]) Fprint(w io.Writer) error {
 	}
 
 	// v4
-	if err := t.fprint(w, true); err != nil {
+	if err := f.fprint(w, true); err != nil {
 		return err
 	}
 
 	// v6
-	if err := t.fprint(w, false); err != nil {
+	if err := f.fprint(w, false); err != nil {
 		return err
 	}
 
@@ -86,8 +86,8 @@ func (t *Fat[V]) Fprint(w io.Writer) error {
 }
 
 // fprint is the version dependent adapter to fprintRec.
-func (t *Fat[V]) fprint(w io.Writer, is4 bool) error {
-	n := t.rootNodeByVersion(is4)
+func (f *Fat[V]) fprint(w io.Writer, is4 bool) error {
+	n := f.rootNodeByVersion(is4)
 	if n.isEmpty() {
 		return nil
 	}
@@ -157,9 +157,9 @@ func (n *fatNode[V]) fprintRec(w io.Writer, parent fatTrieItem[V], pad string) e
 
 // MarshalText implements the [encoding.TextMarshaler] interface,
 // just a wrapper for [Fat.Fprint].
-func (t *Fat[V]) MarshalText() ([]byte, error) {
+func (f *Fat[V]) MarshalText() ([]byte, error) {
 	w := new(bytes.Buffer)
-	if err := t.Fprint(w); err != nil {
+	if err := f.Fprint(w); err != nil {
 		return nil, err
 	}
 
@@ -168,8 +168,8 @@ func (t *Fat[V]) MarshalText() ([]byte, error) {
 
 // MarshalJSON dumps the table into two sorted lists: for ipv4 and ipv6.
 // Every root and subnet is an array, not a map, because the order matters.
-func (t *Fat[V]) MarshalJSON() ([]byte, error) {
-	if t == nil {
+func (f *Fat[V]) MarshalJSON() ([]byte, error) {
+	if f == nil {
 		return []byte("null"), nil
 	}
 
@@ -177,8 +177,8 @@ func (t *Fat[V]) MarshalJSON() ([]byte, error) {
 		Ipv4 []DumpListNode[V] `json:"ipv4,omitempty"`
 		Ipv6 []DumpListNode[V] `json:"ipv6,omitempty"`
 	}{
-		Ipv4: t.DumpList4(),
-		Ipv6: t.DumpList6(),
+		Ipv4: f.DumpList4(),
+		Ipv6: f.DumpList6(),
 	}
 
 	buf, err := json.Marshal(result)
@@ -191,20 +191,20 @@ func (t *Fat[V]) MarshalJSON() ([]byte, error) {
 
 // DumpList4 dumps the ipv4 tree into a list of roots and their subnets.
 // It can be used to analyze the tree or build the text or json serialization.
-func (t *Fat[V]) DumpList4() []DumpListNode[V] {
-	if t == nil {
+func (f *Fat[V]) DumpList4() []DumpListNode[V] {
+	if f == nil {
 		return nil
 	}
-	return t.root4.dumpListRec(0, stridePath{}, 0, true)
+	return f.root4.dumpListRec(0, stridePath{}, 0, true)
 }
 
 // DumpList6 dumps the ipv6 tree into a list of roots and their subnets.
 // It can be used to analyze the tree or build custom json representation.
-func (t *Fat[V]) DumpList6() []DumpListNode[V] {
-	if t == nil {
+func (f *Fat[V]) DumpList6() []DumpListNode[V] {
+	if f == nil {
 		return nil
 	}
-	return t.root6.dumpListRec(0, stridePath{}, 0, false)
+	return f.root6.dumpListRec(0, stridePath{}, 0, false)
 }
 
 // dumpListRec, build the data structure rec-descent with the help
