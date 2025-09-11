@@ -49,7 +49,7 @@ func (d *Fat[V]) Insert(pfx netip.Prefix, val V) {
 }
 
 // Modify TODO
-func (d *Fat[V]) Modify(pfx netip.Prefix, cb func(val V, ok bool) (newVal V, del bool)) (newVal V, deleted bool) {
+func (d *Fat[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del bool)) (_ V, deleted bool) {
 	var zero V
 
 	if !pfx.IsValid() {
