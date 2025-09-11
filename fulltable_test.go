@@ -12,6 +12,7 @@ import (
 	"net/netip"
 	"os"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -371,8 +372,8 @@ func BenchmarkFullTableMemory4(b *testing.B) {
 			b.Skip("No prefixes inserted")
 		}
 
-		//nolint:gosec
-		b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/stats.pfxs), "bytes/route")
+		bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
+		b.ReportMetric(roundFloat64(bytes/float64(stats.pfxs)), "bytes/route")
 		b.ReportMetric(float64(stats.pfxs), "pfxs")
 		b.ReportMetric(float64(stats.nodes), "nodes")
 		b.ReportMetric(float64(stats.leaves), "leaves")
@@ -400,8 +401,9 @@ func BenchmarkFullTableMemory6(b *testing.B) {
 		if stats.pfxs == 0 {
 			b.Skip("No prefixes inserted")
 		}
-		//nolint:gosec
-		b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/stats.pfxs), "bytes/route")
+
+		bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
+		b.ReportMetric(roundFloat64(bytes/float64(stats.pfxs)), "bytes/route")
 		b.ReportMetric(float64(stats.pfxs), "pfxs")
 		b.ReportMetric(float64(stats.nodes), "nodes")
 		b.ReportMetric(float64(stats.leaves), "leaves")
@@ -438,8 +440,9 @@ func BenchmarkFullTableMemory(b *testing.B) {
 		if stats.pfxs == 0 {
 			b.Skip("No prefixes inserted")
 		}
-		//nolint:gosec
-		b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/stats.pfxs), "bytes/route")
+
+		bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
+		b.ReportMetric(roundFloat64(bytes/float64(stats.pfxs)), "bytes/route")
 		b.ReportMetric(float64(stats.pfxs), "pfxs")
 		b.ReportMetric(float64(stats.nodes), "nodes")
 		b.ReportMetric(float64(stats.leaves), "leaves")
@@ -548,4 +551,14 @@ func randomRealWorldPrefixes(prng *rand.Rand, n int) []netip.Prefix {
 	})
 
 	return pfxs
+}
+
+// roundFloat64 to 2 decimal places
+func roundFloat64(f float64) float64 {
+	s := fmt.Sprintf("%.2f", f)
+	ret, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		panic(err)
+	}
+	return ret
 }
