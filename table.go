@@ -99,7 +99,13 @@ func (t *Table[V]) rootNodeByVersion(is4 bool) *node[V] {
 // much faster due to modern CPUs.
 //
 // Perhaps a future Go version that supports SIMD instructions for the [4]uint64 vectors
-// will make the algorithm even faster on suitable hardware.
+// maxDepthAndLastBits computes how many full 8‑bit strides fit into a CIDR length
+// and how many leftover bits remain in the final partial stride.
+//
+// The first return, maxDepth, is the count of full 8‑bit strides (bits/8).
+// The second return, lastBits, is the remaining bit count in the final stride (bits%8),
+// in the range 0..7. For typical use with IP prefixes this yields maxDepth in
+// 0..4 for IPv4 and 0..16 for IPv6.
 func maxDepthAndLastBits(bits int) (maxDepth int, lastBits uint8) {
 	// maxDepth:  range from 0..4 or 0..16 !ATTENTION: not 0..3 or 0..15
 	// lastBits:  range from 0..7

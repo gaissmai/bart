@@ -33,7 +33,7 @@ import "github.com/gaissmai/bart/internal/bitset"
 // For indices >= 256 (i.e., full 8-bit prefixes), see fringeRoutesLookupTbl.
 //
 // This function is used for fast prefix set comparisons using bitwise intersection
-// instead of scanning or looping over ranges.
+// intersection checks.
 func IdxToPrefixRoutes(idx uint8) bitset.BitSet256 {
 	// Recursive function to generate coverage sets for each base index:
 	// func generate(idx uint, bs *bitset.BitSet) {

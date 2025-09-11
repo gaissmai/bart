@@ -16,6 +16,7 @@ import (
 	"github.com/gaissmai/bart/internal/art"
 )
 
+// used as a marker to indicate no associated payload) and true otherwise.
 func shouldPrintValues[V any]() bool {
 	var zero V
 	_, isEmptyStruct := any(zero).(struct{})
@@ -346,7 +347,10 @@ func (n *node[V]) directItemsRec(parentIdx uint8, path stridePath, depth int, is
 }
 
 // cmpPrefix, helper function, compare func for prefix sort,
-// all cidrs are already normalized
+// cmpPrefix compares two netip.Prefix values for ordering.
+// It first compares the prefix addresses; if they differ, the address comparison
+// result is returned. If addresses are equal, it compares the prefix lengths
+// (bit counts). The result is negative if a < b, zero if equal, and positive if a > b.
 func cmpPrefix(a, b netip.Prefix) int {
 	if cmpAddr := a.Addr().Compare(b.Addr()); cmpAddr != 0 {
 		return cmpAddr

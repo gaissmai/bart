@@ -10,7 +10,7 @@ import "github.com/gaissmai/bart/internal/bitset"
 // by this index in the binary prefix tree.
 //
 // This structure is functionally identical to IdxToPrefixRoutes,
-// but applies only to the fringe part of the trie.
+// are encoded in the table itself.
 func IdxToFringeRoutes(idx uint8) bitset.BitSet256 {
 	return fringeRoutesLookupTbl[idx]
 }

@@ -643,7 +643,10 @@ func (n *node[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxIdx uint8, y
 	return true
 }
 
-// cmpIndexRank, sort indexes in prefix sort order.
+// cmpIndexRank reports the ordering of two 8-bit prefix indices.
+// It converts each index to (octet, bit-length) via art.IdxToPfx, compares the octet first,
+// and when octets are equal compares the bit-length. Returns a negative value if aIdx
+// sorts before bIdx, zero if they are equivalent, and a positive value if aIdx sorts after bIdx.
 func cmpIndexRank(aIdx, bIdx uint8) int {
 	// convert idx [1..255] to prefix
 	aOctet, aBits := art.IdxToPfx(aIdx)

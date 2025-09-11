@@ -42,7 +42,12 @@ func OctetToIdx(octet uint8) uint {
 }
 
 // IdxToPfx returns the octet and prefix len of baseIdx.
-// It's the inverse to pfxToIdx256.
+// IdxToPfx decodes a non-zero base index into the corresponding 8-bit prefix octet
+// (left-aligned within the octet) and the prefix length within that 8-bit stride.
+//
+// The returned pfxLen is the number of significant prefix bits in the stride (0..7).
+// The returned octet contains those prefix bits left-aligned (host bits zeroed).
+// idx must be non-zero; 0 is invalid for this decoding.
 func IdxToPfx(idx uint8) (octet, pfxLen uint8) {
 	// The prefix length corresponds to the number of leading bits in idx.
 	// bits.Len8 returns the number of bits needed to represent idx as binary,
@@ -75,7 +80,7 @@ func IdxToPfx(idx uint8) (octet, pfxLen uint8) {
 //	depth = 2 (i.e. third trie level)
 //	idx = 13 (which encodes a prefix of length 3 bits within that stride)
 //
-//	=> PfxBits = 2*8 + 3 = 19
+// The result is the sum of (depth * 8) and the prefix length encoded by idx, in the range [0..128].
 func PfxBits(depth int, idx uint8) uint8 {
 	// bits.Len8(idx) gives the number of significant bits (i.e. prefix length + 1)
 	// subtract 1 to get the actual prefix length used in this stride
