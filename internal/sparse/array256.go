@@ -82,9 +82,8 @@ func (a *Array256[T]) Get(i uint8) (value T, ok bool) {
 
 // MustGet returns the value at index i without checking if it exists.
 //
-// Use only after ensuring that i is set (via Test(i)). Otherwise behavior is
-// undefined: it may return an incorrect value or panic now or later.
-// Intended only for tight validated loops.
+// Use only after ensuring i is set (via Test(i)); otherwise it may return
+// an incorrect value or panic. Intended only for tight, validated loops.
 func (a *Array256[T]) MustGet(i uint8) T {
 	return a.Items[a.Rank(i)-1]
 }
