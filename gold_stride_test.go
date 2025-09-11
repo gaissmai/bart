@@ -84,7 +84,7 @@ func (ta *goldStrideTbl[V]) strideOverlaps(tb *goldStrideTbl[V]) bool {
 func allStridePfxs() []goldStrideItem[int] {
 	ret := make([]goldStrideItem[int], 0, maxItems)
 	for idx := 1; idx < maxItems; idx++ {
-		//nolint:gosec
+		//nolint:gosec // test-only: idx conversion is safe and deterministic
 		octet, bits := art.IdxToPfx(uint8(idx))
 		ret = append(ret, goldStrideItem[int]{octet, bits, idx})
 	}
