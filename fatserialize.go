@@ -121,12 +121,12 @@ func (n *fatNode[V]) fprintRec(w io.Writer, parent fatTrieItem[V], pad string) e
 		return cmpPrefix(a.cidr, b.cidr)
 	})
 
-	// symbols used in tree
-	glyph := "├─ "
-	space := "│  "
-
 	// for all direct item under this node ...
 	for i, item := range directItems {
+		// symbols used in tree
+		glyph := "├─ "
+		space := "│  "
+
 		// ... treat last kid special
 		if i == len(directItems)-1 {
 			glyph = "└─ "
