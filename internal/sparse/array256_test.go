@@ -117,7 +117,7 @@ func TestSparseArrayMustGetPanic(t *testing.T) {
 		a.InsertAt(i, i)
 	}
 
-	// must panic for index out of range
+	// must panic for unset index
 	a.MustGet(0)
 }
 
