@@ -4,6 +4,7 @@
 package bart
 
 import (
+	"cmp"
 	"net/netip"
 	"slices"
 
@@ -650,9 +651,9 @@ func cmpIndexRank(aIdx, bIdx uint8) int {
 
 	// cmp the prefixes, first by address and then by bits
 	if aOctet == bOctet {
-		return int(aBits) - int(bBits)
+		return cmp.Compare(aBits, bBits)
 	}
-	return int(aOctet) - int(bOctet)
+	return cmp.Compare(aOctet, bOctet)
 }
 
 // cidrFromPath, helper function,
