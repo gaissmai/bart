@@ -138,12 +138,12 @@ func (n *node[V]) fprintRec(w io.Writer, parent trieItem[V], pad string) error {
 		return cmpPrefix(a.cidr, b.cidr)
 	})
 
-	// symbols used in tree
-	glyph := "├─ "
-	space := "│  "
-
 	// for all direct item under this node ...
 	for i, item := range directItems {
+		// symbols used in tree
+		glyph := "├─ "
+		space := "│  "
+
 		// ... treat last kid special
 		if i == len(directItems)-1 {
 			glyph = "└─ "
