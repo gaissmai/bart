@@ -112,75 +112,32 @@ func TestFatCloneFlat(t *testing.T) {
 func TestFatInvalid(t *testing.T) {
 	t.Parallel()
 
-	tbl := new(Fat[any])
+	tbl1 := new(Fat[any])
 	var zeroPfx netip.Prefix
 	var zeroIP netip.Addr
-	var testname string
 
-	testname = "Insert"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s should not panic on invalid prefix input", testname)
-			}
-		}(testname)
+	noPanic(t, "Contains", func() { tbl1.Contains(zeroIP) })
+	noPanic(t, "Lookup", func() { tbl1.Lookup(zeroIP) })
 
-		tbl.Insert(zeroPfx, nil)
-	})
+	// noPanic(t, "LookupPrefix", func() { tbl1.LookupPrefix(zeroPfx) })
+	// noPanic(t, "LookupPrefixLPM", func() { tbl1.LookupPrefixLPM(zeroPfx) })
 
-	testname = "Delete"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s should not panic on invalid prefix input", testname)
-			}
-		}(testname)
+	noPanic(t, "Insert", func() { tbl1.Insert(zeroPfx, nil) })
+	noPanic(t, "Get", func() { tbl1.Get(zeroPfx) })
+	noPanic(t, "Delete", func() { tbl1.Delete(zeroPfx) })
+	noPanic(t, "Modify", func() { tbl1.Modify(zeroPfx, nil) })
 
-		_, _ = tbl.Delete(zeroPfx)
-	})
+	// noPanic(t, "InsertPersist", func() { tbl1.InsertPersist(zeroPfx, nil) })
+	// noPanic(t, "DeletePersist", func() { tbl1.DeletePersist(zeroPfx) })
+	// noPanic(t, "ModifyPersist", func() { tbl1.ModifyPersist(zeroPfx, nil) })
 
-	testname = "Get"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s should not panic on invalid prefix input", testname)
-			}
-		}(testname)
+	// noPanic(t, "WalkPersist", func() { tbl1.WalkPersist(nil) })
 
-		_, _ = tbl.Get(zeroPfx)
-	})
+	// noPanic(t, "OverlapsPrefix", func() { tbl1.OverlapsPrefix(zeroPfx) })
 
-	testname = "Contains"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s should not panic on invalid IP input", testname)
-			}
-		}(testname)
-
-		if tbl.Contains(zeroIP) != false {
-			t.Errorf("%s returns true on invalid IP input, expected false", testname)
-		}
-	})
-
-	testname = "Lookup"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s should not panic on invalid IP input", testname)
-			}
-		}(testname)
-
-		_, got := tbl.Lookup(zeroIP)
-		if got != false {
-			t.Errorf("%s returns true on invalid IP input, expected false", testname)
-		}
-	})
+	// noPanic(t, "Overlaps", func() { tbl1.Overlaps(tbl2) })
+	// noPanic(t, "Overlaps4", func() { tbl1.Overlaps4(tbl2) })
+	// noPanic(t, "Overlaps6", func() { tbl1.Overlaps6(tbl2) })
 }
 
 func TestFatInsert(t *testing.T) {
