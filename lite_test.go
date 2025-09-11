@@ -43,7 +43,6 @@ func TestLiteInvalid(t *testing.T) {
 func TestLiteDeletePersist(t *testing.T) {
 	t.Parallel()
 
-	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	t.Run("table_is_empty", func(t *testing.T) {
 		t.Parallel()
@@ -192,7 +191,6 @@ func TestLiteContainsCompare(t *testing.T) {
 		n = 1_000
 	}
 
-	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, n)
 
@@ -218,7 +216,6 @@ func TestLiteContainsCompare(t *testing.T) {
 
 func TestLiteEqual(t *testing.T) {
 	t.Parallel()
-	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 
 	count := 100_000
@@ -303,7 +300,6 @@ func TestLiteLookupPrefixCompare(t *testing.T) {
 		n = 1_000
 	}
 
-	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, n)
 
@@ -337,7 +333,6 @@ func TestLiteLookupPrefixLPMCompare(t *testing.T) {
 		n = 1_000
 	}
 
-	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, n)
 
@@ -373,7 +368,6 @@ func TestLiteInsertPersistShuffled(t *testing.T) {
 		n = 1_000
 	}
 
-	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, n)
 
@@ -428,7 +422,6 @@ func TestLiteDeleteCompare(t *testing.T) {
 		n = 1_000
 	}
 
-	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 
 	var (
@@ -485,7 +478,6 @@ func TestLiteDeleteShuffled(t *testing.T) {
 		n = 1_000
 	}
 
-	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 
 	var (
@@ -542,7 +534,6 @@ func TestLiteDeleteShuffled(t *testing.T) {
 
 func TestLiteDeleteIsReverseOfInsert(t *testing.T) {
 	t.Parallel()
-	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	// Insert count prefixes, then delete those same prefixes in reverse
 	// order. Each deletion should exactly undo the internal structure
@@ -578,7 +569,6 @@ func TestLiteDeleteIsReverseOfInsert(t *testing.T) {
 
 func TestLiteClone(t *testing.T) {
 	t.Parallel()
-	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 
 	count := 10_000
@@ -611,7 +601,6 @@ func TestLiteUnion(t *testing.T) {
 	for i := range 10 {
 		t.Run(fmt.Sprintf("Union-%d", i), func(t *testing.T) {
 			t.Parallel()
-			//nolint:gosec
 			prng := rand.New(rand.NewPCG(42, 42))
 			pfx1 := randomRealWorldPrefixes(prng, 1_000)
 			pfx2 := randomRealWorldPrefixes(prng, 2_000)
@@ -646,7 +635,6 @@ func TestLiteUnionPersist(t *testing.T) {
 	for i := range 10 {
 		t.Run(fmt.Sprintf("UnionPersist-%d", i), func(t *testing.T) {
 			t.Parallel()
-			//nolint:gosec
 			prng := rand.New(rand.NewPCG(42, 42))
 			pfx1 := randomRealWorldPrefixes(prng, 1_000)
 			pfx2 := randomRealWorldPrefixes(prng, 2_000)
