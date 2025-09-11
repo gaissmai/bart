@@ -32,7 +32,6 @@ func TestInsertPersistTable(t *testing.T) {
 		n = 1_000
 	}
 
-	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomRealWorldPrefixes(prng, n)
 
@@ -73,7 +72,6 @@ func TestUpdatePersistTable(t *testing.T) {
 	// setup
 	const n = 10_000
 
-	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomRealWorldPrefixes(prng, n)
 
@@ -118,7 +116,6 @@ func TestDeletePersistTable(t *testing.T) {
 	// setup
 	const n = 10_000
 
-	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomRealWorldPrefixes(prng, n)
 
@@ -151,7 +148,6 @@ func TestInsertPersistLite(t *testing.T) {
 
 	// setup
 	const n = 10_000
-	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomRealWorldPrefixes(prng, n)
 
@@ -195,7 +191,6 @@ func TestDeletePersistLite(t *testing.T) {
 	const n = 10_000
 
 	// setup
-	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomRealWorldPrefixes(prng, n)
 
