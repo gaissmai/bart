@@ -153,7 +153,6 @@ var (
 )
 
 func BenchmarkNodePrefixInsert(b *testing.B) {
-	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	routes := shuffleStridePfxs(allStridePfxs())
 
@@ -179,7 +178,6 @@ func BenchmarkNodePrefixInsert(b *testing.B) {
 }
 
 func BenchmarkNodePrefixDelete(b *testing.B) {
-	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	routes := shuffleStridePfxs(allStridePfxs())
 
@@ -205,7 +203,6 @@ func BenchmarkNodePrefixDelete(b *testing.B) {
 }
 
 func BenchmarkNodePrefixLPM(b *testing.B) {
-	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	routes := shuffleStridePfxs(allStridePfxs())
 
@@ -240,7 +237,6 @@ func BenchmarkNodePrefixLPM(b *testing.B) {
 }
 
 func BenchmarkNodePrefixesAsSlice(b *testing.B) {
-	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, nPrefixes := range prefixCount {
 		this := new(node[any])
@@ -260,7 +256,6 @@ func BenchmarkNodePrefixesAsSlice(b *testing.B) {
 }
 
 func BenchmarkNodePrefixesAll(b *testing.B) {
-	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, nPrefixes := range prefixCount {
 		this := new(node[any])
@@ -280,7 +275,6 @@ func BenchmarkNodePrefixesAll(b *testing.B) {
 }
 
 func BenchmarkNodeChildInsert(b *testing.B) {
-	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, nchilds := range childCount {
 		this := new(node[int])
@@ -303,7 +297,6 @@ func BenchmarkNodeChildInsert(b *testing.B) {
 }
 
 func BenchmarkNodeChildDelete(b *testing.B) {
-	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, nchilds := range childCount {
 		this := new(node[int])
@@ -326,7 +319,6 @@ func BenchmarkNodeChildDelete(b *testing.B) {
 }
 
 func BenchmarkNodeChildrenAsSlice(b *testing.B) {
-	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, nchilds := range childCount {
 		this := new(node[int])
@@ -346,7 +338,6 @@ func BenchmarkNodeChildrenAsSlice(b *testing.B) {
 }
 
 func BenchmarkNodeChildrenAll(b *testing.B) {
-	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, nchilds := range childCount {
 		this := new(node[int])
