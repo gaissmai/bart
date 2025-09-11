@@ -17,7 +17,7 @@ import (
 // See doc/artlookup.pdf for the mapping mechanics and prefix tree details.
 type fatNode[V any] struct {
 	prefixes [256]*V
-	children [256]*any // **artNode or path-compreassed **leaf- or **fringeNode
+	children [256]*any // **fatNode or path-compressed **leaf- or **fringeNode
 	// an array of "pointers to" the empty interface,
 	// and not an array of empty interfaces.
 	//
@@ -87,7 +87,7 @@ func (n *fatNode[V]) insertPrefix(idx uint8, val V) (exists bool) {
 	// insert or overwrite
 
 	// To ensure allot works as intended, every unique prefix in the
-	// artNode must point to a distinct value pointer, even for identical values.
+	// fatNode must point to a distinct value pointer, even for identical values.
 	// Using new() and assignment guarantees each inserted prefix gets its own address,
 	valPtr := new(V)
 	*valPtr = val
@@ -109,7 +109,7 @@ func (n *fatNode[V]) getPrefix(idx uint8) (val V, exists bool) {
 }
 
 // deletePrefix TODO
-// func (n *artNode[V]) deletePrefix(addr uint8, prefixLen uint8) (val V, exists bool) {
+// func (n *fatNode[V]) deletePrefix(addr uint8, prefixLen uint8) (val V, exists bool) {
 func (n *fatNode[V]) deletePrefix(idx uint8) (val V, exists bool) {
 	if exists = n.prefixesBitSet.Test(idx); !exists {
 		// Route entry doesn't exist
