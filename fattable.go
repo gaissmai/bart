@@ -7,7 +7,29 @@ import (
 	"github.com/gaissmai/bart/internal/art"
 )
 
-// TODO
+// Fat follows the original ART design by Knuth in using fixed
+// 256-slot arrays at each level.
+// In contrast to the original, this variant introduces a new form of path
+// compression. This keeps memory usage within a reasonable range while
+// preserving the high lookup speed of the pure array-based ART algorithm.
+//
+// Both [bart.Fat] and [bart.Table] use the same path compression, but they
+// differ in how levels are represented:
+//
+//   - [bart.Fat]:   uncompressed  fixed level arrays + path compression
+//   - [bart.Table]: popcount-compressed level arrays + path compression
+//
+// As a result:
+//   - [bart.Fat] sacrifices memory efficiency to achieve about 2x higher speed
+//   - [bart.Table] minimizes memory consumption as much as possible
+//
+// Which variant is preferable depends on the use case: [bart.Fat] is most
+// beneficial when maximum speed for longest-prefix-match is the top priority,
+// for example in a Forwarding Information Base (FIB).
+//
+// For the full Internet routing table, the [bart.Fat] structure alone requires
+// about 250 MB of memory, with additional space needed for payload such as
+// next hop, interface, and further attributes.
 type Fat[V any] struct {
 	// used by -copylocks checker from `go vet`.
 	_ [0]sync.Mutex
@@ -22,14 +44,16 @@ type Fat[V any] struct {
 }
 
 // rootNodeByVersion, root node getter for ip version and trie levels.
-func (d *Fat[V]) rootNodeByVersion(is4 bool) *fatNode[V] {
+func (f *Fat[V]) rootNodeByVersion(is4 bool) *fatNode[V] {
 	if is4 {
-		return &d.root4
+		return &f.root4
 	}
-	return &d.root6
+	return &f.root6
 }
 
-func (d *Fat[V]) Insert(pfx netip.Prefix, val V) {
+// Insert adds a prefix with the given value.
+// Its semantics are identical to [Table.Insert].
+func (f *Fat[V]) Insert(pfx netip.Prefix, val V) {
 	if !pfx.IsValid() {
 		return
 	}
@@ -37,7 +61,7 @@ func (d *Fat[V]) Insert(pfx netip.Prefix, val V) {
 	pfx = pfx.Masked()
 	is4 := pfx.Addr().Is4()
 
-	n := d.rootNodeByVersion(is4)
+	n := f.rootNodeByVersion(is4)
 
 	// insert prefix
 	if exists := n.insertAtDepth(pfx, val, 0); exists {
@@ -45,11 +69,12 @@ func (d *Fat[V]) Insert(pfx netip.Prefix, val V) {
 	}
 
 	// true insert, update size
-	d.sizeUpdate(is4, 1)
+	f.sizeUpdate(is4, 1)
 }
 
-// Modify TODO
-func (d *Fat[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del bool)) (_ V, deleted bool) {
+// Modify applies a callback to the value of the given prefix.
+// Its semantics are identical to [Table.Modify].
+func (f *Fat[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del bool)) (_ V, deleted bool) {
 	var zero V
 
 	if !pfx.IsValid() {
@@ -66,7 +91,7 @@ func (d *Fat[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del b
 	octets := ip.AsSlice()
 	maxDepth, lastBits := maxDepthAndLastBits(bits)
 
-	n := d.rootNodeByVersion(is4)
+	n := f.rootNodeByVersion(is4)
 
 	// record the nodes on the path to the deleted node, needed to purge
 	// and/or path compress nodes after the deletion of a prefix
@@ -92,13 +117,13 @@ func (d *Fat[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del b
 
 			case existed && del: // delete
 				n.deletePrefix(idx)
-				d.sizeUpdate(is4, -1)
+				f.sizeUpdate(is4, -1)
 				n.purgeAndCompress(stack[:depth], octets, is4)
 				return oldVal, true
 
 			case !existed: // insert
 				n.insertPrefix(idx, newVal)
-				d.sizeUpdate(is4, 1)
+				f.sizeUpdate(is4, 1)
 				return newVal, false
 
 			case existed: // update
@@ -126,7 +151,7 @@ func (d *Fat[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del b
 				n.insertChild(octet, newLeafNode(pfx, newVal))
 			}
 
-			d.sizeUpdate(is4, 1)
+			f.sizeUpdate(is4, 1)
 			return newVal, false
 		}
 
@@ -149,7 +174,7 @@ func (d *Fat[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del b
 				// delete
 				n.deleteChild(octet)
 
-				d.sizeUpdate(is4, -1)
+				f.sizeUpdate(is4, -1)
 				n.purgeAndCompress(stack[:depth], octets, is4)
 
 				return oldVal, true // delete
@@ -178,7 +203,7 @@ func (d *Fat[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del b
 				// delete
 				n.deleteChild(octet)
 
-				d.sizeUpdate(is4, -1)
+				f.sizeUpdate(is4, -1)
 				n.purgeAndCompress(stack[:depth], octets, is4)
 
 				return oldVal, true // delete
@@ -201,9 +226,9 @@ func (d *Fat[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del b
 	return
 }
 
-// Delete deletes the prefix and returns the associated payload for prefix and true,
-// or the zero value and false if prefix is not set in the routing table.
-func (d *Fat[V]) Delete(pfx netip.Prefix) (val V, exists bool) {
+// Delete removes the given prefix and returns its value and whether it existed.
+// Its semantics are identical to [Table.Delete].
+func (f *Fat[V]) Delete(pfx netip.Prefix) (val V, exists bool) {
 	if !pfx.IsValid() {
 		return
 	}
@@ -218,7 +243,7 @@ func (d *Fat[V]) Delete(pfx netip.Prefix) (val V, exists bool) {
 	octets := ip.AsSlice()
 	maxDepth, lastBits := maxDepthAndLastBits(bits)
 
-	n := d.rootNodeByVersion(is4)
+	n := f.rootNodeByVersion(is4)
 
 	// record the nodes on the path to the deleted node, needed to purge
 	// and/or path compress nodes after the deletion of a prefix
@@ -238,7 +263,7 @@ func (d *Fat[V]) Delete(pfx netip.Prefix) (val V, exists bool) {
 				return val, false
 			}
 
-			d.sizeUpdate(is4, -1)
+			f.sizeUpdate(is4, -1)
 			n.purgeAndCompress(stack[:depth], octets, is4)
 			return val, true
 		}
@@ -262,7 +287,7 @@ func (d *Fat[V]) Delete(pfx netip.Prefix) (val V, exists bool) {
 			// pfx is fringe at depth, delete fringe
 			n.deleteChild(octet)
 
-			d.sizeUpdate(is4, -1)
+			f.sizeUpdate(is4, -1)
 			n.purgeAndCompress(stack[:depth], octets, is4)
 
 			return kid.value, true
@@ -276,7 +301,7 @@ func (d *Fat[V]) Delete(pfx netip.Prefix) (val V, exists bool) {
 			// prefix is equal leaf, delete leaf
 			n.deleteChild(octet)
 
-			d.sizeUpdate(is4, -1)
+			f.sizeUpdate(is4, -1)
 			n.purgeAndCompress(stack[:depth], octets, is4)
 
 			return kid.value, true
@@ -289,9 +314,9 @@ func (d *Fat[V]) Delete(pfx netip.Prefix) (val V, exists bool) {
 	return
 }
 
-// Get returns the associated payload for prefix and true, or false if
-// prefix is not set in the routing table.
-func (d *Fat[V]) Get(pfx netip.Prefix) (val V, ok bool) {
+// Get looks up the given prefix and returns its value and whether it exists.
+// Its semantics are identical to [Table.Get].
+func (f *Fat[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 	if !pfx.IsValid() {
 		return
 	}
@@ -306,7 +331,7 @@ func (d *Fat[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 	octets := ip.AsSlice()
 	maxDepth, lastBits := maxDepthAndLastBits(bits)
 
-	n := d.rootNodeByVersion(is4)
+	n := f.rootNodeByVersion(is4)
 
 	// find the trie node
 	for depth, octet := range octets {
@@ -346,14 +371,15 @@ func (d *Fat[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 	panic("unreachable")
 }
 
-// Contains TODO
-func (d *Fat[V]) Contains(ip netip.Addr) bool {
+// Contains reports whether the given address is covered by any stored prefix.
+// Its semantics are identical to [Table.Contains].
+func (f *Fat[V]) Contains(ip netip.Addr) bool {
 	if !ip.IsValid() {
 		return false
 	}
 
 	is4 := ip.Is4()
-	n := d.rootNodeByVersion(is4)
+	n := f.rootNodeByVersion(is4)
 
 	for _, octet := range ip.AsSlice() {
 		if n.contains(uint(octet) + 256) {
@@ -388,14 +414,15 @@ func (d *Fat[V]) Contains(ip netip.Addr) bool {
 	return false
 }
 
-// Lookup TODO
-func (d *Fat[V]) Lookup(ip netip.Addr) (val V, ok bool) {
+// Lookup returns the value of the longest prefix match for the given address.
+// Its semantics are identical to [Table.Lookup].
+func (f *Fat[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	if !ip.IsValid() {
 		return
 	}
 
 	is4 := ip.Is4()
-	n := d.rootNodeByVersion(is4)
+	n := f.rootNodeByVersion(is4)
 
 	for _, octet := range ip.AsSlice() {
 		// save the current best LPM val, lookup is cheap in Fat
@@ -436,9 +463,10 @@ func (d *Fat[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	panic("unreachable")
 }
 
-// Clone TODO
-func (d *Fat[V]) Clone() *Fat[V] {
-	if d == nil {
+// Clone returns a copy of the routing table.
+// Its semantics are identical to [Table.Clone].
+func (f *Fat[V]) Clone() *Fat[V] {
+	if f == nil {
 		return nil
 	}
 
@@ -446,34 +474,34 @@ func (d *Fat[V]) Clone() *Fat[V] {
 
 	cloneFn := cloneFnFactory[V]()
 
-	c.root4 = *d.root4.cloneRec(cloneFn)
-	c.root6 = *d.root6.cloneRec(cloneFn)
+	c.root4 = *f.root4.cloneRec(cloneFn)
+	c.root6 = *f.root6.cloneRec(cloneFn)
 
-	c.size4 = d.size4
-	c.size6 = d.size6
+	c.size4 = f.size4
+	c.size6 = f.size6
 
 	return c
 }
 
-func (d *Fat[V]) sizeUpdate(is4 bool, n int) {
+func (f *Fat[V]) sizeUpdate(is4 bool, n int) {
 	if is4 {
-		d.size4 += n
+		f.size4 += n
 		return
 	}
-	d.size6 += n
+	f.size6 += n
 }
 
 // Size returns the prefix count.
-func (d *Fat[V]) Size() int {
-	return d.size4 + d.size6
+func (f *Fat[V]) Size() int {
+	return f.size4 + f.size6
 }
 
 // Size4 returns the IPv4 prefix count.
-func (d *Fat[V]) Size4() int {
-	return d.size4
+func (f *Fat[V]) Size4() int {
+	return f.size4
 }
 
 // Size6 returns the IPv6 prefix count.
-func (d *Fat[V]) Size6() int {
-	return d.size6
+func (f *Fat[V]) Size6() int {
+	return f.size6
 }
