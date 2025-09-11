@@ -31,7 +31,7 @@ type fatTrieItem[V any] struct {
 }
 
 // String returns a hierarchical tree diagram of the ordered CIDRs
-// as string, just a wrapper for [Table.Fprint].
+// as string, just a wrapper for [Fat.Fprint].
 // If Fprint returns an error, String panics.
 func (t *Fat[V]) String() string {
 	w := new(strings.Builder)
@@ -156,7 +156,7 @@ func (n *fatNode[V]) fprintRec(w io.Writer, parent fatTrieItem[V], pad string) e
 }
 
 // MarshalText implements the [encoding.TextMarshaler] interface,
-// just a wrapper for [Table.Fprint].
+// just a wrapper for [Fat.Fprint].
 func (t *Fat[V]) MarshalText() ([]byte, error) {
 	w := new(bytes.Buffer)
 	if err := t.Fprint(w); err != nil {
