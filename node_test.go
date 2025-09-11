@@ -47,9 +47,9 @@ func TestPrefixInsert(t *testing.T) {
 	}
 
 	for i := range 256 {
-		//nolint:gosec
+		//nolint:gosec  // G115: integer overflow conversion int -> uint
 		octet := byte(i)
-		//nolint:gosec
+		//nolint:gosec  // G115: integer overflow conversion int -> uint
 		addr := uint8(i)
 		goldVal, goldOK := gold.lpm(octet)
 		_, fastVal, fastOK := fast.lpmGet(art.OctetToIdx(addr))
@@ -82,9 +82,9 @@ func TestPrefixDelete(t *testing.T) {
 	}
 
 	for i := range 256 {
-		//nolint:gosec
+		//nolint:gosec  // G115: integer overflow conversion int -> uint
 		octet := byte(i)
-		//nolint:gosec
+		//nolint:gosec  // G115: integer overflow conversion int -> uint
 		addr := uint8(i)
 		goldVal, goldOK := gold.lpm(octet)
 		_, fastVal, fastOK := fast.lpmGet(art.OctetToIdx(addr))
@@ -280,13 +280,13 @@ func BenchmarkNodeChildInsert(b *testing.B) {
 		this := new(node[int])
 
 		for range nchilds {
-			//nolint:gosec
+			//nolint:gosec  // G115: integer overflow conversion int -> uint
 			octet := uint8(prng.IntN(maxItems))
 			this.children.InsertAt(octet, nil)
 		}
 
 		b.Run(fmt.Sprintf("Into %d", nchilds), func(b *testing.B) {
-			//nolint:gosec
+			//nolint:gosec  // G115: integer overflow conversion int -> uint
 			octet := uint8(prng.IntN(maxItems))
 
 			for b.Loop() {
@@ -302,13 +302,13 @@ func BenchmarkNodeChildDelete(b *testing.B) {
 		this := new(node[int])
 
 		for range nchilds {
-			//nolint:gosec
+			//nolint:gosec  // G115: integer overflow conversion int -> uint
 			octet := uint8(prng.IntN(maxItems))
 			this.children.InsertAt(octet, nil)
 		}
 
 		b.Run(fmt.Sprintf("From %d", nchilds), func(b *testing.B) {
-			//nolint:gosec
+			//nolint:gosec  // G115: integer overflow conversion int -> uint
 			octet := uint8(prng.IntN(maxItems))
 
 			for b.Loop() {
