@@ -3343,26 +3343,45 @@ func BenchmarkTableModifyRandom(b *testing.B) {
 func BenchmarkTableDelete(b *testing.B) {
 	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
-	for _, n := range benchRouteCount {
-		rt := new(Table[*MyInt])
-		for i, route := range randomPrefixes(prng, n) {
-			myInt := MyInt(i)
-			rt.Insert(route.pfx, &myInt)
-		}
-
-		prt := rt
-		probe := randomPrefix(prng)
+	for _, n := range []int{1_000, 10_000, 100_000, 1_000_000} {
+		pfxs := randomPrefixes(prng, n)
 
 		b.Run(fmt.Sprintf("mutable from_%d", n), func(b *testing.B) {
 			for b.Loop() {
-				rt.Delete(probe)
+				b.StopTimer()
+				rt := new(Table[*MyInt])
+
+				for i, route := range pfxs {
+					myInt := MyInt(i)
+					rt.Insert(route.pfx, &myInt)
+				}
+				b.StartTimer()
+
+				for _, route := range pfxs {
+					rt.Delete(route.pfx)
+				}
 			}
+			b.ReportMetric(float64(b.Elapsed())/float64(b.N)/float64(len(pfxs)), "ns/route")
+			b.ReportMetric(0, "ns/op")
 		})
 
 		b.Run(fmt.Sprintf("persist from_%d", n), func(b *testing.B) {
 			for b.Loop() {
-				_, _, _ = prt.DeletePersist(probe)
+				b.StopTimer()
+				rt := new(Table[*MyInt])
+
+				for i, route := range pfxs {
+					myInt := MyInt(i)
+					rt.Insert(route.pfx, &myInt)
+				}
+				b.StartTimer()
+
+				for _, route := range pfxs {
+					rt, _, _ = rt.DeletePersist(route.pfx)
+				}
 			}
+			b.ReportMetric(float64(b.Elapsed())/float64(b.N)/float64(len(pfxs)), "ns/route")
+			b.ReportMetric(0, "ns/op")
 		})
 	}
 }
