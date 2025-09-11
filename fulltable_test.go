@@ -44,7 +44,6 @@ type route struct {
 }
 
 func init() {
-	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	fillRouteTables()
 
@@ -263,7 +262,6 @@ func BenchmarkFullTableOverlaps4(b *testing.B) {
 	}
 
 	for i := 1; i <= 1<<20; i *= 2 {
-		//nolint:gosec
 		prng := rand.New(rand.NewPCG(42, 42))
 		lt2 := new(Lite)
 		for _, pfx := range randomRealWorldPrefixes4(prng, i) {
@@ -286,7 +284,6 @@ func BenchmarkFullTableOverlaps6(b *testing.B) {
 	}
 
 	for i := 1; i <= 1<<20; i *= 2 {
-		//nolint:gosec
 		prng := rand.New(rand.NewPCG(42, 42))
 		lt2 := new(Lite)
 		for _, pfx := range randomRealWorldPrefixes6(prng, i) {
@@ -308,7 +305,6 @@ func BenchmarkFullTableOverlapsPrefix(b *testing.B) {
 		lt.Insert(route.CIDR)
 	}
 
-	//nolint:gosec
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfx := randomRealWorldPrefixes(prng, 1)[0]
 
