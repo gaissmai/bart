@@ -176,35 +176,35 @@ func (n *fatNode[V]) nodeStats() stats {
 }
 
 // dumpString is just a wrapper for dump.
-func (d *Fat[V]) dumpString() string {
+func (f *Fat[V]) dumpString() string {
 	w := new(strings.Builder)
-	d.dump(w)
+	f.dump(w)
 
 	return w.String()
 }
 
 // dump the table structure and all the nodes to w.
-func (d *Fat[V]) dump(w io.Writer) {
-	if d == nil {
+func (f *Fat[V]) dump(w io.Writer) {
+	if f == nil {
 		return
 	}
 
-	if d.size4 > 0 {
-		stats := d.root4.nodeStatsRec()
+	if f.size4 > 0 {
+		stats := f.root4.nodeStatsRec()
 		fmt.Fprintln(w)
 		fmt.Fprintf(w, "### IPv4: size(%d), nodes(%d), pfxs(%d), leaves(%d), fringes(%d)",
-			d.size4, stats.nodes, stats.pfxs, stats.leaves, stats.fringes)
+			f.size4, stats.nodes, stats.pfxs, stats.leaves, stats.fringes)
 
-		d.root4.dumpRec(w, stridePath{}, 0, true)
+		f.root4.dumpRec(w, stridePath{}, 0, true)
 	}
 
-	if d.size6 > 0 {
-		stats := d.root6.nodeStatsRec()
+	if f.size6 > 0 {
+		stats := f.root6.nodeStatsRec()
 		fmt.Fprintln(w)
 		fmt.Fprintf(w, "### IPv6: size(%d), nodes(%d), pfxs(%d), leaves(%d), fringes(%d)",
-			d.size6, stats.nodes, stats.pfxs, stats.leaves, stats.fringes)
+			f.size6, stats.nodes, stats.pfxs, stats.leaves, stats.fringes)
 
-		d.root6.dumpRec(w, stridePath{}, 0, false)
+		f.root6.dumpRec(w, stridePath{}, 0, false)
 	}
 }
 
