@@ -489,7 +489,7 @@ func randomRealWorldPrefixes4(prng *rand.Rand, n int) []netip.Prefix {
 	set := make(map[netip.Prefix]struct{})
 	pfxs := make([]netip.Prefix, 0, n)
 
-	for {
+	for len(set) < n {
 		pfx := randomPrefix4(prng)
 
 		// skip too small or too big masks
@@ -506,10 +506,6 @@ func randomRealWorldPrefixes4(prng *rand.Rand, n int) []netip.Prefix {
 			set[pfx] = struct{}{}
 			pfxs = append(pfxs, pfx)
 		}
-
-		if len(set) >= n {
-			break
-		}
 	}
 	return pfxs
 }
@@ -518,7 +514,7 @@ func randomRealWorldPrefixes6(prng *rand.Rand, n int) []netip.Prefix {
 	set := make(map[netip.Prefix]struct{})
 	pfxs := make([]netip.Prefix, 0, n)
 
-	for {
+	for len(set) < n {
 		pfx := randomPrefix6(prng)
 
 		// skip too small or too big masks
@@ -537,9 +533,6 @@ func randomRealWorldPrefixes6(prng *rand.Rand, n int) []netip.Prefix {
 		if _, ok := set[pfx]; !ok {
 			set[pfx] = struct{}{}
 			pfxs = append(pfxs, pfx)
-		}
-		if len(set) >= n {
-			break
 		}
 	}
 	return pfxs
