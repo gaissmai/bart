@@ -62,6 +62,41 @@ func (n *node[V]) isEmpty() bool {
 	return n.prefixes.Len() == 0 && n.children.Len() == 0
 }
 
+// prefixCount returns the number of prefixes stored in this node.
+func (n *node[V]) prefixCount() int {
+	return n.prefixes.Len()
+}
+
+// childCount returns the number of slots used in this node.
+func (n *node[V]) childCount() int {
+	return n.children.Len()
+}
+
+// insertPrefix adds the route addr/prefixLen to n, with value val.
+func (n *node[V]) insertPrefix(idx uint8, val V) (exists bool) {
+	return n.prefixes.InsertAt(idx, val)
+}
+
+func (n *node[V]) getPrefix(idx uint8) (val V, exists bool) {
+	return n.prefixes.Get(idx)
+}
+
+func (n *node[V]) deletePrefix(idx uint8) (val V, exists bool) {
+	return n.prefixes.DeleteAt(idx)
+}
+
+func (n *node[V]) insertChild(addr uint8, child any) (exists bool) {
+	return n.children.InsertAt(addr, child)
+}
+
+func (n *node[V]) getChild(addr uint8) (any, bool) {
+	return n.children.Get(addr)
+}
+
+func (n *node[V]) deleteChild(addr uint8) {
+	_, _ = n.children.DeleteAt(addr)
+}
+
 // leafNode is a prefix with value, used as a path compressed child.
 type leafNode[V any] struct {
 	prefix netip.Prefix
