@@ -147,12 +147,7 @@ func (n *node[V]) cloneRec(cloneFn cloneFunc[V]) *node[V] {
 }
 
 // cloneFlat returns a shallow copy of the current fatNode[V],
-// optionally performing deep copies of values.
-//
-// If cloneFn is nil, the stored values in prefixes are copied directly without modification.
-// Otherwise, cloneFn is applied to each stored value for deep cloning.
-// Child nodes are cloned shallowly: leafNode and fringeNode children are cloned via their clone methods,
-// but child nodes of type *fatNode[V] are assigned as-is without recursive cloning.
+// Its semantics are identical to [node.cloneFlat].
 func (n *fatNode[V]) cloneFlat(cloneFn cloneFunc[V]) *fatNode[V] {
 	if n == nil {
 		return nil
@@ -210,7 +205,8 @@ func (n *fatNode[V]) cloneFlat(cloneFn cloneFunc[V]) *fatNode[V] {
 	return c
 }
 
-// cloneRec TODO
+// cloneRec performs a recursive deep copy of the fatNode[V] and all its descendants.
+// Its semantics are identical to [node.cloneRec].
 func (n *fatNode[V]) cloneRec(cloneFn cloneFunc[V]) *fatNode[V] {
 	if n == nil {
 		return nil
