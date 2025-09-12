@@ -273,7 +273,7 @@ func (n *fatNode[V]) purgeAndCompress(stack []*fatNode[V], octets []uint8, is4 b
 		childCount := n.childCount()
 
 		switch {
-		case n.prefixCount() == 0 && n.childCount() == 0:
+		case pfxCount == 0 && childCount == 0:
 			// just delete this empty node from parent
 			parent.deleteChild(octet)
 
