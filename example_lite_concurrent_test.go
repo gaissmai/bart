@@ -30,9 +30,8 @@ func ExampleLite_concurrent() {
 	go func() {
 		defer wg.Done()
 		for range 10_000 {
-			tbl := liteAtomicPtr.Load()
 			for _, ip := range exampleIPs {
-				_ = tbl.Contains(ip)
+				_ = liteAtomicPtr.Load().Contains(ip)
 			}
 		}
 	}()
