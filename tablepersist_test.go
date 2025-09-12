@@ -7,13 +7,6 @@ import (
 
 // Test types for cloning behavior - defined at package level
 
-// // clonerInt demonstrates value cloning behavior
-// type clonerInt int
-//
-// func (c clonerInt) Clone() clonerInt {
-// 	return clonerInt(int(c) + 1000)
-// }
-
 // nonClonerStruct for testing pointer behavior without cloning
 type nonClonerStruct struct {
 	value int
