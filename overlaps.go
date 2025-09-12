@@ -206,8 +206,8 @@ func (n *node[V]) overlapsSameChildren(o *node[V], depth int) bool {
 	ok := true
 	for ok {
 		if addr, ok = commonChildren.NextSet(addr); ok {
-			nChild := n.children.MustGet(addr)
-			oChild := o.children.MustGet(addr)
+			nChild := n.mustGetChild(addr)
+			oChild := o.mustGetChild(addr)
 
 			if overlapsTwoChilds[V](nChild, oChild, depth+1) {
 				return true
@@ -321,7 +321,7 @@ func (n *node[V]) overlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
 		}
 
 		// next child, node or leaf
-		switch kid := n.children.MustGet(octet).(type) {
+		switch kid := n.mustGetChild(octet).(type) {
 		case *node[V]:
 			n = kid
 			continue

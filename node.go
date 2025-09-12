@@ -81,6 +81,10 @@ func (n *node[V]) getPrefix(idx uint8) (val V, exists bool) {
 	return n.prefixes.Get(idx)
 }
 
+func (n *node[V]) mustGetPrefix(idx uint8) (val V) {
+	return n.prefixes.MustGet(idx)
+}
+
 func (n *node[V]) deletePrefix(idx uint8) (val V, exists bool) {
 	return n.prefixes.DeleteAt(idx)
 }
@@ -91,6 +95,10 @@ func (n *node[V]) insertChild(addr uint8, child any) (exists bool) {
 
 func (n *node[V]) getChild(addr uint8) (any, bool) {
 	return n.children.Get(addr)
+}
+
+func (n *node[V]) mustGetChild(addr uint8) any {
+	return n.children.MustGet(addr)
 }
 
 func (n *node[V]) deleteChild(addr uint8) {
@@ -169,20 +177,20 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 	for _, octet := range octets[depth:] {
 		// last masked octet: insert/override prefix/val into node
 		if depth == lastOctetPlusOne {
-			return n.prefixes.InsertAt(art.PfxToIdx(octet, lastBits), val)
+			return n.insertPrefix(art.PfxToIdx(octet, lastBits), val)
 		}
 
 		// reached end of trie path ...
 		if !n.children.Test(octet) {
 			// insert prefix path compressed as leaf or fringe
 			if isFringe(depth, pfx) {
-				return n.children.InsertAt(octet, newFringeNode(val))
+				return n.insertChild(octet, newFringeNode(val))
 			}
-			return n.children.InsertAt(octet, newLeafNode(pfx, val))
+			return n.insertChild(octet, newLeafNode(pfx, val))
 		}
 
 		// ... or decend down the trie
-		kid := n.children.MustGet(octet)
+		kid := n.mustGetChild(octet)
 
 		// kid is node or leaf at addr
 		switch kid := kid.(type) {
@@ -205,7 +213,7 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 			newNode := new(node[V])
 			newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
 
-			n.children.InsertAt(octet, newNode)
+			n.insertChild(octet, newNode)
 			n = newNode
 
 		case *fringeNode[V]:
@@ -222,9 +230,9 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 			// insert new child at current leaf position (addr)
 			// descend down, replace n with new child
 			newNode := new(node[V])
-			newNode.prefixes.InsertAt(1, kid.value)
+			newNode.insertPrefix(1, kid.value)
 
-			n.children.InsertAt(octet, newNode)
+			n.insertChild(octet, newNode)
 			n = newNode
 
 		default:
@@ -261,7 +269,7 @@ func (n *node[V]) purgeAndCompress(stack []*node[V], octets []uint8, is4 bool) {
 		switch {
 		case n.isEmpty():
 			// just delete this empty node from parent
-			parent.children.DeleteAt(octet)
+			parent.deleteChild(octet)
 
 		case pfxCount == 0 && childCount == 1:
 			switch kid := n.children.Items[0].(type) {
@@ -271,13 +279,13 @@ func (n *node[V]) purgeAndCompress(stack []*node[V], octets []uint8, is4 bool) {
 				return
 			case *leafNode[V]:
 				// just one leaf, delete this node and reinsert the leaf above
-				parent.children.DeleteAt(octet)
+				parent.deleteChild(octet)
 
 				// ... (re)insert the leaf at parents depth
 				parent.insertAtDepth(kid.prefix, kid.value, depth)
 			case *fringeNode[V]:
 				// just one fringe, delete this node and reinsert the fringe as leaf above
-				parent.children.DeleteAt(octet)
+				parent.deleteChild(octet)
 
 				// get the last octet back, the only item is also the first item
 				lastOctet, _ := n.children.FirstSet()
@@ -292,7 +300,7 @@ func (n *node[V]) purgeAndCompress(stack []*node[V], octets []uint8, is4 bool) {
 
 		case pfxCount == 1 && childCount == 0:
 			// just one prefix, delete this node and reinsert the idx as leaf above
-			parent.children.DeleteAt(octet)
+			parent.deleteChild(octet)
 
 			// get prefix back from idx ...
 			idx, _ := n.prefixes.FirstSet() // single idx must be first bit set
@@ -327,7 +335,7 @@ func (n *node[V]) purgeAndCompress(stack []*node[V], octets []uint8, is4 bool) {
 func (n *node[V]) lpmGet(idx uint) (baseIdx uint8, val V, ok bool) {
 	// top is the idx of the longest-prefix-match
 	if top, ok := n.prefixes.IntersectionTop(lpm.BackTrackingBitset(idx)); ok {
-		return top, n.prefixes.MustGet(top), true
+		return top, n.mustGetPrefix(top), true
 	}
 
 	// not found (on this level)
@@ -367,7 +375,7 @@ func (n *node[V]) allRec(path stridePath, depth int, is4 bool, yield func(netip.
 		cidr := cidrFromPath(path, depth, is4, idx)
 
 		// callback for this prefix and val
-		if !yield(cidr, n.prefixes.MustGet(idx)) {
+		if !yield(cidr, n.mustGetPrefix(idx)) {
 			// early exit
 			return false
 		}
@@ -484,7 +492,7 @@ func (n *node[V]) allRecSorted(path stridePath, depth int, is4 bool, yield func(
 		// yield the prefix for this idx
 		cidr := cidrFromPath(path, depth, is4, pfxIdx)
 		// n.prefixes.Items[i] not possible after sorting allIndices
-		if !yield(cidr, n.prefixes.MustGet(pfxIdx)) {
+		if !yield(cidr, n.mustGetPrefix(pfxIdx)) {
 			return false
 		}
 	}
@@ -546,7 +554,7 @@ func (n *node[V]) eachLookupPrefix(octets []byte, depth int, is4 bool, pfxIdx ui
 
 	for ; idx > 0; idx >>= 1 {
 		if n.prefixes.Test(idx) {
-			val := n.prefixes.MustGet(idx)
+			val := n.mustGetPrefix(idx)
 			cidr := cidrFromPath(path, depth, is4, idx)
 
 			if !yield(cidr, val) {
@@ -614,7 +622,7 @@ func (n *node[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxIdx uint8, y
 			}
 
 			// yield the node or leaf?
-			switch kid := n.children.MustGet(addr).(type) {
+			switch kid := n.mustGetChild(addr).(type) {
 			case *node[V]:
 				path[depth] = addr
 				if !kid.allRecSorted(path, depth+1, is4, yield) {
@@ -644,7 +652,7 @@ func (n *node[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxIdx uint8, y
 		// yield the prefix for this idx
 		cidr := cidrFromPath(path, depth, is4, pfxIdx)
 		// n.prefixes.Items[i] not possible after sorting allIndices
-		if !yield(cidr, n.prefixes.MustGet(pfxIdx)) {
+		if !yield(cidr, n.mustGetPrefix(pfxIdx)) {
 			return false
 		}
 	}
@@ -652,7 +660,7 @@ func (n *node[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxIdx uint8, y
 	// yield the rest of leaves and nodes (rec-descent)
 	for _, addr := range allCoveredChildAddrs[addrCursor:] {
 		// yield the node or leaf?
-		switch kid := n.children.MustGet(addr).(type) {
+		switch kid := n.mustGetChild(addr).(type) {
 		case *node[V]:
 			path[depth] = addr
 			if !kid.allRecSorted(path, depth+1, is4, yield) {

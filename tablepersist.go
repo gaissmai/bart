@@ -70,7 +70,7 @@ func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V] {
 	for depth, octet := range octets {
 		// last masked octet: insert/override prefix/val into node
 		if depth == lastOctetPlusOne {
-			exists := n.prefixes.InsertAt(art.PfxToIdx(octet, lastBits), val)
+			exists := n.insertPrefix(art.PfxToIdx(octet, lastBits), val)
 			// If prefix did not previously exist, increment size counter.
 			if !exists {
 				pt.sizeUpdate(is4, 1)
@@ -81,9 +81,9 @@ func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V] {
 		if !n.children.Test(octet) {
 			// insert prefix path compressed as leaf or fringe
 			if isFringe(depth, pfx) {
-				n.children.InsertAt(octet, newFringeNode(val))
+				n.insertChild(octet, newFringeNode(val))
 			} else {
-				n.children.InsertAt(octet, newLeafNode(pfx, val))
+				n.insertChild(octet, newLeafNode(pfx, val))
 			}
 
 			// New prefix addition path compressed, update size.
@@ -91,7 +91,7 @@ func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V] {
 			return pt
 		}
 
-		kid := n.children.MustGet(octet)
+		kid := n.mustGetChild(octet)
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
@@ -102,7 +102,7 @@ func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V] {
 			kid = kid.cloneFlat(cloneFn)
 
 			// replace kid with clone
-			n.children.InsertAt(octet, kid)
+			n.insertChild(octet, kid)
 
 			n = kid
 			continue // descend down to next trie level
@@ -123,7 +123,7 @@ func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V] {
 			newNode := new(node[V])
 			newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
 
-			n.children.InsertAt(octet, newNode)
+			n.insertChild(octet, newNode)
 			n = newNode
 
 		case *fringeNode[V]:
@@ -140,9 +140,9 @@ func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V] {
 			// insert new child at current leaf position (addr)
 			// descend down, replace n with new child
 			newNode := new(node[V])
-			newNode.prefixes.InsertAt(1, kid.value)
+			newNode.insertPrefix(1, kid.value)
 
-			n.children.InsertAt(octet, newNode)
+			n.insertChild(octet, newNode)
 			n = newNode
 
 		default:
@@ -217,9 +217,9 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 		if depth == lastOctetPlusOne {
 			idx := art.PfxToIdx(octet, lastBits)
 
-			oldVal, existed := n.prefixes.Get(idx)
+			oldVal, existed := n.getPrefix(idx)
 			newVal := cb(oldVal, existed)
-			n.prefixes.InsertAt(idx, newVal)
+			n.insertPrefix(idx, newVal)
 
 			if !existed {
 				pt.sizeUpdate(is4, 1)
@@ -233,9 +233,9 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 		if !n.children.Test(addr) {
 			newVal := cb(zero, false)
 			if isFringe(depth, pfx) {
-				n.children.InsertAt(addr, newFringeNode(newVal))
+				n.insertChild(addr, newFringeNode(newVal))
 			} else {
-				n.children.InsertAt(addr, newLeafNode(pfx, newVal))
+				n.insertChild(addr, newLeafNode(pfx, newVal))
 			}
 
 			// New prefix addition updates size.
@@ -244,7 +244,7 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 		}
 
 		// Child exists - retrieve it.
-		kid := n.children.MustGet(addr)
+		kid := n.mustGetChild(addr)
 
 		// kid is node or leaf at addr
 		switch kid := kid.(type) {
@@ -253,7 +253,7 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 			kid = kid.cloneFlat(cloneFn)
 
 			// Replace original child with the cloned child.
-			n.children.InsertAt(addr, kid)
+			n.insertChild(addr, kid)
 
 			// Descend into cloned child for further traversal.
 			n = kid
@@ -265,7 +265,7 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 				newVal = cb(kid.value, true)
 
 				// Replace the existing leaf with an updated one.
-				n.children.InsertAt(addr, newLeafNode(pfx, newVal))
+				n.insertChild(addr, newLeafNode(pfx, newVal))
 
 				return pt, newVal
 			}
@@ -276,7 +276,7 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 			newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
 
 			// Replace leaf with new node and descend.
-			n.children.InsertAt(addr, newNode)
+			n.insertChild(addr, newNode)
 			n = newNode
 
 		case *fringeNode[V]:
@@ -284,17 +284,17 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 			if isFringe(depth, pfx) {
 				newVal = cb(kid.value, true)
 				// Replace fringe node with updated value.
-				n.children.InsertAt(addr, newFringeNode(newVal))
+				n.insertChild(addr, newFringeNode(newVal))
 				return pt, newVal
 			}
 
 			// Else convert fringe node into an internal node with fringe value
 			// pushed down as default route (idx=1).
 			newNode := new(node[V])
-			newNode.prefixes.InsertAt(1, kid.value)
+			newNode.insertPrefix(1, kid.value)
 
 			// Replace fringe with newly created internal node and descend.
-			n.children.InsertAt(addr, newNode)
+			n.insertChild(addr, newNode)
 			n = newNode
 
 		default:
@@ -375,7 +375,7 @@ func (t *Table[V]) ModifyPersist(pfx netip.Prefix, cb func(val V, ok bool) (newV
 		if depth == lastOctetPlusOne {
 			idx := art.PfxToIdx(octet, lastBits)
 
-			oldVal, existed := n.prefixes.Get(idx)
+			oldVal, existed := n.getPrefix(idx)
 			newVal, del := cb(oldVal, existed)
 
 			// update size if necessary
@@ -384,18 +384,18 @@ func (t *Table[V]) ModifyPersist(pfx netip.Prefix, cb func(val V, ok bool) (newV
 				return pt, zero, false
 
 			case existed && del: // delete
-				n.prefixes.DeleteAt(idx)
+				n.deletePrefix(idx)
 				pt.sizeUpdate(is4, -1)
 				n.purgeAndCompress(stack[:depth], octets, is4)
 				return pt, oldVal, true
 
 			case !existed: // insert
-				n.prefixes.InsertAt(idx, newVal)
+				n.insertPrefix(idx, newVal)
 				pt.sizeUpdate(is4, 1)
 				return pt, newVal, false
 
 			case existed: // update
-				n.prefixes.InsertAt(idx, newVal)
+				n.insertPrefix(idx, newVal)
 				return pt, oldVal, false
 
 			default:
@@ -414,9 +414,9 @@ func (t *Table[V]) ModifyPersist(pfx netip.Prefix, cb func(val V, ok bool) (newV
 
 			// insert
 			if isFringe(depth, pfx) {
-				n.children.InsertAt(octet, newFringeNode(newVal))
+				n.insertChild(octet, newFringeNode(newVal))
 			} else {
-				n.children.InsertAt(octet, newLeafNode(pfx, newVal))
+				n.insertChild(octet, newLeafNode(pfx, newVal))
 			}
 
 			pt.sizeUpdate(is4, 1)
@@ -424,7 +424,7 @@ func (t *Table[V]) ModifyPersist(pfx netip.Prefix, cb func(val V, ok bool) (newV
 		}
 
 		// Child exists - retrieve it.
-		kid := n.children.MustGet(octet)
+		kid := n.mustGetChild(octet)
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
@@ -433,7 +433,7 @@ func (t *Table[V]) ModifyPersist(pfx netip.Prefix, cb func(val V, ok bool) (newV
 			kid = kid.cloneFlat(cloneFn)
 
 			// Replace original child with the cloned child.
-			n.children.InsertAt(octet, kid)
+			n.insertChild(octet, kid)
 
 			n = kid // descend down to next trie level
 
@@ -449,7 +449,7 @@ func (t *Table[V]) ModifyPersist(pfx netip.Prefix, cb func(val V, ok bool) (newV
 				}
 
 				// delete
-				n.children.DeleteAt(octet)
+				n.deleteChild(octet)
 
 				pt.sizeUpdate(is4, -1)
 				n.purgeAndCompress(stack[:depth], octets, is4)
@@ -464,7 +464,7 @@ func (t *Table[V]) ModifyPersist(pfx netip.Prefix, cb func(val V, ok bool) (newV
 			newNode := new(node[V])
 			newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
 
-			n.children.InsertAt(octet, newNode)
+			n.insertChild(octet, newNode)
 			n = newNode
 
 		case *fringeNode[V]:
@@ -479,7 +479,7 @@ func (t *Table[V]) ModifyPersist(pfx netip.Prefix, cb func(val V, ok bool) (newV
 				}
 
 				// delete
-				n.children.DeleteAt(octet)
+				n.deleteChild(octet)
 
 				pt.sizeUpdate(is4, -1)
 				n.purgeAndCompress(stack[:depth], octets, is4)
@@ -492,9 +492,9 @@ func (t *Table[V]) ModifyPersist(pfx netip.Prefix, cb func(val V, ok bool) (newV
 			// insert new child at current leaf position (octet
 			// descend down, replace n with new child
 			newNode := new(node[V])
-			newNode.prefixes.InsertAt(1, kid.value)
+			newNode.insertPrefix(1, kid.value)
 
-			n.children.InsertAt(octet, newNode)
+			n.insertChild(octet, newNode)
 			n = newNode
 
 		default:
@@ -574,7 +574,7 @@ func (t *Table[V]) DeletePersist(pfx netip.Prefix) (pt *Table[V], val V, found b
 
 		if depth == lastOctetPlusOne {
 			// Attempt to delete the prefix from the node's prefixes.
-			val, found = n.prefixes.DeleteAt(art.PfxToIdx(octet, lastBits))
+			val, found = n.deletePrefix(art.PfxToIdx(octet, lastBits))
 			if !found {
 				// Prefix not found, nothing deleted.
 				return pt, val, false
@@ -597,7 +597,7 @@ func (t *Table[V]) DeletePersist(pfx netip.Prefix) (pt *Table[V], val V, found b
 		}
 
 		// Fetch child node at current address.
-		kid := n.children.MustGet(addr)
+		kid := n.mustGetChild(addr)
 
 		switch kid := kid.(type) {
 		case *node[V]:
@@ -605,7 +605,7 @@ func (t *Table[V]) DeletePersist(pfx netip.Prefix) (pt *Table[V], val V, found b
 			kid = kid.cloneFlat(cloneFn)
 
 			// Replace child with cloned node.
-			n.children.InsertAt(addr, kid)
+			n.insertChild(addr, kid)
 
 			// Descend to cloned child node.
 			n = kid
@@ -619,7 +619,7 @@ func (t *Table[V]) DeletePersist(pfx netip.Prefix) (pt *Table[V], val V, found b
 			}
 
 			// Delete the fringe node.
-			n.children.DeleteAt(addr)
+			n.deleteChild(addr)
 
 			// Update size to reflect deletion.
 			pt.sizeUpdate(is4, -1)
@@ -637,7 +637,7 @@ func (t *Table[V]) DeletePersist(pfx netip.Prefix) (pt *Table[V], val V, found b
 			}
 
 			// Delete leaf node.
-			n.children.DeleteAt(addr)
+			n.deleteChild(addr)
 
 			// Update size to reflect deletion.
 			pt.sizeUpdate(is4, -1)
