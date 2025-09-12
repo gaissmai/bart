@@ -144,7 +144,7 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 			fmt.Fprintf(w, "%sleaves(#%d):", indent, leafCount)
 
 			for _, addr := range leafAddrs {
-				k := n.children.MustGet(addr)
+				k := n.mustGetChild(addr)
 				pc := k.(*leafNode[V])
 
 				// Lite: val is the empty struct, don't print it
@@ -166,7 +166,7 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 			for _, addr := range fringeAddrs {
 				fringePfx := cidrForFringe(path[:], depth, is4, addr)
 
-				k := n.children.MustGet(addr)
+				k := n.mustGetChild(addr)
 				pc := k.(*fringeNode[V])
 
 				// Lite: val is the empty struct, don't print it
