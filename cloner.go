@@ -23,8 +23,9 @@ func cloneFnFactory[V any]() cloneFunc[V] {
 	return nil
 }
 
-// cloneVal invokes the Clone method to deeply copy val.
-// Assumes that val implements Cloner[V].
+// cloneVal returns a deep clone of val by calling its Clone method when
+// val implements Cloner[V]. If val does not implement Cloner[V] or the
+// asserted Cloner is nil, val is returned unchanged.
 func cloneVal[V any](val V) V {
 	// you can't assert directly on a type parameter
 	c, ok := any(val).(Cloner[V])
