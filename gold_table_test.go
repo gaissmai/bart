@@ -4,7 +4,6 @@
 package bart
 
 import (
-	"cmp"
 	"fmt"
 	"math/rand/v2"
 	"net/netip"
@@ -177,10 +176,7 @@ func (ta *goldTable[V]) overlaps(tb *goldTable[V]) bool {
 // sort, inplace by netip.Prefix, all prefixes are in normalized form
 func (t *goldTable[V]) sort() {
 	slices.SortFunc(*t, func(a, b goldTableItem[V]) int {
-		if cmp := a.pfx.Addr().Compare(b.pfx.Addr()); cmp != 0 {
-			return cmp
-		}
-		return cmp.Compare(a.pfx.Bits(), b.pfx.Bits())
+		return cmpPrefix(a.pfx, b.pfx)
 	})
 }
 
