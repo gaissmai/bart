@@ -113,9 +113,9 @@ func TestNodeCloneFlat_ShallowChildrenDeepValues(t *testing.T) {
 	t.Parallel()
 	parent := &node[clonerInt]{}
 
-	// Add prefix values using InsertAt
-	parent.prefixes.InsertAt(10, clonerInt(1))
-	parent.prefixes.InsertAt(20, clonerInt(2))
+	// Add prefix values
+	parent.insertPrefix(10, clonerInt(1))
+	parent.insertPrefix(20, clonerInt(2))
 
 	// Create child nodes
 	pfx := netip.MustParsePrefix("10.0.0.0/8")
@@ -123,9 +123,9 @@ func TestNodeCloneFlat_ShallowChildrenDeepValues(t *testing.T) {
 	fringe := &fringeNode[clonerInt]{value: 20}
 	childNode := &node[clonerInt]{}
 
-	parent.children.InsertAt(1, childNode)
-	parent.children.InsertAt(2, leaf)
-	parent.children.InsertAt(3, fringe)
+	parent.insertChild(1, childNode)
+	parent.insertChild(2, leaf)
+	parent.insertChild(3, fringe)
 
 	fn := cloneFnFactory[clonerInt]() // should not be nil
 	got := parent.cloneFlat(fn)
@@ -143,29 +143,29 @@ func TestNodeCloneFlat_ShallowChildrenDeepValues(t *testing.T) {
 	}
 
 	// Verify prefixes are cloned (different array, cloned values)
-	if got.prefixes.Len() != 2 {
-		t.Fatalf("expected 2 prefixes, got %d", got.prefixes.Len())
+	if got.prefixCount() != 2 {
+		t.Fatalf("expected 2 prefixes, got %d", got.prefixCount())
 	}
 	// Values should be cloned (+1000)
-	if v, ok := got.prefixes.Get(10); !ok || v != clonerInt(1001) {
+	if v, ok := got.getPrefix(10); !ok || v != clonerInt(1001) {
 		t.Fatalf("expected cloned prefix value 1001; got %v ok=%v", v, ok)
 	}
-	if v, ok := got.prefixes.Get(20); !ok || v != clonerInt(1002) {
+	if v, ok := got.getPrefix(20); !ok || v != clonerInt(1002) {
 		t.Fatalf("expected cloned prefix value 1002; got %v ok=%v", v, ok)
 	}
 
 	// Verify children are processed correctly
-	if got.children.Len() != 3 {
-		t.Fatalf("expected 3 children, got %d", got.children.Len())
+	if got.childCount() != 3 {
+		t.Fatalf("expected 3 children, got %d", got.childCount())
 	}
 
 	// *node child should be same reference (shallow)
-	if gotNode, ok := got.children.Get(1); !ok || gotNode != childNode {
+	if gotNode, ok := got.getChild(1); !ok || gotNode != childNode {
 		t.Fatalf("expected shallow reference for *node child")
 	}
 
 	// leaf should be cloned
-	if gotLeaf, ok := got.children.Get(2); !ok {
+	if gotLeaf, ok := got.getChild(2); !ok {
 		t.Fatalf("expected leaf at index 2")
 	} else if l2, ok := gotLeaf.(*leafNode[clonerInt]); !ok || l2 == leaf {
 		t.Fatalf("expected new leaf instance")
@@ -174,7 +174,7 @@ func TestNodeCloneFlat_ShallowChildrenDeepValues(t *testing.T) {
 	}
 
 	// fringe should be cloned
-	if gotFringe, ok := got.children.Get(3); !ok {
+	if gotFringe, ok := got.getChild(3); !ok {
 		t.Fatalf("expected fringe at index 3")
 	} else if f2, ok := gotFringe.(*fringeNode[clonerInt]); !ok || f2 == fringe {
 		t.Fatalf("expected new fringe instance")
@@ -203,8 +203,8 @@ func TestNodeCloneRec_DeepCopiesNodeChildren(t *testing.T) {
 	grand := &node[clonerInt]{}
 
 	// build hierarchy
-	parent.children.InsertAt(10, child)
-	child.children.InsertAt(20, grand)
+	parent.insertChild(10, child)
+	child.insertChild(20, grand)
 
 	cloneFn := cloneFnFactory[clonerInt]()
 	got := parent.cloneRec(cloneFn)
@@ -215,7 +215,7 @@ func TestNodeCloneRec_DeepCopiesNodeChildren(t *testing.T) {
 	}
 
 	// verify deep clone
-	kidAny, ok := got.children.Get(10)
+	kidAny, ok := got.getChild(10)
 	if !ok {
 		t.Fatalf("expected child at index 10")
 	}
@@ -224,7 +224,7 @@ func TestNodeCloneRec_DeepCopiesNodeChildren(t *testing.T) {
 		t.Fatalf("expected deep-cloned child fatNode")
 	}
 
-	gkAny, ok := kid.children.Get(20)
+	gkAny, ok := kid.getChild(20)
 	if !ok {
 		t.Fatalf("expected grandchild at index 20")
 	}
