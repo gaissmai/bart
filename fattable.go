@@ -87,9 +87,8 @@ func (f *Fat[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del b
 	// values derived from pfx
 	ip := pfx.Addr()
 	is4 := ip.Is4()
-	bits := pfx.Bits()
 	octets := ip.AsSlice()
-	maxDepth, lastBits := maxDepthAndLastBits(bits)
+	lastOctetPlusOne, lastBits := lastOctetPlusOneAndLastBits(pfx)
 
 	n := f.rootNodeByVersion(is4)
 
@@ -99,12 +98,12 @@ func (f *Fat[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del b
 
 	// find the trie node
 	for depth, octet := range octets {
-		depth = depth & 0xf // BCE
+		depth = depth & depthMask // BCE
 
 		// push current node on stack for path recording
 		stack[depth] = n
 
-		if depth == maxDepth {
+		if depth == lastOctetPlusOne {
 			idx := art.PfxToIdx(octet, lastBits)
 
 			oldVal, existed := n.getPrefix(idx)
@@ -145,7 +144,7 @@ func (f *Fat[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del b
 			}
 
 			// insert
-			if isFringe(depth, bits) {
+			if isFringe(depth, pfx) {
 				n.insertChild(octet, newFringeNode(newVal))
 			} else {
 				n.insertChild(octet, newLeafNode(pfx, newVal))
@@ -164,7 +163,7 @@ func (f *Fat[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del b
 			oldVal := kid.value
 
 			// update existing value if prefix is fringe
-			if isFringe(depth, bits) {
+			if isFringe(depth, pfx) {
 				newVal, del := cb(kid.value, true)
 				if !del {
 					kid.value = newVal
@@ -239,9 +238,8 @@ func (f *Fat[V]) Delete(pfx netip.Prefix) (val V, exists bool) {
 	// values derived from pfx
 	ip := pfx.Addr()
 	is4 := ip.Is4()
-	bits := pfx.Bits()
 	octets := ip.AsSlice()
-	maxDepth, lastBits := maxDepthAndLastBits(bits)
+	lastOctetPlusOne, lastBits := lastOctetPlusOneAndLastBits(pfx)
 
 	n := f.rootNodeByVersion(is4)
 
@@ -251,12 +249,12 @@ func (f *Fat[V]) Delete(pfx netip.Prefix) (val V, exists bool) {
 
 	// find the trie node
 	for depth, octet := range octets {
-		depth = depth & 0xf // BCE, Delete must be fast
+		depth = depth & depthMask // BCE
 
 		// push current node on stack for path recording
 		stack[depth] = n
 
-		if depth == maxDepth {
+		if depth == lastOctetPlusOne {
 			// try to delete prefix in trie node
 			val, exists = n.deletePrefix(art.PfxToIdx(octet, lastBits))
 			if !exists {
@@ -280,7 +278,7 @@ func (f *Fat[V]) Delete(pfx netip.Prefix) (val V, exists bool) {
 
 		case *fringeNode[V]:
 			// if pfx is no fringe at this depth, fast exit
-			if !isFringe(depth, bits) {
+			if !isFringe(depth, pfx) {
 				return
 			}
 
@@ -327,15 +325,14 @@ func (f *Fat[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 	// values derived from pfx
 	ip := pfx.Addr()
 	is4 := ip.Is4()
-	bits := pfx.Bits()
 	octets := ip.AsSlice()
-	maxDepth, lastBits := maxDepthAndLastBits(bits)
+	lastOctetPlusOne, lastBits := lastOctetPlusOneAndLastBits(pfx)
 
 	n := f.rootNodeByVersion(is4)
 
 	// find the trie node
 	for depth, octet := range octets {
-		if depth == maxDepth {
+		if depth == lastOctetPlusOne {
 			return n.getPrefix(art.PfxToIdx(octet, lastBits))
 		}
 
@@ -351,7 +348,7 @@ func (f *Fat[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 
 		case *fringeNode[V]:
 			// reached a path compressed fringe, stop traversing
-			if isFringe(depth, bits) {
+			if isFringe(depth, pfx) {
 				return kid.value, true
 			}
 			return

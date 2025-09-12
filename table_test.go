@@ -3115,7 +3115,7 @@ func TestSize(t *testing.T) {
 	}
 }
 
-func TestLastIdxLastBits(t *testing.T) {
+func TestLastOctetPlusOneAndLastBits(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -3172,12 +3172,14 @@ func TestLastIdxLastBits(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		gotMaxDepth, gotBits := maxDepthAndLastBits(tc.pfx.Bits())
-		if gotMaxDepth != tc.wantDepth {
-			t.Errorf("maxDepthAndLastBits(%d), maxDepth got: %d, want: %d", tc.pfx.Bits(), gotMaxDepth, tc.wantDepth)
+		lastOctetPlusOne, gotBits := lastOctetPlusOneAndLastBits(tc.pfx)
+		if lastOctetPlusOne != tc.wantDepth {
+			t.Errorf("lastOctetPlusOneAndLastBits(%d), lastOctetPlusOne got: %d, want: %d",
+				tc.pfx.Bits(), lastOctetPlusOne, tc.wantDepth)
 		}
 		if gotBits != tc.wantBits {
-			t.Errorf("maxDepthAndLastBits(%d), lastBits got: %d, want: %d", tc.pfx.Bits(), gotBits, tc.wantBits)
+			t.Errorf("lastOctetPlusOneAndLastBits(%d), lastBits got: %d, want: %d",
+				tc.pfx.Bits(), gotBits, tc.wantBits)
 		}
 	}
 }
