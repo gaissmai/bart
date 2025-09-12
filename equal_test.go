@@ -116,7 +116,7 @@ func TestFullTableEqual(t *testing.T) {
 		}
 	})
 
-	t.Run("update", func(t *testing.T) {
+	t.Run("modify", func(t *testing.T) {
 		t.Parallel()
 		ct := at.Clone()
 
