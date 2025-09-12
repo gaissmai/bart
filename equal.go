@@ -30,6 +30,9 @@ func (n *node[V]) equalRec(o *node[V]) bool {
 	if n == nil || o == nil {
 		return n == o
 	}
+	if n == o {
+		return true
+	}
 
 	if n.prefixes.BitSet256 != o.prefixes.BitSet256 {
 		return false
