@@ -14,9 +14,10 @@ import (
 )
 
 const (
-	strideLen    = 8   // byte, a multibit trie with stride len 8
-	maxTreeDepth = 16  // max 16 bytes for IPv6
-	maxItems     = 256 // max 256 prefixes or children in node
+	strideLen    = 8                // byte, a multibit trie with stride len 8
+	maxItems     = 256              // max 256 prefixes or children in node
+	maxTreeDepth = 16               // max 16 bytes for IPv6
+	depthMask    = maxTreeDepth - 1 // used for BCE
 )
 
 // stridePath, max 16 octets deep
@@ -110,11 +111,11 @@ func newFringeNode[V any](val V) *fringeNode[V] {
 //
 // Logic:
 //   - A prefix qualifies as a fringe if:
-//     depth == maxDepth - 1 &&
-//     lastBits == 0 (i.e., aligned on stride boundary, /8, /16, ... /128 bits)
-func isFringe(depth, bits int) bool {
-	maxDepth, lastBits := maxDepthAndLastBits(bits)
-	return depth == maxDepth-1 && lastBits == 0
+//     depth == lastOctet && lastBits == 0
+//     (i.e., aligned on stride boundary, /8, /16, ... /128 bits)
+func isFringe(depth int, pfx netip.Prefix) bool {
+	lastOctetPlusOne, lastBits := lastOctetPlusOneAndLastBits(pfx)
+	return depth == lastOctetPlusOne-1 && lastBits == 0
 }
 
 // insertAtDepth inserts a network prefix and its associated value into the
@@ -125,22 +126,21 @@ func isFringe(depth, bits int) bool {
 // it is pushed down via a new intermediate node. Existing entries with the same prefix are overwritten.
 func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool) {
 	ip := pfx.Addr() // the pfx must be in canonical form
-	bits := pfx.Bits()
 	octets := ip.AsSlice()
-	maxDepth, lastBits := maxDepthAndLastBits(bits)
+	lastOctetPlusOne, lastBits := lastOctetPlusOneAndLastBits(pfx)
 
 	// find the proper trie node to insert prefix
 	// start with prefix octet at depth
 	for _, octet := range octets[depth:] {
 		// last masked octet: insert/override prefix/val into node
-		if depth == maxDepth {
+		if depth == lastOctetPlusOne {
 			return n.prefixes.InsertAt(art.PfxToIdx(octet, lastBits), val)
 		}
 
 		// reached end of trie path ...
 		if !n.children.Test(octet) {
 			// insert prefix path compressed as leaf or fringe
-			if isFringe(depth, bits) {
+			if isFringe(depth, pfx) {
 				return n.children.InsertAt(octet, newFringeNode(val))
 			}
 			return n.children.InsertAt(octet, newLeafNode(pfx, val))
@@ -176,7 +176,7 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 		case *fringeNode[V]:
 			// reached a path compressed fringe
 			// override value in slot if pfx is a fringe
-			if isFringe(depth, bits) {
+			if isFringe(depth, pfx) {
 				kid.value = val
 				// exists
 				return true
@@ -660,7 +660,7 @@ func cmpIndexRank(aIdx, bIdx uint8) int {
 // get prefix back from stride path, depth and idx.
 // The prefix is solely defined by the position in the trie and the baseIndex.
 func cidrFromPath(path stridePath, depth int, is4 bool, idx uint8) netip.Prefix {
-	depth = depth & 0xf // BCE
+	depth = depth & depthMask // BCE
 
 	octet, pfxLen := art.IdxToPfx(idx)
 
@@ -689,7 +689,7 @@ func cidrFromPath(path stridePath, depth int, is4 bool, idx uint8) netip.Prefix 
 // get prefix back from octets path, depth, IP version and last octet.
 // The prefix of a fringe is solely defined by the position in the trie.
 func cidrForFringe(octets []byte, depth int, is4 bool, lastOctet uint8) netip.Prefix {
-	depth = depth & 0xf // BCE
+	depth = depth & depthMask // BCE
 
 	path := stridePath{}
 	copy(path[:], octets[:depth+1])
