@@ -182,17 +182,14 @@ func (n *node[V]) overlapsChildrenIn(o *node[V]) bool {
 	// make allot table with prefixes as bitsets, bitsets are precalculated.
 	// Just union the bitsets to one bitset (allot table) for all prefixes
 	// in this node
-	hostRoutes := bitset.BitSet256{}
-
-	allIndices := n.prefixes.AsSlice(&[256]uint8{})
-
-	// union all pre alloted bitsets
-	for _, idx := range allIndices {
+	allFringeRoutes := bitset.BitSet256{}
+	for _, idx := range n.prefixes.AsSlice(&[256]uint8{}) {
 		fringeRoutes := allot.IdxToFringeRoutes(idx)
-		hostRoutes.Union(&fringeRoutes)
+		// union all pre alloted bitsets
+		allFringeRoutes.Union(&fringeRoutes)
 	}
 
-	return hostRoutes.Intersects(&o.children.BitSet256)
+	return allFringeRoutes.Intersects(&o.children.BitSet256)
 }
 
 // overlapsSameChildren compares all matching child addresses (octets)
