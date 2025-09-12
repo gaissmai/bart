@@ -80,11 +80,11 @@ func (t *Table[V]) String() string {
 //	   │  └─ 2001:db8::/32 (V)
 //	   └─ fe80::/10 (V)
 func (t *Table[V]) Fprint(w io.Writer) error {
-	if t == nil {
-		return nil
-	}
 	if w == nil {
 		return fmt.Errorf("nil writer")
+	}
+	if t == nil {
+		return nil
 	}
 
 	// v4
