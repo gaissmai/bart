@@ -379,7 +379,7 @@ func (f *Fat[V]) Contains(ip netip.Addr) bool {
 	n := f.rootNodeByVersion(is4)
 
 	for _, octet := range ip.AsSlice() {
-		if n.contains(uint(octet) + 256) {
+		if n.contains(art.OctetToIdx(octet)) {
 			return true
 		}
 
@@ -423,7 +423,7 @@ func (f *Fat[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 
 	for _, octet := range ip.AsSlice() {
 		// save the current best LPM val, lookup is cheap in Fat
-		if bestLPM, tmpOk := n.lookup(uint(octet) + 256); tmpOk {
+		if bestLPM, tmpOk := n.lookup(art.OctetToIdx(octet)); tmpOk {
 			val = bestLPM
 			ok = tmpOk
 		}
