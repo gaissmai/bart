@@ -86,17 +86,17 @@ func newFringeNode[V any](val V) *fringeNode[V] {
 
 // isFringe determines whether a prefix qualifies as a "fringe node" -
 // that is, a special kind of path-compressed leaf inserted at the final
-// possible trie level (depth == maxDepth - 1).
+// possible trie level (depth == lastOctet).
 //
 // Both "leaves" and "fringes" are path-compressed terminal entries;
 // the distinction lies in their position within the trie:
 //
 //   - A leaf is inserted at any intermediate level if no further stride
-//     boundary matches (depth < maxDepth - 1).
+//     boundary matches (depth < lastOctet).
 //
 //   - A fringe is inserted at the last possible stride level
-//     (depth == maxDepth - 1) before a prefix would otherwise land
-//     as a direct prefix (depth == maxDepth).
+//     (depth == lastOctet) before a prefix would otherwise land
+//     as a direct prefix (depth == lastOctet+1).
 //
 // Special property:
 //   - A fringe acts as a default route for all downstream bit patterns
@@ -105,9 +105,9 @@ func newFringeNode[V any](val V) *fringeNode[V] {
 // Examples:
 //
 //	e.g. prefix is addr/8, or addr/16, or ... addr/128
-//	depth <  maxDepth-1 : a leaf, path-compressed
-//	depth == maxDepth-1 : a fringe, path-compressed
-//	depth == maxDepth   : a prefix with octet/pfx == 0/0 => idx == 1, a strides default route
+//	depth <  lastOctet :  a leaf, path-compressed
+//	depth == lastOctet :  a fringe, path-compressed
+//	depth == lastOctet+1: a prefix with octet/pfx == 0/0 => idx == 1, a strides default route
 //
 // Logic:
 //   - A prefix qualifies as a fringe if:
