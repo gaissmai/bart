@@ -464,7 +464,6 @@ func TestWalkPersist_ClonesModifiedValues(t *testing.T) {
 		return pt2, true
 	})
 
-	// After walk, p1=1110, p2=120 (no extra cloning yet).
 	if v, ok := t2.Get(p1); !ok || v != clonerInt(2110) {
 		t.Fatalf("expected 2110 after walk; got %v ok=%v", v, ok)
 	}
@@ -472,7 +471,6 @@ func TestWalkPersist_ClonesModifiedValues(t *testing.T) {
 		t.Fatalf("expected 120 after walk; got %v ok=%v", v, ok)
 	}
 
-	// A further persist clones again → p1=2110, p2=1120.
 	q := netip.MustParsePrefix("2001:db8::/64")
 	t3 := t2.InsertPersist(q, clonerInt(0))
 
