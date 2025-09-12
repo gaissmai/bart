@@ -191,15 +191,14 @@ func (n *fatNode[V]) allot(idx uint8, oldValPtr, valPtr *V) {
 
 func (n *fatNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool) {
 	ip := pfx.Addr() // the pfx must be in canonical form
-	bits := pfx.Bits()
 	octets := ip.AsSlice()
-	maxDepth, lastBits := maxDepthAndLastBits(bits)
+	lastOctetPlusOne, lastBits := lastOctetPlusOneAndLastBits(pfx)
 
 	// find the proper trie node to insert prefix
 	// start with prefix octet at depth
 	for _, octet := range octets[depth:] {
 		// last masked octet: insert/override prefix/val into node
-		if depth == maxDepth {
+		if depth == lastOctetPlusOne {
 			return n.insertPrefix(art.PfxToIdx(octet, lastBits), val)
 		}
 
@@ -207,7 +206,7 @@ func (n *fatNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists b
 		// reached end of trie path ...
 		if !ok {
 			// insert prefix path compressed as leaf or fringe
-			if isFringe(depth, bits) {
+			if isFringe(depth, pfx) {
 				return n.insertChild(octet, newFringeNode(val))
 			}
 			return n.insertChild(octet, newLeafNode(pfx, val))
@@ -239,7 +238,7 @@ func (n *fatNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists b
 		case *fringeNode[V]:
 			// reached a path compressed fringe
 			// override value in slot if pfx is a fringe
-			if isFringe(depth, bits) {
+			if isFringe(depth, pfx) {
 				kid.value = val
 				// exists
 				return true
