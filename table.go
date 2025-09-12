@@ -60,7 +60,6 @@ func (t *Table[V]) rootNodeByVersion(is4 bool) *node[V] {
 	if is4 {
 		return &t.root4
 	}
-
 	return &t.root6
 }
 
@@ -106,8 +105,10 @@ func (t *Table[V]) rootNodeByVersion(is4 bool) *node[V] {
 func lastOctetPlusOneAndLastBits(pfx netip.Prefix) (lastOctetPlusOne int, lastBits uint8) {
 	// maxDepth:  range from 0..4 or 0..16 !ATTENTION: not 0..3 or 0..15
 	// lastBits:  range from 0..7
+	bits := pfx.Bits()
+
 	//nolint:gosec  // G115: integer overflow conversion int -> uint
-	return pfx.Bits() >> 3, uint8(pfx.Bits() & 7)
+	return bits >> 3, uint8(bits & 7)
 }
 
 // Insert adds a pfx to the tree, with given val.
