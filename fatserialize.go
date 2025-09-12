@@ -65,11 +65,11 @@ func (f *Fat[V]) String() string {
 //	   │  └─ 2001:db8::/32 (V)
 //	   └─ fe80::/10 (V)
 func (f *Fat[V]) Fprint(w io.Writer) error {
-	if f == nil {
-		return nil
-	}
 	if w == nil {
 		return fmt.Errorf("nil writer")
+	}
+	if f == nil {
+		return nil
 	}
 
 	// v4
