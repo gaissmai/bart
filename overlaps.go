@@ -298,19 +298,18 @@ func overlapsTwoChilds[V any](nChild, oChild any, depth int) bool {
 // trie traversal across varying prefix lengths and compression levels.
 func (n *node[V]) overlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
 	ip := pfx.Addr()
-	bits := pfx.Bits()
 	octets := ip.AsSlice()
-	maxDepth, lastBits := maxDepthAndLastBits(bits)
+	lastOctetPlusOne, lastBits := lastOctetPlusOneAndLastBits(pfx)
 
 	for ; depth < len(octets); depth++ {
-		if depth > maxDepth {
+		if depth > lastOctetPlusOne {
 			break
 		}
 
 		octet := octets[depth]
 
 		// full octet path in node trie, check overlap with last prefix octet
-		if depth == maxDepth {
+		if depth == lastOctetPlusOne {
 			return n.overlapsIdx(art.PfxToIdx(octet, lastBits))
 		}
 
