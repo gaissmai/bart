@@ -50,9 +50,8 @@ func ExampleTable_concurrent() {
 	go func() {
 		defer wg.Done()
 		for range 100_000 {
-			tbl := tblAtomicPtr.Load()
 			for _, ip := range exampleIPs {
-				_, _ = tbl.Lookup(ip)
+				_, _ = tblAtomicPtr.Load().Lookup(ip)
 			}
 		}
 	}()
