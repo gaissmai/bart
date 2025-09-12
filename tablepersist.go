@@ -34,7 +34,6 @@ func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V] {
 	// Extract address, IP version, and prefix length.
 	ip := pfx.Addr()
 	is4 := ip.Is4()
-	bits := pfx.Bits()
 
 	// share size counters; root nodes cloned selectively.
 	pt := &Table[V]{
@@ -63,14 +62,14 @@ func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V] {
 	}
 
 	// Prepare traversal info.
-	maxDepth, lastBits := maxDepthAndLastBits(bits)
+	lastOctetPlusOne, lastBits := lastOctetPlusOneAndLastBits(pfx)
 	octets := ip.AsSlice()
 
 	// Insert the prefix and value using the persist insert method that clones nodes
 	// along the path.
 	for depth, octet := range octets {
 		// last masked octet: insert/override prefix/val into node
-		if depth == maxDepth {
+		if depth == lastOctetPlusOne {
 			exists := n.prefixes.InsertAt(art.PfxToIdx(octet, lastBits), val)
 			// If prefix did not previously exist, increment size counter.
 			if !exists {
@@ -81,7 +80,7 @@ func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V] {
 
 		if !n.children.Test(octet) {
 			// insert prefix path compressed as leaf or fringe
-			if isFringe(depth, bits) {
+			if isFringe(depth, pfx) {
 				n.children.InsertAt(octet, newFringeNode(val))
 			} else {
 				n.children.InsertAt(octet, newLeafNode(pfx, val))
@@ -130,7 +129,7 @@ func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V] {
 		case *fringeNode[V]:
 			// reached a path compressed fringe
 			// override value in slot if pfx is a fringe
-			if isFringe(depth, bits) {
+			if isFringe(depth, pfx) {
 				kid.value = val
 				// exists
 				return pt
@@ -181,7 +180,6 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 	// Extract address, version info and prefix length.
 	ip := pfx.Addr()
 	is4 := ip.Is4()
-	bits := pfx.Bits()
 
 	// share size counters; root nodes cloned selectively.
 	pt = &Table[V]{
@@ -210,13 +208,13 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 	}
 
 	// Prepare traversal info.
-	maxDepth, lastBits := maxDepthAndLastBits(bits)
+	lastOctetPlusOne, lastBits := lastOctetPlusOneAndLastBits(pfx)
 	octets := ip.AsSlice()
 
 	// Traverse the trie by octets to find the node to update.
 	for depth, octet := range octets {
 		// If at the last relevant octet, update or insert the prefix in this node.
-		if depth == maxDepth {
+		if depth == lastOctetPlusOne {
 			idx := art.PfxToIdx(octet, lastBits)
 
 			oldVal, existed := n.prefixes.Get(idx)
@@ -234,7 +232,7 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 		// If child node for this address does not exist, insert new leaf or fringe.
 		if !n.children.Test(addr) {
 			newVal := cb(zero, false)
-			if isFringe(depth, bits) {
+			if isFringe(depth, pfx) {
 				n.children.InsertAt(addr, newFringeNode(newVal))
 			} else {
 				n.children.InsertAt(addr, newLeafNode(pfx, newVal))
@@ -283,7 +281,7 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 
 		case *fringeNode[V]:
 			// If current node corresponds to a fringe prefix, update its value.
-			if isFringe(depth, bits) {
+			if isFringe(depth, pfx) {
 				newVal = cb(kid.value, true)
 				// Replace fringe node with updated value.
 				n.children.InsertAt(addr, newFringeNode(newVal))
@@ -333,7 +331,6 @@ func (t *Table[V]) ModifyPersist(pfx netip.Prefix, cb func(val V, ok bool) (newV
 	// Extract address, version info and prefix length.
 	ip := pfx.Addr()
 	is4 := ip.Is4()
-	bits := pfx.Bits()
 
 	// share size counters; root nodes cloned selectively.
 	pt = &Table[V]{
@@ -362,7 +359,7 @@ func (t *Table[V]) ModifyPersist(pfx netip.Prefix, cb func(val V, ok bool) (newV
 	}
 
 	// Prepare traversal info.
-	maxDepth, lastBits := maxDepthAndLastBits(bits)
+	lastOctetPlusOne, lastBits := lastOctetPlusOneAndLastBits(pfx)
 	octets := ip.AsSlice()
 
 	// record the nodes on the path to the deleted node, needed to purge
@@ -375,7 +372,7 @@ func (t *Table[V]) ModifyPersist(pfx netip.Prefix, cb func(val V, ok bool) (newV
 		stack[depth] = n
 
 		// last octet from prefix, update/insert/delete prefix
-		if depth == maxDepth {
+		if depth == lastOctetPlusOne {
 			idx := art.PfxToIdx(octet, lastBits)
 
 			oldVal, existed := n.prefixes.Get(idx)
@@ -416,7 +413,7 @@ func (t *Table[V]) ModifyPersist(pfx netip.Prefix, cb func(val V, ok bool) (newV
 			}
 
 			// insert
-			if isFringe(depth, bits) {
+			if isFringe(depth, pfx) {
 				n.children.InsertAt(octet, newFringeNode(newVal))
 			} else {
 				n.children.InsertAt(octet, newLeafNode(pfx, newVal))
@@ -474,7 +471,7 @@ func (t *Table[V]) ModifyPersist(pfx netip.Prefix, cb func(val V, ok bool) (newV
 			oldVal := kid.value
 
 			// update existing value if prefix is fringe
-			if isFringe(depth, bits) {
+			if isFringe(depth, pfx) {
 				newVal, del := cb(oldVal, true)
 				if !del {
 					kid.value = newVal
@@ -535,7 +532,6 @@ func (t *Table[V]) DeletePersist(pfx netip.Prefix) (pt *Table[V], val V, found b
 	// Extract address, IP version, and prefix length.
 	ip := pfx.Addr()
 	is4 := ip.Is4()
-	bits := pfx.Bits()
 
 	// share size counters; root nodes cloned selectively.
 	pt = &Table[V]{
@@ -564,7 +560,7 @@ func (t *Table[V]) DeletePersist(pfx netip.Prefix) (pt *Table[V], val V, found b
 	}
 
 	// Prepare traversal context.
-	maxDepth, lastBits := maxDepthAndLastBits(bits)
+	lastOctetPlusOne, lastBits := lastOctetPlusOneAndLastBits(pfx)
 	octets := ip.AsSlice()
 
 	// Stack to keep track of cloned nodes along the path,
@@ -576,7 +572,7 @@ func (t *Table[V]) DeletePersist(pfx netip.Prefix) (pt *Table[V], val V, found b
 		// Keep track of the cloned node at current depth.
 		stack[depth] = n
 
-		if depth == maxDepth {
+		if depth == lastOctetPlusOne {
 			// Attempt to delete the prefix from the node's prefixes.
 			val, found = n.prefixes.DeleteAt(art.PfxToIdx(octet, lastBits))
 			if !found {
@@ -617,7 +613,7 @@ func (t *Table[V]) DeletePersist(pfx netip.Prefix) (pt *Table[V], val V, found b
 
 		case *fringeNode[V]:
 			// Reached a path compressed fringe.
-			if !isFringe(depth, bits) {
+			if !isFringe(depth, pfx) {
 				// Prefix to delete not found here.
 				return pt, val, false
 			}
