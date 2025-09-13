@@ -406,10 +406,8 @@ func (f *Fat[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 //
 // Its semantics are identical to [Table.Contains].
 func (f *Fat[V]) Contains(ip netip.Addr) bool {
-	if !ip.IsValid() {
-		return false
-	}
-
+	// speed if top priority: no explicit test for ip.Isvalid
+	// if ip is invalidi, AsSlice() returns nil, Contains returns false.
 	is4 := ip.Is4()
 	n := f.rootNodeByVersion(is4)
 

@@ -598,7 +598,8 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 // but as a test against an allow-/deny-list it's often sufficient
 // and even few nanoseconds faster than [Table.Lookup].
 func (t *Table[V]) Contains(ip netip.Addr) bool {
-	// if ip is invalid, Is4() returns false and AsSlice() returns nil
+	// speed if top priority: no explicit test for ip.Isvalid
+	// if ip is invalidi, AsSlice() returns nil, Contains returns false.
 	is4 := ip.Is4()
 	n := t.rootNodeByVersion(is4)
 
