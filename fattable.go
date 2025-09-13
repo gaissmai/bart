@@ -51,7 +51,13 @@ func (f *Fat[V]) rootNodeByVersion(is4 bool) *fatNode[V] {
 	return &f.root6
 }
 
-// Insert adds a prefix with the given value.
+// Insert adds or updates a prefix-value pair in the routing table.
+// If the prefix already exists, its value is updated; otherwise a new entry is created.
+// Invalid prefixes are silently ignored.
+//
+// The prefix is automatically canonicalized using pfx.Masked() to ensure
+// consistent behavior regardless of host bits in the input.
+//
 // Its semantics are identical to [Table.Insert].
 func (f *Fat[V]) Insert(pfx netip.Prefix, val V) {
 	if !pfx.IsValid() {
@@ -72,8 +78,19 @@ func (f *Fat[V]) Insert(pfx netip.Prefix, val V) {
 	f.sizeUpdate(is4, 1)
 }
 
-// Modify applies a callback to the value of the given prefix.
-// Its semantics are identical to [Table.Modify].
+// Modify applies an insert, update, or delete operation for the value
+// associated with the given prefix. The supplied callback decides the
+// the operation.
+// It receives the current value (if the prefix exists) and a boolean indicating
+// existence, then returns the new value and a deletion flag.
+//
+// Returns the previous value (for updates/deletes) or new value (for inserts),
+// and a boolean indicating whether a deletion occurred.
+//
+// If the prefix doesn't exist and the callback returns del=true, no operation is performed.
+// The prefix is automatically canonicalized using pfx.Masked().
+//
+// Its value semantics are identical to [Table.Modify].
 func (f *Fat[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del bool)) (_ V, deleted bool) {
 	var zero V
 
@@ -225,7 +242,12 @@ func (f *Fat[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del b
 	return
 }
 
-// Delete removes the given prefix and returns its value and whether it existed.
+// Delete removes a prefix from the routing table and returns its associated value.
+// Returns the zero value of V and false if the prefix doesn't exist.
+// Invalid prefixes are silently ignored.
+//
+// The prefix is automatically canonicalized using pfx.Masked().
+//
 // Its semantics are identical to [Table.Delete].
 func (f *Fat[V]) Delete(pfx netip.Prefix) (val V, exists bool) {
 	if !pfx.IsValid() {
@@ -312,7 +334,15 @@ func (f *Fat[V]) Delete(pfx netip.Prefix) (val V, exists bool) {
 	return
 }
 
-// Get looks up the given prefix and returns its value and whether it exists.
+// Get retrieves the value associated with an exact prefix match.
+// Returns the zero value of V and false if the prefix doesn't exist.
+// Invalid prefixes return the zero value and false.
+//
+// The prefix is automatically canonicalized using pfx.Masked().
+//
+// This performs exact prefix matching, not longest-prefix matching.
+// Use Lookup for longest-prefix matching with IP addresses.
+//
 // Its semantics are identical to [Table.Get].
 func (f *Fat[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 	if !pfx.IsValid() {
@@ -368,7 +398,12 @@ func (f *Fat[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 	panic("unreachable")
 }
 
-// Contains reports whether the given address is covered by any stored prefix.
+// Contains reports whether any stored prefix covers the given IP address.
+// Returns false for invalid IP addresses.
+//
+// This performs longest-prefix matching and returns true if any prefix
+// in the routing table contains the IP address, regardless of the associated value.
+//
 // Its semantics are identical to [Table.Contains].
 func (f *Fat[V]) Contains(ip netip.Addr) bool {
 	if !ip.IsValid() {
@@ -411,7 +446,13 @@ func (f *Fat[V]) Contains(ip netip.Addr) bool {
 	return false
 }
 
-// Lookup returns the value of the longest prefix match for the given address.
+// Lookup performs longest-prefix matching for the given IP address and returns
+// the associated value of the most specific matching prefix.
+// Returns the zero value of V and false if no prefix matches.
+// Returns false for invalid IP addresses.
+//
+// This is the core routing table operation used for packet forwarding decisions.
+//
 // Its semantics are identical to [Table.Lookup].
 func (f *Fat[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	if !ip.IsValid() {
@@ -460,7 +501,12 @@ func (f *Fat[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	panic("unreachable")
 }
 
-// Clone returns a copy of the routing table.
+// Clone creates a deep copy of the routing table, including all prefixes and values.
+// If the value type V implements the Cloner[V] interface, values are cloned using
+// the Clone() method; otherwise values are copied by assignment.
+//
+// Returns nil if the receiver is nil.
+//
 // Its semantics are identical to [Table.Clone].
 func (f *Fat[V]) Clone() *Fat[V] {
 	if f == nil {
