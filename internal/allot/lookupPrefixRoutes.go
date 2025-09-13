@@ -34,7 +34,7 @@ import "github.com/gaissmai/bart/internal/bitset"
 //
 // This function is used for fast prefix set comparisons using bitwise intersection
 // instead of scanning or looping over ranges.
-func IdxToPrefixRoutes(idx uint8) *bitset.BitSet256 {
+func IdxToPrefixRoutes(idx uint8) bitset.BitSet256 {
 	// Recursive function to generate coverage sets for each base index:
 	// func generate(idx uint, bs *bitset.BitSet) {
 	//     bs = bs.Set(idx)
@@ -45,7 +45,7 @@ func IdxToPrefixRoutes(idx uint8) *bitset.BitSet256 {
 	//     generate(2*idx + 1, bs) // right child
 	// }
 
-	return &pfxRoutesLookupTbl[idx]
+	return pfxRoutesLookupTbl[idx]
 }
 
 // pfxRoutesLookupTbl is a lookup table of BitSet256 entries.

@@ -5,7 +5,6 @@ package bart
 
 import (
 	"bytes"
-	"cmp"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -16,25 +15,11 @@ import (
 	"github.com/gaissmai/bart/internal/art"
 )
 
-func shouldPrintValues[V any]() bool {
-	var zero V
-	_, isEmptyStruct := any(zero).(struct{})
-	return !isEmptyStruct
-}
-
-// DumpListNode contains CIDR, Value and Subnets, representing the trie
-// in a sorted, recursive representation, especially useful for serialization.
-type DumpListNode[V any] struct {
-	CIDR    netip.Prefix      `json:"cidr"`
-	Value   V                 `json:"value"`
-	Subnets []DumpListNode[V] `json:"subnets,omitempty"`
-}
-
-// trieItem, a node has no path information about its predecessors,
+// fatTrieItem, a node has no path information about its predecessors,
 // we collect this during the recursive descent.
-type trieItem[V any] struct {
+type fatTrieItem[V any] struct {
 	// for traversing, path/depth/idx is needed to get the CIDR back from the trie.
-	n     *node[V]
+	n     *fatNode[V]
 	is4   bool
 	path  stridePath
 	depth int
@@ -46,11 +31,11 @@ type trieItem[V any] struct {
 }
 
 // String returns a hierarchical tree diagram of the ordered CIDRs
-// as string, just a wrapper for [Table.Fprint].
+// as string, just a wrapper for [Fat.Fprint].
 // If Fprint returns an error, String panics.
-func (t *Table[V]) String() string {
+func (f *Fat[V]) String() string {
 	w := new(strings.Builder)
-	if err := t.Fprint(w); err != nil {
+	if err := f.Fprint(w); err != nil {
 		panic(err)
 	}
 
@@ -79,21 +64,21 @@ func (t *Table[V]) String() string {
 //	   ├─ 2000::/3 (V)
 //	   │  └─ 2001:db8::/32 (V)
 //	   └─ fe80::/10 (V)
-func (t *Table[V]) Fprint(w io.Writer) error {
+func (f *Fat[V]) Fprint(w io.Writer) error {
 	if w == nil {
 		return fmt.Errorf("nil writer")
 	}
-	if t == nil {
+	if f == nil {
 		return nil
 	}
 
 	// v4
-	if err := t.fprint(w, true); err != nil {
+	if err := f.fprint(w, true); err != nil {
 		return err
 	}
 
 	// v6
-	if err := t.fprint(w, false); err != nil {
+	if err := f.fprint(w, false); err != nil {
 		return err
 	}
 
@@ -101,8 +86,8 @@ func (t *Table[V]) Fprint(w io.Writer) error {
 }
 
 // fprint is the version dependent adapter to fprintRec.
-func (t *Table[V]) fprint(w io.Writer, is4 bool) error {
-	n := t.rootNodeByVersion(is4)
+func (f *Fat[V]) fprint(w io.Writer, is4 bool) error {
+	n := f.rootNodeByVersion(is4)
 	if n.isEmpty() {
 		return nil
 	}
@@ -111,7 +96,7 @@ func (t *Table[V]) fprint(w io.Writer, is4 bool) error {
 		return err
 	}
 
-	startParent := trieItem[V]{
+	startParent := fatTrieItem[V]{
 		n:    nil,
 		idx:  0,
 		path: stridePath{},
@@ -121,10 +106,8 @@ func (t *Table[V]) fprint(w io.Writer, is4 bool) error {
 	return n.fprintRec(w, startParent, "")
 }
 
-// fprintRec recursively prints a hierarchical CIDR tree representation
-// starting from this node to the provided writer. The output shows the
-// routing table structure in human-readable format for debugging and analysis.
-func (n *node[V]) fprintRec(w io.Writer, parent trieItem[V], pad string) error {
+// fprintRec, the output is a hierarchical CIDR tree covered starting with this node
+func (n *fatNode[V]) fprintRec(w io.Writer, parent fatTrieItem[V], pad string) error {
 	// recursion stop condition
 	if n == nil {
 		return nil
@@ -134,7 +117,7 @@ func (n *node[V]) fprintRec(w io.Writer, parent trieItem[V], pad string) error {
 	directItems := n.directItemsRec(parent.idx, parent.path, parent.depth, parent.is4)
 
 	// sort them by netip.Prefix, not by baseIndex
-	slices.SortFunc(directItems, func(a, b trieItem[V]) int {
+	slices.SortFunc(directItems, func(a, b fatTrieItem[V]) int {
 		return cmpPrefix(a.cidr, b.cidr)
 	})
 
@@ -173,10 +156,10 @@ func (n *node[V]) fprintRec(w io.Writer, parent trieItem[V], pad string) error {
 }
 
 // MarshalText implements the [encoding.TextMarshaler] interface,
-// just a wrapper for [Table.Fprint].
-func (t *Table[V]) MarshalText() ([]byte, error) {
+// just a wrapper for [Fat.Fprint].
+func (f *Fat[V]) MarshalText() ([]byte, error) {
 	w := new(bytes.Buffer)
-	if err := t.Fprint(w); err != nil {
+	if err := f.Fprint(w); err != nil {
 		return nil, err
 	}
 
@@ -185,8 +168,8 @@ func (t *Table[V]) MarshalText() ([]byte, error) {
 
 // MarshalJSON dumps the table into two sorted lists: for ipv4 and ipv6.
 // Every root and subnet is an array, not a map, because the order matters.
-func (t *Table[V]) MarshalJSON() ([]byte, error) {
-	if t == nil {
+func (f *Fat[V]) MarshalJSON() ([]byte, error) {
+	if f == nil {
 		return []byte("null"), nil
 	}
 
@@ -194,8 +177,8 @@ func (t *Table[V]) MarshalJSON() ([]byte, error) {
 		Ipv4 []DumpListNode[V] `json:"ipv4,omitempty"`
 		Ipv6 []DumpListNode[V] `json:"ipv6,omitempty"`
 	}{
-		Ipv4: t.DumpList4(),
-		Ipv6: t.DumpList6(),
+		Ipv4: f.DumpList4(),
+		Ipv6: f.DumpList6(),
 	}
 
 	buf, err := json.Marshal(result)
@@ -208,25 +191,25 @@ func (t *Table[V]) MarshalJSON() ([]byte, error) {
 
 // DumpList4 dumps the ipv4 tree into a list of roots and their subnets.
 // It can be used to analyze the tree or build the text or json serialization.
-func (t *Table[V]) DumpList4() []DumpListNode[V] {
-	if t == nil {
+func (f *Fat[V]) DumpList4() []DumpListNode[V] {
+	if f == nil {
 		return nil
 	}
-	return t.root4.dumpListRec(0, stridePath{}, 0, true)
+	return f.root4.dumpListRec(0, stridePath{}, 0, true)
 }
 
 // DumpList6 dumps the ipv6 tree into a list of roots and their subnets.
 // It can be used to analyze the tree or build custom json representation.
-func (t *Table[V]) DumpList6() []DumpListNode[V] {
-	if t == nil {
+func (f *Fat[V]) DumpList6() []DumpListNode[V] {
+	if f == nil {
 		return nil
 	}
-	return t.root6.dumpListRec(0, stridePath{}, 0, false)
+	return f.root6.dumpListRec(0, stridePath{}, 0, false)
 }
 
 // dumpListRec, build the data structure rec-descent with the help
 // of directItemsRec.
-func (n *node[V]) dumpListRec(parentIdx uint8, path stridePath, depth int, is4 bool) []DumpListNode[V] {
+func (n *fatNode[V]) dumpListRec(parentIdx uint8, path stridePath, depth int, is4 bool) []DumpListNode[V] {
 	// recursion stop condition
 	if n == nil {
 		return nil
@@ -235,7 +218,7 @@ func (n *node[V]) dumpListRec(parentIdx uint8, path stridePath, depth int, is4 b
 	directItems := n.directItemsRec(parentIdx, path, depth, is4)
 
 	// sort the items by prefix
-	slices.SortFunc(directItems, func(a, b trieItem[V]) int {
+	slices.SortFunc(directItems, func(a, b fatTrieItem[V]) int {
 		return cmpPrefix(a.cidr, b.cidr)
 	})
 
@@ -258,18 +241,17 @@ func (n *node[V]) dumpListRec(parentIdx uint8, path stridePath, depth int, is4 b
 // by heart to understand this function!
 //
 // See the  artlookup.pdf paper in the doc folder, the baseIndex function is the key.
-func (n *node[V]) directItemsRec(parentIdx uint8, path stridePath, depth int, is4 bool) (directItems []trieItem[V]) {
+func (n *fatNode[V]) directItemsRec(parentIdx uint8, path stridePath, depth int, is4 bool) (directItems []fatTrieItem[V]) {
 	// recursion stop condition
 	if n == nil {
 		return nil
 	}
 
-	// prefixes:
-	// for all idx's (prefixes mapped by baseIndex) in this node
-	// do a longest-prefix-match
-	for i, idx := range n.prefixes.AsSlice(&[256]uint8{}) {
-		// tricky part, skip self
-		// test with next possible lpm (idx>>1), it's a complete binary tree
+	// used to compare the LPM match, maybe nil for parentIdx == 0
+	parentValPtr := n.prefixes[parentIdx]
+
+	for _, idx := range n.prefixesBitSet.AsSlice(&[256]uint8{}) {
+		// tricky part, skip self, test with next possible lpm (idx>>1), it's a complete binary tree
 		nextIdx := idx >> 1
 
 		// fast skip, lpm not possible
@@ -277,14 +259,13 @@ func (n *node[V]) directItemsRec(parentIdx uint8, path stridePath, depth int, is
 			continue
 		}
 
-		// do a longest-prefix-match
-		lpm, _, _ := n.lpmGet(uint(nextIdx))
+		// if prefix is directly covered by parentIdx ...
+		valPtr := n.prefixes[nextIdx]
 
-		// be aware, 0 is here a possible value for parentIdx and lpm (if not found)
-		if lpm == parentIdx {
-			// prefix is directly covered by parent
+		// both maybe nil
+		if valPtr == parentValPtr {
 
-			item := trieItem[V]{
+			item := fatTrieItem[V]{
 				n:     n,
 				is4:   is4,
 				path:  path,
@@ -292,7 +273,7 @@ func (n *node[V]) directItemsRec(parentIdx uint8, path stridePath, depth int, is
 				idx:   idx,
 				// get the prefix back from trie
 				cidr: cidrFromPath(path, depth, is4, idx),
-				val:  n.prefixes.Items[i],
+				val:  *n.prefixes[idx],
 			}
 
 			directItems = append(directItems, item)
@@ -300,28 +281,29 @@ func (n *node[V]) directItemsRec(parentIdx uint8, path stridePath, depth int, is
 	}
 
 	// children:
-	for i, addr := range n.children.AsSlice(&[256]uint8{}) {
-		hostIdx := art.OctetToIdx(addr)
+	for _, octet := range n.childrenBitSet.AsSlice(&[256]uint8{}) {
+		hostIdx := art.OctetToIdx(octet) >> 1
 
 		// fast skip, lpm not possible
 		if hostIdx < uint(parentIdx) {
 			continue
 		}
 
-		// do a longest-prefix-match
-		lpm, _, _ := n.lpmGet(hostIdx)
+		// lookup
+		valPtr := n.prefixes[hostIdx] // maybe nil
+		if valPtr == parentValPtr {
+			kidAny := *n.children[octet]
 
-		// be aware, 0 is here a possible value for parentIdx and lpm (if not found)
-		if lpm == parentIdx {
-			// child is directly covered by parent
-			switch kid := n.children.Items[i].(type) {
-			case *node[V]: // traverse rec-descent, call with next child node,
+			switch kid := kidAny.(type) {
+			case *fatNode[V]:
+				// traverse rec-descent, call with next child node,
 				// next trie level, set parentIdx to 0, adjust path and depth
-				path[depth&0xf] = addr
+				path[depth] = octet
 				directItems = append(directItems, kid.directItemsRec(0, path, depth+1, is4)...)
 
-			case *leafNode[V]: // path-compressed child, stop's recursion for this child
-				item := trieItem[V]{
+			case *leafNode[V]:
+				// path-compressed child, stop's recursion for this child
+				item := fatTrieItem[V]{
 					n:    nil,
 					is4:  is4,
 					cidr: kid.prefix,
@@ -329,12 +311,13 @@ func (n *node[V]) directItemsRec(parentIdx uint8, path stridePath, depth int, is
 				}
 				directItems = append(directItems, item)
 
-			case *fringeNode[V]: // path-compressed fringe, stop's recursion for this child
-				item := trieItem[V]{
+			case *fringeNode[V]:
+				// path-compressed fringe, stop's recursion for this child
+				item := fatTrieItem[V]{
 					n:   nil,
 					is4: is4,
 					// get the prefix back from trie
-					cidr: cidrForFringe(path[:], depth, is4, addr),
+					cidr: cidrForFringe(path[:], depth, is4, octet),
 					val:  kid.value,
 				}
 				directItems = append(directItems, item)
@@ -343,14 +326,4 @@ func (n *node[V]) directItemsRec(parentIdx uint8, path stridePath, depth int, is
 	}
 
 	return directItems
-}
-
-// cmpPrefix, helper function, compare func for prefix sort,
-// all cidrs are already normalized
-func cmpPrefix(a, b netip.Prefix) int {
-	if cmpAddr := a.Addr().Compare(b.Addr()); cmpAddr != 0 {
-		return cmpAddr
-	}
-
-	return cmp.Compare(a.Bits(), b.Bits())
 }

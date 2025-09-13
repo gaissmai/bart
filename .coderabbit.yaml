@@ -1,6 +1,6 @@
 language: en-US
 tone_instructions: ''
-early_access: false
+early_access: true
 enable_free_tier: true
 reviews:
   profile: chill

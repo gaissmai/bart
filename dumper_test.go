@@ -44,7 +44,7 @@ func TestDumpDefaultRouteV4(t *testing.T) {
 			mpp("0.0.0.0/0"),
 		},
 		want: `
-### IPv4: size(1), nodes(1), pfxs(1), leaves(0), fringes(0),
+### IPv4: size(1), nodes(1), pfxs(1), leaves(0), fringes(0)
 [STOP] depth:  0 path: [] / 0
 indexs(#1): [1]
 prefxs(#1): 0.0.0.0/0
@@ -61,7 +61,7 @@ func TestDumpDefaultRouteV6(t *testing.T) {
 			mpp("::/0"),
 		},
 		want: `
-### IPv6: size(1), nodes(1), pfxs(1), leaves(0), fringes(0),
+### IPv6: size(1), nodes(1), pfxs(1), leaves(0), fringes(0)
 [STOP] depth:  0 path: [] / 0
 indexs(#1): [1]
 prefxs(#1): ::/0
@@ -87,7 +87,7 @@ func TestDumpSampleV4(t *testing.T) {
 			mpp("192.168.1.0/24"),
 		},
 		want: `
-### IPv4: size(9), nodes(6), pfxs(3), leaves(3), fringes(3),
+### IPv4: size(9), nodes(6), pfxs(3), leaves(3), fringes(3)
 [HALF] depth:  0 path: [] / 0
 octets(#5): [10 127 169 172 192]
 leaves(#2): 169:{169.254.0.0/16, <nil>} 172:{172.16.0.0/12, <nil>}
@@ -136,7 +136,7 @@ func TestDumpSampleV6(t *testing.T) {
 			mpp("2001:db8::/32"),
 		},
 		want: `
-### IPv6: size(4), nodes(1), pfxs(2), leaves(2), fringes(0),
+### IPv6: size(4), nodes(1), pfxs(2), leaves(2), fringes(0)
 [STOP] depth:  0 path: [] / 0
 indexs(#2): [1 9]
 prefxs(#2): ::/0 2000::/3
@@ -168,7 +168,7 @@ func TestDumpSample(t *testing.T) {
 			mpp("192.168.1.0/24"),
 		},
 		want: `
-### IPv4: size(9), nodes(6), pfxs(3), leaves(3), fringes(3),
+### IPv4: size(9), nodes(6), pfxs(3), leaves(3), fringes(3)
 [HALF] depth:  0 path: [] / 0
 octets(#5): [10 127 169 172 192]
 leaves(#2): 169:{169.254.0.0/16, <nil>} 172:{172.16.0.0/12, <nil>}
@@ -203,7 +203,7 @@ childs(#3): 10 127 192
 ..octets(#1): [1]
 ..fringe(#1): 1:{192.168.1.0/24, <nil>}
 
-### IPv6: size(4), nodes(1), pfxs(2), leaves(2), fringes(0),
+### IPv6: size(4), nodes(1), pfxs(2), leaves(2), fringes(0)
 [STOP] depth:  0 path: [] / 0
 indexs(#2): [1 9]
 prefxs(#2): ::/0 2000::/3
@@ -235,7 +235,7 @@ func TestLiteDumpSample(t *testing.T) {
 			mpp("192.168.1.0/24"),
 		},
 		want: `
-### IPv4: size(9), nodes(6), pfxs(3), leaves(3), fringes(3),
+### IPv4: size(9), nodes(6), pfxs(3), leaves(3), fringes(3)
 [HALF] depth:  0 path: [] / 0
 octets(#5): [10 127 169 172 192]
 leaves(#2): 169:{169.254.0.0/16} 172:{172.16.0.0/12}
@@ -267,7 +267,7 @@ childs(#3): 10 127 192
 ..octets(#1): [1]
 ..fringe(#1): 1:{192.168.1.0/24}
 
-### IPv6: size(4), nodes(1), pfxs(2), leaves(2), fringes(0),
+### IPv6: size(4), nodes(1), pfxs(2), leaves(2), fringes(0)
 [STOP] depth:  0 path: [] / 0
 indexs(#2): [1 9]
 prefxs(#2): ::/0 2000::/3

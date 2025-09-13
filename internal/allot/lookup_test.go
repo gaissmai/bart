@@ -9,6 +9,8 @@ import (
 )
 
 func TestIdxToFringeRoutes(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		idx  uint8
 		want []uint8
@@ -40,7 +42,8 @@ func TestIdxToFringeRoutes(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		got := IdxToFringeRoutes(tc.idx).Bits()
+		fringeRoutes := IdxToFringeRoutes(tc.idx)
+		got := fringeRoutes.Bits()
 		if !slices.Equal(got, tc.want) {
 			t.Errorf("IdxToFringeRoutes(%d), want: %v, got: %v", tc.idx, tc.want, got)
 		}
@@ -48,6 +51,8 @@ func TestIdxToFringeRoutes(t *testing.T) {
 }
 
 func TestIdxToPrefixRoutes(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		idx  uint8
 		want []uint8
@@ -83,7 +88,8 @@ func TestIdxToPrefixRoutes(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		got := IdxToPrefixRoutes(tc.idx).Bits()
+		prefixRoutes := IdxToPrefixRoutes(tc.idx)
+		got := prefixRoutes.Bits()
 		if !slices.Equal(got, tc.want) {
 			t.Errorf("IdxToPrefixRoutes(%d), want: %v, got: %v", tc.idx, tc.want, got)
 		}

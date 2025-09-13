@@ -182,16 +182,14 @@ func (n *node[V]) overlapsChildrenIn(o *node[V]) bool {
 	// make allot table with prefixes as bitsets, bitsets are precalculated.
 	// Just union the bitsets to one bitset (allot table) for all prefixes
 	// in this node
-	hostRoutes := bitset.BitSet256{}
-
-	allIndices := n.prefixes.AsSlice(&[256]uint8{})
-
-	// union all pre alloted bitsets
-	for _, idx := range allIndices {
-		hostRoutes = hostRoutes.Union(allot.IdxToFringeRoutes(idx))
+	allFringeRoutes := bitset.BitSet256{}
+	for _, idx := range n.prefixes.AsSlice(&[256]uint8{}) {
+		fringeRoutes := allot.IdxToFringeRoutes(idx)
+		// union all pre alloted bitsets
+		allFringeRoutes.Union(&fringeRoutes)
 	}
 
-	return hostRoutes.Intersects(&o.children.BitSet256)
+	return allFringeRoutes.Intersects(&o.children.BitSet256)
 }
 
 // overlapsSameChildren compares all matching child addresses (octets)
@@ -208,8 +206,8 @@ func (n *node[V]) overlapsSameChildren(o *node[V], depth int) bool {
 	ok := true
 	for ok {
 		if addr, ok = commonChildren.NextSet(addr); ok {
-			nChild := n.children.MustGet(addr)
-			oChild := o.children.MustGet(addr)
+			nChild := n.mustGetChild(addr)
+			oChild := o.mustGetChild(addr)
 
 			if overlapsTwoChilds[V](nChild, oChild, depth+1) {
 				return true
@@ -297,19 +295,18 @@ func overlapsTwoChilds[V any](nChild, oChild any, depth int) bool {
 // trie traversal across varying prefix lengths and compression levels.
 func (n *node[V]) overlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
 	ip := pfx.Addr()
-	bits := pfx.Bits()
 	octets := ip.AsSlice()
-	maxDepth, lastBits := maxDepthAndLastBits(bits)
+	lastOctetPlusOne, lastBits := lastOctetPlusOneAndLastBits(pfx)
 
 	for ; depth < len(octets); depth++ {
-		if depth > maxDepth {
+		if depth > lastOctetPlusOne {
 			break
 		}
 
 		octet := octets[depth]
 
 		// full octet path in node trie, check overlap with last prefix octet
-		if depth == maxDepth {
+		if depth == lastOctetPlusOne {
 			return n.overlapsIdx(art.PfxToIdx(octet, lastBits))
 		}
 
@@ -324,7 +321,7 @@ func (n *node[V]) overlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
 		}
 
 		// next child, node or leaf
-		switch kid := n.children.MustGet(octet).(type) {
+		switch kid := n.mustGetChild(octet).(type) {
 		case *node[V]:
 			n = kid
 			continue

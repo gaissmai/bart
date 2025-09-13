@@ -27,7 +27,10 @@ func TestInsertPersistTable(t *testing.T) {
 	t.Parallel()
 
 	// setup
-	const n = 10_000
+	n := 10_000
+	if testing.Short() {
+		n = 1_000
+	}
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomRealWorldPrefixes(prng, n)
@@ -39,7 +42,7 @@ func TestInsertPersistTable(t *testing.T) {
 
 	clone := orig
 	for _, pfx := range pfxs {
-		clone := clone.InsertPersist(pfx, &testVal{Data: 2})
+		clone = clone.InsertPersist(pfx, &testVal{Data: 2})
 
 		// mutate clone's value to ensure it's not aliased
 		v2, _ := clone.Get(pfx)
@@ -48,7 +51,7 @@ func TestInsertPersistTable(t *testing.T) {
 		// original must be unchanged
 		v1, _ := orig.Get(pfx)
 		if v1.Data != 1 {
-			t.Errorf("InsertPersist: original table modified for prefix %s: want %q, got %q", pfx, 1, v1.Data)
+			t.Errorf("InsertPersist: original table modified for prefix %s: want %d, got %d", pfx, 1, v1.Data)
 		}
 
 		// cloned table should have the mutated value
@@ -94,11 +97,11 @@ func TestUpdatePersistTable(t *testing.T) {
 		v2, _ := clone.Get(pfx)
 
 		if v1.Data != 1 {
-			t.Errorf("UpdatePersist: original modified for %s: got=%q want=%q", pfx, v1.Data, 1)
+			t.Errorf("UpdatePersist: original modified for %s: got=%d want=%d", pfx, v1.Data, 1)
 		}
 
 		if v2.Data != 3 {
-			t.Errorf("UpdatePersist: clone not correctly updated for %s: got=%q want=%q", pfx, v2.Data, 3)
+			t.Errorf("UpdatePersist: clone not correctly updated for %s: got=%d want=%d", pfx, v2.Data, 3)
 		}
 
 		if v1 == v2 {
@@ -155,7 +158,7 @@ func TestInsertPersistLite(t *testing.T) {
 
 	clone := orig
 	for _, pfx := range pfxs {
-		clone := clone.InsertPersist(pfx)
+		clone = clone.InsertPersist(pfx)
 
 		// both tables must have the pfx
 		ok1 := orig.Exists(pfx)
@@ -173,11 +176,11 @@ func TestInsertPersistLite(t *testing.T) {
 		size2 := clone.Size()
 
 		if size1 != n {
-			t.Errorf("InsertPersist: original table has unexptected size, want %d, got %d", n, size1)
+			t.Errorf("InsertPersist: original table has unexpected size, want %d, got %d", n, size1)
 		}
 
 		if size2 != n {
-			t.Errorf("InsertPersist: cloned table has unexptected size, want %d, got %d", n, size2)
+			t.Errorf("InsertPersist: cloned table has unexpected size, want %d, got %d", n, size2)
 		}
 	}
 }
@@ -214,11 +217,11 @@ func TestDeletePersistLite(t *testing.T) {
 		size2 := clone.Size()
 
 		if size1 != n {
-			t.Errorf("InsertPersist: original table has unexptected size, want %d, got %d", n, size1)
+			t.Errorf("DeletePersist: original table has unexpected size, want %d, got %d", n, size1)
 		}
 
 		if size2 != n-i-1 {
-			t.Errorf("InsertPersist: cloned table has unexptected size, want %d, got %d", n-i-1, size2)
+			t.Errorf("DeletePersist: cloned table has unexpected size, want %d, got %d", n-i-1, size2)
 		}
 	}
 }

@@ -43,11 +43,13 @@ func TestPrefixInsert(t *testing.T) {
 	fast := new(node[int])
 
 	for _, pfx := range pfxs {
-		fast.prefixes.InsertAt(art.PfxToIdx(pfx.octet, pfx.bits), pfx.val)
+		fast.insertPrefix(art.PfxToIdx(pfx.octet, pfx.bits), pfx.val)
 	}
 
 	for i := range 256 {
+		//nolint:gosec  // G115: integer overflow conversion int -> uint
 		octet := byte(i)
+		//nolint:gosec  // G115: integer overflow conversion int -> uint
 		addr := uint8(i)
 		goldVal, goldOK := gold.lpm(octet)
 		_, fastVal, fastOK := fast.lpmGet(art.OctetToIdx(addr))
@@ -65,13 +67,13 @@ func TestPrefixDelete(t *testing.T) {
 	fast := new(node[int])
 
 	for _, pfx := range pfxs {
-		fast.prefixes.InsertAt(art.PfxToIdx(pfx.octet, pfx.bits), pfx.val)
+		fast.insertPrefix(art.PfxToIdx(pfx.octet, pfx.bits), pfx.val)
 	}
 
 	toDelete := pfxs[:50]
 	for _, pfx := range toDelete {
 		gold.delete(pfx.octet, pfx.bits)
-		fast.prefixes.DeleteAt(art.PfxToIdx(pfx.octet, pfx.bits))
+		fast.deletePrefix(art.PfxToIdx(pfx.octet, pfx.bits))
 	}
 
 	// Sanity check that slow table seems to have done the right thing.
@@ -80,7 +82,9 @@ func TestPrefixDelete(t *testing.T) {
 	}
 
 	for i := range 256 {
+		//nolint:gosec  // G115: integer overflow conversion int -> uint
 		octet := byte(i)
+		//nolint:gosec  // G115: integer overflow conversion int -> uint
 		addr := uint8(i)
 		goldVal, goldOK := gold.lpm(octet)
 		_, fastVal, fastOK := fast.lpmGet(art.OctetToIdx(addr))
@@ -98,7 +102,7 @@ func TestOverlapsPrefix(t *testing.T) {
 	fast := new(node[int])
 
 	for _, pfx := range pfxs {
-		fast.prefixes.InsertAt(art.PfxToIdx(pfx.octet, pfx.bits), pfx.val)
+		fast.insertPrefix(art.PfxToIdx(pfx.octet, pfx.bits), pfx.val)
 	}
 
 	for _, tt := range allStridePfxs() {
@@ -124,7 +128,7 @@ func TestOverlapsRoutes(t *testing.T) {
 		fast := new(node[int])
 
 		for _, pfx := range pfxs {
-			fast.prefixes.InsertAt(art.PfxToIdx(pfx.octet, pfx.bits), pfx.val)
+			fast.insertPrefix(art.PfxToIdx(pfx.octet, pfx.bits), pfx.val)
 		}
 
 		inter := all[numEntries : 2*numEntries]
@@ -132,7 +136,7 @@ func TestOverlapsRoutes(t *testing.T) {
 		fastInter := new(node[int])
 
 		for _, pfx := range inter {
-			fastInter.prefixes.InsertAt(art.PfxToIdx(pfx.octet, pfx.bits), pfx.val)
+			fastInter.insertPrefix(art.PfxToIdx(pfx.octet, pfx.bits), pfx.val)
 		}
 
 		gotGold := gold.strideOverlaps(goldInter)
@@ -159,7 +163,7 @@ func BenchmarkNodePrefixInsert(b *testing.B) {
 			if i >= nroutes {
 				break
 			}
-			this.prefixes.InsertAt(art.PfxToIdx(route.octet, route.bits), 0)
+			this.insertPrefix(art.PfxToIdx(route.octet, route.bits), 0)
 		}
 
 		b.Run(fmt.Sprintf("Into %d", nroutes), func(b *testing.B) {
@@ -167,7 +171,7 @@ func BenchmarkNodePrefixInsert(b *testing.B) {
 			idx := art.PfxToIdx(route.octet, route.bits)
 
 			for b.Loop() {
-				this.prefixes.InsertAt(idx, 0)
+				this.insertPrefix(idx, 0)
 			}
 		})
 	}
@@ -184,7 +188,7 @@ func BenchmarkNodePrefixDelete(b *testing.B) {
 			if i >= nroutes {
 				break
 			}
-			this.prefixes.InsertAt(art.PfxToIdx(route.octet, route.bits), 0)
+			this.insertPrefix(art.PfxToIdx(route.octet, route.bits), 0)
 		}
 
 		b.Run(fmt.Sprintf("From %d", nroutes), func(b *testing.B) {
@@ -192,7 +196,7 @@ func BenchmarkNodePrefixDelete(b *testing.B) {
 			idx := art.PfxToIdx(route.octet, route.bits)
 
 			for b.Loop() {
-				this.prefixes.DeleteAt(idx)
+				this.deletePrefix(idx)
 			}
 		})
 	}
@@ -209,7 +213,7 @@ func BenchmarkNodePrefixLPM(b *testing.B) {
 			if i >= nroutes {
 				break
 			}
-			this.prefixes.InsertAt(art.PfxToIdx(route.octet, route.bits), 0)
+			this.insertPrefix(art.PfxToIdx(route.octet, route.bits), 0)
 		}
 
 		b.Run(fmt.Sprintf("lpmGet  IN %d", nroutes), func(b *testing.B) {
@@ -239,7 +243,7 @@ func BenchmarkNodePrefixesAsSlice(b *testing.B) {
 
 		for range nPrefixes {
 			idx := byte(prng.IntN(maxItems))
-			this.prefixes.InsertAt(idx, nil)
+			this.insertPrefix(idx, nil)
 		}
 
 		b.Run(fmt.Sprintf("Set %d", nPrefixes), func(b *testing.B) {
@@ -258,7 +262,7 @@ func BenchmarkNodePrefixesAll(b *testing.B) {
 
 		for range nPrefixes {
 			idx := byte(prng.IntN(maxItems))
-			this.prefixes.InsertAt(idx, nil)
+			this.insertPrefix(idx, nil)
 		}
 
 		b.Run(fmt.Sprintf("Set %d", nPrefixes), func(b *testing.B) {
@@ -276,15 +280,17 @@ func BenchmarkNodeChildInsert(b *testing.B) {
 		this := new(node[int])
 
 		for range nchilds {
-			octet := prng.IntN(maxItems)
-			this.children.InsertAt(uint8(octet), nil)
+			//nolint:gosec  // G115: integer overflow conversion int -> uint
+			octet := uint8(prng.IntN(maxItems))
+			this.insertChild(octet, nil)
 		}
 
 		b.Run(fmt.Sprintf("Into %d", nchilds), func(b *testing.B) {
-			octet := prng.IntN(maxItems)
+			//nolint:gosec  // G115: integer overflow conversion int -> uint
+			octet := uint8(prng.IntN(maxItems))
 
 			for b.Loop() {
-				this.children.InsertAt(uint8(octet), nil)
+				this.insertChild(octet, nil)
 			}
 		})
 	}
@@ -296,15 +302,17 @@ func BenchmarkNodeChildDelete(b *testing.B) {
 		this := new(node[int])
 
 		for range nchilds {
-			octet := prng.IntN(maxItems)
-			this.children.InsertAt(uint8(octet), nil)
+			//nolint:gosec  // G115: integer overflow conversion int -> uint
+			octet := uint8(prng.IntN(maxItems))
+			this.insertChild(octet, nil)
 		}
 
 		b.Run(fmt.Sprintf("From %d", nchilds), func(b *testing.B) {
-			octet := prng.IntN(maxItems)
+			//nolint:gosec  // G115: integer overflow conversion int -> uint
+			octet := uint8(prng.IntN(maxItems))
 
 			for b.Loop() {
-				this.children.DeleteAt(uint8(octet))
+				this.deleteChild(octet)
 			}
 		})
 	}
@@ -317,7 +325,7 @@ func BenchmarkNodeChildrenAsSlice(b *testing.B) {
 
 		for range nchilds {
 			octet := byte(prng.IntN(maxItems))
-			this.children.InsertAt(octet, nil)
+			this.insertChild(octet, nil)
 		}
 
 		b.Run(fmt.Sprintf("Set %d", nchilds), func(b *testing.B) {
@@ -336,7 +344,7 @@ func BenchmarkNodeChildrenAll(b *testing.B) {
 
 		for range nchilds {
 			octet := byte(prng.IntN(maxItems))
-			this.children.InsertAt(octet, nil)
+			this.insertChild(octet, nil)
 		}
 
 		b.Run(fmt.Sprintf("Set %d", nchilds), func(b *testing.B) {

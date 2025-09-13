@@ -4,6 +4,7 @@
 package bart
 
 import (
+	"fmt"
 	"math/rand/v2"
 	"net/netip"
 	"testing"
@@ -15,140 +16,28 @@ func TestLiteInvalid(t *testing.T) {
 	t.Parallel()
 
 	tbl1 := new(Lite)
+	tbl2 := new(Lite)
+
 	var zeroPfx netip.Prefix
 	var zeroIP netip.Addr
-	var testname string
 
-	testname = "Exists"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid prefix input", testname)
-			}
-		}(testname)
+	noPanic(t, "Contains", func() { tbl1.Contains(zeroIP) })
+	noPanic(t, "Lookup", func() { tbl1.Lookup(zeroIP) })
 
-		tbl1.Exists(zeroPfx)
-	})
+	noPanic(t, "LookupPrefix", func() { tbl1.LookupPrefix(zeroPfx) })
+	noPanic(t, "LookupPrefixLPM", func() { tbl1.LookupPrefixLPM(zeroPfx) })
 
-	testname = "Insert"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid prefix input", testname)
-			}
-		}(testname)
+	noPanic(t, "Exists", func() { tbl1.Exists(zeroPfx) })
+	noPanic(t, "Insert", func() { tbl1.Insert(zeroPfx) })
+	noPanic(t, "Delete", func() { tbl1.Delete(zeroPfx) })
+	noPanic(t, "InsertPersist", func() { tbl1.InsertPersist(zeroPfx) })
+	noPanic(t, "DeletePersist", func() { tbl1.DeletePersist(zeroPfx) })
 
-		tbl1.Insert(zeroPfx)
-	})
+	noPanic(t, "OverlapsPrefix", func() { tbl1.OverlapsPrefix(zeroPfx) })
 
-	testname = "InsertPersist"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid prefix input", testname)
-			}
-		}(testname)
-
-		_ = tbl1.InsertPersist(zeroPfx)
-	})
-
-	testname = "Delete"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid prefix input", testname)
-			}
-		}(testname)
-
-		tbl1.Delete(zeroPfx)
-	})
-
-	testname = "DeletePersist"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid prefix input", testname)
-			}
-		}(testname)
-
-		_, _ = tbl1.DeletePersist(zeroPfx)
-	})
-
-	testname = "Contains"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		if tbl1.Contains(zeroIP) != false {
-			t.Errorf("%s returns true on invalid IP input, expected false", testname)
-		}
-	})
-
-	testname = "LookupPrefix"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid prefix input", testname)
-			}
-		}(testname)
-
-		tbl1.LookupPrefix(zeroPfx)
-	})
-
-	testname = "LookupPrefixLPM"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid prefix input", testname)
-			}
-		}(testname)
-
-		tbl1.LookupPrefixLPM(zeroPfx)
-	})
-
-	testname = "OverlapsPrefix"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid prefix input", testname)
-			}
-		}(testname)
-
-		tbl1.OverlapsPrefix(zeroPfx)
-	})
-
-	testname = "Overlaps"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on empty table", testname)
-			}
-		}(testname)
-
-		tbl2 := new(Lite)
-		tbl1.Overlaps(tbl2)
-		tbl1.Overlaps4(tbl2)
-		tbl1.Overlaps6(tbl2)
-	})
-
-	testname = "Contains"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid ip input", testname)
-			}
-		}(testname)
-
-		tbl1.Contains(zeroIP)
-	})
+	noPanic(t, "Overlaps", func() { tbl1.Overlaps(tbl2) })
+	noPanic(t, "Overlaps4", func() { tbl1.Overlaps4(tbl2) })
+	noPanic(t, "Overlaps6", func() { tbl1.Overlaps6(tbl2) })
 }
 
 func TestLiteDeletePersist(t *testing.T) {
@@ -296,17 +185,24 @@ func TestLiteContainsCompare(t *testing.T) {
 	// Create large route tables repeatedly, and compare Table's
 	// behavior to a naive and slow but correct implementation.
 	t.Parallel()
+
+	n := 10_000
+	if testing.Short() {
+		n = 1_000
+	}
+
 	prng := rand.New(rand.NewPCG(42, 42))
-	pfxs := randomPrefixes(prng, 10_000)
+	pfxs := randomPrefixes(prng, n)
 
-	gold := new(goldTable[int]).insertMany(pfxs)
+	gold := new(goldTable[int])
+	gold.insertMany(pfxs)
+
 	fast := new(Lite)
-
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx)
 	}
 
-	for range 10_000 {
+	for range n {
 		a := randomAddr(prng)
 
 		_, goldOK := gold.lookup(a)
@@ -322,8 +218,13 @@ func TestLiteEqual(t *testing.T) {
 	t.Parallel()
 	prng := rand.New(rand.NewPCG(42, 42))
 
+	count := 100_000
+	if testing.Short() {
+		count = 10_000
+	}
+
 	rt := new(Lite)
-	for _, pfx := range randomRealWorldPrefixes(prng, 100_000) {
+	for _, pfx := range randomRealWorldPrefixes(prng, count) {
 		rt.Insert(pfx)
 	}
 
@@ -393,17 +294,24 @@ func TestLiteLookupPrefixCompare(t *testing.T) {
 	// Create large route tables repeatedly, and compare Table's
 	// behavior to a naive and slow but correct implementation.
 	t.Parallel()
+
+	n := 10_000
+	if testing.Short() {
+		n = 1_000
+	}
+
 	prng := rand.New(rand.NewPCG(42, 42))
-	pfxs := randomPrefixes(prng, 10_000)
+	pfxs := randomPrefixes(prng, n)
+
+	gold := new(goldTable[int])
+	gold.insertMany(pfxs)
 
 	fast := new(Lite)
-	gold := new(goldTable[int]).insertMany(pfxs)
-
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx)
 	}
 
-	for range 10_000 {
+	for range n {
 		pfx := randomPrefix(prng)
 
 		_, goldOK := gold.lookupPfx(pfx)
@@ -420,17 +328,23 @@ func TestLiteLookupPrefixLPMCompare(t *testing.T) {
 	// Create large route tables repeatedly, and compare Table's
 	// behavior to a naive and slow but correct implementation.
 	t.Parallel()
+	n := 10_000
+	if testing.Short() {
+		n = 1_000
+	}
+
 	prng := rand.New(rand.NewPCG(42, 42))
-	pfxs := randomPrefixes(prng, 10_000)
+	pfxs := randomPrefixes(prng, n)
+
+	gold := new(goldTable[int])
+	gold.insertMany(pfxs)
 
 	fast := new(Lite)
-	gold := new(goldTable[int]).insertMany(pfxs)
-
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx)
 	}
 
-	for range 10_000 {
+	for range n {
 		pfx := randomPrefix(prng)
 
 		goldLPM, _, goldOK := gold.lookupPfxLPM(pfx)
@@ -448,16 +362,21 @@ func TestLiteInsertPersistShuffled(t *testing.T) {
 	// should not matter, as long as you're inserting the same set of
 	// routes.
 	t.Parallel()
-	prng := rand.New(rand.NewPCG(42, 42))
 
-	pfxs := randomPrefixes(prng, 1000)
+	n := 10_000
+	if testing.Short() {
+		n = 1_000
+	}
+
+	prng := rand.New(rand.NewPCG(42, 42))
+	pfxs := randomPrefixes(prng, n)
 
 	for range 10 {
 		pfxs2 := append([]goldTableItem[int](nil), pfxs...)
-		rand.Shuffle(len(pfxs2), func(i, j int) { pfxs2[i], pfxs2[j] = pfxs2[j], pfxs2[i] })
+		prng.Shuffle(len(pfxs2), func(i, j int) { pfxs2[i], pfxs2[j] = pfxs2[j], pfxs2[i] })
 
-		addrs := make([]netip.Addr, 0, 10_000)
-		for range 10_000 {
+		addrs := make([]netip.Addr, 0, n)
+		for range n {
 			addrs = append(addrs, randomAddr(prng))
 		}
 
@@ -498,13 +417,18 @@ func TestLiteDeleteCompare(t *testing.T) {
 	// prefixes, and compare Table's behavior to a naive and slow but
 	// correct implementation.
 	t.Parallel()
+	n := 10_000
+	if testing.Short() {
+		n = 1_000
+	}
+
 	prng := rand.New(rand.NewPCG(42, 42))
 
-	const (
-		numPrefixes  = 10_000 // total prefixes to insert (test deletes 50% of them)
+	var (
+		numPrefixes  = n // total prefixes to insert (test deletes 50% of them)
 		numPerFamily = numPrefixes / 2
 		deleteCut    = numPerFamily / 2
-		numProbes    = 10_000 // random addr lookups to do
+		numProbes    = n // random addr lookups to do
 	)
 
 	// We have to do this little dance instead of just using allPrefixes,
@@ -517,9 +441,10 @@ func TestLiteDeleteCompare(t *testing.T) {
 	toDelete := append([]goldTableItem[int](nil), all4[deleteCut:]...)
 	toDelete = append(toDelete, all6[deleteCut:]...)
 
-	fast := new(Lite)
-	gold := new(goldTable[int]).insertMany(pfxs)
+	gold := new(goldTable[int])
+	gold.insertMany(pfxs)
 
+	fast := new(Lite)
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx)
 	}
@@ -548,13 +473,17 @@ func TestLiteDeleteShuffled(t *testing.T) {
 	// should not matter, as long as you're deleting the same set of
 	// routes.
 	t.Parallel()
+	n := 10_000
+	if testing.Short() {
+		n = 1_000
+	}
+
 	prng := rand.New(rand.NewPCG(42, 42))
 
-	const (
-		numPrefixes  = 10_000 // prefixes to insert (test deletes 50% of them)
+	var (
+		numPrefixes  = n // prefixes to insert (test deletes 50% of them)
 		numPerFamily = numPrefixes / 2
 		deleteCut    = numPerFamily / 2
-		numProbes    = 10_000 // random addr lookups to do
 	)
 
 	// We have to do this little dance instead of just using allPrefixes,
@@ -581,7 +510,7 @@ func TestLiteDeleteShuffled(t *testing.T) {
 	for range 10 {
 		pfxs2 := append([]goldTableItem[int](nil), pfxs...)
 		toDelete2 := append([]goldTableItem[int](nil), toDelete...)
-		rand.Shuffle(len(toDelete2), func(i, j int) { toDelete2[i], toDelete2[j] = toDelete2[j], toDelete2[i] })
+		prng.Shuffle(len(toDelete2), func(i, j int) { toDelete2[i], toDelete2[j] = toDelete2[j], toDelete2[i] })
 		rt2 := new(Lite)
 		for _, pfx := range pfxs2 {
 			rt2.Insert(pfx.pfx)
@@ -606,15 +535,19 @@ func TestLiteDeleteShuffled(t *testing.T) {
 func TestLiteDeleteIsReverseOfInsert(t *testing.T) {
 	t.Parallel()
 	prng := rand.New(rand.NewPCG(42, 42))
-	// Insert N prefixes, then delete those same prefixes in reverse
+	// Insert count prefixes, then delete those same prefixes in reverse
 	// order. Each deletion should exactly undo the internal structure
 	// changes that each insert did.
-	const N = 10_000
+
+	count := 10_000
+	if testing.Short() {
+		count = 1_000
+	}
 
 	tbl := new(Lite)
 	want := tbl.dumpString()
 
-	prefixes := randomPrefixes(prng, N)
+	prefixes := randomPrefixes(prng, count)
 
 	defer func() {
 		if t.Failed() {
@@ -638,7 +571,12 @@ func TestLiteClone(t *testing.T) {
 	t.Parallel()
 	prng := rand.New(rand.NewPCG(42, 42))
 
-	pfxs := randomPrefixes(prng, 100_000)
+	count := 10_000
+	if testing.Short() {
+		count = 1_000
+	}
+
+	pfxs := randomPrefixes(prng, count)
 
 	golden := new(Lite)
 	tbl := new(Lite)
@@ -660,8 +598,8 @@ func TestLiteClone(t *testing.T) {
 func TestLiteUnion(t *testing.T) {
 	t.Parallel()
 
-	for range 10 {
-		t.Run("Union", func(t *testing.T) {
+	for i := range 10 {
+		t.Run(fmt.Sprintf("Union-%d", i), func(t *testing.T) {
 			t.Parallel()
 			prng := rand.New(rand.NewPCG(42, 42))
 			pfx1 := randomRealWorldPrefixes(prng, 1_000)
@@ -685,7 +623,7 @@ func TestLiteUnion(t *testing.T) {
 			tbl1.Union(tbl2)
 
 			if tbl1.dumpString() != golden.dumpString() {
-				t.Errorf("Union: got:\n%swant:\n%s", tbl1.dumpString(), golden.dumpString())
+				t.Errorf("got:\n%swant:\n%s", tbl1.dumpString(), golden.dumpString())
 			}
 		})
 	}
@@ -694,8 +632,8 @@ func TestLiteUnion(t *testing.T) {
 func TestLiteUnionPersist(t *testing.T) {
 	t.Parallel()
 
-	for range 10 {
-		t.Run("Union", func(t *testing.T) {
+	for i := range 10 {
+		t.Run(fmt.Sprintf("UnionPersist-%d", i), func(t *testing.T) {
 			t.Parallel()
 			prng := rand.New(rand.NewPCG(42, 42))
 			pfx1 := randomRealWorldPrefixes(prng, 1_000)
@@ -719,7 +657,7 @@ func TestLiteUnionPersist(t *testing.T) {
 			pTbl := tbl1.UnionPersist(tbl2)
 
 			if pTbl.dumpString() != golden.dumpString() {
-				t.Errorf("UnionPersist: got:\n%swant:\n%s", pTbl.dumpString(), golden.dumpString())
+				t.Errorf("got:\n%swant:\n%s", pTbl.dumpString(), golden.dumpString())
 			}
 		})
 	}

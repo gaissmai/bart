@@ -28,11 +28,11 @@ package bitset
 // can inline (*BitSet256).IsEmpty with cost 22
 // can inline (*BitSet256).LastSet with cost 37
 // can inline (*BitSet256).NextSet with cost 65
-// can inline (*BitSet256).popcnt with cost 33
 // can inline (*BitSet256).Rank with cost 57
 // can inline (*BitSet256).Set with cost 12
+// can inline (*BitSet256).Size with cost 33
 // can inline (*BitSet256).Test with cost 15
-// can inline (*BitSet256).Union with cost 53
+// can inline (*BitSet256).Union with cost 36
 
 import (
 	"fmt"
@@ -107,15 +107,19 @@ func (b *BitSet256) FirstSet() (first uint8, ok bool) {
 	x3 := bits.TrailingZeros64(b[3])
 
 	if x0 != 64 {
+		//nolint:gosec  // G115: integer overflow conversion int -> uint
 		return uint8(x0), true
 	}
 	if x1 != 64 {
+		//nolint:gosec  // G115: integer overflow conversion int -> uint
 		return uint8(x1 + 64), true
 	}
 	if x2 != 64 {
+		//nolint:gosec  // G115: integer overflow conversion int -> uint
 		return uint8(x2 + 128), true
 	}
 	if x3 != 64 {
+		//nolint:gosec  // G115: integer overflow conversion int -> uint
 		return uint8(x3 + 192), true
 	}
 
@@ -144,12 +148,14 @@ func (b *BitSet256) NextSet(bit uint8) (next uint8, ok bool) {
 	// process the first (maybe partial) word
 	first := b[wIdx] >> (bit & 63)
 	if first != 0 {
+		//nolint:gosec  // G115: integer overflow conversion int -> uint
 		return bit + uint8(bits.TrailingZeros64(first)), true
 	}
 
 	// process the following words until next bit is set
 	for wIdx++; wIdx < 4; wIdx++ {
 		if next := b[wIdx]; next != 0 {
+			//nolint:gosec  // G115: integer overflow conversion int -> uint
 			return uint8(wIdx<<6 + bits.TrailingZeros64(next)), true
 		}
 	}
@@ -194,6 +200,7 @@ func (b *BitSet256) LastSet() (last uint8, ok bool) {
 
 	for wIdx := 3; wIdx >= 0; wIdx-- {
 		if word := b[wIdx]; word != 0 {
+			//nolint:gosec  // G115: integer overflow conversion int -> uint
 			return uint8(wIdx<<6+bits.Len64(word)) - 1, true
 		}
 	}
@@ -210,6 +217,7 @@ func (b *BitSet256) AsSlice(buf *[256]uint8) []uint8 {
 	size := 0
 	for wIdx, word := range b {
 		for ; word != 0; size++ {
+			//nolint:gosec  // G115: integer overflow conversion int -> uint
 			buf[size] = uint8(wIdx<<6 + bits.TrailingZeros64(word))
 			word &= word - 1 // clear the rightmost set bit
 		}
@@ -237,6 +245,7 @@ func (b *BitSet256) Bits() []uint8 {
 func (b *BitSet256) IntersectionTop(c *BitSet256) (top uint8, ok bool) {
 	for wIdx := 3; wIdx >= 0; wIdx-- {
 		if word := b[wIdx] & c[wIdx]; word != 0 {
+			//nolint:gosec  // G115: integer overflow conversion int -> uint
 			return uint8(wIdx<<6+bits.Len64(word)) - 1, true
 		}
 	}
@@ -297,18 +306,17 @@ func (b *BitSet256) Intersection(c *BitSet256) (bs BitSet256) {
 	return
 }
 
-// Union creates the union of base set with compare set.
-// This is the BitSet equivalent of | (or).
-func (b *BitSet256) Union(c *BitSet256) (bs BitSet256) {
-	bs[0] = b[0] | c[0]
-	bs[1] = b[1] | c[1]
-	bs[2] = b[2] | c[2]
-	bs[3] = b[3] | c[3]
-	return
+// Union performs an in-place union of the receiver with c.
+// It is the BitSet equivalent of | (OR).
+func (b *BitSet256) Union(c *BitSet256) {
+	b[0] |= c[0]
+	b[1] |= c[1]
+	b[2] |= c[2]
+	b[3] |= c[3]
 }
 
-// popcount is the number of set bits.
-func (b *BitSet256) popcount() (cnt int) {
+// Size is the number of set bits.
+func (b *BitSet256) Size() (cnt int) {
 	cnt += bits.OnesCount64(b[0])
 	cnt += bits.OnesCount64(b[1])
 	cnt += bits.OnesCount64(b[2])

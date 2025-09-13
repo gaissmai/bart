@@ -72,15 +72,20 @@ func TestOverlapsCompare(t *testing.T) {
 	seen := map[bool]int{}
 	for range 10_000 {
 		pfxs := randomPrefixes(prng, numEntries)
-		fast := new(Table[int])
-		gold := new(goldTable[int]).insertMany(pfxs)
 
+		gold := new(goldTable[int])
+		gold.insertMany(pfxs)
+
+		fast := new(Table[int])
 		for _, pfx := range pfxs {
 			fast.Insert(pfx.pfx, pfx.val)
 		}
 
 		inter := randomPrefixes(prng, numEntries)
-		goldInter := new(goldTable[int]).insertMany(inter)
+
+		goldInter := new(goldTable[int])
+		goldInter.insertMany(inter)
+
 		fastInter := new(Table[int])
 		for _, pfx := range inter {
 			fastInter.Insert(pfx.pfx, pfx.val)
@@ -103,9 +108,10 @@ func TestOverlapsPrefixCompare(t *testing.T) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, 100_000)
 
-	fast := new(Table[int])
-	gold := new(goldTable[int]).insertMany(pfxs)
+	gold := new(goldTable[int])
+	gold.insertMany(pfxs)
 
+	fast := new(Table[int])
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx, pfx.val)
 	}
@@ -129,7 +135,7 @@ func TestOverlapsChildren(t *testing.T) {
 		mpp("12.0.0.0/8"),
 		mpp("13.0.0.0/8"),
 		mpp("14.0.0.0/8"),
-		// chi5dren
+		// children
 		mpp("10.100.0.0/17"),
 		mpp("11.100.0.0/17"),
 		mpp("12.100.0.0/17"),

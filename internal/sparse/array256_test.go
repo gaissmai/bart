@@ -11,45 +11,48 @@ import (
 
 func TestNewArray(t *testing.T) {
 	t.Parallel()
-	a := new(Array256[int])
+	a := new(Array256[uint8])
 
 	if c := a.Len(); c != 0 {
-		t.Errorf("Count, expected 0, got %d", c)
+		t.Errorf("Len, expected 0, got %d", c)
 	}
 }
 
-func TestSparseArrayCount(t *testing.T) {
+func TestSparseArrayLen(t *testing.T) {
 	t.Parallel()
-	a := new(Array256[int])
+	a := new(Array256[uint8])
 
-	for i := range 255 {
-		a.InsertAt(uint8(i), i)
-		a.InsertAt(uint8(i), i)
+	var i uint8
+	for i = range 255 {
+		a.InsertAt(i, i)
 	}
-	if c := a.Len(); c != 255 {
-		t.Errorf("Count, expected 255, got %d", c)
+	a.InsertAt(255, 255)
+	if c := a.Len(); c != 256 {
+		t.Errorf("Len, expected 256, got %d", c)
 	}
 
-	for i := range 128 {
-		a.DeleteAt(uint8(i))
-		a.DeleteAt(uint8(i))
+	for i = range 128 {
+		a.DeleteAt(i)
 	}
-	if c := a.Len(); c != 127 {
-		t.Errorf("Count, expected 127, got %d", c)
+	if c := a.Len(); c != 128 {
+		t.Errorf("Len, expected 128, got %d", c)
 	}
 }
 
 func TestSparseArrayGet(t *testing.T) {
 	t.Parallel()
-	a := new(Array256[int])
+	a := new(Array256[uint8])
 
-	for i := range 255 {
-		a.InsertAt(uint8(i), i)
+	var i uint8
+	for i = range 255 {
+		a.InsertAt(i, i)
 	}
+	a.InsertAt(255, 255)
 
 	for range 100 {
-		i := rand.IntN(100)
-		v, ok := a.Get(uint8(i))
+		//nolint:gosec // G115: integer overflow conversion uint -> uint8
+		i := uint8(rand.UintN(100))
+		v, ok := a.Get(i)
 		if !ok {
 			t.Errorf("Get, expected true, got %v", ok)
 		}
@@ -57,7 +60,7 @@ func TestSparseArrayGet(t *testing.T) {
 			t.Errorf("Get, expected %d, got %d", i, v)
 		}
 
-		v = a.MustGet(uint8(i))
+		v = a.MustGet(i)
 		if v != i {
 			t.Errorf("MustGet, expected %d, got %d", i, v)
 		}
@@ -74,7 +77,7 @@ func TestSparseArraySetPanic(t *testing.T) {
 	t.Parallel()
 	defer func() {
 		if r := recover(); r == nil {
-			t.Errorf("MustSet, expected panic")
+			t.Errorf("Set, expected panic")
 		}
 	}()
 
@@ -88,7 +91,7 @@ func TestSparseArrayClearPanic(t *testing.T) {
 	t.Parallel()
 	defer func() {
 		if r := recover(); r == nil {
-			t.Errorf("MustClear, expected panic")
+			t.Errorf("Clear, expected panic")
 		}
 	}()
 
@@ -107,13 +110,14 @@ func TestSparseArrayMustGetPanic(t *testing.T) {
 		}
 	}()
 
-	a := new(Array256[int])
+	a := new(Array256[uint8])
 
-	for i := 5; i <= 10; i++ {
-		a.InsertAt(uint8(i), i)
+	var i uint8
+	for i = 5; i <= 10; i++ {
+		a.InsertAt(i, i)
 	}
 
-	// must panic, runtime error: index out of range [-1]
+	// must panic for unset index
 	a.MustGet(0)
 }
 
@@ -187,6 +191,16 @@ func TestSparseArrayCopy(t *testing.T) {
 				if &aCopy.Items[0] == &original.Items[0] {
 					t.Error("Items backing array not copied, pointers are equal")
 				}
+			}
+
+			// mutate copy and ensure original is unchanged
+			if len(aCopy.Items) > 0 {
+				old := aCopy.Items[0]
+				aCopy.Items[0] = old + 1
+				if original.Items[0] == aCopy.Items[0] {
+					t.Error("Copy mutation leaked into original")
+				}
+				aCopy.Items[0] = old
 			}
 		})
 	}

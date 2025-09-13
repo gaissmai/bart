@@ -37,212 +37,49 @@ func (i *MyInt) Clone() *MyInt {
 	return &a
 }
 
+func noPanic(t *testing.T, name string, fn func()) {
+	t.Helper()
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("%s panicked: %v", name, r)
+		}
+	}()
+	fn()
+}
+
 // ############ tests ################################
 
 func TestInvalid(t *testing.T) {
 	t.Parallel()
 
-	tbl := new(Table[any])
-	var zeroPfx netip.Prefix
+	tbl1 := new(Table[any])
+	tbl2 := new(Table[any])
+
 	var zeroIP netip.Addr
-	var testname string
+	var zeroPfx netip.Prefix
 
-	testname = "Insert"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid prefix input", testname)
-			}
-		}(testname)
+	noPanic(t, "Contains", func() { tbl1.Contains(zeroIP) })
+	noPanic(t, "Lookup", func() { tbl1.Lookup(zeroIP) })
 
-		tbl.Insert(zeroPfx, nil)
-	})
+	noPanic(t, "LookupPrefix", func() { tbl1.LookupPrefix(zeroPfx) })
+	noPanic(t, "LookupPrefixLPM", func() { tbl1.LookupPrefixLPM(zeroPfx) })
 
-	testname = "InsertPersist"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid prefix input", testname)
-			}
-		}(testname)
+	noPanic(t, "Insert", func() { tbl1.Insert(zeroPfx, nil) })
+	noPanic(t, "Get", func() { tbl1.Get(zeroPfx) })
+	noPanic(t, "Delete", func() { tbl1.Delete(zeroPfx) })
+	noPanic(t, "Modify", func() { tbl1.Modify(zeroPfx, nil) })
 
-		_ = tbl.InsertPersist(zeroPfx, nil)
-	})
+	noPanic(t, "InsertPersist", func() { tbl1.InsertPersist(zeroPfx, nil) })
+	noPanic(t, "DeletePersist", func() { tbl1.DeletePersist(zeroPfx) })
+	noPanic(t, "ModifyPersist", func() { tbl1.ModifyPersist(zeroPfx, nil) })
 
-	testname = "Delete"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid prefix input", testname)
-			}
-		}(testname)
+	noPanic(t, "WalkPersist", func() { tbl1.WalkPersist(nil) })
 
-		tbl.Delete(zeroPfx)
-	})
+	noPanic(t, "OverlapsPrefix", func() { tbl1.OverlapsPrefix(zeroPfx) })
 
-	testname = "DeletePersist"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid prefix input", testname)
-			}
-		}(testname)
-
-		_, _, _ = tbl.DeletePersist(zeroPfx)
-	})
-
-	testname = "Update"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid prefix input", testname)
-			}
-		}(testname)
-
-		_ = tbl.Update(zeroPfx, func(any, bool) any { return nil })
-	})
-
-	testname = "Mofify"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid prefix input", testname)
-			}
-		}(testname)
-
-		_, _ = tbl.Modify(zeroPfx, func(any, bool) (any, bool) { return nil, false })
-	})
-
-	testname = "UpdatePersist"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid prefix input", testname)
-			}
-		}(testname)
-
-		_, _ = tbl.UpdatePersist(zeroPfx, func(v any, _ bool) any { return v })
-	})
-
-	testname = "ModifyPersist"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid prefix input", testname)
-			}
-		}(testname)
-
-		_, _, _ = tbl.ModifyPersist(zeroPfx, func(any, bool) (any, bool) { return nil, false })
-	})
-
-	testname = "Get"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid prefix input", testname)
-			}
-		}(testname)
-
-		_, _ = tbl.Get(zeroPfx)
-	})
-
-	testname = "GetAndDelete"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid prefix input", testname)
-			}
-		}(testname)
-
-		_, _ = tbl.GetAndDelete(zeroPfx)
-	})
-
-	testname = "GetAndDeletePersist"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid prefix input", testname)
-			}
-		}(testname)
-
-		_, _, _ = tbl.GetAndDeletePersist(zeroPfx)
-	})
-
-	testname = "Contains"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid IP input", testname)
-			}
-		}(testname)
-
-		if tbl.Contains(zeroIP) != false {
-			t.Errorf("%s returns true on invalid IP input, expected false", testname)
-		}
-	})
-
-	testname = "Lookup"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid IP input", testname)
-			}
-		}(testname)
-
-		_, got := tbl.Lookup(zeroIP)
-		if got != false {
-			t.Errorf("%s returns true on invalid IP input, expected false", testname)
-		}
-	})
-
-	testname = "LookupPrefix"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid prefix input", testname)
-			}
-		}(testname)
-
-		tbl.LookupPrefix(zeroPfx)
-	})
-
-	testname = "LookupPrefixLPM"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid prefix input", testname)
-			}
-		}(testname)
-
-		tbl.LookupPrefixLPM(zeroPfx)
-	})
-
-	testname = "OverlapsPrefix"
-	t.Run(testname, func(t *testing.T) {
-		t.Parallel()
-		defer func(testname string) {
-			if r := recover(); r != nil {
-				t.Fatalf("%s panics on invalid prefix input", testname)
-			}
-		}(testname)
-
-		tbl.OverlapsPrefix(zeroPfx)
-	})
+	noPanic(t, "Overlaps", func() { tbl1.Overlaps(tbl2) })
+	noPanic(t, "Overlaps4", func() { tbl1.Overlaps4(tbl2) })
+	noPanic(t, "Overlaps6", func() { tbl1.Overlaps6(tbl2) })
 }
 
 func TestInsert(t *testing.T) {
@@ -1274,9 +1111,10 @@ func TestContainsCompare(t *testing.T) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, 10_000)
 
-	gold := new(goldTable[int]).insertMany(pfxs)
-	fast := new(Table[int])
+	gold := new(goldTable[int])
+	gold.insertMany(pfxs)
 
+	fast := new(Table[int])
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx, pfx.val)
 	}
@@ -1300,9 +1138,10 @@ func TestLookupCompare(t *testing.T) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, 10_000)
 
-	fast := new(Table[int])
-	gold := new(goldTable[int]).insertMany(pfxs)
+	gold := new(goldTable[int])
+	gold.insertMany(pfxs)
 
+	fast := new(Table[int])
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx, pfx.val)
 	}
@@ -1402,9 +1241,10 @@ func TestLookupPrefixCompare(t *testing.T) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, 10_000)
 
-	fast := new(Table[int])
-	gold := new(goldTable[int]).insertMany(pfxs)
+	gold := new(goldTable[int])
+	gold.insertMany(pfxs)
 
+	fast := new(Table[int])
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx, pfx.val)
 	}
@@ -1448,9 +1288,10 @@ func TestLookupPrefixLPMCompare(t *testing.T) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, 10_000)
 
-	fast := new(Table[int])
-	gold := new(goldTable[int]).insertMany(pfxs)
+	gold := new(goldTable[int])
+	gold.insertMany(pfxs)
 
+	fast := new(Table[int])
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx, pfx.val)
 	}
@@ -1502,7 +1343,7 @@ func TestInsertShuffled(t *testing.T) {
 
 	for range 10 {
 		pfxs2 := append([]goldTableItem[int](nil), pfxs...)
-		rand.Shuffle(len(pfxs2), func(i, j int) { pfxs2[i], pfxs2[j] = pfxs2[j], pfxs2[i] })
+		prng.Shuffle(len(pfxs2), func(i, j int) { pfxs2[i], pfxs2[j] = pfxs2[j], pfxs2[i] })
 
 		addrs := make([]netip.Addr, 0, 10_000)
 		for range 10_000 {
@@ -1541,7 +1382,7 @@ func TestInsertPersistShuffled(t *testing.T) {
 
 	for range 10 {
 		pfxs2 := append([]goldTableItem[int](nil), pfxs...)
-		rand.Shuffle(len(pfxs2), func(i, j int) { pfxs2[i], pfxs2[j] = pfxs2[j], pfxs2[i] })
+		prng.Shuffle(len(pfxs2), func(i, j int) { pfxs2[i], pfxs2[j] = pfxs2[j], pfxs2[i] })
 
 		addrs := make([]netip.Addr, 0, 10_000)
 		for range 10_000 {
@@ -1604,9 +1445,10 @@ func TestDeleteCompare(t *testing.T) {
 	toDelete := append([]goldTableItem[int](nil), all4[deleteCut:]...)
 	toDelete = append(toDelete, all6[deleteCut:]...)
 
-	fast := new(Table[int])
-	gold := new(goldTable[int]).insertMany(pfxs)
+	gold := new(goldTable[int])
+	gold.insertMany(pfxs)
 
+	fast := new(Table[int])
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx, pfx.val)
 	}
@@ -1690,7 +1532,7 @@ func TestDeleteShuffled(t *testing.T) {
 
 		pfxs2 := append([]goldTableItem[int](nil), pfxs...)
 		toDelete2 := append([]goldTableItem[int](nil), toDelete...)
-		rand.Shuffle(len(toDelete2), func(i, j int) { toDelete2[i], toDelete2[j] = toDelete2[j], toDelete2[i] })
+		prng.Shuffle(len(toDelete2), func(i, j int) { toDelete2[i], toDelete2[j] = toDelete2[j], toDelete2[i] })
 
 		rt2 := new(Table[int])
 
@@ -1764,7 +1606,7 @@ func TestDeleteButOne(t *testing.T) {
 		}
 
 		// shuffle the prefixes
-		rand.Shuffle(N, func(i, j int) {
+		prng.Shuffle(N, func(i, j int) {
 			prefixes[i], prefixes[j] = prefixes[j], prefixes[i]
 		})
 
@@ -1787,7 +1629,7 @@ func TestDeleteButOne(t *testing.T) {
 			stats6.pfxs + stats6.leaves + stats6.fringes
 
 		if sum != 1 {
-			t.Fatalf("delete but one, onle one item must be left, but: %d\n%s", sum, tbl.dumpString())
+			t.Fatalf("delete but one, only one item must be left, but: %d\n%s", sum, tbl.dumpString())
 		}
 	}
 }
@@ -1808,7 +1650,7 @@ func TestGetAndDelete(t *testing.T) {
 	}
 
 	// shuffle the prefixes
-	rand.Shuffle(N, func(i, j int) {
+	prng.Shuffle(N, func(i, j int) {
 		prefixes[i], prefixes[j] = prefixes[j], prefixes[i]
 	})
 
@@ -1900,9 +1742,11 @@ func TestGetCompare(t *testing.T) {
 	prng := rand.New(rand.NewPCG(42, 42))
 
 	pfxs := randomPrefixes(prng, 10_000)
-	fast := new(Table[int])
-	gold := new(goldTable[int]).insertMany(pfxs)
 
+	gold := new(goldTable[int])
+	gold.insertMany(pfxs)
+
+	fast := new(Table[int])
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx, pfx.val)
 	}
@@ -1922,9 +1766,11 @@ func TestUpdateCompare(t *testing.T) {
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, 10_000)
-	fast := new(Table[int])
-	gold := new(goldTable[int]).insertMany(pfxs)
 
+	gold := new(goldTable[int])
+	gold.insertMany(pfxs)
+
+	fast := new(Table[int])
 	// Update as insert
 	for _, pfx := range pfxs {
 		fast.Update(pfx.pfx, func(int, bool) int { return pfx.val })
@@ -2181,10 +2027,11 @@ func TestModifyCompare(t *testing.T) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, 10_000)
 
-	fast := new(Table[int])
-	gold := new(goldTable[int]).insertMany(pfxs)
+	gold := new(goldTable[int])
+	gold.insertMany(pfxs)
 
 	// Update as insert
+	fast := new(Table[int])
 	for _, pfx := range pfxs {
 		fast.Modify(pfx.pfx, func(int, bool) (int, bool) { return pfx.val, false })
 	}
@@ -2416,7 +2263,7 @@ func TestModifyShuffled(t *testing.T) {
 
 		pfxs2 := append([]goldTableItem[int](nil), pfxs...)
 		toDelete2 := append([]goldTableItem[int](nil), toDelete...)
-		rand.Shuffle(len(toDelete2), func(i, j int) { toDelete2[i], toDelete2[j] = toDelete2[j], toDelete2[i] })
+		prng.Shuffle(len(toDelete2), func(i, j int) { toDelete2[i], toDelete2[j] = toDelete2[j], toDelete2[i] })
 
 		rt2 := new(Table[int])
 
@@ -2487,7 +2334,7 @@ func TestModifyPersistShuffled(t *testing.T) {
 
 		pfxs2 := append([]goldTableItem[int](nil), pfxs...)
 		toDelete2 := append([]goldTableItem[int](nil), toDelete...)
-		rand.Shuffle(len(toDelete2), func(i, j int) { toDelete2[i], toDelete2[j] = toDelete2[j], toDelete2[i] })
+		prng.Shuffle(len(toDelete2), func(i, j int) { toDelete2[i], toDelete2[j] = toDelete2[j], toDelete2[i] })
 
 		rt2 := new(Table[int])
 
@@ -2826,15 +2673,20 @@ func TestUnionCompare(t *testing.T) {
 
 	for range 100 {
 		pfxs := randomPrefixes(prng, numEntries)
-		fast := new(Table[int])
-		gold := new(goldTable[int]).insertMany(pfxs)
 
+		gold := new(goldTable[int])
+		gold.insertMany(pfxs)
+
+		fast := new(Table[int])
 		for _, pfx := range pfxs {
 			fast.Insert(pfx.pfx, pfx.val)
 		}
 
 		pfxs2 := randomPrefixes(prng, numEntries)
-		gold2 := new(goldTable[int]).insertMany(pfxs2)
+
+		gold2 := new(goldTable[int])
+		gold2.insertMany(pfxs2)
+
 		fast2 := new(Table[int])
 		for _, pfx := range pfxs2 {
 			fast2.Insert(pfx.pfx, pfx.val)
@@ -2873,15 +2725,20 @@ func TestUnionPersistCompare(t *testing.T) {
 
 	for range 100 {
 		pfxs := randomPrefixes(prng, numEntries)
-		fast := new(Table[int])
-		gold := new(goldTable[int]).insertMany(pfxs)
 
+		gold := new(goldTable[int])
+		gold.insertMany(pfxs)
+
+		fast := new(Table[int])
 		for _, pfx := range pfxs {
 			fast.Insert(pfx.pfx, pfx.val)
 		}
 
 		pfxs2 := randomPrefixes(prng, numEntries)
-		gold2 := new(goldTable[int]).insertMany(pfxs2)
+
+		gold2 := new(goldTable[int])
+		gold2.insertMany(pfxs2)
+
 		fast2 := new(Table[int])
 		for _, pfx := range pfxs2 {
 			fast2.Insert(pfx.pfx, pfx.val)
@@ -3258,7 +3115,7 @@ func TestSize(t *testing.T) {
 	}
 }
 
-func TestLastIdxLastBits(t *testing.T) {
+func TestLastOctetPlusOneAndLastBits(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -3315,12 +3172,14 @@ func TestLastIdxLastBits(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		gotMaxDepth, gotBits := maxDepthAndLastBits(tc.pfx.Bits())
-		if gotMaxDepth != tc.wantDepth {
-			t.Errorf("maxDepthAndLastBits(%d), maxDepth got: %d, want: %d", tc.pfx.Bits(), gotMaxDepth, tc.wantDepth)
+		lastOctetPlusOne, gotBits := lastOctetPlusOneAndLastBits(tc.pfx)
+		if lastOctetPlusOne != tc.wantDepth {
+			t.Errorf("lastOctetPlusOneAndLastBits(%d), lastOctetPlusOne got: %d, want: %d",
+				tc.pfx.Bits(), lastOctetPlusOne, tc.wantDepth)
 		}
 		if gotBits != tc.wantBits {
-			t.Errorf("maxDepthAndLastBits(%d), lastBits got: %d, want: %d", tc.pfx.Bits(), gotBits, tc.wantBits)
+			t.Errorf("lastOctetPlusOneAndLastBits(%d), lastBits got: %d, want: %d",
+				tc.pfx.Bits(), gotBits, tc.wantBits)
 		}
 	}
 }
@@ -3427,56 +3286,30 @@ func TestWalkPersist(t *testing.T) {
 
 var benchRouteCount = []int{1, 2, 5, 10, 100, 1000, 10_000, 100_000, 200_000}
 
-func BenchmarkTableInsertRandom(b *testing.B) {
+func BenchmarkTableModifyRandom(b *testing.B) {
 	prng := rand.New(rand.NewPCG(42, 42))
-	for _, n := range []int{10_000, 100_000, 1_000_000, 2_000_000} {
+	for _, n := range benchRouteCount {
 		randomPfxs := randomRealWorldPrefixes(prng, n)
 
-		rt := new(Table[*MyInt])
+		rt := new(Table[int])
 		for i, pfx := range randomPfxs {
-			myInt := MyInt(i)
-			rt.Insert(pfx, &myInt)
+			rt.Insert(pfx, i)
 		}
 
 		prt := rt
 
-		probe := randomPrefix(prng)
-		myInt := MyInt(42)
+		probe := randomPfxs[prng.IntN(len(randomPfxs))]
 
 		b.Run(fmt.Sprintf("mutable into %d", n), func(b *testing.B) {
 			for b.Loop() {
-				rt.Insert(probe, &myInt)
+				rt.Modify(probe, func(int, bool) (int, bool) { return 42, false })
 			}
-
-			s4 := rt.root4.nodeStatsRec()
-			s6 := rt.root6.nodeStatsRec()
-			stats := stats{
-				s4.pfxs + s6.pfxs,
-				s4.childs + s6.childs,
-				s4.nodes + s6.nodes,
-				s4.leaves + s6.leaves,
-				s4.fringes + s6.fringes,
-			}
-
-			b.ReportMetric(float64(rt.Size())/float64(stats.nodes), "Prefix/Node")
 		})
 
 		b.Run(fmt.Sprintf("persist into %d", n), func(b *testing.B) {
 			for b.Loop() {
-				_ = prt.InsertPersist(probe, &myInt)
+				prt.ModifyPersist(probe, func(int, bool) (int, bool) { return 42, false })
 			}
-
-			s4 := rt.root4.nodeStatsRec()
-			s6 := rt.root6.nodeStatsRec()
-			stats := stats{
-				s4.pfxs + s6.pfxs,
-				s4.childs + s6.childs,
-				s4.nodes + s6.nodes,
-				s4.leaves + s6.leaves,
-				s4.fringes + s6.fringes,
-			}
-
-			b.ReportMetric(float64(rt.Size())/float64(stats.nodes), "Prefix/Node")
 		})
 
 	}
@@ -3484,26 +3317,45 @@ func BenchmarkTableInsertRandom(b *testing.B) {
 
 func BenchmarkTableDelete(b *testing.B) {
 	prng := rand.New(rand.NewPCG(42, 42))
-	for _, n := range benchRouteCount {
-		rt := new(Table[*MyInt])
-		for i, route := range randomPrefixes(prng, n) {
-			myInt := MyInt(i)
-			rt.Insert(route.pfx, &myInt)
-		}
-
-		prt := rt
-		probe := randomPrefix(prng)
+	for _, n := range []int{1_000, 10_000, 100_000, 1_000_000} {
+		pfxs := randomPrefixes(prng, n)
 
 		b.Run(fmt.Sprintf("mutable from_%d", n), func(b *testing.B) {
 			for b.Loop() {
-				rt.Delete(probe)
+				b.StopTimer()
+				rt := new(Table[*MyInt])
+
+				for i, route := range pfxs {
+					myInt := MyInt(i)
+					rt.Insert(route.pfx, &myInt)
+				}
+				b.StartTimer()
+
+				for _, route := range pfxs {
+					rt.Delete(route.pfx)
+				}
 			}
+			b.ReportMetric(float64(b.Elapsed())/float64(b.N)/float64(len(pfxs)), "ns/route")
+			b.ReportMetric(0, "ns/op")
 		})
 
 		b.Run(fmt.Sprintf("persist from_%d", n), func(b *testing.B) {
 			for b.Loop() {
-				_, _, _ = prt.DeletePersist(probe)
+				b.StopTimer()
+				rt := new(Table[*MyInt])
+
+				for i, route := range pfxs {
+					myInt := MyInt(i)
+					rt.Insert(route.pfx, &myInt)
+				}
+				b.StartTimer()
+
+				for _, route := range pfxs {
+					rt, _, _ = rt.DeletePersist(route.pfx)
+				}
 			}
+			b.ReportMetric(float64(b.Elapsed())/float64(b.N)/float64(len(pfxs)), "ns/route")
+			b.ReportMetric(0, "ns/op")
 		})
 	}
 }
@@ -3673,11 +3525,13 @@ func BenchmarkMemIP4(b *testing.B) {
 			runtime.ReadMemStats(&endMem)
 
 			stats := rt.root4.nodeStatsRec()
-			b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/k), "bytes/pfx")
-			b.ReportMetric(float64(stats.nodes), "node")
+
+			bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
+			b.ReportMetric(roundFloat64(bytes/float64(stats.pfxs)), "bytes/route")
 			b.ReportMetric(float64(stats.pfxs), "pfxs")
-			b.ReportMetric(float64(stats.leaves), "leaf")
-			b.ReportMetric(float64(stats.fringes), "fringe")
+			b.ReportMetric(float64(stats.nodes), "nodes")
+			b.ReportMetric(float64(stats.leaves), "leaves")
+			b.ReportMetric(float64(stats.fringes), "fringes")
 			b.ReportMetric(0, "ns/op")
 		})
 	}
@@ -3704,11 +3558,13 @@ func BenchmarkMemIP6(b *testing.B) {
 			runtime.ReadMemStats(&endMem)
 
 			stats := rt.root6.nodeStatsRec()
-			b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/k), "bytes/pfx")
-			b.ReportMetric(float64(stats.nodes), "node")
+
+			bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
+			b.ReportMetric(roundFloat64(bytes/float64(stats.pfxs)), "bytes/route")
 			b.ReportMetric(float64(stats.pfxs), "pfxs")
-			b.ReportMetric(float64(stats.leaves), "leaf")
-			b.ReportMetric(float64(stats.fringes), "fringe")
+			b.ReportMetric(float64(stats.nodes), "nodes")
+			b.ReportMetric(float64(stats.leaves), "leaves")
+			b.ReportMetric(float64(stats.fringes), "fringes")
 			b.ReportMetric(0, "ns/op")
 		})
 	}
@@ -3744,11 +3600,12 @@ func BenchmarkMem(b *testing.B) {
 				s4.fringes + s6.fringes,
 			}
 
-			b.ReportMetric(float64(int(endMem.HeapAlloc-startMem.HeapAlloc)/k), "bytes/pfx")
-			b.ReportMetric(float64(stats.nodes), "node")
+			bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
+			b.ReportMetric(roundFloat64(bytes/float64(stats.pfxs)), "bytes/route")
 			b.ReportMetric(float64(stats.pfxs), "pfxs")
-			b.ReportMetric(float64(stats.leaves), "leaf")
-			b.ReportMetric(float64(stats.fringes), "fringe")
+			b.ReportMetric(float64(stats.nodes), "nodes")
+			b.ReportMetric(float64(stats.leaves), "leaves")
+			b.ReportMetric(float64(stats.fringes), "fringes")
 			b.ReportMetric(0, "ns/op")
 		})
 	}

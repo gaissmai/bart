@@ -5,7 +5,7 @@ package art
 
 import "testing"
 
-func TestHostIdx(t *testing.T) {
+func TestOctetToIdx(t *testing.T) {
 	testCases := []struct {
 		octet uint8
 		want  uint
@@ -23,7 +23,7 @@ func TestHostIdx(t *testing.T) {
 	for _, tc := range testCases {
 		got := OctetToIdx(tc.octet)
 		if got != tc.want {
-			t.Errorf("HostIdx(%d), want: %d, got: %d", tc.octet, tc.want, got)
+			t.Errorf("OctetToIdx(%d), want: %d, got: %d", tc.octet, tc.want, got)
 		}
 	}
 }
@@ -34,13 +34,7 @@ func TestPfxLen256(t *testing.T) {
 		idx   uint8
 		want  uint8
 	}{
-		/*
-			{
-				depth: 0,
-				idx:   0,  // invalid
-				want:  -1, // invalid
-			},
-		*/
+		// idx: 0 is invalid
 		{
 			depth: 0,
 			idx:   1,
@@ -113,13 +107,7 @@ func TestIdxToPfx256(t *testing.T) {
 		wantOctet  uint8
 		wantPfxLen uint8
 	}{
-		/*
-			{
-				idx:        0,  // invalid
-				wantOctet:  0,  // invalid
-				wantPfxLen: -1, // invalid
-			},
-		*/
+		// idx: 0 is invalid
 		{
 			idx:        1,
 			wantOctet:  0,
@@ -151,13 +139,7 @@ func TestIdxToRange256(t *testing.T) {
 		wantFirst uint8
 		wantLast  uint8
 	}{
-		/*
-			{
-				idx:       0, // invalid
-				wantFirst: 0,
-				wantLast:  255,
-			},
-		*/
+		// idx: 0 is invalid
 		{
 			idx:       1,
 			wantFirst: 0,

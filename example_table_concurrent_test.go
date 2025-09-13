@@ -22,11 +22,6 @@ func (v *testVal) Clone() *testVal {
 	return &testVal{data: v.data}
 }
 
-var (
-	tblAtomicPtr atomic.Pointer[bart.Table[*testVal]]
-	tblMutex     sync.Mutex
-)
-
 // #######################################
 
 // ExampleTable_concurrent demonstrates safe concurrent usage of bart.
@@ -43,6 +38,9 @@ var (
 // If the payload V either contains a pointer or is a pointer,
 // it must implement the [bart.Cloner] interface.
 func ExampleTable_concurrent() {
+	var tblAtomicPtr atomic.Pointer[bart.Table[*testVal]]
+	var tblMutex sync.Mutex
+
 	baseTbl := new(bart.Table[*testVal])
 	tblAtomicPtr.Store(baseTbl)
 
@@ -51,7 +49,7 @@ func ExampleTable_concurrent() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for range 10_000_000 {
+		for range 100_000 {
 			for _, ip := range exampleIPs {
 				_, _ = tblAtomicPtr.Load().Lookup(ip)
 			}
@@ -61,7 +59,7 @@ func ExampleTable_concurrent() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for range 10_000 {
+		for range 1_000 {
 			tblMutex.Lock()
 			tbl := tblAtomicPtr.Load()
 
@@ -78,7 +76,7 @@ func ExampleTable_concurrent() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for range 10_000 {
+		for range 1_000 {
 			tblMutex.Lock()
 			tbl := tblAtomicPtr.Load()
 

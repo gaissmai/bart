@@ -4,6 +4,7 @@
 package bart
 
 import (
+	"cmp"
 	"net/netip"
 	"slices"
 
@@ -13,9 +14,10 @@ import (
 )
 
 const (
-	strideLen    = 8   // byte, a multibit trie with stride len 8
-	maxTreeDepth = 16  // max 16 bytes for IPv6
-	maxItems     = 256 // max 256 prefixes or children in node
+	strideLen    = 8                // byte, a multibit trie with stride len 8
+	maxItems     = 256              // max 256 prefixes or children in node
+	maxTreeDepth = 16               // max 16 bytes for IPv6
+	depthMask    = maxTreeDepth - 1 // used for BCE
 )
 
 // stridePath, max 16 octets deep
@@ -60,6 +62,49 @@ func (n *node[V]) isEmpty() bool {
 	return n.prefixes.Len() == 0 && n.children.Len() == 0
 }
 
+// prefixCount returns the number of prefixes stored in this node.
+func (n *node[V]) prefixCount() int {
+	return n.prefixes.Len()
+}
+
+// childCount returns the number of slots used in this node.
+func (n *node[V]) childCount() int {
+	return n.children.Len()
+}
+
+// insertPrefix adds the route addr/prefixLen to n, with value val.
+func (n *node[V]) insertPrefix(idx uint8, val V) (exists bool) {
+	return n.prefixes.InsertAt(idx, val)
+}
+
+func (n *node[V]) getPrefix(idx uint8) (val V, exists bool) {
+	return n.prefixes.Get(idx)
+}
+
+func (n *node[V]) mustGetPrefix(idx uint8) (val V) {
+	return n.prefixes.MustGet(idx)
+}
+
+func (n *node[V]) deletePrefix(idx uint8) (val V, exists bool) {
+	return n.prefixes.DeleteAt(idx)
+}
+
+func (n *node[V]) insertChild(addr uint8, child any) (exists bool) {
+	return n.children.InsertAt(addr, child)
+}
+
+func (n *node[V]) getChild(addr uint8) (any, bool) {
+	return n.children.Get(addr)
+}
+
+func (n *node[V]) mustGetChild(addr uint8) any {
+	return n.children.MustGet(addr)
+}
+
+func (n *node[V]) deleteChild(addr uint8) {
+	_, _ = n.children.DeleteAt(addr)
+}
+
 // leafNode is a prefix with value, used as a path compressed child.
 type leafNode[V any] struct {
 	prefix netip.Prefix
@@ -84,17 +129,17 @@ func newFringeNode[V any](val V) *fringeNode[V] {
 
 // isFringe determines whether a prefix qualifies as a "fringe node" -
 // that is, a special kind of path-compressed leaf inserted at the final
-// possible trie level (depth == maxDepth - 1).
+// possible trie level (depth == lastOctet).
 //
 // Both "leaves" and "fringes" are path-compressed terminal entries;
 // the distinction lies in their position within the trie:
 //
 //   - A leaf is inserted at any intermediate level if no further stride
-//     boundary matches (depth < maxDepth - 1).
+//     boundary matches (depth < lastOctet).
 //
 //   - A fringe is inserted at the last possible stride level
-//     (depth == maxDepth - 1) before a prefix would otherwise land
-//     as a direct prefix (depth == maxDepth).
+//     (depth == lastOctet) before a prefix would otherwise land
+//     as a direct prefix (depth == lastOctet+1).
 //
 // Special property:
 //   - A fringe acts as a default route for all downstream bit patterns
@@ -103,17 +148,17 @@ func newFringeNode[V any](val V) *fringeNode[V] {
 // Examples:
 //
 //	e.g. prefix is addr/8, or addr/16, or ... addr/128
-//	depth <  maxDepth-1 : a leaf, path-compressed
-//	depth == maxDepth-1 : a fringe, path-compressed
-//	depth == maxDepth   : a prefix with octet/pfx == 0/0 => idx == 1, a strides default route
+//	depth <  lastOctet :  a leaf, path-compressed
+//	depth == lastOctet :  a fringe, path-compressed
+//	depth == lastOctet+1: a prefix with octet/pfx == 0/0 => idx == 1, a strides default route
 //
 // Logic:
 //   - A prefix qualifies as a fringe if:
-//     depth == maxDepth - 1 &&
-//     lastBits == 0 (i.e., aligned on stride boundary, /8, /16, ... /128 bits)
-func isFringe(depth, bits int) bool {
-	maxDepth, lastBits := maxDepthAndLastBits(bits)
-	return depth == maxDepth-1 && lastBits == 0
+//     depth == lastOctet && lastBits == 0
+//     (i.e., aligned on stride boundary, /8, /16, ... /128 bits)
+func isFringe(depth int, pfx netip.Prefix) bool {
+	lastOctetPlusOne, lastBits := lastOctetPlusOneAndLastBits(pfx)
+	return depth == lastOctetPlusOne-1 && lastBits == 0
 }
 
 // insertAtDepth inserts a network prefix and its associated value into the
@@ -124,29 +169,28 @@ func isFringe(depth, bits int) bool {
 // it is pushed down via a new intermediate node. Existing entries with the same prefix are overwritten.
 func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool) {
 	ip := pfx.Addr() // the pfx must be in canonical form
-	bits := pfx.Bits()
 	octets := ip.AsSlice()
-	maxDepth, lastBits := maxDepthAndLastBits(bits)
+	lastOctetPlusOne, lastBits := lastOctetPlusOneAndLastBits(pfx)
 
 	// find the proper trie node to insert prefix
 	// start with prefix octet at depth
 	for _, octet := range octets[depth:] {
 		// last masked octet: insert/override prefix/val into node
-		if depth == maxDepth {
-			return n.prefixes.InsertAt(art.PfxToIdx(octet, lastBits), val)
+		if depth == lastOctetPlusOne {
+			return n.insertPrefix(art.PfxToIdx(octet, lastBits), val)
 		}
 
 		// reached end of trie path ...
 		if !n.children.Test(octet) {
 			// insert prefix path compressed as leaf or fringe
-			if isFringe(depth, bits) {
-				return n.children.InsertAt(octet, newFringeNode(val))
+			if isFringe(depth, pfx) {
+				return n.insertChild(octet, newFringeNode(val))
 			}
-			return n.children.InsertAt(octet, newLeafNode(pfx, val))
+			return n.insertChild(octet, newLeafNode(pfx, val))
 		}
 
 		// ... or decend down the trie
-		kid := n.children.MustGet(octet)
+		kid := n.mustGetChild(octet)
 
 		// kid is node or leaf at addr
 		switch kid := kid.(type) {
@@ -169,13 +213,13 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 			newNode := new(node[V])
 			newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
 
-			n.children.InsertAt(octet, newNode)
+			n.insertChild(octet, newNode)
 			n = newNode
 
 		case *fringeNode[V]:
 			// reached a path compressed fringe
 			// override value in slot if pfx is a fringe
-			if isFringe(depth, bits) {
+			if isFringe(depth, pfx) {
 				kid.value = val
 				// exists
 				return true
@@ -186,9 +230,9 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 			// insert new child at current leaf position (addr)
 			// descend down, replace n with new child
 			newNode := new(node[V])
-			newNode.prefixes.InsertAt(1, kid.value)
+			newNode.insertPrefix(1, kid.value)
 
-			n.children.InsertAt(octet, newNode)
+			n.insertChild(octet, newNode)
 			n = newNode
 
 		default:
@@ -225,7 +269,7 @@ func (n *node[V]) purgeAndCompress(stack []*node[V], octets []uint8, is4 bool) {
 		switch {
 		case n.isEmpty():
 			// just delete this empty node from parent
-			parent.children.DeleteAt(octet)
+			parent.deleteChild(octet)
 
 		case pfxCount == 0 && childCount == 1:
 			switch kid := n.children.Items[0].(type) {
@@ -235,13 +279,13 @@ func (n *node[V]) purgeAndCompress(stack []*node[V], octets []uint8, is4 bool) {
 				return
 			case *leafNode[V]:
 				// just one leaf, delete this node and reinsert the leaf above
-				parent.children.DeleteAt(octet)
+				parent.deleteChild(octet)
 
 				// ... (re)insert the leaf at parents depth
 				parent.insertAtDepth(kid.prefix, kid.value, depth)
 			case *fringeNode[V]:
 				// just one fringe, delete this node and reinsert the fringe as leaf above
-				parent.children.DeleteAt(octet)
+				parent.deleteChild(octet)
 
 				// get the last octet back, the only item is also the first item
 				lastOctet, _ := n.children.FirstSet()
@@ -256,7 +300,7 @@ func (n *node[V]) purgeAndCompress(stack []*node[V], octets []uint8, is4 bool) {
 
 		case pfxCount == 1 && childCount == 0:
 			// just one prefix, delete this node and reinsert the idx as leaf above
-			parent.children.DeleteAt(octet)
+			parent.deleteChild(octet)
 
 			// get prefix back from idx ...
 			idx, _ := n.prefixes.FirstSet() // single idx must be first bit set
@@ -291,7 +335,7 @@ func (n *node[V]) purgeAndCompress(stack []*node[V], octets []uint8, is4 bool) {
 func (n *node[V]) lpmGet(idx uint) (baseIdx uint8, val V, ok bool) {
 	// top is the idx of the longest-prefix-match
 	if top, ok := n.prefixes.IntersectionTop(lpm.BackTrackingBitset(idx)); ok {
-		return top, n.prefixes.MustGet(top), true
+		return top, n.mustGetPrefix(top), true
 	}
 
 	// not found (on this level)
@@ -331,7 +375,7 @@ func (n *node[V]) allRec(path stridePath, depth int, is4 bool, yield func(netip.
 		cidr := cidrFromPath(path, depth, is4, idx)
 
 		// callback for this prefix and val
-		if !yield(cidr, n.prefixes.MustGet(idx)) {
+		if !yield(cidr, n.mustGetPrefix(idx)) {
 			// early exit
 			return false
 		}
@@ -448,7 +492,7 @@ func (n *node[V]) allRecSorted(path stridePath, depth int, is4 bool, yield func(
 		// yield the prefix for this idx
 		cidr := cidrFromPath(path, depth, is4, pfxIdx)
 		// n.prefixes.Items[i] not possible after sorting allIndices
-		if !yield(cidr, n.prefixes.MustGet(pfxIdx)) {
+		if !yield(cidr, n.mustGetPrefix(pfxIdx)) {
 			return false
 		}
 	}
@@ -505,11 +549,12 @@ func (n *node[V]) eachLookupPrefix(octets []byte, depth int, is4 bool, pfxIdx ui
 	if pfxIdx > 255 {
 		pfxIdx >>= 1
 	}
+	//nolint:gosec  // G115: integer overflow conversion int -> uint
 	idx := uint8(pfxIdx) // now it fits into uint8
 
 	for ; idx > 0; idx >>= 1 {
 		if n.prefixes.Test(idx) {
-			val := n.prefixes.MustGet(idx)
+			val := n.mustGetPrefix(idx)
 			cidr := cidrFromPath(path, depth, is4, idx)
 
 			if !yield(cidr, val) {
@@ -577,7 +622,7 @@ func (n *node[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxIdx uint8, y
 			}
 
 			// yield the node or leaf?
-			switch kid := n.children.MustGet(addr).(type) {
+			switch kid := n.mustGetChild(addr).(type) {
 			case *node[V]:
 				path[depth] = addr
 				if !kid.allRecSorted(path, depth+1, is4, yield) {
@@ -607,7 +652,7 @@ func (n *node[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxIdx uint8, y
 		// yield the prefix for this idx
 		cidr := cidrFromPath(path, depth, is4, pfxIdx)
 		// n.prefixes.Items[i] not possible after sorting allIndices
-		if !yield(cidr, n.prefixes.MustGet(pfxIdx)) {
+		if !yield(cidr, n.mustGetPrefix(pfxIdx)) {
 			return false
 		}
 	}
@@ -615,7 +660,7 @@ func (n *node[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxIdx uint8, y
 	// yield the rest of leaves and nodes (rec-descent)
 	for _, addr := range allCoveredChildAddrs[addrCursor:] {
 		// yield the node or leaf?
-		switch kid := n.children.MustGet(addr).(type) {
+		switch kid := n.mustGetChild(addr).(type) {
 		case *node[V]:
 			path[depth] = addr
 			if !kid.allRecSorted(path, depth+1, is4, yield) {
@@ -649,25 +694,16 @@ func cmpIndexRank(aIdx, bIdx uint8) int {
 
 	// cmp the prefixes, first by address and then by bits
 	if aOctet == bOctet {
-		if aBits <= bBits {
-			return -1
-		}
-
-		return 1
+		return cmp.Compare(aBits, bBits)
 	}
-
-	if aOctet < bOctet {
-		return -1
-	}
-
-	return 1
+	return cmp.Compare(aOctet, bOctet)
 }
 
 // cidrFromPath, helper function,
 // get prefix back from stride path, depth and idx.
 // The prefix is solely defined by the position in the trie and the baseIndex.
 func cidrFromPath(path stridePath, depth int, is4 bool, idx uint8) netip.Prefix {
-	depth = depth & 0xf // BCE
+	depth = depth & depthMask // BCE
 
 	octet, pfxLen := art.IdxToPfx(idx)
 
@@ -696,7 +732,7 @@ func cidrFromPath(path stridePath, depth int, is4 bool, idx uint8) netip.Prefix 
 // get prefix back from octets path, depth, IP version and last octet.
 // The prefix of a fringe is solely defined by the position in the trie.
 func cidrForFringe(octets []byte, depth int, is4 bool, lastOctet uint8) netip.Prefix {
-	depth = depth & 0xf // BCE
+	depth = depth & depthMask // BCE
 
 	path := stridePath{}
 	copy(path[:], octets[:depth+1])

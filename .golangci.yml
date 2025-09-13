@@ -1,9 +1,13 @@
-version: "2"
+version: '2'
+run:
+  timeout: 5m
 linters:
   enable:
     - decorder
     - errorlint
     - gocyclo
+    - govet
+    - gosec
     - gosmopolitan
     - intrange
     - misspell
@@ -19,6 +23,9 @@ linters:
   settings:
     gocyclo:
       min-complexity: 30
+    gosec:
+      excludes:
+        - G404 # deterministic RNG in tests/benchmarks only
   exclusions:
     generated: lax
     presets:
@@ -30,6 +37,7 @@ linters:
       - third_party$
       - builtin$
       - examples$
+
 formatters:
   enable:
     - gofmt

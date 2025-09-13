@@ -23,11 +23,16 @@ func cloneFnFactory[V any]() cloneFunc[V] {
 	return nil
 }
 
-// cloneVal invokes the Clone method to deeply copy val.
-// Assumes that val implements Cloner[V].
+// cloneVal returns a deep clone of val by calling its Clone method when
+// val implements Cloner[V]. If val does not implement Cloner[V] or the
+// asserted Cloner is nil, val is returned unchanged.
 func cloneVal[V any](val V) V {
 	// you can't assert directly on a type parameter
-	return any(val).(Cloner[V]).Clone()
+	c, ok := any(val).(Cloner[V])
+	if !ok || c == nil {
+		return val
+	}
+	return c.Clone()
 }
 
 // copyVal just copies the value.
@@ -135,6 +140,89 @@ func (n *node[V]) cloneRec(cloneFn cloneFunc[V]) *node[V] {
 	for i, kidAny := range c.children.Items {
 		if kid, ok := kidAny.(*node[V]); ok {
 			c.children.Items[i] = kid.cloneRec(cloneFn)
+		}
+	}
+
+	return c
+}
+
+// cloneFlat returns a shallow copy of the current fatNode[V],
+// Its semantics are identical to [node.cloneFlat].
+func (n *fatNode[V]) cloneFlat(cloneFn cloneFunc[V]) *fatNode[V] {
+	if n == nil {
+		return nil
+	}
+
+	c := new(fatNode[V])
+	if n.isEmpty() {
+		return c
+	}
+
+	// copy the bitsets
+	c.prefixesBitSet = n.prefixesBitSet
+	c.childrenBitSet = n.childrenBitSet
+
+	// it's a clone of the prefixes ...
+	// but the allot algorithm makes it more difficult
+	// see also insertPrefix
+	for _, idx := range n.prefixesBitSet.AsSlice(&[256]uint8{}) {
+		origValPtr := n.prefixes[idx]
+		newValPtr := new(V)
+
+		if cloneFn == nil {
+			*newValPtr = *origValPtr // just copy the value
+		} else {
+			*newValPtr = cloneFn(*origValPtr) // clone the value
+		}
+
+		oldValPtr := c.prefixes[idx]
+		c.allot(idx, oldValPtr, newValPtr)
+	}
+
+	// flat clone of the children
+	for _, octet := range n.childrenBitSet.AsSlice(&[256]uint8{}) {
+		kidAny := *n.children[octet]
+
+		switch kid := kidAny.(type) {
+		case *fatNode[V]:
+			// just copy the pointer
+			c.children[octet] = n.children[octet]
+
+		case *leafNode[V]:
+			leafAny := any(kid.cloneLeaf(cloneFn))
+			c.children[octet] = &leafAny
+
+		case *fringeNode[V]:
+			fringeAny := any(kid.cloneFringe(cloneFn))
+			c.children[octet] = &fringeAny
+
+		default:
+			panic("logic error, wrong node type")
+		}
+
+	}
+
+	return c
+}
+
+// cloneRec performs a recursive deep copy of the fatNode[V] and all its descendants.
+// Its semantics are identical to [node.cloneRec].
+func (n *fatNode[V]) cloneRec(cloneFn cloneFunc[V]) *fatNode[V] {
+	if n == nil {
+		return nil
+	}
+
+	// Perform a flat clone of the current node.
+	c := n.cloneFlat(cloneFn)
+
+	// Recursively clone all child nodes of type *fatNode[V]
+	for _, octet := range c.childrenBitSet.AsSlice(&[256]uint8{}) {
+		kidAny := *c.children[octet]
+
+		switch kid := kidAny.(type) {
+		case *fatNode[V]:
+			nodeAny := any(kid.cloneRec(cloneFn))
+			c.children[octet] = &nodeAny
 		}
 	}
 

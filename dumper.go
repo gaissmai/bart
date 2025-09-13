@@ -41,16 +41,18 @@ func (t *Table[V]) dump(w io.Writer) {
 	if t.size4 > 0 {
 		stats := t.root4.nodeStatsRec()
 		fmt.Fprintln(w)
-		fmt.Fprintf(w, "### IPv4: size(%d), nodes(%d), pfxs(%d), leaves(%d), fringes(%d),",
+		fmt.Fprintf(w, "### IPv4: size(%d), nodes(%d), pfxs(%d), leaves(%d), fringes(%d)",
 			t.size4, stats.nodes, stats.pfxs, stats.leaves, stats.fringes)
+
 		t.root4.dumpRec(w, stridePath{}, 0, true)
 	}
 
 	if t.size6 > 0 {
 		stats := t.root6.nodeStatsRec()
 		fmt.Fprintln(w)
-		fmt.Fprintf(w, "### IPv6: size(%d), nodes(%d), pfxs(%d), leaves(%d), fringes(%d),",
+		fmt.Fprintf(w, "### IPv6: size(%d), nodes(%d), pfxs(%d), leaves(%d), fringes(%d)",
 			t.size6, stats.nodes, stats.pfxs, stats.leaves, stats.fringes)
+
 		t.root6.dumpRec(w, stridePath{}, 0, false)
 	}
 }
@@ -62,7 +64,7 @@ func (n *node[V]) dumpRec(w io.Writer, path stridePath, depth int, is4 bool) {
 
 	// node may have children, rec-descent down
 	for i, addr := range n.children.Bits() {
-		path[depth&15] = addr
+		path[depth] = addr
 
 		if child, ok := n.children.Items[i].(*node[V]); ok {
 			child.dumpRec(w, path, depth+1, is4)
@@ -142,7 +144,7 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 			fmt.Fprintf(w, "%sleaves(#%d):", indent, leafCount)
 
 			for _, addr := range leafAddrs {
-				k := n.children.MustGet(addr)
+				k := n.mustGetChild(addr)
 				pc := k.(*leafNode[V])
 
 				// Lite: val is the empty struct, don't print it
@@ -164,7 +166,7 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 			for _, addr := range fringeAddrs {
 				fringePfx := cidrForFringe(path[:], depth, is4, addr)
 
-				k := n.children.MustGet(addr)
+				k := n.mustGetChild(addr)
 				pc := k.(*fringeNode[V])
 
 				// Lite: val is the empty struct, don't print it

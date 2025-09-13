@@ -2,4 +2,4 @@
 
 ## Reporting a Vulnerability
 
-You can report privately a vulnerability by email at karl.gaissmaier@uni-ulm.de (author and maintainer).
+You can report vulnerabilities privately via email: <mailto:karl.gaissmaier@uni-ulm.de>.
