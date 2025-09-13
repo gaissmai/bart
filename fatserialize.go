@@ -103,11 +103,11 @@ func (f *Fat[V]) fprint(w io.Writer, is4 bool) error {
 		is4:  is4,
 	}
 
-	return n.fprintRec(w, startParent, "")
+	return n.fprintRec(w, startParent, "", shouldPrintValues[V]())
 }
 
 // fprintRec, the output is a hierarchical CIDR tree covered starting with this node
-func (n *fatNode[V]) fprintRec(w io.Writer, parent fatTrieItem[V], pad string) error {
+func (n *fatNode[V]) fprintRec(w io.Writer, parent fatTrieItem[V], pad string, printVals bool) error {
 	// recursion stop condition
 	if n == nil {
 		return nil
@@ -136,7 +136,7 @@ func (n *fatNode[V]) fprintRec(w io.Writer, parent fatTrieItem[V], pad string) e
 		var err error
 		// val is the empty struct, don't print it
 		switch {
-		case !shouldPrintValues[V]():
+		case !printVals:
 			_, err = fmt.Fprintf(w, "%s%s\n", pad+glyph, item.cidr)
 		default:
 			_, err = fmt.Fprintf(w, "%s%s (%v)\n", pad+glyph, item.cidr, item.val)
@@ -147,7 +147,7 @@ func (n *fatNode[V]) fprintRec(w io.Writer, parent fatTrieItem[V], pad string) e
 		}
 
 		// rec-descent with this item as parent
-		if err = item.n.fprintRec(w, item, pad+space); err != nil {
+		if err = item.n.fprintRec(w, item, pad+space, printVals); err != nil {
 			return err
 		}
 	}
