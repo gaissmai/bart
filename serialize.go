@@ -118,13 +118,13 @@ func (t *Table[V]) fprint(w io.Writer, is4 bool) error {
 		is4:  is4,
 	}
 
-	return n.fprintRec(w, startParent, "")
+	return n.fprintRec(w, startParent, "", shouldPrintValues[V]())
 }
 
 // fprintRec recursively prints a hierarchical CIDR tree representation
 // starting from this node to the provided writer. The output shows the
 // routing table structure in human-readable format for debugging and analysis.
-func (n *node[V]) fprintRec(w io.Writer, parent trieItem[V], pad string) error {
+func (n *node[V]) fprintRec(w io.Writer, parent trieItem[V], pad string, printVals bool) error {
 	// recursion stop condition
 	if n == nil {
 		return nil
@@ -153,7 +153,7 @@ func (n *node[V]) fprintRec(w io.Writer, parent trieItem[V], pad string) error {
 		var err error
 		// val is the empty struct, don't print it
 		switch {
-		case !shouldPrintValues[V]():
+		case !printVals:
 			_, err = fmt.Fprintf(w, "%s%s\n", pad+glyph, item.cidr)
 		default:
 			_, err = fmt.Fprintf(w, "%s%s (%v)\n", pad+glyph, item.cidr, item.val)
@@ -164,7 +164,7 @@ func (n *node[V]) fprintRec(w io.Writer, parent trieItem[V], pad string) error {
 		}
 
 		// rec-descent with this item as parent
-		if err = item.n.fprintRec(w, item, pad+space); err != nil {
+		if err = item.n.fprintRec(w, item, pad+space, printVals); err != nil {
 			return err
 		}
 	}
