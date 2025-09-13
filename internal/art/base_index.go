@@ -128,11 +128,15 @@ func IdxToRange(idx uint8) (first, last uint8) {
 //	bits = 2  -> 0b11000000
 //	bits = 3  -> 0b11100000
 //	...
-//	bits = 8  -> 0b11111111
+//	bits = 8 -> 0b11111111
 //
 // This mask is used to extract or identify the fixed (prefix) portion of an octet.
 // The rightmost (8 - bits) bits are cleared (set to zero), and the upper 'bits' are set to 1.
 func NetMask(bits uint8) uint8 {
+	if bits > 8 {
+		panic("NetMask: invalid bits > 8")
+	}
+
 	// Use a full 8-bit mask and shift left to clear trailing (host) bits.
 	// Convert 'bits' to uint16 to avoid overflow in shift for bits == 8.
 	return 0b11111111 << (8 - uint16(bits))
