@@ -7,7 +7,7 @@
 // for longest-prefix match (LPM) queries on IPv4 and IPv6 addresses.
 //
 // Internally, BART is implemented as a multibit trie with a fixed stride of 8 bits.
-// Each level node uses a fast mapping function (adapted from D. E. Knuth´s ART algorithm)
+// Each level node uses a fast mapping function (adapted from D. E. Knuth's ART algorithm)
 // to arrange all 256 possible prefixes in a complete binary tree structure.
 //
 // Instead of allocating full arrays, BART uses popcount-compressed sparse arrays
@@ -90,7 +90,7 @@ func (t *Table[V]) rootNodeByVersion(is4 bool) *node[V] {
 //		2001:db8::/56  => lastOctetPlusOne:  7, lastBits: 0 (possible fringe)
 //
 //		/32 and /128 prefixes are special, they never form a new node,
-//	 they are always inserted as path-compressed leaf.
+//	  at trie end, they are always inserted as path-compressed fringe.
 //
 // We are not splitting at /8, /16, ..., because this would mean that the
 // first node would have 512 prefixes, 9 bits from [0-8]. All remaining nodes
@@ -107,7 +107,7 @@ func lastOctetPlusOneAndLastBits(pfx netip.Prefix) (lastOctetPlusOne int, lastBi
 	// lastBits:  range from 0..7
 	bits := pfx.Bits()
 
-	//nolint:gosec  // G115: integer overflow conversion int -> uint
+	//nolint:gosec  // G115: narrowing conversion is safe here (bits in [0..128])
 	return bits >> 3, uint8(bits & 7)
 }
 
@@ -134,11 +134,6 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 
 // Deprecated: use [Table.Modify] instead.
 //
-// Migration example:
-//
-//	Old: t.Update(pfx, func(val V, found bool) V { return newVal })
-//	New: t.Modify(pfx, func(val V, found bool) (V, bool) { return newVal, false })
-//
 // Update or set the value at pfx with a callback function.
 // The callback function is called with (value, found) and returns a new value.
 //
@@ -163,7 +158,9 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, found bool) V) (newVa
 
 	// find the proper trie node to update prefix
 	for depth, octet := range octets {
-		// last octet from prefix, update/insert prefix into node
+		// Last “octet” from prefix, update/insert prefix into node.
+		// Note: For /32 and /128, depth never reaches lastOctetPlusOne (4/16),
+		// so those are handled below via the fringe/leaf path.
 		if depth == lastOctetPlusOne {
 			idx := art.PfxToIdx(octet, lastBits)
 
@@ -297,7 +294,9 @@ func (t *Table[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del
 		// push current node on stack for path recording
 		stack[depth] = n
 
-		// last octet from prefix, update/insert/delete prefix
+		// Last “octet” from prefix, update/insert prefix into node.
+		// Note: For /32 and /128, depth never reaches lastOctetPlusOne (4/16),
+		// so those are handled below via the fringe/leaf path.
 		if depth == lastOctetPlusOne {
 			idx := art.PfxToIdx(octet, lastBits)
 
@@ -312,6 +311,7 @@ func (t *Table[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del
 			case existed && del: // delete
 				n.deletePrefix(idx)
 				t.sizeUpdate(is4, -1)
+				// remove now-empty nodes and re-path-compress upwards
 				n.purgeAndCompress(stack[:depth], octets, is4)
 				return oldVal, true
 
@@ -373,6 +373,7 @@ func (t *Table[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del
 				n.deleteChild(octet)
 
 				t.sizeUpdate(is4, -1)
+				// remove now-empty nodes and re-path-compress upwards
 				n.purgeAndCompress(stack[:depth], octets, is4)
 
 				return oldVal, true
@@ -403,6 +404,7 @@ func (t *Table[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del
 				n.deleteChild(octet)
 
 				t.sizeUpdate(is4, -1)
+				// remove now-empty nodes and re-path-compress upwards
 				n.purgeAndCompress(stack[:depth], octets, is4)
 
 				return oldVal, true
@@ -460,6 +462,9 @@ func (t *Table[V]) Delete(pfx netip.Prefix) (val V, found bool) {
 		// push current node on stack for path recording
 		stack[depth] = n
 
+		// Last “octet” from prefix, update/insert prefix into node.
+		// Note: For /32 and /128, depth never reaches lastOctetPlusOne (4/16),
+		// so those are handled below via the fringe/leaf path.
 		if depth == lastOctetPlusOne {
 			// try to delete prefix in trie node
 			val, found = n.deletePrefix(art.PfxToIdx(octet, lastBits))
@@ -468,6 +473,7 @@ func (t *Table[V]) Delete(pfx netip.Prefix) (val V, found bool) {
 			}
 
 			t.sizeUpdate(is4, -1)
+			// remove now-empty nodes and re-path-compress upwards
 			n.purgeAndCompress(stack[:depth], octets, is4)
 			return val, true
 		}
@@ -492,6 +498,7 @@ func (t *Table[V]) Delete(pfx netip.Prefix) (val V, found bool) {
 			n.deleteChild(octet)
 
 			t.sizeUpdate(is4, -1)
+			// remove now-empty nodes and re-path-compress upwards
 			n.purgeAndCompress(stack[:depth], octets, is4)
 
 			return kid.value, true
@@ -506,6 +513,7 @@ func (t *Table[V]) Delete(pfx netip.Prefix) (val V, found bool) {
 			n.deleteChild(octet)
 
 			t.sizeUpdate(is4, -1)
+			// remove now-empty nodes and re-path-compress upwards
 			n.purgeAndCompress(stack[:depth], octets, is4)
 
 			return kid.value, true
@@ -540,6 +548,9 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 
 	// find the trie node
 	for depth, octet := range octets {
+		// Last “octet” from prefix, update/insert prefix into node.
+		// Note: For /32 and /128, depth never reaches lastOctetPlusOne (4/16),
+		// so those are handled below via the fringe/leaf path.
 		if depth == lastOctetPlusOne {
 			return n.getPrefix(art.PfxToIdx(octet, lastBits))
 		}
@@ -583,7 +594,7 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 // in the routing table contains the IP address, regardless of the associated value.
 //
 // It does not return the value nor the prefix of the matching item,
-// but as a test against a black- or whitelist it's often sufficient
+// but as a test against an allow-/deny-list it's often sufficient
 // and even few nanoseconds faster than [Table.Lookup].
 func (t *Table[V]) Contains(ip netip.Addr) bool {
 	// if ip is invalid, Is4() returns false and AsSlice() returns nil
@@ -749,6 +760,7 @@ LOOP:
 	for depth, octet = range octets {
 		depth = depth & depthMask // BCE
 
+		// stepped one past the last stride of interest; back up to last and exit
 		if depth > lastOctetPlusOne {
 			depth--
 			break
@@ -812,6 +824,9 @@ LOOP:
 		// all others are just host routes
 		var idx uint
 		octet = octets[depth]
+		// Last “octet” from prefix, update/insert prefix into node.
+		// Note: For /32 and /128, depth never reaches lastOctetPlusOne (4/16),
+		// so those are handled below via the fringe/leaf path.
 		if depth == lastOctetPlusOne {
 			idx = uint(art.PfxToIdx(octet, lastBits))
 		} else {
@@ -887,6 +902,7 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 		// find last node along this octet path
 	LOOP:
 		for depth, octet = range octets {
+			// stepped one past the last stride of interest; back up to last and exit
 			if depth > lastOctetPlusOne {
 				depth--
 				break
@@ -948,6 +964,9 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 			// all others are just host routes
 			var idx uint
 			octet = octets[depth]
+			// Last “octet” from prefix, update/insert prefix into node.
+			// Note: For /32 and /128, depth never reaches lastOctetPlusOne (4/16),
+			// so those are handled below via the fringe/leaf path.
 			if depth == lastOctetPlusOne {
 				idx = uint(art.PfxToIdx(octet, lastBits))
 			} else {
@@ -997,6 +1016,9 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 
 		// find the trie node
 		for depth, octet := range octets {
+			// Last “octet” from prefix, update/insert prefix into node.
+			// Note: For /32 and /128, depth never reaches lastOctetPlusOne (4/16),
+			// so those are handled below via the fringe/leaf path.
 			if depth == lastOctetPlusOne {
 				idx := art.PfxToIdx(octet, lastBits)
 				_ = n.eachSubnet(octets, depth, is4, idx, yield)
