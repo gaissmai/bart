@@ -107,6 +107,10 @@ func TestUpdatePersistTable(t *testing.T) {
 			t.Errorf("UpdatePersist: clone not correctly updated for %s: got=%d want=%d", pfx, v2.Data, 3)
 		}
 
+		if v2 != newVal {
+			t.Errorf("UpdatePersist: expected returned value to alias stored value for %s", pfx)
+		}
+
 		if v1 == v2 {
 			t.Errorf("UpdatePersist: aliasing detected for %s", pfx)
 		}
