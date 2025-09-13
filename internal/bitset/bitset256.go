@@ -201,7 +201,7 @@ func (b *BitSet256) LastSet() (last uint8, ok bool) {
 	for wIdx := 3; wIdx >= 0; wIdx-- {
 		if word := b[wIdx]; word != 0 {
 			//nolint:gosec  // G115: integer overflow conversion int -> uint
-			return uint8(wIdx<<6+bits.Len64(word)) - 1, true
+			return uint8(wIdx<<6 + bits.Len64(word) - 1), true
 		}
 	}
 	return
@@ -245,8 +245,8 @@ func (b *BitSet256) Bits() []uint8 {
 func (b *BitSet256) IntersectionTop(c *BitSet256) (top uint8, ok bool) {
 	for wIdx := 3; wIdx >= 0; wIdx-- {
 		if word := b[wIdx] & c[wIdx]; word != 0 {
-			//nolint:gosec  // G115: integer overflow conversion int -> uint
-			return uint8(wIdx<<6+bits.Len64(word)) - 1, true
+			//nolint:gosec  // G115: integer overflow conversion int -> uint8
+			return uint8(wIdx<<6 + bits.Len64(word) - 1), true
 		}
 	}
 	return
