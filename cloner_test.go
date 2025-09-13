@@ -243,14 +243,6 @@ func TestNodeCloneFlat_ShallowChildrenDeepValues(t *testing.T) {
 		t.Fatalf("expected a new node instance")
 	}
 
-	if &got.prefixes == &parent.prefixes {
-		t.Fatalf("expected a new prefixes backing slice")
-	}
-
-	if &got.children == &parent.children {
-		t.Fatalf("expected a new children backing slice")
-	}
-
 	// Verify prefixes are cloned (different array, cloned values)
 	if got.prefixCount() != 2 {
 		t.Fatalf("expected 2 prefixes, got %d", got.prefixCount())
