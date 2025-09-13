@@ -485,7 +485,7 @@ func fillRouteTables() {
 	}
 
 	if err = scanner.Err(); err != nil {
-		log.Fatalf("reading from %v, %v", rgz, err)
+		log.Fatalf("reading %s, %v", prefixFile, err)
 	}
 }
 
