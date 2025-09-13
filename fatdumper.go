@@ -215,9 +215,8 @@ func (n *fatNode[V]) dumpRec(w io.Writer, path stridePath, depth int, is4 bool) 
 
 	// the node may have childs, rec-descent down
 	for _, addr := range n.childrenBitSet.AsSlice(&[256]uint8{}) {
-		path[depth&0xf] = addr
-
 		if kid, ok := (*n.children[addr]).(*fatNode[V]); ok {
+			path[depth] = addr
 			kid.dumpRec(w, path, depth+1, is4)
 		}
 	}
