@@ -294,6 +294,17 @@ func TestNodeCloneFlat_ShallowChildrenDeepValues(t *testing.T) {
 	} else if f2.value.nextHop != fringe.value.nextHop {
 		t.Fatalf("cloned fringe value should have same nextHop")
 	}
+
+	// Structural independence: mutating the clone must not affect the original.
+	origPC, origCC := parent.prefixCount(), parent.childCount()
+	got.insertPrefix(30, &routeEntry{nextHop: netip.MustParseAddr("10.9.0.1"), exitIF: "tmp"})
+	got.insertChild(99, &node[*routeEntry]{})
+	if parent.prefixCount() != origPC {
+		t.Fatalf("parent prefixCount changed after mutating clone: got %d want %d", parent.prefixCount(), origPC)
+	}
+	if parent.childCount() != origCC {
+		t.Fatalf("parent childCount changed after mutating clone: got %d want %d", parent.childCount(), origCC)
+	}
 }
 
 func TestNodeCloneFlat_PanicOnWrongType(t *testing.T) {
