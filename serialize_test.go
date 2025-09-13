@@ -43,6 +43,38 @@ func TestStringEmpty(t *testing.T) {
 	}
 }
 
+func TestFprintNilWriter(t *testing.T) {
+	t.Parallel()
+	tbl := new(Table[any])
+	if err := tbl.Fprint(nil); err == nil {
+		t.Fatalf("expected error for nil writer")
+	}
+}
+
+func TestStringNoValuesWithEmptyStruct(t *testing.T) {
+	t.Parallel()
+	tbl := new(Table[struct{}])
+	tbl.Insert(mpp("0.0.0.0/0"), struct{}{})
+	tbl.Insert(mpp("::/0"), struct{}{})
+
+	want := `▼
+└─ 0.0.0.0/0
+▼
+└─ ::/0
+`
+	if got := tbl.String(); got != want {
+		t.Errorf("String got:\n%swant:\n%s", got, want)
+	}
+
+	lite := new(Lite)
+	lite.Insert(mpp("0.0.0.0/0"))
+	lite.Insert(mpp("::/0"))
+
+	if got := lite.String(); got != want {
+		t.Errorf("String got:\n%swant:\n%s", got, want)
+	}
+}
+
 func TestStringDefaultRouteV4(t *testing.T) {
 	t.Parallel()
 
