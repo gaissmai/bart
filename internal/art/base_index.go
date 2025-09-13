@@ -44,6 +44,9 @@ func OctetToIdx(octet uint8) uint {
 // IdxToPfx returns the octet and prefix len of baseIdx.
 // It's the inverse to pfxToIdx256.
 func IdxToPfx(idx uint8) (octet, pfxLen uint8) {
+	if idx == 0 {
+		panic("IdxToPfx: invalid idx 0")
+	}
 	// The prefix length corresponds to the number of leading bits in idx.
 	// bits.Len8 returns the number of bits needed to represent idx as binary,
 	// so we subtract 1 to recover the prefix length (which is always >= 0).
