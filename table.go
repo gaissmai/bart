@@ -576,10 +576,13 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 	panic("unreachable")
 }
 
-// Contains does a route lookup for IP and
-// returns true if any route matched.
+// Contains reports whether any stored prefix covers the given IP address.
+// Returns false for invalid IP addresses.
 //
-// Contains does not return the value nor the prefix of the matching item,
+// This performs longest-prefix matching and returns true if any prefix
+// in the routing table contains the IP address, regardless of the associated value.
+//
+// It does not return the value nor the prefix of the matching item,
 // but as a test against a black- or whitelist it's often sufficient
 // and even few nanoseconds faster than [Table.Lookup].
 func (t *Table[V]) Contains(ip netip.Addr) bool {
@@ -619,8 +622,12 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 	return false
 }
 
-// Lookup does a route lookup (longest prefix match) for IP and
-// returns the associated value and true, or false if no route matched.
+// Lookup performs longest-prefix matching for the given IP address and returns
+// the associated value of the most specific matching prefix.
+// Returns the zero value of V and false if no prefix matches.
+// Returns false for invalid IP addresses.
+//
+// This is the core routing table operation used for packet forwarding decisions.
 func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	if !ip.IsValid() {
 		return
