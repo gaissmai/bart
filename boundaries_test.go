@@ -213,6 +213,14 @@ func TestBoundaryBehavior_TransitionPaths(t *testing.T) {
 					t.Errorf("Lookup for host should return correct route")
 				}
 			}
+
+			// /31 endpoints should resolve to point_to_point route
+			for _, addr := range []string{"203.0.113.0", "203.0.113.1"} {
+				ip := netip.MustParseAddr(addr)
+				if got, ok := tbl.Lookup(ip); !ok || got.attributes["metric"] != 5 {
+					t.Errorf("Lookup %s expected p2p metric 5, got ok=%v", addr, ok)
+				}
+			}
 		}
 
 		// Test modification across different path types
