@@ -90,7 +90,8 @@ func (t *Table[V]) rootNodeByVersion(is4 bool) *node[V] {
 //	2001:db8::/56  => lastOctetPlusOne:  7, lastBits: 0 (possible fringe)
 //
 //	/32 and /128 prefixes are special, they never form a new node,
-//	At the end of the trie they are always inserted as a path‑compressed fringe.
+//	At the end of the trie (IPv4: depth 4, IPv6: depth 16) they are always
+//	inserted as a path‑compressed fringe.
 //
 // We are not splitting at /8, /16, ..., because this would mean that the
 // first node would have 512 prefixes, 9 bits from [0-8]. All remaining nodes
