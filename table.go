@@ -7,7 +7,7 @@
 // for longest-prefix match (LPM) queries on IPv4 and IPv6 addresses.
 //
 // Internally, BART is implemented as a multibit trie with a fixed stride of 8 bits.
-// Each level node uses a fast mapping function (adapted from D. E. Knuths ART algorithm)
+// Each level node uses a fast mapping function (adapted from D. E. Knuth´s ART algorithm)
 // to arrange all 256 possible prefixes in a complete binary tree structure.
 //
 // Instead of allocating full arrays, BART uses popcount-compressed sparse arrays
@@ -205,7 +205,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, found bool) V) (newVa
 
 			// create new node
 			// push the leaf down
-			// insert new child at current leaf position (octet
+			// insert new child at current leaf position (octet)
 			// descend down, replace n with new child
 			newNode := new(node[V])
 			newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
@@ -222,7 +222,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, found bool) V) (newVa
 
 			// create new node
 			// push the fringe down, it becomes a default route (idx=1)
-			// insert new child at current leaf position (octet
+			// insert new child at current leaf position (octet)
 			// descend down, replace n with new child
 			newNode := new(node[V])
 			newNode.insertPrefix(1, kid.value)
@@ -380,7 +380,7 @@ func (t *Table[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del
 
 			// create new node
 			// push the leaf down
-			// insert new child at current leaf position (octet
+			// insert new child at current leaf position (octet)
 			// descend down, replace n with new child
 			newNode := new(node[V])
 			newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
@@ -410,7 +410,7 @@ func (t *Table[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del
 
 			// create new node
 			// push the fringe down, it becomes a default route (idx=1)
-			// insert new child at current leaf position (octet
+			// insert new child at current leaf position (octet)
 			// descend down, replace n with new child
 			newNode := new(node[V])
 			newNode.insertPrefix(1, kid.value)
