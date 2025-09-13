@@ -7,55 +7,112 @@ import (
 
 // ---- Test helper types ----
 
-type clonerInt int
+// routeEntry represents a realistic routing table entry that needs deep cloning
+type routeEntry struct {
+	nextHop    netip.Addr
+	exitIF     string
+	attributes map[string]int
+}
 
-// Implement Cloner[clonerInt]
-func (c clonerInt) Clone() clonerInt {
-	// return a distinct value to prove cloning happened
-	return clonerInt(int(c) + 1000)
+// Clone implements Cloner[*routeEntry] for deep cloning of routing entries
+func (r *routeEntry) Clone() *routeEntry {
+	if r == nil {
+		return nil
+	}
+
+	clone := &routeEntry{
+		nextHop:    r.nextHop,
+		exitIF:     r.exitIF,
+		attributes: make(map[string]int, len(r.attributes)),
+	}
+
+	// Deep clone the attributes map
+	for k, v := range r.attributes {
+		clone.attributes[k] = v
+	}
+
+	return clone
+}
+
+// routeEntryNonCloner is the same struct but without Clone method for testing non-cloner behavior
+type routeEntryNonCloner struct {
+	nextHop    netip.Addr
+	exitIF     string
+	attributes map[string]int
 }
 
 // ---- cloneFnFactory / cloneVal / copyVal ----
 
 func TestCloneFnFactory_WithCloner(t *testing.T) {
-	fn := cloneFnFactory[clonerInt]()
+	fn := cloneFnFactory[*routeEntry]()
 	if fn == nil {
 		t.Fatalf("expected non-nil clone func when V implements Cloner[V]")
 	}
-	in := clonerInt(7)
+
+	in := &routeEntry{
+		nextHop:    netip.MustParseAddr("10.0.0.1"),
+		exitIF:     "eth0",
+		attributes: map[string]int{"metric": 100, "preference": 10},
+	}
+
 	out := fn(in)
-	if out != in.Clone() {
-		t.Fatalf("expected out=%v cloned, got %v", in.Clone(), out)
+	expected := in.Clone()
+	if out.nextHop != expected.nextHop || out.exitIF != expected.exitIF {
+		t.Fatalf("expected cloned route with nextHop=%v exitIF=%s, got nextHop=%v exitIF=%s",
+			expected.nextHop, expected.exitIF, out.nextHop, out.exitIF)
+	}
+	if out.attributes["metric"] != expected.attributes["metric"] {
+		t.Fatalf("expected cloned attributes, got metric=%d", out.attributes["metric"])
 	}
 }
 
 func TestCloneFnFactory_WithoutCloner(t *testing.T) {
-	fn := cloneFnFactory[int]()
+	fn := cloneFnFactory[*routeEntryNonCloner]()
 	if fn != nil {
 		t.Fatalf("expected nil clone func when V does not implement Cloner[V]")
 	}
 }
 
 func TestCloneVal_WithCloner(t *testing.T) {
-	in := clonerInt(3)
-	got := cloneVal[clonerInt](in)
-	if want := in.Clone(); got != want {
-		t.Fatalf("expected %v, got %v", want, got)
+	in := &routeEntry{
+		nextHop:    netip.MustParseAddr("192.168.1.1"),
+		exitIF:     "wlan0",
+		attributes: map[string]int{"cost": 50, "bandwidth": 1000},
+	}
+
+	got := cloneVal[*routeEntry](in)
+	want := in.Clone()
+	if got.nextHop != want.nextHop || got.exitIF != want.exitIF {
+		t.Fatalf("expected cloned route, got different values")
+	}
+
+	// Verify independence - modify clone shouldn't affect original
+	got.attributes["cost"] = 999
+	if in.attributes["cost"] != 50 {
+		t.Fatalf("modifying clone affected original")
 	}
 }
 
 func TestCloneVal_WithoutCloner(t *testing.T) {
-	in := 5
-	got := cloneVal[int](in)
+	in := &routeEntryNonCloner{
+		nextHop: netip.MustParseAddr("172.16.0.1"),
+		exitIF:  "eth1",
+	}
+
+	got := cloneVal[*routeEntryNonCloner](in)
 	if got != in {
-		t.Fatalf("expected passthrough for non-cloner, got %v", got)
+		t.Fatalf("expected passthrough for non-cloner, got different instance")
 	}
 }
 
 func TestCopyVal_Passthrough(t *testing.T) {
-	in := 9
-	if got := copyVal[int](in); got != in {
-		t.Fatalf("copyVal should return input; want %v got %v", in, got)
+	in := &routeEntry{
+		nextHop: netip.MustParseAddr("203.0.113.1"),
+		exitIF:  "tun0",
+	}
+
+	if got := copyVal[*routeEntry](in); got != in {
+		t.Fatalf("copyVal should return input; want same instance")
 	}
 }
 
@@ -63,8 +120,15 @@ func TestCopyVal_Passthrough(t *testing.T) {
 
 func TestCloneLeaf_NilCloneFn(t *testing.T) {
 	prefix := netip.MustParsePrefix("192.0.2.0/24")
-	l := &leafNode[int]{prefix: prefix, value: 42}
+	route := &routeEntry{
+		nextHop:    netip.MustParseAddr("192.0.2.1"),
+		exitIF:     "eth0",
+		attributes: map[string]int{"metric": 10},
+	}
+
+	l := &leafNode[*routeEntry]{prefix: prefix, value: route}
 	got := l.cloneLeaf(nil)
+
 	if got == l {
 		t.Fatalf("expected new leaf instance")
 	}
@@ -72,17 +136,28 @@ func TestCloneLeaf_NilCloneFn(t *testing.T) {
 		t.Fatalf("prefix must be copied as-is: want %v got %v", l.prefix, got.prefix)
 	}
 	if got.value != l.value {
-		t.Fatalf("value must be copied: want %v got %v", l.value, got.value)
+		t.Fatalf("value must be copied when cloneFn is nil")
 	}
 }
 
 func TestCloneLeaf_WithCloneFn(t *testing.T) {
 	prefix := netip.MustParsePrefix("198.51.100.0/24")
-	l := &leafNode[clonerInt]{prefix: prefix, value: 7}
-	cloneFn := func(v clonerInt) clonerInt { return v.Clone() }
+	route := &routeEntry{
+		nextHop:    netip.MustParseAddr("198.51.100.1"),
+		exitIF:     "ppp0",
+		attributes: map[string]int{"mtu": 1500, "delay": 10},
+	}
+
+	l := &leafNode[*routeEntry]{prefix: prefix, value: route}
+	cloneFn := func(v *routeEntry) *routeEntry { return v.Clone() }
 	got := l.cloneLeaf(cloneFn)
-	if got.value != l.value.Clone() {
-		t.Fatalf("expected leaf value to be cloned; want %v got %v", l.value.Clone(), got.value)
+
+	expected := l.value.Clone()
+	if got.value.nextHop != expected.nextHop || got.value.exitIF != expected.exitIF {
+		t.Fatalf("expected leaf value to be cloned")
+	}
+	if got.value == l.value {
+		t.Fatalf("cloned value should be different instance")
 	}
 	// prefix is copied as-is
 	if got.prefix != l.prefix {
@@ -91,7 +166,14 @@ func TestCloneLeaf_WithCloneFn(t *testing.T) {
 }
 
 func TestCloneFringe_NilAndWithCloneFn(t *testing.T) {
-	f := &fringeNode[clonerInt]{value: 33}
+	route := &routeEntry{
+		nextHop:    netip.MustParseAddr("10.1.1.1"),
+		exitIF:     "bond0",
+		attributes: map[string]int{"weight": 100, "priority": 5},
+	}
+
+	f := &fringeNode[*routeEntry]{value: route}
+
 	// nil cloneFn
 	got := f.cloneFringe(nil)
 	if got == f {
@@ -100,10 +182,15 @@ func TestCloneFringe_NilAndWithCloneFn(t *testing.T) {
 	if got.value != f.value {
 		t.Fatalf("value must be copied when cloneFn is nil")
 	}
+
 	// with cloneFn
-	got2 := f.cloneFringe(func(v clonerInt) clonerInt { return v.Clone() })
-	if want := f.value.Clone(); got2.value != want {
-		t.Fatalf("expected cloned value: want %v got %v", want, got2.value)
+	got2 := f.cloneFringe(func(v *routeEntry) *routeEntry { return v.Clone() })
+	want := f.value.Clone()
+	if got2.value.nextHop != want.nextHop || got2.value.exitIF != want.exitIF {
+		t.Fatalf("expected cloned value")
+	}
+	if got2.value == f.value {
+		t.Fatalf("cloned value should be different instance")
 	}
 }
 
@@ -111,23 +198,45 @@ func TestCloneFringe_NilAndWithCloneFn(t *testing.T) {
 
 func TestNodeCloneFlat_ShallowChildrenDeepValues(t *testing.T) {
 	t.Parallel()
-	parent := &node[clonerInt]{}
+	parent := &node[*routeEntry]{}
 
 	// Add prefix values
-	parent.insertPrefix(10, clonerInt(1))
-	parent.insertPrefix(20, clonerInt(2))
+	route1 := &routeEntry{
+		nextHop:    netip.MustParseAddr("10.1.0.1"),
+		exitIF:     "eth0",
+		attributes: map[string]int{"metric": 10},
+	}
+	route2 := &routeEntry{
+		nextHop:    netip.MustParseAddr("10.2.0.1"),
+		exitIF:     "eth1",
+		attributes: map[string]int{"metric": 20},
+	}
+
+	parent.insertPrefix(10, route1)
+	parent.insertPrefix(20, route2)
 
 	// Create child nodes
 	pfx := netip.MustParsePrefix("10.0.0.0/8")
-	leaf := &leafNode[clonerInt]{prefix: pfx, value: 10}
-	fringe := &fringeNode[clonerInt]{value: 20}
-	childNode := &node[clonerInt]{}
+	leafRoute := &routeEntry{
+		nextHop:    netip.MustParseAddr("10.0.0.1"),
+		exitIF:     "lo",
+		attributes: map[string]int{"metric": 1},
+	}
+	fringeRoute := &routeEntry{
+		nextHop:    netip.MustParseAddr("10.3.0.1"),
+		exitIF:     "vlan10",
+		attributes: map[string]int{"vlan": 10},
+	}
+
+	leaf := &leafNode[*routeEntry]{prefix: pfx, value: leafRoute}
+	fringe := &fringeNode[*routeEntry]{value: fringeRoute}
+	childNode := &node[*routeEntry]{}
 
 	parent.insertChild(1, childNode)
 	parent.insertChild(2, leaf)
 	parent.insertChild(3, fringe)
 
-	fn := cloneFnFactory[clonerInt]() // should not be nil
+	fn := cloneFnFactory[*routeEntry]() // should not be nil
 	got := parent.cloneFlat(fn)
 
 	if got == parent {
@@ -146,12 +255,12 @@ func TestNodeCloneFlat_ShallowChildrenDeepValues(t *testing.T) {
 	if got.prefixCount() != 2 {
 		t.Fatalf("expected 2 prefixes, got %d", got.prefixCount())
 	}
-	// Values should be cloned (+1000)
-	if v, ok := got.getPrefix(10); !ok || v != clonerInt(1001) {
-		t.Fatalf("expected cloned prefix value 1001; got %v ok=%v", v, ok)
-	}
-	if v, ok := got.getPrefix(20); !ok || v != clonerInt(1002) {
-		t.Fatalf("expected cloned prefix value 1002; got %v ok=%v", v, ok)
+
+	// Values should be cloned (different instances)
+	if v, ok := got.getPrefix(10); !ok || v == route1 {
+		t.Fatalf("expected cloned prefix value at index 10")
+	} else if v.nextHop != route1.nextHop {
+		t.Fatalf("cloned route should have same nextHop")
 	}
 
 	// Verify children are processed correctly
@@ -167,24 +276,28 @@ func TestNodeCloneFlat_ShallowChildrenDeepValues(t *testing.T) {
 	// leaf should be cloned
 	if gotLeaf, ok := got.getChild(2); !ok {
 		t.Fatalf("expected leaf at index 2")
-	} else if l2, ok := gotLeaf.(*leafNode[clonerInt]); !ok || l2 == leaf {
+	} else if l2, ok := gotLeaf.(*leafNode[*routeEntry]); !ok || l2 == leaf {
 		t.Fatalf("expected new leaf instance")
-	} else if l2.value != leaf.value.Clone() {
+	} else if l2.value == leaf.value {
 		t.Fatalf("expected cloned leaf value")
+	} else if l2.value.nextHop != leaf.value.nextHop {
+		t.Fatalf("cloned leaf value should have same nextHop")
 	}
 
 	// fringe should be cloned
 	if gotFringe, ok := got.getChild(3); !ok {
 		t.Fatalf("expected fringe at index 3")
-	} else if f2, ok := gotFringe.(*fringeNode[clonerInt]); !ok || f2 == fringe {
+	} else if f2, ok := gotFringe.(*fringeNode[*routeEntry]); !ok || f2 == fringe {
 		t.Fatalf("expected new fringe instance")
-	} else if f2.value != fringe.value.Clone() {
+	} else if f2.value == fringe.value {
 		t.Fatalf("expected cloned fringe value")
+	} else if f2.value.nextHop != fringe.value.nextHop {
+		t.Fatalf("cloned fringe value should have same nextHop")
 	}
 }
 
 func TestNodeCloneFlat_PanicOnWrongType(t *testing.T) {
-	n := &node[int]{}
+	n := &node[*routeEntry]{}
 	n.children = *n.children.Copy()
 	// insert a wrong type into children.Items to trigger panic branch
 	n.children.Items = append(n.children.Items, struct{}{}) // not a recognized node type
@@ -198,15 +311,23 @@ func TestNodeCloneFlat_PanicOnWrongType(t *testing.T) {
 
 func TestNodeCloneRec_DeepCopiesNodeChildren(t *testing.T) {
 	// chain of *node: parent[0] -> child[0] -> grandchild
-	parent := &node[clonerInt]{}
-	child := &node[clonerInt]{}
-	grand := &node[clonerInt]{}
+	parent := &node[*routeEntry]{}
+	child := &node[*routeEntry]{}
+	grand := &node[*routeEntry]{}
+
+	// Add a route to the grandchild to verify deep cloning
+	grandRoute := &routeEntry{
+		nextHop:    netip.MustParseAddr("192.168.0.1"),
+		exitIF:     "eth0",
+		attributes: map[string]int{"metric": 5},
+	}
+	grand.insertPrefix(100, grandRoute)
 
 	// build hierarchy
 	parent.insertChild(10, child)
 	child.insertChild(20, grand)
 
-	cloneFn := cloneFnFactory[clonerInt]()
+	cloneFn := cloneFnFactory[*routeEntry]()
 	got := parent.cloneRec(cloneFn)
 
 	// Must be a new parent
@@ -219,41 +340,69 @@ func TestNodeCloneRec_DeepCopiesNodeChildren(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected child at index 10")
 	}
-	kid, ok := kidAny.(*node[clonerInt])
+	kid, ok := kidAny.(*node[*routeEntry])
 	if !ok || kid == child {
-		t.Fatalf("expected deep-cloned child fatNode")
+		t.Fatalf("expected deep-cloned child node")
 	}
 
 	gkAny, ok := kid.getChild(20)
 	if !ok {
 		t.Fatalf("expected grandchild at index 20")
 	}
-	gk, ok := gkAny.(*node[clonerInt])
+	gk, ok := gkAny.(*node[*routeEntry])
 	if !ok || gk == grand {
-		t.Fatalf("expected deep-cloned grandchild fatNode")
+		t.Fatalf("expected deep-cloned grandchild node")
+	}
+
+	// Verify the route in grandchild is also cloned
+	clonedRoute, ok := gk.getPrefix(100)
+	if !ok {
+		t.Fatalf("expected route in cloned grandchild")
+	}
+	if clonedRoute == grandRoute {
+		t.Fatalf("route should be cloned in recursive clone")
+	}
+	if clonedRoute.nextHop != grandRoute.nextHop {
+		t.Fatalf("cloned route should have same nextHop")
 	}
 }
 
 // ---- fatNode.cloneFlat / cloneRec ----
 
 func TestFatNodeCloneFlat_ValuesClonedAndChildrenFlat(t *testing.T) {
-	fn := &fatNode[clonerInt]{}
+	fn := &fatNode[*routeEntry]{}
 
-	// insert prefix
-	fn.insertPrefix(42, clonerInt(11))
+	// insert prefix - default route
+	defaultRoute := &routeEntry{
+		nextHop:    netip.MustParseAddr("0.0.0.0"),
+		exitIF:     "eth0",
+		attributes: map[string]int{"metric": 1000},
+	}
+	fn.insertPrefix(42, defaultRoute)
 
 	// Create child nodes
 	pfx := netip.MustParsePrefix("192.0.2.0/24")
-	leaf := &leafNode[clonerInt]{prefix: pfx, value: 21}
-	fringe := &fringeNode[clonerInt]{value: 31}
-	childFat := &fatNode[clonerInt]{}
+	leafRoute := &routeEntry{
+		nextHop:    netip.MustParseAddr("192.0.2.1"),
+		exitIF:     "eth1",
+		attributes: map[string]int{"metric": 100},
+	}
+	fringeRoute := &routeEntry{
+		nextHop:    netip.MustParseAddr("172.16.0.1"),
+		exitIF:     "eth2",
+		attributes: map[string]int{"metric": 200},
+	}
+
+	leaf := &leafNode[*routeEntry]{prefix: pfx, value: leafRoute}
+	fringe := &fringeNode[*routeEntry]{value: fringeRoute}
+	childFat := &fatNode[*routeEntry]{}
 
 	// insert children at addrs: 0,1,2
 	fn.insertChild(0, leaf)
 	fn.insertChild(1, fringe)
 	fn.insertChild(2, childFat)
 
-	got := fn.cloneFlat(cloneFnFactory[clonerInt]())
+	got := fn.cloneFlat(cloneFnFactory[*routeEntry]())
 	if got == fn {
 		t.Fatalf("expected new fat node instance")
 	}
@@ -262,8 +411,10 @@ func TestFatNodeCloneFlat_ValuesClonedAndChildrenFlat(t *testing.T) {
 	if got.prefixCount() != 1 {
 		t.Fatalf("expected 1 prefix in cloned node")
 	}
-	if v, ok := got.getPrefix(42); !ok || v != clonerInt(1011) {
-		t.Fatalf("expected cloned prefix value 1011 at index 42; got %v ok=%v", v, ok)
+	if v, ok := got.getPrefix(42); !ok || v == defaultRoute {
+		t.Fatalf("expected cloned prefix value at index 42")
+	} else if v.nextHop != defaultRoute.nextHop {
+		t.Fatalf("cloned route should have same nextHop")
 	}
 
 	// Check children counts
@@ -274,15 +425,23 @@ func TestFatNodeCloneFlat_ValuesClonedAndChildrenFlat(t *testing.T) {
 	// leaf should be cloned
 	if gotLeaf, ok := got.getChild(0); !ok {
 		t.Fatalf("expected cloned leaf child")
-	} else if l2, ok := gotLeaf.(*leafNode[clonerInt]); !ok || l2 == leaf || l2.value != clonerInt(1021) {
-		t.Fatalf("expected cloned leaf with cloned value")
+	} else if l2, ok := gotLeaf.(*leafNode[*routeEntry]); !ok || l2 == leaf {
+		t.Fatalf("expected new leaf instance")
+	} else if l2.value == leaf.value {
+		t.Fatalf("expected cloned leaf value")
+	} else if l2.value.nextHop != leafRoute.nextHop {
+		t.Fatalf("cloned leaf value should have same nextHop")
 	}
 
 	// fringe should be cloned
 	if gotFringe, ok := got.getChild(1); !ok {
 		t.Fatalf("expected cloned fringe child")
-	} else if f2, ok := gotFringe.(*fringeNode[clonerInt]); !ok || f2 == fringe || f2.value != clonerInt(1031) {
-		t.Fatalf("expected cloned fringe with cloned value")
+	} else if f2, ok := gotFringe.(*fringeNode[*routeEntry]); !ok || f2 == fringe {
+		t.Fatalf("expected new fringe instance")
+	} else if f2.value == fringe.value {
+		t.Fatalf("expected cloned fringe value")
+	} else if f2.value.nextHop != fringeRoute.nextHop {
+		t.Fatalf("cloned fringe value should have same nextHop")
 	}
 
 	// fatNode child should be shallow copied (same pointer)
@@ -292,15 +451,23 @@ func TestFatNodeCloneFlat_ValuesClonedAndChildrenFlat(t *testing.T) {
 }
 
 func TestFatNodeCloneRec_DeepCopiesFatNodeChildren(t *testing.T) {
-	parent := &fatNode[clonerInt]{}
-	child := &fatNode[clonerInt]{}
-	grand := &fatNode[clonerInt]{}
+	parent := &fatNode[*routeEntry]{}
+	child := &fatNode[*routeEntry]{}
+	grand := &fatNode[*routeEntry]{}
+
+	// Add route to grandchild to verify deep cloning
+	route := &routeEntry{
+		nextHop:    netip.MustParseAddr("203.0.113.1"),
+		exitIF:     "wan0",
+		attributes: map[string]int{"preference": 100},
+	}
+	grand.insertPrefix(1, route)
 
 	// Build hierarchy
 	parent.insertChild(10, child)
 	child.insertChild(20, grand)
 
-	cloneFn := cloneFnFactory[clonerInt]()
+	cloneFn := cloneFnFactory[*routeEntry]()
 	got := parent.cloneRec(cloneFn)
 	if got == parent {
 		t.Fatalf("expected new parent")
@@ -311,7 +478,7 @@ func TestFatNodeCloneRec_DeepCopiesFatNodeChildren(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected child at index 10")
 	}
-	kid, ok := kidAny.(*fatNode[clonerInt])
+	kid, ok := kidAny.(*fatNode[*routeEntry])
 	if !ok || kid == child {
 		t.Fatalf("expected deep-cloned child fatNode")
 	}
@@ -320,8 +487,20 @@ func TestFatNodeCloneRec_DeepCopiesFatNodeChildren(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected grandchild at index 20")
 	}
-	gk, ok := gkAny.(*fatNode[clonerInt])
+	gk, ok := gkAny.(*fatNode[*routeEntry])
 	if !ok || gk == grand {
 		t.Fatalf("expected deep-cloned grandchild fatNode")
+	}
+
+	// Verify route is cloned at deepest level
+	clonedRoute, ok := gk.getPrefix(1)
+	if !ok {
+		t.Fatalf("expected route in cloned grandchild")
+	}
+	if clonedRoute == route {
+		t.Fatalf("route should be cloned in recursive clone")
+	}
+	if clonedRoute.nextHop != route.nextHop {
+		t.Fatalf("cloned route should have same nextHop")
 	}
 }
