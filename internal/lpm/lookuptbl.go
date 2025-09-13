@@ -29,6 +29,8 @@ import "github.com/gaissmai/bart/internal/bitset"
 //		}
 //		return false
 //	}
+//
+// ATTENTION: pointer return, speed is the top priority here.
 func BackTrackingBitset(idx uint) *bitset.BitSet256 {
 	return &lookupTbl[idx&511] // &511 is BCE
 }
