@@ -8,7 +8,6 @@ import (
 
 	"github.com/gaissmai/bart/internal/allot"
 	"github.com/gaissmai/bart/internal/art"
-	"github.com/gaissmai/bart/internal/bitset"
 )
 
 // overlaps recursively compares two trie nodes and returns true
@@ -180,16 +179,14 @@ func (n *node[V]) overlapsChildrenIn(o *node[V]) bool {
 	// build the alloted routing table from them
 
 	// make allot table with prefixes as bitsets, bitsets are precalculated.
-	// Just union the bitsets to one bitset (allot table) for all prefixes
-	// in this node
-	allFringeRoutes := bitset.BitSet256{}
 	for _, idx := range n.prefixes.AsSlice(&[256]uint8{}) {
 		fringeRoutes := allot.IdxToFringeRoutes(idx)
-		// union all pre alloted bitsets
-		allFringeRoutes.Union(&fringeRoutes)
+		if fringeRoutes.Intersects(&o.children.BitSet256) {
+			return true
+		}
 	}
 
-	return allFringeRoutes.Intersects(&o.children.BitSet256)
+	return false
 }
 
 // overlapsSameChildren compares all matching child addresses (octets)
