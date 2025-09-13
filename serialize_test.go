@@ -408,6 +408,6 @@ func checkJSON(t *testing.T, tbl *Table[any], tt jsonTest) {
 
 	got := string(jsonBuffer)
 	if tt.want != got {
-		t.Errorf("String got:\n%s\nwant:\n%s", got, tt.want)
+		t.Errorf("JSON got:\n%s\nwant:\n%s", got, tt.want)
 	}
 }
