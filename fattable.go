@@ -20,7 +20,7 @@ import (
 //   - [bart.Table]: popcount-compressed level arrays + path compression
 //
 // As a result:
-//   - [bart.Fat] sacrifices memory efficiency to achieve about 2x higher speed
+//   - [bart.Fat] sacrifices memory efficiency to achieve 2x higher speed
 //   - [bart.Table] minimizes memory consumption as much as possible
 //
 // Which variant is preferable depends on the use case: [bart.Fat] is most
@@ -80,7 +80,7 @@ func (f *Fat[V]) Insert(pfx netip.Prefix, val V) {
 
 // Modify applies an insert, update, or delete operation for the value
 // associated with the given prefix. The supplied callback decides the
-// the operation.
+// operation.
 // It receives the current value (if the prefix exists) and a boolean indicating
 // existence, then returns the new value and a deletion flag.
 //
@@ -406,8 +406,8 @@ func (f *Fat[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 //
 // Its semantics are identical to [Table.Contains].
 func (f *Fat[V]) Contains(ip netip.Addr) bool {
-	// speed if top priority: no explicit test for ip.Isvalid
-	// if ip is invalidi, AsSlice() returns nil, Contains returns false.
+	// speed is top priority: no explicit test for ip.Isvalid
+	// if ip is invalid, AsSlice() returns nil, Contains returns false.
 	is4 := ip.Is4()
 	n := f.rootNodeByVersion(is4)
 
