@@ -123,7 +123,7 @@ func TestFatNode_dump_OnEmptyNode_PrintsHeaderOnly(t *testing.T) {
 	if !strings.Contains(out, "depth:  0") {
 		t.Fatalf("expected depth header; got: %q", out)
 	}
-	if strings.Contains(out, "octets(") || strings.Contains(out, "prefxs(") {
+	if strings.Contains(out, "octets(") || strings.Contains(out, "prfxs(") {
 		t.Fatalf("unexpected children or prefixes in empty dump: %q", out)
 	}
 }
