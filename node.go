@@ -117,7 +117,7 @@ func newLeafNode[V any](pfx netip.Prefix, val V) *leafNode[V] {
 
 // fringeNode is a path-compressed leaf with value but without a prefix.
 // The prefix of a fringe is solely defined by the position in the trie.
-// The fringe-compressiion (no stored prefix) saves a lot of memory,
+// The fringe-compression (no stored prefix) saves a lot of memory,
 // but the algorithm is more complex.
 type fringeNode[V any] struct {
 	value V
@@ -189,7 +189,7 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 			return n.insertChild(octet, newLeafNode(pfx, val))
 		}
 
-		// ... or decend down the trie
+		// ... or descend down the trie
 		kid := n.mustGetChild(octet)
 
 		// kid is node or leaf at addr
@@ -748,7 +748,7 @@ func cidrForFringe(octets []byte, depth int, is4 bool, lastOctet uint8) netip.Pr
 		ip = netip.AddrFrom16(path)
 	}
 
-	// it's a fringe, bits are alway /8, /16, /24, ...
+	// it's a fringe, bits are always /8, /16, /24, ...
 	bits := (depth + 1) << 3
 
 	// return a (normalized) prefix from ip/bits
