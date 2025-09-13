@@ -70,7 +70,10 @@ func TestUpdatePersistTable(t *testing.T) {
 	t.Parallel()
 
 	// setup
-	const n = 10_000
+	n := 10_000
+	if testing.Short() {
+		n = 1_000
+	}
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomRealWorldPrefixes(prng, n)
@@ -114,7 +117,10 @@ func TestDeletePersistTable(t *testing.T) {
 	t.Parallel()
 
 	// setup
-	const n = 10_000
+	n := 10_000
+	if testing.Short() {
+		n = 1_000
+	}
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomRealWorldPrefixes(prng, n)
@@ -147,7 +153,11 @@ func TestInsertPersistLite(t *testing.T) {
 	t.Parallel()
 
 	// setup
-	const n = 10_000
+	n := 10_000
+	if testing.Short() {
+		n = 1_000
+	}
+
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomRealWorldPrefixes(prng, n)
 
@@ -188,7 +198,11 @@ func TestInsertPersistLite(t *testing.T) {
 func TestDeletePersistLite(t *testing.T) {
 	t.Parallel()
 
-	const n = 10_000
+	// setup
+	n := 10_000
+	if testing.Short() {
+		n = 1_000
+	}
 
 	// setup
 	prng := rand.New(rand.NewPCG(42, 42))
