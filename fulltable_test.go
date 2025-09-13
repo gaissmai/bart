@@ -8,11 +8,11 @@ import (
 	"compress/gzip"
 	"fmt"
 	"log"
+	"math"
 	"math/rand/v2"
 	"net/netip"
 	"os"
 	"runtime"
-	"strconv"
 	"strings"
 	"testing"
 )
@@ -557,11 +557,4 @@ func randomRealWorldPrefixes(prng *rand.Rand, n int) []netip.Prefix {
 }
 
 // roundFloat64 to 2 decimal places
-func roundFloat64(f float64) float64 {
-	s := fmt.Sprintf("%.2f", f)
-	ret, err := strconv.ParseFloat(s, 64)
-	if err != nil {
-		panic(err)
-	}
-	return ret
-}
+func roundFloat64(f float64) float64 { return math.Round(f*100) / 100 }
