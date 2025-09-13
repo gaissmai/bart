@@ -95,7 +95,7 @@ func TestOverlapsCompare(t *testing.T) {
 		gotFast := fast.Overlaps(fastInter)
 
 		if gotGold != gotFast {
-			t.Fatalf("Overlaps(...) = %v, want %v\nTable1:\n%s\nTable:\n%v",
+			t.Fatalf("Overlaps(...) = %v, want %v\nTable1:\n%s\nTable:\n%s",
 				gotFast, gotGold, fast.String(), fastInter.String())
 		}
 
