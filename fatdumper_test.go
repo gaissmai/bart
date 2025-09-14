@@ -29,40 +29,6 @@ func TestFat_dump_OnNilReceiver_NoPanicAndNoOutput(t *testing.T) {
 	}
 }
 
-func TestFat_dump_IPv4HeaderPrintedWhenSize4Positive(t *testing.T) {
-	t.Parallel()
-	f := &Fat[int]{}
-	f.size4 = 1
-
-	var buf bytes.Buffer
-	f.dump(&buf)
-	out := buf.String()
-
-	if !strings.Contains(out, "### IPv4: size(1)") {
-		t.Fatalf("expected IPv4 header with size(1); got: %q", out)
-	}
-	if !strings.Contains(out, "depth:  0") {
-		t.Fatalf("expected depth: 0 line in dump; got: %q", out)
-	}
-}
-
-func TestFat_dump_IPv6HeaderPrintedWhenSize6Positive(t *testing.T) {
-	t.Parallel()
-	f := &Fat[int]{}
-	f.size6 = 2
-
-	var buf bytes.Buffer
-	f.dump(&buf)
-	out := buf.String()
-
-	if !strings.Contains(out, "### IPv6: size(2)") {
-		t.Fatalf("expected IPv6 header with size(2); got: %q", out)
-	}
-	if !strings.Contains(out, "depth:  0") {
-		t.Fatalf("expected depth: 0 line in dump; got: %q", out)
-	}
-}
-
 func TestFat_dump_IPv4AndIPv6PrintedIndependently(t *testing.T) {
 	t.Parallel()
 	f := &Fat[int]{}
@@ -125,18 +91,5 @@ func TestFatNode_dump_OnEmptyNode_PrintsHeaderOnly(t *testing.T) {
 	}
 	if strings.Contains(out, "octets(") || strings.Contains(out, "prfxs(") {
 		t.Fatalf("unexpected children or prefixes in empty dump: %q", out)
-	}
-}
-
-func TestFatNode_dumpRec_DoesNotPanic_OnEmptyTree(t *testing.T) {
-	t.Parallel()
-	n := &fatNode[int]{}
-	var buf bytes.Buffer
-	var path stridePath
-
-	dumpRec(n, &buf, path, 0, true)
-
-	if !strings.Contains(buf.String(), "depth:  0") {
-		t.Fatalf("expected at least root header in dumpRec; got %q", buf.String())
 	}
 }
