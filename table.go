@@ -608,7 +608,7 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 
 	for _, octet := range ip.AsSlice() {
 		// for contains, any lpm match is good enough, no backtracking needed
-		if n.prefixes.Len() != 0 && n.lpmTest(art.OctetToIdx(octet)) {
+		if n.prefixes.Len() != 0 && n.contains(art.OctetToIdx(octet)) {
 			return true
 		}
 
@@ -979,7 +979,7 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 			}
 
 			// micro benchmarking, skip if there is no match
-			if !n.lpmTest(idx) {
+			if !n.contains(idx) {
 				continue
 			}
 

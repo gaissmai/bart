@@ -93,3 +93,56 @@ func TestFatNode_dump_OnEmptyNode_PrintsHeaderOnly(t *testing.T) {
 		t.Fatalf("unexpected children or prefixes in empty dump: %q", out)
 	}
 }
+
+func TestFat_dumpString_OnNonEmptySizes_PrintsHeaders(t *testing.T) {
+	t.Parallel()
+	f := &Fat[int]{}
+	f.size4 = 1
+	f.size6 = 2
+
+	out := f.dumpString()
+
+	if !strings.Contains(out, "### IPv4: size(1)") {
+		t.Fatalf("missing IPv4 header: %q", out)
+	}
+	if !strings.Contains(out, "### IPv6: size(2)") {
+		t.Fatalf("missing IPv6 header: %q", out)
+	}
+}
+
+func TestFat_dumpString_OnNilReceiver_ReturnsEmpty(t *testing.T) {
+	t.Parallel()
+	var f *Fat[int]
+	out := f.dumpString()
+	if strings.TrimSpace(out) != "" {
+		t.Fatalf("expected empty dump for nil Fat; got %q", out)
+	}
+}
+
+func TestFat_dump_OnlyIPv4Size_PrintsIPv4Header(t *testing.T) {
+	t.Parallel()
+	f := &Fat[int]{}
+	f.size4 = 2 // IPv6 remains zero
+
+	var buf bytes.Buffer
+	f.dump(&buf)
+	out := buf.String()
+
+	if !strings.Contains(out, "### IPv4: size(2)") {
+		t.Fatalf("missing IPv4 header for v4-only dump: %q", out)
+	}
+}
+
+func TestFatNode_dump_WithNonZeroDepth_PrintsDepthHeader(t *testing.T) {
+	t.Parallel()
+	n := &fatNode[int]{}
+	var buf bytes.Buffer
+	var path stridePath
+
+	dump(n, &buf, path, 2, false)
+
+	out := buf.String()
+	if !strings.Contains(out, "depth:  2") {
+		t.Fatalf("expected depth header for depth 2; got: %q", out)
+	}
+}
