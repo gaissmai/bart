@@ -67,6 +67,9 @@ type node[V any] struct {
 // and no child nodes. Empty nodes are candidates for compression or removal
 // during trie optimization.
 func (n *node[V]) isEmpty() bool {
+	if n == nil {
+		return true
+	}
 	return n.prefixes.Len() == 0 && n.children.Len() == 0
 }
 
