@@ -44,6 +44,9 @@ func (n *fatNode[V]) childCount() int {
 
 // isEmpty returns true if node has neither prefixes nor children
 func (n *fatNode[V]) isEmpty() bool {
+	if n == nil {
+		return true
+	}
 	return (n.prefixesBitSet.Size() + n.childrenBitSet.Size()) == 0
 }
 
