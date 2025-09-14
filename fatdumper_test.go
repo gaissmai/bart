@@ -70,7 +70,7 @@ func TestFatNode_nodeStats_OnEmptyNode_AllZeros(t *testing.T) {
 func TestFatNode_nodeStatsRec_OnEmptyNode_NodeCountZero(t *testing.T) {
 	t.Parallel()
 	n := &fatNode[int]{}
-	s := nodeStatsRec[int](n)
+	s := nodeStatsRec(n)
 
 	if s.pfxs != 0 || s.childs != 0 || s.nodes != 0 || s.leaves != 0 || s.fringes != 0 {
 		t.Fatalf("expected zero recursive stats for empty node; got %+v", s)
