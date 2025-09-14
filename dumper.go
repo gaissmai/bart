@@ -58,7 +58,12 @@ type nodeDumper[V any] interface {
 // addresses and recurses into children that implement nodeDumper[V] (internal
 // subnodes). The path slice and depth together represent the byte-wise path
 // from the root to the current node; depth is incremented for each recursion.
-// The is4 flag controls IPv4/IPv6 formatting used by dump.
+// dumpRec recursively writes a human-readable dump of the trie subtree rooted at n to w.
+// It returns immediately if n is nil or empty. The function dumps the current node and
+// then descends depth-first into child entries obtained from n.getChildAddrs(), recursing
+// only into children that themselves implement nodeDumper (leaves and fringes are not
+// traversed). The provided path and depth are used to build per-node prefixes; the is4
+// flag selects IPv4 vs IPv6 formatting.
 func dumpRec[V any](n nodeDumper[V], w io.Writer, path stridePath, depth int, is4 bool) {
 	if n == nil || n.isEmpty() {
 		return
@@ -81,7 +86,14 @@ func dumpRec[V any](n nodeDumper[V], w io.Writer, path stridePath, depth int, is
 // It prints the node type, depth, formatted path (IPv4 vs IPv6 controlled by `is4`),
 // and bit count, followed by any stored prefixes (and their values when applicable),
 // the set of child octets, and any path-compressed leaves or fringe entries.
-// `path` and `depth` determine how prefixes and fringe CIDRs are rendered.
+// dump writes a human-readable representation of the node n to w.
+// 
+// It prints the node's type, depth, path (derived from `path` and `depth`), bit count,
+// any stored prefixes (and their values when the generic payload type is non-empty),
+// and a breakdown of children into internal nodes, path-compressed leaves, and fringes.
+// The `path` and `depth` parameters determine how prefixes and fringe CIDRs are rendered;
+// `is4` controls IPv4 vs IPv6 formatting. The function writes directly to w and may panic
+// if a child has an unexpected concrete type.
 func dump[V any](n nodeDumper[V], w io.Writer, path stridePath, depth int, is4 bool) {
 	bits := depth * strideLen
 	indent := strings.Repeat(".", depth)
@@ -218,7 +230,7 @@ func dump[V any](n nodeDumper[V], w io.Writer, path stridePath, depth int, is4 b
 //   - fullNode: has prefixes or leaves/fringes and also has subnodes
 //   - pathNode: has subnodes only (no prefixes, leaves, or fringes)
 //
-// The order of these checks is significant to ensure the correct classification.
+// Panics if the node's immediate statistics do not match any expected case.
 func hasType[V any](n nodeDumper[V]) nodeType {
 	s := nodeStats[V](n)
 
@@ -309,7 +321,13 @@ type stats struct {
 // nodeStats returns immediate statistics for n: counts of prefixes and children,
 // and a classification of each child into nodes, leaves, or fringes.
 // It inspects only the direct children of n (not the whole subtree).
-// Panics if a child has an unexpected concrete type.
+// nodeStats computes immediate statistics for node n: counts of prefixes (pfxs),
+// direct children (childs), child nodes that are internal nodes (nodes), fringe
+// children (fringes), and leaf children (leaves).
+//
+// The function inspects each child address returned by n.getChildAddrs() and
+// classifies the concrete child type. It panics if any child has an unexpected
+// concrete type.
 func nodeStats[V any](n nodeDumper[V]) stats {
 	var s stats
 
@@ -341,7 +359,18 @@ func nodeStats[V any](n nodeDumper[V]) stats {
 // child slots) plus the number of nodes, leaves, and fringe nodes in the
 // subtree. If n is nil or empty, a zeroed stats is returned. The returned
 // stats.nodes includes the current node. The function will panic if a child
-// has an unexpected concrete type.
+// nodeStatsRec recursively computes aggregated immediate statistics for the subtree
+// rooted at n and returns a stats struct summarizing that subtree.
+//
+// If n is nil or n.isEmpty(), a zero-valued stats is returned. The returned stats
+// includes the current node (nodes starts at 1 for a non-empty n), the total
+// number of prefixes (pfxs), direct child slots (childs), and counts of leaf and
+// fringe children found anywhere in the subtree. For each child address returned
+// by n.getChildAddrs(), the function inspects the concrete child type:
+//  - nodeDumper[V]: recurses into that child and accumulates its stats,
+//  - *fringeNode[V]: increments the fringes count,
+//  - *leafNode[V]: increments the leaves count.
+// The function panics if a child has an unexpected concrete type.
 func nodeStatsRec[V any](n nodeDumper[V]) stats {
 	var s stats
 	if n == nil || n.isEmpty() {
