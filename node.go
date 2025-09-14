@@ -13,14 +13,22 @@ import (
 	"github.com/gaissmai/bart/internal/sparse"
 )
 
-const (
-	strideLen    = 8                // byte, a multibit trie with stride len 8
-	maxItems     = 256              // max 256 prefixes or children in node
-	maxTreeDepth = 16               // max 16 bytes for IPv6
-	depthMask    = maxTreeDepth - 1 // used for BCE
-)
+// strideLen represents the byte stride length for the multibit trie.
+// Each stride processes 8 bits (1 byte) at a time.
+const strideLen = 8
 
-// stridePath, max 16 octets deep
+// maxItems defines the maximum number of prefixes or children that can be stored in a single node.
+// This corresponds to 256 possible values for an 8-bit stride.
+const maxItems = 256
+
+// maxTreeDepth represents the maximum depth of the trie structure.
+// For IPv6 addresses, this allows up to 16 bytes of depth.
+const maxTreeDepth = 16
+
+// depthMask is used for bounds check elimination (BCE) when accessing depth-indexed arrays.
+const depthMask = maxTreeDepth - 1
+
+// stridePath represents a path through the trie, with a maximum depth of 16 octets for IPv6.
 type stridePath [maxTreeDepth]uint8
 
 // node is a trie level node in the multibit routing table.
@@ -72,69 +80,138 @@ func (n *node[V]) childCount() int {
 	return n.children.Len()
 }
 
-// insertPrefix adds the route addr/prefixLen to n, with value val.
+// insertPrefix adds a routing entry at the specified index with the given value.
+// It returns true if a prefix already existed at that index (indicating an update),
+// false if this is a new insertion.
 func (n *node[V]) insertPrefix(idx uint8, val V) (exists bool) {
 	return n.prefixes.InsertAt(idx, val)
 }
 
+// getPrefix retrieves the value associated with the prefix at the given index.
+// Returns the value and true if found, or zero value and false if not present.
 func (n *node[V]) getPrefix(idx uint8) (val V, exists bool) {
 	return n.prefixes.Get(idx)
 }
 
-// getIndices TODO
+// getIndices returns a slice of all index positions that have prefixes stored in this node.
+// The indices correspond to positions in the complete binary tree representation used
+// for prefix storage within the 8-bit stride.
 //
 //nolint:unused
 func (n *node[V]) getIndices() []uint8 {
 	return n.prefixes.Bits()
 }
 
+// mustGetPrefix retrieves the value at the specified index, panicking if not found.
+// This method should only be used when the caller is certain the index exists.
 func (n *node[V]) mustGetPrefix(idx uint8) (val V) {
 	return n.prefixes.MustGet(idx)
 }
 
+// deletePrefix removes the prefix at the specified index and returns its value.
+// Returns the deleted value and true if the prefix existed, or zero value and false otherwise.
 func (n *node[V]) deletePrefix(idx uint8) (val V, exists bool) {
 	return n.prefixes.DeleteAt(idx)
 }
 
+// insertChild adds a child node at the specified address (0-255).
+// The child can be a *node[V], *leafNode[V], or *fringeNode[V].
+// Returns true if a child already existed at that address.
 func (n *node[V]) insertChild(addr uint8, child any) (exists bool) {
 	return n.children.InsertAt(addr, child)
 }
 
+// getChild retrieves the child node at the specified address.
+// Returns the child and true if found, or nil and false if not present.
 func (n *node[V]) getChild(addr uint8) (any, bool) {
 	return n.children.Get(addr)
 }
 
+// getChildAddrs returns a slice of all addresses (0-255) that have children in this node.
+// This is useful for iterating over all child nodes without checking every possible address.
+//
 //nolint:unused
 func (n *node[V]) getChildAddrs() []uint8 {
 	return n.children.AsSlice(&[256]uint8{})
 }
 
+// mustGetChild retrieves the child at the specified address, panicking if not found.
+// This method should only be used when the caller is certain the child exists.
 func (n *node[V]) mustGetChild(addr uint8) any {
 	return n.children.MustGet(addr)
 }
 
-func (n *node[V]) deleteChild(addr uint8) {
-	_, _ = n.children.DeleteAt(addr)
+// deleteChild removes the child node at the specified address.
+// This operation is idempotent - removing a non-existent child is safe.
+func (n *node[V]) deleteChild(addr uint8) (exists bool) {
+	_, exists = n.children.DeleteAt(addr)
+	return
 }
 
-// leafNode is a prefix with value, used as a path compressed child.
+// contains returns true if an index (idx) has any matching longest-prefix
+// in the current node’s prefix table.
+//
+// This function performs a presence check without retrieving the associated value.
+// It is faster than a full lookup, as it only tests for intersection with the
+// backtracking bitset for the given index.
+//
+// The prefix table is structured as a complete binary tree (CBT), and LPM testing
+// is done via a bitset operation that maps the traversal path from the given index
+// toward its possible ancestors.
+func (n *node[V]) contains(idx uint) bool {
+	return n.prefixes.Intersects(lpm.BackTrackingBitset(idx))
+}
+
+// lookupIdx performs a longest-prefix match (LPM) lookup for the given index (idx)
+// within the 8-bit stride-based prefix table at this trie depth.
+//
+// The function returns the matched base index, associated value, and true if a
+// matching prefix exists at this level; otherwise, ok is false.
+//
+// Internally, the prefix table is organized as a complete binary tree (CBT) indexed
+// via the baseIndex function. Unlike the original ART algorithm, this implementation
+// does not use an allotment-based approach. Instead, it performs CBT backtracking
+// using a bitset-based operation with a precomputed backtracking pattern specific to idx.
+func (n *node[V]) lookupIdx(idx uint) (baseIdx uint8, val V, ok bool) {
+	// top is the idx of the longest-prefix-match
+	if top, ok := n.prefixes.IntersectionTop(lpm.BackTrackingBitset(idx)); ok {
+		return top, n.mustGetPrefix(top), true
+	}
+
+	// not found (on this level)
+	return
+}
+
+// lookup is just a wrapper for lookupIdx.
+//
+//nolint:unused
+func (n *node[V]) lookup(idx uint) (val V, ok bool) {
+	_, val, ok = n.lookupIdx(idx)
+	return
+}
+
+// leafNode represents a path-compressed routing entry that stores both prefix and value.
+// Leaf nodes are used when a prefix doesn't align with trie stride boundaries
+// and needs to be stored as a compressed path to save memory.
 type leafNode[V any] struct {
 	prefix netip.Prefix
 	value  V
 }
 
+// newLeafNode creates a new leaf node with the specified prefix and value.
 func newLeafNode[V any](pfx netip.Prefix, val V) *leafNode[V] {
 	return &leafNode[V]{prefix: pfx, value: val}
 }
 
-// fringeNode is a path-compressed leaf with value but without a prefix.
-// The prefix of a fringe is solely defined by the position in the trie.
-// The fringe-compression (no stored prefix) saves a lot of memory,
-// but the algorithm is more complex.
+// fringeNode represents a path-compressed routing entry that stores only a value.
+// The prefix is implicitly defined by the node's position in the trie.
+// Fringe nodes are used for prefixes that align exactly with stride boundaries
+// (/8, /16, /24, etc.) to save memory by not storing redundant prefix information.
 type fringeNode[V any] struct {
 	value V
 }
 
+// newFringeNode creates a new fringe node with the specified value.
 func newFringeNode[V any](val V) *fringeNode[V] {
 	return &fringeNode[V]{value: val}
 }
@@ -176,9 +253,17 @@ func isFringe(depth int, pfx netip.Prefix) bool {
 // insertAtDepth inserts a network prefix and its associated value into the
 // trie starting at the specified byte depth.
 //
-// The function walks the prefix address from the given depth and inserts the value either directly into
-// the node´s prefix table or as a compressed leaf or fringe node. If a conflicting leaf or fringe exists,
-// it is pushed down via a new intermediate node. Existing entries with the same prefix are overwritten.
+// The function traverses the prefix address from the given depth and inserts
+// the value either directly into the node's prefix table or as a compressed
+// leaf or fringe node. If a conflicting leaf or fringe exists, it creates
+// a new intermediate node to accommodate both entries.
+//
+// Parameters:
+//   - pfx: The network prefix to insert (must be in canonical form)
+//   - val: The value to associate with the prefix
+//   - depth: The current depth in the trie (0-based byte index)
+//
+// Returns true if a prefix already existed and was updated, false for new insertions.
 func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool) {
 	ip := pfx.Addr() // the pfx must be in canonical form
 	octets := ip.AsSlice()
@@ -259,16 +344,18 @@ func (n *node[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool
 
 // purgeAndCompress performs bottom-up compression of the trie by removing
 // empty nodes and converting sparse branches into compressed leaf/fringe nodes.
-// It unwinds the provided stack of parent nodes, checking each level for
-// compression opportunities based on child count and prefix distribution.
 //
-// The compression may convert:
-//   - Nodes with single prefix into leafNode (path compression)
-//   - Nodes at maxDepth-1 with single prefix into fringeNode
+// The function unwinds the provided stack of parent nodes, checking each level
+// for compression opportunities based on child count and prefix distribution.
+// It may convert:
+//   - Nodes with a single prefix into leafNode (path compression)
+//   - Nodes at lastOctet with a single prefix into fringeNode
 //   - Empty intermediate nodes are removed entirely
 //
-// The reconstruction of prefixes for compressed nodes uses the traversal
-// path stored in octets and the parent's depth information.
+// Parameters:
+//   - stack: Array of parent nodes to process during unwinding
+//   - octets: The path of octets taken to reach the current position
+//   - is4: True for IPv4 processing, false for IPv6
 func (n *node[V]) purgeAndCompress(stack []*node[V], octets []uint8, is4 bool) {
 	// unwind the stack
 	for depth := len(stack) - 1; depth >= 0; depth-- {
@@ -332,40 +419,6 @@ func (n *node[V]) purgeAndCompress(stack []*node[V], octets []uint8, is4 bool) {
 		// climb up the stack
 		n = parent
 	}
-}
-
-// lpmGet performs a longest-prefix match (LPM) lookup for the given index (idx)
-// within the 8-bit stride-based prefix table at this trie depth.
-//
-// The function returns the matched base index, associated value, and true if a
-// matching prefix exists at this level; otherwise, ok is false.
-//
-// Internally, the prefix table is organized as a complete binary tree (CBT) indexed
-// via the baseIndex function. Unlike the original ART algorithm, this implementation
-// does not use an allotment-based approach. Instead, it performs CBT backtracking
-// using a bitset-based operation with a precomputed backtracking pattern specific to idx.
-func (n *node[V]) lpmGet(idx uint) (baseIdx uint8, val V, ok bool) {
-	// top is the idx of the longest-prefix-match
-	if top, ok := n.prefixes.IntersectionTop(lpm.BackTrackingBitset(idx)); ok {
-		return top, n.mustGetPrefix(top), true
-	}
-
-	// not found (on this level)
-	return
-}
-
-// lpmTest returns true if an index (idx) has any matching longest-prefix
-// in the current node’s prefix table.
-//
-// This function performs a presence check without retrieving the associated value.
-// It is faster than a full lookup, as it only tests for intersection with the
-// backtracking bitset for the given index.
-//
-// The prefix table is structured as a complete binary tree (CBT), and LPM testing
-// is done via a bitset operation that maps the traversal path from the given index
-// toward its possible ancestors.
-func (n *node[V]) lpmTest(idx uint) bool {
-	return n.prefixes.Intersects(lpm.BackTrackingBitset(idx))
 }
 
 // allRec recursively traverses the trie starting at the current node,
@@ -711,9 +764,17 @@ func cmpIndexRank(aIdx, bIdx uint8) int {
 	return cmp.Compare(aOctet, bOctet)
 }
 
-// cidrFromPath, helper function,
-// get prefix back from stride path, depth and idx.
-// The prefix is solely defined by the position in the trie and the baseIndex.
+// cidrFromPath reconstructs a CIDR prefix from a stride path, depth, and index.
+// The prefix is determined by the node's position in the trie and the base index
+// from the ART algorithm's complete binary tree representation.
+//
+// Parameters:
+//   - path: The stride path through the trie
+//   - depth: Current depth in the trie
+//   - is4: True for IPv4 processing, false for IPv6
+//   - idx: The base index from the prefix table
+//
+// Returns the reconstructed netip.Prefix.
 func cidrFromPath(path stridePath, depth int, is4 bool, idx uint8) netip.Prefix {
 	depth = depth & depthMask // BCE
 
@@ -740,9 +801,17 @@ func cidrFromPath(path stridePath, depth int, is4 bool, idx uint8) netip.Prefix 
 	return netip.PrefixFrom(ip, bits)
 }
 
-// cidrForFringe, helper function,
-// get prefix back from octets path, depth, IP version and last octet.
-// The prefix of a fringe is solely defined by the position in the trie.
+// cidrForFringe reconstructs a CIDR prefix for a fringe node from the traversal path.
+// Since fringe nodes don't store their prefix explicitly, it's derived entirely
+// from the node's position in the trie.
+//
+// Parameters:
+//   - octets: The path of octets leading to the fringe
+//   - depth: Current depth in the trie
+//   - is4: True for IPv4 processing, false for IPv6
+//   - lastOctet: The final octet where the fringe is located
+//
+// Returns the reconstructed netip.Prefix for the fringe.
 func cidrForFringe(octets []byte, depth int, is4 bool, lastOctet uint8) netip.Prefix {
 	depth = depth & depthMask // BCE
 

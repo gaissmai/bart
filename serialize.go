@@ -278,7 +278,7 @@ func (n *node[V]) directItemsRec(parentIdx uint8, path stridePath, depth int, is
 		}
 
 		// do a longest-prefix-match
-		lpm, _, _ := n.lpmGet(uint(nextIdx))
+		lpm, _, _ := n.lookupIdx(uint(nextIdx))
 
 		// be aware, 0 is here a possible value for parentIdx and lpm (if not found)
 		if lpm == parentIdx {
@@ -309,7 +309,7 @@ func (n *node[V]) directItemsRec(parentIdx uint8, path stridePath, depth int, is
 		}
 
 		// do a longest-prefix-match
-		lpm, _, _ := n.lpmGet(hostIdx)
+		lpm, _, _ := n.lookupIdx(hostIdx)
 
 		// be aware, 0 is here a possible value for parentIdx and lpm (if not found)
 		if lpm == parentIdx {
