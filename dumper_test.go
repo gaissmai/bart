@@ -14,6 +14,57 @@ type dumpTest struct {
 	want  string
 }
 
+func TestDumpRec_MustNotPanicWithInterfaceIsNil(t *testing.T) {
+	t.Parallel()
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("dumpRec: panic occurred: %v", r)
+		}
+	}()
+
+	var nilInterface nodeDumper[any]
+	w := new(strings.Builder)
+	path := stridePath{}
+
+	// This should not panic
+	dumpRec(nilInterface, w, path, 0, true)
+}
+
+func TestDumpRec_MustNotPanicWithNodeIsNil(t *testing.T) {
+	t.Parallel()
+
+	// This test demonstrates the panic when we have a nil pointer wrapped in interface
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("dumpRec: panic occurred: %v", r)
+		}
+	}()
+
+	w := new(strings.Builder)
+	path := stridePath{}
+
+	// This should not panic
+	dumpRec(new(node[any]), w, path, 0, true)
+}
+
+func TestDumpRec_MustNotPanicWithFatNodeIsNil(t *testing.T) {
+	t.Parallel()
+
+	// This test demonstrates the panic when we have a nil pointer wrapped in interface
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("dumpRec: panic occurred: %v", r)
+		}
+	}()
+
+	w := new(strings.Builder)
+	path := stridePath{}
+
+	// This should not panic
+	dumpRec(new(fatNode[any]), w, path, 0, true)
+}
+
 func TestDumperPanic(t *testing.T) {
 	t.Parallel()
 	defer func() {
