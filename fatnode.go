@@ -48,11 +48,28 @@ func (n *fatNode[V]) isEmpty() bool {
 }
 
 // getChild TODO
+//
+//nolint:unused
 func (n *fatNode[V]) getChild(addr uint8) (any, bool) {
 	if anyPtr := n.children[addr]; anyPtr != nil {
 		return *anyPtr, true
 	}
 	return nil, false
+}
+
+// mustGetChild TODO
+//
+//nolint:unused
+func (n *fatNode[V]) mustGetChild(addr uint8) any {
+	// panics if n.children[addr] is nil
+	return *n.children[addr]
+}
+
+// getChildAddrs TODO
+//
+//nolint:unused
+func (n *fatNode[V]) getChildAddrs() []uint8 {
+	return n.childrenBitSet.AsSlice(&[256]uint8{})
 }
 
 // insertChild TODO
@@ -106,6 +123,20 @@ func (n *fatNode[V]) getPrefix(idx uint8) (val V, exists bool) {
 		val = *n.prefixes[idx]
 	}
 	return
+}
+
+// mustGetPrefix TODO
+//
+//nolint:unused
+func (n *fatNode[V]) mustGetPrefix(idx uint8) V {
+	return *n.prefixes[idx]
+}
+
+// getIndices TODO
+//
+//nolint:unused
+func (n *fatNode[V]) getIndices() []uint8 {
+	return n.prefixesBitSet.Bits()
 }
 
 // deletePrefix TODO

@@ -81,6 +81,13 @@ func (n *node[V]) getPrefix(idx uint8) (val V, exists bool) {
 	return n.prefixes.Get(idx)
 }
 
+// getIndices TODO
+//
+//nolint:unused
+func (n *node[V]) getIndices() []uint8 {
+	return n.prefixes.Bits()
+}
+
 func (n *node[V]) mustGetPrefix(idx uint8) (val V) {
 	return n.prefixes.MustGet(idx)
 }
@@ -95,6 +102,11 @@ func (n *node[V]) insertChild(addr uint8, child any) (exists bool) {
 
 func (n *node[V]) getChild(addr uint8) (any, bool) {
 	return n.children.Get(addr)
+}
+
+//nolint:unused
+func (n *node[V]) getChildAddrs() []uint8 {
+	return n.children.AsSlice(&[256]uint8{})
 }
 
 func (n *node[V]) mustGetChild(addr uint8) any {
