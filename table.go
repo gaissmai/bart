@@ -1281,22 +1281,20 @@ func (t *Table[V]) dump(w io.Writer) {
 	}
 
 	if t.size4 > 0 {
-		n := t.root4
-		stats := nodeStatsRec[V](&n)
+		stats := nodeStatsRec(&t.root4)
 		fmt.Fprintln(w)
 		fmt.Fprintf(w, "### IPv4: size(%d), nodes(%d), pfxs(%d), leaves(%d), fringes(%d)",
 			t.size4, stats.nodes, stats.pfxs, stats.leaves, stats.fringes)
 
-		dumpRec[V](&n, w, stridePath{}, 0, true)
+		dumpRec(&t.root4, w, stridePath{}, 0, true)
 	}
 
 	if t.size6 > 0 {
-		n := t.root6
-		stats := nodeStatsRec[V](&n)
+		stats := nodeStatsRec(&t.root6)
 		fmt.Fprintln(w)
 		fmt.Fprintf(w, "### IPv6: size(%d), nodes(%d), pfxs(%d), leaves(%d), fringes(%d)",
 			t.size6, stats.nodes, stats.pfxs, stats.leaves, stats.fringes)
 
-		dumpRec(&n, w, stridePath{}, 0, false)
+		dumpRec(&t.root6, w, stridePath{}, 0, false)
 	}
 }
