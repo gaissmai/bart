@@ -30,6 +30,32 @@ func TestDumpRec_MustNotPanic(t *testing.T) {
 	dumpRec[any](nil, w, path, 0, true)
 }
 
+func TestDumpRec_MustNotPanicWithTypedNilNode(t *testing.T) {
+	t.Parallel()
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("dumpRec: panic with typed-nil: %v", r)
+		}
+	}()
+	var pn *node[any]
+	w := new(strings.Builder)
+	path := stridePath{}
+	dumpRec(nodeReader[any](pn), w, path, 0, true)
+}
+
+func TestDumpRec_MustNotPanicWithTypedNilFatNode(t *testing.T) {
+	t.Parallel()
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("dumpRec: panic with typed-nil fatNode: %v", r)
+		}
+	}()
+	var pn *fatNode[any]
+	w := new(strings.Builder)
+	path := stridePath{}
+	dumpRec(nodeReader[any](pn), w, path, 0, true)
+}
+
 func TestDumperPanic(t *testing.T) {
 	t.Parallel()
 	defer func() {
