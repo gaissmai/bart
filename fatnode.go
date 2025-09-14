@@ -81,7 +81,9 @@ func (n *fatNode[V]) insertChild(addr uint8, child any) (exists bool) {
 		exists = true
 	}
 
-	c := child // force clear ownership; address escapes to heap
+	// force clear ownership; taking &c makes it escape to heap so the pointer remains valid.
+	// This reduces per-slot memory for nil entries versus storing `any` directly.
+	c := child
 	n.children[addr] = &c
 
 	return exists
@@ -154,7 +156,6 @@ func (n *fatNode[V]) deletePrefix(idx uint8) (val V, exists bool) {
 	n.allot(idx, valPtr, parentValPtr)
 
 	n.prefixesBitSet.Clear(idx)
-
 	return *valPtr, true
 }
 
