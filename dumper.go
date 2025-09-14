@@ -64,7 +64,7 @@ func dumpRec[V any](n nodeDumper[V], w io.Writer, path stridePath, depth int, is
 		anyKid := n.mustGetChild(addr)
 		if kid, ok := anyKid.(nodeDumper[V]); ok {
 			path[depth] = addr
-			dumpRec[V](kid, w, path, depth+1, is4)
+			dumpRec(kid, w, path, depth+1, is4)
 		}
 	}
 }
