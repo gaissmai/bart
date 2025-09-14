@@ -444,7 +444,7 @@ func TestNodes_OverlapsRoutes_Symmetric(t *testing.T) {
 			t.Parallel()
 
 			if _, ok := tt.node.(*fatNode[int]); ok {
-				t.Skipf("overlapsIdx not implemented yet for fatNode")
+				t.Skipf("overlapsRoutes not implemented yet for fatNode")
 			}
 
 			build := func(pfxs []goldStrideItem[int]) *node[int] {
