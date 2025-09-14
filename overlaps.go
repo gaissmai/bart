@@ -114,7 +114,7 @@ func (n *node[V]) overlapsRoutes(o *node[V]) bool {
 		if nOK {
 			// does any route in o overlap this prefix from n
 			if nIdx, nOK = n.prefixes.NextSet(nIdx); nOK {
-				if o.lpmTest(uint(nIdx)) {
+				if o.contains(uint(nIdx)) {
 					return true
 				}
 
@@ -130,7 +130,7 @@ func (n *node[V]) overlapsRoutes(o *node[V]) bool {
 		if oOK {
 			// does any route in n overlap this prefix from o
 			if oIdx, oOK = o.prefixes.NextSet(oIdx); oOK {
-				if n.lpmTest(uint(oIdx)) {
+				if n.contains(uint(oIdx)) {
 					return true
 				}
 
@@ -167,7 +167,7 @@ func (n *node[V]) overlapsChildrenIn(o *node[V]) bool {
 	// do range over, not so many childs and maybe too many prefixes for other algo below
 	if doRange {
 		for _, addr := range o.children.AsSlice(&[256]uint8{}) {
-			if n.lpmTest(art.OctetToIdx(addr)) {
+			if n.contains(art.OctetToIdx(addr)) {
 				return true
 			}
 		}
@@ -309,7 +309,7 @@ func (n *node[V]) overlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
 
 		// test if any route overlaps prefix´ so far
 		// no best match needed, forward tests without backtracking
-		if n.prefixes.Len() != 0 && n.lpmTest(art.OctetToIdx(octet)) {
+		if n.prefixes.Len() != 0 && n.contains(art.OctetToIdx(octet)) {
 			return true
 		}
 
@@ -351,7 +351,7 @@ func (n *node[V]) overlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
 // without descending further into the trie.
 func (n *node[V]) overlapsIdx(idx uint8) bool {
 	// 1. Test if any route in this node overlaps prefix?
-	if n.lpmTest(uint(idx)) {
+	if n.contains(uint(idx)) {
 		return true
 	}
 

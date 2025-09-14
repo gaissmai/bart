@@ -52,7 +52,7 @@ func TestPrefixInsert(t *testing.T) {
 		//nolint:gosec  // G115: integer overflow conversion int -> uint
 		addr := uint8(i)
 		goldVal, goldOK := gold.lpm(octet)
-		_, fastVal, fastOK := fast.lpmGet(art.OctetToIdx(addr))
+		_, fastVal, fastOK := fast.lookupIdx(art.OctetToIdx(addr))
 		if !getsEqual(fastVal, fastOK, goldVal, goldOK) {
 			t.Fatalf("get(%d) = (%v, %v), want (%v, %v)", octet, fastVal, fastOK, goldVal, goldOK)
 		}
@@ -87,7 +87,7 @@ func TestPrefixDelete(t *testing.T) {
 		//nolint:gosec  // G115: integer overflow conversion int -> uint
 		addr := uint8(i)
 		goldVal, goldOK := gold.lpm(octet)
-		_, fastVal, fastOK := fast.lpmGet(art.OctetToIdx(addr))
+		_, fastVal, fastOK := fast.lookupIdx(art.OctetToIdx(addr))
 		if !getsEqual(fastVal, fastOK, goldVal, goldOK) {
 			t.Fatalf("get(%d) = (%v, %v), want (%v, %v)", octet, fastVal, fastOK, goldVal, goldOK)
 		}
@@ -221,7 +221,7 @@ func BenchmarkNodePrefixLPM(b *testing.B) {
 			idx := art.PfxToIdx(route.octet, route.bits)
 
 			for b.Loop() {
-				this.lpmGet(uint(idx))
+				this.lookupIdx(uint(idx))
 			}
 		})
 
@@ -230,7 +230,7 @@ func BenchmarkNodePrefixLPM(b *testing.B) {
 			idx := art.PfxToIdx(route.octet, route.bits)
 
 			for b.Loop() {
-				this.lpmTest(uint(idx))
+				this.contains(uint(idx))
 			}
 		})
 	}

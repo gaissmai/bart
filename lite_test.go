@@ -867,3 +867,289 @@ func checkLiteString(t *testing.T, tbl *Lite, tt stringTest) {
 		t.Errorf("MarshalText got:\n%swant:\n%s", gotBytes, tt.want)
 	}
 }
+
+// TestLiteInsertPersistDoesNotMutateOriginal verifies persistent semantics:
+// InsertPersist returns a new table and leaves the receiver unchanged.
+func TestLiteInsertPersistDoesNotMutateOriginal(t *testing.T) {
+	t.Parallel()
+
+	orig := new(Lite)
+	orig.Insert(mpp("10.0.0.0/8"))
+
+	before := orig.dumpString()
+
+	// Insert a more specific prefix persistently.
+	newTbl := orig.InsertPersist(mpp("10.0.1.0/24"))
+
+	// Original must be unchanged.
+	if got := orig.dumpString(); got != before {
+		t.Fatalf("orig mutated by InsertPersist:\n got:\n%s\nwant:\n%s", got, before)
+	}
+
+	// New table must contain both prefixes; original must not "exist" the /24.
+	if !newTbl.Exists(mpp("10.0.0.0/8")) || !newTbl.Exists(mpp("10.0.1.0/24")) {
+		t.Fatalf("newTbl missing expected prefixes")
+	}
+	if orig.Exists(mpp("10.0.1.0/24")) {
+		t.Fatalf("orig unexpectedly has 10.0.1.0/24 after InsertPersist")
+	}
+}
+
+// TestLiteDeletePersistDoesNotMutateOriginal verifies persistent Delete semantics.
+func TestLiteDeletePersistDoesNotMutateOriginal(t *testing.T) {
+	t.Parallel()
+
+	orig := new(Lite)
+	orig.Insert(mpp("10.0.0.0/8"))
+	orig.Insert(mpp("10.0.1.0/24"))
+	before := orig.dumpString()
+
+	// Delete the /24 persistently, original must remain intact.
+	delTbl, _ := orig.DeletePersist(mpp("10.0.1.0/24"))
+
+	if got := orig.dumpString(); got != before {
+		t.Fatalf("orig mutated by DeletePersist:\n got:\n%s\nwant:\n%s", got, before)
+	}
+
+	if !delTbl.Exists(mpp("10.0.0.0/8")) {
+		t.Fatalf("delTbl lost 10.0.0.0/8 unexpectedly")
+	}
+	if delTbl.Exists(mpp("10.0.1.0/24")) {
+		t.Fatalf("delTbl still contains deleted 10.0.1.0/24")
+	}
+}
+
+// TestLiteExistsBasic exercises Exists across IPv4/IPv6, present/absent, and duplicates.
+func TestLiteExistsBasic(t *testing.T) {
+	t.Parallel()
+
+	tbl := new(Lite)
+
+	ins := []netip.Prefix{
+		mpp("10.0.0.0/8"),
+		mpp("10.0.1.0/24"),
+		mpp("2001:db8::/32"),
+	}
+	for _, p := range ins {
+		tbl.Insert(p)
+		// Repeat insert must be idempotent.
+		tbl.Insert(p)
+	}
+
+	// Present
+	for _, p := range ins {
+		if !tbl.Exists(p) {
+			t.Errorf("Exists(%s) = false, want true", p)
+		}
+	}
+
+	// Absent, but related
+	absent := []netip.Prefix{
+		mpp("10.0.2.0/24"),
+		mpp("2001:db8:1::/48"),
+	}
+	for _, p := range absent {
+		if tbl.Exists(p) {
+			t.Errorf("Exists(%s) = true, want false", p)
+		}
+	}
+
+	// Zero prefix should not exist.
+	if tbl.Exists(netip.Prefix{}) {
+		t.Errorf("Exists(zero) = true, want false")
+	}
+}
+
+// TestLiteOverlapsVariants validates Overlaps and family-specific variants.
+func TestLiteOverlapsVariants(t *testing.T) {
+	t.Parallel()
+
+	// Non-overlapping IPv4.
+	a := new(Lite)
+	a.Insert(mpp("10.0.0.0/8"))
+	b := new(Lite)
+	b.Insert(mpp("172.16.0.0/12"))
+
+	if a.Overlaps(b) || a.Overlaps4(b) || a.Overlaps6(b) {
+		t.Fatalf("expected no overlaps between 10.0.0.0/8 and 172.16.0.0/12")
+	}
+
+	// Overlapping IPv4.
+	c := new(Lite)
+	c.Insert(mpp("10.0.0.0/8"))
+	d := new(Lite)
+	d.Insert(mpp("10.1.0.0/16"))
+
+	if !c.Overlaps(d) || !c.Overlaps4(d) {
+		t.Fatalf("expected IPv4 overlap")
+	}
+	if c.Overlaps6(d) {
+		t.Fatalf("did not expect IPv6 overlap")
+	}
+
+	// Overlapping IPv6.
+	e := new(Lite)
+	e.Insert(mpp("2001:db8::/32"))
+	f := new(Lite)
+	f.Insert(mpp("2001:db8:1::/48"))
+
+	if !e.Overlaps(f) || !e.Overlaps6(f) {
+		t.Fatalf("expected IPv6 overlap")
+	}
+	if e.Overlaps4(f) {
+		t.Fatalf("did not expect IPv4 overlap")
+	}
+
+	// OverlapsPrefix against single table.
+	if !c.OverlapsPrefix(mpp("10.1.2.0/24")) {
+		t.Errorf("OverlapsPrefix(10.1.2.0/24) = false, want true")
+	}
+	if c.OverlapsPrefix(mpp("9.0.0.0/8")) {
+		t.Errorf("OverlapsPrefix(9.0.0.0/8) = true, want false")
+	}
+	if c.OverlapsPrefix(mpp("::/0")) {
+		t.Errorf("OverlapsPrefix(::/0) = true, want false")
+	}
+	if e.OverlapsPrefix(mpp("10.0.0.0/8")) {
+		t.Errorf("IPv6 table overlapping IPv4 prefix reported true")
+	}
+}
+
+// TestLiteAllEnumeratesAllPrefixes ensures All yields exactly the inserted set.
+func TestLiteAllEnumeratesAllPrefixes(t *testing.T) {
+	t.Parallel()
+
+	tbl := new(Lite)
+	want := []netip.Prefix{
+		mpp("0.0.0.0/0"),
+		mpp("10.0.0.0/8"),
+		mpp("10.0.1.0/24"),
+		mpp("2001:db8::/32"),
+	}
+	for _, p := range want {
+		tbl.Insert(p)
+	}
+
+	gotSet := map[string]bool{}
+	for p := range tbl.All() {
+		gotSet[p.String()] = true
+	}
+
+	if len(gotSet) != len(want) {
+		t.Fatalf("All yielded %d entries, want %d (%v)", len(gotSet), len(want), gotSet)
+	}
+	for _, p := range want {
+		if !gotSet[p.String()] {
+			t.Errorf("All missing %s", p)
+		}
+	}
+}
+
+// TestLiteMarshalTextEmpty verifies empty table textual form.
+func TestLiteMarshalTextEmpty(t *testing.T) {
+	t.Parallel()
+
+	tbl := new(Lite)
+	b, err := tbl.MarshalText()
+	if err != nil {
+		t.Fatalf("MarshalText error: %v", err)
+	}
+	if string(b) != "" {
+		t.Fatalf("MarshalText(empty) = %q, want empty string", string(b))
+	}
+	if got := tbl.String(); got != "" {
+		t.Fatalf("String(empty) = %q, want empty string", got)
+	}
+}
+
+// TestLiteLookupPrefixExactAndLPMDefault confirms exact and default-route LPM behavior.
+func TestLiteLookupPrefixExactAndLPMDefault(t *testing.T) {
+	t.Parallel()
+
+	tbl := new(Lite)
+	tbl.Insert(mpp("0.0.0.0/0"))
+	tbl.Insert(mpp("10.0.0.0/8"))
+	tbl.Insert(mpp("10.0.1.0/24"))
+
+	// Exact, canonical match must succeed.
+	_, ok := tbl.LookupPrefix(mpp("10.0.1.0/24"))
+	if !ok {
+		t.Fatalf("LookupPrefix(10.0.1.0/24) = false, want true")
+	}
+
+	// LPM for a non-matching network should fall back to default.
+	lpm, _, ok := tbl.LookupPrefixLPM(netip.MustParsePrefix("11.22.33.44/32"))
+	if !ok || lpm != mpp("0.0.0.0/0") {
+		t.Fatalf("LookupPrefixLPM(11.22.33.44/32) = (%v,%v), want (0.0.0.0/0,true)", lpm, ok)
+	}
+
+	// LPM inside the more specific /24 must return that /24.
+	lpm, _, ok = tbl.LookupPrefixLPM(netip.MustParsePrefix("10.0.1.123/32"))
+	if !ok || lpm != mpp("10.0.1.0/24") {
+		t.Fatalf("LookupPrefixLPM(10.0.1.123/32) = (%v,%v), want (10.0.1.0/24,true)", lpm, ok)
+	}
+}
+
+// Complements existing WalkPersist tests: delete only IPv6 prefixes.
+func TestLiteWalkPersistDeleteOnlyIPv6(t *testing.T) {
+	t.Parallel()
+
+	input := []string{
+		"172.16.0.0/12",
+		"2001:db8:2::/48",
+		"2001:db8:3::/48",
+	}
+
+	// Build initial table.
+	tbl := new(Lite)
+	for _, s := range input {
+		tbl.Insert(mpp(s))
+	}
+
+	// WalkPersist: remove only IPv6 routes.
+	got := tbl.WalkPersist(func(pl *Lite, pfx netip.Prefix) (*Lite, bool) {
+		if pfx.Addr().Is6() {
+			pl, _ = pl.DeletePersist(pfx)
+		}
+		return pl, true
+	})
+
+	// Expect only the IPv4 prefix to remain.
+	wantRemain := map[string]bool{"172.16.0.0/12": true}
+	gotRemain := map[string]bool{}
+	for pfx := range got.All() {
+		gotRemain[pfx.String()] = true
+	}
+
+	if len(gotRemain) != len(wantRemain) {
+		t.Fatalf("expected %d entries, got %d: %v", len(wantRemain), len(gotRemain), gotRemain)
+	}
+	for k := range gotRemain {
+		if !wantRemain[k] {
+			t.Errorf("unexpected remaining prefix: %s", k)
+		}
+	}
+}
+
+// Union should not mutate the right-hand table.
+func TestLiteUnionRightIsUnchanged(t *testing.T) {
+	t.Parallel()
+
+	left := new(Lite)
+	right := new(Lite)
+
+	left.Insert(mpp("10.0.0.0/8"))
+	right.Insert(mpp("192.168.0.0/16"))
+
+	beforeRight := right.dumpString()
+	left.Union(right)
+
+	if got := right.dumpString(); got != beforeRight {
+		t.Fatalf("right table mutated by Union:\n got:\n%s\nwant:\n%s", got, beforeRight)
+	}
+
+	// Left must now contain both.
+	if !left.Exists(mpp("10.0.0.0/8")) || !left.Exists(mpp("192.168.0.0/16")) {
+		t.Fatalf("left after Union missing expected prefixes")
+	}
+}
