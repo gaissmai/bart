@@ -47,7 +47,8 @@ func (n *fatNode[V]) isEmpty() bool {
 	return (n.prefixesBitSet.Size() + n.childrenBitSet.Size()) == 0
 }
 
-// getChild TODO
+// getChild returns the child node at the specified address and true if it exists.
+// If no child exists at addr, returns nil and false.
 //
 //nolint:unused
 func (n *fatNode[V]) getChild(addr uint8) (any, bool) {
@@ -57,7 +58,9 @@ func (n *fatNode[V]) getChild(addr uint8) (any, bool) {
 	return nil, false
 }
 
-// mustGetChild TODO
+// mustGetChild returns the child node at the specified address.
+// Panics if no child exists at addr. This method should only be called
+// when the caller has verified the child exists.
 //
 //nolint:unused
 func (n *fatNode[V]) mustGetChild(addr uint8) any {
@@ -65,14 +68,17 @@ func (n *fatNode[V]) mustGetChild(addr uint8) any {
 	return *n.children[addr]
 }
 
-// getChildAddrs TODO
+// getChildAddrs returns a slice containing all addresses that have child nodes.
+// The addresses are returned in ascending order.
 //
 //nolint:unused
 func (n *fatNode[V]) getChildAddrs() []uint8 {
 	return n.childrenBitSet.AsSlice(&[256]uint8{})
 }
 
-// insertChild TODO
+// insertChild inserts a child node at the specified address.
+// Returns true if a child already existed at addr (overwrite case),
+// false if this is a new insertion.
 func (n *fatNode[V]) insertChild(addr uint8, child any) (exists bool) {
 	if n.children[addr] == nil {
 		exists = false
@@ -89,21 +95,27 @@ func (n *fatNode[V]) insertChild(addr uint8, child any) (exists bool) {
 	return exists
 }
 
-// deleteChild TODO
-func (n *fatNode[V]) deleteChild(addr uint8) {
-	if n.children[addr] != nil {
-		n.childrenBitSet.Clear(addr)
+// deleteChild removes the child node at the specified address.
+// This operation is idempotent - removing a non-existent child is safe.
+func (n *fatNode[V]) deleteChild(addr uint8) (exists bool) {
+	if n.children[addr] == nil {
+		return false
 	}
+
+	n.childrenBitSet.Clear(addr)
 	n.children[addr] = nil
+	return true
 }
 
-// insertPrefix adds the route addr/prefixLen to n, with value val.
+// insertPrefix adds a routing entry at the specified index with the given value.
+// It returns true if a prefix already existed at that index (indicating an update),
+// false if this is a new insertion.
 func (n *fatNode[V]) insertPrefix(idx uint8, val V) (exists bool) {
 	if exists = n.prefixesBitSet.Test(idx); !exists {
 		n.prefixesBitSet.Set(idx)
 	}
 
-	// insert or overwrite
+	// insert or update
 
 	// To ensure allot works as intended, every unique prefix in the
 	// fatNode must point to a distinct value pointer, even for identical values.
@@ -119,7 +131,8 @@ func (n *fatNode[V]) insertPrefix(idx uint8, val V) (exists bool) {
 	return
 }
 
-// getPrefix TODO
+// getPrefix returns the value for the given prefix index and true if it exists.
+// If no prefix exists at idx, returns the zero value and false.
 func (n *fatNode[V]) getPrefix(idx uint8) (val V, exists bool) {
 	if exists = n.prefixesBitSet.Test(idx); exists {
 		val = *n.prefixes[idx]
@@ -127,22 +140,26 @@ func (n *fatNode[V]) getPrefix(idx uint8) (val V, exists bool) {
 	return
 }
 
-// mustGetPrefix TODO
+// mustGetPrefix returns the value for the given prefix index.
+// Panics if no prefix exists at idx. This method should only be called
+// when the caller has verified the prefix exists.
 //
 //nolint:unused
 func (n *fatNode[V]) mustGetPrefix(idx uint8) V {
 	return *n.prefixes[idx]
 }
 
-// getIndices TODO
+// getIndices returns a slice containing all prefix indices that have values stored.
+// The indices are returned in ascending order.
 //
 //nolint:unused
 func (n *fatNode[V]) getIndices() []uint8 {
 	return n.prefixesBitSet.Bits()
 }
 
-// deletePrefix TODO
-// func (n *fatNode[V]) deletePrefix(addr uint8, prefixLen uint8) (val V, exists bool) {
+// deletePrefix removes the route at the given index.
+// Returns the removed value and true if the prefix existed,
+// or the zero value and false if no prefix was found at idx.
 func (n *fatNode[V]) deletePrefix(idx uint8) (val V, exists bool) {
 	if exists = n.prefixesBitSet.Test(idx); !exists {
 		// Route entry doesn't exist
@@ -159,13 +176,24 @@ func (n *fatNode[V]) deletePrefix(idx uint8) (val V, exists bool) {
 	return *valPtr, true
 }
 
-// contains TODO
+// contains returns true if the given index has any matching longest-prefix
+// in the current node's prefix table.
+//
+// This function performs a presence check using the ART algorithm's
+// hierarchical prefix structure. It tests whether any ancestor prefix
+// exists for the given index by checking the parent entry.
 func (n *fatNode[V]) contains(idx uint) (ok bool) {
 	//nolint:gosec  // G115: integer overflow conversion int -> uint
 	return n.prefixes[uint8(idx>>1)] != nil
 }
 
-// lookup TODO
+// lookup performs a longest-prefix match (LPM) lookup for the given index
+// within the current node's prefix table in O(1).
+//
+// The function returns the matched value and true if a matching prefix exists;
+// otherwise, it returns the zero value and false. The lookup uses the ART
+// algorithm's hierarchical structure to find the most specific
+// matching prefix.
 func (n *fatNode[V]) lookup(idx uint) (val V, ok bool) {
 	//nolint:gosec  // G115: integer overflow conversion int -> uint
 	if valPtr := n.prefixes[uint8(idx>>1)]; valPtr != nil {
@@ -221,6 +249,12 @@ func (n *fatNode[V]) allot(idx uint8, oldValPtr, valPtr *V) {
 	}
 }
 
+// insertAtDepth inserts a network prefix and its associated value into the
+// trie starting at the specified byte depth.
+//
+// The function walks the prefix address from the given depth and inserts the value either directly into
+// the node's prefix table or as a compressed leaf or fringe node. If a conflicting leaf or fringe exists,
+// it is pushed down via a new intermediate node. Existing entries with the same prefix are overwritten.
 func (n *fatNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool) {
 	ip := pfx.Addr() // the pfx must be in canonical form
 	octets := ip.AsSlice()
@@ -295,6 +329,18 @@ func (n *fatNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists b
 	panic("unreachable")
 }
 
+// purgeAndCompress performs bottom-up compression of the trie by removing
+// empty nodes and converting sparse branches into compressed leaf/fringe nodes.
+// It unwinds the provided stack of parent nodes, checking each level for
+// compression opportunities based on child count and prefix distribution.
+//
+// The compression may convert:
+//   - Nodes with single prefix into leafNode (path compression)
+//   - Nodes at maxDepth-1 with single prefix into fringeNode
+//   - Empty intermediate nodes are removed entirely
+//
+// The reconstruction of prefixes for compressed nodes uses the traversal
+// path stored in octets and the parent's depth information.
 func (n *fatNode[V]) purgeAndCompress(stack []*fatNode[V], octets []uint8, is4 bool) {
 	// unwind the stack
 	for depth := len(stack) - 1; depth >= 0; depth-- {
