@@ -202,35 +202,55 @@ func BenchmarkNodePrefixDelete(b *testing.B) {
 	}
 }
 
-func BenchmarkNodePrefixLPM(b *testing.B) {
+func BenchmarkNodesPrefixLPM(b *testing.B) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	routes := shuffleStridePfxs(allStridePfxs())
 
 	for _, nroutes := range prefixCount {
 		this := new(node[int])
+		that := new(fatNode[int])
 
 		for i, route := range routes {
 			if i >= nroutes {
 				break
 			}
 			this.insertPrefix(art.PfxToIdx(route.octet, route.bits), 0)
+			that.insertPrefix(art.PfxToIdx(route.octet, route.bits), 0)
 		}
 
-		b.Run(fmt.Sprintf("lpmGet  IN %d", nroutes), func(b *testing.B) {
+		b.Run(fmt.Sprintf("node:    lookup   IN %d", nroutes), func(b *testing.B) {
 			route := routes[prng.IntN(len(routes))]
 			idx := art.PfxToIdx(route.octet, route.bits)
 
 			for b.Loop() {
-				this.lookupIdx(uint(idx))
+				this.lookup(uint(idx))
 			}
 		})
 
-		b.Run(fmt.Sprintf("lpmTest IN %d", nroutes), func(b *testing.B) {
+		b.Run(fmt.Sprintf("fatNode: lookup   IN %d", nroutes), func(b *testing.B) {
+			route := routes[prng.IntN(len(routes))]
+			idx := art.PfxToIdx(route.octet, route.bits)
+
+			for b.Loop() {
+				that.lookup(uint(idx))
+			}
+		})
+
+		b.Run(fmt.Sprintf("node:    contains IN %d", nroutes), func(b *testing.B) {
 			route := routes[prng.IntN(len(routes))]
 			idx := art.PfxToIdx(route.octet, route.bits)
 
 			for b.Loop() {
 				this.contains(uint(idx))
+			}
+		})
+
+		b.Run(fmt.Sprintf("fatNode: contains IN %d", nroutes), func(b *testing.B) {
+			route := routes[prng.IntN(len(routes))]
+			idx := art.PfxToIdx(route.octet, route.bits)
+
+			for b.Loop() {
+				that.contains(uint(idx))
 			}
 		})
 	}
