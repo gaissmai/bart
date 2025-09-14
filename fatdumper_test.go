@@ -51,7 +51,7 @@ func TestFatNode_hasType_OnEmptyNode_ReturnsNullNode(t *testing.T) {
 	t.Parallel()
 	n := &fatNode[struct{}]{}
 
-	nt := hasType[struct{}](n)
+	nt := hasType(n)
 	if nt != nullNode {
 		t.Fatalf("expected nullNode for empty node; got %v", nt)
 	}
@@ -60,7 +60,7 @@ func TestFatNode_hasType_OnEmptyNode_ReturnsNullNode(t *testing.T) {
 func TestFatNode_nodeStats_OnEmptyNode_AllZeros(t *testing.T) {
 	t.Parallel()
 	n := &fatNode[int]{}
-	s := nodeStats[int](n)
+	s := nodeStats(n)
 
 	if s.pfxs != 0 || s.childs != 0 || s.nodes != 0 || s.leaves != 0 || s.fringes != 0 {
 		t.Fatalf("expected zero stats for empty node; got %+v", s)
@@ -130,6 +130,10 @@ func TestFat_dump_OnlyIPv4Size_PrintsIPv4Header(t *testing.T) {
 
 	if !strings.Contains(out, "### IPv4: size(2)") {
 		t.Fatalf("missing IPv4 header for v4-only dump: %q", out)
+	}
+
+	if strings.Contains(out, "### IPv6:") {
+		t.Fatalf("unexpected IPv6 header for v4-only dump: %q", out)
 	}
 }
 
