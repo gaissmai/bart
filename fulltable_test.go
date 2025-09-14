@@ -558,3 +558,239 @@ func randomRealWorldPrefixes(prng *rand.Rand, n int) []netip.Prefix {
 
 // roundFloat64 to 2 decimal places
 func roundFloat64(f float64) float64 { return math.Round(f*100) / 100 }
+
+// ------------------------
+// Unit tests (appended)
+// ------------------------
+
+func TestInitLoadedRoutesAndSplits(t *testing.T) {
+	t.Parallel()
+
+	// Ensure init() ran and loaded data
+	if len(routes) == 0 {
+		t.Fatalf("expected routes to be loaded from %s", prefixFile)
+	}
+	if len(routes4) == 0 {
+		t.Fatalf("expected IPv4 routes to be loaded")
+	}
+	if len(routes6) == 0 {
+		t.Fatalf("expected IPv6 routes to be loaded")
+	}
+	// routes should equal routes4 + routes6
+	if got, want := len(routes), len(routes4)+len(routes6); got != want {
+		t.Fatalf("routes count mismatch: got %d want %d", got, want)
+	}
+	// Validate family partition
+	for _, r := range routes4 {
+		if !r.CIDR.Addr().Is4() {
+			t.Fatalf("routes4 contains non-IPv4 prefix: %v", r.CIDR)
+		}
+	}
+	for _, r := range routes6 {
+		if r.CIDR.Addr().Is4() {
+			t.Fatalf("routes6 contains IPv4 prefix: %v", r.CIDR)
+		}
+	}
+}
+
+func TestTableContainsAndLookup_MatchAndMiss_IPv4(t *testing.T) {
+	t.Parallel()
+
+	rt := new(Table[struct{}])
+	for _, r := range routes {
+		rt.Insert(r.CIDR, struct{}{})
+	}
+
+	// Happy paths
+	if ok := rt.Contains(matchIP4); !ok {
+		t.Fatalf("expected Contains(%v) to be true", matchIP4)
+	}
+	if _, ok := rt.Lookup(matchIP4); !ok {
+		t.Fatalf("expected Lookup(%v) to find a value", matchIP4)
+	}
+	if _, ok := rt.LookupPrefix(matchPfx4); !ok {
+		t.Fatalf("expected LookupPrefix(%v) to find a value", matchPfx4)
+	}
+	if _, _, ok := rt.LookupPrefixLPM(matchPfx4); !ok {
+		t.Fatalf("expected LookupPrefixLPM(%v) to find a value", matchPfx4)
+	}
+
+	// Miss paths
+	if ok := rt.Contains(missIP4); ok {
+		t.Fatalf("expected Contains(%v) to be false", missIP4)
+	}
+	if _, ok := rt.Lookup(missIP4); ok {
+		t.Fatalf("expected Lookup(%v) to miss", missIP4)
+	}
+	if _, ok := rt.LookupPrefix(missPfx4); ok {
+		t.Fatalf("expected LookupPrefix(%v) to miss", missPfx4)
+	}
+	if _, _, ok := rt.LookupPrefixLPM(missPfx4); ok {
+		t.Fatalf("expected LookupPrefixLPM(%v) to miss", missPfx4)
+	}
+}
+
+func TestTableContainsAndLookup_MatchAndMiss_IPv6(t *testing.T) {
+	t.Parallel()
+
+	rt := new(Table[int])
+	for i, r := range routes {
+		rt.Insert(r.CIDR, i)
+	}
+
+	// Happy paths
+	if ok := rt.Contains(matchIP6); !ok {
+		t.Fatalf("expected Contains(%v) to be true", matchIP6)
+	}
+	if _, ok := rt.Lookup(matchIP6); !ok {
+		t.Fatalf("expected Lookup(%v) to find a value", matchIP6)
+	}
+	if _, ok := rt.LookupPrefix(matchPfx6); !ok {
+		t.Fatalf("expected LookupPrefix(%v) to find a value", matchPfx6)
+	}
+	if _, _, ok := rt.LookupPrefixLPM(matchPfx6); !ok {
+		t.Fatalf("expected LookupPrefixLPM(%v) to find a value", matchPfx6)
+	}
+
+	// Miss paths
+	if ok := rt.Contains(missIP6); ok {
+		t.Fatalf("expected Contains(%v) to be false", missIP6)
+	}
+	if _, ok := rt.Lookup(missIP6); ok {
+		t.Fatalf("expected Lookup(%v) to miss", missIP6)
+	}
+	if _, ok := rt.LookupPrefix(missPfx6); ok {
+		t.Fatalf("expected LookupPrefix(%v) to miss", missPfx6)
+	}
+	if _, _, ok := rt.LookupPrefixLPM(missPfx6); ok {
+		t.Fatalf("expected LookupPrefixLPM(%v) to miss", missPfx6)
+	}
+}
+
+func TestLiteOverlapsPrefix_IPv6(t *testing.T) {
+	t.Parallel()
+
+	prng := rand.New(rand.NewPCG(42, 42))
+	lt := new(Lite)
+	// Insert a controlled IPv6 prefix and verify overlaps with its super/sub prefixes
+	pfxs := randomRealWorldPrefixes6(prng, 1)
+	if len(pfxs) == 0 {
+		t.Skip("no IPv6 random prefixes produced")
+	}
+	p := pfxs[0]
+	lt.Insert(p)
+
+	// Subprefix should overlap
+	subBits := p.Bits() + 8
+	if subBits > 56 {
+		subBits = p.Bits()
+	}
+	sub := netip.PrefixFrom(p.Addr(), subBits)
+	if ok := lt.OverlapsPrefix(sub); !ok {
+		t.Fatalf("expected OverlapsPrefix to be true for subprefix %v of %v", sub, p)
+	}
+
+	// Superprefix should overlap
+	superBits := p.Bits() - 4
+	if superBits < 16 {
+		superBits = p.Bits()
+	}
+	super := netip.PrefixFrom(p.Addr(), superBits)
+	if ok := lt.OverlapsPrefix(super); !ok {
+		t.Fatalf("expected OverlapsPrefix to be true for superprefix %v of %v", super, p)
+	}
+
+	// Non-overlapping: pick an address outside global 2000::/3 (e.g., fc00::/7 is ULA)
+	nonGlobal := mpp("fc00::/7")
+	if ok := lt.OverlapsPrefix(nonGlobal); ok {
+		t.Fatalf("expected no overlap with ULA space %v", nonGlobal)
+	}
+}
+
+func TestRandomRealWorldPrefixes4_ConstraintsAndUniqueness(t *testing.T) {
+	t.Parallel()
+
+	prng := rand.New(rand.NewPCG(42, 42))
+	n := 256
+	pfxs := randomRealWorldPrefixes4(prng, n)
+	if len(pfxs) != n {
+		t.Fatalf("expected %d prefixes, got %d", n, len(pfxs))
+	}
+	seen := make(map[netip.Prefix]struct{}, n)
+	reserved := mpp("240.0.0.0/8")
+
+	for _, p := range pfxs {
+		if _, dup := seen[p]; dup {
+			t.Fatalf("duplicate prefix returned: %v", p)
+		}
+		seen[p] = struct{}{}
+
+		if p.Bits() < 8 || p.Bits() > 28 {
+			t.Fatalf("mask size out of bounds for IPv4: %v", p)
+		}
+		if p.Overlaps(reserved) {
+			t.Fatalf("unexpected reserved/experimental range included: %v", p)
+		}
+		if !p.Addr().Is4() {
+			t.Fatalf("non-IPv4 prefix returned: %v", p)
+		}
+	}
+}
+
+func TestRandomRealWorldPrefixes6_ConstraintsAndUniqueness(t *testing.T) {
+	t.Parallel()
+
+	prng := rand.New(rand.NewPCG(42, 42))
+	n := 256
+	pfxs := randomRealWorldPrefixes6(prng, n)
+	if len(pfxs) != n {
+		t.Fatalf("expected %d prefixes, got %d", n, len(pfxs))
+	}
+	seen := make(map[netip.Prefix]struct{}, n)
+	global := mpp("2000::/3")
+	upper := mpp("2c0f::/16").Addr() // limit used in generator
+
+	for _, p := range pfxs {
+		if _, dup := seen[p]; dup {
+			t.Fatalf("duplicate prefix returned: %v", p)
+		}
+		seen[p] = struct{}{}
+
+		if p.Bits() < 16 || p.Bits() > 56 {
+			t.Fatalf("mask size out of bounds for IPv6: %v", p)
+		}
+		if !p.Overlaps(global) {
+			t.Fatalf("expected global unicast range, got %v", p)
+		}
+		// Ensure address is not above upper bound used in generator
+		if p.Addr().Compare(upper) == 1 {
+			t.Fatalf("address %v exceeds upper bound %v", p.Addr(), upper)
+		}
+		if p.Addr().Is4() {
+			t.Fatalf("IPv4 prefix returned in IPv6 generator: %v", p)
+		}
+	}
+}
+
+func TestRandomRealWorldPrefixes_MixedAndShuffled(t *testing.T) {
+	t.Parallel()
+
+	prng := rand.New(rand.NewPCG(42, 42))
+	n := 51
+	pfxs := randomRealWorldPrefixes(prng, n)
+	if len(pfxs) != n {
+		t.Fatalf("expected %d prefixes, got %d", n, len(pfxs))
+	}
+	// Should contain at least one v4 and one v6 when n > 1
+	has4, has6 := false, false
+	for _, p := range pfxs {
+		if p.Addr().Is4() {
+			has4 = true
+		} else {
+			has6 = true
+		}
+	}
+	if !has4 || !has6 {
+		t.Fatalf("expected mixed families (has4=%v, has6=%v) for n=%d", has4, has6, n)
+	}
+}

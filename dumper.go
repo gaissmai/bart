@@ -20,21 +20,25 @@ const (
 	stopNode                 // no children, only prefixes or path-compressed prefixes
 )
 
-// nodeDumper is a generic interface that abstracts tree node operations
-// for dumping and traversal.
+// noder is a generic interface that abstracts tree node operations
+// for testing, dumping and traversal.
 //
-// It provides a unified API for accessing both regular nodes and fat nodes
-// in the routing table structures. The interface supports prefix and child
-// management operations needed for tree traversal, statistics collection,
-// and structural dumping.
+// It provides a unified API for setting or accessing both regular
+// nodes and fat nodes in the routing table structures.
 //
 // Type parameter V represents the value type stored at prefixes in the tree.
-//
-// The interface combines read operations (get*, count*, isEmpty)
-// to support inspection during tree operations. This abstraction enables the
-// dumper functionality to work uniformly across different node implementations
-// (node[V] and fatNode[V]).
-type nodeDumper[V any] interface {
+type noder[V any] interface {
+	nodeReader[V]
+
+	// + writer methods
+	insertChild(uint8, any) bool
+	insertPrefix(uint8, V) bool
+
+	deleteChild(uint8) bool
+	deletePrefix(uint8) (V, bool)
+}
+
+type nodeReader[V any] interface {
 	isEmpty() bool
 
 	childCount() int
@@ -48,6 +52,9 @@ type nodeDumper[V any] interface {
 
 	getChildAddrs() []uint8
 	getIndices() []uint8
+
+	contains(idx uint) bool
+	lookup(idx uint) (V, bool)
 }
 
 // dumpRec recursively descends the trie rooted at n and writes a human-readable
@@ -59,7 +66,7 @@ type nodeDumper[V any] interface {
 // subnodes). The path slice and depth together represent the byte-wise path
 // from the root to the current node; depth is incremented for each recursion.
 // The is4 flag controls IPv4/IPv6 formatting used by dump.
-func dumpRec[V any](n nodeDumper[V], w io.Writer, path stridePath, depth int, is4 bool) {
+func dumpRec[V any](n nodeReader[V], w io.Writer, path stridePath, depth int, is4 bool) {
 	if n == nil || n.isEmpty() {
 		return
 	}
@@ -70,7 +77,7 @@ func dumpRec[V any](n nodeDumper[V], w io.Writer, path stridePath, depth int, is
 	// node may have children, rec-descent down
 	for _, addr := range n.getChildAddrs() {
 		anyKid := n.mustGetChild(addr)
-		if kid, ok := anyKid.(nodeDumper[V]); ok {
+		if kid, ok := anyKid.(nodeReader[V]); ok {
 			path[depth] = addr
 			dumpRec(kid, w, path, depth+1, is4)
 		}
@@ -82,7 +89,7 @@ func dumpRec[V any](n nodeDumper[V], w io.Writer, path stridePath, depth int, is
 // and bit count, followed by any stored prefixes (and their values when applicable),
 // the set of child octets, and any path-compressed leaves or fringe entries.
 // `path` and `depth` determine how prefixes and fringe CIDRs are rendered.
-func dump[V any](n nodeDumper[V], w io.Writer, path stridePath, depth int, is4 bool) {
+func dump[V any](n nodeReader[V], w io.Writer, path stridePath, depth int, is4 bool) {
 	bits := depth * strideLen
 	indent := strings.Repeat(".", depth)
 
@@ -133,7 +140,7 @@ func dump[V any](n nodeDumper[V], w io.Writer, path stridePath, depth int, is4 b
 		for _, addr := range allChildAddrs {
 			anyKid := n.mustGetChild(addr)
 			switch anyKid.(type) {
-			case nodeDumper[V]:
+			case nodeReader[V]:
 				childAddrs = append(childAddrs, addr)
 				continue
 
@@ -219,7 +226,7 @@ func dump[V any](n nodeDumper[V], w io.Writer, path stridePath, depth int, is4 b
 //   - pathNode: has subnodes only (no prefixes, leaves, or fringes)
 //
 // The order of these checks is significant to ensure the correct classification.
-func hasType[V any](n nodeDumper[V]) nodeType {
+func hasType[V any](n nodeReader[V]) nodeType {
 	s := nodeStats[V](n)
 
 	// the order is important
@@ -310,7 +317,7 @@ type stats struct {
 // and a classification of each child into nodes, leaves, or fringes.
 // It inspects only the direct children of n (not the whole subtree).
 // Panics if a child has an unexpected concrete type.
-func nodeStats[V any](n nodeDumper[V]) stats {
+func nodeStats[V any](n nodeReader[V]) stats {
 	var s stats
 
 	s.pfxs = n.prefixCount()
@@ -318,7 +325,7 @@ func nodeStats[V any](n nodeDumper[V]) stats {
 
 	for _, addr := range n.getChildAddrs() {
 		switch n.mustGetChild(addr).(type) {
-		case nodeDumper[V]:
+		case nodeReader[V]:
 			s.nodes++
 
 		case *fringeNode[V]:
@@ -342,7 +349,7 @@ func nodeStats[V any](n nodeDumper[V]) stats {
 // subtree. If n is nil or empty, a zeroed stats is returned. The returned
 // stats.nodes includes the current node. The function will panic if a child
 // has an unexpected concrete type.
-func nodeStatsRec[V any](n nodeDumper[V]) stats {
+func nodeStatsRec[V any](n nodeReader[V]) stats {
 	var s stats
 	if n == nil || n.isEmpty() {
 		return s
@@ -356,7 +363,7 @@ func nodeStatsRec[V any](n nodeDumper[V]) stats {
 
 	for _, addr := range n.getChildAddrs() {
 		switch kid := n.mustGetChild(addr).(type) {
-		case nodeDumper[V]:
+		case nodeReader[V]:
 			// rec-descent
 			rs := nodeStatsRec[V](kid)
 
