@@ -20,34 +20,45 @@ const (
 	stopNode                 // no children, only prefixes or path-compressed prefixes
 )
 
-type noder[V any] interface {
-	prefixCount() int
-	childCount() int
-
+// nodeDumper is a generic interface that abstracts tree node operations
+// for dumping and traversal.
+//
+// It provides a unified API for accessing both regular nodes and fat nodes
+// in the routing table structures. The interface supports prefix and child
+// management operations needed for tree traversal, statistics collection,
+// and structural dumping.
+//
+// Type parameter V represents the value type stored at prefixes in the tree.
+//
+// The interface combines read operations (get*, count*, isEmpty)
+// to support inspection during tree operations. This abstraction enables the
+// dumper functionality to work uniformly across different node implementations
+// (node[V] and fatNode[V]).
+type nodeDumper[V any] interface {
 	isEmpty() bool
 
-	insertChild(uint8, any) bool
-	deleteChild(uint8)
-	getChild(uint8) (any, bool)
-	getChildAddrs() []uint8
-	mustGetChild(uint8) any
+	childCount() int
+	prefixCount() int
 
-	insertPrefix(uint8, V) bool
-	deletePrefix(uint8) (V, bool)
+	getChild(uint8) (any, bool)
 	getPrefix(idx uint8) (V, bool)
+
+	mustGetChild(uint8) any
 	mustGetPrefix(idx uint8) V
+
+	getChildAddrs() []uint8
 	getIndices() []uint8
 }
 
 // dumpRec recursively descends the trie
-func dumpRec[V any](n noder[V], w io.Writer, path stridePath, depth int, is4 bool) {
+func dumpRec[V any](n nodeDumper[V], w io.Writer, path stridePath, depth int, is4 bool) {
 	// dump this node
 	dump(n, w, path, depth, is4)
 
 	// node may have children, rec-descent down
 	for _, addr := range n.getChildAddrs() {
 		anyKid := n.mustGetChild(addr)
-		if kid, ok := anyKid.(noder[V]); ok {
+		if kid, ok := anyKid.(nodeDumper[V]); ok {
 			path[depth] = addr
 			dumpRec[V](kid, w, path, depth+1, is4)
 		}
@@ -55,7 +66,7 @@ func dumpRec[V any](n noder[V], w io.Writer, path stridePath, depth int, is4 boo
 }
 
 // dump the node to w.
-func dump[V any](n noder[V], w io.Writer, path stridePath, depth int, is4 bool) {
+func dump[V any](n nodeDumper[V], w io.Writer, path stridePath, depth int, is4 bool) {
 	bits := depth * strideLen
 	indent := strings.Repeat(".", depth)
 
@@ -106,7 +117,7 @@ func dump[V any](n noder[V], w io.Writer, path stridePath, depth int, is4 bool) 
 		for _, addr := range allChildAddrs {
 			anyKid := n.mustGetChild(addr)
 			switch anyKid.(type) {
-			case noder[V]:
+			case nodeDumper[V]:
 				childAddrs = append(childAddrs, addr)
 				continue
 
@@ -181,7 +192,7 @@ func dump[V any](n noder[V], w io.Writer, path stridePath, depth int, is4 bool) 
 }
 
 // hasType returns the nodeType.
-func hasType[V any](n noder[V]) nodeType {
+func hasType[V any](n nodeDumper[V]) nodeType {
 	s := nodeStats[V](n)
 
 	// the order is important
@@ -269,7 +280,7 @@ type stats struct {
 }
 
 // node statistics for this single node
-func nodeStats[V any](n noder[V]) stats {
+func nodeStats[V any](n nodeDumper[V]) stats {
 	var s stats
 
 	s.pfxs = n.prefixCount()
@@ -277,7 +288,7 @@ func nodeStats[V any](n noder[V]) stats {
 
 	for _, addr := range n.getChildAddrs() {
 		switch n.mustGetChild(addr).(type) {
-		case noder[V]:
+		case nodeDumper[V]:
 			s.nodes++
 
 		case *fringeNode[V]:
@@ -295,7 +306,7 @@ func nodeStats[V any](n noder[V]) stats {
 }
 
 // nodeStatsRec, calculate the number of pfxs, nodes and leaves under n, rec-descent.
-func nodeStatsRec[V any](n noder[V]) stats {
+func nodeStatsRec[V any](n nodeDumper[V]) stats {
 	var s stats
 	if n == nil || n.isEmpty() {
 		return s
@@ -309,7 +320,7 @@ func nodeStatsRec[V any](n noder[V]) stats {
 
 	for _, addr := range n.getChildAddrs() {
 		switch kid := n.mustGetChild(addr).(type) {
-		case noder[V]:
+		case nodeDumper[V]:
 			// rec-descent
 			rs := nodeStatsRec[V](kid)
 
