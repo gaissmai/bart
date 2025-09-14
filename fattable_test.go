@@ -58,8 +58,8 @@ func TestFatCloneFlat(t *testing.T) {
 				gotBuf := &strings.Builder{}
 				origBuf := &strings.Builder{}
 
-				got.dumpRec(gotBuf, stridePath{}, 0, true)
-				orig.dumpRec(origBuf, stridePath{}, 0, true)
+				dumpRec(got, gotBuf, stridePath{}, 0, true)
+				dumpRec(orig, origBuf, stridePath{}, 0, true)
 
 				if gotBuf.String() != origBuf.String() {
 					t.Errorf("dump is different\norig:%sgot:%s", origBuf.String(), gotBuf.String())
@@ -88,8 +88,8 @@ func TestFatCloneFlat(t *testing.T) {
 				gotBuf := &strings.Builder{}
 				origBuf := &strings.Builder{}
 
-				got.dumpRec(gotBuf, stridePath{}, 0, true)
-				orig.dumpRec(origBuf, stridePath{}, 0, true)
+				dumpRec(got, gotBuf, stridePath{}, 0, true)
+				dumpRec(orig, origBuf, stridePath{}, 0, true)
 
 				if gotBuf.String() != origBuf.String() {
 					t.Errorf("dump is different\norig:%sgot:%s", origBuf.String(), gotBuf.String())
@@ -1109,8 +1109,8 @@ func TestFatDeleteButOne(t *testing.T) {
 			tbl.Delete(p.pfx)
 		}
 
-		stats4 := tbl.root4.nodeStatsRec()
-		stats6 := tbl.root6.nodeStatsRec()
+		stats4 := nodeStatsRec(&tbl.root4)
+		stats6 := nodeStatsRec(&tbl.root6)
 
 		if nodes := stats4.nodes + stats6.nodes; nodes != 1 {
 			t.Fatalf("delete but one, want nodes: 1, got: %d\n%s", nodes, tbl.dumpString())
@@ -1490,7 +1490,7 @@ func BenchmarkFatMemIP4(b *testing.B) {
 			runtime.GC()
 			runtime.ReadMemStats(&endMem)
 
-			stats := rt.root4.nodeStatsRec()
+			stats := nodeStatsRec(&rt.root4)
 
 			bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
 			b.ReportMetric(roundFloat64(bytes/float64(rt.Size())), "bytes/route")
@@ -1521,7 +1521,7 @@ func BenchmarkFatMemIP6(b *testing.B) {
 			runtime.GC()
 			runtime.ReadMemStats(&endMem)
 
-			stats := rt.root6.nodeStatsRec()
+			stats := nodeStatsRec(&rt.root6)
 
 			bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
 			b.ReportMetric(roundFloat64(bytes/float64(rt.Size())), "bytes/route")
@@ -1552,8 +1552,8 @@ func BenchmarkFatMem(b *testing.B) {
 			runtime.GC()
 			runtime.ReadMemStats(&endMem)
 
-			s4 := rt.root4.nodeStatsRec()
-			s6 := rt.root6.nodeStatsRec()
+			s4 := nodeStatsRec(&rt.root4)
+			s6 := nodeStatsRec(&rt.root6)
 			stats := stats{
 				s4.pfxs + s6.pfxs,
 				s4.childs + s6.childs,
@@ -1590,7 +1590,7 @@ func BenchmarkFatFullTableMemory4(b *testing.B) {
 		runtime.GC()
 		runtime.ReadMemStats(&endMem)
 
-		stats := rt.root4.nodeStatsRec()
+		stats := nodeStatsRec(&rt.root4)
 
 		bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
 		b.ReportMetric(roundFloat64(bytes/float64(rt.Size())), "bytes/route")
@@ -1620,7 +1620,7 @@ func BenchmarkFatFullTableMemory6(b *testing.B) {
 		runtime.GC()
 		runtime.ReadMemStats(&endMem)
 
-		stats := rt.root6.nodeStatsRec()
+		stats := nodeStatsRec(&rt.root6)
 
 		bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
 		b.ReportMetric(roundFloat64(bytes/float64(rt.Size())), "bytes/route")
@@ -1650,8 +1650,8 @@ func BenchmarkFatFullTableMemory(b *testing.B) {
 		runtime.GC()
 		runtime.ReadMemStats(&endMem)
 
-		s4 := rt.root4.nodeStatsRec()
-		s6 := rt.root6.nodeStatsRec()
+		s4 := nodeStatsRec(&rt.root4)
+		s6 := nodeStatsRec(&rt.root6)
 		stats := stats{
 			pfxs:    s4.pfxs + s6.pfxs,
 			childs:  s4.childs + s6.childs,
@@ -1754,8 +1754,8 @@ func BenchmarkFatFullMiss6(b *testing.B) {
 func checkFatNumNodes(t *testing.T, tbl *Fat[int], want int) {
 	t.Helper()
 
-	s4 := tbl.root4.nodeStatsRec()
-	s6 := tbl.root6.nodeStatsRec()
+	s4 := nodeStatsRec(&tbl.root4)
+	s6 := nodeStatsRec(&tbl.root6)
 	nodes := s4.nodes + s6.nodes
 
 	if got := nodes; got != want {
