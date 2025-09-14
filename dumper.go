@@ -20,72 +20,55 @@ const (
 	stopNode                 // no children, only prefixes or path-compressed prefixes
 )
 
-// ##################################################
-//  useful during development, debugging and testing
-// ##################################################
+type noder[V any] interface {
+	prefixCount() int
+	childCount() int
 
-// dumpString is just a wrapper for dump.
-func (t *Table[V]) dumpString() string {
-	w := new(strings.Builder)
-	t.dump(w)
+	isEmpty() bool
 
-	return w.String()
-}
+	insertChild(uint8, any) bool
+	deleteChild(uint8)
+	getChild(uint8) (any, bool)
+	getChildAddrs() []uint8
+	mustGetChild(uint8) any
 
-// dump the table structure and all the nodes to w.
-func (t *Table[V]) dump(w io.Writer) {
-	if t == nil {
-		return
-	}
-
-	if t.size4 > 0 {
-		stats := t.root4.nodeStatsRec()
-		fmt.Fprintln(w)
-		fmt.Fprintf(w, "### IPv4: size(%d), nodes(%d), pfxs(%d), leaves(%d), fringes(%d)",
-			t.size4, stats.nodes, stats.pfxs, stats.leaves, stats.fringes)
-
-		t.root4.dumpRec(w, stridePath{}, 0, true)
-	}
-
-	if t.size6 > 0 {
-		stats := t.root6.nodeStatsRec()
-		fmt.Fprintln(w)
-		fmt.Fprintf(w, "### IPv6: size(%d), nodes(%d), pfxs(%d), leaves(%d), fringes(%d)",
-			t.size6, stats.nodes, stats.pfxs, stats.leaves, stats.fringes)
-
-		t.root6.dumpRec(w, stridePath{}, 0, false)
-	}
+	insertPrefix(uint8, V) bool
+	deletePrefix(uint8) (V, bool)
+	getPrefix(idx uint8) (V, bool)
+	mustGetPrefix(idx uint8) V
+	getIndices() []uint8
 }
 
 // dumpRec recursively descends the trie
-func (n *node[V]) dumpRec(w io.Writer, path stridePath, depth int, is4 bool) {
+func dumpRec[V any](n noder[V], w io.Writer, path stridePath, depth int, is4 bool) {
 	// dump this node
-	n.dump(w, path, depth, is4)
+	dump(n, w, path, depth, is4)
 
 	// node may have children, rec-descent down
-	for i, addr := range n.children.Bits() {
-		if child, ok := n.children.Items[i].(*node[V]); ok {
+	for _, addr := range n.getChildAddrs() {
+		anyKid := n.mustGetChild(addr)
+		if kid, ok := anyKid.(noder[V]); ok {
 			path[depth] = addr
-			child.dumpRec(w, path, depth+1, is4)
+			dumpRec[V](kid, w, path, depth+1, is4)
 		}
 	}
 }
 
 // dump the node to w.
-func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
+func dump[V any](n noder[V], w io.Writer, path stridePath, depth int, is4 bool) {
 	bits := depth * strideLen
 	indent := strings.Repeat(".", depth)
 
 	// node type with depth and octet path and bits.
 	fmt.Fprintf(w, "\n%s[%s] depth:  %d path: [%s] / %d\n",
-		indent, n.hasType(), depth, ipStridePath(path, depth, is4), bits)
+		indent, hasType[V](n), depth, ipStridePath(path, depth, is4), bits)
 
-	if nPfxCount := n.prefixes.Len(); nPfxCount != 0 {
+	if nPfxCount := n.prefixCount(); nPfxCount != 0 {
 		// no heap allocs
-		allIndices := n.prefixes.Bits()
+		allIndices := n.getIndices()
 
 		// print the baseIndices for this node.
-		fmt.Fprintf(w, "%sindexs(#%d): %s\n", indent, nPfxCount, n.prefixes.String())
+		fmt.Fprintf(w, "%sindexs(#%d): %v\n", indent, nPfxCount, allIndices)
 
 		// print the prefixes for this node
 		fmt.Fprintf(w, "%sprefxs(#%d):", indent, nPfxCount)
@@ -98,12 +81,13 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 		fmt.Fprintln(w)
 
 		// skip values if the payload is the empty struct
-		if _, ok := any(n.prefixes.Items[0]).(struct{}); !ok {
+		if shouldPrintValues[V]() {
 
 			// print the values for this node
 			fmt.Fprintf(w, "%svalues(#%d):", indent, nPfxCount)
 
-			for _, val := range n.prefixes.Items {
+			for _, idx := range allIndices {
+				val := n.mustGetPrefix(idx)
 				fmt.Fprintf(w, " %#v", val)
 			}
 
@@ -111,16 +95,18 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 		}
 	}
 
-	if n.children.Len() != 0 {
+	if n.childCount() != 0 {
+		allChildAddrs := n.getChildAddrs()
 
 		childAddrs := make([]uint8, 0, maxItems)
 		leafAddrs := make([]uint8, 0, maxItems)
 		fringeAddrs := make([]uint8, 0, maxItems)
 
 		// the node has recursive child nodes or path-compressed leaves
-		for i, addr := range n.children.Bits() {
-			switch n.children.Items[i].(type) {
-			case *node[V]:
+		for _, addr := range allChildAddrs {
+			anyKid := n.mustGetChild(addr)
+			switch anyKid.(type) {
+			case noder[V]:
 				childAddrs = append(childAddrs, addr)
 				continue
 
@@ -136,7 +122,7 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 		}
 
 		// print the children for this node.
-		fmt.Fprintf(w, "%soctets(#%d): %s\n", indent, n.children.Len(), n.children.String())
+		fmt.Fprintf(w, "%soctets(#%d): %v\n", indent, n.childCount(), allChildAddrs)
 
 		if leafCount := len(leafAddrs); leafCount > 0 {
 			// print the pathcomp prefixes for this node
@@ -195,9 +181,10 @@ func (n *node[V]) dump(w io.Writer, path stridePath, depth int, is4 bool) {
 }
 
 // hasType returns the nodeType.
-func (n *node[V]) hasType() nodeType {
-	s := n.nodeStats()
+func hasType[V any](n noder[V]) nodeType {
+	s := nodeStats[V](n)
 
+	// the order is important
 	switch {
 	case s.pfxs == 0 && s.childs == 0:
 		return nullNode
@@ -282,15 +269,15 @@ type stats struct {
 }
 
 // node statistics for this single node
-func (n *node[V]) nodeStats() stats {
+func nodeStats[V any](n noder[V]) stats {
 	var s stats
 
-	s.pfxs = n.prefixes.Len()
-	s.childs = n.children.Len()
+	s.pfxs = n.prefixCount()
+	s.childs = n.childCount()
 
-	for i := range n.children.Bits() {
-		switch n.children.Items[i].(type) {
-		case *node[V]:
+	for _, addr := range n.getChildAddrs() {
+		switch n.mustGetChild(addr).(type) {
+		case noder[V]:
 			s.nodes++
 
 		case *fringeNode[V]:
@@ -308,23 +295,23 @@ func (n *node[V]) nodeStats() stats {
 }
 
 // nodeStatsRec, calculate the number of pfxs, nodes and leaves under n, rec-descent.
-func (n *node[V]) nodeStatsRec() stats {
+func nodeStatsRec[V any](n noder[V]) stats {
 	var s stats
 	if n == nil || n.isEmpty() {
 		return s
 	}
 
-	s.pfxs = n.prefixes.Len()
-	s.childs = n.children.Len()
+	s.pfxs = n.prefixCount()
+	s.childs = n.childCount()
 	s.nodes = 1 // this node
 	s.leaves = 0
 	s.fringes = 0
 
-	for _, kidAny := range n.children.Items {
-		switch kid := kidAny.(type) {
-		case *node[V]:
+	for _, addr := range n.getChildAddrs() {
+		switch kid := n.mustGetChild(addr).(type) {
+		case noder[V]:
 			// rec-descent
-			rs := kid.nodeStatsRec()
+			rs := nodeStatsRec[V](kid)
 
 			s.pfxs += rs.pfxs
 			s.childs += rs.childs
