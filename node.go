@@ -168,6 +168,9 @@ func (n *node[V]) contains(idx uint) bool {
 // lookupIdx performs a longest-prefix match (LPM) lookup for the given index (idx)
 // within the 8-bit stride-based prefix table at this trie depth.
 //
+// idx must be an ART stride index as returned by art.OctetToIdx (range 256..511) or
+// art.PfxToIdx (range 1..255)
+//
 // The function returns the matched base index, associated value, and true if a
 // matching prefix exists at this level; otherwise, ok is false.
 //
