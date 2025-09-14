@@ -837,8 +837,8 @@ func TestLiteWalkPersist(t *testing.T) {
 func checkLiteNumNodes(t *testing.T, tbl *Lite, want int) {
 	t.Helper()
 
-	s4 := tbl.root4.nodeStatsRec()
-	s6 := tbl.root6.nodeStatsRec()
+	s4 := nodeStatsRec(&tbl.root4)
+	s6 := nodeStatsRec(&tbl.root6)
 	nodes := s4.nodes + s6.nodes
 
 	if got := nodes; got != want {

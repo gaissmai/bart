@@ -85,7 +85,7 @@ func TestFatNode_hasType_OnEmptyNode_ReturnsNullNode(t *testing.T) {
 	t.Parallel()
 	n := &fatNode[struct{}]{}
 
-	nt := n.hasType()
+	nt := hasType[struct{}](n)
 	if nt != nullNode {
 		t.Fatalf("expected nullNode for empty node; got %v", nt)
 	}
@@ -94,7 +94,7 @@ func TestFatNode_hasType_OnEmptyNode_ReturnsNullNode(t *testing.T) {
 func TestFatNode_nodeStats_OnEmptyNode_AllZeros(t *testing.T) {
 	t.Parallel()
 	n := &fatNode[int]{}
-	s := n.nodeStats()
+	s := nodeStats[int](n)
 
 	if s.pfxs != 0 || s.childs != 0 || s.nodes != 0 || s.leaves != 0 || s.fringes != 0 {
 		t.Fatalf("expected zero stats for empty node; got %+v", s)
@@ -104,7 +104,7 @@ func TestFatNode_nodeStats_OnEmptyNode_AllZeros(t *testing.T) {
 func TestFatNode_nodeStatsRec_OnEmptyNode_NodeCountZero(t *testing.T) {
 	t.Parallel()
 	n := &fatNode[int]{}
-	s := n.nodeStatsRec()
+	s := nodeStatsRec[int](n)
 
 	if s.pfxs != 0 || s.childs != 0 || s.nodes != 0 || s.leaves != 0 || s.fringes != 0 {
 		t.Fatalf("expected zero recursive stats for empty node; got %+v", s)
@@ -117,7 +117,7 @@ func TestFatNode_dump_OnEmptyNode_PrintsHeaderOnly(t *testing.T) {
 	var buf bytes.Buffer
 
 	var path stridePath
-	n.dump(&buf, path, 0, true)
+	dump(n, &buf, path, 0, true)
 
 	out := buf.String()
 	if !strings.Contains(out, "depth:  0") {
@@ -134,7 +134,7 @@ func TestFatNode_dumpRec_DoesNotPanic_OnEmptyTree(t *testing.T) {
 	var buf bytes.Buffer
 	var path stridePath
 
-	n.dumpRec(&buf, path, 0, true)
+	dumpRec(n, &buf, path, 0, true)
 
 	if !strings.Contains(buf.String(), "depth:  0") {
 		t.Fatalf("expected at least root header in dumpRec; got %q", buf.String())

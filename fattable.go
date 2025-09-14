@@ -1,7 +1,10 @@
 package bart
 
 import (
+	"fmt"
+	"io"
 	"net/netip"
+	"strings"
 	"sync"
 
 	"github.com/gaissmai/bart/internal/art"
@@ -545,4 +548,39 @@ func (f *Fat[V]) Size4() int {
 // Size6 returns the IPv6 prefix count.
 func (f *Fat[V]) Size6() int {
 	return f.size6
+}
+
+// dumpString is just a wrapper for dump.
+func (t *Fat[V]) dumpString() string {
+	w := new(strings.Builder)
+	t.dump(w)
+
+	return w.String()
+}
+
+// dump the table structure and all the nodes to w.
+func (t *Fat[V]) dump(w io.Writer) {
+	if t == nil {
+		return
+	}
+
+	if t.size4 > 0 {
+		n := t.root4
+		stats := nodeStatsRec[V](&n)
+		fmt.Fprintln(w)
+		fmt.Fprintf(w, "### IPv4: size(%d), nodes(%d), pfxs(%d), leaves(%d), fringes(%d)",
+			t.size4, stats.nodes, stats.pfxs, stats.leaves, stats.fringes)
+
+		dumpRec[V](&n, w, stridePath{}, 0, true)
+	}
+
+	if t.size6 > 0 {
+		n := t.root6
+		stats := nodeStatsRec[V](&n)
+		fmt.Fprintln(w)
+		fmt.Fprintf(w, "### IPv6: size(%d), nodes(%d), pfxs(%d), leaves(%d), fringes(%d)",
+			t.size6, stats.nodes, stats.pfxs, stats.leaves, stats.fringes)
+
+		dumpRec(&n, w, stridePath{}, 0, false)
+	}
 }
