@@ -52,6 +52,10 @@ type nodeDumper[V any] interface {
 
 // dumpRec recursively descends the trie
 func dumpRec[V any](n nodeDumper[V], w io.Writer, path stridePath, depth int, is4 bool) {
+	if n == nil || n.isEmpty() {
+		return
+	}
+
 	// dump this node
 	dump(n, w, path, depth, is4)
 
