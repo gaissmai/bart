@@ -55,6 +55,7 @@ type nodeReader[V any] interface {
 
 	contains(idx uint) bool
 	lookup(idx uint) (V, bool)
+	lookupIdx(idx uint) (uint8, V, bool)
 }
 
 // dumpRec recursively descends the trie rooted at n and writes a human-readable

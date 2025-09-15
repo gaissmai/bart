@@ -4,12 +4,12 @@
 // Package art summarizes the functions and inverse functions
 // for mapping between a prefix and a baseIndex.
 //
+//	can inline IdxToPfx with cost 37
+//	can inline IdxToRange with cost 68
+//	can inline NetMask with cost 14
 //	can inline OctetToIdx with cost 5
-//	can inline PfxToIdx with cost 10
-//	can inline IdxToPfx with cost 30
-//	can inline IdxToRange with cost 54
 //	can inline PfxBits with cost 21
-//	can inline NetMask with cost 7
+//	can inline PfxToIdx with cost 17
 //
 // Please read the ART paper ./doc/artlookup.pdf
 // to understand the baseIndex algorithm.
@@ -32,6 +32,9 @@ import "math/bits"
 //		                 + -----------------------
 //		                               0b0000_1101 = 13
 func PfxToIdx(octet, pfxLen uint8) uint8 {
+	if pfxLen > 7 {
+		panic("PfxToIdx: invalid pfxLen > 7")
+	}
 	return octet>>(8-pfxLen) + 1<<pfxLen
 }
 
@@ -42,7 +45,7 @@ func OctetToIdx(octet uint8) uint {
 }
 
 // IdxToPfx returns the octet and prefix len of baseIdx.
-// It's the inverse to pfxToIdx256.
+// It's the inverse to PfxToIdx.
 func IdxToPfx(idx uint8) (octet, pfxLen uint8) {
 	if idx == 0 {
 		panic("IdxToPfx: invalid idx 0")
@@ -139,5 +142,5 @@ func NetMask(bits uint8) uint8 {
 
 	// Use a full 8-bit mask and shift left to clear trailing (host) bits.
 	// Convert 'bits' to uint16 to avoid overflow in shift for bits == 8.
-	return 0b11111111 << (8 - uint16(bits))
+	return ^uint8(0) << (8 - bits)
 }
