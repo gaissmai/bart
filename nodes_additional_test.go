@@ -296,11 +296,13 @@ func TestNodes_LPMLongestPrefixWins(t *testing.T) {
 		bits uint8
 		val  int
 	}
+
+	// octet = 0b1010_1010
 	ps := []p{
 		{0, 0}, // default route
 		{3, 3}, // 101_____ cover
 		{5, 5}, // 10101___ cover
-		{7, 7}, // 1010110_ cover
+		{7, 7}, // 1010101_ cover
 	}
 
 	nodes := []struct {
@@ -315,20 +317,19 @@ func TestNodes_LPMLongestPrefixWins(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			for _, e := range ps {
-				// Mask octet per prefix length and insert.
 				tt.node.insertPrefix(art.PfxToIdx(octet, e.bits), e.val)
 			}
 
 			got, ok := tt.node.lookup(art.OctetToIdx(octet))
 			if !ok || got != 7 {
-				t.Fatalf("lookup(%d) got=(%v,%v), want (7,true)", octet, got, ok)
+				t.Fatalf("lookup(%d) got=(%v,%v), want (7,true)", art.OctetToIdx(octet), got, ok)
 			}
 
 			// Remove the /7 and ensure next-longest (/5) is selected.
 			tt.node.deletePrefix(art.PfxToIdx(octet, 7))
 			got, ok = tt.node.lookup(art.OctetToIdx(octet))
 			if !ok || got != 5 {
-				t.Fatalf("after delete /7, lookup(%d) got=(%v,%v), want (5,true)", octet, got, ok)
+				t.Fatalf("after delete /7, lookup(%d) got=(%v,%v), want (5,true)", art.OctetToIdx(octet), got, ok)
 			}
 		})
 	}

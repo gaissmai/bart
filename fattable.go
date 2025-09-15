@@ -1,6 +1,8 @@
 package bart
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/netip"
@@ -581,4 +583,132 @@ func (t *Fat[V]) dump(w io.Writer) {
 
 		dumpRec(&t.root6, w, stridePath{}, 0, false)
 	}
+}
+
+// String returns a hierarchical tree diagram of the ordered CIDRs
+// as string, just a wrapper for [Table.Fprint].
+// If Fprint returns an error, String panics.
+func (t *Fat[V]) String() string {
+	w := new(strings.Builder)
+	if err := t.Fprint(w); err != nil {
+		panic(err)
+	}
+
+	return w.String()
+}
+
+// Fprint writes a hierarchical tree diagram of the ordered CIDRs
+// with default formatted payload V to w.
+//
+// The order from top to bottom is in ascending order of the prefix address
+// and the subtree structure is determined by the CIDRs coverage.
+//
+//	▼
+//	├─ 10.0.0.0/8 (V)
+//	│  ├─ 10.0.0.0/24 (V)
+//	│  └─ 10.0.1.0/24 (V)
+//	├─ 127.0.0.0/8 (V)
+//	│  └─ 127.0.0.1/32 (V)
+//	├─ 169.254.0.0/16 (V)
+//	├─ 172.16.0.0/12 (V)
+//	└─ 192.168.0.0/16 (V)
+//	   └─ 192.168.1.0/24 (V)
+//	▼
+//	└─ ::/0 (V)
+//	   ├─ ::1/128 (V)
+//	   ├─ 2000::/3 (V)
+//	   │  └─ 2001:db8::/32 (V)
+//	   └─ fe80::/10 (V)
+func (t *Fat[V]) Fprint(w io.Writer) error {
+	if w == nil {
+		return fmt.Errorf("nil writer")
+	}
+	if t == nil {
+		return nil
+	}
+
+	// v4
+	if err := t.fprint(w, true); err != nil {
+		return err
+	}
+
+	// v6
+	if err := t.fprint(w, false); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// fprint is the version dependent adapter to fprintRec.
+func (t *Fat[V]) fprint(w io.Writer, is4 bool) error {
+	n := t.rootNodeByVersion(is4)
+	if n.isEmpty() {
+		return nil
+	}
+
+	if _, err := fmt.Fprint(w, "▼\n"); err != nil {
+		return err
+	}
+
+	startParent := trieItem[V]{
+		n:    nil,
+		idx:  0,
+		path: stridePath{},
+		is4:  is4,
+	}
+
+	return fprintRec(n, w, startParent, "", shouldPrintValues[V]())
+}
+
+// MarshalText implements the [encoding.TextMarshaler] interface,
+// just a wrapper for [Table.Fprint].
+func (t *Fat[V]) MarshalText() ([]byte, error) {
+	w := new(bytes.Buffer)
+	if err := t.Fprint(w); err != nil {
+		return nil, err
+	}
+
+	return w.Bytes(), nil
+}
+
+// MarshalJSON dumps the table into two sorted lists: for ipv4 and ipv6.
+// Every root and subnet is an array, not a map, because the order matters.
+func (t *Fat[V]) MarshalJSON() ([]byte, error) {
+	if t == nil {
+		return []byte("null"), nil
+	}
+
+	result := struct {
+		Ipv4 []DumpListNode[V] `json:"ipv4,omitempty"`
+		Ipv6 []DumpListNode[V] `json:"ipv6,omitempty"`
+	}{
+		Ipv4: t.DumpList4(),
+		Ipv6: t.DumpList6(),
+	}
+
+	buf, err := json.Marshal(result)
+	if err != nil {
+		return nil, err
+	}
+
+	return buf, nil
+}
+
+// DumpList4 dumps the ipv4 tree into a list of roots and their subnets.
+// It can be used to analyze the tree or build the text or json serialization.
+func (t *Fat[V]) DumpList4() []DumpListNode[V] {
+	if t == nil {
+		return nil
+	}
+	return dumpListRec(&t.root4, 0, stridePath{}, 0, true)
+}
+
+// DumpList6 dumps the ipv6 tree into a list of roots and their subnets.
+// It can be used to analyze the tree or build custom json representation.
+func (t *Fat[V]) DumpList6() []DumpListNode[V] {
+	if t == nil {
+		return nil
+	}
+	return dumpListRec(&t.root6, 0, stridePath{}, 0, false)
 }

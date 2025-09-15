@@ -119,14 +119,23 @@ func TestFatNode_Prefix_Insert_Get_Contains_Lookup_Propagation(t *testing.T) {
 	if val, ok := n.lookup(128); !ok || val != 300 {
 		t.Fatalf("lookup(128) after specific insert=(%d,%v), want (300,true)", val, ok)
 	}
+	if base, val, ok := n.lookupIdx(128); !ok || base != 64 || val != 300 {
+		t.Fatalf("lookupIdx(128) got (base=%d,val=%d,ok=%v), want (base=64,val=300,ok=true)", base, val, ok)
+	}
 
 	// Parent change should not affect specific route
 	n.insertPrefix(32, 400)
 	if val, ok := n.lookup(128); !ok || val != 300 {
 		t.Fatalf("lookup(128) after parent overwrite=(%d,%v), want (300,true)", val, ok)
 	}
-	if val, ok := n.lookup(64); !ok || val != 400 {
-		t.Fatalf("lookup(64) (direct child of 32)=(%d,%v), want (400,true)", val, ok)
+	if base, val, ok := n.lookupIdx(128); !ok || base != 64 || val != 300 {
+		t.Fatalf("lookupIdx(128) got (base=%d,val=%d,ok=%v), want (base=64,val=300,ok=true)", base, val, ok)
+	}
+	if val, ok := n.lookup(64); !ok || val != 300 {
+		t.Fatalf("lookup(64) (direct child of 32)=(%d,%v), want (300,true)", val, ok)
+	}
+	if base, val, ok := n.lookupIdx(66); ok {
+		t.Fatalf("lookupIdx(66) ok=true (base=%d,val=%d), want false", base, val)
 	}
 }
 
@@ -191,7 +200,7 @@ func TestFatNode_Allot_StopsAtSpecificRoutes(t *testing.T) {
 	if v, ok := n.lookup(66); ok {
 		t.Fatalf("lookup(66) ok=true (%d), want false (unrelated branch)", v)
 	}
-	if v, ok := n.lookup(64); !ok || v != 3 {
-		t.Fatalf("lookup(64) got (%d,%v), want (3,true)", v, ok)
+	if v, ok := n.lookup(64); !ok || v != 2 {
+		t.Fatalf("lookup(64) got (%d,%v), want (2,true)", v, ok)
 	}
 }

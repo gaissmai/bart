@@ -183,8 +183,6 @@ func (n *node[V]) lookupIdx(idx uint) (baseIdx uint8, val V, ok bool) {
 	if top, ok := n.prefixes.IntersectionTop(lpm.BackTrackingBitset(idx)); ok {
 		return top, n.mustGetPrefix(top), true
 	}
-
-	// not found (on this level)
 	return
 }
 
