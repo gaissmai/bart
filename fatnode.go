@@ -5,6 +5,7 @@ import (
 
 	"github.com/gaissmai/bart/internal/art"
 	"github.com/gaissmai/bart/internal/bitset"
+	"github.com/gaissmai/bart/internal/lpm"
 )
 
 // fatNode is a trie level node in the multibit routing table.
@@ -184,10 +185,15 @@ func (n *fatNode[V]) deletePrefix(idx uint8) (val V, exists bool) {
 //
 // This function performs a presence check using the ART algorithm's
 // hierarchical prefix structure. It tests whether any ancestor prefix
-// exists for the given index by checking the parent entry.
+// exists for the given index by probing the slot at idx (children inherit
+// ancestor pointers via allot), after normalizing host indices.
 func (n *fatNode[V]) contains(idx uint) (ok bool) {
+	// normalizing host indices.
+	if idx > 255 {
+		idx >>= 1
+	}
 	//nolint:gosec  // G115: integer overflow conversion int -> uint
-	return n.prefixes[uint8(idx>>1)] != nil
+	return n.prefixes[uint8(idx)] != nil
 }
 
 // lookup performs a longest-prefix match (LPM) lookup for the given index
@@ -198,11 +204,38 @@ func (n *fatNode[V]) contains(idx uint) (ok bool) {
 // algorithm's hierarchical structure to find the most specific
 // matching prefix.
 func (n *fatNode[V]) lookup(idx uint) (val V, ok bool) {
+	// normalizing host indices.
+	if idx > 255 {
+		idx >>= 1
+	}
 	//nolint:gosec  // G115: integer overflow conversion int -> uint
-	if valPtr := n.prefixes[uint8(idx>>1)]; valPtr != nil {
+	if valPtr := n.prefixes[uint8(idx)]; valPtr != nil {
 		return *valPtr, true
 	}
-	return val, false
+	return
+}
+
+// lookupIdx performs a longest-prefix match (LPM) lookup for the given index (idx)
+// within the 8-bit stride-based prefix table at this trie depth.
+//
+// idx must be an ART stride index as returned by art.OctetToIdx (range 256..511) or
+// art.PfxToIdx (range 1..255)
+//
+// The function returns the matched base index, associated value, and true if a
+// matching prefix exists at this level; otherwise, ok is false.
+//
+// Internally, the prefix table is organized as a complete binary tree (CBT) indexed
+// via the baseIndex function. Unlike the original ART algorithm, this implementation
+// does not use an allotment-based approach. Instead, it performs CBT backtracking
+// using a bitset-based operation with a precomputed backtracking pattern specific to idx.
+//
+//nolint:unused
+func (n *fatNode[V]) lookupIdx(idx uint) (baseIdx uint8, val V, ok bool) {
+	// top is the idx of the longest-prefix-match
+	if top, ok := n.prefixesBitSet.IntersectionTop(lpm.BackTrackingBitset(idx)); ok {
+		return top, n.mustGetPrefix(top), true
+	}
+	return
 }
 
 // allot updates entries whose stored valPtr matches oldValPtr, in the
