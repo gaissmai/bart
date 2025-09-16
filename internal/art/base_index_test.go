@@ -206,3 +206,67 @@ func TestIdxToRange(t *testing.T) {
 		}
 	}
 }
+
+func TestNetMask(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		bits uint8
+		want uint8
+	}{
+		{
+			bits: 0,
+			want: 0x00, // 00000000
+		},
+		{
+			bits: 1,
+			want: 0x80, // 10000000
+		},
+		{
+			bits: 2,
+			want: 0xC0, // 11000000
+		},
+		{
+			bits: 3,
+			want: 0xE0, // 11100000
+		},
+		{
+			bits: 4,
+			want: 0xF0, // 11110000
+		},
+		{
+			bits: 5,
+			want: 0xF8, // 11111000
+		},
+		{
+			bits: 6,
+			want: 0xFC, // 11111100
+		},
+		{
+			bits: 7,
+			want: 0xFE, // 11111110
+		},
+		{
+			bits: 8,
+			want: 0xFF, // 11111111
+		},
+	}
+
+	for _, tc := range testCases {
+		got := NetMask(tc.bits)
+		if got != tc.want {
+			t.Errorf("NetMask(%d), want: 0x%02X, got: 0x%02X", tc.bits, tc.want, got)
+		}
+	}
+}
+
+func TestNetMask_PanicOnInvalidInput(t *testing.T) {
+	t.Parallel()
+
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("NetMask(9) should have panicked")
+		}
+	}()
+	NetMask(9)
+}
