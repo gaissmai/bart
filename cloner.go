@@ -61,9 +61,12 @@ func (l *fringeNode[V]) cloneFringe(cloneFn cloneFunc[V]) *fringeNode[V] {
 	return &fringeNode[V]{value: cloneFn(l.value)}
 }
 
-// ###################################################################################
-// # why no generic version of cloneFlat and cloneRec? It's the performance, stupid! #
-// ###################################################################################
+// ############################################################################
+// # why no generic version of cloneFlat and cloneRec?                        #
+// # - avoid interface boxing and extra heap allocations                      #
+// # - direct Array256.Items access is much faster than generic getIndices/   #
+// #   getChildAddrs method calls                                             #
+// ############################################################################
 
 // cloneFlat returns a shallow copy of the current node[V], optionally performing deep copies of values.
 //
