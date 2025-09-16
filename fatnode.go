@@ -230,8 +230,6 @@ func (n *fatNode[V]) lookup(idx uint) (val V, ok bool) {
 // via the baseIndex function. Unlike the original ART algorithm, this implementation
 // does not use an allotment-based approach. Instead, it performs CBT backtracking
 // using a bitset-based operation with a precomputed backtracking pattern specific to idx.
-//
-//nolint:unused
 func (n *fatNode[V]) lookupIdx(idx uint) (baseIdx uint8, val V, ok bool) {
 	// top is the idx of the longest-prefix-match
 	if top, ok := n.prefixesBitSet.IntersectionTop(lpm.BackTrackingBitset(idx)); ok {
