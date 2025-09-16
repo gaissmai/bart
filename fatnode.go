@@ -186,7 +186,10 @@ func (n *fatNode[V]) deletePrefix(idx uint8) (val V, exists bool) {
 // This function performs a presence check using the ART algorithm's
 // hierarchical prefix structure. It tests whether any ancestor prefix
 // exists for the given index by probing the slot at idx (children inherit
-// ancestor pointers via allot), after normalizing host indices.
+// ancestor pointers via allot), after normalizing the ART stride index.
+// idx must come from art.PfxToIdx (1..255) or art.OctetToIdx(octet) (256..511).
+// Host-route indices [256..511] are normalized to their parent prefix slot
+// [128..255] via idx >>= 1.
 func (n *fatNode[V]) contains(idx uint) (ok bool) {
 	normalizedIdx := normalizeIdx(idx)
 	return n.prefixes[normalizedIdx] != nil
@@ -216,10 +219,7 @@ func (n *fatNode[V]) lookup(idx uint) (val V, ok bool) {
 // The function returns the matched base index, associated value, and true if a
 // matching prefix exists at this level; otherwise, ok is false.
 //
-// Internally, the prefix table is organized as a complete binary tree (CBT) indexed
-// via the baseIndex function. Unlike the original ART algorithm, this implementation
-// does not use an allotment-based approach. Instead, it performs CBT backtracking
-// using a bitset-based operation with a precomputed backtracking pattern specific to idx.
+// Its semantics are identical to [node.lookupIdx].
 func (n *fatNode[V]) lookupIdx(idx uint) (baseIdx uint8, val V, ok bool) {
 	normalizedIdx := normalizeIdx(idx)
 	// top is the idx of the longest-prefix-match
