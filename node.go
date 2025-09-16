@@ -151,6 +151,19 @@ func (n *node[V]) deleteChild(addr uint8) (exists bool) {
 	return
 }
 
+// normalizeIdx normalizes host route indices [256..511] to valid
+// range [0..255] to find the parent prefix, since host routes
+// (prefix length 8) are stored as fringes in the children array,
+// while only prefix lengths 0-7 use the 256-slot prefixes array.
+//
+//nolint:gosec // G115: integer overflow conversion uint -> uint8
+func normalizeIdx(idx uint) uint8 {
+	if idx < 256 {
+		return uint8(idx)
+	}
+	return uint8((idx & 511) >> 1)
+}
+
 // contains returns true if an index (idx) has any matching longest-prefix
 // in the current node’s prefix table.
 //

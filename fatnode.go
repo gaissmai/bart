@@ -180,20 +180,6 @@ func (n *fatNode[V]) deletePrefix(idx uint8) (val V, exists bool) {
 	return *valPtr, true
 }
 
-// normalizeIdx normalizes ART stride index: mask to valid range [0..511],
-// then map host route indices [256..511] back to [128..255] using >>1
-// to find the parent prefix, since host routes (prefix length 8) are stored
-// as fringes in the children array, while only prefix lengths 0-7 use the
-// 256-slot prefixes array.
-func normalizeIdx(idx uint) uint8 {
-	idx &= 511
-	if idx >= 256 {
-		idx >>= 1
-	}
-	//nolint:gosec // G115: integer overflow conversion uint -> uint8
-	return uint8(idx) // idx <= 255 by construction
-}
-
 // contains returns true if the given index has any matching longest-prefix
 // in the current node's prefix table.
 //
