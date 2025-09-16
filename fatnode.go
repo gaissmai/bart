@@ -188,7 +188,8 @@ func (n *fatNode[V]) deletePrefix(idx uint8) (val V, exists bool) {
 // exists for the given index by probing the slot at idx (children inherit
 // ancestor pointers via allot), after normalizing host indices.
 func (n *fatNode[V]) contains(idx uint) (ok bool) {
-	// normalizing host indices.
+	// normalize and tolerate stray inputs
+	idx &= 511
 	if idx > 255 {
 		idx >>= 1
 	}
@@ -204,7 +205,8 @@ func (n *fatNode[V]) contains(idx uint) (ok bool) {
 // algorithm's hierarchical structure to find the most specific
 // matching prefix.
 func (n *fatNode[V]) lookup(idx uint) (val V, ok bool) {
-	// normalizing host indices.
+	// normalize and tolerate stray inputs
+	idx &= 511
 	if idx > 255 {
 		idx >>= 1
 	}
