@@ -1,3 +1,6 @@
+// Copyright (c) 2025 Karl Gaissmaier
+// SPDX-License-Identifier: MIT
+
 package bart
 
 // Cloner is an interface that enables deep cloning of values of type V.
