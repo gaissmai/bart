@@ -6,6 +6,7 @@ package bart
 import (
 	"fmt"
 	"io"
+	"iter"
 	"strconv"
 	"strings"
 )
@@ -53,6 +54,9 @@ type nodeReader[V any] interface {
 	getChildAddrs() []uint8
 	getIndices() []uint8
 
+	allChildren() iter.Seq2[uint8, any]
+	allIndices() iter.Seq2[uint8, V]
+
 	contains(idx uint) bool
 	lookup(idx uint) (V, bool)
 	lookupIdx(idx uint) (uint8, V, bool)
@@ -76,9 +80,8 @@ func dumpRec[V any](n nodeReader[V], w io.Writer, path stridePath, depth int, is
 	dump(n, w, path, depth, is4)
 
 	// node may have children, rec-descent down
-	for _, addr := range n.getChildAddrs() {
-		anyKid := n.mustGetChild(addr)
-		if kid, ok := anyKid.(nodeReader[V]); ok {
+	for addr, child := range n.allChildren() {
+		if kid, ok := child.(nodeReader[V]); ok {
 			path[depth] = addr
 			dumpRec(kid, w, path, depth+1, is4)
 		}
@@ -131,16 +134,16 @@ func dump[V any](n nodeReader[V], w io.Writer, path stridePath, depth int, is4 b
 	}
 
 	if n.childCount() != 0 {
-		allChildAddrs := n.getChildAddrs()
-
+		allAddrs := make([]uint8, 0, maxItems)
 		childAddrs := make([]uint8, 0, maxItems)
 		leafAddrs := make([]uint8, 0, maxItems)
 		fringeAddrs := make([]uint8, 0, maxItems)
 
 		// the node has recursive child nodes or path-compressed leaves
-		for _, addr := range allChildAddrs {
-			anyKid := n.mustGetChild(addr)
-			switch anyKid.(type) {
+		for addr, child := range n.allChildren() {
+			allAddrs = append(allAddrs, addr)
+
+			switch child.(type) {
 			case nodeReader[V]:
 				childAddrs = append(childAddrs, addr)
 				continue
@@ -157,7 +160,7 @@ func dump[V any](n nodeReader[V], w io.Writer, path stridePath, depth int, is4 b
 		}
 
 		// print the children for this node.
-		fmt.Fprintf(w, "%soctets(#%d): %v\n", indent, n.childCount(), allChildAddrs)
+		fmt.Fprintf(w, "%soctets(#%d): %v\n", indent, n.childCount(), allAddrs)
 
 		if leafCount := len(leafAddrs); leafCount > 0 {
 			// print the pathcomp prefixes for this node
@@ -324,8 +327,8 @@ func nodeStats[V any](n nodeReader[V]) stats {
 	s.pfxs = n.prefixCount()
 	s.childs = n.childCount()
 
-	for _, addr := range n.getChildAddrs() {
-		switch n.mustGetChild(addr).(type) {
+	for _, child := range n.allChildren() {
+		switch child.(type) {
 		case nodeReader[V]:
 			s.nodes++
 
@@ -362,8 +365,8 @@ func nodeStatsRec[V any](n nodeReader[V]) stats {
 	s.leaves = 0
 	s.fringes = 0
 
-	for _, addr := range n.getChildAddrs() {
-		switch kid := n.mustGetChild(addr).(type) {
+	for _, child := range n.allChildren() {
+		switch kid := child.(type) {
 		case nodeReader[V]:
 			// rec-descent
 			rs := nodeStatsRec[V](kid)

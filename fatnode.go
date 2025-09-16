@@ -4,6 +4,7 @@
 package bart
 
 import (
+	"iter"
 	"net/netip"
 
 	"github.com/gaissmai/bart/internal/art"
@@ -81,6 +82,17 @@ func (n *fatNode[V]) mustGetChild(addr uint8) any {
 //nolint:unused
 func (n *fatNode[V]) getChildAddrs() []uint8 {
 	return n.childrenBitSet.AsSlice(&[256]uint8{})
+}
+
+func (n *fatNode[V]) allChildren() iter.Seq2[uint8, any] {
+	return func(yield func(addr uint8, child any) bool) {
+		for _, addr := range n.getChildAddrs() {
+			child := n.mustGetChild(addr)
+			if !yield(addr, child) {
+				return
+			}
+		}
+	}
 }
 
 // insertChild inserts a child node at the specified address.
@@ -162,6 +174,17 @@ func (n *fatNode[V]) mustGetPrefix(idx uint8) V {
 //nolint:unused
 func (n *fatNode[V]) getIndices() []uint8 {
 	return n.prefixesBitSet.AsSlice(&[256]uint8{})
+}
+
+func (n *node[V]) allIndices() iter.Seq2[uint8, V] {
+	return func(yield func(uint8, V) bool) {
+		for _, idx := range n.getIndices() {
+			val := n.mustGetPrefix(idx)
+			if !yield(idx, val) {
+				return
+			}
+		}
+	}
 }
 
 // deletePrefix removes the route at the given index.

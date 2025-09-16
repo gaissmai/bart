@@ -179,7 +179,7 @@ func directItemsRec[V any](n nodeReader[V], parentIdx uint8, path stridePath, de
 	}
 
 	// children:
-	for _, addr := range n.getChildAddrs() {
+	for addr, child := range n.allChildren() {
 		hostIdx := art.OctetToIdx(addr)
 
 		// do a longest-prefix-match
@@ -188,7 +188,7 @@ func directItemsRec[V any](n nodeReader[V], parentIdx uint8, path stridePath, de
 		// be aware, 0 is here a possible value for parentIdx and lpm (if not found)
 		if lpm == parentIdx {
 			// child is directly covered by parent
-			switch kid := n.mustGetChild(addr).(type) {
+			switch kid := child.(type) {
 			case nodeReader[V]: // traverse rec-descent, call with next child node,
 				// next trie level, set parentIdx to 0, adjust path and depth
 				path[depth] = addr
