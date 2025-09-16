@@ -61,6 +61,10 @@ func (l *fringeNode[V]) cloneFringe(cloneFn cloneFunc[V]) *fringeNode[V] {
 	return &fringeNode[V]{value: cloneFn(l.value)}
 }
 
+// ###################################################################################
+// # why no generic version of cloneFlat and cloneRec? It's the performance, stupid! #
+// ###################################################################################
+
 // cloneFlat returns a shallow copy of the current node[V], optionally performing deep copies of values.
 //
 // If cloneFn is nil, the stored values in prefixes are copied directly without modification.
@@ -165,7 +169,7 @@ func (n *fatNode[V]) cloneFlat(cloneFn cloneFunc[V]) *fatNode[V] {
 	// it's a clone of the prefixes ...
 	// but the allot algorithm makes it more difficult
 	// see also insertPrefix
-	for _, idx := range n.prefixesBitSet.AsSlice(&[256]uint8{}) {
+	for _, idx := range n.getIndices() {
 		origValPtr := n.prefixes[idx]
 		newValPtr := new(V)
 
@@ -180,21 +184,21 @@ func (n *fatNode[V]) cloneFlat(cloneFn cloneFunc[V]) *fatNode[V] {
 	}
 
 	// flat clone of the children
-	for _, octet := range n.childrenBitSet.AsSlice(&[256]uint8{}) {
-		kidAny := *n.children[octet]
+	for _, addr := range n.getChildAddrs() {
+		kidAny := *n.children[addr]
 
 		switch kid := kidAny.(type) {
 		case *fatNode[V]:
 			// just copy the pointer
-			c.children[octet] = n.children[octet]
+			c.children[addr] = n.children[addr]
 
 		case *leafNode[V]:
 			leafAny := any(kid.cloneLeaf(cloneFn))
-			c.children[octet] = &leafAny
+			c.children[addr] = &leafAny
 
 		case *fringeNode[V]:
 			fringeAny := any(kid.cloneFringe(cloneFn))
-			c.children[octet] = &fringeAny
+			c.children[addr] = &fringeAny
 
 		default:
 			panic("logic error, wrong node type")
