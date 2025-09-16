@@ -180,6 +180,20 @@ func (n *fatNode[V]) deletePrefix(idx uint8) (val V, exists bool) {
 	return *valPtr, true
 }
 
+// normalizeIdx normalizes ART stride index: mask to valid range [0..511],
+// then map host route indices [256..511] back to [128..255] using >>1
+// to find the parent prefix, since host routes (prefix length 8) are stored
+// as fringes in the children array, while only prefix lengths 0-7 use the
+// 256-slot prefixes array.
+func normalizeIdx(idx uint) uint8 {
+	idx &= 511
+	if idx > 255 {
+		idx >>= 1
+	}
+	//nolint:gosec  // G115: integer overflow conversion uint -> uint8
+	return uint8(idx)
+}
+
 // contains returns true if the given index has any matching longest-prefix
 // in the current node's prefix table.
 //
@@ -188,13 +202,8 @@ func (n *fatNode[V]) deletePrefix(idx uint8) (val V, exists bool) {
 // exists for the given index by probing the slot at idx (children inherit
 // ancestor pointers via allot), after normalizing host indices.
 func (n *fatNode[V]) contains(idx uint) (ok bool) {
-	// normalize and tolerate stray inputs
-	idx &= 511
-	if idx > 255 {
-		idx >>= 1
-	}
-	//nolint:gosec  // G115: integer overflow conversion int -> uint
-	return n.prefixes[uint8(idx)] != nil
+	normalizedIdx := normalizeIdx(idx)
+	return n.prefixes[normalizedIdx] != nil
 }
 
 // lookup performs a longest-prefix match (LPM) lookup for the given index
@@ -205,13 +214,8 @@ func (n *fatNode[V]) contains(idx uint) (ok bool) {
 // algorithm's hierarchical structure to find the most specific
 // matching prefix.
 func (n *fatNode[V]) lookup(idx uint) (val V, ok bool) {
-	// normalize and tolerate stray inputs
-	idx &= 511
-	if idx > 255 {
-		idx >>= 1
-	}
-	//nolint:gosec  // G115: integer overflow conversion int -> uint
-	if valPtr := n.prefixes[uint8(idx)]; valPtr != nil {
+	normalizedIdx := normalizeIdx(idx)
+	if valPtr := n.prefixes[normalizedIdx]; valPtr != nil {
 		return *valPtr, true
 	}
 	return
