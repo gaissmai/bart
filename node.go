@@ -162,7 +162,8 @@ func (n *node[V]) deleteChild(addr uint8) (exists bool) {
 // is done via a bitset operation that maps the traversal path from the given index
 // toward its possible ancestors.
 func (n *node[V]) contains(idx uint) bool {
-	return n.prefixes.Intersects(lpm.BackTrackingBitset(idx))
+	normalizedIdx := normalizeIdx(idx)
+	return n.prefixes.Intersects(lpm.BackTrackingBitset(normalizedIdx))
 }
 
 // lookupIdx performs a longest-prefix match (LPM) lookup for the given index (idx)
@@ -179,8 +180,9 @@ func (n *node[V]) contains(idx uint) bool {
 // does not use an allotment-based approach. Instead, it performs CBT backtracking
 // using a bitset-based operation with a precomputed backtracking pattern specific to idx.
 func (n *node[V]) lookupIdx(idx uint) (baseIdx uint8, val V, ok bool) {
+	normalizedIdx := normalizeIdx(idx)
 	// top is the idx of the longest-prefix-match
-	if top, ok := n.prefixes.IntersectionTop(lpm.BackTrackingBitset(idx)); ok {
+	if top, ok := n.prefixes.IntersectionTop(lpm.BackTrackingBitset(normalizedIdx)); ok {
 		return top, n.mustGetPrefix(top), true
 	}
 	return
