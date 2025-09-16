@@ -158,7 +158,7 @@ func (n *fatNode[V]) mustGetPrefix(idx uint8) V {
 //
 //nolint:unused
 func (n *fatNode[V]) getIndices() []uint8 {
-	return n.prefixesBitSet.Bits()
+	return n.prefixesBitSet.AsSlice(&[256]uint8{})
 }
 
 // deletePrefix removes the route at the given index.
