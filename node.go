@@ -5,6 +5,7 @@ package bart
 
 import (
 	"cmp"
+	"iter"
 	"net/netip"
 	"slices"
 
@@ -105,6 +106,17 @@ func (n *node[V]) getIndices() []uint8 {
 	return n.prefixes.Bits()
 }
 
+func (n *fatNode[V]) allIndices() iter.Seq2[uint8, V] {
+	return func(yield func(uint8, V) bool) {
+		for _, idx := range n.getIndices() {
+			val := n.mustGetPrefix(idx)
+			if !yield(idx, val) {
+				return
+			}
+		}
+	}
+}
+
 // mustGetPrefix retrieves the value at the specified index, panicking if not found.
 // This method should only be used when the caller is certain the index exists.
 func (n *node[V]) mustGetPrefix(idx uint8) (val V) {
@@ -136,6 +148,17 @@ func (n *node[V]) getChild(addr uint8) (any, bool) {
 //nolint:unused
 func (n *node[V]) getChildAddrs() []uint8 {
 	return n.children.AsSlice(&[256]uint8{})
+}
+
+func (n *node[V]) allChildren() iter.Seq2[uint8, any] {
+	return func(yield func(addr uint8, child any) bool) {
+		for _, addr := range n.getChildAddrs() {
+			child := n.mustGetChild(addr)
+			if !yield(addr, child) {
+				return
+			}
+		}
+	}
 }
 
 // mustGetChild retrieves the child at the specified address, panicking if not found.
