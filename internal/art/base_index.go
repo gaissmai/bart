@@ -141,6 +141,6 @@ func NetMask(bits uint8) uint8 {
 	}
 
 	// Use a full 8-bit mask and shift left to clear trailing (host) bits.
-	// Convert 'bits' to uint16 to avoid overflow in shift for bits == 8.
+	// Shifts 0..8 on a uint8 are well-defined; safe for bits in [0..8].
 	return ^uint8(0) << (8 - bits)
 }
