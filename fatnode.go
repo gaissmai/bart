@@ -187,11 +187,11 @@ func (n *fatNode[V]) deletePrefix(idx uint8) (val V, exists bool) {
 // 256-slot prefixes array.
 func normalizeIdx(idx uint) uint8 {
 	idx &= 511
-	if idx > 255 {
+	if idx >= 256 {
 		idx >>= 1
 	}
-	//nolint:gosec  // G115: integer overflow conversion uint -> uint8
-	return uint8(idx)
+	//nolint:gosec // G115: integer overflow conversion uint -> uint8
+	return uint8(idx) // idx <= 255 by construction
 }
 
 // contains returns true if the given index has any matching longest-prefix
