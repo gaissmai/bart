@@ -182,11 +182,6 @@ func directItemsRec[V any](n nodeReader[V], parentIdx uint8, path stridePath, de
 	for _, addr := range n.getChildAddrs() {
 		hostIdx := art.OctetToIdx(addr)
 
-		// fast skip, lpm not possible
-		if hostIdx < uint(parentIdx) {
-			continue
-		}
-
 		// do a longest-prefix-match
 		lpm, _, _ := n.lookupIdx(hostIdx)
 
