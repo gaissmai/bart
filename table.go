@@ -1,4 +1,4 @@
-// Copyright (c) 2024-2025 Karl Gaissmaier
+// Copyright (c) 2025 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
 // Package bart provides a high-performance Balanced Routing Table (BART).
