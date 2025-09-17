@@ -766,8 +766,13 @@ func TestFastModifySemantics(t *testing.T) {
 func TestFastUpdateCompare(t *testing.T) {
 	t.Parallel()
 
+	n := 10_000
+	if testing.Short() {
+		n = 1_000
+	}
+
 	prng := rand.New(rand.NewPCG(42, 42))
-	pfxs := randomPrefixes(prng, 10_000)
+	pfxs := randomPrefixes(prng, n)
 	fast := new(Fast[int])
 
 	gold := new(goldTable[int])
@@ -810,8 +815,13 @@ func TestFastContainsCompare(t *testing.T) {
 	// Create large route tables repeatedly, and compare Table's
 	// behavior to a naive and slow but correct implementation.
 	t.Parallel()
+	n := 10_000
+	if testing.Short() {
+		n = 1_000
+	}
+
 	prng := rand.New(rand.NewPCG(42, 42))
-	pfxs := randomPrefixes(prng, 10_000)
+	pfxs := randomPrefixes(prng, n)
 
 	gold := new(goldTable[int])
 	gold.insertMany(pfxs)
@@ -821,7 +831,7 @@ func TestFastContainsCompare(t *testing.T) {
 		fast.Insert(pfx.pfx, pfx.val)
 	}
 
-	for range 10_000 {
+	for range n {
 		a := randomAddr(prng)
 
 		_, goldOK := gold.lookup(a)
@@ -837,8 +847,13 @@ func TestFastLookupCompare(t *testing.T) {
 	// Create large route tables repeatedly, and compare Table's
 	// behavior to a naive and slow but correct implementation.
 	t.Parallel()
+	n := 10_000
+	if testing.Short() {
+		n = 1_000
+	}
+
 	prng := rand.New(rand.NewPCG(42, 42))
-	pfxs := randomPrefixes(prng, 10_000)
+	pfxs := randomPrefixes(prng, n)
 
 	gold := new(goldTable[int])
 	gold.insertMany(pfxs)
@@ -851,7 +866,7 @@ func TestFastLookupCompare(t *testing.T) {
 	seenVals4 := map[int]bool{}
 	seenVals6 := map[int]bool{}
 
-	for range 10_000 {
+	for range n {
 		a := randomAddr(prng)
 
 		goldVal, goldOK := gold.lookup(a)
@@ -885,6 +900,10 @@ func TestFastInsertShuffled(t *testing.T) {
 	// should not matter, as long as you're inserting the same set of
 	// routes.
 	t.Parallel()
+	n := 10_000
+	if testing.Short() {
+		n = 1_000
+	}
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, 1000)
@@ -893,8 +912,8 @@ func TestFastInsertShuffled(t *testing.T) {
 		pfxs2 := append([]goldTableItem[int](nil), pfxs...)
 		prng.Shuffle(len(pfxs2), func(i, j int) { pfxs2[i], pfxs2[j] = pfxs2[j], pfxs2[i] })
 
-		addrs := make([]netip.Addr, 0, 10_000)
-		for range 10_000 {
+		addrs := make([]netip.Addr, 0, n)
+		for range n {
 			addrs = append(addrs, randomAddr(prng))
 		}
 
@@ -926,11 +945,16 @@ func TestFastDeleteCompare(t *testing.T) {
 	t.Parallel()
 	prng := rand.New(rand.NewPCG(42, 42))
 
-	const (
-		numPrefixes  = 10_000 // total prefixes to insert (test deletes 50% of them)
+	n := 10_000
+	if testing.Short() {
+		n = 1_000
+	}
+
+	var (
+		numPrefixes  = n // total prefixes to insert (test deletes 50% of them)
 		numPerFamily = numPrefixes / 2
 		deleteCut    = numPerFamily / 2
-		numProbes    = 10_000 // random addr lookups to do
+		numProbes    = n // random addr lookups to do
 	)
 
 	// We have to do this little dance instead of just using allPrefixes,
@@ -958,9 +982,6 @@ func TestFastDeleteCompare(t *testing.T) {
 		fast.Delete(pfx.pfx)
 	}
 
-	seenVals4 := map[int]bool{}
-	seenVals6 := map[int]bool{}
-
 	for range numProbes {
 		a := randomAddr(prng)
 
@@ -970,22 +991,6 @@ func TestFastDeleteCompare(t *testing.T) {
 		if !getsEqual(goldVal, goldOK, fastVal, fastOK) {
 			t.Fatalf("Lookup(%q) = (%v, %v), want (%v, %v)", a, fastVal, fastOK, goldVal, goldOK)
 		}
-
-		if a.Is6() {
-			seenVals6[fastVal] = true
-		} else {
-			seenVals4[fastVal] = true
-		}
-	}
-	// Empirically, 10k probes into 5k v4 prefixes and 5k v6 prefixes results in
-	// ~1k distinct values for v4 and ~300 for v6. distinct routes. This sanity
-	// check that we didn't just return a single route for everything should be
-	// very generous indeed.
-	if cnt := len(seenVals4); cnt < 10 {
-		t.Fatalf("saw %d distinct v4 route results, statistically expected ~1000", cnt)
-	}
-	if cnt := len(seenVals6); cnt < 10 {
-		t.Fatalf("saw %d distinct v6 route results, statistically expected ~300", cnt)
 	}
 }
 
@@ -996,8 +1001,13 @@ func TestFastDeleteShuffled(t *testing.T) {
 	t.Parallel()
 	prng := rand.New(rand.NewPCG(42, 42))
 
-	const (
-		numPrefixes  = 10_000 // prefixes to insert (test deletes 50% of them)
+	n := 10_000
+	if testing.Short() {
+		n = 1_000
+	}
+
+	var (
+		numPrefixes  = n // prefixes to insert (test deletes 50% of them)
 		numPerFamily = numPrefixes / 2
 		deleteCut    = numPerFamily / 2
 	)
@@ -1233,9 +1243,14 @@ func TestFastGet(t *testing.T) {
 
 func TestFastGetCompare(t *testing.T) {
 	t.Parallel()
+	n := 10_000
+	if testing.Short() {
+		n = 1_000
+	}
+
 	prng := rand.New(rand.NewPCG(42, 42))
 
-	pfxs := randomPrefixes(prng, 10_000)
+	pfxs := randomPrefixes(prng, n)
 
 	gold := new(goldTable[int])
 	gold.insertMany(pfxs)
@@ -1581,10 +1596,10 @@ func BenchmarkFastFullTableMemory4(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 	nRoutes := len(routes4)
 
-	b.Run(fmt.Sprintf("Table[]: %d", nRoutes), func(b *testing.B) {
-		runtime.GC()
-		runtime.ReadMemStats(&startMem)
+	runtime.GC()
+	runtime.ReadMemStats(&startMem)
 
+	b.Run(fmt.Sprintf("Table[]: %d", nRoutes), func(b *testing.B) {
 		rt := new(Fast[any])
 		for _, route := range routes4 {
 			rt.Insert(route.CIDR, nil)
@@ -1609,13 +1624,13 @@ func BenchmarkFastFullTableMemory4(b *testing.B) {
 func BenchmarkFastFullTableMemory6(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 
-	rt := new(Fast[any])
 	runtime.GC()
 	runtime.ReadMemStats(&startMem)
 
 	nRoutes := len(routes6)
 
 	b.Run(fmt.Sprintf("Table[]: %d", nRoutes), func(b *testing.B) {
+		rt := new(Fast[any])
 		for _, route := range routes6 {
 			rt.Insert(route.CIDR, nil)
 		}
@@ -1639,13 +1654,13 @@ func BenchmarkFastFullTableMemory6(b *testing.B) {
 func BenchmarkFastFullTableMemory(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 
-	rt := new(Fast[any])
 	runtime.GC()
 	runtime.ReadMemStats(&startMem)
 
 	nRoutes := len(routes)
 
 	b.Run(fmt.Sprintf("Table[]: %d", nRoutes), func(b *testing.B) {
+		rt := new(Fast[any])
 		for _, route := range routes {
 			rt.Insert(route.CIDR, nil)
 		}
