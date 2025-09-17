@@ -103,7 +103,7 @@ func (n *node[V]) getPrefix(idx uint8) (val V, exists bool) {
 //
 //nolint:unused
 func (n *node[V]) getIndices() []uint8 {
-	return n.prefixes.Bits()
+	return n.prefixes.AsSlice(&[256]uint8{})
 }
 
 // allIndices returns an iterator over all prefix entries.
@@ -112,7 +112,7 @@ func (n *node[V]) getIndices() []uint8 {
 //nolint:unused
 func (n *node[V]) allIndices() iter.Seq2[uint8, V] {
 	return func(yield func(uint8, V) bool) {
-		for _, idx := range n.getIndices() {
+		for _, idx := range n.prefixes.AsSlice(&[256]uint8{}) {
 			val := n.mustGetPrefix(idx)
 			if !yield(idx, val) {
 				return
