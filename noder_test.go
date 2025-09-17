@@ -4,10 +4,433 @@
 package bart
 
 import (
+	"maps"
+	"slices"
 	"testing"
 
 	"github.com/gaissmai/bart/internal/art"
 )
+
+func TestZeroValueState(t *testing.T) {
+	tests := []struct {
+		name string
+		node nodeReader[string]
+	}{
+		{"node", &node[string]{}},
+		{"fatNode", &fatNode[string]{}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			n := tt.node
+
+			if !n.isEmpty() {
+				t.Error("Zero value node should be empty")
+			}
+
+			if n.childCount() != 0 {
+				t.Errorf("Zero value node childCount should be 0, got: %d", n.childCount())
+			}
+
+			if n.prefixCount() != 0 {
+				t.Errorf("Zero value node prefixCount should be 0, got: %d", n.prefixCount())
+			}
+
+			// Test that getIndices returns empty slice
+			indices := n.getIndices()
+			if len(indices) != 0 {
+				t.Errorf("Zero value node getIndices() should be empty, got length %d", len(indices))
+			}
+
+			// Test that getChildAddrs returns empty slice
+			addrs := n.getChildAddrs()
+			if len(addrs) != 0 {
+				t.Errorf("Zero value node getChildAddrs() should be empty, got length %d", len(addrs))
+			}
+		})
+	}
+}
+
+func TestEmptyNodeIterators(t *testing.T) {
+	tests := []struct {
+		name string
+		node nodeReader[string]
+	}{
+		{"node", &node[string]{}},
+		{"fatNode", &fatNode[string]{}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			n := tt.node
+
+			// Empty node should have no iterations
+			var indices []uint8
+			for idx := range n.allIndices() {
+				indices = append(indices, idx)
+			}
+			if len(indices) != 0 {
+				t.Errorf("Empty node allIndices should have 0 iterations, got %d", len(indices))
+			}
+
+			var addrs []uint8
+			for addr := range n.allChildren() {
+				addrs = append(addrs, addr)
+			}
+			if len(addrs) != 0 {
+				t.Errorf("Empty node allChildren should have 0 iterations, got %d", len(addrs))
+			}
+		})
+	}
+}
+
+func TestAllIndices(t *testing.T) {
+	tests := []struct {
+		name string
+		node noder[string]
+	}{
+		{"node", &node[string]{}},
+		{"fatNode", &fatNode[string]{}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			n := tt.node
+
+			// Insert test data with specific indices and values
+			expectedData := map[uint8]string{
+				1:  "default",
+				8:  "net8",
+				16: "net16",
+				24: "net24",
+			}
+
+			var expectedIndices []uint8
+			var expectedValues []string
+
+			for idx := range maps.Keys(expectedData) {
+				expectedIndices = append(expectedIndices, idx)
+			}
+
+			slices.Sort(expectedIndices)
+
+			for _, idx := range expectedIndices {
+				expectedValues = append(expectedValues, expectedData[idx])
+			}
+
+			// Insert in non-sorted order to test sorting
+			n.insertPrefix(24, "net24")
+			n.insertPrefix(1, "default") // default route uses index 1
+			n.insertPrefix(16, "net16")
+			n.insertPrefix(8, "net8")
+
+			var indices []uint8
+			var values []string
+
+			for idx, val := range n.allIndices() {
+				indices = append(indices, idx)
+				values = append(values, val)
+			}
+
+			if !slices.Equal(indices, expectedIndices) {
+				t.Errorf("Expected indices, got %v, want %v", indices, expectedIndices)
+			}
+
+			if !slices.Equal(values, expectedValues) {
+				t.Errorf("Expected values, got %v, want %v", values, expectedValues)
+			}
+		})
+	}
+}
+
+func TestAllChildren(t *testing.T) {
+	tests := []struct {
+		name       string
+		node       noder[string]
+		childAddrs []uint8
+	}{
+		{
+			name:       "node",
+			node:       &node[string]{},
+			childAddrs: []uint8{64, 128, 192},
+		},
+		{
+			name:       "fatNode",
+			node:       &fatNode[string]{},
+			childAddrs: []uint8{32, 96, 160},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			n := tt.node
+
+			// Create expected children data
+			expectedChildren := make(map[uint8]any)
+			for _, addr := range tt.childAddrs {
+				var child any
+				if _, ok := n.(*node[string]); ok {
+					child = &node[string]{}
+					child.(*node[string]).insertPrefix(1, "child_val")
+				} else {
+					child = &fatNode[string]{}
+					child.(*fatNode[string]).insertPrefix(1, "child_val")
+				}
+				expectedChildren[addr] = child
+			}
+
+			var expectedAddrs []uint8
+			for addr := range maps.Keys(expectedChildren) {
+				expectedAddrs = append(expectedAddrs, addr)
+			}
+			slices.Sort(expectedAddrs)
+
+			// Insert children in non-sorted order to test sorting
+			for i := len(tt.childAddrs) - 1; i >= 0; i-- {
+				addr := tt.childAddrs[i]
+				n.insertChild(addr, expectedChildren[addr])
+			}
+
+			var addrs []uint8
+			var children []any
+
+			for addr, child := range n.allChildren() {
+				addrs = append(addrs, addr)
+				children = append(children, child)
+			}
+
+			if !slices.Equal(addrs, expectedAddrs) {
+				t.Errorf("Expected addresses, got %v, want %v", addrs, expectedAddrs)
+			}
+
+			// Check exact children match expected
+			for i, addr := range addrs {
+				expectedChild := expectedChildren[addr]
+				if children[i] != expectedChild {
+					t.Errorf("Address %d: child pointer mismatch", addr)
+				}
+			}
+		})
+	}
+}
+
+func TestImplementsNodeReader(t *testing.T) {
+	tests := []struct {
+		name string
+		node nodeReader[string]
+	}{
+		{"node", &node[string]{}},
+		{"fatNode", &fatNode[string]{}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			n := tt.node
+
+			// Insert specific test data
+			expectedData := map[uint8]string{
+				1: "default", // default route uses index 1
+				8: "net8",
+			}
+
+			var expectedIndices []uint8
+			for idx := range maps.Keys(expectedData) {
+				expectedIndices = append(expectedIndices, idx)
+			}
+			slices.Sort(expectedIndices)
+
+			// Cast to noder to insert data
+			noder := n.(noder[string])
+			for idx, val := range expectedData {
+				noder.insertPrefix(idx, val)
+			}
+
+			// Test isEmpty
+			if n.isEmpty() {
+				t.Error("Node should not be empty when prefixes are present")
+			}
+
+			// Test counts
+			if n.prefixCount() != len(expectedData) {
+				t.Errorf("Expected prefixCount %d, got %d", len(expectedData), n.prefixCount())
+			}
+
+			if n.childCount() != 0 {
+				t.Errorf("Expected childCount 0, got %d", n.childCount())
+			}
+
+			// Test getIndices returns exact expected indices
+			indices := n.getIndices()
+			if !slices.Equal(indices, expectedIndices) {
+				t.Errorf("getIndices(), got %v, want %v", indices, expectedIndices)
+			}
+
+			// Test getPrefix for each expected entry
+			for expectedIdx, expectedVal := range expectedData {
+				val, exists := n.getPrefix(expectedIdx)
+				if !exists {
+					t.Errorf("getPrefix(%d): should exist", expectedIdx)
+				}
+				if val != expectedVal {
+					t.Errorf("getPrefix(%d): expected %q, got %q", expectedIdx, expectedVal, val)
+				}
+			}
+
+			// Test mustGetPrefix for each expected entry
+			for expectedIdx, expectedVal := range expectedData {
+				val := n.mustGetPrefix(expectedIdx)
+				if val != expectedVal {
+					t.Errorf("mustGetPrefix(%d): expected %q, got %q", expectedIdx, expectedVal, val)
+				}
+			}
+		})
+	}
+}
+
+func TestImplementsNoder(t *testing.T) {
+	tests := []struct {
+		name string
+		node noder[string]
+	}{
+		{"node", &node[string]{}},
+		{"fatNode", &fatNode[string]{}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			n := tt.node
+
+			// Test initial state
+			if n.prefixCount() != 0 {
+				t.Errorf("Initial prefixCount should be 0, got %d", n.prefixCount())
+			}
+
+			// Test insertPrefix with specific values
+			testData := map[uint8]string{
+				1:  "default",
+				8:  "net8",
+				16: "net16",
+			}
+
+			for idx, value := range testData {
+				exists := n.insertPrefix(idx, value)
+				if exists {
+					t.Errorf("insertPrefix(%d): should return false for new index", idx)
+				}
+			}
+
+			// Verify final count
+			if n.prefixCount() != len(testData) {
+				t.Errorf("Expected prefixCount %d after insertions, got %d", len(testData), n.prefixCount())
+			}
+
+			// Test duplicate insertion
+			exists := n.insertPrefix(8, "duplicate")
+			if !exists {
+				t.Error("insertPrefix(8): should return true for existing index")
+			}
+
+			// Count should remain the same
+			if n.prefixCount() != len(testData) {
+				t.Errorf("prefixCount should remain %d after duplicate insertion, got %d", len(testData), n.prefixCount())
+			}
+
+			// Test deletePrefix with exact expected values
+			expectedAfterDuplicate := maps.Clone(testData)
+			expectedAfterDuplicate[8] = "duplicate" // was overwritten
+
+			for idx := range testData {
+				val, exists := n.deletePrefix(idx)
+				if !exists {
+					t.Errorf("deletePrefix(%d): should exist", idx)
+					continue
+				}
+
+				expectedVal := expectedAfterDuplicate[idx]
+				if val != expectedVal {
+					t.Errorf("deletePrefix(%d): expected %q, got %q", idx, expectedVal, val)
+				}
+			}
+
+			// Verify final count after deletions
+			if n.prefixCount() != 0 {
+				t.Errorf("Expected prefixCount 0 after deletions, got %d", n.prefixCount())
+			}
+
+			// Test delete non-existent
+			val, exists := n.deletePrefix(99)
+			if exists {
+				t.Errorf("deletePrefix(99): should not exist, got value %q", val)
+			}
+		})
+	}
+}
+
+func TestIteratorConsistency(t *testing.T) {
+	tests := []struct {
+		name string
+		node nodeReader[string]
+	}{
+		{"node", &node[string]{}},
+		{"fatNode", &fatNode[string]{}},
+	}
+
+	// Define expected test data
+	expectedData := map[uint8]string{
+		1:  "default", // default route uses index 1
+		8:  "net8",
+		24: "net24",
+	}
+
+	var expectedIndices []uint8
+	var expectedValues []string
+
+	for idx := range maps.Keys(expectedData) {
+		expectedIndices = append(expectedIndices, idx)
+	}
+	slices.Sort(expectedIndices)
+
+	for _, idx := range expectedIndices {
+		expectedValues = append(expectedValues, expectedData[idx])
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			n := tt.node
+
+			// Cast to noder to insert data
+			noder := n.(noder[string])
+			for idx, val := range expectedData {
+				noder.insertPrefix(idx, val)
+			}
+
+			// Test that allIndices and getIndices are consistent
+			directIndices := n.getIndices()
+
+			var iterIndices []uint8
+			var iterValues []string
+			for idx, val := range n.allIndices() {
+				iterIndices = append(iterIndices, idx)
+				iterValues = append(iterValues, val)
+			}
+
+			// Check indices match exactly
+			if !slices.Equal(directIndices, expectedIndices) {
+				t.Errorf("Direct indices, got %v, want %v", directIndices, expectedIndices)
+			}
+
+			if !slices.Equal(iterIndices, expectedIndices) {
+				t.Errorf("Iterator indices, got %v, want %v", iterIndices, expectedIndices)
+			}
+
+			if !slices.Equal(iterValues, expectedValues) {
+				t.Errorf("Iterator values, got %v, want %v", iterValues, expectedValues)
+			}
+		})
+	}
+}
+
+// additional node tests
 
 type childObj struct {
 	id   int
