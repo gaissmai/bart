@@ -6,7 +6,6 @@ package bart
 import (
 	"fmt"
 	"io"
-	"iter"
 	"strconv"
 	"strings"
 )
@@ -20,47 +19,6 @@ const (
 	pathNode                 // only children, no prefix nor path-compressed prefixes
 	stopNode                 // no children, only prefixes or path-compressed prefixes
 )
-
-// noder is a generic interface that abstracts tree node operations
-// for testing, dumping and traversal.
-//
-// It provides a unified API for setting or accessing both regular
-// nodes and fat nodes in the routing table structures.
-//
-// Type parameter V represents the value type stored at prefixes in the tree.
-type noder[V any] interface {
-	nodeReader[V]
-
-	// + writer methods
-	insertChild(uint8, any) bool
-	insertPrefix(uint8, V) bool
-
-	deleteChild(uint8) bool
-	deletePrefix(uint8) (V, bool)
-}
-
-type nodeReader[V any] interface {
-	isEmpty() bool
-
-	childCount() int
-	prefixCount() int
-
-	getChild(uint8) (any, bool)
-	getPrefix(idx uint8) (V, bool)
-
-	mustGetChild(uint8) any
-	mustGetPrefix(idx uint8) V
-
-	getChildAddrs() []uint8
-	getIndices() []uint8
-
-	allChildren() iter.Seq2[uint8, any]
-	allIndices() iter.Seq2[uint8, V]
-
-	contains(idx uint) bool
-	lookup(idx uint) (V, bool)
-	lookupIdx(idx uint) (uint8, V, bool)
-}
 
 // dumpRec recursively descends the trie rooted at n and writes a human-readable
 // representation of each visited node to w.
@@ -160,7 +118,7 @@ func dump[V any](n nodeReader[V], w io.Writer, path stridePath, depth int, is4 b
 		}
 
 		// print the children for this node.
-		fmt.Fprintf(w, "%soctets(#%d): %v\n", indent, n.childCount(), allAddrs)
+		fmt.Fprintf(w, "%soctets(#%d): %v\n", indent, len(allAddrs), allAddrs)
 
 		if leafCount := len(leafAddrs); leafCount > 0 {
 			// print the pathcomp prefixes for this node
