@@ -208,7 +208,7 @@ func BenchmarkNodesPrefixLPM(b *testing.B) {
 
 	for _, nroutes := range prefixCount {
 		this := new(node[int])
-		that := new(fatNode[int])
+		that := new(fastNode[int])
 
 		for i, route := range routes {
 			if i >= nroutes {
@@ -227,7 +227,7 @@ func BenchmarkNodesPrefixLPM(b *testing.B) {
 			}
 		})
 
-		b.Run(fmt.Sprintf("fatNode: lookup   IN %d", nroutes), func(b *testing.B) {
+		b.Run(fmt.Sprintf("fastNode: lookup   IN %d", nroutes), func(b *testing.B) {
 			route := routes[prng.IntN(len(routes))]
 			idx := art.PfxToIdx(route.octet, route.bits)
 
@@ -245,7 +245,7 @@ func BenchmarkNodesPrefixLPM(b *testing.B) {
 			}
 		})
 
-		b.Run(fmt.Sprintf("fatNode: contains IN %d", nroutes), func(b *testing.B) {
+		b.Run(fmt.Sprintf("fastNode: contains IN %d", nroutes), func(b *testing.B) {
 			route := routes[prng.IntN(len(routes))]
 			idx := art.PfxToIdx(route.octet, route.bits)
 

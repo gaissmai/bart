@@ -15,36 +15,36 @@ import (
 	"github.com/gaissmai/bart/internal/art"
 )
 
-// Fat follows the original ART design by Knuth in using fixed
+// Fast follows the original ART design by Knuth in using fixed
 // 256-slot arrays at each level.
 // In contrast to the original, this variant introduces a new form of path
 // compression. This keeps memory usage within a reasonable range while
 // preserving the high lookup speed of the pure array-based ART algorithm.
 //
-// Both [bart.Fat] and [bart.Table] use the same path compression, but they
+// Both [bart.Fast] and [bart.Table] use the same path compression, but they
 // differ in how levels are represented:
 //
-//   - [bart.Fat]:   uncompressed  fixed level arrays + path compression
+//   - [bart.Fast]:   uncompressed  fixed level arrays + path compression
 //   - [bart.Table]: popcount-compressed level arrays + path compression
 //
 // As a result:
-//   - [bart.Fat] sacrifices memory efficiency to achieve 2x higher speed
+//   - [bart.Fast] sacrifices memory efficiency to achieve 2x higher speed
 //   - [bart.Table] minimizes memory consumption as much as possible
 //
-// Which variant is preferable depends on the use case: [bart.Fat] is most
+// Which variant is preferable depends on the use case: [bart.Fast] is most
 // beneficial when maximum speed for longest-prefix-match is the top priority,
 // for example in a Forwarding Information Base (FIB).
 //
-// For the full Internet routing table, the [bart.Fat] structure alone requires
+// For the full Internet routing table, the [bart.Fast] structure alone requires
 // about 250 MB of memory, with additional space needed for payload such as
 // next hop, interface, and further attributes.
-type Fat[V any] struct {
+type Fast[V any] struct {
 	// used by -copylocks checker from `go vet`.
 	_ [0]sync.Mutex
 
-	// the root nodes are fat nodes with fixed size arrays
-	root4 fatNode[V]
-	root6 fatNode[V]
+	// the root nodes are fast nodes with fixed size arrays
+	root4 fastNode[V]
+	root6 fastNode[V]
 
 	// the number of prefixes in the routing table
 	size4 int
@@ -52,7 +52,7 @@ type Fat[V any] struct {
 }
 
 // rootNodeByVersion, root node getter for ip version and trie levels.
-func (f *Fat[V]) rootNodeByVersion(is4 bool) *fatNode[V] {
+func (f *Fast[V]) rootNodeByVersion(is4 bool) *fastNode[V] {
 	if is4 {
 		return &f.root4
 	}
@@ -67,7 +67,7 @@ func (f *Fat[V]) rootNodeByVersion(is4 bool) *fatNode[V] {
 // consistent behavior regardless of host bits in the input.
 //
 // Its semantics are identical to [Table.Insert].
-func (f *Fat[V]) Insert(pfx netip.Prefix, val V) {
+func (f *Fast[V]) Insert(pfx netip.Prefix, val V) {
 	if !pfx.IsValid() {
 		return
 	}
@@ -99,7 +99,7 @@ func (f *Fat[V]) Insert(pfx netip.Prefix, val V) {
 // The prefix is automatically canonicalized using pfx.Masked().
 //
 // Its value semantics are identical to [Table.Modify].
-func (f *Fat[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del bool)) (_ V, deleted bool) {
+func (f *Fast[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del bool)) (_ V, deleted bool) {
 	var zero V
 
 	if !pfx.IsValid() {
@@ -119,7 +119,7 @@ func (f *Fat[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del b
 
 	// record the nodes on the path to the deleted node, needed to purge
 	// and/or path compress nodes after the deletion of a prefix
-	stack := [maxTreeDepth]*fatNode[V]{}
+	stack := [maxTreeDepth]*fastNode[V]{}
 
 	// find the trie node
 	for depth, octet := range octets {
@@ -181,7 +181,7 @@ func (f *Fat[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del b
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kidAny.(type) {
-		case *fatNode[V]:
+		case *fastNode[V]:
 			n = kid // descend down to next trie level
 
 		case *fringeNode[V]:
@@ -208,7 +208,7 @@ func (f *Fat[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del b
 			// push the fringe down, it becomes a default route (idx=1)
 			// insert new child at current leaf position (addr)
 			// descend down, replace n with new child
-			newNode := new(fatNode[V])
+			newNode := new(fastNode[V])
 			_ = newNode.insertPrefix(1, kid.value)
 			_ = n.insertChild(octet, newNode)
 			n = newNode
@@ -237,7 +237,7 @@ func (f *Fat[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del b
 			// push the leaf down
 			// insert new child at current leaf position (addr)
 			// descend down, replace n with new child
-			newNode := new(fatNode[V])
+			newNode := new(fastNode[V])
 			_ = newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
 			_ = n.insertChild(octet, newNode)
 			n = newNode
@@ -257,7 +257,7 @@ func (f *Fat[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del b
 // The prefix is automatically canonicalized using pfx.Masked().
 //
 // Its semantics are identical to [Table.Delete].
-func (f *Fat[V]) Delete(pfx netip.Prefix) (val V, exists bool) {
+func (f *Fast[V]) Delete(pfx netip.Prefix) (val V, exists bool) {
 	if !pfx.IsValid() {
 		return
 	}
@@ -275,7 +275,7 @@ func (f *Fat[V]) Delete(pfx netip.Prefix) (val V, exists bool) {
 
 	// record the nodes on the path to the deleted node, needed to purge
 	// and/or path compress nodes after the deletion of a prefix
-	stack := [maxTreeDepth]*fatNode[V]{}
+	stack := [maxTreeDepth]*fastNode[V]{}
 
 	// find the trie node
 	for depth, octet := range octets {
@@ -303,7 +303,7 @@ func (f *Fat[V]) Delete(pfx netip.Prefix) (val V, exists bool) {
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kidAny.(type) {
-		case *fatNode[V]:
+		case *fastNode[V]:
 			n = kid // descend down to next trie level
 
 		case *fringeNode[V]:
@@ -352,7 +352,7 @@ func (f *Fat[V]) Delete(pfx netip.Prefix) (val V, exists bool) {
 // Use Lookup for longest-prefix matching with IP addresses.
 //
 // Its semantics are identical to [Table.Get].
-func (f *Fat[V]) Get(pfx netip.Prefix) (val V, ok bool) {
+func (f *Fast[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 	if !pfx.IsValid() {
 		return
 	}
@@ -381,7 +381,7 @@ func (f *Fat[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kidAny.(type) {
-		case *fatNode[V]:
+		case *fastNode[V]:
 			n = kid // descend down to next trie level
 
 		case *fringeNode[V]:
@@ -413,7 +413,7 @@ func (f *Fat[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 // in the routing table contains the IP address, regardless of the associated value.
 //
 // Its semantics are identical to [Table.Contains].
-func (f *Fat[V]) Contains(ip netip.Addr) bool {
+func (f *Fast[V]) Contains(ip netip.Addr) bool {
 	// speed is top priority: no explicit test for ip.Isvalid
 	// if ip is invalid, AsSlice() returns nil, Contains returns false.
 	is4 := ip.Is4()
@@ -432,7 +432,7 @@ func (f *Fat[V]) Contains(ip netip.Addr) bool {
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kidAny.(type) {
-		case *fatNode[V]:
+		case *fastNode[V]:
 			n = kid // continue
 
 		case *fringeNode[V]:
@@ -460,7 +460,7 @@ func (f *Fat[V]) Contains(ip netip.Addr) bool {
 // This is the core routing table operation used for packet forwarding decisions.
 //
 // Its semantics are identical to [Table.Lookup].
-func (f *Fat[V]) Lookup(ip netip.Addr) (val V, ok bool) {
+func (f *Fast[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	if !ip.IsValid() {
 		return
 	}
@@ -469,7 +469,7 @@ func (f *Fat[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	n := f.rootNodeByVersion(is4)
 
 	for _, octet := range ip.AsSlice() {
-		// save the current best LPM val, lookup is cheap in Fat
+		// save the current best LPM val, lookup is cheap in Fast
 		if bestLPM, tmpOk := n.lookup(art.OctetToIdx(octet)); tmpOk {
 			val = bestLPM
 			ok = tmpOk
@@ -481,9 +481,9 @@ func (f *Fat[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 			return val, ok
 		}
 
-		// next kid is fat, fringe or leaf node.
+		// next kid is fast, fringe or leaf node.
 		switch kid := kidAny.(type) {
-		case *fatNode[V]:
+		case *fastNode[V]:
 			n = kid
 
 		case *fringeNode[V]:
@@ -514,12 +514,12 @@ func (f *Fat[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 // Returns nil if the receiver is nil.
 //
 // Its semantics are identical to [Table.Clone].
-func (f *Fat[V]) Clone() *Fat[V] {
+func (f *Fast[V]) Clone() *Fast[V] {
 	if f == nil {
 		return nil
 	}
 
-	c := new(Fat[V])
+	c := new(Fast[V])
 
 	cloneFn := cloneFnFactory[V]()
 
@@ -532,7 +532,7 @@ func (f *Fat[V]) Clone() *Fat[V] {
 	return c
 }
 
-func (f *Fat[V]) sizeUpdate(is4 bool, n int) {
+func (f *Fast[V]) sizeUpdate(is4 bool, n int) {
 	if is4 {
 		f.size4 += n
 		return
@@ -541,22 +541,22 @@ func (f *Fat[V]) sizeUpdate(is4 bool, n int) {
 }
 
 // Size returns the prefix count.
-func (f *Fat[V]) Size() int {
+func (f *Fast[V]) Size() int {
 	return f.size4 + f.size6
 }
 
 // Size4 returns the IPv4 prefix count.
-func (f *Fat[V]) Size4() int {
+func (f *Fast[V]) Size4() int {
 	return f.size4
 }
 
 // Size6 returns the IPv6 prefix count.
-func (f *Fat[V]) Size6() int {
+func (f *Fast[V]) Size6() int {
 	return f.size6
 }
 
 // dumpString is just a wrapper for dump.
-func (t *Fat[V]) dumpString() string {
+func (t *Fast[V]) dumpString() string {
 	w := new(strings.Builder)
 	t.dump(w)
 
@@ -564,7 +564,7 @@ func (t *Fat[V]) dumpString() string {
 }
 
 // dump the table structure and all the nodes to w.
-func (t *Fat[V]) dump(w io.Writer) {
+func (t *Fast[V]) dump(w io.Writer) {
 	if t == nil {
 		return
 	}
@@ -591,7 +591,7 @@ func (t *Fat[V]) dump(w io.Writer) {
 // String returns a hierarchical tree diagram of the ordered CIDRs
 // as string, just a wrapper for [Table.Fprint].
 // If Fprint returns an error, String panics.
-func (t *Fat[V]) String() string {
+func (t *Fast[V]) String() string {
 	w := new(strings.Builder)
 	if err := t.Fprint(w); err != nil {
 		panic(err)
@@ -622,7 +622,7 @@ func (t *Fat[V]) String() string {
 //	   ├─ 2000::/3 (V)
 //	   │  └─ 2001:db8::/32 (V)
 //	   └─ fe80::/10 (V)
-func (t *Fat[V]) Fprint(w io.Writer) error {
+func (t *Fast[V]) Fprint(w io.Writer) error {
 	if w == nil {
 		return fmt.Errorf("nil writer")
 	}
@@ -644,7 +644,7 @@ func (t *Fat[V]) Fprint(w io.Writer) error {
 }
 
 // fprint is the version dependent adapter to fprintRec.
-func (t *Fat[V]) fprint(w io.Writer, is4 bool) error {
+func (t *Fast[V]) fprint(w io.Writer, is4 bool) error {
 	n := t.rootNodeByVersion(is4)
 	if n.isEmpty() {
 		return nil
@@ -666,7 +666,7 @@ func (t *Fat[V]) fprint(w io.Writer, is4 bool) error {
 
 // MarshalText implements the [encoding.TextMarshaler] interface,
 // just a wrapper for [Table.Fprint].
-func (t *Fat[V]) MarshalText() ([]byte, error) {
+func (t *Fast[V]) MarshalText() ([]byte, error) {
 	w := new(bytes.Buffer)
 	if err := t.Fprint(w); err != nil {
 		return nil, err
@@ -677,7 +677,7 @@ func (t *Fat[V]) MarshalText() ([]byte, error) {
 
 // MarshalJSON dumps the table into two sorted lists: for ipv4 and ipv6.
 // Every root and subnet is an array, not a map, because the order matters.
-func (t *Fat[V]) MarshalJSON() ([]byte, error) {
+func (t *Fast[V]) MarshalJSON() ([]byte, error) {
 	if t == nil {
 		return []byte("null"), nil
 	}
@@ -700,7 +700,7 @@ func (t *Fat[V]) MarshalJSON() ([]byte, error) {
 
 // DumpList4 dumps the ipv4 tree into a list of roots and their subnets.
 // It can be used to analyze the tree or build the text or json serialization.
-func (t *Fat[V]) DumpList4() []DumpListNode[V] {
+func (t *Fast[V]) DumpList4() []DumpListNode[V] {
 	if t == nil {
 		return nil
 	}
@@ -709,7 +709,7 @@ func (t *Fat[V]) DumpList4() []DumpListNode[V] {
 
 // DumpList6 dumps the ipv6 tree into a list of roots and their subnets.
 // It can be used to analyze the tree or build custom json representation.
-func (t *Fat[V]) DumpList6() []DumpListNode[V] {
+func (t *Fast[V]) DumpList6() []DumpListNode[V] {
 	if t == nil {
 		return nil
 	}

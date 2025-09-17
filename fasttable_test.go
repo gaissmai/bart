@@ -13,22 +13,22 @@ import (
 	"testing"
 )
 
-func TestFatCloneFlat(t *testing.T) {
+func TestFastCloneFlat(t *testing.T) {
 	t.Parallel()
 
 	cloneFn := copyVal[int] // just copy
 
 	tests := []struct {
 		name    string
-		prepare func() *fatNode[int]
-		check   func(t *testing.T, got, orig *fatNode[int])
+		prepare func() *fastNode[int]
+		check   func(t *testing.T, got, orig *fastNode[int])
 	}{
 		{
 			name: "nil node returns nil",
-			prepare: func() *fatNode[int] {
+			prepare: func() *fastNode[int] {
 				return nil
 			},
-			check: func(t *testing.T, got, orig *fatNode[int]) {
+			check: func(t *testing.T, got, orig *fastNode[int]) {
 				if got != nil {
 					t.Errorf("expected nil, got %+v", got)
 				}
@@ -36,10 +36,10 @@ func TestFatCloneFlat(t *testing.T) {
 		},
 		{
 			name: "empty node",
-			prepare: func() *fatNode[int] {
-				return &fatNode[int]{}
+			prepare: func() *fastNode[int] {
+				return &fastNode[int]{}
 			},
-			check: func(t *testing.T, got, orig *fatNode[int]) {
+			check: func(t *testing.T, got, orig *fastNode[int]) {
 				if got == nil {
 					t.Fatal("got is nil")
 				}
@@ -50,14 +50,14 @@ func TestFatCloneFlat(t *testing.T) {
 		},
 		{
 			name: "node with prefix",
-			prepare: func() *fatNode[int] {
-				n := &fatNode[int]{}
+			prepare: func() *fastNode[int] {
+				n := &fastNode[int]{}
 				pfx := mpp("8.0.0.0/6")
 				val := 42
 				n.insertAtDepth(pfx, val, 0)
 				return n
 			},
-			check: func(t *testing.T, got, orig *fatNode[int]) {
+			check: func(t *testing.T, got, orig *fastNode[int]) {
 				gotBuf := &strings.Builder{}
 				origBuf := &strings.Builder{}
 
@@ -71,8 +71,8 @@ func TestFatCloneFlat(t *testing.T) {
 		},
 		{
 			name: "node with prefixes",
-			prepare: func() *fatNode[int] {
-				n := &fatNode[int]{}
+			prepare: func() *fastNode[int] {
+				n := &fastNode[int]{}
 				pfx := mpp("8.0.0.0/6")
 				val := 6
 				n.insertAtDepth(pfx, val, 0)
@@ -87,7 +87,7 @@ func TestFatCloneFlat(t *testing.T) {
 
 				return n
 			},
-			check: func(t *testing.T, got, orig *fatNode[int]) {
+			check: func(t *testing.T, got, orig *fastNode[int]) {
 				gotBuf := &strings.Builder{}
 				origBuf := &strings.Builder{}
 
@@ -112,10 +112,10 @@ func TestFatCloneFlat(t *testing.T) {
 	}
 }
 
-func TestFatInvalid(t *testing.T) {
+func TestFastInvalid(t *testing.T) {
 	t.Parallel()
 
-	tbl1 := new(Fat[any])
+	tbl1 := new(Fast[any])
 	var zeroPfx netip.Prefix
 	var zeroIP netip.Addr
 
@@ -143,15 +143,15 @@ func TestFatInvalid(t *testing.T) {
 	// noPanic(t, "Overlaps6", func() { tbl1.Overlaps6(tbl2) })
 }
 
-func TestFatInsert(t *testing.T) {
+func TestFastInsert(t *testing.T) {
 	t.Parallel()
 
-	tbl := new(Fat[int])
+	tbl := new(Fast[int])
 
 	// Create a new leaf strideTable, with compressed path
 	tbl.Insert(mpp("192.168.0.1/32"), 1)
-	checkFatNumNodes(t, tbl, 1)
-	checkFatRoutes(t, tbl, []tableTest{
+	checkFastNumNodes(t, tbl, 1)
+	checkFastRoutes(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", -1},
 		{"192.168.0.3", -1},
@@ -166,8 +166,8 @@ func TestFatInsert(t *testing.T) {
 
 	// explode path compressed
 	tbl.Insert(mpp("192.168.0.2/32"), 2)
-	checkFatNumNodes(t, tbl, 4)
-	checkFatRoutes(t, tbl, []tableTest{
+	checkFastNumNodes(t, tbl, 4)
+	checkFastRoutes(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", 2},
 		{"192.168.0.3", -1},
@@ -182,8 +182,8 @@ func TestFatInsert(t *testing.T) {
 
 	// Insert into existing leaf
 	tbl.Insert(mpp("192.168.0.0/26"), 7)
-	checkFatNumNodes(t, tbl, 4)
-	checkFatRoutes(t, tbl, []tableTest{
+	checkFastNumNodes(t, tbl, 4)
+	checkFastRoutes(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", 2},
 		{"192.168.0.3", 7},
@@ -198,8 +198,8 @@ func TestFatInsert(t *testing.T) {
 
 	// Create a different leaf at root
 	tbl.Insert(mpp("10.0.0.0/27"), 3)
-	checkFatNumNodes(t, tbl, 4)
-	checkFatRoutes(t, tbl, []tableTest{
+	checkFastNumNodes(t, tbl, 4)
+	checkFastRoutes(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", 2},
 		{"192.168.0.3", 7},
@@ -214,8 +214,8 @@ func TestFatInsert(t *testing.T) {
 
 	// Insert that creates a new path compressed leaf
 	tbl.Insert(mpp("192.168.1.1/32"), 4)
-	checkFatNumNodes(t, tbl, 4)
-	checkFatRoutes(t, tbl, []tableTest{
+	checkFastNumNodes(t, tbl, 4)
+	checkFastRoutes(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", 2},
 		{"192.168.0.3", 7},
@@ -230,8 +230,8 @@ func TestFatInsert(t *testing.T) {
 
 	// Insert that creates a new path compressed leaf
 	tbl.Insert(mpp("192.170.0.0/16"), 5)
-	checkFatNumNodes(t, tbl, 4)
-	checkFatRoutes(t, tbl, []tableTest{
+	checkFastNumNodes(t, tbl, 4)
+	checkFastRoutes(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", 2},
 		{"192.168.0.3", 7},
@@ -247,8 +247,8 @@ func TestFatInsert(t *testing.T) {
 	// New leaf in a different subtree, so the next insert can test a
 	// variant of decompression.
 	tbl.Insert(mpp("192.180.0.1/32"), 8)
-	checkFatNumNodes(t, tbl, 4)
-	checkFatRoutes(t, tbl, []tableTest{
+	checkFastNumNodes(t, tbl, 4)
+	checkFastRoutes(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", 2},
 		{"192.168.0.3", 7},
@@ -263,8 +263,8 @@ func TestFatInsert(t *testing.T) {
 
 	// Insert that explodes the previous path compression
 	tbl.Insert(mpp("192.180.0.0/21"), 9)
-	checkFatNumNodes(t, tbl, 5)
-	checkFatRoutes(t, tbl, []tableTest{
+	checkFastNumNodes(t, tbl, 5)
+	checkFastRoutes(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", 2},
 		{"192.168.0.3", 7},
@@ -279,8 +279,8 @@ func TestFatInsert(t *testing.T) {
 
 	// Insert a default route, those have their own codepath.
 	tbl.Insert(mpp("0.0.0.0/0"), 6)
-	checkFatNumNodes(t, tbl, 5)
-	checkFatRoutes(t, tbl, []tableTest{
+	checkFastNumNodes(t, tbl, 5)
+	checkFastRoutes(t, tbl, []tableTest{
 		{"192.168.0.1", 1},
 		{"192.168.0.2", 2},
 		{"192.168.0.3", 7},
@@ -297,8 +297,8 @@ func TestFatInsert(t *testing.T) {
 
 	// Create a new path compressed leaf
 	tbl.Insert(mpp("ff:aaaa::1/128"), 1)
-	checkFatNumNodes(t, tbl, 6)
-	checkFatRoutes(t, tbl, []tableTest{
+	checkFastNumNodes(t, tbl, 6)
+	checkFastRoutes(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", -1},
 		{"ff:aaaa::3", -1},
@@ -313,8 +313,8 @@ func TestFatInsert(t *testing.T) {
 
 	// Insert into previous leaf, explode v6 path compression
 	tbl.Insert(mpp("ff:aaaa::2/128"), 2)
-	checkFatNumNodes(t, tbl, 21)
-	checkFatRoutes(t, tbl, []tableTest{
+	checkFastNumNodes(t, tbl, 21)
+	checkFastRoutes(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", 2},
 		{"ff:aaaa::3", -1},
@@ -329,8 +329,8 @@ func TestFatInsert(t *testing.T) {
 
 	// Insert into previous node
 	tbl.Insert(mpp("ff:aaaa::/125"), 7)
-	checkFatNumNodes(t, tbl, 21)
-	checkFatRoutes(t, tbl, []tableTest{
+	checkFastNumNodes(t, tbl, 21)
+	checkFastRoutes(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", 2},
 		{"ff:aaaa::3", 7},
@@ -345,8 +345,8 @@ func TestFatInsert(t *testing.T) {
 
 	// Create a different leaf elsewhere
 	tbl.Insert(mpp("ffff:bbbb::/120"), 3)
-	checkFatNumNodes(t, tbl, 21)
-	checkFatRoutes(t, tbl, []tableTest{
+	checkFastNumNodes(t, tbl, 21)
+	checkFastRoutes(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", 2},
 		{"ff:aaaa::3", 7},
@@ -361,8 +361,8 @@ func TestFatInsert(t *testing.T) {
 
 	// Insert that creates a new path compressed leaf
 	tbl.Insert(mpp("ff:aaaa:aaaa::1/128"), 4)
-	checkFatNumNodes(t, tbl, 21)
-	checkFatRoutes(t, tbl, []tableTest{
+	checkFastNumNodes(t, tbl, 21)
+	checkFastRoutes(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", 2},
 		{"ff:aaaa::3", 7},
@@ -377,8 +377,8 @@ func TestFatInsert(t *testing.T) {
 
 	// Insert that creates a new path in tree
 	tbl.Insert(mpp("ff:aaaa:aaaa:bb00::/56"), 5)
-	checkFatNumNodes(t, tbl, 23)
-	checkFatRoutes(t, tbl, []tableTest{
+	checkFastNumNodes(t, tbl, 23)
+	checkFastRoutes(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", 2},
 		{"ff:aaaa::3", 7},
@@ -394,8 +394,8 @@ func TestFatInsert(t *testing.T) {
 	// New leaf in a different subtree, so the next insert can test a
 	// variant of decompression.
 	tbl.Insert(mpp("ff:cccc::1/128"), 8)
-	checkFatNumNodes(t, tbl, 23)
-	checkFatRoutes(t, tbl, []tableTest{
+	checkFastNumNodes(t, tbl, 23)
+	checkFastRoutes(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", 2},
 		{"ff:aaaa::3", 7},
@@ -410,8 +410,8 @@ func TestFatInsert(t *testing.T) {
 
 	// Insert that explodes a previous path compressed leaf
 	tbl.Insert(mpp("ff:cccc::/37"), 9)
-	checkFatNumNodes(t, tbl, 25)
-	checkFatRoutes(t, tbl, []tableTest{
+	checkFastNumNodes(t, tbl, 25)
+	checkFastRoutes(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", 2},
 		{"ff:aaaa::3", 7},
@@ -426,8 +426,8 @@ func TestFatInsert(t *testing.T) {
 
 	// Insert a default route, those have their own codepath.
 	tbl.Insert(mpp("::/0"), 6)
-	checkFatNumNodes(t, tbl, 25)
-	checkFatRoutes(t, tbl, []tableTest{
+	checkFastNumNodes(t, tbl, 25)
+	checkFastRoutes(t, tbl, []tableTest{
 		{"ff:aaaa::1", 1},
 		{"ff:aaaa::2", 2},
 		{"ff:aaaa::3", 7},
@@ -441,34 +441,34 @@ func TestFatInsert(t *testing.T) {
 	})
 }
 
-func TestFatDeleteEdgeCases(t *testing.T) {
+func TestFastDeleteEdgeCases(t *testing.T) {
 	t.Parallel()
 
 	t.Run("table_is_empty", func(t *testing.T) {
 		t.Parallel()
 		prng := rand.New(rand.NewPCG(42, 42))
 		// must not panic
-		tbl := new(Fat[int])
-		checkFatNumNodes(t, tbl, 0)
+		tbl := new(Fast[int])
+		checkFastNumNodes(t, tbl, 0)
 		tbl.Delete(randomPrefix(prng))
-		checkFatNumNodes(t, tbl, 0)
+		checkFastNumNodes(t, tbl, 0)
 	})
 
 	t.Run("prefix_in_root", func(t *testing.T) {
 		t.Parallel()
 		// Add/remove prefix from root table.
-		tbl := new(Fat[int])
-		checkFatNumNodes(t, tbl, 0)
+		tbl := new(Fast[int])
+		checkFastNumNodes(t, tbl, 0)
 
 		tbl.Insert(mpp("10.0.0.0/8"), 1)
-		checkFatNumNodes(t, tbl, 1)
-		checkFatRoutes(t, tbl, []tableTest{
+		checkFastNumNodes(t, tbl, 1)
+		checkFastRoutes(t, tbl, []tableTest{
 			{"10.0.0.1", 1},
 			{"255.255.255.255", -1},
 		})
 		tbl.Delete(mpp("10.0.0.0/8"))
-		checkFatNumNodes(t, tbl, 0)
-		checkFatRoutes(t, tbl, []tableTest{
+		checkFastNumNodes(t, tbl, 0)
+		checkFastRoutes(t, tbl, []tableTest{
 			{"10.0.0.1", -1},
 			{"255.255.255.255", -1},
 		})
@@ -477,19 +477,19 @@ func TestFatDeleteEdgeCases(t *testing.T) {
 	t.Run("prefix_in_leaf", func(t *testing.T) {
 		t.Parallel()
 		// Create, then delete a single leaf table.
-		tbl := new(Fat[int])
-		checkFatNumNodes(t, tbl, 0)
+		tbl := new(Fast[int])
+		checkFastNumNodes(t, tbl, 0)
 
 		tbl.Insert(mpp("192.168.0.1/32"), 1)
-		checkFatNumNodes(t, tbl, 1)
-		checkFatRoutes(t, tbl, []tableTest{
+		checkFastNumNodes(t, tbl, 1)
+		checkFastRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"255.255.255.255", -1},
 		})
 
 		tbl.Delete(mpp("192.168.0.1/32"))
-		checkFatNumNodes(t, tbl, 0)
-		checkFatRoutes(t, tbl, []tableTest{
+		checkFastNumNodes(t, tbl, 0)
+		checkFastRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", -1},
 			{"255.255.255.255", -1},
 		})
@@ -498,21 +498,21 @@ func TestFatDeleteEdgeCases(t *testing.T) {
 	t.Run("intermediate_no_routes", func(t *testing.T) {
 		t.Parallel()
 		// Create an intermediate with 2 leaves, then delete one leaf.
-		tbl := new(Fat[int])
-		checkFatNumNodes(t, tbl, 0)
+		tbl := new(Fast[int])
+		checkFastNumNodes(t, tbl, 0)
 
 		tbl.Insert(mpp("192.168.0.1/32"), 1)
 		tbl.Insert(mpp("192.180.0.1/32"), 2)
-		checkFatNumNodes(t, tbl, 2)
-		checkFatRoutes(t, tbl, []tableTest{
+		checkFastNumNodes(t, tbl, 2)
+		checkFastRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.180.0.1", 2},
 			{"192.40.0.1", -1},
 		})
 
 		tbl.Delete(mpp("192.180.0.1/32"))
-		checkFatNumNodes(t, tbl, 1)
-		checkFatRoutes(t, tbl, []tableTest{
+		checkFastNumNodes(t, tbl, 1)
+		checkFastRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.180.0.1", -1},
 			{"192.40.0.1", -1},
@@ -522,15 +522,15 @@ func TestFatDeleteEdgeCases(t *testing.T) {
 	t.Run("intermediate_with_route", func(t *testing.T) {
 		t.Parallel()
 		// Same, but the intermediate carries a route as well.
-		tbl := new(Fat[int])
-		checkFatNumNodes(t, tbl, 0)
+		tbl := new(Fast[int])
+		checkFastNumNodes(t, tbl, 0)
 
 		tbl.Insert(mpp("192.168.0.1/32"), 1)
 		tbl.Insert(mpp("192.180.0.1/32"), 2)
 		tbl.Insert(mpp("192.0.0.0/10"), 3)
 
-		checkFatNumNodes(t, tbl, 2)
-		checkFatRoutes(t, tbl, []tableTest{
+		checkFastNumNodes(t, tbl, 2)
+		checkFastRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.180.0.1", 2},
 			{"192.40.0.1", 3},
@@ -538,8 +538,8 @@ func TestFatDeleteEdgeCases(t *testing.T) {
 		})
 
 		tbl.Delete(mpp("192.180.0.1/32"))
-		checkFatNumNodes(t, tbl, 2)
-		checkFatRoutes(t, tbl, []tableTest{
+		checkFastNumNodes(t, tbl, 2)
+		checkFastRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.180.0.1", -1},
 			{"192.40.0.1", 3},
@@ -550,15 +550,15 @@ func TestFatDeleteEdgeCases(t *testing.T) {
 	t.Run("intermediate_many_leaves", func(t *testing.T) {
 		t.Parallel()
 		// Intermediate with 3 leaves, then delete one leaf.
-		tbl := new(Fat[int])
-		checkFatNumNodes(t, tbl, 0)
+		tbl := new(Fast[int])
+		checkFastNumNodes(t, tbl, 0)
 
 		tbl.Insert(mpp("192.168.0.1/32"), 1)
 		tbl.Insert(mpp("192.180.0.1/32"), 2)
 		tbl.Insert(mpp("192.200.0.1/32"), 3)
 
-		checkFatNumNodes(t, tbl, 2)
-		checkFatRoutes(t, tbl, []tableTest{
+		checkFastNumNodes(t, tbl, 2)
+		checkFastRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.180.0.1", 2},
 			{"192.200.0.1", 3},
@@ -566,8 +566,8 @@ func TestFatDeleteEdgeCases(t *testing.T) {
 		})
 
 		tbl.Delete(mpp("192.180.0.1/32"))
-		checkFatNumNodes(t, tbl, 2)
-		checkFatRoutes(t, tbl, []tableTest{
+		checkFastNumNodes(t, tbl, 2)
+		checkFastRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.180.0.1", -1},
 			{"192.200.0.1", 3},
@@ -578,19 +578,19 @@ func TestFatDeleteEdgeCases(t *testing.T) {
 	t.Run("nosuchprefix_missing_child", func(t *testing.T) {
 		t.Parallel()
 		// Delete non-existent prefix
-		tbl := new(Fat[int])
-		checkFatNumNodes(t, tbl, 0)
+		tbl := new(Fast[int])
+		checkFastNumNodes(t, tbl, 0)
 
 		tbl.Insert(mpp("192.168.0.1/32"), 1)
-		checkFatNumNodes(t, tbl, 1)
-		checkFatRoutes(t, tbl, []tableTest{
+		checkFastNumNodes(t, tbl, 1)
+		checkFastRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.255.0.1", -1},
 		})
 
 		tbl.Delete(mpp("200.0.0.0/32"))
-		checkFatNumNodes(t, tbl, 1)
-		checkFatRoutes(t, tbl, []tableTest{
+		checkFastNumNodes(t, tbl, 1)
+		checkFastRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.255.0.1", -1},
 		})
@@ -600,21 +600,21 @@ func TestFatDeleteEdgeCases(t *testing.T) {
 		t.Parallel()
 		// Intermediate node loses its last route and becomes
 		// compactable.
-		tbl := new(Fat[int])
-		checkFatNumNodes(t, tbl, 0)
+		tbl := new(Fast[int])
+		checkFastNumNodes(t, tbl, 0)
 
 		tbl.Insert(mpp("192.168.0.1/32"), 1)
 		tbl.Insert(mpp("192.168.0.0/22"), 2)
-		checkFatNumNodes(t, tbl, 3)
-		checkFatRoutes(t, tbl, []tableTest{
+		checkFastNumNodes(t, tbl, 3)
+		checkFastRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.168.0.2", 2},
 			{"192.255.0.1", -1},
 		})
 
 		tbl.Delete(mpp("192.168.0.0/22"))
-		checkFatNumNodes(t, tbl, 1)
-		checkFatRoutes(t, tbl, []tableTest{
+		checkFastNumNodes(t, tbl, 1)
+		checkFastRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
 			{"192.168.0.2", -1},
 			{"192.255.0.1", -1},
@@ -623,15 +623,15 @@ func TestFatDeleteEdgeCases(t *testing.T) {
 
 	t.Run("default_route", func(t *testing.T) {
 		t.Parallel()
-		tbl := new(Fat[int])
-		checkFatNumNodes(t, tbl, 0)
+		tbl := new(Fast[int])
+		checkFastNumNodes(t, tbl, 0)
 
 		tbl.Insert(mpp("0.0.0.0/0"), 1)
 		tbl.Insert(mpp("::/0"), 1)
 		tbl.Delete(mpp("0.0.0.0/0"))
 
-		checkFatNumNodes(t, tbl, 1)
-		checkFatRoutes(t, tbl, []tableTest{
+		checkFastNumNodes(t, tbl, 1)
+		checkFastRoutes(t, tbl, []tableTest{
 			{"1.2.3.4", -1},
 			{"::1", 1},
 		})
@@ -639,22 +639,22 @@ func TestFatDeleteEdgeCases(t *testing.T) {
 
 	t.Run("path compressed purge", func(t *testing.T) {
 		t.Parallel()
-		tbl := new(Fat[int])
-		checkFatNumNodes(t, tbl, 0)
+		tbl := new(Fast[int])
+		checkFastNumNodes(t, tbl, 0)
 
 		tbl.Insert(mpp("10.10.0.0/17"), 1)
 		tbl.Insert(mpp("10.20.0.0/17"), 2)
-		checkFatNumNodes(t, tbl, 2)
+		checkFastNumNodes(t, tbl, 2)
 
 		tbl.Delete(mpp("10.20.0.0/17"))
-		checkFatNumNodes(t, tbl, 1)
+		checkFastNumNodes(t, tbl, 1)
 
 		tbl.Delete(mpp("10.10.0.0/17"))
-		checkFatNumNodes(t, tbl, 0)
+		checkFastNumNodes(t, tbl, 0)
 	})
 }
 
-// TestFatModifySemantics
+// TestFastModifySemantics
 //
 // Operation | cb-input        | cb-return       | Modify-return
 // ---------------------------------------------------------------
@@ -662,7 +662,7 @@ func TestFatDeleteEdgeCases(t *testing.T) {
 // Insert:   | (zero,   false) | (newVal, false) | (newVal, false)
 // Update:   | (oldVal, true)  | (newVal, false) | (oldVal, false)
 // Delete:   | (oldVal, true)  | (_,      true)  | (oldVal, true)
-func TestFatModifySemantics(t *testing.T) {
+func TestFastModifySemantics(t *testing.T) {
 	t.Parallel()
 
 	type args struct {
@@ -732,7 +732,7 @@ func TestFatModifySemantics(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			rt := new(Fat[int])
+			rt := new(Fast[int])
 
 			// Insert initial entries using Modify
 			for pfx, v := range tt.prepare {
@@ -763,12 +763,12 @@ func TestFatModifySemantics(t *testing.T) {
 	}
 }
 
-func TestFatUpdateCompare(t *testing.T) {
+func TestFastUpdateCompare(t *testing.T) {
 	t.Parallel()
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, 10_000)
-	fast := new(Fat[int])
+	fast := new(Fast[int])
 
 	gold := new(goldTable[int])
 	gold.insertMany(pfxs)
@@ -806,7 +806,7 @@ func TestFatUpdateCompare(t *testing.T) {
 	}
 }
 
-func TestFatContainsCompare(t *testing.T) {
+func TestFastContainsCompare(t *testing.T) {
 	// Create large route tables repeatedly, and compare Table's
 	// behavior to a naive and slow but correct implementation.
 	t.Parallel()
@@ -816,7 +816,7 @@ func TestFatContainsCompare(t *testing.T) {
 	gold := new(goldTable[int])
 	gold.insertMany(pfxs)
 
-	fast := new(Fat[int])
+	fast := new(Fast[int])
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx, pfx.val)
 	}
@@ -833,7 +833,7 @@ func TestFatContainsCompare(t *testing.T) {
 	}
 }
 
-func TestFatLookupCompare(t *testing.T) {
+func TestFastLookupCompare(t *testing.T) {
 	// Create large route tables repeatedly, and compare Table's
 	// behavior to a naive and slow but correct implementation.
 	t.Parallel()
@@ -843,7 +843,7 @@ func TestFatLookupCompare(t *testing.T) {
 	gold := new(goldTable[int])
 	gold.insertMany(pfxs)
 
-	fast := new(Fat[int])
+	fast := new(Fast[int])
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx, pfx.val)
 	}
@@ -880,7 +880,7 @@ func TestFatLookupCompare(t *testing.T) {
 	}
 }
 
-func TestFatInsertShuffled(t *testing.T) {
+func TestFastInsertShuffled(t *testing.T) {
 	// The order in which you insert prefixes into a route table
 	// should not matter, as long as you're inserting the same set of
 	// routes.
@@ -898,8 +898,8 @@ func TestFatInsertShuffled(t *testing.T) {
 			addrs = append(addrs, randomAddr(prng))
 		}
 
-		rt1 := new(Fat[int])
-		rt2 := new(Fat[int])
+		rt1 := new(Fast[int])
+		rt2 := new(Fast[int])
 
 		for _, pfx := range pfxs {
 			rt1.Insert(pfx.pfx, pfx.val)
@@ -919,7 +919,7 @@ func TestFatInsertShuffled(t *testing.T) {
 	}
 }
 
-func TestFatDeleteCompare(t *testing.T) {
+func TestFastDeleteCompare(t *testing.T) {
 	// Create large route tables repeatedly, delete half of their
 	// prefixes, and compare Table's behavior to a naive and slow but
 	// correct implementation.
@@ -946,7 +946,7 @@ func TestFatDeleteCompare(t *testing.T) {
 	gold := new(goldTable[int])
 	gold.insertMany(pfxs)
 
-	fast := new(Fat[int])
+	fast := new(Fast[int])
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx, pfx.val)
 	}
@@ -989,7 +989,7 @@ func TestFatDeleteCompare(t *testing.T) {
 	}
 }
 
-func TestFatDeleteShuffled(t *testing.T) {
+func TestFastDeleteShuffled(t *testing.T) {
 	// The order in which you delete prefixes from a route table
 	// should not matter, as long as you're deleting the same set of
 	// routes.
@@ -1013,7 +1013,7 @@ func TestFatDeleteShuffled(t *testing.T) {
 		toDelete := append([]goldTableItem[int](nil), all4[deleteCut:]...)
 		toDelete = append(toDelete, all6[deleteCut:]...)
 
-		rt1 := new(Fat[int])
+		rt1 := new(Fast[int])
 
 		// insert
 		for _, pfx := range pfxs {
@@ -1032,7 +1032,7 @@ func TestFatDeleteShuffled(t *testing.T) {
 		toDelete2 := append([]goldTableItem[int](nil), toDelete...)
 		prng.Shuffle(len(toDelete2), func(i, j int) { toDelete2[i], toDelete2[j] = toDelete2[j], toDelete2[i] })
 
-		rt2 := new(Fat[int])
+		rt2 := new(Fast[int])
 
 		// insert
 		for _, pfx := range pfxs2 {
@@ -1053,7 +1053,7 @@ func TestFatDeleteShuffled(t *testing.T) {
 	}
 }
 
-func TestFatDeleteIsReverseOfInsert(t *testing.T) {
+func TestFastDeleteIsReverseOfInsert(t *testing.T) {
 	t.Parallel()
 	prng := rand.New(rand.NewPCG(42, 42))
 	// Insert N prefixes, then delete those same prefixes in reverse
@@ -1061,7 +1061,7 @@ func TestFatDeleteIsReverseOfInsert(t *testing.T) {
 	// changes that each insert did.
 	const N = 10_000
 
-	tbl := new(Fat[int])
+	tbl := new(Fast[int])
 	want := tbl.dumpString()
 
 	prefixes := randomPrefixes(prng, N)
@@ -1084,7 +1084,7 @@ func TestFatDeleteIsReverseOfInsert(t *testing.T) {
 	}
 }
 
-func TestFatDeleteButOne(t *testing.T) {
+func TestFastDeleteButOne(t *testing.T) {
 	t.Parallel()
 	prng := rand.New(rand.NewPCG(42, 42))
 	// Insert N prefixes, then delete all but one
@@ -1092,7 +1092,7 @@ func TestFatDeleteButOne(t *testing.T) {
 
 	for range 1_000 {
 
-		tbl := new(Fat[int])
+		tbl := new(Fast[int])
 		prefixes := randomPrefixes(prng, N)
 
 		for _, p := range prefixes {
@@ -1128,14 +1128,14 @@ func TestFatDeleteButOne(t *testing.T) {
 	}
 }
 
-func TestFatDelete(t *testing.T) {
+func TestFastDelete(t *testing.T) {
 	t.Parallel()
 	prng := rand.New(rand.NewPCG(42, 42))
 	// Insert N prefixes, then delete those same prefixes in shuffled
 	// order.
 	const N = 10_000
 
-	tbl := new(Fat[int])
+	tbl := new(Fast[int])
 	prefixes := randomPrefixes(prng, N)
 
 	// insert the prefixes
@@ -1167,14 +1167,14 @@ func TestFatDelete(t *testing.T) {
 	}
 }
 
-func TestFatGet(t *testing.T) {
+func TestFastGet(t *testing.T) {
 	t.Parallel()
 
 	t.Run("empty table", func(t *testing.T) {
 		t.Parallel()
 		prng := rand.New(rand.NewPCG(42, 42))
 
-		rt := new(Fat[int])
+		rt := new(Fast[int])
 		pfx := randomPrefix(prng)
 		_, ok := rt.Get(pfx)
 
@@ -1210,7 +1210,7 @@ func TestFatGet(t *testing.T) {
 		},
 	}
 
-	rt := new(Fat[int])
+	rt := new(Fast[int])
 	for _, tt := range tests {
 		rt.Insert(tt.pfx, tt.val)
 	}
@@ -1231,7 +1231,7 @@ func TestFatGet(t *testing.T) {
 	}
 }
 
-func TestFatGetCompare(t *testing.T) {
+func TestFastGetCompare(t *testing.T) {
 	t.Parallel()
 	prng := rand.New(rand.NewPCG(42, 42))
 
@@ -1240,7 +1240,7 @@ func TestFatGetCompare(t *testing.T) {
 	gold := new(goldTable[int])
 	gold.insertMany(pfxs)
 
-	fast := new(Fat[int])
+	fast := new(Fast[int])
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx, pfx.val)
 	}
@@ -1255,10 +1255,10 @@ func TestFatGetCompare(t *testing.T) {
 	}
 }
 
-func TestFatCloneEdgeCases(t *testing.T) {
+func TestFastCloneEdgeCases(t *testing.T) {
 	t.Parallel()
 
-	tbl := new(Fat[int])
+	tbl := new(Fast[int])
 	clone := tbl.Clone()
 	if tbl.dumpString() != clone.dumpString() {
 		t.Errorf("empty Clone: got:\n%swant:\n%s", clone.dumpString(), tbl.dumpString())
@@ -1283,14 +1283,14 @@ func TestFatCloneEdgeCases(t *testing.T) {
 	}
 }
 
-func TestFatClone(t *testing.T) {
+func TestFastClone(t *testing.T) {
 	t.Parallel()
 	prng := rand.New(rand.NewPCG(42, 42))
 
 	pfxs := randomPrefixes(prng, 2)
 
-	golden := new(Fat[int])
-	tbl := new(Fat[int])
+	golden := new(Fast[int])
+	tbl := new(Fast[int])
 
 	for _, pfx := range pfxs {
 		golden.Insert(pfx.pfx, pfx.val)
@@ -1307,10 +1307,10 @@ func TestFatClone(t *testing.T) {
 	}
 }
 
-func TestFatCloneShallow(t *testing.T) {
+func TestFastCloneShallow(t *testing.T) {
 	t.Parallel()
 
-	tbl := new(Fat[*int])
+	tbl := new(Fast[*int])
 	clone := tbl.Clone()
 	if tbl.dumpString() != clone.dumpString() {
 		t.Errorf("empty Clone: got:\n%swant:\n%s", clone.dumpString(), tbl.dumpString())
@@ -1338,10 +1338,10 @@ func TestFatCloneShallow(t *testing.T) {
 	}
 }
 
-func TestFatCloneDeep(t *testing.T) {
+func TestFastCloneDeep(t *testing.T) {
 	t.Parallel()
 
-	tbl := new(Fat[*MyInt])
+	tbl := new(Fast[*MyInt])
 	clone := tbl.Clone()
 	if tbl.dumpString() != clone.dumpString() {
 		t.Errorf("empty Clone: got:\n%swant:\n%s", clone.dumpString(), tbl.dumpString())
@@ -1371,7 +1371,7 @@ func TestFatCloneDeep(t *testing.T) {
 
 // ############ benchmarks ################################
 
-func BenchmarkFatTableDelete(b *testing.B) {
+func BenchmarkFastTableDelete(b *testing.B) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, n := range []int{1_000, 10_000, 100_000, 1_000_000} {
 		pfxs := randomPrefixes(prng, n)
@@ -1379,7 +1379,7 @@ func BenchmarkFatTableDelete(b *testing.B) {
 		b.Run(fmt.Sprintf("mutable from_%d", n), func(b *testing.B) {
 			for b.Loop() {
 				b.StopTimer()
-				rt := new(Fat[*MyInt])
+				rt := new(Fast[*MyInt])
 
 				for i, route := range pfxs {
 					myInt := MyInt(i)
@@ -1396,12 +1396,12 @@ func BenchmarkFatTableDelete(b *testing.B) {
 		})
 
 		b.Run(fmt.Sprintf("persist from_%d", n), func(b *testing.B) {
-			b.Skip("Fat.DeletePersist not yet implemented")
+			b.Skip("Fast.DeletePersist not yet implemented")
 
 			/*
 				for b.Loop() {
 					b.StopTimer()
-					rt := new(Fat[*MyInt])
+					rt := new(Fast[*MyInt])
 
 					for i, route := range pfxs {
 						myInt := MyInt(i)
@@ -1420,7 +1420,7 @@ func BenchmarkFatTableDelete(b *testing.B) {
 	}
 }
 
-func BenchmarkFatTableGet(b *testing.B) {
+func BenchmarkFastTableGet(b *testing.B) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, fam := range []string{"ipv4", "ipv6"} {
 		rng := randomPrefixes4
@@ -1429,7 +1429,7 @@ func BenchmarkFatTableGet(b *testing.B) {
 		}
 
 		for _, nroutes := range benchRouteCount {
-			rt := new(Fat[int])
+			rt := new(Fast[int])
 			for _, route := range rng(prng, nroutes) {
 				rt.Insert(route.pfx, route.val)
 			}
@@ -1445,7 +1445,7 @@ func BenchmarkFatTableGet(b *testing.B) {
 	}
 }
 
-func BenchmarkFatTableLPM(b *testing.B) {
+func BenchmarkFastTableLPM(b *testing.B) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, fam := range []string{"ipv4", "ipv6"} {
 		rng := randomPrefixes4
@@ -1454,7 +1454,7 @@ func BenchmarkFatTableLPM(b *testing.B) {
 		}
 
 		for _, nroutes := range benchRouteCount {
-			rt := new(Fat[int])
+			rt := new(Fast[int])
 			for _, route := range rng(prng, nroutes) {
 				rt.Insert(route.pfx, route.val)
 			}
@@ -1476,7 +1476,7 @@ func BenchmarkFatTableLPM(b *testing.B) {
 	}
 }
 
-func BenchmarkFatMemIP4(b *testing.B) {
+func BenchmarkFastMemIP4(b *testing.B) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, k := range []int{1_000, 10_000, 100_000, 1_000_000} {
 		var startMem, endMem runtime.MemStats
@@ -1485,7 +1485,7 @@ func BenchmarkFatMemIP4(b *testing.B) {
 		runtime.ReadMemStats(&startMem)
 
 		b.Run(strconv.Itoa(k), func(b *testing.B) {
-			rt := new(Fat[any])
+			rt := new(Fast[any])
 			for _, pfx := range randomRealWorldPrefixes4(prng, k) {
 				rt.Insert(pfx, nil)
 			}
@@ -1507,7 +1507,7 @@ func BenchmarkFatMemIP4(b *testing.B) {
 	}
 }
 
-func BenchmarkFatMemIP6(b *testing.B) {
+func BenchmarkFastMemIP6(b *testing.B) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, k := range []int{1_000, 10_000, 100_000, 1_000_000} {
 		var startMem, endMem runtime.MemStats
@@ -1516,7 +1516,7 @@ func BenchmarkFatMemIP6(b *testing.B) {
 		runtime.ReadMemStats(&startMem)
 
 		b.Run(strconv.Itoa(k), func(b *testing.B) {
-			rt := new(Fat[any])
+			rt := new(Fast[any])
 			for _, pfx := range randomRealWorldPrefixes6(prng, k) {
 				rt.Insert(pfx, nil)
 			}
@@ -1538,7 +1538,7 @@ func BenchmarkFatMemIP6(b *testing.B) {
 	}
 }
 
-func BenchmarkFatMem(b *testing.B) {
+func BenchmarkFastMem(b *testing.B) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, k := range []int{1_000, 10_000, 100_000, 1_000_000} {
 		var startMem, endMem runtime.MemStats
@@ -1547,7 +1547,7 @@ func BenchmarkFatMem(b *testing.B) {
 		runtime.ReadMemStats(&startMem)
 
 		b.Run(strconv.Itoa(k), func(b *testing.B) {
-			rt := new(Fat[any])
+			rt := new(Fast[any])
 			for _, pfx := range randomRealWorldPrefixes(prng, k) {
 				rt.Insert(pfx, nil)
 			}
@@ -1577,7 +1577,7 @@ func BenchmarkFatMem(b *testing.B) {
 	}
 }
 
-func BenchmarkFatFullTableMemory4(b *testing.B) {
+func BenchmarkFastFullTableMemory4(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 	nRoutes := len(routes4)
 
@@ -1585,7 +1585,7 @@ func BenchmarkFatFullTableMemory4(b *testing.B) {
 		runtime.GC()
 		runtime.ReadMemStats(&startMem)
 
-		rt := new(Fat[any])
+		rt := new(Fast[any])
 		for _, route := range routes4 {
 			rt.Insert(route.CIDR, nil)
 		}
@@ -1606,10 +1606,10 @@ func BenchmarkFatFullTableMemory4(b *testing.B) {
 	})
 }
 
-func BenchmarkFatFullTableMemory6(b *testing.B) {
+func BenchmarkFastFullTableMemory6(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 
-	rt := new(Fat[any])
+	rt := new(Fast[any])
 	runtime.GC()
 	runtime.ReadMemStats(&startMem)
 
@@ -1636,10 +1636,10 @@ func BenchmarkFatFullTableMemory6(b *testing.B) {
 	})
 }
 
-func BenchmarkFatFullTableMemory(b *testing.B) {
+func BenchmarkFastFullTableMemory(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 
-	rt := new(Fat[any])
+	rt := new(Fast[any])
 	runtime.GC()
 	runtime.ReadMemStats(&startMem)
 
@@ -1674,8 +1674,8 @@ func BenchmarkFatFullTableMemory(b *testing.B) {
 	})
 }
 
-func BenchmarkFatFullMatch4(b *testing.B) {
-	rt := new(Fat[any])
+func BenchmarkFastFullMatch4(b *testing.B) {
+	rt := new(Fast[any])
 
 	for _, route := range routes {
 		rt.Insert(route.CIDR, nil)
@@ -1694,8 +1694,8 @@ func BenchmarkFatFullMatch4(b *testing.B) {
 	})
 }
 
-func BenchmarkFatFullMatch6(b *testing.B) {
-	rt := new(Fat[any])
+func BenchmarkFastFullMatch6(b *testing.B) {
+	rt := new(Fast[any])
 
 	for _, route := range routes {
 		rt.Insert(route.CIDR, nil)
@@ -1714,8 +1714,8 @@ func BenchmarkFatFullMatch6(b *testing.B) {
 	})
 }
 
-func BenchmarkFatFullMiss4(b *testing.B) {
-	rt := new(Fat[any])
+func BenchmarkFastFullMiss4(b *testing.B) {
+	rt := new(Fast[any])
 
 	for _, route := range routes {
 		rt.Insert(route.CIDR, nil)
@@ -1734,8 +1734,8 @@ func BenchmarkFatFullMiss4(b *testing.B) {
 	})
 }
 
-func BenchmarkFatFullMiss6(b *testing.B) {
-	rt := new(Fat[any])
+func BenchmarkFastFullMiss6(b *testing.B) {
+	rt := new(Fast[any])
 
 	for _, route := range routes {
 		rt.Insert(route.CIDR, nil)
@@ -1754,7 +1754,7 @@ func BenchmarkFatFullMiss6(b *testing.B) {
 	})
 }
 
-func checkFatNumNodes(t *testing.T, tbl *Fat[int], want int) {
+func checkFastNumNodes(t *testing.T, tbl *Fast[int], want int) {
 	t.Helper()
 
 	s4 := nodeStatsRec(&tbl.root4)
@@ -1767,7 +1767,7 @@ func checkFatNumNodes(t *testing.T, tbl *Fat[int], want int) {
 	}
 }
 
-func checkFatRoutes(t *testing.T, tbl *Fat[int], tt []tableTest) {
+func checkFastRoutes(t *testing.T, tbl *Fast[int], tt []tableTest) {
 	t.Helper()
 	for _, tc := range tt {
 		v, ok := tbl.Lookup(mpa(tc.addr))

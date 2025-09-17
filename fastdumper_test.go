@@ -9,9 +9,9 @@ import (
 	"testing"
 )
 
-func TestFat_dumpString_OnEmptyTable_ReturnsEmptyString(t *testing.T) {
+func TestFast_dumpString_OnEmptyTable_ReturnsEmptyString(t *testing.T) {
 	t.Parallel()
-	f := &Fat[struct{}]{}
+	f := &Fast[struct{}]{}
 
 	out := f.dumpString()
 	if strings.TrimSpace(out) != "" {
@@ -19,22 +19,22 @@ func TestFat_dumpString_OnEmptyTable_ReturnsEmptyString(t *testing.T) {
 	}
 }
 
-func TestFat_dump_OnNilReceiver_NoPanicAndNoOutput(t *testing.T) {
+func TestFast_dump_OnNilReceiver_NoPanicAndNoOutput(t *testing.T) {
 	t.Parallel()
-	var f *Fat[int] = nil
+	var f *Fast[int] = nil
 
 	var buf bytes.Buffer
 	f.dump(&buf)
 
 	got := strings.TrimSpace(buf.String())
 	if got != "" {
-		t.Fatalf("expected no output for nil Fat; got %q", got)
+		t.Fatalf("expected no output for nil Fast; got %q", got)
 	}
 }
 
-func TestFat_dump_IPv4AndIPv6PrintedIndependently(t *testing.T) {
+func TestFast_dump_IPv4AndIPv6PrintedIndependently(t *testing.T) {
 	t.Parallel()
-	f := &Fat[int]{}
+	f := &Fast[int]{}
 	f.size4 = 3
 	f.size6 = 4
 
@@ -50,9 +50,9 @@ func TestFat_dump_IPv4AndIPv6PrintedIndependently(t *testing.T) {
 	}
 }
 
-func TestFatNode_hasType_OnEmptyNode_ReturnsNullNode(t *testing.T) {
+func TestFastNode_hasType_OnEmptyNode_ReturnsNullNode(t *testing.T) {
 	t.Parallel()
-	n := &fatNode[struct{}]{}
+	n := &fastNode[struct{}]{}
 
 	nt := hasType(n)
 	if nt != nullNode {
@@ -60,9 +60,9 @@ func TestFatNode_hasType_OnEmptyNode_ReturnsNullNode(t *testing.T) {
 	}
 }
 
-func TestFatNode_nodeStats_OnEmptyNode_AllZeros(t *testing.T) {
+func TestFastNode_nodeStats_OnEmptyNode_AllZeros(t *testing.T) {
 	t.Parallel()
-	n := &fatNode[int]{}
+	n := &fastNode[int]{}
 	s := nodeStats(n)
 
 	if s.pfxs != 0 || s.childs != 0 || s.nodes != 0 || s.leaves != 0 || s.fringes != 0 {
@@ -70,9 +70,9 @@ func TestFatNode_nodeStats_OnEmptyNode_AllZeros(t *testing.T) {
 	}
 }
 
-func TestFatNode_nodeStatsRec_OnEmptyNode_NodeCountZero(t *testing.T) {
+func TestFastNode_nodeStatsRec_OnEmptyNode_NodeCountZero(t *testing.T) {
 	t.Parallel()
-	n := &fatNode[int]{}
+	n := &fastNode[int]{}
 	s := nodeStatsRec(n)
 
 	if s.pfxs != 0 || s.childs != 0 || s.nodes != 0 || s.leaves != 0 || s.fringes != 0 {
@@ -80,9 +80,9 @@ func TestFatNode_nodeStatsRec_OnEmptyNode_NodeCountZero(t *testing.T) {
 	}
 }
 
-func TestFatNode_dump_OnEmptyNode_PrintsHeaderOnly(t *testing.T) {
+func TestFastNode_dump_OnEmptyNode_PrintsHeaderOnly(t *testing.T) {
 	t.Parallel()
-	n := &fatNode[int]{}
+	n := &fastNode[int]{}
 	var buf bytes.Buffer
 
 	var path stridePath
@@ -97,9 +97,9 @@ func TestFatNode_dump_OnEmptyNode_PrintsHeaderOnly(t *testing.T) {
 	}
 }
 
-func TestFat_dumpString_OnNonEmptySizes_PrintsHeaders(t *testing.T) {
+func TestFast_dumpString_OnNonEmptySizes_PrintsHeaders(t *testing.T) {
 	t.Parallel()
-	f := &Fat[int]{}
+	f := &Fast[int]{}
 	f.size4 = 1
 	f.size6 = 2
 
@@ -113,18 +113,18 @@ func TestFat_dumpString_OnNonEmptySizes_PrintsHeaders(t *testing.T) {
 	}
 }
 
-func TestFat_dumpString_OnNilReceiver_ReturnsEmpty(t *testing.T) {
+func TestFast_dumpString_OnNilReceiver_ReturnsEmpty(t *testing.T) {
 	t.Parallel()
-	var f *Fat[int]
+	var f *Fast[int]
 	out := f.dumpString()
 	if strings.TrimSpace(out) != "" {
-		t.Fatalf("expected empty dump for nil Fat; got %q", out)
+		t.Fatalf("expected empty dump for nil Fast; got %q", out)
 	}
 }
 
-func TestFat_dump_OnlyIPv4Size_PrintsIPv4Header(t *testing.T) {
+func TestFast_dump_OnlyIPv4Size_PrintsIPv4Header(t *testing.T) {
 	t.Parallel()
-	f := &Fat[int]{}
+	f := &Fast[int]{}
 	f.size4 = 2 // IPv6 remains zero
 
 	var buf bytes.Buffer
@@ -140,9 +140,9 @@ func TestFat_dump_OnlyIPv4Size_PrintsIPv4Header(t *testing.T) {
 	}
 }
 
-func TestFatNode_dump_WithNonZeroDepth_PrintsDepthHeader(t *testing.T) {
+func TestFastNode_dump_WithNonZeroDepth_PrintsDepthHeader(t *testing.T) {
 	t.Parallel()
-	n := &fatNode[int]{}
+	n := &fastNode[int]{}
 	var buf bytes.Buffer
 	var path stridePath
 

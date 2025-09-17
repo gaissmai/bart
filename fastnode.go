@@ -12,17 +12,17 @@ import (
 	"github.com/gaissmai/bart/internal/lpm"
 )
 
-// fatNode is a trie level node in the multibit routing table.
+// fastNode is a trie level node in the multibit routing table.
 //
-// Each fatNode contains two conceptually different fixed sized arrays:
+// Each fastNode contains two conceptually different fixed sized arrays:
 //   - prefixes: representing routes, using a complete binary tree layout
 //     driven by the baseIndex() function from the ART algorithm.
 //   - children: holding subtries or path-compressed leaves or fringes.
 //
 // See doc/artlookup.pdf for the mapping mechanics and prefix tree details.
-type fatNode[V any] struct {
+type fastNode[V any] struct {
 	prefixes [256]*V
-	children [256]*any // **fatNode or path-compressed **leaf- or **fringeNode
+	children [256]*any // **fastNode or path-compressed **leaf- or **fringeNode
 	// an array of "pointers to" the empty interface,
 	// and not an array of empty interfaces.
 	//
@@ -38,17 +38,17 @@ type fatNode[V any] struct {
 }
 
 // prefixCount returns the number of prefixes stored in this node.
-func (n *fatNode[V]) prefixCount() int {
+func (n *fastNode[V]) prefixCount() int {
 	return n.prefixesBitSet.Size()
 }
 
 // childCount returns the number of slots used in this node.
-func (n *fatNode[V]) childCount() int {
+func (n *fastNode[V]) childCount() int {
 	return n.childrenBitSet.Size()
 }
 
 // isEmpty returns true if node has neither prefixes nor children
-func (n *fatNode[V]) isEmpty() bool {
+func (n *fastNode[V]) isEmpty() bool {
 	if n == nil {
 		return true
 	}
@@ -59,7 +59,7 @@ func (n *fatNode[V]) isEmpty() bool {
 // If no child exists at addr, returns nil and false.
 //
 //nolint:unused
-func (n *fatNode[V]) getChild(addr uint8) (any, bool) {
+func (n *fastNode[V]) getChild(addr uint8) (any, bool) {
 	if anyPtr := n.children[addr]; anyPtr != nil {
 		return *anyPtr, true
 	}
@@ -71,7 +71,7 @@ func (n *fatNode[V]) getChild(addr uint8) (any, bool) {
 // when the caller has verified the child exists.
 //
 //nolint:unused
-func (n *fatNode[V]) mustGetChild(addr uint8) any {
+func (n *fastNode[V]) mustGetChild(addr uint8) any {
 	// panics if n.children[addr] is nil
 	return *n.children[addr]
 }
@@ -80,7 +80,7 @@ func (n *fatNode[V]) mustGetChild(addr uint8) any {
 // The addresses are returned in ascending order.
 //
 //nolint:unused
-func (n *fatNode[V]) getChildAddrs() []uint8 {
+func (n *fastNode[V]) getChildAddrs() []uint8 {
 	return n.childrenBitSet.AsSlice(&[256]uint8{})
 }
 
@@ -88,7 +88,7 @@ func (n *fatNode[V]) getChildAddrs() []uint8 {
 // Each iteration yields the child's address (uint8) and the child node (any).
 //
 //nolint:unused
-func (n *fatNode[V]) allChildren() iter.Seq2[uint8, any] {
+func (n *fastNode[V]) allChildren() iter.Seq2[uint8, any] {
 	return func(yield func(addr uint8, child any) bool) {
 		for _, addr := range n.getChildAddrs() {
 			child := *n.children[addr]
@@ -102,7 +102,7 @@ func (n *fatNode[V]) allChildren() iter.Seq2[uint8, any] {
 // insertChild inserts a child node at the specified address.
 // Returns true if a child already existed at addr (overwrite case),
 // false if this is a new insertion.
-func (n *fatNode[V]) insertChild(addr uint8, child any) (exists bool) {
+func (n *fastNode[V]) insertChild(addr uint8, child any) (exists bool) {
 	if n.children[addr] == nil {
 		exists = false
 		n.childrenBitSet.Set(addr)
@@ -120,7 +120,7 @@ func (n *fatNode[V]) insertChild(addr uint8, child any) (exists bool) {
 
 // deleteChild removes the child node at the specified address.
 // This operation is idempotent - removing a non-existent child is safe.
-func (n *fatNode[V]) deleteChild(addr uint8) (exists bool) {
+func (n *fastNode[V]) deleteChild(addr uint8) (exists bool) {
 	if n.children[addr] == nil {
 		return false
 	}
@@ -133,7 +133,7 @@ func (n *fatNode[V]) deleteChild(addr uint8) (exists bool) {
 // insertPrefix adds a routing entry at the specified index with the given value.
 // It returns true if a prefix already existed at that index (indicating an update),
 // false if this is a new insertion.
-func (n *fatNode[V]) insertPrefix(idx uint8, val V) (exists bool) {
+func (n *fastNode[V]) insertPrefix(idx uint8, val V) (exists bool) {
 	if exists = n.prefixesBitSet.Test(idx); !exists {
 		n.prefixesBitSet.Set(idx)
 	}
@@ -141,7 +141,7 @@ func (n *fatNode[V]) insertPrefix(idx uint8, val V) (exists bool) {
 	// insert or update
 
 	// To ensure allot works as intended, every unique prefix in the
-	// fatNode must point to a distinct value pointer, even for identical values.
+	// fastNode must point to a distinct value pointer, even for identical values.
 	// Using new() and assignment guarantees each inserted prefix gets its own address,
 	valPtr := new(V)
 	*valPtr = val
@@ -156,7 +156,7 @@ func (n *fatNode[V]) insertPrefix(idx uint8, val V) (exists bool) {
 
 // getPrefix returns the value for the given prefix index and true if it exists.
 // If no prefix exists at idx, returns the zero value and false.
-func (n *fatNode[V]) getPrefix(idx uint8) (val V, exists bool) {
+func (n *fastNode[V]) getPrefix(idx uint8) (val V, exists bool) {
 	if exists = n.prefixesBitSet.Test(idx); exists {
 		val = *n.prefixes[idx]
 	}
@@ -168,7 +168,7 @@ func (n *fatNode[V]) getPrefix(idx uint8) (val V, exists bool) {
 // when the caller has verified the prefix exists.
 //
 //nolint:unused
-func (n *fatNode[V]) mustGetPrefix(idx uint8) V {
+func (n *fastNode[V]) mustGetPrefix(idx uint8) V {
 	return *n.prefixes[idx]
 }
 
@@ -176,7 +176,7 @@ func (n *fatNode[V]) mustGetPrefix(idx uint8) V {
 // The indices are returned in ascending order.
 //
 //nolint:unused
-func (n *fatNode[V]) getIndices() []uint8 {
+func (n *fastNode[V]) getIndices() []uint8 {
 	return n.prefixesBitSet.AsSlice(&[256]uint8{})
 }
 
@@ -184,7 +184,7 @@ func (n *fatNode[V]) getIndices() []uint8 {
 // Each iteration yields the prefix index (uint8) and its associated value (V).
 //
 //nolint:unused
-func (n *fatNode[V]) allIndices() iter.Seq2[uint8, V] {
+func (n *fastNode[V]) allIndices() iter.Seq2[uint8, V] {
 	return func(yield func(uint8, V) bool) {
 		for _, idx := range n.getIndices() {
 			val := n.mustGetPrefix(idx)
@@ -198,7 +198,7 @@ func (n *fatNode[V]) allIndices() iter.Seq2[uint8, V] {
 // deletePrefix removes the route at the given index.
 // Returns the removed value and true if the prefix existed,
 // or the zero value and false if no prefix was found at idx.
-func (n *fatNode[V]) deletePrefix(idx uint8) (val V, exists bool) {
+func (n *fastNode[V]) deletePrefix(idx uint8) (val V, exists bool) {
 	if exists = n.prefixesBitSet.Test(idx); !exists {
 		// Route entry doesn't exist
 		return
@@ -224,7 +224,7 @@ func (n *fatNode[V]) deletePrefix(idx uint8) (val V, exists bool) {
 // idx must come from art.PfxToIdx (1..255) or art.OctetToIdx(octet) (256..511).
 // Host-route indices [256..511] are normalized to their parent prefix slot
 // [128..255] via idx >>= 1.
-func (n *fatNode[V]) contains(idx uint) (ok bool) {
+func (n *fastNode[V]) contains(idx uint) (ok bool) {
 	normalizedIdx := normalizeIdx(idx)
 	return n.prefixes[normalizedIdx] != nil
 }
@@ -236,7 +236,7 @@ func (n *fatNode[V]) contains(idx uint) (ok bool) {
 // otherwise, it returns the zero value and false. The lookup uses the ART
 // algorithm's hierarchical structure to find the most specific
 // matching prefix.
-func (n *fatNode[V]) lookup(idx uint) (val V, ok bool) {
+func (n *fastNode[V]) lookup(idx uint) (val V, ok bool) {
 	normalizedIdx := normalizeIdx(idx)
 	if valPtr := n.prefixes[normalizedIdx]; valPtr != nil {
 		return *valPtr, true
@@ -254,7 +254,7 @@ func (n *fatNode[V]) lookup(idx uint) (val V, ok bool) {
 // matching prefix exists at this level; otherwise, ok is false.
 //
 // Its semantics are identical to [node.lookupIdx].
-func (n *fatNode[V]) lookupIdx(idx uint) (baseIdx uint8, val V, ok bool) {
+func (n *fastNode[V]) lookupIdx(idx uint) (baseIdx uint8, val V, ok bool) {
 	normalizedIdx := normalizeIdx(idx)
 	// top is the idx of the longest-prefix-match
 	if top, ok := n.prefixesBitSet.IntersectionTop(lpm.BackTrackingBitset(normalizedIdx)); ok {
@@ -280,7 +280,7 @@ func (n *fatNode[V]) lookupIdx(idx uint) (baseIdx uint8, val V, ok bool) {
 //	                    ╰─────────╯╰─────────────┴────╯
 //
 // Using an iterative form ensures better inlining opportunities.
-func (n *fatNode[V]) allot(idx uint8, oldValPtr, valPtr *V) {
+func (n *fastNode[V]) allot(idx uint8, oldValPtr, valPtr *V) {
 	// iteration with stack instead of recursion
 	stack := make([]uint8, 0, 256)
 
@@ -316,7 +316,7 @@ func (n *fatNode[V]) allot(idx uint8, oldValPtr, valPtr *V) {
 // The function walks the prefix address from the given depth and inserts the value either directly into
 // the node's prefix table or as a compressed leaf or fringe node. If a conflicting leaf or fringe exists,
 // it is pushed down via a new intermediate node. Existing entries with the same prefix are overwritten.
-func (n *fatNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool) {
+func (n *fastNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool) {
 	ip := pfx.Addr() // the pfx must be in canonical form
 	octets := ip.AsSlice()
 	lastOctetPlusOne, lastBits := lastOctetPlusOneAndLastBits(pfx)
@@ -341,7 +341,7 @@ func (n *fatNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists b
 
 		// kid is node or leaf at addr
 		switch kid := kidAny.(type) {
-		case *fatNode[V]:
+		case *fastNode[V]:
 			n = kid // descend down to next trie level
 
 		case *leafNode[V]:
@@ -357,7 +357,7 @@ func (n *fatNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists b
 			// push the leaf down
 			// insert new child at current leaf position (addr)
 			// descend down, replace n with new child
-			newNode := new(fatNode[V])
+			newNode := new(fastNode[V])
 			_ = newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
 			_ = n.insertChild(octet, newNode)
 			n = newNode
@@ -375,7 +375,7 @@ func (n *fatNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists b
 			// push the fringe down, it becomes a default route (idx=1)
 			// insert new child at current leaf position (addr)
 			// descend down, replace n with new child
-			newNode := new(fatNode[V])
+			newNode := new(fastNode[V])
 			_ = newNode.insertPrefix(1, kid.value)
 			_ = n.insertChild(octet, newNode)
 			n = newNode
@@ -402,7 +402,7 @@ func (n *fatNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists b
 //
 // The reconstruction of prefixes for compressed nodes uses the traversal
 // path stored in octets and the parent's depth information.
-func (n *fatNode[V]) purgeAndCompress(stack []*fatNode[V], octets []uint8, is4 bool) {
+func (n *fastNode[V]) purgeAndCompress(stack []*fastNode[V], octets []uint8, is4 bool) {
 	// unwind the stack
 	for depth := len(stack) - 1; depth >= 0; depth-- {
 		parent := stack[depth]
@@ -421,7 +421,7 @@ func (n *fatNode[V]) purgeAndCompress(stack []*fatNode[V], octets []uint8, is4 b
 			kidAny := *n.children[addr]
 
 			switch kid := kidAny.(type) {
-			case *fatNode[V]:
+			case *fastNode[V]:
 				// fast exit, we are at an intermediate path node
 				// no further delete/compress upwards the stack is possible
 				return
