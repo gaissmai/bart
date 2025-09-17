@@ -91,7 +91,7 @@ func (n *fatNode[V]) getChildAddrs() []uint8 {
 func (n *fatNode[V]) allChildren() iter.Seq2[uint8, any] {
 	return func(yield func(addr uint8, child any) bool) {
 		for _, addr := range n.getChildAddrs() {
-			child := n.mustGetChild(addr)
+			child := *n.children[addr]
 			if !yield(addr, child) {
 				return
 			}
