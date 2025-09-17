@@ -84,6 +84,9 @@ func (n *fatNode[V]) getChildAddrs() []uint8 {
 	return n.childrenBitSet.AsSlice(&[256]uint8{})
 }
 
+// allChildren returns an iterator over all child nodes.
+// Each iteration yields the child's address (uint8) and the child node (any).
+//
 //nolint:unused
 func (n *fatNode[V]) allChildren() iter.Seq2[uint8, any] {
 	return func(yield func(addr uint8, child any) bool) {
@@ -177,6 +180,9 @@ func (n *fatNode[V]) getIndices() []uint8 {
 	return n.prefixesBitSet.AsSlice(&[256]uint8{})
 }
 
+// allIndices returns an iterator over all prefix entries.
+// Each iteration yields the prefix index (uint8) and its associated value (V).
+//
 //nolint:unused
 func (n *fatNode[V]) allIndices() iter.Seq2[uint8, V] {
 	return func(yield func(uint8, V) bool) {
