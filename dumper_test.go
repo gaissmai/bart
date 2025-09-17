@@ -12,10 +12,11 @@ import (
 )
 
 // Test unified dumper functionality across node types
+//
+//nolint:tparallel
 func TestUnifiedDumper_NodeTypes(t *testing.T) {
 	t.Parallel()
 
-	// Using zero values as suggested - no builders needed
 	nodeTypes := map[string]nodeReadWriter[any]{
 		"node":     &node[any]{},     // zero value ready to use
 		"fastNode": &fastNode[any]{}, // zero value ready to use
@@ -23,7 +24,6 @@ func TestUnifiedDumper_NodeTypes(t *testing.T) {
 
 	for nodeTypeName, n := range nodeTypes {
 		t.Run(nodeTypeName+"_EmptyNodeStats", func(t *testing.T) {
-			t.Parallel()
 			// Test nodeStats on nodeReader interface
 			reader := nodeReader[any](n)
 			stats := nodeStats(reader)
@@ -34,7 +34,6 @@ func TestUnifiedDumper_NodeTypes(t *testing.T) {
 		})
 
 		t.Run(nodeTypeName+"_WithPrefix", func(t *testing.T) {
-			t.Parallel()
 			n.insertPrefix(128, "test-value")
 
 			// Test that we can get stats after insertion
@@ -46,7 +45,6 @@ func TestUnifiedDumper_NodeTypes(t *testing.T) {
 		})
 
 		t.Run(nodeTypeName+"_DumpToWriter", func(t *testing.T) {
-			t.Parallel()
 			n.insertPrefix(64, "dump-test")
 
 			var buf strings.Builder
