@@ -651,7 +651,7 @@ func TestNodes_GetPrefix_And_OverwriteSemantics(t *testing.T) {
 	}
 }
 
-func TestFastNode_IsEmpty_AfterAllDeletes(t *testing.T) {
+func TestNode_IsEmpty_AfterAllDeletes(t *testing.T) {
 	t.Parallel()
 	nodes := []struct {
 		name string
