@@ -5,17 +5,25 @@ package bart
 
 import "iter"
 
-// noder is a generic interface that abstracts tree node operations
+// compile time check
+var (
+	_ nodeReadWriter[any] = (*node[any])(nil)
+	_ nodeReadWriter[any] = (*fastNode[any])(nil)
+)
+
+// nodeReadWriter is a generic interface that abstracts tree node operations
 // for testing, dumping and traversal.
 //
 // It provides a unified API for setting or accessing both regular
 // nodes and fast nodes in the routing table structures.
 //
 // Type parameter V represents the value type stored at prefixes in the tree.
-type noder[V any] interface {
+type nodeReadWriter[V any] interface {
 	nodeReader[V]
+	nodeWriter[V]
+}
 
-	// + writer methods
+type nodeWriter[V any] interface {
 	insertChild(uint8, any) bool
 	insertPrefix(uint8, V) bool
 
