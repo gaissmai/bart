@@ -146,7 +146,7 @@ func directItemsRec[V any](n nodeReader[V], parentIdx uint8, path stridePath, de
 	// prefixes:
 	// for all idx's (prefixes mapped by baseIndex) in this node
 	// do a longest-prefix-match
-	for _, idx := range n.getIndices() {
+	for idx, val := range n.allIndices() {
 		// tricky part, skip self
 		// test with next possible lpm (idx>>1), it's a complete binary tree
 		nextIdx := idx >> 1
@@ -171,7 +171,7 @@ func directItemsRec[V any](n nodeReader[V], parentIdx uint8, path stridePath, de
 				idx:   idx,
 				// get the prefix back from trie
 				cidr: cidrFromPath(path, depth, is4, idx),
-				val:  n.mustGetPrefix(idx),
+				val:  val,
 			}
 
 			directItems = append(directItems, item)
