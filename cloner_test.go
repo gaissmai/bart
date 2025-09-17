@@ -373,10 +373,10 @@ func TestNodeCloneRec_DeepCopiesNodeChildren(t *testing.T) {
 	}
 }
 
-// ---- fatNode.cloneFlat / cloneRec ----
+// ---- fastNode.cloneFlat / cloneRec ----
 
-func TestFatNodeCloneFlat_ValuesClonedAndChildrenFlat(t *testing.T) {
-	fn := &fatNode[*routeEntry]{}
+func TestFastNodeCloneFlat_ValuesClonedAndChildrenFlat(t *testing.T) {
+	fn := &fastNode[*routeEntry]{}
 
 	// insert prefix - default route
 	defaultRoute := &routeEntry{
@@ -401,16 +401,16 @@ func TestFatNodeCloneFlat_ValuesClonedAndChildrenFlat(t *testing.T) {
 
 	leaf := &leafNode[*routeEntry]{prefix: pfx, value: leafRoute}
 	fringe := &fringeNode[*routeEntry]{value: fringeRoute}
-	childFat := &fatNode[*routeEntry]{}
+	childFast := &fastNode[*routeEntry]{}
 
 	// insert children at addrs: 0,1,2
 	fn.insertChild(0, leaf)
 	fn.insertChild(1, fringe)
-	fn.insertChild(2, childFat)
+	fn.insertChild(2, childFast)
 
 	got := fn.cloneFlat(cloneFnFactory[*routeEntry]())
 	if got == fn {
-		t.Fatalf("expected new fat node instance")
+		t.Fatalf("expected new fast node instance")
 	}
 
 	// Check that prefixes are cloned
@@ -450,16 +450,16 @@ func TestFatNodeCloneFlat_ValuesClonedAndChildrenFlat(t *testing.T) {
 		t.Fatalf("cloned fringe value should have same nextHop")
 	}
 
-	// fatNode child should be shallow copied (same pointer)
-	if gotChild, ok := got.getChild(2); !ok || gotChild != childFat {
-		t.Fatalf("expected shallow copy of fatNode child")
+	// fastNode child should be shallow copied (same pointer)
+	if gotChild, ok := got.getChild(2); !ok || gotChild != childFast {
+		t.Fatalf("expected shallow copy of fastNode child")
 	}
 }
 
-func TestFatNodeCloneRec_DeepCopiesFatNodeChildren(t *testing.T) {
-	parent := &fatNode[*routeEntry]{}
-	child := &fatNode[*routeEntry]{}
-	grand := &fatNode[*routeEntry]{}
+func TestFastNodeCloneRec_DeepCopiesFastNodeChildren(t *testing.T) {
+	parent := &fastNode[*routeEntry]{}
+	child := &fastNode[*routeEntry]{}
+	grand := &fastNode[*routeEntry]{}
 
 	// Add route to grandchild to verify deep cloning
 	route := &routeEntry{
@@ -484,18 +484,18 @@ func TestFatNodeCloneRec_DeepCopiesFatNodeChildren(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected child at index 10")
 	}
-	kid, ok := kidAny.(*fatNode[*routeEntry])
+	kid, ok := kidAny.(*fastNode[*routeEntry])
 	if !ok || kid == child {
-		t.Fatalf("expected deep-cloned child fatNode")
+		t.Fatalf("expected deep-cloned child fastNode")
 	}
 
 	gkAny, ok := kid.getChild(20)
 	if !ok {
 		t.Fatalf("expected grandchild at index 20")
 	}
-	gk, ok := gkAny.(*fatNode[*routeEntry])
+	gk, ok := gkAny.(*fastNode[*routeEntry])
 	if !ok || gk == grand {
-		t.Fatalf("expected deep-cloned grandchild fatNode")
+		t.Fatalf("expected deep-cloned grandchild fastNode")
 	}
 
 	// Verify route is cloned at deepest level

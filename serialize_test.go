@@ -278,7 +278,7 @@ func TestTableDumpList6(t *testing.T) {
 	}
 }
 
-func TestFatStringSerialization(t *testing.T) {
+func TestFastStringSerialization(t *testing.T) {
 	tests := []struct {
 		name           string
 		expectedData   map[netip.Prefix]string
@@ -301,14 +301,14 @@ func TestFatStringSerialization(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fat := &Fat[string]{}
+			fast := &Fast[string]{}
 
 			// Insert test data
 			for prefix, value := range tt.expectedData {
-				fat.Insert(prefix, value)
+				fast.Insert(prefix, value)
 			}
 
-			str := fat.String()
+			str := fast.String()
 
 			// Validation
 			if len(tt.expectedData) == 0 {
@@ -329,7 +329,7 @@ func TestFatStringSerialization(t *testing.T) {
 	}
 }
 
-func TestFatMarshalText(t *testing.T) {
+func TestFastMarshalText(t *testing.T) {
 	tests := []struct {
 		name         string
 		expectedData map[netip.Prefix]string
@@ -349,14 +349,14 @@ func TestFatMarshalText(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fat := &Fat[string]{}
+			fast := &Fast[string]{}
 
 			// Insert test data
 			for prefix, value := range tt.expectedData {
-				fat.Insert(prefix, value)
+				fast.Insert(prefix, value)
 			}
 
-			data, err := fat.MarshalText()
+			data, err := fast.MarshalText()
 			if err != nil {
 				t.Errorf("MarshalText failed: %v", err)
 			}
@@ -376,7 +376,7 @@ func TestFatMarshalText(t *testing.T) {
 	}
 }
 
-func TestFatMarshalJSON(t *testing.T) {
+func TestFastMarshalJSON(t *testing.T) {
 	tests := []struct {
 		name         string
 		expectedData map[netip.Prefix]any
@@ -396,14 +396,14 @@ func TestFatMarshalJSON(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fat := &Fat[any]{}
+			fast := &Fast[any]{}
 
 			// Insert test data
 			for prefix, value := range tt.expectedData {
-				fat.Insert(prefix, value)
+				fast.Insert(prefix, value)
 			}
 
-			jsonData, err := json.Marshal(fat)
+			jsonData, err := json.Marshal(fast)
 			if err != nil {
 				t.Errorf("JSON marshaling failed: %v", err)
 			}
@@ -421,8 +421,8 @@ func TestFatMarshalJSON(t *testing.T) {
 	}
 }
 
-func TestFatDumpList4(t *testing.T) {
-	fat := &Fat[string]{}
+func TestFastDumpList4(t *testing.T) {
+	fast := &Fast[string]{}
 
 	// Insert test data
 	prefixes := []netip.Prefix{
@@ -432,10 +432,10 @@ func TestFatDumpList4(t *testing.T) {
 	values := []string{"lan", "private"}
 
 	for i, prefix := range prefixes {
-		fat.Insert(prefix, values[i])
+		fast.Insert(prefix, values[i])
 	}
 
-	dumpList := fat.DumpList4()
+	dumpList := fast.DumpList4()
 
 	// Count total IPv4 nodes
 	totalNodes := countDumpListNodes(dumpList)
@@ -447,8 +447,8 @@ func TestFatDumpList4(t *testing.T) {
 	verifyAllIPv4Nodes(t, dumpList)
 }
 
-func TestFatDumpList6(t *testing.T) {
-	fat := &Fat[string]{}
+func TestFastDumpList6(t *testing.T) {
+	fast := &Fast[string]{}
 
 	// Insert test data
 	prefixes := []netip.Prefix{
@@ -458,10 +458,10 @@ func TestFatDumpList6(t *testing.T) {
 	values := []string{"doc", "link-local"}
 
 	for i, prefix := range prefixes {
-		fat.Insert(prefix, values[i])
+		fast.Insert(prefix, values[i])
 	}
 
-	dumpList := fat.DumpList6()
+	dumpList := fast.DumpList6()
 
 	// Count total IPv6 nodes
 	totalNodes := countDumpListNodes(dumpList)
@@ -582,34 +582,34 @@ func TestNilTableSerialization(t *testing.T) {
 	}
 }
 
-func TestNilFatSerialization(t *testing.T) {
-	var fat *Fat[string] = nil
+func TestNilFastSerialization(t *testing.T) {
+	var fast *Fast[string] = nil
 
 	// String() should not panic
-	str := fat.String()
+	str := fast.String()
 	if str != "" {
-		t.Errorf("Nil Fat String() should be empty, got: %q", str)
+		t.Errorf("Nil Fast String() should be empty, got: %q", str)
 	}
 
 	// MarshalText() should not panic
-	data, err := fat.MarshalText()
+	data, err := fast.MarshalText()
 	if err != nil {
-		t.Errorf("Nil Fat MarshalText() should not error: %v", err)
+		t.Errorf("Nil Fast MarshalText() should not error: %v", err)
 	}
 	if len(data) != 0 {
-		t.Errorf("Nil Fat MarshalText() should return empty data, got %d bytes", len(data))
+		t.Errorf("Nil Fast MarshalText() should return empty data, got %d bytes", len(data))
 	}
 
 	// DumpList4() should not panic
-	dumpList4 := fat.DumpList4()
+	dumpList4 := fast.DumpList4()
 	if len(dumpList4) != 0 {
-		t.Errorf("Nil Fat DumpList4() should return empty slice, got %d items", len(dumpList4))
+		t.Errorf("Nil Fast DumpList4() should return empty slice, got %d items", len(dumpList4))
 	}
 
 	// DumpList6() should not panic
-	dumpList6 := fat.DumpList6()
+	dumpList6 := fast.DumpList6()
 	if len(dumpList6) != 0 {
-		t.Errorf("Nil Fat DumpList6() should return empty slice, got %d items", len(dumpList6))
+		t.Errorf("Nil Fast DumpList6() should return empty slice, got %d items", len(dumpList6))
 	}
 }
 

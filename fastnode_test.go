@@ -7,9 +7,9 @@ import (
 	"testing"
 )
 
-func TestFatNode_EmptyCountsAndState(t *testing.T) {
+func TestFastNode_EmptyCountsAndState(t *testing.T) {
 	t.Parallel()
-	n := &fatNode[int]{}
+	n := &fastNode[int]{}
 
 	if got := n.prefixCount(); got != 0 {
 		t.Fatalf("prefixCount=%d, want 0", got)
@@ -30,9 +30,9 @@ func TestFatNode_EmptyCountsAndState(t *testing.T) {
 	}
 }
 
-func TestFatNode_Children_Insert_Get_Delete_Idempotent(t *testing.T) {
+func TestFastNode_Children_Insert_Get_Delete_Idempotent(t *testing.T) {
 	t.Parallel()
-	n := &fatNode[int]{}
+	n := &fastNode[int]{}
 
 	type dummy struct{ id int }
 	child := &dummy{id: 42}
@@ -73,9 +73,9 @@ func TestFatNode_Children_Insert_Get_Delete_Idempotent(t *testing.T) {
 	}
 }
 
-func TestFatNode_Prefix_Insert_Get_Contains_Lookup_Propagation(t *testing.T) {
+func TestFastNode_Prefix_Insert_Get_Contains_Lookup_Propagation(t *testing.T) {
 	t.Parallel()
-	n := &fatNode[int]{}
+	n := &fastNode[int]{}
 
 	if exists := n.insertPrefix(32, 100); exists {
 		t.Fatalf("insertPrefix first insertion exists=true, want false")
@@ -142,9 +142,9 @@ func TestFatNode_Prefix_Insert_Get_Contains_Lookup_Propagation(t *testing.T) {
 	}
 }
 
-func TestFatNode_DeletePrefix_Behavior(t *testing.T) {
+func TestFastNode_DeletePrefix_Behavior(t *testing.T) {
 	t.Parallel()
-	n := &fatNode[int]{}
+	n := &fastNode[int]{}
 
 	n.insertPrefix(32, 111)
 	n.insertPrefix(64, 222)
@@ -187,9 +187,9 @@ func TestFatNode_DeletePrefix_Behavior(t *testing.T) {
 	}
 }
 
-func TestFatNode_Allot_StopsAtSpecificRoutes(t *testing.T) {
+func TestFastNode_Allot_StopsAtSpecificRoutes(t *testing.T) {
 	t.Parallel()
-	n := &fatNode[int]{}
+	n := &fastNode[int]{}
 
 	n.insertPrefix(32, 1)
 	n.insertPrefix(64, 2)
