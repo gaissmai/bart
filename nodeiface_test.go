@@ -87,7 +87,7 @@ func TestEmptyNodeIterators(t *testing.T) {
 func TestAllIndices(t *testing.T) {
 	tests := []struct {
 		name string
-		node noder[string]
+		node nodeReadWriter[string]
 	}{
 		{"node", &node[string]{}},
 		{"fastNode", &fastNode[string]{}},
@@ -146,7 +146,7 @@ func TestAllIndices(t *testing.T) {
 func TestAllChildren(t *testing.T) {
 	tests := []struct {
 		name       string
-		node       noder[string]
+		node       nodeReadWriter[string]
 		childAddrs []uint8
 	}{
 		{
@@ -240,7 +240,7 @@ func TestImplementsNodeReader(t *testing.T) {
 			slices.Sort(expectedIndices)
 
 			// Cast to noder to insert data
-			noder := n.(noder[string])
+			noder := n.(nodeReadWriter[string])
 			for idx, val := range expectedData {
 				noder.insertPrefix(idx, val)
 			}
@@ -290,7 +290,7 @@ func TestImplementsNodeReader(t *testing.T) {
 func TestImplementsNoder(t *testing.T) {
 	tests := []struct {
 		name string
-		node noder[string]
+		node nodeReadWriter[string]
 	}{
 		{"node", &node[string]{}},
 		{"fastNode", &fastNode[string]{}},
@@ -399,7 +399,7 @@ func TestIteratorConsistency(t *testing.T) {
 			n := tt.node
 
 			// Cast to noder to insert data
-			noder := n.(noder[string])
+			noder := n.(nodeReadWriter[string])
 			for idx, val := range expectedData {
 				noder.insertPrefix(idx, val)
 			}
@@ -446,7 +446,7 @@ func TestNodes_MultipleChildrenLifecycle(t *testing.T) {
 
 	nodes := []struct {
 		name string
-		node noder[int]
+		node nodeReadWriter[int]
 	}{
 		{name: "node", node: &node[int]{}},
 		{name: "fastNode", node: &fastNode[int]{}},
@@ -519,7 +519,7 @@ func TestNodes_NearestAncestorWins_AcrossMultipleLevels(t *testing.T) {
 	t.Parallel()
 	nodes := []struct {
 		name string
-		node noder[int]
+		node nodeReadWriter[int]
 	}{
 		{name: "node", node: &node[int]{}},
 		{name: "fastNode", node: &fastNode[int]{}},
@@ -582,7 +582,7 @@ func TestNodes_Lookup_NoAncestorPath(t *testing.T) {
 	t.Parallel()
 	nodes := []struct {
 		name string
-		node noder[int]
+		node nodeReadWriter[int]
 	}{
 		{name: "node", node: &node[int]{}},
 		{name: "fastNode", node: &fastNode[int]{}},
@@ -615,7 +615,7 @@ func TestNodes_GetPrefix_And_OverwriteSemantics(t *testing.T) {
 	t.Parallel()
 	nodes := []struct {
 		name string
-		node noder[int]
+		node nodeReadWriter[int]
 	}{
 		{name: "node", node: &node[int]{}},
 		{name: "fastNode", node: &fastNode[int]{}},
@@ -655,7 +655,7 @@ func TestFastNode_IsEmpty_AfterAllDeletes(t *testing.T) {
 	t.Parallel()
 	nodes := []struct {
 		name string
-		node noder[int]
+		node nodeReadWriter[int]
 	}{
 		{name: "node", node: &node[int]{}},
 		{name: "fastNode", node: &fastNode[int]{}},
@@ -689,7 +689,7 @@ func TestNodes_LPMEmpty_NoMatch(t *testing.T) {
 	t.Parallel()
 	nodes := []struct {
 		name string
-		node noder[int]
+		node nodeReadWriter[int]
 	}{
 		{name: "node", node: &node[int]{}},
 		{name: "fastNode", node: &fastNode[int]{}},
@@ -730,7 +730,7 @@ func TestNodes_LPMLongestPrefixWins(t *testing.T) {
 
 	nodes := []struct {
 		name string
-		node noder[int]
+		node nodeReadWriter[int]
 	}{
 		{name: "node", node: &node[int]{}},
 		{name: "fastNode", node: &fastNode[int]{}},
@@ -763,7 +763,7 @@ func TestNodes_DeleteNonExistent_Safe(t *testing.T) {
 
 	nodes := []struct {
 		name string
-		node noder[int]
+		node nodeReadWriter[int]
 	}{
 		{name: "node", node: &node[int]{}},
 		{name: "fastNode", node: &fastNode[int]{}},
@@ -792,7 +792,7 @@ func TestNodes_Contains_EqualsLookupTruthiness(t *testing.T) {
 
 	nodes := []struct {
 		name string
-		node noder[int]
+		node nodeReadWriter[int]
 	}{
 		{name: "node", node: &node[int]{}},
 		{name: "fastNode", node: &fastNode[int]{}},
@@ -823,7 +823,7 @@ func TestNodes_Prefixes_AsSliceConsistency(t *testing.T) {
 
 	nodes := []struct {
 		name string
-		node noder[int]
+		node nodeReadWriter[int]
 	}{
 		{name: "node", node: &node[int]{}},
 		{name: "fastNode", node: &fastNode[int]{}},
@@ -862,7 +862,7 @@ func TestNode_Children_AsSliceConsistency(t *testing.T) {
 	t.Parallel()
 	nodes := []struct {
 		name string
-		node noder[int]
+		node nodeReadWriter[int]
 	}{
 		{name: "node", node: &node[int]{}},
 		{name: "fastNode", node: &fastNode[int]{}},
@@ -899,7 +899,7 @@ func TestNodes_InsertDuplicatePrefix_OverwritesValue(t *testing.T) {
 	t.Parallel()
 	nodes := []struct {
 		name string
-		node noder[int]
+		node nodeReadWriter[int]
 	}{
 		{name: "node", node: &node[int]{}},
 		{name: "fastNode", node: &fastNode[int]{}},
@@ -931,7 +931,7 @@ func TestNodes_DeleteChild_Idempotent(t *testing.T) {
 	t.Parallel()
 	nodes := []struct {
 		name string
-		node noder[int]
+		node nodeReadWriter[int]
 	}{
 		{name: "node", node: &node[int]{}},
 		{name: "fastNode", node: &fastNode[int]{}},
