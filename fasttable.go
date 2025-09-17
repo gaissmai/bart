@@ -469,10 +469,10 @@ func (f *Fast[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	n := f.rootNodeByVersion(is4)
 
 	for _, octet := range ip.AsSlice() {
-		// save the current best LPM val, lookup is cheap in Fast
-		if bestLPM, tmpOk := n.lookup(art.OctetToIdx(octet)); tmpOk {
+		// save the current best LPM val, lookup is cheap for fastNode
+		if bestLPM, ok2 := n.lookup(art.OctetToIdx(octet)); ok2 {
 			val = bestLPM
-			ok = tmpOk
+			ok = ok2
 		}
 
 		kidAny, exists := n.getChild(octet)
