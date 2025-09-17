@@ -305,8 +305,8 @@ func (n *fastNode[V]) allot(idx uint8, oldValPtr, valPtr *V) {
 
 		// child nodes, it's a complete binary tree
 		// left:  idx*2
-		// right: idx*2+1
-		stack = append(stack, idx<<1, idx<<1+1)
+		// right: (idx*2)+1
+		stack = append(stack, idx<<1, (idx<<1)+1)
 	}
 }
 
