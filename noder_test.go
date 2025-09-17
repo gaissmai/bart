@@ -17,7 +17,7 @@ func TestZeroValueState(t *testing.T) {
 		node nodeReader[string]
 	}{
 		{"node", &node[string]{}},
-		{"fatNode", &fatNode[string]{}},
+		{"fastNode", &fastNode[string]{}},
 	}
 
 	for _, tt := range tests {
@@ -57,7 +57,7 @@ func TestEmptyNodeIterators(t *testing.T) {
 		node nodeReader[string]
 	}{
 		{"node", &node[string]{}},
-		{"fatNode", &fatNode[string]{}},
+		{"fastNode", &fastNode[string]{}},
 	}
 
 	for _, tt := range tests {
@@ -90,7 +90,7 @@ func TestAllIndices(t *testing.T) {
 		node noder[string]
 	}{
 		{"node", &node[string]{}},
-		{"fatNode", &fatNode[string]{}},
+		{"fastNode", &fastNode[string]{}},
 	}
 
 	for _, tt := range tests {
@@ -155,8 +155,8 @@ func TestAllChildren(t *testing.T) {
 			childAddrs: []uint8{64, 128, 192},
 		},
 		{
-			name:       "fatNode",
-			node:       &fatNode[string]{},
+			name:       "fastNode",
+			node:       &fastNode[string]{},
 			childAddrs: []uint8{32, 96, 160},
 		},
 	}
@@ -173,8 +173,8 @@ func TestAllChildren(t *testing.T) {
 					child = &node[string]{}
 					child.(*node[string]).insertPrefix(1, "child_val")
 				} else {
-					child = &fatNode[string]{}
-					child.(*fatNode[string]).insertPrefix(1, "child_val")
+					child = &fastNode[string]{}
+					child.(*fastNode[string]).insertPrefix(1, "child_val")
 				}
 				expectedChildren[addr] = child
 			}
@@ -220,7 +220,7 @@ func TestImplementsNodeReader(t *testing.T) {
 		node nodeReader[string]
 	}{
 		{"node", &node[string]{}},
-		{"fatNode", &fatNode[string]{}},
+		{"fastNode", &fastNode[string]{}},
 	}
 
 	for _, tt := range tests {
@@ -293,7 +293,7 @@ func TestImplementsNoder(t *testing.T) {
 		node noder[string]
 	}{
 		{"node", &node[string]{}},
-		{"fatNode", &fatNode[string]{}},
+		{"fastNode", &fastNode[string]{}},
 	}
 
 	for _, tt := range tests {
@@ -372,7 +372,7 @@ func TestIteratorConsistency(t *testing.T) {
 		node nodeReader[string]
 	}{
 		{"node", &node[string]{}},
-		{"fatNode", &fatNode[string]{}},
+		{"fastNode", &fastNode[string]{}},
 	}
 
 	// Define expected test data
@@ -449,7 +449,7 @@ func TestNodes_MultipleChildrenLifecycle(t *testing.T) {
 		node noder[int]
 	}{
 		{name: "node", node: &node[int]{}},
-		{name: "fatNode", node: &fatNode[int]{}},
+		{name: "fastNode", node: &fastNode[int]{}},
 	}
 
 	for _, tt := range nodes {
@@ -522,7 +522,7 @@ func TestNodes_NearestAncestorWins_AcrossMultipleLevels(t *testing.T) {
 		node noder[int]
 	}{
 		{name: "node", node: &node[int]{}},
-		{name: "fatNode", node: &fatNode[int]{}},
+		{name: "fastNode", node: &fastNode[int]{}},
 	}
 
 	for _, tt := range nodes {
@@ -585,7 +585,7 @@ func TestNodes_Lookup_NoAncestorPath(t *testing.T) {
 		node noder[int]
 	}{
 		{name: "node", node: &node[int]{}},
-		{name: "fatNode", node: &fatNode[int]{}},
+		{name: "fastNode", node: &fastNode[int]{}},
 	}
 
 	for _, tt := range nodes {
@@ -618,7 +618,7 @@ func TestNodes_GetPrefix_And_OverwriteSemantics(t *testing.T) {
 		node noder[int]
 	}{
 		{name: "node", node: &node[int]{}},
-		{name: "fatNode", node: &fatNode[int]{}},
+		{name: "fastNode", node: &fastNode[int]{}},
 	}
 
 	for _, tt := range nodes {
@@ -651,14 +651,14 @@ func TestNodes_GetPrefix_And_OverwriteSemantics(t *testing.T) {
 	}
 }
 
-func TestFatNode_IsEmpty_AfterAllDeletes(t *testing.T) {
+func TestFastNode_IsEmpty_AfterAllDeletes(t *testing.T) {
 	t.Parallel()
 	nodes := []struct {
 		name string
 		node noder[int]
 	}{
 		{name: "node", node: &node[int]{}},
-		{name: "fatNode", node: &fatNode[int]{}},
+		{name: "fastNode", node: &fastNode[int]{}},
 	}
 
 	for _, tt := range nodes {
@@ -692,7 +692,7 @@ func TestNodes_LPMEmpty_NoMatch(t *testing.T) {
 		node noder[int]
 	}{
 		{name: "node", node: &node[int]{}},
-		{name: "fatNode", node: &fatNode[int]{}},
+		{name: "fastNode", node: &fastNode[int]{}},
 	}
 
 	for _, tt := range nodes {
@@ -733,7 +733,7 @@ func TestNodes_LPMLongestPrefixWins(t *testing.T) {
 		node noder[int]
 	}{
 		{name: "node", node: &node[int]{}},
-		{name: "fatNode", node: &fatNode[int]{}},
+		{name: "fastNode", node: &fastNode[int]{}},
 	}
 
 	for _, tt := range nodes {
@@ -766,7 +766,7 @@ func TestNodes_DeleteNonExistent_Safe(t *testing.T) {
 		node noder[int]
 	}{
 		{name: "node", node: &node[int]{}},
-		{name: "fatNode", node: &fatNode[int]{}},
+		{name: "fastNode", node: &fastNode[int]{}},
 	}
 
 	for _, tt := range nodes {
@@ -795,7 +795,7 @@ func TestNodes_Contains_EqualsLookupTruthiness(t *testing.T) {
 		node noder[int]
 	}{
 		{name: "node", node: &node[int]{}},
-		{name: "fatNode", node: &fatNode[int]{}},
+		{name: "fastNode", node: &fastNode[int]{}},
 	}
 
 	for _, tt := range nodes {
@@ -826,7 +826,7 @@ func TestNodes_Prefixes_AsSliceConsistency(t *testing.T) {
 		node noder[int]
 	}{
 		{name: "node", node: &node[int]{}},
-		{name: "fatNode", node: &fatNode[int]{}},
+		{name: "fastNode", node: &fastNode[int]{}},
 	}
 
 	for _, tt := range nodes {
@@ -865,7 +865,7 @@ func TestNode_Children_AsSliceConsistency(t *testing.T) {
 		node noder[int]
 	}{
 		{name: "node", node: &node[int]{}},
-		{name: "fatNode", node: &fatNode[int]{}},
+		{name: "fastNode", node: &fastNode[int]{}},
 	}
 
 	for _, tt := range nodes {
@@ -902,7 +902,7 @@ func TestNodes_InsertDuplicatePrefix_OverwritesValue(t *testing.T) {
 		node noder[int]
 	}{
 		{name: "node", node: &node[int]{}},
-		{name: "fatNode", node: &fatNode[int]{}},
+		{name: "fastNode", node: &fastNode[int]{}},
 	}
 
 	for _, tt := range nodes {
@@ -934,7 +934,7 @@ func TestNodes_DeleteChild_Idempotent(t *testing.T) {
 		node noder[int]
 	}{
 		{name: "node", node: &node[int]{}},
-		{name: "fatNode", node: &fatNode[int]{}},
+		{name: "fastNode", node: &fastNode[int]{}},
 	}
 
 	for _, tt := range nodes {

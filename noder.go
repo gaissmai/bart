@@ -9,7 +9,7 @@ import "iter"
 // for testing, dumping and traversal.
 //
 // It provides a unified API for setting or accessing both regular
-// nodes and fat nodes in the routing table structures.
+// nodes and fast nodes in the routing table structures.
 //
 // Type parameter V represents the value type stored at prefixes in the tree.
 type noder[V any] interface {

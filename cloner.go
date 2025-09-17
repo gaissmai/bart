@@ -156,14 +156,14 @@ func (n *node[V]) cloneRec(cloneFn cloneFunc[V]) *node[V] {
 	return c
 }
 
-// cloneFlat returns a shallow copy of the current fatNode[V],
+// cloneFlat returns a shallow copy of the current fastNode[V],
 // Its semantics are identical to [node.cloneFlat].
-func (n *fatNode[V]) cloneFlat(cloneFn cloneFunc[V]) *fatNode[V] {
+func (n *fastNode[V]) cloneFlat(cloneFn cloneFunc[V]) *fastNode[V] {
 	if n == nil {
 		return nil
 	}
 
-	c := new(fatNode[V])
+	c := new(fastNode[V])
 	if n.isEmpty() {
 		return c
 	}
@@ -194,7 +194,7 @@ func (n *fatNode[V]) cloneFlat(cloneFn cloneFunc[V]) *fatNode[V] {
 		kidAny := *n.children[addr]
 
 		switch kid := kidAny.(type) {
-		case *fatNode[V]:
+		case *fastNode[V]:
 			// just copy the pointer
 			c.children[addr] = n.children[addr]
 
@@ -215,9 +215,9 @@ func (n *fatNode[V]) cloneFlat(cloneFn cloneFunc[V]) *fatNode[V] {
 	return c
 }
 
-// cloneRec performs a recursive deep copy of the fatNode[V] and all its descendants.
+// cloneRec performs a recursive deep copy of the fastNode[V] and all its descendants.
 // Its semantics are identical to [node.cloneRec].
-func (n *fatNode[V]) cloneRec(cloneFn cloneFunc[V]) *fatNode[V] {
+func (n *fastNode[V]) cloneRec(cloneFn cloneFunc[V]) *fastNode[V] {
 	if n == nil {
 		return nil
 	}
@@ -225,12 +225,12 @@ func (n *fatNode[V]) cloneRec(cloneFn cloneFunc[V]) *fatNode[V] {
 	// Perform a flat clone of the current node.
 	c := n.cloneFlat(cloneFn)
 
-	// Recursively clone all child nodes of type *fatNode[V]
+	// Recursively clone all child nodes of type *fastNode[V]
 	for _, octet := range c.childrenBitSet.AsSlice(&[256]uint8{}) {
 		kidAny := *c.children[octet]
 
 		switch kid := kidAny.(type) {
-		case *fatNode[V]:
+		case *fastNode[V]:
 			nodeAny := any(kid.cloneRec(cloneFn))
 			c.children[octet] = &nodeAny
 		}

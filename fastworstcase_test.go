@@ -7,13 +7,13 @@ import (
 	"testing"
 )
 
-func TestFatWorstCaseMatch4(t *testing.T) {
+func TestFastWorstCaseMatch4(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Contains", func(t *testing.T) {
 		t.Parallel()
 
-		tbl := new(Fat[string])
+		tbl := new(Fast[string])
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
 		}
@@ -28,7 +28,7 @@ func TestFatWorstCaseMatch4(t *testing.T) {
 	t.Run("Lookup", func(t *testing.T) {
 		t.Parallel()
 
-		tbl := new(Fat[string])
+		tbl := new(Fast[string])
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
 		}
@@ -47,13 +47,13 @@ func TestFatWorstCaseMatch4(t *testing.T) {
 	})
 }
 
-func TestFatWorstCaseMiss4(t *testing.T) {
+func TestFastWorstCaseMiss4(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Contains", func(t *testing.T) {
 		t.Parallel()
 
-		tbl := new(Fat[string])
+		tbl := new(Fast[string])
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
 		}
@@ -70,7 +70,7 @@ func TestFatWorstCaseMiss4(t *testing.T) {
 	t.Run("Lookup", func(t *testing.T) {
 		t.Parallel()
 
-		tbl := new(Fat[string])
+		tbl := new(Fast[string])
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
 		}
@@ -85,13 +85,13 @@ func TestFatWorstCaseMiss4(t *testing.T) {
 	})
 }
 
-func TestFatWorstCaseMatch6(t *testing.T) {
+func TestFastWorstCaseMatch6(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Contains", func(t *testing.T) {
 		t.Parallel()
 
-		tbl := new(Fat[string])
+		tbl := new(Fast[string])
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())
 		}
@@ -106,7 +106,7 @@ func TestFatWorstCaseMatch6(t *testing.T) {
 	t.Run("Lookup", func(t *testing.T) {
 		t.Parallel()
 
-		tbl := new(Fat[string])
+		tbl := new(Fast[string])
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())
 		}
@@ -125,13 +125,13 @@ func TestFatWorstCaseMatch6(t *testing.T) {
 	})
 }
 
-func TestFatWorstCaseMiss6(t *testing.T) {
+func TestFastWorstCaseMiss6(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Contains", func(t *testing.T) {
 		t.Parallel()
 
-		tbl := new(Fat[string])
+		tbl := new(Fast[string])
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())
 		}
@@ -148,7 +148,7 @@ func TestFatWorstCaseMiss6(t *testing.T) {
 	t.Run("Lookup", func(t *testing.T) {
 		t.Parallel()
 
-		tbl := new(Fat[string])
+		tbl := new(Fast[string])
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())
 		}
@@ -163,9 +163,9 @@ func TestFatWorstCaseMiss6(t *testing.T) {
 	})
 }
 
-func BenchmarkFatWorstCaseMatch4(b *testing.B) {
+func BenchmarkFastWorstCaseMatch4(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
-		tbl := new(Fat[string])
+		tbl := new(Fast[string])
 
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
@@ -177,7 +177,7 @@ func BenchmarkFatWorstCaseMatch4(b *testing.B) {
 	})
 
 	b.Run("Lookup", func(b *testing.B) {
-		tbl := new(Fat[string])
+		tbl := new(Fast[string])
 
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
@@ -191,9 +191,9 @@ func BenchmarkFatWorstCaseMatch4(b *testing.B) {
 	})
 }
 
-func BenchmarkFatWorstCaseMiss4(b *testing.B) {
+func BenchmarkFastWorstCaseMiss4(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
-		tbl := new(Fat[string])
+		tbl := new(Fast[string])
 
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
@@ -207,7 +207,7 @@ func BenchmarkFatWorstCaseMiss4(b *testing.B) {
 	})
 
 	b.Run("Lookup", func(b *testing.B) {
-		tbl := new(Fat[string])
+		tbl := new(Fast[string])
 
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, p.String())
@@ -221,9 +221,9 @@ func BenchmarkFatWorstCaseMiss4(b *testing.B) {
 	})
 }
 
-func BenchmarkFatWorstCaseMatch6(b *testing.B) {
+func BenchmarkFastWorstCaseMatch6(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
-		tbl := new(Fat[string])
+		tbl := new(Fast[string])
 
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())
@@ -235,7 +235,7 @@ func BenchmarkFatWorstCaseMatch6(b *testing.B) {
 	})
 
 	b.Run("Lookup", func(b *testing.B) {
-		tbl := new(Fat[string])
+		tbl := new(Fast[string])
 
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())
@@ -249,9 +249,9 @@ func BenchmarkFatWorstCaseMatch6(b *testing.B) {
 	})
 }
 
-func BenchmarkFatWorstCaseMiss6(b *testing.B) {
+func BenchmarkFastWorstCaseMiss6(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
-		tbl := new(Fat[string])
+		tbl := new(Fast[string])
 
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())
@@ -265,7 +265,7 @@ func BenchmarkFatWorstCaseMiss6(b *testing.B) {
 	})
 
 	b.Run("Lookup", func(b *testing.B) {
-		tbl := new(Fat[string])
+		tbl := new(Fast[string])
 
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, p.String())
