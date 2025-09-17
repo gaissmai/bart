@@ -106,6 +106,9 @@ func (n *node[V]) getIndices() []uint8 {
 	return n.prefixes.Bits()
 }
 
+// allIndices returns an iterator over all prefix entries.
+// Each iteration yields the prefix index (uint8) and its associated value (V).
+//
 //nolint:unused
 func (n *node[V]) allIndices() iter.Seq2[uint8, V] {
 	return func(yield func(uint8, V) bool) {
