@@ -106,6 +106,7 @@ func (n *node[V]) getIndices() []uint8 {
 	return n.prefixes.Bits()
 }
 
+//nolint:unused
 func (n *fatNode[V]) allIndices() iter.Seq2[uint8, V] {
 	return func(yield func(uint8, V) bool) {
 		for _, idx := range n.getIndices() {
@@ -150,6 +151,7 @@ func (n *node[V]) getChildAddrs() []uint8 {
 	return n.children.AsSlice(&[256]uint8{})
 }
 
+//nolint:unused
 func (n *node[V]) allChildren() iter.Seq2[uint8, any] {
 	return func(yield func(addr uint8, child any) bool) {
 		for _, addr := range n.getChildAddrs() {
