@@ -178,7 +178,7 @@ func (n *fatNode[V]) getIndices() []uint8 {
 }
 
 //nolint:unused
-func (n *node[V]) allIndices() iter.Seq2[uint8, V] {
+func (n *fatNode[V]) allIndices() iter.Seq2[uint8, V] {
 	return func(yield func(uint8, V) bool) {
 		for _, idx := range n.getIndices() {
 			val := n.mustGetPrefix(idx)
