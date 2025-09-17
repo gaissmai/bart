@@ -157,8 +157,9 @@ func (n *node[V]) getChildAddrs() []uint8 {
 //nolint:unused
 func (n *node[V]) allChildren() iter.Seq2[uint8, any] {
 	return func(yield func(addr uint8, child any) bool) {
-		for _, addr := range n.getChildAddrs() {
-			child := n.mustGetChild(addr)
+		addrs := n.children.AsSlice(&[256]uint8{})
+		for i, addr := range addrs {
+			child := n.children.Items[i]
 			if !yield(addr, child) {
 				return
 			}
