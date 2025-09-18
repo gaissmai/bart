@@ -12,10 +12,10 @@ import (
 
 // LookupTbl is a precomputed read‑only table used in hot paths.
 //
-// It allows a one shot bitset intersection algorithm:
+// It allows a one-shot bitset intersection algorithm:
 // Each entry i encodes i and all its binary ancestors (i>>1, i>>2, ...).
 //
-// idx must be the uint8 produced by art.OctetToIdx or art.PfxToIdx.
+// idx must be the uint8 produced by art.OctetToIdx or art.PfxToIdx (0 is invalid).
 //
 // Usage:
 //
