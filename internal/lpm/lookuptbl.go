@@ -10,34 +10,23 @@ import (
 	"github.com/gaissmai/bart/internal/bitset"
 )
 
-// BackTrackingBitset is the backtracking sequence in the complete binary tree
-// of the prefixes as bitstring.
+// LookupTbl allows a one shot bitset intersection algorithm:
 //
-// allows a one shot bitset intersection algorithm:
-//
-//	func (n *node[V]) contains(idx uint) bool {
-//		normalizedIdx := normalizeIdx(idx)
-//		return n.prefixes.Intersects(lpm.BackTrackingBitset(normalizedIdx))
+//	func (n *node[V]) contains(idx uint8) bool {
+//		return n.prefixes.Intersects(&lpm.LookupTbl[idx])
 //	}
 //
 // instead of a sequence of single bitset tests:
 //
-//	func (n *node[V]) contains(idx uint) bool {
-//	normalizedIdx := normalizeIdx(idx)
-//		for ; normalizedIdx > 0; normalizedIdx >>= 1 {
-//			if n.prefixes.Test(normalizedIdx) {
+//	func (n *node[V]) contains(idx uint8) bool {
+//		for ; idx > 0; idx >>= 1 {
+//			if n.prefixes.Test(idx) {
 //				return true
 //			}
 //		}
 //		return false
 //	}
-//
-// ATTENTION: pointer return, speed is the top priority here.
-func BackTrackingBitset(idx uint8) *bitset.BitSet256 {
-	return &lookupTbl[idx]
-}
-
-var lookupTbl = [256]bitset.BitSet256{
+var LookupTbl = [256]bitset.BitSet256{
 	/* idx:   0 */ {0x0, 0x0, 0x0, 0x0}, // invalid
 	/* idx:   1 */ {0x2, 0x0, 0x0, 0x0}, // [1]
 	/* idx:   2 */ {0x6, 0x0, 0x0, 0x0}, // [1 2]

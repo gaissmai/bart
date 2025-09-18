@@ -162,6 +162,8 @@ func (n *fastNode[V]) getPrefix(idx uint8) (val V, exists bool) {
 // mustGetPrefix returns the value for the given prefix index.
 // Panics if no prefix exists at idx. This method should only be called
 // when the caller has verified the prefix exists.
+//
+//nolint:unused
 func (n *fastNode[V]) mustGetPrefix(idx uint8) V {
 	return *n.prefixes[idx]
 }
@@ -240,8 +242,8 @@ func (n *fastNode[V]) lookup(idx uint8) (val V, ok bool) {
 // Its semantics are identical to [node.lookupIdx].
 func (n *fastNode[V]) lookupIdx(idx uint8) (baseIdx uint8, val V, ok bool) {
 	// top is the idx of the longest-prefix-match
-	if top, ok := n.prefixesBitSet.IntersectionTop(lpm.BackTrackingBitset(idx)); ok {
-		return top, n.mustGetPrefix(top), true
+	if top, ok := n.prefixesBitSet.IntersectionTop(&lpm.LookupTbl[idx]); ok {
+		return top, *n.prefixes[idx], true
 	}
 	return
 }
