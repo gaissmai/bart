@@ -38,10 +38,10 @@ func PfxToIdx(octet, pfxLen uint8) uint8 {
 	return octet>>(8-pfxLen) + 1<<pfxLen
 }
 
-// OctetToIdx maps octet/8 prefixes to numbers. The return values range from 256 to 511.
-// OctetToIdx is a special case of PfxToIdx.
-func OctetToIdx(octet uint8) uint {
-	return uint(octet) + 256
+// OctetToIdx maps octet/8 prefixes to numbers in the range [128..255].
+func OctetToIdx(octet uint8) uint8 {
+	//nolint:gosec  // G115: integer overflow conversion uint -> uint8
+	return uint8((uint(octet) + 256) >> 1)
 }
 
 // IdxToPfx returns the octet and prefix len of baseIdx.

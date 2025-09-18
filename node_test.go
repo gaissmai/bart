@@ -223,7 +223,7 @@ func BenchmarkNodesPrefixLPM(b *testing.B) {
 			idx := art.PfxToIdx(route.octet, route.bits)
 
 			for b.Loop() {
-				this.lookup(uint(idx))
+				this.lookup(idx)
 			}
 		})
 
@@ -232,7 +232,7 @@ func BenchmarkNodesPrefixLPM(b *testing.B) {
 			idx := art.PfxToIdx(route.octet, route.bits)
 
 			for b.Loop() {
-				that.lookup(uint(idx))
+				that.lookup(idx)
 			}
 		})
 
@@ -241,7 +241,7 @@ func BenchmarkNodesPrefixLPM(b *testing.B) {
 			idx := art.PfxToIdx(route.octet, route.bits)
 
 			for b.Loop() {
-				this.contains(uint(idx))
+				this.contains(idx)
 			}
 		})
 
@@ -250,7 +250,7 @@ func BenchmarkNodesPrefixLPM(b *testing.B) {
 			idx := art.PfxToIdx(route.octet, route.bits)
 
 			for b.Loop() {
-				that.contains(uint(idx))
+				that.contains(idx)
 			}
 		})
 	}

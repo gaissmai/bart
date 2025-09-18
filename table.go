@@ -708,13 +708,11 @@ LOOP:
 
 		// longest prefix match, skip if node has no prefixes
 		if n.prefixes.Len() != 0 {
-			normalizedIdx := normalizeIdx(art.OctetToIdx(octets[depth]))
-			// lpmGet(idx), manually inlined
-			// --------------------------------------------------------------
-			if topIdx, ok := n.prefixes.IntersectionTop(lpm.BackTrackingBitset(normalizedIdx)); ok {
+			idx := art.OctetToIdx(octets[depth])
+			// lookupIdx() manually inlined
+			if topIdx, ok := n.prefixes.IntersectionTop(lpm.BackTrackingBitset(idx)); ok {
 				return n.mustGetPrefix(topIdx), true
 			}
-			// --------------------------------------------------------------
 		}
 	}
 
@@ -767,7 +765,7 @@ LOOP:
 	for depth, octet = range octets {
 		depth = depth & depthMask // BCE
 
-		// stepped one past the last stride of interest; back up to last and exit
+		// stepped one past the last stride of interest; back up to last and break
 		if depth > lastOctetPlusOne {
 			depth--
 			break
@@ -829,19 +827,19 @@ LOOP:
 
 		// only the lastOctet may have a different prefix len
 		// all others are just host routes
-		var normalizedIdx uint8
+		var idx uint8
 		octet = octets[depth]
 		// Last “octet” from prefix, update/insert prefix into node.
-		// Note: For /32 and /128, depth never reaches lastOctetPlusOne (4/16),
+		// Note: For /32 and /128, depth never reaches lastOctetPlusOne (4 or 16),
 		// so those are handled below via the fringe/leaf path.
 		if depth == lastOctetPlusOne {
-			normalizedIdx = art.PfxToIdx(octet, lastBits)
+			idx = art.PfxToIdx(octet, lastBits)
 		} else {
-			normalizedIdx = normalizeIdx(art.OctetToIdx(octet))
+			idx = art.OctetToIdx(octet)
 		}
 
-		// manually inlined: lpmGet(idx)
-		if topIdx, ok := n.prefixes.IntersectionTop(lpm.BackTrackingBitset(normalizedIdx)); ok {
+		// manually inlined: lookupIdx(idx)
+		if topIdx, ok := n.prefixes.IntersectionTop(lpm.BackTrackingBitset(idx)); ok {
 			val = n.mustGetPrefix(topIdx)
 
 			// called from LookupPrefix
@@ -969,13 +967,13 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 
 			// only the lastOctet may have a different prefix len
 			// all others are just host routes
-			var idx uint
+			var idx uint8
 			octet = octets[depth]
 			// Last “octet” from prefix, update/insert prefix into node.
 			// Note: For /32 and /128, depth never reaches lastOctetPlusOne (4/16),
 			// so those are handled below via the fringe/leaf path.
 			if depth == lastOctetPlusOne {
-				idx = uint(art.PfxToIdx(octet, lastBits))
+				idx = art.PfxToIdx(octet, lastBits)
 			} else {
 				idx = art.OctetToIdx(octet)
 			}

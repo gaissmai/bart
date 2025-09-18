@@ -57,8 +57,6 @@ func (n *fastNode[V]) isEmpty() bool {
 
 // getChild returns the child node at the specified address and true if it exists.
 // If no child exists at addr, returns nil and false.
-//
-//nolint:unused
 func (n *fastNode[V]) getChild(addr uint8) (any, bool) {
 	if anyPtr := n.children[addr]; anyPtr != nil {
 		return *anyPtr, true
@@ -78,8 +76,6 @@ func (n *fastNode[V]) mustGetChild(addr uint8) any {
 
 // getChildAddrs returns a slice containing all addresses that have child nodes.
 // The addresses are returned in ascending order.
-//
-//nolint:unused
 func (n *fastNode[V]) getChildAddrs() []uint8 {
 	return n.childrenBitSet.AsSlice(&[256]uint8{})
 }
@@ -166,16 +162,12 @@ func (n *fastNode[V]) getPrefix(idx uint8) (val V, exists bool) {
 // mustGetPrefix returns the value for the given prefix index.
 // Panics if no prefix exists at idx. This method should only be called
 // when the caller has verified the prefix exists.
-//
-//nolint:unused
 func (n *fastNode[V]) mustGetPrefix(idx uint8) V {
 	return *n.prefixes[idx]
 }
 
 // getIndices returns a slice containing all prefix indices that have values stored.
 // The indices are returned in ascending order.
-//
-//nolint:unused
 func (n *fastNode[V]) getIndices() []uint8 {
 	return n.prefixesBitSet.AsSlice(&[256]uint8{})
 }
@@ -220,13 +212,9 @@ func (n *fastNode[V]) deletePrefix(idx uint8) (val V, exists bool) {
 // This function performs a presence check using the ART algorithm's
 // hierarchical prefix structure. It tests whether any ancestor prefix
 // exists for the given index by probing the slot at idx (children inherit
-// ancestor pointers via allot), after normalizing the ART stride index.
-// idx must come from art.PfxToIdx (1..255) or art.OctetToIdx(octet) (256..511).
-// Host-route indices [256..511] are normalized to their parent prefix slot
-// [128..255] via idx >>= 1.
-func (n *fastNode[V]) contains(idx uint) (ok bool) {
-	normalizedIdx := normalizeIdx(idx)
-	return n.prefixes[normalizedIdx] != nil
+// ancestor pointers via allot).
+func (n *fastNode[V]) contains(idx uint8) (ok bool) {
+	return n.prefixes[idx] != nil
 }
 
 // lookup performs a longest-prefix match (LPM) lookup for the given index
@@ -236,9 +224,8 @@ func (n *fastNode[V]) contains(idx uint) (ok bool) {
 // otherwise, it returns the zero value and false. The lookup uses the ART
 // algorithm's hierarchical structure to find the most specific
 // matching prefix.
-func (n *fastNode[V]) lookup(idx uint) (val V, ok bool) {
-	normalizedIdx := normalizeIdx(idx)
-	if valPtr := n.prefixes[normalizedIdx]; valPtr != nil {
+func (n *fastNode[V]) lookup(idx uint8) (val V, ok bool) {
+	if valPtr := n.prefixes[idx]; valPtr != nil {
 		return *valPtr, true
 	}
 	return
@@ -247,17 +234,13 @@ func (n *fastNode[V]) lookup(idx uint) (val V, ok bool) {
 // lookupIdx performs a longest-prefix match (LPM) lookup for the given index (idx)
 // within the 8-bit stride-based prefix table at this trie depth.
 //
-// idx must be an ART stride index as returned by art.OctetToIdx (range 256..511) or
-// art.PfxToIdx (range 1..255)
-//
 // The function returns the matched base index, associated value, and true if a
 // matching prefix exists at this level; otherwise, ok is false.
 //
 // Its semantics are identical to [node.lookupIdx].
-func (n *fastNode[V]) lookupIdx(idx uint) (baseIdx uint8, val V, ok bool) {
-	normalizedIdx := normalizeIdx(idx)
+func (n *fastNode[V]) lookupIdx(idx uint8) (baseIdx uint8, val V, ok bool) {
 	// top is the idx of the longest-prefix-match
-	if top, ok := n.prefixesBitSet.IntersectionTop(lpm.BackTrackingBitset(normalizedIdx)); ok {
+	if top, ok := n.prefixesBitSet.IntersectionTop(lpm.BackTrackingBitset(idx)); ok {
 		return top, n.mustGetPrefix(top), true
 	}
 	return
