@@ -20,13 +20,18 @@ linters:
     - wastedassign
     - copyloopvar
     - tparallel
+    - gochecknoglobals
   settings:
     gocyclo:
       min-complexity: 30
     gosec:
       excludes:
-        - G404 # deterministic RNG in tests/benchmarks only
+        - G404             # deterministic RNG in tests/benchmarks only
   exclusions:
+    rules:
+      - path: '(.+)_test\.go'
+        linters:
+          - gochecknoglobals
     generated: lax
     presets:
       - comments
