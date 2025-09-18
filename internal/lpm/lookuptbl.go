@@ -10,7 +10,14 @@ import (
 	"github.com/gaissmai/bart/internal/bitset"
 )
 
-// LookupTbl allows a one shot bitset intersection algorithm:
+// LookupTbl is a precomputed read‑only table used in hot paths.
+//
+// It allows a one shot bitset intersection algorithm:
+// Each entry i encodes i and all its binary ancestors (i>>1, i>>2, ...).
+//
+// idx must be the uint8 produced by art.OctetToIdx or art.PfxToIdx.
+//
+// Usage:
 //
 //	func (n *node[V]) contains(idx uint8) bool {
 //		return n.prefixes.Intersects(&lpm.LookupTbl[idx])
