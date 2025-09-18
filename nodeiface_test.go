@@ -539,7 +539,7 @@ func TestNodes_NearestAncestorWins_AcrossMultipleLevels(t *testing.T) {
 
 			// Helper to assert lookups
 			assertLookup := func(idx uint8, want int) {
-				if got, ok := tt.node.lookup(uint(idx)); !ok || got != want {
+				if got, ok := tt.node.lookup(idx); !ok || got != want {
 					t.Fatalf("lookup(%d)=(%d,%v), want (%d,true)", idx, got, ok, want)
 				}
 			}
