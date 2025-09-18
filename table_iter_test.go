@@ -13,9 +13,15 @@ import (
 
 func TestAll4RangeOverFunc(t *testing.T) {
 	t.Parallel()
+
+	n := 10_000
+	if testing.Short() {
+		n = 1_000
+	}
+
 	prng := rand.New(rand.NewPCG(42, 42))
-	pfxs := randomPrefixes4(prng, 10_000)
-	seen := make(map[netip.Prefix]int, 10_000)
+	pfxs := randomPrefixes4(prng, n)
+	seen := make(map[netip.Prefix]int, n)
 
 	t.Run("All4RangeOverFunc", func(t *testing.T) {
 		t.Parallel()
@@ -65,9 +71,15 @@ func TestAll4RangeOverFunc(t *testing.T) {
 
 func TestAll6RangeOverFunc(t *testing.T) {
 	t.Parallel()
+
+	n := 10_000
+	if testing.Short() {
+		n = 1_000
+	}
+
 	prng := rand.New(rand.NewPCG(42, 42))
-	pfxs := randomPrefixes6(prng, 10_000)
-	seen := make(map[netip.Prefix]int, 10_000)
+	pfxs := randomPrefixes6(prng, n)
+	seen := make(map[netip.Prefix]int, n)
 
 	t.Run("All6RangeOverFunc", func(t *testing.T) {
 		t.Parallel()
@@ -117,9 +129,15 @@ func TestAll6RangeOverFunc(t *testing.T) {
 
 func TestAllRangeOverFunc(t *testing.T) {
 	t.Parallel()
+
+	n := 10_000
+	if testing.Short() {
+		n = 1_000
+	}
+
 	prng := rand.New(rand.NewPCG(42, 42))
-	pfxs := randomPrefixes(prng, 10_000)
-	seen := make(map[netip.Prefix]int, 10_000)
+	pfxs := randomPrefixes(prng, n)
+	seen := make(map[netip.Prefix]int, n)
 
 	t.Run("AllRangeOverFunc", func(t *testing.T) {
 		t.Parallel()
@@ -169,9 +187,15 @@ func TestAllRangeOverFunc(t *testing.T) {
 
 func TestAll4SortedIter(t *testing.T) {
 	t.Parallel()
+
+	n := 10_000
+	if testing.Short() {
+		n = 1_000
+	}
+
 	prng := rand.New(rand.NewPCG(42, 42))
-	pfxs := randomPrefixes4(prng, 10_000)
-	seen := make(map[netip.Prefix]int, 10_000)
+	pfxs := randomPrefixes4(prng, n)
+	seen := make(map[netip.Prefix]int, n)
 
 	t.Run("All4SortedRangeOverFunc", func(t *testing.T) {
 		t.Parallel()
@@ -221,9 +245,15 @@ func TestAll4SortedIter(t *testing.T) {
 
 func TestAll6SortedRangeOverFunc(t *testing.T) {
 	t.Parallel()
+
+	n := 10_000
+	if testing.Short() {
+		n = 1_000
+	}
+
 	prng := rand.New(rand.NewPCG(42, 42))
-	pfxs := randomPrefixes6(prng, 10_000)
-	seen := make(map[netip.Prefix]int, 10_000)
+	pfxs := randomPrefixes6(prng, n)
+	seen := make(map[netip.Prefix]int, n)
 
 	t.Run("All6SortedRangeOverFunc", func(t *testing.T) {
 		t.Parallel()
@@ -273,9 +303,15 @@ func TestAll6SortedRangeOverFunc(t *testing.T) {
 
 func TestAllSortedRangeOverFunc(t *testing.T) {
 	t.Parallel()
+
+	n := 10_000
+	if testing.Short() {
+		n = 1_000
+	}
+
 	prng := rand.New(rand.NewPCG(42, 42))
-	pfxs := randomPrefixes(prng, 10_000)
-	seen := make(map[netip.Prefix]int, 10_000)
+	pfxs := randomPrefixes(prng, n)
+	seen := make(map[netip.Prefix]int, n)
 
 	t.Run("AllSortedRangeOverFunc", func(t *testing.T) {
 		t.Parallel()
