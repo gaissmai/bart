@@ -136,7 +136,23 @@ func dumpListRec[V any](n nodeReader[V], parentIdx uint8, path stridePath, depth
 // It's a complex recursive function, you have to know the data structure
 // by heart to understand this function!
 //
-// See the  artlookup.pdf paper in the doc folder, the baseIndex function is the key.
+// directItemsRec returns the set of trieItem entries that are directly covered by the
+// parent identified by parentIdx under node n (i.e., the prefixes and immediate
+// children whose longest-prefix-match resolves to parentIdx).
+//
+// The function performs two passes over n:
+// 1. Prefix entries (n.allIndices): for each stored index it computes the next
+//    candidate LPM (idx>>1) and includes the prefix when that LPM equals parentIdx.
+// 2. Child entries (n.allChildren): for each child it computes an LPM for the
+//    child's host index; if the LPM equals parentIdx the child is either
+//    descended into (nodeReader), or converted to a trieItem for path-compressed
+//    leaves/fringes. For nodeReader children the recursion continues with
+//    parentIdx reset to 0 and depth/path advanced.
+//
+// The returned trieItem values contain reconstructed CIDRs (via cidrFromPath or
+// cidrForFringe) and the associated stored value. If n is nil or empty the
+// function returns nil. The function will panic if it encounters an unexpected
+// child concrete type.
 func directItemsRec[V any](n nodeReader[V], parentIdx uint8, path stridePath, depth int, is4 bool) (directItems []trieItem[V]) {
 	// recursion stop condition
 	if n == nil || n.isEmpty() {

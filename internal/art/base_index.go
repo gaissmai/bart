@@ -30,7 +30,7 @@ import "math/bits"
 //		                0b0000_0001 => 0b0000_1000
 //		                          ^ << 3      ^
 //		                 + -----------------------
-//		                               0b0000_1101 = 13
+// Panics if `pfxLen > 7`.
 func PfxToIdx(octet, pfxLen uint8) uint8 {
 	if pfxLen > 7 {
 		panic("PfxToIdx: invalid pfxLen > 7")
@@ -38,7 +38,7 @@ func PfxToIdx(octet, pfxLen uint8) uint8 {
 	return octet>>(8-pfxLen) + 1<<pfxLen
 }
 
-// OctetToIdx maps octet/8 prefixes to numbers in the range [128..255].
+// deterministic uint8 result for every input 0..255. No error conditions are raised.
 func OctetToIdx(octet uint8) uint8 {
 	//nolint:gosec  // G115: integer overflow conversion uint -> uint8
 	return uint8((uint(octet) + 256) >> 1)
