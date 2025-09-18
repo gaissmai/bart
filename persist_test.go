@@ -29,7 +29,7 @@ func (v *testVal) Clone() *testVal {
 func TestInsertPersistTable(t *testing.T) {
 	t.Parallel()
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomRealWorldPrefixes(prng, n)
@@ -68,7 +68,7 @@ func TestInsertPersistTable(t *testing.T) {
 func TestUpdatePersistTable(t *testing.T) {
 	t.Parallel()
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomRealWorldPrefixes(prng, n)
@@ -115,7 +115,7 @@ func TestUpdatePersistTable(t *testing.T) {
 func TestDeletePersistTable(t *testing.T) {
 	t.Parallel()
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomRealWorldPrefixes(prng, n)
@@ -147,7 +147,7 @@ func TestDeletePersistTable(t *testing.T) {
 func TestInsertPersistLite(t *testing.T) {
 	t.Parallel()
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomRealWorldPrefixes(prng, n)
@@ -189,7 +189,7 @@ func TestInsertPersistLite(t *testing.T) {
 func TestDeletePersistLite(t *testing.T) {
 	t.Parallel()
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	// setup
 	prng := rand.New(rand.NewPCG(42, 42))
