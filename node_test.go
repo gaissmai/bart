@@ -48,7 +48,7 @@ func TestPrefixInsert(t *testing.T) {
 		fast.insertPrefix(art.PfxToIdx(pfx.octet, pfx.bits), pfx.val)
 	}
 
-	for i := range 256 {
+	for i := range maxItems {
 		//nolint:gosec  // G115: integer overflow conversion int -> uint
 		octet := byte(i)
 		//nolint:gosec  // G115: integer overflow conversion int -> uint
@@ -82,10 +82,10 @@ func TestPrefixDelete(t *testing.T) {
 
 	// Sanity check that slow table seems to have done the right thing.
 	if cnt := len(*gold); cnt != 50 {
-		t.Fatalf("goldenStride has %d entries after deletes, want 50", cnt)
+		t.Fatalf("goldNode has %d entries after deletes, want 50", cnt)
 	}
 
-	for i := range 256 {
+	for i := range maxItems {
 		//nolint:gosec  // G115: integer overflow conversion int -> uint
 		octet := byte(i)
 		//nolint:gosec  // G115: integer overflow conversion int -> uint
@@ -122,7 +122,7 @@ func TestOverlapsPrefix(t *testing.T) {
 func TestOverlapsRoutes(t *testing.T) {
 	t.Parallel()
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
 
@@ -176,11 +176,12 @@ func BenchmarkNodePrefixInsert(b *testing.B) {
 		}
 
 		b.Run(fmt.Sprintf("Into %d", nroutes), func(b *testing.B) {
-			route := routes[prng.IntN(len(routes))]
-			idx := art.PfxToIdx(route.octet, route.bits)
-
+			var i int
 			for b.Loop() {
+				route := routes[i%len(routes)]
+				idx := art.PfxToIdx(route.octet, route.bits)
 				this.insertPrefix(idx, 0)
+				i++
 			}
 		})
 	}
@@ -201,11 +202,12 @@ func BenchmarkNodePrefixDelete(b *testing.B) {
 		}
 
 		b.Run(fmt.Sprintf("From %d", nroutes), func(b *testing.B) {
-			route := routes[prng.IntN(len(routes))]
-			idx := art.PfxToIdx(route.octet, route.bits)
-
+			var i int
 			for b.Loop() {
-				this.deletePrefix(idx)
+				route := routes[i%len(routes)]
+				idx := art.PfxToIdx(route.octet, route.bits)
+				this.insertPrefix(idx, 0)
+				i++
 			}
 		})
 	}
@@ -276,7 +278,7 @@ func BenchmarkNodePrefixesAsSlice(b *testing.B) {
 		}
 
 		b.Run(fmt.Sprintf("Set %d", nPrefixes), func(b *testing.B) {
-			var buf [256]uint8
+			var buf [maxItems]uint8
 			for b.Loop() {
 				this.prefixes.AsSlice(&buf)
 			}
@@ -358,7 +360,7 @@ func BenchmarkNodeChildrenAsSlice(b *testing.B) {
 		}
 
 		b.Run(fmt.Sprintf("Set %d", nchilds), func(b *testing.B) {
-			var buf [256]uint8
+			var buf [maxItems]uint8
 			for b.Loop() {
 				this.children.AsSlice(&buf)
 			}

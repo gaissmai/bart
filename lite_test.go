@@ -186,7 +186,7 @@ func TestLiteContainsCompare(t *testing.T) {
 	// behavior to a naive and slow but correct implementation.
 	t.Parallel()
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, n)
@@ -215,7 +215,7 @@ func TestLiteEqual(t *testing.T) {
 	t.Parallel()
 	prng := rand.New(rand.NewPCG(42, 42))
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	rt := new(Lite)
 	for _, pfx := range randomRealWorldPrefixes(prng, n) {
@@ -289,7 +289,7 @@ func TestLiteLookupPrefixCompare(t *testing.T) {
 	// behavior to a naive and slow but correct implementation.
 	t.Parallel()
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, n)
@@ -320,7 +320,7 @@ func TestLiteLookupPrefixLPMCompare(t *testing.T) {
 	// behavior to a naive and slow but correct implementation.
 	t.Parallel()
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, n)
@@ -352,7 +352,7 @@ func TestLiteInsertPersistShuffled(t *testing.T) {
 	// routes.
 	t.Parallel()
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, n)
@@ -404,7 +404,7 @@ func TestLiteDeleteCompare(t *testing.T) {
 	// correct implementation.
 	t.Parallel()
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
 
@@ -458,7 +458,7 @@ func TestLiteDeleteShuffled(t *testing.T) {
 	// routes.
 	t.Parallel()
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
 
@@ -521,7 +521,7 @@ func TestLiteDeleteIsReverseOfInsert(t *testing.T) {
 	// order. Each deletion should exactly undo the internal structure
 	// changes that each insert did.
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	tbl := new(Lite)
 	want := tbl.dumpString()
@@ -550,7 +550,7 @@ func TestLiteClone(t *testing.T) {
 	t.Parallel()
 	prng := rand.New(rand.NewPCG(42, 42))
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	pfxs := randomPrefixes(prng, n)
 

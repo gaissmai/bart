@@ -18,7 +18,7 @@ import (
 	"testing"
 )
 
-func workLoadN(t *testing.T) int {
+func workLoadN() int {
 	if testing.Short() {
 		return 1_000
 	}
@@ -1128,7 +1128,7 @@ func TestContainsCompare(t *testing.T) {
 	// behavior to a naive and slow but correct implementation.
 	t.Parallel()
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, n)
@@ -1158,7 +1158,7 @@ func TestLookupCompare(t *testing.T) {
 	// behavior to a naive and slow but correct implementation.
 	t.Parallel()
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, n)
@@ -1264,7 +1264,7 @@ func TestLookupPrefixCompare(t *testing.T) {
 	// behavior to a naive and slow but correct implementation.
 	t.Parallel()
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, n)
@@ -1314,7 +1314,7 @@ func TestLookupPrefixLPMCompare(t *testing.T) {
 	// behavior to a naive and slow but correct implementation.
 	t.Parallel()
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, n)
@@ -1369,7 +1369,7 @@ func TestInsertShuffled(t *testing.T) {
 	// routes.
 	t.Parallel()
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, 1000)
@@ -1410,7 +1410,7 @@ func TestInsertPersistShuffled(t *testing.T) {
 	// routes.
 	t.Parallel()
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, 1000)
@@ -1462,7 +1462,7 @@ func TestDeleteCompare(t *testing.T) {
 	// correct implementation.
 	t.Parallel()
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
 
@@ -1535,7 +1535,7 @@ func TestDeleteShuffled(t *testing.T) {
 	// routes.
 	t.Parallel()
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
 
@@ -1603,7 +1603,7 @@ func TestDeleteShuffled(t *testing.T) {
 func TestDeleteIsReverseOfInsert(t *testing.T) {
 	t.Parallel()
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	// Insert n prefixes, then delete those same prefixes in reverse
@@ -1680,7 +1680,7 @@ func TestDeleteButOne(t *testing.T) {
 func TestGetAndDelete(t *testing.T) {
 	t.Parallel()
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	// Insert n prefixes, then delete those same prefixes in shuffled
@@ -1785,7 +1785,7 @@ func TestGet(t *testing.T) {
 func TestGetCompare(t *testing.T) {
 	t.Parallel()
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, n)
@@ -1811,7 +1811,7 @@ func TestGetCompare(t *testing.T) {
 func TestUpdateCompare(t *testing.T) {
 	t.Parallel()
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, n)
@@ -2073,7 +2073,7 @@ func TestTableModifyPersistSemantics(t *testing.T) {
 func TestModifyCompare(t *testing.T) {
 	t.Parallel()
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, n)
@@ -2118,7 +2118,7 @@ func TestModifyCompare(t *testing.T) {
 func TestUpdatePersistCompare(t *testing.T) {
 	t.Parallel()
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, n)
@@ -2161,7 +2161,7 @@ func TestUpdatePersistCompare(t *testing.T) {
 func TestModifyPersistCompare(t *testing.T) {
 	t.Parallel()
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, n)
@@ -2280,7 +2280,7 @@ func TestModifyShuffled(t *testing.T) {
 	// routes.
 	t.Parallel()
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
 
@@ -2354,7 +2354,7 @@ func TestModifyPersistShuffled(t *testing.T) {
 	// routes.
 	t.Parallel()
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
 
@@ -3121,7 +3121,7 @@ func TestOverlapsPrefixEdgeCases(t *testing.T) {
 func TestSize(t *testing.T) {
 	t.Parallel()
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
 
