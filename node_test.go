@@ -38,8 +38,10 @@ func TestPrefixInsert(t *testing.T) {
 	// every lookup. The naive implementation is very slow, but its behavior is
 	// easy to verify by inspection.
 
-	pfxs := shuffleStridePfxs(allStridePfxs())[:100]
-	gold := new(goldStrideTbl[int]).insertMany(pfxs)
+	prng := rand.New(rand.NewPCG(42, 42))
+
+	pfxs := shuffleNodePfxs(prng, allNodePfxs())[:100]
+	gold := new(goldNode[int]).insertMany(pfxs)
 	fast := new(node[int])
 
 	for _, pfx := range pfxs {
@@ -62,8 +64,10 @@ func TestPrefixInsert(t *testing.T) {
 func TestPrefixDelete(t *testing.T) {
 	t.Parallel()
 	// Compare route deletion to our reference table.
-	pfxs := shuffleStridePfxs(allStridePfxs())[:100]
-	gold := new(goldStrideTbl[int]).insertMany(pfxs)
+	prng := rand.New(rand.NewPCG(42, 42))
+
+	pfxs := shuffleNodePfxs(prng, allNodePfxs())[:100]
+	gold := new(goldNode[int]).insertMany(pfxs)
 	fast := new(node[int])
 
 	for _, pfx := range pfxs {
@@ -72,7 +76,7 @@ func TestPrefixDelete(t *testing.T) {
 
 	toDelete := pfxs[:50]
 	for _, pfx := range toDelete {
-		gold.delete(pfx.octet, pfx.bits)
+		gold.deleteItem(pfx.octet, pfx.bits)
 		fast.deletePrefix(art.PfxToIdx(pfx.octet, pfx.bits))
 	}
 
@@ -96,17 +100,18 @@ func TestPrefixDelete(t *testing.T) {
 
 func TestOverlapsPrefix(t *testing.T) {
 	t.Parallel()
+	prng := rand.New(rand.NewPCG(42, 42))
 
-	pfxs := shuffleStridePfxs(allStridePfxs())[:100]
-	gold := new(goldStrideTbl[int]).insertMany(pfxs)
+	pfxs := shuffleNodePfxs(prng, allNodePfxs())[:100]
+	gold := new(goldNode[int]).insertMany(pfxs)
 	fast := new(node[int])
 
 	for _, pfx := range pfxs {
 		fast.insertPrefix(art.PfxToIdx(pfx.octet, pfx.bits), pfx.val)
 	}
 
-	for _, tt := range allStridePfxs() {
-		goldOK := gold.strideOverlapsPrefix(tt.octet, tt.bits)
+	for _, tt := range allNodePfxs() {
+		goldOK := gold.overlapsPrefix(tt.octet, tt.bits)
 		fastOK := fast.overlapsIdx(art.PfxToIdx(tt.octet, tt.bits))
 		if goldOK != fastOK {
 			t.Fatalf("overlapsPrefix(%d, %d) = %v, want %v", tt.octet, tt.bits, fastOK, goldOK)
@@ -117,14 +122,16 @@ func TestOverlapsPrefix(t *testing.T) {
 func TestOverlapsRoutes(t *testing.T) {
 	t.Parallel()
 
+	prng := rand.New(rand.NewPCG(42, 42))
+
 	const numEntries = 2
-	all := allStridePfxs()
+	all := allNodePfxs()
 
 	for range 100_000 {
-		shuffleStridePfxs(all)
+		shuffleNodePfxs(prng, all)
 		pfxs := all[:numEntries]
 
-		gold := new(goldStrideTbl[int]).insertMany(pfxs)
+		gold := new(goldNode[int]).insertMany(pfxs)
 		fast := new(node[int])
 
 		for _, pfx := range pfxs {
@@ -132,14 +139,14 @@ func TestOverlapsRoutes(t *testing.T) {
 		}
 
 		inter := all[numEntries : 2*numEntries]
-		goldInter := new(goldStrideTbl[int]).insertMany(inter)
+		goldInter := new(goldNode[int]).insertMany(inter)
 		fastInter := new(node[int])
 
 		for _, pfx := range inter {
 			fastInter.insertPrefix(art.PfxToIdx(pfx.octet, pfx.bits), pfx.val)
 		}
 
-		gotGold := gold.strideOverlaps(goldInter)
+		gotGold := gold.overlaps(goldInter)
 		gotFast := fast.overlapsRoutes(fastInter)
 		if gotGold != gotFast {
 			t.Fatalf("node.overlaps = %v, want %v", gotFast, gotGold)
@@ -154,7 +161,7 @@ var (
 
 func BenchmarkNodePrefixInsert(b *testing.B) {
 	prng := rand.New(rand.NewPCG(42, 42))
-	routes := shuffleStridePfxs(allStridePfxs())
+	routes := shuffleNodePfxs(prng, allNodePfxs())
 
 	for _, nroutes := range prefixCount {
 		this := new(node[int])
@@ -179,7 +186,7 @@ func BenchmarkNodePrefixInsert(b *testing.B) {
 
 func BenchmarkNodePrefixDelete(b *testing.B) {
 	prng := rand.New(rand.NewPCG(42, 42))
-	routes := shuffleStridePfxs(allStridePfxs())
+	routes := shuffleNodePfxs(prng, allNodePfxs())
 
 	for _, nroutes := range prefixCount {
 		this := new(node[int])
@@ -204,7 +211,7 @@ func BenchmarkNodePrefixDelete(b *testing.B) {
 
 func BenchmarkNodesPrefixLPM(b *testing.B) {
 	prng := rand.New(rand.NewPCG(42, 42))
-	routes := shuffleStridePfxs(allStridePfxs())
+	routes := shuffleNodePfxs(prng, allNodePfxs())
 
 	for _, nroutes := range prefixCount {
 		this := new(node[int])
