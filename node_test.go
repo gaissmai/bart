@@ -122,12 +122,14 @@ func TestOverlapsPrefix(t *testing.T) {
 func TestOverlapsRoutes(t *testing.T) {
 	t.Parallel()
 
+	n := workLoadN(t)
+
 	prng := rand.New(rand.NewPCG(42, 42))
 
 	const numEntries = 2
 	all := allNodePfxs()
 
-	for range 100_000 {
+	for range n {
 		shuffleNodePfxs(prng, all)
 		pfxs := all[:numEntries]
 

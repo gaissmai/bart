@@ -14,10 +14,7 @@ import (
 func TestAll4RangeOverFunc(t *testing.T) {
 	t.Parallel()
 
-	n := 10_000
-	if testing.Short() {
-		n = 1_000
-	}
+	n := workLoadN(t)
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes4(prng, n)
@@ -72,10 +69,7 @@ func TestAll4RangeOverFunc(t *testing.T) {
 func TestAll6RangeOverFunc(t *testing.T) {
 	t.Parallel()
 
-	n := 10_000
-	if testing.Short() {
-		n = 1_000
-	}
+	n := workLoadN(t)
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes6(prng, n)
@@ -130,10 +124,7 @@ func TestAll6RangeOverFunc(t *testing.T) {
 func TestAllRangeOverFunc(t *testing.T) {
 	t.Parallel()
 
-	n := 10_000
-	if testing.Short() {
-		n = 1_000
-	}
+	n := workLoadN(t)
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, n)
@@ -188,10 +179,7 @@ func TestAllRangeOverFunc(t *testing.T) {
 func TestAll4SortedIter(t *testing.T) {
 	t.Parallel()
 
-	n := 10_000
-	if testing.Short() {
-		n = 1_000
-	}
+	n := workLoadN(t)
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes4(prng, n)
@@ -246,10 +234,7 @@ func TestAll4SortedIter(t *testing.T) {
 func TestAll6SortedRangeOverFunc(t *testing.T) {
 	t.Parallel()
 
-	n := 10_000
-	if testing.Short() {
-		n = 1_000
-	}
+	n := workLoadN(t)
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes6(prng, n)
@@ -304,10 +289,7 @@ func TestAll6SortedRangeOverFunc(t *testing.T) {
 func TestAllSortedRangeOverFunc(t *testing.T) {
 	t.Parallel()
 
-	n := 10_000
-	if testing.Short() {
-		n = 1_000
-	}
+	n := workLoadN(t)
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, n)

@@ -766,10 +766,7 @@ func TestFastModifySemantics(t *testing.T) {
 func TestFastUpdateCompare(t *testing.T) {
 	t.Parallel()
 
-	n := 10_000
-	if testing.Short() {
-		n = 1_000
-	}
+	n := workLoadN(t)
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, n)
@@ -815,10 +812,8 @@ func TestFastContainsCompare(t *testing.T) {
 	// Create large route tables repeatedly, and compare Table's
 	// behavior to a naive and slow but correct implementation.
 	t.Parallel()
-	n := 10_000
-	if testing.Short() {
-		n = 1_000
-	}
+
+	n := workLoadN(t)
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, n)
@@ -847,10 +842,8 @@ func TestFastLookupCompare(t *testing.T) {
 	// Create large route tables repeatedly, and compare Table's
 	// behavior to a naive and slow but correct implementation.
 	t.Parallel()
-	n := 10_000
-	if testing.Short() {
-		n = 1_000
-	}
+
+	n := workLoadN(t)
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, n)
@@ -900,10 +893,8 @@ func TestFastInsertShuffled(t *testing.T) {
 	// should not matter, as long as you're inserting the same set of
 	// routes.
 	t.Parallel()
-	n := 10_000
-	if testing.Short() {
-		n = 1_000
-	}
+
+	n := workLoadN(t)
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, 1000)
@@ -945,10 +936,7 @@ func TestFastDeleteCompare(t *testing.T) {
 	t.Parallel()
 	prng := rand.New(rand.NewPCG(42, 42))
 
-	n := 10_000
-	if testing.Short() {
-		n = 1_000
-	}
+	n := workLoadN(t)
 
 	var (
 		numPrefixes  = n // total prefixes to insert (test deletes 50% of them)
@@ -1001,10 +989,7 @@ func TestFastDeleteShuffled(t *testing.T) {
 	t.Parallel()
 	prng := rand.New(rand.NewPCG(42, 42))
 
-	n := 10_000
-	if testing.Short() {
-		n = 1_000
-	}
+	n := workLoadN(t)
 
 	var (
 		numPrefixes  = n // prefixes to insert (test deletes 50% of them)
@@ -1243,13 +1228,10 @@ func TestFastGet(t *testing.T) {
 
 func TestFastGetCompare(t *testing.T) {
 	t.Parallel()
-	n := 10_000
-	if testing.Short() {
-		n = 1_000
-	}
+
+	n := workLoadN(t)
 
 	prng := rand.New(rand.NewPCG(42, 42))
-
 	pfxs := randomPrefixes(prng, n)
 
 	gold := new(goldTable[int])
