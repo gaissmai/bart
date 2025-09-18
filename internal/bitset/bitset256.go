@@ -332,6 +332,8 @@ func (b *BitSet256) Size() (cnt int) {
 //
 // Used internally by the trie for position counting, CIDR ordering,
 // and fast range-limited bit population counts.
+//
+//nolint:gochecknoglobals // Precomputed read‑only table used in hot paths.
 var rankMask = [256]BitSet256{
 	/*   0 */ {0x1, 0x0, 0x0, 0x0},
 	/*   1 */ {0x3, 0x0, 0x0, 0x0},

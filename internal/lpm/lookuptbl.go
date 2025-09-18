@@ -30,6 +30,8 @@ import (
 // ##################################################
 // # DO NOT MUTATE: treated as read-only at runtime #
 // ##################################################
+//
+//nolint:gochecknoglobals // Precomputed read‑only table used in hot paths.
 var LookupTbl = [256]bitset.BitSet256{
 	/* idx:   0 */ {0x0, 0x0, 0x0, 0x0}, // invalid
 	/* idx:   1 */ {0x2, 0x0, 0x0, 0x0}, // [1]
