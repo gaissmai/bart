@@ -186,10 +186,7 @@ func TestLiteContainsCompare(t *testing.T) {
 	// behavior to a naive and slow but correct implementation.
 	t.Parallel()
 
-	n := 10_000
-	if testing.Short() {
-		n = 1_000
-	}
+	n := workLoadN(t)
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, n)
@@ -218,13 +215,10 @@ func TestLiteEqual(t *testing.T) {
 	t.Parallel()
 	prng := rand.New(rand.NewPCG(42, 42))
 
-	count := 100_000
-	if testing.Short() {
-		count = 10_000
-	}
+	n := workLoadN(t)
 
 	rt := new(Lite)
-	for _, pfx := range randomRealWorldPrefixes(prng, count) {
+	for _, pfx := range randomRealWorldPrefixes(prng, n) {
 		rt.Insert(pfx)
 	}
 
@@ -295,10 +289,7 @@ func TestLiteLookupPrefixCompare(t *testing.T) {
 	// behavior to a naive and slow but correct implementation.
 	t.Parallel()
 
-	n := 10_000
-	if testing.Short() {
-		n = 1_000
-	}
+	n := workLoadN(t)
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, n)
@@ -328,10 +319,8 @@ func TestLiteLookupPrefixLPMCompare(t *testing.T) {
 	// Create large route tables repeatedly, and compare Table's
 	// behavior to a naive and slow but correct implementation.
 	t.Parallel()
-	n := 10_000
-	if testing.Short() {
-		n = 1_000
-	}
+
+	n := workLoadN(t)
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, n)
@@ -363,10 +352,7 @@ func TestLiteInsertPersistShuffled(t *testing.T) {
 	// routes.
 	t.Parallel()
 
-	n := 10_000
-	if testing.Short() {
-		n = 1_000
-	}
+	n := workLoadN(t)
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, n)
@@ -417,10 +403,8 @@ func TestLiteDeleteCompare(t *testing.T) {
 	// prefixes, and compare Table's behavior to a naive and slow but
 	// correct implementation.
 	t.Parallel()
-	n := 10_000
-	if testing.Short() {
-		n = 1_000
-	}
+
+	n := workLoadN(t)
 
 	prng := rand.New(rand.NewPCG(42, 42))
 
@@ -473,10 +457,8 @@ func TestLiteDeleteShuffled(t *testing.T) {
 	// should not matter, as long as you're deleting the same set of
 	// routes.
 	t.Parallel()
-	n := 10_000
-	if testing.Short() {
-		n = 1_000
-	}
+
+	n := workLoadN(t)
 
 	prng := rand.New(rand.NewPCG(42, 42))
 
@@ -539,15 +521,12 @@ func TestLiteDeleteIsReverseOfInsert(t *testing.T) {
 	// order. Each deletion should exactly undo the internal structure
 	// changes that each insert did.
 
-	count := 10_000
-	if testing.Short() {
-		count = 1_000
-	}
+	n := workLoadN(t)
 
 	tbl := new(Lite)
 	want := tbl.dumpString()
 
-	prefixes := randomPrefixes(prng, count)
+	prefixes := randomPrefixes(prng, n)
 
 	defer func() {
 		if t.Failed() {
@@ -571,12 +550,9 @@ func TestLiteClone(t *testing.T) {
 	t.Parallel()
 	prng := rand.New(rand.NewPCG(42, 42))
 
-	count := 10_000
-	if testing.Short() {
-		count = 1_000
-	}
+	n := workLoadN(t)
 
-	pfxs := randomPrefixes(prng, count)
+	pfxs := randomPrefixes(prng, n)
 
 	golden := new(Lite)
 	tbl := new(Lite)
