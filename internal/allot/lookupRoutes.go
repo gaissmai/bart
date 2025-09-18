@@ -282,7 +282,7 @@ var PfxRoutesLookupTbl = [256]bitset.BitSet256{
 }
 
 // FringeRoutesLookupTbl, the second 256 Bits, see also the PfxRoutesLookupTbl for the first 256 Bits
-// we split the 512 Bits to 2x256 for the BitSet256 optimizations.
+// we split 512 bits into 2×256 to leverage BitSet256 optimizations.
 //
 //nolint:gochecknoglobals // Precomputed read‑only table used in hot paths.
 var FringeRoutesLookupTbl = [256]bitset.BitSet256{
