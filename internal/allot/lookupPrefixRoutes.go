@@ -67,6 +67,8 @@ func IdxToPrefixRoutes(idx uint8) bitset.BitSet256 {
 //   - fringeRoutesLookupTbl holds /8 prefixes (idx >= 256)
 //
 // This structure allows for very fast set inclusion checks using simple bitwise AND.
+//
+//nolint:gochecknoglobals // Precomputed read‑only table used in hot paths.
 var pfxRoutesLookupTbl = [256]bitset.BitSet256{
 	/* idx:   0 */ {0x0, 0x0, 0x0, 0x0}, // invalid
 	/* idx:   1 */ {0xfffffffffffffffe, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff}, // [1 2 3 4 5 6 7 8 9 ...

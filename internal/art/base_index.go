@@ -31,6 +31,8 @@ import "math/bits"
 //		                          ^ << 3      ^
 //		                 + -----------------------
 //		                               0b0000_1101 = 13
+//
+// Panics if `pfxLen > 7`.
 func PfxToIdx(octet, pfxLen uint8) uint8 {
 	if pfxLen > 7 {
 		panic("PfxToIdx: invalid pfxLen > 7")
