@@ -20,8 +20,7 @@ type goldNodeItem[V any] struct {
 }
 
 func (t *goldNode[V]) insertMany(items []goldNodeItem[V]) *goldNode[V] {
-	conv := goldNode[V](items)
-	t = &conv
+	*t = goldNode[V](items)
 	return t
 }
 
