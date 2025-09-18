@@ -766,7 +766,7 @@ func TestFastModifySemantics(t *testing.T) {
 func TestFastUpdateCompare(t *testing.T) {
 	t.Parallel()
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, n)
@@ -813,7 +813,7 @@ func TestFastContainsCompare(t *testing.T) {
 	// behavior to a naive and slow but correct implementation.
 	t.Parallel()
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, n)
@@ -843,7 +843,7 @@ func TestFastLookupCompare(t *testing.T) {
 	// behavior to a naive and slow but correct implementation.
 	t.Parallel()
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, n)
@@ -894,7 +894,7 @@ func TestFastInsertShuffled(t *testing.T) {
 	// routes.
 	t.Parallel()
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, 1000)
@@ -936,7 +936,7 @@ func TestFastDeleteCompare(t *testing.T) {
 	t.Parallel()
 	prng := rand.New(rand.NewPCG(42, 42))
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	var (
 		numPrefixes  = n // total prefixes to insert (test deletes 50% of them)
@@ -989,7 +989,7 @@ func TestFastDeleteShuffled(t *testing.T) {
 	t.Parallel()
 	prng := rand.New(rand.NewPCG(42, 42))
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	var (
 		numPrefixes  = n // prefixes to insert (test deletes 50% of them)
@@ -1229,7 +1229,7 @@ func TestFastGet(t *testing.T) {
 func TestFastGetCompare(t *testing.T) {
 	t.Parallel()
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, n)

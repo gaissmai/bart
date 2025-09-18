@@ -14,7 +14,7 @@ import (
 func TestAll4RangeOverFunc(t *testing.T) {
 	t.Parallel()
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes4(prng, n)
@@ -60,8 +60,8 @@ func TestAll4RangeOverFunc(t *testing.T) {
 		}
 
 		// check if iteration stopped with error
-		if count > 1000 {
-			t.Fatalf("expected premature stop with error")
+		if count != 1000 {
+			t.Fatalf("expected to break exactly at 1000, got %d", count)
 		}
 	})
 }
@@ -69,7 +69,7 @@ func TestAll4RangeOverFunc(t *testing.T) {
 func TestAll6RangeOverFunc(t *testing.T) {
 	t.Parallel()
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes6(prng, n)
@@ -115,8 +115,8 @@ func TestAll6RangeOverFunc(t *testing.T) {
 		}
 
 		// check if iteration stopped with error
-		if count > 1000 {
-			t.Fatalf("expected premature stop with error")
+		if count != 1000 {
+			t.Fatalf("expected to break exactly at 1000, got %d", count)
 		}
 	})
 }
@@ -124,7 +124,7 @@ func TestAll6RangeOverFunc(t *testing.T) {
 func TestAllRangeOverFunc(t *testing.T) {
 	t.Parallel()
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, n)
@@ -170,8 +170,8 @@ func TestAllRangeOverFunc(t *testing.T) {
 		}
 
 		// check if iteration stopped with error
-		if count > 1000 {
-			t.Fatalf("expected premature stop with error")
+		if count != 1000 {
+			t.Fatalf("expected to break exactly at 1000, got %d", count)
 		}
 	})
 }
@@ -179,7 +179,7 @@ func TestAllRangeOverFunc(t *testing.T) {
 func TestAll4SortedIter(t *testing.T) {
 	t.Parallel()
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes4(prng, n)
@@ -225,8 +225,8 @@ func TestAll4SortedIter(t *testing.T) {
 		}
 
 		// check if iteration stopped with error
-		if count > 1000 {
-			t.Fatalf("expected premature stop with error")
+		if count != 1000 {
+			t.Fatalf("expected to break exactly at 1000, got %d", count)
 		}
 	})
 }
@@ -234,7 +234,7 @@ func TestAll4SortedIter(t *testing.T) {
 func TestAll6SortedRangeOverFunc(t *testing.T) {
 	t.Parallel()
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes6(prng, n)
@@ -280,8 +280,8 @@ func TestAll6SortedRangeOverFunc(t *testing.T) {
 		}
 
 		// check if iteration stopped with error
-		if count > 1000 {
-			t.Fatalf("expected premature stop with error")
+		if count != 1000 {
+			t.Fatalf("expected to break exactly at 1000, got %d", count)
 		}
 	})
 }
@@ -289,7 +289,7 @@ func TestAll6SortedRangeOverFunc(t *testing.T) {
 func TestAllSortedRangeOverFunc(t *testing.T) {
 	t.Parallel()
 
-	n := workLoadN(t)
+	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomPrefixes(prng, n)
@@ -335,8 +335,8 @@ func TestAllSortedRangeOverFunc(t *testing.T) {
 		}
 
 		// check if iteration stopped with error
-		if count > 1000 {
-			t.Fatalf("expected premature stop with error")
+		if count != 1000 {
+			t.Fatalf("expected to break exactly at 1000, got %d", count)
 		}
 	})
 }
