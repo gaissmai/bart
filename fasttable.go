@@ -507,6 +507,147 @@ func (f *Fast[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	panic("unreachable")
 }
 
+// LookupPrefix does a route lookup (longest prefix match) for pfx and
+// returns the associated value and true, or false if no route matched.
+func (f *Fast[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
+	_, val, ok = f.lookupPrefixLPM(pfx, false)
+	return val, ok
+}
+
+// LookupPrefixLPM is similar to [Fast.LookupPrefix],
+// but it returns the lpm prefix in addition to value,ok.
+//
+// This method is about 20-30% slower than LookupPrefix and should only
+// be used if the matching lpm entry is also required for other reasons.
+//
+// If LookupPrefixLPM is to be used for IP address lookups,
+// they must be converted to /32 or /128 prefixes.
+func (f *Fast[V]) LookupPrefixLPM(pfx netip.Prefix) (lpmPfx netip.Prefix, val V, ok bool) {
+	return f.lookupPrefixLPM(pfx, true)
+}
+
+func (f *Fast[V]) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpmPfx netip.Prefix, val V, ok bool) {
+	if !pfx.IsValid() {
+		return
+	}
+
+	// canonicalize the prefix
+	pfx = pfx.Masked()
+
+	ip := pfx.Addr()
+	bits := pfx.Bits()
+	is4 := ip.Is4()
+	octets := ip.AsSlice()
+	lastOctetPlusOne, lastBits := lastOctetPlusOneAndLastBits(pfx)
+
+	n := f.rootNodeByVersion(is4)
+
+	// record path to leaf node
+	stack := [maxTreeDepth]*fastNode[V]{}
+
+	var depth int
+	var octet byte
+
+LOOP:
+	// find the last node on the octets path in the trie,
+	for depth, octet = range octets {
+		depth = depth & depthMask // BCE
+
+		// stepped one past the last stride of interest; back up to last and break
+		if depth > lastOctetPlusOne {
+			depth--
+			break
+		}
+		// push current node on stack
+		stack[depth] = n
+
+		// go down in tight loop to leaf node
+		kidAny, exists := n.getChild(octet)
+		if !exists {
+			break LOOP
+		}
+
+		// kid is node or leaf or fringe at octet
+		switch kid := kidAny.(type) {
+		case *fastNode[V]:
+			n = kid
+			continue LOOP // descend down to next trie level
+
+		case *leafNode[V]:
+			// reached a path compressed prefix, stop traversing
+			if kid.prefix.Bits() > bits || !kid.prefix.Contains(ip) {
+				break LOOP
+			}
+			return kid.prefix, kid.value, true
+
+		case *fringeNode[V]:
+			// the bits of the fringe are defined by the depth
+			// maybe the LPM isn't needed, saves some cycles
+			fringeBits := (depth + 1) << 3
+			if fringeBits > bits {
+				break LOOP
+			}
+
+			// the LPM isn't needed, saves some cycles
+			if !withLPM {
+				return netip.Prefix{}, kid.value, true
+			}
+
+			// sic, get the LPM prefix back, it costs some cycles!
+			fringePfx := cidrForFringe(octets, depth, is4, octet)
+			return fringePfx, kid.value, true
+
+		default:
+			panic("logic error, wrong node type")
+		}
+	}
+
+	// start backtracking, unwind the stack
+	for ; depth >= 0; depth-- {
+		depth = depth & depthMask // BCE
+
+		n = stack[depth]
+
+		// longest prefix match, skip if node has no prefixes
+		if n.prefixCount() == 0 {
+			continue
+		}
+
+		// only the lastOctet may have a different prefix len
+		// all others are just host routes
+		var idx uint8
+		octet = octets[depth]
+		// Last “octet” from prefix, update/insert prefix into node.
+		// Note: For /32 and /128, depth never reaches lastOctetPlusOne (4 or 16),
+		// so those are handled below via the fringe/leaf path.
+		if depth == lastOctetPlusOne {
+			idx = art.PfxToIdx(octet, lastBits)
+		} else {
+			idx = art.OctetToIdx(octet)
+		}
+
+		switch withLPM {
+		case false: // LookupPrefix
+			if val, ok := n.lookup(idx); ok {
+				return netip.Prefix{}, val, ok
+			}
+
+		case true: // LookupPrefixLPM
+			if topIdx, val, ok := n.lookupIdx(idx); ok {
+				// get the bits from depth and top idx
+				pfxBits := int(art.PfxBits(depth, topIdx))
+
+				// calculate the lpmPfx from incoming ip and new mask
+				lpmPfx, _ = ip.Prefix(pfxBits)
+				return lpmPfx, val, ok
+			}
+		}
+		// continue rewinding the stack
+	}
+
+	return
+}
+
 // Clone creates a deep copy of the routing table, including all prefixes and values.
 // If the value type V implements the Cloner[V] interface, values are cloned using
 // the Clone() method; otherwise values are copied by assignment.
