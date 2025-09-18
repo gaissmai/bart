@@ -154,6 +154,9 @@ func (n *node[V]) getChildAddrs() []uint8 {
 	return n.children.AsSlice(&[256]uint8{})
 }
 
+// allChildren returns an iterator over all child nodes.
+// Each iteration yields the child's address (uint8) and the child node (any).
+//
 //nolint:unused
 func (n *node[V]) allChildren() iter.Seq2[uint8, any] {
 	return func(yield func(addr uint8, child any) bool) {
@@ -180,19 +183,6 @@ func (n *node[V]) deleteChild(addr uint8) (exists bool) {
 	return
 }
 
-// normalizeIdx normalizes host route indices [256..511] to valid
-// range [0..255] to find the parent prefix, since host routes
-// (prefix length 8) are stored as fringes in the children array,
-// while only prefix lengths 0-7 use the 256-slot prefixes array.
-//
-//nolint:gosec // G115: integer overflow conversion uint -> uint8
-func normalizeIdx(idx uint) uint8 {
-	if idx < 256 {
-		return uint8(idx)
-	}
-	return uint8((idx & 511) >> 1)
-}
-
 // contains returns true if an index (idx) has any matching longest-prefix
 // in the current node’s prefix table.
 //
@@ -203,16 +193,12 @@ func normalizeIdx(idx uint) uint8 {
 // The prefix table is structured as a complete binary tree (CBT), and LPM testing
 // is done via a bitset operation that maps the traversal path from the given index
 // toward its possible ancestors.
-func (n *node[V]) contains(idx uint) bool {
-	normalizedIdx := normalizeIdx(idx)
-	return n.prefixes.Intersects(lpm.BackTrackingBitset(normalizedIdx))
+func (n *node[V]) contains(idx uint8) bool {
+	return n.prefixes.Intersects(lpm.BackTrackingBitset(idx))
 }
 
 // lookupIdx performs a longest-prefix match (LPM) lookup for the given index (idx)
 // within the 8-bit stride-based prefix table at this trie depth.
-//
-// idx must be an ART stride index as returned by art.OctetToIdx (range 256..511) or
-// art.PfxToIdx (range 1..255)
 //
 // The function returns the matched base index, associated value, and true if a
 // matching prefix exists at this level; otherwise, ok is false.
@@ -221,19 +207,16 @@ func (n *node[V]) contains(idx uint) bool {
 // via the baseIndex function. Unlike the original ART algorithm, this implementation
 // does not use an allotment-based approach. Instead, it performs CBT backtracking
 // using a bitset-based operation with a precomputed backtracking pattern specific to idx.
-func (n *node[V]) lookupIdx(idx uint) (baseIdx uint8, val V, ok bool) {
-	normalizedIdx := normalizeIdx(idx)
+func (n *node[V]) lookupIdx(idx uint8) (baseIdx uint8, val V, ok bool) {
 	// top is the idx of the longest-prefix-match
-	if top, ok := n.prefixes.IntersectionTop(lpm.BackTrackingBitset(normalizedIdx)); ok {
+	if top, ok := n.prefixes.IntersectionTop(lpm.BackTrackingBitset(idx)); ok {
 		return top, n.mustGetPrefix(top), true
 	}
 	return
 }
 
-// lookup is just a wrapper for lookupIdx.
-//
-//nolint:unused
-func (n *node[V]) lookup(idx uint) (val V, ok bool) {
+// lookup is just a simple wrapper for lookupIdx.
+func (n *node[V]) lookup(idx uint8) (val V, ok bool) {
 	_, val, ok = n.lookupIdx(idx)
 	return
 }
@@ -653,22 +636,15 @@ func (n *node[V]) allRecSorted(path stridePath, depth int, is4 bool, yield func(
 //
 // This function is intended for internal use during supernet traversal and
 // does not descend the trie further.
-func (n *node[V]) eachLookupPrefix(octets []byte, depth int, is4 bool, pfxIdx uint, yield func(netip.Prefix, V) bool) (ok bool) {
+func (n *node[V]) eachLookupPrefix(octets []byte, depth int, is4 bool, pfxIdx uint8, yield func(netip.Prefix, V) bool) (ok bool) {
 	// path needed below more than once in loop
 	var path stridePath
 	copy(path[:], octets)
 
-	// fast forward, it's a /8 route, too big for bitset256
-	if pfxIdx > 255 {
-		pfxIdx >>= 1
-	}
-	//nolint:gosec  // G115: integer overflow conversion int -> uint
-	idx := uint8(pfxIdx) // now it fits into uint8
-
-	for ; idx > 0; idx >>= 1 {
-		if n.prefixes.Test(idx) {
-			val := n.mustGetPrefix(idx)
-			cidr := cidrFromPath(path, depth, is4, idx)
+	for ; pfxIdx > 0; pfxIdx >>= 1 {
+		if n.prefixes.Test(pfxIdx) {
+			val := n.mustGetPrefix(pfxIdx)
+			cidr := cidrFromPath(path, depth, is4, pfxIdx)
 
 			if !yield(cidr, val) {
 				return false

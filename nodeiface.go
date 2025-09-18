@@ -49,7 +49,7 @@ type nodeReader[V any] interface {
 	allChildren() iter.Seq2[uint8, any]
 	allIndices() iter.Seq2[uint8, V]
 
-	contains(idx uint) bool
-	lookup(idx uint) (V, bool)
-	lookupIdx(idx uint) (uint8, V, bool)
+	contains(idx uint8) bool
+	lookup(idx uint8) (V, bool)
+	lookupIdx(idx uint8) (uint8, V, bool)
 }

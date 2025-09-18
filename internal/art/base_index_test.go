@@ -10,19 +10,19 @@ func TestOctetToIdx(t *testing.T) {
 
 	testCases := []struct {
 		octet uint8
-		want  uint
+		want  uint8
 	}{
 		{
 			octet: 0,
-			want:  256,
+			want:  128,
 		},
 		{
 			octet: 255,
-			want:  511,
+			want:  255,
 		},
 		{
 			octet: 128,
-			want:  384,
+			want:  192,
 		},
 	}
 

@@ -157,7 +157,7 @@ func directItemsRec[V any](n nodeReader[V], parentIdx uint8, path stridePath, de
 		}
 
 		// do a longest-prefix-match
-		lpm, _, _ := n.lookupIdx(uint(nextIdx))
+		lpm, _, _ := n.lookupIdx(nextIdx)
 
 		// be aware, 0 is here a possible value for parentIdx and lpm (if not found)
 		if lpm == parentIdx {

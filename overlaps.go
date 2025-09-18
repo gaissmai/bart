@@ -114,7 +114,7 @@ func (n *node[V]) overlapsRoutes(o *node[V]) bool {
 		if nOK {
 			// does any route in o overlap this prefix from n
 			if nIdx, nOK = n.prefixes.NextSet(nIdx); nOK {
-				if o.contains(uint(nIdx)) {
+				if o.contains(nIdx) {
 					return true
 				}
 
@@ -130,7 +130,7 @@ func (n *node[V]) overlapsRoutes(o *node[V]) bool {
 		if oOK {
 			// does any route in n overlap this prefix from o
 			if oIdx, oOK = o.prefixes.NextSet(oIdx); oOK {
-				if n.contains(uint(oIdx)) {
+				if n.contains(oIdx) {
 					return true
 				}
 
@@ -351,7 +351,7 @@ func (n *node[V]) overlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
 // without descending further into the trie.
 func (n *node[V]) overlapsIdx(idx uint8) bool {
 	// 1. Test if any route in this node overlaps prefix?
-	if n.contains(uint(idx)) {
+	if n.contains(idx) {
 		return true
 	}
 
