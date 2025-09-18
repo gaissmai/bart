@@ -17,6 +17,8 @@ func IdxToFringeRoutes(idx uint8) bitset.BitSet256 {
 
 // fringeRoutesLookupTbl, the second 256 Bits, see also the pfxRoutesLookupTbl for the first 256 Bits
 // we split the 512 Bits to 2x256 for the BitSet256 optimizations.
+//
+//nolint:gochecknoglobals // Precomputed read‑only table used in hot paths.
 var fringeRoutesLookupTbl = [256]bitset.BitSet256{
 	/* idx:   0 */ {0x0, 0x0, 0x0, 0x0}, // invalid
 	/* idx:   1 */ {0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff}, // [0 1 2 3 4 5 6 7 8 9 10 11 12 ...
