@@ -710,7 +710,7 @@ LOOP:
 		if n.prefixes.Len() != 0 {
 			idx := art.OctetToIdx(octets[depth])
 			// lookupIdx() manually inlined
-			if topIdx, ok := n.prefixes.IntersectionTop(lpm.BackTrackingBitset(idx)); ok {
+			if topIdx, ok := n.prefixes.IntersectionTop(&lpm.LookupTbl[idx]); ok {
 				return n.mustGetPrefix(topIdx), true
 			}
 		}
@@ -839,7 +839,7 @@ LOOP:
 		}
 
 		// manually inlined: lookupIdx(idx)
-		if topIdx, ok := n.prefixes.IntersectionTop(lpm.BackTrackingBitset(idx)); ok {
+		if topIdx, ok := n.prefixes.IntersectionTop(&lpm.LookupTbl[idx]); ok {
 			val = n.mustGetPrefix(topIdx)
 
 			// called from LookupPrefix
