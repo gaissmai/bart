@@ -18,6 +18,18 @@ import (
 	"testing"
 )
 
+type tabler[V any] interface {
+	Insert(netip.Prefix, V)
+	Delete(netip.Prefix) (V, bool)
+	Modify(netip.Prefix, func(V, bool) (V, bool)) (V, bool)
+	Get(netip.Prefix) (V, bool)
+	Contains(netip.Addr) bool
+	Lookup(netip.Addr) (V, bool)
+	LookupPrefix(netip.Prefix) (V, bool)
+	LookupPrefixLPM(netip.Prefix) (netip.Prefix, V, bool)
+	Size() int
+}
+
 var mpa = netip.MustParseAddr
 
 var mpp = func(s string) netip.Prefix {
