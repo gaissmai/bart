@@ -4,30 +4,30 @@
 package bart
 
 import (
-	"math/rand"
+	"math/rand/v2"
 
 	"github.com/gaissmai/bart/internal/art"
 )
 
-// goldStrideTbl, is an 8-bit slow routing table, implemented as a slice
+// goldNode, is an 8-bit slow routing table, implemented as a slice
 // as a correctness reference.
-type goldStrideTbl[V any] []goldStrideItem[V]
+type goldNode[V any] []goldNodeItem[V]
 
-type goldStrideItem[V any] struct {
+type goldNodeItem[V any] struct {
 	octet uint8
 	bits  uint8
 	val   V
 }
 
-func (t *goldStrideTbl[V]) insertMany(strides []goldStrideItem[V]) *goldStrideTbl[V] {
-	conv := goldStrideTbl[V](strides)
+func (t *goldNode[V]) insertMany(items []goldNodeItem[V]) *goldNode[V] {
+	conv := goldNode[V](items)
 	t = &conv
 	return t
 }
 
-// delete prefix
-func (t *goldStrideTbl[V]) delete(octet, prefixLen uint8) {
-	pfx := make([]goldStrideItem[V], 0, len(*t))
+// deleteItem prefix
+func (t *goldNode[V]) deleteItem(octet, prefixLen uint8) {
+	pfx := make([]goldNodeItem[V], 0, len(*t))
 	for _, e := range *t {
 		if e.octet == octet && e.bits == prefixLen {
 			continue
@@ -38,7 +38,7 @@ func (t *goldStrideTbl[V]) delete(octet, prefixLen uint8) {
 }
 
 // lpm, longest-prefix-match
-func (t *goldStrideTbl[V]) lpm(octet byte) (ret V, ok bool) {
+func (t *goldNode[V]) lpm(octet byte) (ret V, ok bool) {
 	const noMatch = -1
 	longest := noMatch
 	for _, e := range *t {
@@ -50,8 +50,8 @@ func (t *goldStrideTbl[V]) lpm(octet byte) (ret V, ok bool) {
 	return ret, longest != noMatch
 }
 
-// strideOverlapsPrefix
-func (t *goldStrideTbl[V]) strideOverlapsPrefix(octet, prefixLen uint8) bool {
+// overlapsPrefix
+func (t *goldNode[V]) overlapsPrefix(octet, prefixLen uint8) bool {
 	for _, e := range *t {
 		minBits := prefixLen
 		if e.bits < minBits {
@@ -65,8 +65,8 @@ func (t *goldStrideTbl[V]) strideOverlapsPrefix(octet, prefixLen uint8) bool {
 	return false
 }
 
-// strideOverlaps
-func (ta *goldStrideTbl[V]) strideOverlaps(tb *goldStrideTbl[V]) bool {
+// overlaps
+func (ta *goldNode[V]) overlaps(tb *goldNode[V]) bool {
 	for _, aItem := range *ta {
 		for _, bItem := range *tb {
 			minBits := aItem.bits
@@ -81,17 +81,17 @@ func (ta *goldStrideTbl[V]) strideOverlaps(tb *goldStrideTbl[V]) bool {
 	return false
 }
 
-func allStridePfxs() []goldStrideItem[int] {
-	ret := make([]goldStrideItem[int], 0, maxItems)
+func allNodePfxs() []goldNodeItem[int] {
+	ret := make([]goldNodeItem[int], 0, maxItems)
 	for idx := 1; idx < maxItems; idx++ {
 		//nolint:gosec // test-only: idx conversion is safe and deterministic
 		octet, bits := art.IdxToPfx(uint8(idx))
-		ret = append(ret, goldStrideItem[int]{octet, bits, idx})
+		ret = append(ret, goldNodeItem[int]{octet, bits, idx})
 	}
 	return ret
 }
 
-func shuffleStridePfxs(pfxs []goldStrideItem[int]) []goldStrideItem[int] {
-	rand.Shuffle(len(pfxs), func(i, j int) { pfxs[i], pfxs[j] = pfxs[j], pfxs[i] })
+func shuffleNodePfxs(prng *rand.Rand, pfxs []goldNodeItem[int]) []goldNodeItem[int] {
+	prng.Shuffle(len(pfxs), func(i, j int) { pfxs[i], pfxs[j] = pfxs[j], pfxs[i] })
 	return pfxs
 }
