@@ -18,6 +18,7 @@ import (
 	"testing"
 )
 
+// workLoadN to adjust loops for tests with -short
 func workLoadN() int {
 	if testing.Short() {
 		return 1_000
@@ -25,6 +26,8 @@ func workLoadN() int {
 	return 10_000
 }
 
+// tabler is a test-only interface that provides a unified abstraction for
+// testing multiple table implementations (Table and Fast) with the same test suite.
 type tabler[V any] interface {
 	Insert(netip.Prefix, V)
 	Delete(netip.Prefix) (V, bool)
