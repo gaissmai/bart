@@ -20,6 +20,7 @@ func TestLookupTbl_Length(t *testing.T) {
 	}
 }
 
+//nolint:gosec
 func TestLookupTbl_PathInvariant(t *testing.T) {
 	t.Parallel()
 	for i := range 256 {
