@@ -5,6 +5,7 @@ package bart
 
 import (
 	"maps"
+	"math/rand/v2"
 	"slices"
 	"testing"
 
@@ -801,8 +802,10 @@ func TestNodes_Contains_EqualsLookupTruthiness(t *testing.T) {
 	for _, tt := range nodes {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+			prng := rand.New(rand.NewPCG(42, 42))
+
 			// Insert a sample of prefixes.
-			for _, pfx := range shuffleStridePfxs(allStridePfxs())[:64] {
+			for _, pfx := range shuffleNodePfxs(prng, allNodePfxs())[:64] {
 				tt.node.insertPrefix(art.PfxToIdx(pfx.octet, pfx.bits), pfx.val)
 			}
 
