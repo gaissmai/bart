@@ -178,10 +178,9 @@ func (n *node[V]) overlapsChildrenIn(o *node[V]) bool {
 	// maybe too many childs for range-over or not so many prefixes to
 	// build the alloted routing table from them
 
-	// make allot table with prefixes as bitsets, bitsets are precalculated.
+	// use allot table with prefixes as bitsets, bitsets are precalculated.
 	for _, idx := range n.prefixes.AsSlice(&[256]uint8{}) {
-		fringeRoutes := allot.IdxToFringeRoutes(idx)
-		if fringeRoutes.Intersects(&o.children.BitSet256) {
+		if o.children.Intersects(&allot.FringeRoutesLookupTbl[idx]) {
 			return true
 		}
 	}
@@ -356,16 +355,10 @@ func (n *node[V]) overlapsIdx(idx uint8) bool {
 	}
 
 	// 2. Test if prefix overlaps any route in this node
-
-	// use bitset intersections instead of range loops
-	// shallow copy pre alloted bitset for idx
-	allotedPrefixRoutes := allot.IdxToPrefixRoutes(idx)
-	if allotedPrefixRoutes.Intersects(&n.prefixes.BitSet256) {
+	if n.prefixes.Intersects(&allot.PfxRoutesLookupTbl[idx]) {
 		return true
 	}
 
 	// 3. Test if prefix overlaps any child in this node
-
-	allotedHostRoutes := allot.IdxToFringeRoutes(idx)
-	return allotedHostRoutes.Intersects(&n.children.BitSet256)
+	return n.children.Intersects(&allot.FringeRoutesLookupTbl[idx])
 }
