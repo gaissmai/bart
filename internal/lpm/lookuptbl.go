@@ -26,6 +26,10 @@ import (
 //		}
 //		return false
 //	}
+//
+// ##################################################
+// # DO NOT MUTATE: treated as read-only at runtime #
+// ##################################################
 var LookupTbl = [256]bitset.BitSet256{
 	/* idx:   0 */ {0x0, 0x0, 0x0, 0x0}, // invalid
 	/* idx:   1 */ {0x2, 0x0, 0x0, 0x0}, // [1]
