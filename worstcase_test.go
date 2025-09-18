@@ -65,15 +65,6 @@ var (
 	}
 )
 
-type tabler[V any] interface {
-	Delete(netip.Prefix) (V, bool)
-	Insert(netip.Prefix, V)
-	Contains(netip.Addr) bool
-	Lookup(netip.Addr) (V, bool)
-	LookupPrefix(netip.Prefix) (V, bool)
-	LookupPrefixLPM(netip.Prefix) (netip.Prefix, V, bool)
-}
-
 func TestWorstCaseMatch4(t *testing.T) {
 	t.Parallel()
 
