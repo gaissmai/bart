@@ -193,7 +193,7 @@ func TestWorstCaseMiss4(t *testing.T) {
 			}
 		})
 
-		t.Run("Lookup", func(t *testing.T) {
+		t.Run(tc.name+"_Lookup", func(t *testing.T) {
 			t.Parallel()
 
 			tbl := tc.builder()
@@ -210,7 +210,7 @@ func TestWorstCaseMiss4(t *testing.T) {
 			}
 		})
 
-		t.Run("LookupPrefix", func(t *testing.T) {
+		t.Run(tc.name+"_LookupPrefix", func(t *testing.T) {
 			t.Parallel()
 
 			tbl := tc.builder()
@@ -227,7 +227,7 @@ func TestWorstCaseMiss4(t *testing.T) {
 			}
 		})
 
-		t.Run("LookupPfxLPM", func(t *testing.T) {
+		t.Run(tc.name+"_LookupPfxLPM", func(t *testing.T) {
 			t.Parallel()
 
 			tbl := tc.builder()
