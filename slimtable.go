@@ -8,15 +8,17 @@ import (
 	"sync"
 
 	"github.com/gaissmai/bart/internal/art"
-	"github.com/gaissmai/bart/internal/lpm"
 )
 
-type Foo struct {
+// Slim follows the BART design but with no payload.
+// It is ideal for simple IP ACLs (access-control-lists) with plain
+// true/false results with the smallest memory consumption.
+type Slim struct {
 	// used by -copylocks checker from `go vet`.
 	_ [0]sync.Mutex
 
-	root4 liteNode[any]
-	root6 liteNode[any]
+	root4 slimNode[any]
+	root6 slimNode[any]
 
 	// the number of prefixes in the routing table
 	size4 int
@@ -24,16 +26,16 @@ type Foo struct {
 }
 
 // rootNodeByVersion, root node getter for ip version.
-func (l *Foo) rootNodeByVersion(is4 bool) *liteNode[any] {
+func (l *Slim) rootNodeByVersion(is4 bool) *slimNode[any] {
 	if is4 {
 		return &l.root4
 	}
 	return &l.root6
 }
 
-// Insert adds a pfx to the tree, with given val.
-// If pfx is already present in the tree, its value is set to val.
-func (l *Foo) Insert(pfx netip.Prefix) {
+// Insert adds a prefix to the table (idempotent).
+// If the prefix already exists, the operation is a no-op.
+func (l *Slim) Insert(pfx netip.Prefix) {
 	if !pfx.IsValid() {
 		return
 	}
@@ -52,9 +54,8 @@ func (l *Foo) Insert(pfx netip.Prefix) {
 	l.sizeUpdate(is4, 1)
 }
 
-// Delete the prefix and returns the associated payload for prefix and true if found
-// or the zero value and false if prefix is not set in the routing table.
-func (l *Foo) Delete(pfx netip.Prefix) (found bool) {
+// Delete removes the prefix and returns true if it was present, false otherwise.
+func (l *Slim) Delete(pfx netip.Prefix) (found bool) {
 	if !pfx.IsValid() {
 		return
 	}
@@ -72,7 +73,7 @@ func (l *Foo) Delete(pfx netip.Prefix) (found bool) {
 
 	// record the nodes on the path to the deleted node, needed to purge
 	// and/or path compress nodes after the deletion of a prefix
-	stack := [maxTreeDepth]*liteNode[any]{}
+	stack := [maxTreeDepth]*slimNode[any]{}
 
 	// find the trie node
 	for depth, octet := range octets {
@@ -104,10 +105,10 @@ func (l *Foo) Delete(pfx netip.Prefix) (found bool) {
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
-		case *liteNode[any]:
+		case *slimNode[any]:
 			n = kid // descend down to next trie level
 
-		case *liteFringeNode:
+		case *slimFringeNode:
 			// if pfx is no fringe at this depth, fast exit
 			if !isFringe(depth, pfx) {
 				return
@@ -122,7 +123,7 @@ func (l *Foo) Delete(pfx netip.Prefix) (found bool) {
 
 			return true
 
-		case *liteLeafNode:
+		case *slimLeafNode:
 			// Attention: pfx must be masked to be comparable!
 			if kid.prefix != pfx {
 				return
@@ -149,12 +150,8 @@ func (l *Foo) Delete(pfx netip.Prefix) (found bool) {
 // Returns false for invalid IP addresses.
 //
 // This performs longest-prefix matching and returns true if any prefix
-// in the routing table contains the IP address, regardless of the associated value.
-//
-// It does not return the value nor the prefix of the matching item,
-// but as a test against an allow-/deny-list it's often sufficient
-// and even few nanoseconds faster than [Table.Lookup].
-func (l *Foo) Contains(ip netip.Addr) bool {
+// in the routing table contains the IP address.
+func (l *Slim) Contains(ip netip.Addr) bool {
 	// speed is top priority: no explicit test for ip.Isvalid
 	// if ip is invalid, AsSlice() returns nil, Contains returns false.
 	is4 := ip.Is4()
@@ -174,14 +171,14 @@ func (l *Foo) Contains(ip netip.Addr) bool {
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
-		case *liteNode[any]:
+		case *slimNode[any]:
 			n = kid // descend down to next trie level
 
-		case *liteFringeNode:
+		case *slimFringeNode:
 			// fringe is the default-route for all possible octets below
 			return true
 
-		case *liteLeafNode:
+		case *slimLeafNode:
 			return kid.prefix.Contains(ip)
 
 		default:
@@ -192,104 +189,25 @@ func (l *Foo) Contains(ip netip.Addr) bool {
 	return false
 }
 
-// Lookup performs longest-prefix matching for the given IP address and returns
-// the associated value of the most specific matching prefix.
-// Returns the zero value of V and false if no prefix matches.
-// Returns false for invalid IP addresses.
-//
-// This is the core routing table operation used for packet forwarding decisions.
-func (l *Foo) Lookup(ip netip.Addr) (ok bool) {
-	if !ip.IsValid() {
-		return
-	}
-
-	is4 := ip.Is4()
-	octets := ip.AsSlice()
-
-	n := l.rootNodeByVersion(is4)
-
-	// stack of the traversed nodes for fast backtracking, if needed
-	stack := [maxTreeDepth]*liteNode[any]{}
-
-	// run variable, used after for loop
-	var depth int
-	var octet byte
-
-LOOP:
-	// find leaf node
-	for depth, octet = range octets {
-		depth = depth & depthMask // BCE, Lookup must be fast
-
-		// push current node on stack for fast backtracking
-		stack[depth] = n
-
-		// go down in tight loop to last octet
-		if !n.children.Test(octet) {
-			// no more nodes below octet
-			break LOOP
-		}
-		kid := n.mustGetChild(octet)
-
-		// kid is node or leaf or fringe at octet
-		switch kid := kid.(type) {
-		case *liteNode[any]:
-			n = kid
-			continue LOOP // descend down to next trie level
-
-		case *liteFringeNode:
-			// fringe is the default-route for all possible nodes below
-			return true
-
-		case *liteLeafNode:
-			if kid.prefix.Contains(ip) {
-				return true
-			}
-			// reached a path compressed prefix, stop traversing
-			break LOOP
-
-		default:
-			panic("logic error, wrong node type")
-		}
-	}
-
-	// start backtracking, unwind the stack, bounds check eliminated
-	for ; depth >= 0; depth-- {
-		depth = depth & depthMask // BCE
-
-		n = stack[depth]
-
-		// longest prefix match, skip if node has no prefixes
-		if n.pfxCount != 0 {
-			idx := art.OctetToIdx(octets[depth])
-			// lookupIdx() manually inlined
-			if _, ok := n.prefixes.IntersectionTop(&lpm.LookupTbl[idx]); ok {
-				return true
-			}
-		}
-	}
-
-	return
-}
-
 // Size returns the prefix count.
-func (l *Foo) Size() int {
+func (l *Slim) Size() int {
 	return l.size4 + l.size6
 }
 
 // Size4 returns the IPv4 prefix count.
-func (l *Foo) Size4() int {
+func (l *Slim) Size4() int {
 	return l.size4
 }
 
 // Size6 returns the IPv6 prefix count.
-func (l *Foo) Size6() int {
+func (l *Slim) Size6() int {
 	return l.size6
 }
 
-func (l *Foo) sizeUpdate(is4 bool, n int) {
+func (l *Slim) sizeUpdate(is4 bool, delta int) {
 	if is4 {
-		l.size4 += n
+		l.size4 += delta
 		return
 	}
-	l.size6 += n
+	l.size6 += delta
 }
