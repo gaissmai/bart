@@ -25,6 +25,10 @@ func TestBoundaryBehavior_DefaultRoutes(t *testing.T) {
 			name:    "Fast",
 			builder: func() tabler[*routeEntry] { return &Fast[*routeEntry]{} },
 		},
+		{
+			name:    "Slim",
+			builder: func() tabler[*routeEntry] { return &slimTable[*routeEntry]{} },
+		},
 	}
 
 	// Test both IPv4 and IPv6 default routes
