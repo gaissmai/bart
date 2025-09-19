@@ -708,12 +708,12 @@ func (f *Fast[V]) Overlaps6(o *Fast[V]) bool {
 	return f.root6.overlaps(&o.root6, 0)
 }
 
-func (f *Fast[V]) sizeUpdate(is4 bool, n int) {
+func (f *Fast[V]) sizeUpdate(is4 bool, delta int) {
 	if is4 {
-		f.size4 += n
+		f.size4 += delta
 		return
 	}
-	f.size6 += n
+	f.size6 += delta
 }
 
 // Size returns the prefix count.
