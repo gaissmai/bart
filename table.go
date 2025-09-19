@@ -1173,12 +1173,12 @@ func (t *Table[V]) Clone() *Table[V] {
 	return c
 }
 
-func (t *Table[V]) sizeUpdate(is4 bool, n int) {
+func (t *Table[V]) sizeUpdate(is4 bool, delta int) {
 	if is4 {
-		t.size4 += n
+		t.size4 += delta
 		return
 	}
-	t.size6 += n
+	t.size6 += delta
 }
 
 // Size returns the prefix count.
