@@ -17,16 +17,16 @@ import (
 func TestUnifiedDumper_NodeTypes(t *testing.T) {
 	t.Parallel()
 
-	nodeTypes := map[string]nodeReadWriter[any]{
-		"node":     &node[any]{},     // zero value ready to use
-		"fastNode": &fastNode[any]{}, // zero value ready to use
+	nodeBuilder := map[string]func() nodeReadWriter[any]{
+		"node":     func() nodeReadWriter[any] { return &node[any]{} },
+		"fastNode": func() nodeReadWriter[any] { return &fastNode[any]{} },
 	}
 
-	for nodeTypeName, n := range nodeTypes {
+	for nodeTypeName, nodeBuilder := range nodeBuilder {
 		t.Run(nodeTypeName+"_EmptyNodeStats", func(t *testing.T) {
-			// Test nodeStats on nodeReader interface
-			reader := nodeReader[any](n)
-			stats := nodeStats(reader)
+			// Test nodeStats
+			n := nodeBuilder()
+			stats := nodeStats(n)
 			// For empty nodes, stats should have reasonable values
 			if stats.nodes < 0 || stats.pfxs < 0 {
 				t.Errorf("Invalid stats for empty %s: %+v", nodeTypeName, stats)
@@ -34,29 +34,29 @@ func TestUnifiedDumper_NodeTypes(t *testing.T) {
 		})
 
 		t.Run(nodeTypeName+"_WithPrefix", func(t *testing.T) {
+			n := nodeBuilder()
 			n.insertPrefix(128, "test-value")
 
 			// Test that we can get stats after insertion
-			reader := nodeReader[any](n)
-			stats := nodeStats(reader)
+			stats := nodeStats(n)
 			if stats.pfxs == 0 {
 				t.Errorf("Expected non-zero prefixes after insertion in %s", nodeTypeName)
 			}
 		})
 
 		t.Run(nodeTypeName+"_DumpToWriter", func(t *testing.T) {
-			n.insertPrefix(64, "dump-test")
-
 			var buf strings.Builder
 			path := stridePath{}
 
+			n := nodeBuilder()
+			n.insertPrefix(64, "dump-test")
+
 			// Use the dump function that takes io.Writer
-			reader := nodeReader[any](n)
-			dump(reader, &buf, path, 0, false)
+			dump(n, &buf, path, 0, false)
 
 			output := buf.String()
 			// Just check that it produces some output without panicking
-			if len(output) == 0 && n.prefixCount() > 0 {
+			if output == "" {
 				t.Errorf("Expected non-empty dump output for %s with data", nodeTypeName)
 			}
 		})
@@ -67,12 +67,12 @@ func TestUnifiedDumper_NodeTypes(t *testing.T) {
 func TestUnifiedDumper_TypedNilHandling(t *testing.T) {
 	t.Parallel()
 
-	nodeTypes := map[string]func() nodeReader[any]{
+	nodeBuilder := map[string]func() nodeReader[any]{
 		"node":     func() nodeReader[any] { return (*node[any])(nil) },
 		"fastNode": func() nodeReader[any] { return (*fastNode[any])(nil) },
 	}
 
-	for nodeTypeName, createNilNode := range nodeTypes {
+	for nodeTypeName, createNilNode := range nodeBuilder {
 		t.Run("TypedNil_"+nodeTypeName, func(t *testing.T) {
 			t.Parallel()
 			defer func() {
