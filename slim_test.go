@@ -424,7 +424,7 @@ func TestSlim_StressTest(t *testing.T) {
 
 	// Generate random prefixes
 	prng := rand.New(rand.NewPCG(42, 42))
-	for i := 0; i < workLoadN(); i++ {
+	for range workLoadN() {
 		if prng.Float64() < 0.5 {
 			// IPv4
 			ip := netip.AddrFrom4([4]byte{
@@ -457,7 +457,7 @@ func TestSlim_StressTest(t *testing.T) {
 	t.Logf("Inserted %d unique prefixes out of %d total", originalSize, len(prefixes))
 
 	// Test some lookups
-	for i := 0; i < 1000; i++ {
+	for range workLoadN() {
 		if prng.Float64() < 0.5 {
 			ip := netip.AddrFrom4([4]byte{
 				byte(prng.Uint32()), byte(prng.Uint32()),
