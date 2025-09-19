@@ -673,6 +673,38 @@ func (f *Fast[V]) Clone() *Fast[V] {
 	return c
 }
 
+// Overlaps reports whether any route in the receiver table overlaps
+// with a route in the other table, in either direction.
+//
+// The overlap check is bidirectional: it returns true if any IP prefix
+// in the receiver is covered by the other table, or vice versa.
+// This includes partial overlaps, exact matches, and supernet/subnet relationships.
+//
+// Both IPv4 and IPv6 route trees are compared independently. If either
+// tree has overlapping routes, the function returns true.
+//
+// This is useful for conflict detection, policy enforcement,
+// or validating mutually exclusive routing domains.
+func (f *Fast[V]) Overlaps(o *Fast[V]) bool {
+	return f.Overlaps4(o) || f.Overlaps6(o)
+}
+
+// Overlaps4 is like [Table.Overlaps] but for the v4 routing table only.
+func (f *Fast[V]) Overlaps4(o *Fast[V]) bool {
+	if f.size4 == 0 || o.size4 == 0 {
+		return false
+	}
+	return f.root4.overlaps(&o.root4, 0)
+}
+
+// Overlaps6 is like [Table.Overlaps] but for the v6 routing table only.
+func (f *Fast[V]) Overlaps6(o *Fast[V]) bool {
+	if f.size6 == 0 || o.size6 == 0 {
+		return false
+	}
+	return f.root6.overlaps(&o.root6, 0)
+}
+
 func (f *Fast[V]) sizeUpdate(is4 bool, n int) {
 	if is4 {
 		f.size4 += n
