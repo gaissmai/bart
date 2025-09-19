@@ -9,15 +9,13 @@ import "iter"
 var (
 	_ nodeReadWriter[any] = (*node[any])(nil)
 	_ nodeReadWriter[any] = (*fastNode[any])(nil)
+	_ nodeReadWriter[any] = (*slimNode[any])(nil)
 )
 
 // nodeReadWriter is a generic interface that abstracts tree node operations
 // for testing, dumping and traversal.
-//
-// It provides a unified API for setting or accessing both regular
-// nodes and fast nodes in the routing table structures.
-//
-// Type parameter V represents the value type stored at prefixes in the tree.
+// Note: Implementations like slimNode do not store V; value-returning
+// methods will yield the zero value while still reporting presence.
 type nodeReadWriter[V any] interface {
 	nodeReader[V]
 	nodeWriter[V]
