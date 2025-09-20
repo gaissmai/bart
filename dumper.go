@@ -29,19 +29,19 @@ const (
 // subnodes). The path slice and depth together represent the byte-wise path
 // from the root to the current node; depth is incremented for each recursion.
 // The is4 flag controls IPv4/IPv6 formatting used by dump.
-func dumpRec[V any](n nodeReader[V], w io.Writer, path stridePath, depth int, is4 bool) {
+func dumpRec[V any](n nodeReader[V], w io.Writer, path stridePath, depth int, is4 bool, printVals bool) {
 	if n == nil || n.isEmpty() {
 		return
 	}
 
 	// dump this node
-	dump(n, w, path, depth, is4)
+	dump(n, w, path, depth, is4, printVals)
 
 	// node may have children, rec-descent down
 	for addr, child := range n.allChildren() {
 		if kid, ok := child.(nodeReader[V]); ok {
 			path[depth] = addr
-			dumpRec(kid, w, path, depth+1, is4)
+			dumpRec(kid, w, path, depth+1, is4, printVals)
 		}
 	}
 }
@@ -51,7 +51,7 @@ func dumpRec[V any](n nodeReader[V], w io.Writer, path stridePath, depth int, is
 // and bit count, followed by any stored prefixes (and their values when applicable),
 // the set of child octets, and any path-compressed leaves or fringe entries.
 // `path` and `depth` determine how prefixes and fringe CIDRs are rendered.
-func dump[V any](n nodeReader[V], w io.Writer, path stridePath, depth int, is4 bool) {
+func dump[V any](n nodeReader[V], w io.Writer, path stridePath, depth int, is4 bool, printVals bool) {
 	bits := depth * strideLen
 	indent := strings.Repeat(".", depth)
 
@@ -76,8 +76,8 @@ func dump[V any](n nodeReader[V], w io.Writer, path stridePath, depth int, is4 b
 
 		fmt.Fprintln(w)
 
-		// skip values if the payload is the empty struct
-		if shouldPrintValues[V]() {
+		// skip values, maybe the payload is the empty struct
+		if printVals {
 
 			// print the values for this node
 			fmt.Fprintf(w, "%svalues(#%d):", indent, nPfxCount)
@@ -126,7 +126,7 @@ func dump[V any](n nodeReader[V], w io.Writer, path stridePath, depth int, is4 b
 
 			for _, addr := range leafAddrs {
 				kid := n.mustGetChild(addr).(*leafNode[V])
-				if shouldPrintValues[V]() {
+				if printVals {
 					fmt.Fprintf(w, " %s:{%s, %v}", addrFmt(addr, is4), kid.prefix, kid.value)
 				} else {
 					fmt.Fprintf(w, " %s:{%s}", addrFmt(addr, is4), kid.prefix)
@@ -144,7 +144,7 @@ func dump[V any](n nodeReader[V], w io.Writer, path stridePath, depth int, is4 b
 				fringePfx := cidrForFringe(path[:], depth, is4, addr)
 
 				kid := n.mustGetChild(addr).(*fringeNode[V])
-				if shouldPrintValues[V]() {
+				if printVals {
 					fmt.Fprintf(w, " %s:{%s, %v}", addrFmt(addr, is4), fringePfx, kid.value)
 				} else {
 					fmt.Fprintf(w, " %s:{%s}", addrFmt(addr, is4), fringePfx)
