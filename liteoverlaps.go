@@ -248,27 +248,27 @@ func liteOverlapsTwoChilds[V any](nChild, oChild any, depth int) bool {
 		switch oKind := oChild.(type) {
 		case *liteNode[V]: // node, node
 			return nKind.overlaps(oKind, depth)
-		case *liteLeafNode: // node, leaf
+		case *leafNode[V]: // node, leaf
 			return nKind.overlapsPrefixAtDepth(oKind.prefix, depth)
-		case *liteFringeNode: // node, fringe
+		case *fringeNode[V]: // node, fringe
 			return true
 		default:
 			panic("logic error, wrong node type")
 		}
 
-	case *liteLeafNode:
+	case *leafNode[V]:
 		switch oKind := oChild.(type) {
 		case *liteNode[V]: // leaf, node
 			return oKind.overlapsPrefixAtDepth(nKind.prefix, depth)
-		case *liteLeafNode: // leaf, leaf
+		case *leafNode[V]: // leaf, leaf
 			return oKind.prefix.Overlaps(nKind.prefix)
-		case *liteFringeNode: // leaf, fringe
+		case *fringeNode[V]: // leaf, fringe
 			return true
 		default:
 			panic("logic error, wrong node type")
 		}
 
-	case *liteFringeNode:
+	case *fringeNode[V]:
 		return true
 
 	default:
@@ -322,10 +322,10 @@ func (n *liteNode[V]) overlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
 			n = kid
 			continue
 
-		case *liteLeafNode:
+		case *leafNode[V]:
 			return kid.prefix.Overlaps(pfx)
 
-		case *liteFringeNode:
+		case *fringeNode[V]:
 			return true
 
 		default:
