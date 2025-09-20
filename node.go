@@ -225,8 +225,8 @@ func (n *node[V]) lookup(idx uint8) (val V, ok bool) {
 // Leaf nodes are used when a prefix doesn't align with trie stride boundaries
 // and needs to be stored as a compressed path to save memory.
 type leafNode[V any] struct {
-	prefix netip.Prefix
 	value  V
+	prefix netip.Prefix
 }
 
 // newLeafNode creates a new leaf node with the specified prefix and value.
