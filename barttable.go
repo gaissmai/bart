@@ -1423,7 +1423,7 @@ func (t *Table[V]) dump(w io.Writer) {
 		fmt.Fprintf(w, "### IPv4: size(%d), nodes(%d), pfxs(%d), leaves(%d), fringes(%d)",
 			t.size4, stats.nodes, stats.pfxs, stats.leaves, stats.fringes)
 
-		dumpRec(&t.root4, w, stridePath{}, 0, true)
+		dumpRec(&t.root4, w, stridePath{}, 0, true, shouldPrintValues[V]())
 	}
 
 	if t.size6 > 0 {
@@ -1432,6 +1432,6 @@ func (t *Table[V]) dump(w io.Writer) {
 		fmt.Fprintf(w, "### IPv6: size(%d), nodes(%d), pfxs(%d), leaves(%d), fringes(%d)",
 			t.size6, stats.nodes, stats.pfxs, stats.leaves, stats.fringes)
 
-		dumpRec(&t.root6, w, stridePath{}, 0, false)
+		dumpRec(&t.root6, w, stridePath{}, 0, false, shouldPrintValues[V]())
 	}
 }
