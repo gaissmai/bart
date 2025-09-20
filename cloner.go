@@ -288,7 +288,7 @@ func (n *liteNode[V]) cloneRec(_ cloneFunc[V]) *liteNode[V] {
 	// Perform a flat clone of the current node.
 	c := n.cloneFlat(nil)
 
-	// Recursively clone all child nodes of type *litNode[V]
+	// Recursively clone all child nodes of type *liteNode[V]
 	for i, kidAny := range c.children.Items {
 		if kid, ok := kidAny.(*liteNode[V]); ok {
 			c.children.Items[i] = kid.cloneRec(nil)
