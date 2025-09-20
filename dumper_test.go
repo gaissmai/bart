@@ -23,10 +23,10 @@ func TestUnifiedDumper_NodeTypes(t *testing.T) {
 		"liteNode": func() nodeReadWriter[any] { return &liteNode[any]{} },
 	}
 
-	for nodeTypeName, nodeBuilder := range nodeBuilder {
+	for nodeTypeName, build := range nodeBuilder {
 		t.Run(nodeTypeName+"_EmptyNodeStats", func(t *testing.T) {
 			// Test nodeStats
-			n := nodeBuilder()
+			n := build()
 			stats := nodeStats(n)
 			// For empty nodes, stats should have reasonable values
 			if stats.nodes < 0 || stats.pfxs < 0 {
@@ -35,7 +35,7 @@ func TestUnifiedDumper_NodeTypes(t *testing.T) {
 		})
 
 		t.Run(nodeTypeName+"_WithPrefix", func(t *testing.T) {
-			n := nodeBuilder()
+			n := build()
 			n.insertPrefix(128, "test-value")
 
 			// Test that we can get stats after insertion
@@ -49,7 +49,7 @@ func TestUnifiedDumper_NodeTypes(t *testing.T) {
 			var buf strings.Builder
 			path := stridePath{}
 
-			n := nodeBuilder()
+			n := build()
 			n.insertPrefix(64, "dump-test")
 
 			// Use the dump function that takes io.Writer
