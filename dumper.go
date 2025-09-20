@@ -77,7 +77,7 @@ func dump[V any](n nodeReader[V], w io.Writer, path stridePath, depth int, is4 b
 		fmt.Fprintln(w)
 
 		// skip values if the payload is the empty struct
-		if shouldPrintValues[V]() {
+		if shouldPrintValues[V](n) {
 
 			// print the values for this node
 			fmt.Fprintf(w, "%svalues(#%d):", indent, nPfxCount)
@@ -106,10 +106,10 @@ func dump[V any](n nodeReader[V], w io.Writer, path stridePath, depth int, is4 b
 				childAddrs = append(childAddrs, addr)
 				continue
 
-			case *fringeNode[V]:
+			case *fringeNode[V], *liteFringeNode:
 				fringeAddrs = append(fringeAddrs, addr)
 
-			case *leafNode[V]:
+			case *leafNode[V], *liteLeafNode:
 				leafAddrs = append(leafAddrs, addr)
 
 			default:
@@ -125,15 +125,17 @@ func dump[V any](n nodeReader[V], w io.Writer, path stridePath, depth int, is4 b
 			fmt.Fprintf(w, "%sleaves(#%d):", indent, leafCount)
 
 			for _, addr := range leafAddrs {
-				k := n.mustGetChild(addr)
-				pc := k.(*leafNode[V])
-
-				// Lite: val is the empty struct, don't print it
-				switch any(pc.value).(type) {
-				case struct{}:
-					fmt.Fprintf(w, " %s:{%s}", addrFmt(addr, is4), pc.prefix)
+				anyKid := n.mustGetChild(addr)
+				switch kid := anyKid.(type) {
+				case *leafNode[V]:
+					if shouldPrintValues[V](n) {
+						fmt.Fprintf(w, " %s:{%s, %v}", addrFmt(addr, is4), kid.prefix, kid.value)
+					} else {
+						fmt.Fprintf(w, " %s:{%s}", addrFmt(addr, is4), kid.prefix)
+					}
+				case *liteLeafNode:
+					fmt.Fprintf(w, " %s:{%s}", addrFmt(addr, is4), kid.prefix)
 				default:
-					fmt.Fprintf(w, " %s:{%s, %v}", addrFmt(addr, is4), pc.prefix, pc.value)
 				}
 			}
 
@@ -147,15 +149,16 @@ func dump[V any](n nodeReader[V], w io.Writer, path stridePath, depth int, is4 b
 			for _, addr := range fringeAddrs {
 				fringePfx := cidrForFringe(path[:], depth, is4, addr)
 
-				k := n.mustGetChild(addr)
-				pc := k.(*fringeNode[V])
-
-				// Lite: val is the empty struct, don't print it
-				switch any(pc.value).(type) {
-				case struct{}:
+				anyKid := n.mustGetChild(addr)
+				switch kid := anyKid.(type) {
+				case *liteFringeNode:
 					fmt.Fprintf(w, " %s:{%s}", addrFmt(addr, is4), fringePfx)
-				default:
-					fmt.Fprintf(w, " %s:{%s, %v}", addrFmt(addr, is4), fringePfx, pc.value)
+				case *fringeNode[V]:
+					if shouldPrintValues[V](n) {
+						fmt.Fprintf(w, " %s:{%s, %v}", addrFmt(addr, is4), fringePfx, kid.value)
+					} else {
+						fmt.Fprintf(w, " %s:{%s}", addrFmt(addr, is4), fringePfx)
+					}
 				}
 			}
 
@@ -290,10 +293,10 @@ func nodeStats[V any](n nodeReader[V]) stats {
 		case nodeReader[V]:
 			s.nodes++
 
-		case *fringeNode[V]:
+		case *fringeNode[V], *liteFringeNode:
 			s.fringes++
 
-		case *leafNode[V]:
+		case *leafNode[V], *liteLeafNode:
 			s.leaves++
 
 		default:
@@ -335,10 +338,10 @@ func nodeStatsRec[V any](n nodeReader[V]) stats {
 			s.leaves += rs.leaves
 			s.fringes += rs.fringes
 
-		case *fringeNode[V]:
+		case *fringeNode[V], *liteFringeNode:
 			s.fringes++
 
-		case *leafNode[V]:
+		case *leafNode[V], *liteLeafNode:
 			s.leaves++
 
 		default:
