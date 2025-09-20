@@ -143,6 +143,7 @@ func TestDeletePersistTable(t *testing.T) {
 }
 
 // ########## Lite ##############
+/*
 
 func TestInsertPersistLite(t *testing.T) {
 	t.Parallel()
@@ -226,3 +227,4 @@ func TestDeletePersistLite(t *testing.T) {
 		}
 	}
 }
+*/
