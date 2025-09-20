@@ -27,8 +27,8 @@ func (l *Lite) Insert(pfx netip.Prefix) {
 }
 
 // adapter method, not delegated
-func (l *Lite) Overlaps(o *Lite) {
-	l.liteTable.Overlaps(&o.liteTable)
+func (l *Lite) Overlaps(o *Lite) bool {
+	return l.liteTable.Overlaps(&o.liteTable)
 }
 
 // adapter method, not delegated
