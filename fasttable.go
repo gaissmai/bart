@@ -749,44 +749,44 @@ func (f *Fast[V]) Size6() int {
 }
 
 // dumpString is just a wrapper for dump.
-func (t *Fast[V]) dumpString() string {
+func (f *Fast[V]) dumpString() string {
 	w := new(strings.Builder)
-	t.dump(w)
+	f.dump(w)
 
 	return w.String()
 }
 
 // dump the table structure and all the nodes to w.
-func (t *Fast[V]) dump(w io.Writer) {
-	if t == nil {
+func (f *Fast[V]) dump(w io.Writer) {
+	if f == nil {
 		return
 	}
 
-	if t.size4 > 0 {
-		stats := nodeStatsRec(&t.root4)
+	if f.size4 > 0 {
+		stats := nodeStatsRec(&f.root4)
 		fmt.Fprintln(w)
 		fmt.Fprintf(w, "### IPv4: size(%d), nodes(%d), pfxs(%d), leaves(%d), fringes(%d)",
-			t.size4, stats.nodes, stats.pfxs, stats.leaves, stats.fringes)
+			f.size4, stats.nodes, stats.pfxs, stats.leaves, stats.fringes)
 
-		dumpRec(&t.root4, w, stridePath{}, 0, true)
+		dumpRec(&f.root4, w, stridePath{}, 0, true)
 	}
 
-	if t.size6 > 0 {
-		stats := nodeStatsRec(&t.root6)
+	if f.size6 > 0 {
+		stats := nodeStatsRec(&f.root6)
 		fmt.Fprintln(w)
 		fmt.Fprintf(w, "### IPv6: size(%d), nodes(%d), pfxs(%d), leaves(%d), fringes(%d)",
-			t.size6, stats.nodes, stats.pfxs, stats.leaves, stats.fringes)
+			f.size6, stats.nodes, stats.pfxs, stats.leaves, stats.fringes)
 
-		dumpRec(&t.root6, w, stridePath{}, 0, false)
+		dumpRec(&f.root6, w, stridePath{}, 0, false)
 	}
 }
 
 // String returns a hierarchical tree diagram of the ordered CIDRs
 // as string, just a wrapper for [Table.Fprint].
 // If Fprint returns an error, String panics.
-func (t *Fast[V]) String() string {
+func (f *Fast[V]) String() string {
 	w := new(strings.Builder)
-	if err := t.Fprint(w); err != nil {
+	if err := f.Fprint(w); err != nil {
 		panic(err)
 	}
 
@@ -815,21 +815,21 @@ func (t *Fast[V]) String() string {
 //	   ├─ 2000::/3 (V)
 //	   │  └─ 2001:db8::/32 (V)
 //	   └─ fe80::/10 (V)
-func (t *Fast[V]) Fprint(w io.Writer) error {
+func (f *Fast[V]) Fprint(w io.Writer) error {
 	if w == nil {
 		return fmt.Errorf("nil writer")
 	}
-	if t == nil {
+	if f == nil {
 		return nil
 	}
 
 	// v4
-	if err := t.fprint(w, true); err != nil {
+	if err := f.fprint(w, true); err != nil {
 		return err
 	}
 
 	// v6
-	if err := t.fprint(w, false); err != nil {
+	if err := f.fprint(w, false); err != nil {
 		return err
 	}
 
@@ -837,8 +837,8 @@ func (t *Fast[V]) Fprint(w io.Writer) error {
 }
 
 // fprint is the version dependent adapter to fprintRec.
-func (t *Fast[V]) fprint(w io.Writer, is4 bool) error {
-	n := t.rootNodeByVersion(is4)
+func (f *Fast[V]) fprint(w io.Writer, is4 bool) error {
+	n := f.rootNodeByVersion(is4)
 	if n.isEmpty() {
 		return nil
 	}
@@ -859,9 +859,9 @@ func (t *Fast[V]) fprint(w io.Writer, is4 bool) error {
 
 // MarshalText implements the [encoding.TextMarshaler] interface,
 // just a wrapper for [Table.Fprint].
-func (t *Fast[V]) MarshalText() ([]byte, error) {
+func (f *Fast[V]) MarshalText() ([]byte, error) {
 	w := new(bytes.Buffer)
-	if err := t.Fprint(w); err != nil {
+	if err := f.Fprint(w); err != nil {
 		return nil, err
 	}
 
@@ -870,8 +870,8 @@ func (t *Fast[V]) MarshalText() ([]byte, error) {
 
 // MarshalJSON dumps the table into two sorted lists: for ipv4 and ipv6.
 // Every root and subnet is an array, not a map, because the order matters.
-func (t *Fast[V]) MarshalJSON() ([]byte, error) {
-	if t == nil {
+func (f *Fast[V]) MarshalJSON() ([]byte, error) {
+	if f == nil {
 		return []byte("null"), nil
 	}
 
@@ -879,8 +879,8 @@ func (t *Fast[V]) MarshalJSON() ([]byte, error) {
 		Ipv4 []DumpListNode[V] `json:"ipv4,omitempty"`
 		Ipv6 []DumpListNode[V] `json:"ipv6,omitempty"`
 	}{
-		Ipv4: t.DumpList4(),
-		Ipv6: t.DumpList6(),
+		Ipv4: f.DumpList4(),
+		Ipv6: f.DumpList6(),
 	}
 
 	buf, err := json.Marshal(result)
@@ -893,18 +893,18 @@ func (t *Fast[V]) MarshalJSON() ([]byte, error) {
 
 // DumpList4 dumps the ipv4 tree into a list of roots and their subnets.
 // It can be used to analyze the tree or build the text or json serialization.
-func (t *Fast[V]) DumpList4() []DumpListNode[V] {
-	if t == nil {
+func (f *Fast[V]) DumpList4() []DumpListNode[V] {
+	if f == nil {
 		return nil
 	}
-	return dumpListRec(&t.root4, 0, stridePath{}, 0, true)
+	return dumpListRec(&f.root4, 0, stridePath{}, 0, true)
 }
 
 // DumpList6 dumps the ipv6 tree into a list of roots and their subnets.
 // It can be used to analyze the tree or build custom json representation.
-func (t *Fast[V]) DumpList6() []DumpListNode[V] {
-	if t == nil {
+func (f *Fast[V]) DumpList6() []DumpListNode[V] {
+	if f == nil {
 		return nil
 	}
-	return dumpListRec(&t.root6, 0, stridePath{}, 0, false)
+	return dumpListRec(&f.root6, 0, stridePath{}, 0, false)
 }
