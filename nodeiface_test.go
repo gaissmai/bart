@@ -21,7 +21,7 @@ func TestZeroValueState(t *testing.T) {
 	}{
 		{"node", func() nodeReader[string] { return &node[string]{} }},
 		{"fastNode", func() nodeReader[string] { return &fastNode[string]{} }},
-		{"slimNode", func() nodeReader[string] { return &slimNode[string]{} }},
+		{"liteNode", func() nodeReader[string] { return &liteNode[string]{} }},
 	}
 
 	for _, tt := range tests {
@@ -65,7 +65,7 @@ func TestEmptyNodeIterators(t *testing.T) {
 	}{
 		{"node", func() nodeReader[string] { return &node[string]{} }},
 		{"fastNode", func() nodeReader[string] { return &fastNode[string]{} }},
-		{"slimNode", func() nodeReader[string] { return &slimNode[string]{} }},
+		{"liteNode", func() nodeReader[string] { return &liteNode[string]{} }},
 	}
 
 	for _, tt := range tests {
@@ -102,7 +102,7 @@ func TestAllIndices(t *testing.T) {
 	}{
 		{"node", func() nodeReadWriter[string] { return &node[string]{} }},
 		{"fastNode", func() nodeReadWriter[string] { return &fastNode[string]{} }},
-		{"slimNode", func() nodeReadWriter[string] { return &slimNode[string]{} }},
+		{"liteNode", func() nodeReadWriter[string] { return &liteNode[string]{} }},
 	}
 
 	for _, tt := range tests {
@@ -150,8 +150,8 @@ func TestAllIndices(t *testing.T) {
 				t.Errorf("Expected indices, got %v, want %v", indices, expectedIndices)
 			}
 
-			// slimNode has no real payload, return early
-			if _, ok := n.(*slimNode[string]); ok {
+			// liteNode has no real payload, return early
+			if _, ok := n.(*liteNode[string]); ok {
 				return
 			}
 
@@ -180,8 +180,8 @@ func TestAllChildren(t *testing.T) {
 			nodeBuilder: func() nodeReadWriter[string] { return &fastNode[string]{} },
 		},
 		{
-			name:        "slimNode",
-			nodeBuilder: func() nodeReadWriter[string] { return &slimNode[string]{} },
+			name:        "liteNode",
+			nodeBuilder: func() nodeReadWriter[string] { return &liteNode[string]{} },
 		},
 	}
 
@@ -242,7 +242,7 @@ func TestImplementsNodeReader(t *testing.T) {
 	}{
 		{"node", func() nodeReader[string] { return &node[string]{} }},
 		{"fastNode", func() nodeReader[string] { return &fastNode[string]{} }},
-		{"slimNode", func() nodeReader[string] { return &slimNode[string]{} }},
+		{"liteNode", func() nodeReader[string] { return &liteNode[string]{} }},
 	}
 
 	for _, tt := range tests {
