@@ -609,7 +609,7 @@ LOOP:
 		n = stack[depth]
 
 		// longest prefix match, skip if node has no prefixes
-		if n.prefixCount() == 0 {
+		if n.pfxCount == 0 {
 			continue
 		}
 

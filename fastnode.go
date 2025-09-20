@@ -35,16 +35,19 @@ type fastNode[V any] struct {
 
 	prefixesBitSet bitset.BitSet256 // for count and fast bitset operations
 	childrenBitSet bitset.BitSet256 // for count and fast bitset operations
+
+	pfxCount uint16
+	cldCount uint16
 }
 
 // prefixCount returns the number of prefixes stored in this node.
 func (n *fastNode[V]) prefixCount() int {
-	return n.prefixesBitSet.Size()
+	return int(n.pfxCount)
 }
 
 // childCount returns the number of slots used in this node.
 func (n *fastNode[V]) childCount() int {
-	return n.childrenBitSet.Size()
+	return int(n.cldCount)
 }
 
 // isEmpty returns true if node has neither prefixes nor children
@@ -102,6 +105,7 @@ func (n *fastNode[V]) insertChild(addr uint8, child any) (exists bool) {
 	if n.children[addr] == nil {
 		exists = false
 		n.childrenBitSet.Set(addr)
+		n.cldCount++
 	} else {
 		exists = true
 	}
@@ -120,6 +124,7 @@ func (n *fastNode[V]) deleteChild(addr uint8) (exists bool) {
 	if n.children[addr] == nil {
 		return false
 	}
+	n.cldCount--
 
 	n.childrenBitSet.Clear(addr)
 	n.children[addr] = nil
@@ -132,6 +137,7 @@ func (n *fastNode[V]) deleteChild(addr uint8) (exists bool) {
 func (n *fastNode[V]) insertPrefix(idx uint8, val V) (exists bool) {
 	if exists = n.prefixesBitSet.Test(idx); !exists {
 		n.prefixesBitSet.Set(idx)
+		n.pfxCount++
 	}
 
 	// insert or update
@@ -197,6 +203,7 @@ func (n *fastNode[V]) deletePrefix(idx uint8) (val V, exists bool) {
 		// Route entry doesn't exist
 		return
 	}
+	n.pfxCount--
 
 	valPtr := n.prefixes[idx]
 	parentValPtr := n.prefixes[idx>>1]
