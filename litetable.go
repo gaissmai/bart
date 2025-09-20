@@ -613,6 +613,30 @@ LOOP:
 	return
 }
 
+// OverlapsPrefix reports whether any route in the table overlaps with the given pfx or vice versa.
+//
+// The check is bidirectional: it returns true if the input prefix is covered by an existing
+// route, or if any stored route is itself contained within the input prefix.
+//
+// Internally, the function normalizes the prefix and descends the relevant trie branch,
+// using stride-based logic to identify overlap without performing a full lookup.
+//
+// This is useful for containment tests, route validation, or policy checks using prefix
+// semantics without retrieving exact matches.
+func (l *liteTable[V]) OverlapsPrefix(pfx netip.Prefix) bool {
+	if !pfx.IsValid() {
+		return false
+	}
+
+	// canonicalize the prefix
+	pfx = pfx.Masked()
+
+	is4 := pfx.Addr().Is4()
+	n := l.rootNodeByVersion(is4)
+
+	return n.overlapsPrefixAtDepth(pfx, 0)
+}
+
 // Overlaps reports whether any route in the receiver table overlaps
 // with a route in the other table, in either direction.
 //
