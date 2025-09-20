@@ -1151,7 +1151,7 @@ func (t *Table[V]) Union(o *Table[V]) {
 // It ensures both trees (IPv4-based and IPv6-based) have the same sizes and
 // recursively compares their root nodes.
 func (t *Table[V]) Equal(o *Table[V]) bool {
-	if t.size4 != o.size4 || t.size6 != o.size6 {
+	if o == nil || t.size4 != o.size4 || t.size6 != o.size6 {
 		return false
 	}
 
