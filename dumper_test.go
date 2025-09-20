@@ -53,7 +53,7 @@ func TestUnifiedDumper_NodeTypes(t *testing.T) {
 			n.insertPrefix(64, "dump-test")
 
 			// Use the dump function that takes io.Writer
-			dump(n, &buf, path, 0, false)
+			dump(n, &buf, path, 0, false, shouldPrintValues[any]())
 
 			output := buf.String()
 			// Just check that it produces some output without panicking
@@ -86,7 +86,7 @@ func TestUnifiedDumper_TypedNilHandling(t *testing.T) {
 			pn := createNilNode()
 			w := new(strings.Builder)
 			path := stridePath{}
-			dumpRec(pn, w, path, 0, true)
+			dumpRec(pn, w, path, 0, true, shouldPrintValues[any]())
 		})
 	}
 }
