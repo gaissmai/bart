@@ -38,6 +38,7 @@ type DumpListNode[V any] struct {
 
 func shouldPrintValues[V any]() bool {
 	var zero V
+
 	_, isEmptyStruct := any(zero).(struct{})
 	return !isEmptyStruct
 }

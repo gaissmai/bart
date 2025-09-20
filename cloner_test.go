@@ -201,7 +201,7 @@ func TestCloneFringe_NilAndWithCloneFn(t *testing.T) {
 
 func TestNodeCloneFlat_ShallowChildrenDeepValues(t *testing.T) {
 	t.Parallel()
-	parent := &node[*routeEntry]{}
+	parent := &bartNode[*routeEntry]{}
 
 	// Add prefix values
 	route1 := &routeEntry{
@@ -233,7 +233,7 @@ func TestNodeCloneFlat_ShallowChildrenDeepValues(t *testing.T) {
 
 	leaf := &leafNode[*routeEntry]{prefix: pfx, value: leafRoute}
 	fringe := &fringeNode[*routeEntry]{value: fringeRoute}
-	childNode := &node[*routeEntry]{}
+	childNode := &bartNode[*routeEntry]{}
 
 	parent.insertChild(1, childNode)
 	parent.insertChild(2, leaf)
@@ -263,9 +263,9 @@ func TestNodeCloneFlat_ShallowChildrenDeepValues(t *testing.T) {
 		t.Fatalf("expected 3 children, got %d", got.childCount())
 	}
 
-	// *node child should be same reference (shallow)
+	// *bartNode child should be same reference (shallow)
 	if gotNode, ok := got.getChild(1); !ok || gotNode != childNode {
-		t.Fatalf("expected shallow reference for *node child")
+		t.Fatalf("expected shallow reference for *bartNode child")
 	}
 
 	// leaf should be cloned
@@ -293,7 +293,7 @@ func TestNodeCloneFlat_ShallowChildrenDeepValues(t *testing.T) {
 	// Structural independence: mutating the clone must not affect the original.
 	origPC, origCC := parent.prefixCount(), parent.childCount()
 	got.insertPrefix(30, &routeEntry{nextHop: netip.MustParseAddr("10.9.0.1"), exitIF: "tmp"})
-	got.insertChild(99, &node[*routeEntry]{})
+	got.insertChild(99, &bartNode[*routeEntry]{})
 	if parent.prefixCount() != origPC {
 		t.Fatalf("parent prefixCount changed after mutating clone: got %d want %d", parent.prefixCount(), origPC)
 	}
@@ -303,7 +303,7 @@ func TestNodeCloneFlat_ShallowChildrenDeepValues(t *testing.T) {
 }
 
 func TestNodeCloneFlat_PanicOnWrongType(t *testing.T) {
-	n := &node[*routeEntry]{}
+	n := &bartNode[*routeEntry]{}
 	n.children = *n.children.Copy()
 	// insert a wrong type into children.Items to trigger panic branch
 	n.children.Items = append(n.children.Items, struct{}{}) // not a recognized node type
@@ -316,10 +316,10 @@ func TestNodeCloneFlat_PanicOnWrongType(t *testing.T) {
 }
 
 func TestNodeCloneRec_DeepCopiesNodeChildren(t *testing.T) {
-	// chain of *node: parent[0] -> child[0] -> grandchild
-	parent := &node[*routeEntry]{}
-	child := &node[*routeEntry]{}
-	grand := &node[*routeEntry]{}
+	// chain of *bartNode: parent[0] -> child[0] -> grandchild
+	parent := &bartNode[*routeEntry]{}
+	child := &bartNode[*routeEntry]{}
+	grand := &bartNode[*routeEntry]{}
 
 	// Add a route to the grandchild to verify deep cloning
 	grandRoute := &routeEntry{
@@ -346,7 +346,7 @@ func TestNodeCloneRec_DeepCopiesNodeChildren(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected child at index 10")
 	}
-	kid, ok := kidAny.(*node[*routeEntry])
+	kid, ok := kidAny.(*bartNode[*routeEntry])
 	if !ok || kid == child {
 		t.Fatalf("expected deep-cloned child node")
 	}
@@ -355,7 +355,7 @@ func TestNodeCloneRec_DeepCopiesNodeChildren(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected grandchild at index 20")
 	}
-	gk, ok := gkAny.(*node[*routeEntry])
+	gk, ok := gkAny.(*bartNode[*routeEntry])
 	if !ok || gk == grand {
 		t.Fatalf("expected deep-cloned grandchild node")
 	}

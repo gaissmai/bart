@@ -19,13 +19,13 @@ import (
 //
 // Usage:
 //
-//	func (n *node[V]) contains(idx uint8) bool {
+//	func (n *bartNode[V]) contains(idx uint8) bool {
 //		return n.prefixes.Intersects(&lpm.LookupTbl[idx])
 //	}
 //
 // instead of a sequence of single bitset tests:
 //
-//	func (n *node[V]) contains(idx uint8) bool {
+//	func (n *bartNode[V]) contains(idx uint8) bool {
 //		for ; idx > 0; idx >>= 1 {
 //			if n.prefixes.Test(idx) {
 //				return true

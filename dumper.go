@@ -125,15 +125,11 @@ func dump[V any](n nodeReader[V], w io.Writer, path stridePath, depth int, is4 b
 			fmt.Fprintf(w, "%sleaves(#%d):", indent, leafCount)
 
 			for _, addr := range leafAddrs {
-				k := n.mustGetChild(addr)
-				pc := k.(*leafNode[V])
-
-				// Lite: val is the empty struct, don't print it
-				switch any(pc.value).(type) {
-				case struct{}:
-					fmt.Fprintf(w, " %s:{%s}", addrFmt(addr, is4), pc.prefix)
-				default:
-					fmt.Fprintf(w, " %s:{%s, %v}", addrFmt(addr, is4), pc.prefix, pc.value)
+				kid := n.mustGetChild(addr).(*leafNode[V])
+				if shouldPrintValues[V]() {
+					fmt.Fprintf(w, " %s:{%s, %v}", addrFmt(addr, is4), kid.prefix, kid.value)
+				} else {
+					fmt.Fprintf(w, " %s:{%s}", addrFmt(addr, is4), kid.prefix)
 				}
 			}
 
@@ -147,15 +143,11 @@ func dump[V any](n nodeReader[V], w io.Writer, path stridePath, depth int, is4 b
 			for _, addr := range fringeAddrs {
 				fringePfx := cidrForFringe(path[:], depth, is4, addr)
 
-				k := n.mustGetChild(addr)
-				pc := k.(*fringeNode[V])
-
-				// Lite: val is the empty struct, don't print it
-				switch any(pc.value).(type) {
-				case struct{}:
+				kid := n.mustGetChild(addr).(*fringeNode[V])
+				if shouldPrintValues[V]() {
+					fmt.Fprintf(w, " %s:{%s, %v}", addrFmt(addr, is4), fringePfx, kid.value)
+				} else {
 					fmt.Fprintf(w, " %s:{%s}", addrFmt(addr, is4), fringePfx)
-				default:
-					fmt.Fprintf(w, " %s:{%s, %v}", addrFmt(addr, is4), fringePfx, pc.value)
 				}
 			}
 

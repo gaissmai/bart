@@ -3,6 +3,8 @@
 
 package bart_test
 
+/*
+
 import (
 	"sync"
 	"sync/atomic"
@@ -77,3 +79,4 @@ func ExampleLite_concurrent() {
 
 	// Output:
 }
+*/

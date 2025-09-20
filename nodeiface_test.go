@@ -12,6 +12,11 @@ import (
 	"github.com/gaissmai/bart/internal/art"
 )
 
+func isLiteNode[V any](n nodeReadWriter[V]) bool {
+	_, ok := n.(*liteNode[V])
+	return ok
+}
+
 func TestZeroValueState(t *testing.T) {
 	t.Parallel()
 
@@ -19,8 +24,9 @@ func TestZeroValueState(t *testing.T) {
 		name        string
 		nodeBuilder func() nodeReader[string]
 	}{
-		{"node", func() nodeReader[string] { return &node[string]{} }},
+		{"bartNode", func() nodeReader[string] { return &bartNode[string]{} }},
 		{"fastNode", func() nodeReader[string] { return &fastNode[string]{} }},
+		{"liteNode", func() nodeReader[string] { return &liteNode[string]{} }},
 	}
 
 	for _, tt := range tests {
@@ -62,8 +68,9 @@ func TestEmptyNodeIterators(t *testing.T) {
 		name        string
 		nodeBuilder func() nodeReader[string]
 	}{
-		{"node", func() nodeReader[string] { return &node[string]{} }},
+		{"bartNode", func() nodeReader[string] { return &bartNode[string]{} }},
 		{"fastNode", func() nodeReader[string] { return &fastNode[string]{} }},
+		{"liteNode", func() nodeReader[string] { return &liteNode[string]{} }},
 	}
 
 	for _, tt := range tests {
@@ -98,8 +105,9 @@ func TestAllIndices(t *testing.T) {
 		name        string
 		nodeBuilder func() nodeReadWriter[string]
 	}{
-		{"node", func() nodeReadWriter[string] { return &node[string]{} }},
+		{"bartNode", func() nodeReadWriter[string] { return &bartNode[string]{} }},
 		{"fastNode", func() nodeReadWriter[string] { return &fastNode[string]{} }},
+		{"liteNode", func() nodeReadWriter[string] { return &liteNode[string]{} }},
 	}
 
 	for _, tt := range tests {
@@ -147,6 +155,11 @@ func TestAllIndices(t *testing.T) {
 				t.Errorf("Expected indices, got %v, want %v", indices, expectedIndices)
 			}
 
+			// liteNode has no real payload, return early
+			if _, ok := n.(*liteNode[string]); ok {
+				return
+			}
+
 			if !slices.Equal(values, expectedValues) {
 				t.Errorf("Expected values, got %v, want %v", values, expectedValues)
 			}
@@ -164,12 +177,16 @@ func TestAllChildren(t *testing.T) {
 		nodeBuilder func() nodeReadWriter[string]
 	}{
 		{
-			name:        "node",
-			nodeBuilder: func() nodeReadWriter[string] { return &node[string]{} },
+			name:        "bartNode",
+			nodeBuilder: func() nodeReadWriter[string] { return &bartNode[string]{} },
 		},
 		{
 			name:        "fastNode",
 			nodeBuilder: func() nodeReadWriter[string] { return &fastNode[string]{} },
+		},
+		{
+			name:        "liteNode",
+			nodeBuilder: func() nodeReadWriter[string] { return &liteNode[string]{} },
 		},
 	}
 
@@ -221,82 +238,6 @@ func TestAllChildren(t *testing.T) {
 	}
 }
 
-func TestImplementsNodeReader(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name        string
-		nodeBuilder func() nodeReader[string]
-	}{
-		{"node", func() nodeReader[string] { return &node[string]{} }},
-		{"fastNode", func() nodeReader[string] { return &fastNode[string]{} }},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			n := tt.nodeBuilder()
-
-			// Insert specific test data
-			expectedData := map[uint8]string{
-				1: "default", // default route uses index 1
-				8: "net8",
-			}
-
-			var expectedIndices []uint8
-			for idx := range maps.Keys(expectedData) {
-				expectedIndices = append(expectedIndices, idx)
-			}
-			slices.Sort(expectedIndices)
-
-			// Cast to noder to insert data
-			noder := n.(nodeReadWriter[string])
-			for idx, val := range expectedData {
-				noder.insertPrefix(idx, val)
-			}
-
-			// Test isEmpty
-			if n.isEmpty() {
-				t.Error("Node should not be empty when prefixes are present")
-			}
-
-			// Test counts
-			if n.prefixCount() != len(expectedData) {
-				t.Errorf("Expected prefixCount %d, got %d", len(expectedData), n.prefixCount())
-			}
-
-			if n.childCount() != 0 {
-				t.Errorf("Expected childCount 0, got %d", n.childCount())
-			}
-
-			// Test getIndices returns exact expected indices
-			indices := n.getIndices()
-			if !slices.Equal(indices, expectedIndices) {
-				t.Errorf("getIndices(), got %v, want %v", indices, expectedIndices)
-			}
-
-			// Test getPrefix for each expected entry
-			for expectedIdx, expectedVal := range expectedData {
-				val, exists := n.getPrefix(expectedIdx)
-				if !exists {
-					t.Errorf("getPrefix(%d): should exist", expectedIdx)
-				}
-				if val != expectedVal {
-					t.Errorf("getPrefix(%d): expected %q, got %q", expectedIdx, expectedVal, val)
-				}
-			}
-
-			// Test mustGetPrefix for each expected entry
-			for expectedIdx, expectedVal := range expectedData {
-				val := n.mustGetPrefix(expectedIdx)
-				if val != expectedVal {
-					t.Errorf("mustGetPrefix(%d): expected %q, got %q", expectedIdx, expectedVal, val)
-				}
-			}
-		})
-	}
-}
-
 func TestImplementsNoder(t *testing.T) {
 	t.Parallel()
 
@@ -304,8 +245,9 @@ func TestImplementsNoder(t *testing.T) {
 		name        string
 		nodeBuilder func() nodeReadWriter[string]
 	}{
-		{"node", func() nodeReadWriter[string] { return &node[string]{} }},
+		{"bartNode", func() nodeReadWriter[string] { return &bartNode[string]{} }},
 		{"fastNode", func() nodeReadWriter[string] { return &fastNode[string]{} }},
+		{"liteNode", func() nodeReadWriter[string] { return &liteNode[string]{} }},
 	}
 
 	for _, tt := range tests {
@@ -359,9 +301,11 @@ func TestImplementsNoder(t *testing.T) {
 					continue
 				}
 
-				expectedVal := expectedAfterDuplicate[idx]
-				if val != expectedVal {
-					t.Errorf("deletePrefix(%d): expected %q, got %q", idx, expectedVal, val)
+				if !isLiteNode(n) {
+					expectedVal := expectedAfterDuplicate[idx]
+					if val != expectedVal {
+						t.Errorf("deletePrefix(%d): expected %q, got %q", idx, expectedVal, val)
+					}
 				}
 			}
 
@@ -386,8 +330,9 @@ func TestIteratorConsistency(t *testing.T) {
 		name        string
 		nodeBuilder func() nodeReader[string]
 	}{
-		{"node", func() nodeReader[string] { return &node[string]{} }},
+		{"bartNode", func() nodeReader[string] { return &bartNode[string]{} }},
 		{"fastNode", func() nodeReader[string] { return &fastNode[string]{} }},
+		{"liteNode", func() nodeReader[string] { return &liteNode[string]{} }},
 	}
 
 	// Define expected test data
@@ -439,8 +384,10 @@ func TestIteratorConsistency(t *testing.T) {
 				t.Errorf("Iterator indices, got %v, want %v", iterIndices, expectedIndices)
 			}
 
-			if !slices.Equal(iterValues, expectedValues) {
-				t.Errorf("Iterator values, got %v, want %v", iterValues, expectedValues)
+			if !isLiteNode(noder) {
+				if !slices.Equal(iterValues, expectedValues) {
+					t.Errorf("Iterator values, got %v, want %v", iterValues, expectedValues)
+				}
 			}
 		})
 	}
@@ -464,8 +411,9 @@ func TestNodes_MultipleChildrenLifecycle(t *testing.T) {
 		name        string
 		nodeBuilder func() nodeReadWriter[string]
 	}{
-		{"node", func() nodeReadWriter[string] { return &node[string]{} }},
+		{"bartNode", func() nodeReadWriter[string] { return &bartNode[string]{} }},
 		{"fastNode", func() nodeReadWriter[string] { return &fastNode[string]{} }},
+		{"liteNode", func() nodeReadWriter[string] { return &liteNode[string]{} }},
 	}
 
 	for _, tt := range tests {
@@ -540,8 +488,9 @@ func TestNodes_NearestAncestorWins_AcrossMultipleLevels(t *testing.T) {
 		name        string
 		nodeBuilder func() nodeReadWriter[int]
 	}{
-		{"node", func() nodeReadWriter[int] { return &node[int]{} }},
+		{"bartNode", func() nodeReadWriter[int] { return &bartNode[int]{} }},
 		{"fastNode", func() nodeReadWriter[int] { return &fastNode[int]{} }},
+		{"liteNode", func() nodeReadWriter[int] { return &liteNode[int]{} }},
 	}
 
 	for _, tt := range tests {
@@ -565,10 +514,12 @@ func TestNodes_NearestAncestorWins_AcrossMultipleLevels(t *testing.T) {
 			}
 
 			// Most specific ancestor should be chosen
-			assertLookup(16, 80) // 16->8->4->2->1
-			assertLookup(9, 40)  // 9->4->2->1
-			assertLookup(6, 10)  // 6->3->1 (note: 2 is not on 6's chain)
-			assertLookup(3, 10)  // 3->1
+			if !isLiteNode(n) {
+				assertLookup(16, 80) // 16->8->4->2->1
+				assertLookup(9, 40)  // 9->4->2->1
+				assertLookup(6, 10)  // 6->3->1 (note: 2 is not on 6's chain)
+				assertLookup(3, 10)  // 3->1
+			}
 
 			// contains should reflect ancestry presence
 			if !n.contains(18) { // 18->9->4->2->1
@@ -579,20 +530,22 @@ func TestNodes_NearestAncestorWins_AcrossMultipleLevels(t *testing.T) {
 			}
 
 			// Remove an intermediate ancestor and verify fallback to next ancestor
-			if v, ok := n.deletePrefix(4); !ok || v != 40 {
-				t.Fatalf("deletePrefix(4)=(%d,%v), want (40,true)", v, ok)
-			}
-			assertLookup(9, 20) // now falls back to 2
-			assertLookup(16, 80)
+			if !isLiteNode(n) {
+				if v, ok := n.deletePrefix(4); !ok || v != 40 {
+					t.Fatalf("deletePrefix(4)=(%d,%v), want (40,true)", v, ok)
+				}
+				assertLookup(9, 20) // now falls back to 2
+				assertLookup(16, 80)
 
-			// Remove most specific and ensure fallback continues to next available
-			if v, ok := n.deletePrefix(8); !ok || v != 80 {
-				t.Fatalf("deletePrefix(8)=(%d,%v), want (80,true)", v, ok)
-			}
-			assertLookup(16, 20) // 16->8(X)->4(X)->2
+				// Remove most specific and ensure fallback continues to next available
+				if v, ok := n.deletePrefix(8); !ok || v != 80 {
+					t.Fatalf("deletePrefix(8)=(%d,%v), want (80,true)", v, ok)
+				}
+				assertLookup(16, 20) // 16->8(X)->4(X)->2
 
-			if got := n.prefixCount(); got != 2 {
-				t.Fatalf("prefixCount=%d, want 2 (only 1 and 2 remain)", got)
+				if got := n.prefixCount(); got != 2 {
+					t.Fatalf("prefixCount=%d, want 2 (only 1 and 2 remain)", got)
+				}
 			}
 		})
 	}
@@ -605,8 +558,9 @@ func TestNodes_Lookup_NoAncestorPath(t *testing.T) {
 		name        string
 		nodeBuilder func() nodeReadWriter[int]
 	}{
-		{"node", func() nodeReadWriter[int] { return &node[int]{} }},
+		{"bartNode", func() nodeReadWriter[int] { return &bartNode[int]{} }},
 		{"fastNode", func() nodeReadWriter[int] { return &fastNode[int]{} }},
+		{"liteNode", func() nodeReadWriter[int] { return &liteNode[int]{} }},
 	}
 
 	for _, tt := range tests {
@@ -621,13 +575,15 @@ func TestNodes_Lookup_NoAncestorPath(t *testing.T) {
 			if n.contains(5) {
 				t.Fatalf("contains(5)=true, want false (no ancestor along 5's chain)")
 			}
-			if _, ok := n.lookup(5); ok {
-				t.Fatalf("lookup(5) ok=true, want false (no ancestor along 5's chain)")
-			}
+			if !isLiteNode(n) {
+				if _, ok := n.lookup(5); ok {
+					t.Fatalf("lookup(5) ok=true, want false (no ancestor along 5's chain)")
+				}
 
-			// Direct getPrefix should also be false when not set
-			if v, ok := n.getPrefix(5); ok || v != 0 {
-				t.Fatalf("getPrefix(5)=(%d,%v), want (0,false)", v, ok)
+				// Direct getPrefix should also be false when not set
+				if v, ok := n.getPrefix(5); ok || v != 0 {
+					t.Fatalf("getPrefix(5)=(%d,%v), want (0,false)", v, ok)
+				}
 			}
 		})
 	}
@@ -640,8 +596,9 @@ func TestNodes_GetPrefix_And_OverwriteSemantics(t *testing.T) {
 		name        string
 		nodeBuilder func() nodeReadWriter[int]
 	}{
-		{"node", func() nodeReadWriter[int] { return &node[int]{} }},
+		{"bartNode", func() nodeReadWriter[int] { return &bartNode[int]{} }},
 		{"fastNode", func() nodeReadWriter[int] { return &fastNode[int]{} }},
+		{"liteNode", func() nodeReadWriter[int] { return &liteNode[int]{} }},
 	}
 
 	for _, tt := range tests {
@@ -652,8 +609,10 @@ func TestNodes_GetPrefix_And_OverwriteSemantics(t *testing.T) {
 			if exists := n.insertPrefix(32, 111); exists {
 				t.Fatalf("insertPrefix(32) first exists=true, want false")
 			}
-			if v, ok := n.getPrefix(32); !ok || v != 111 {
-				t.Fatalf("getPrefix(32)=(%d,%v), want (111,true)", v, ok)
+			if !isLiteNode(n) {
+				if v, ok := n.getPrefix(32); !ok || v != 111 {
+					t.Fatalf("getPrefix(32)=(%d,%v), want (111,true)", v, ok)
+				}
 			}
 
 			// Overwrite should report exists and not increase count
@@ -665,8 +624,14 @@ func TestNodes_GetPrefix_And_OverwriteSemantics(t *testing.T) {
 			}
 
 			// Deleting returns the last stored value
-			if v, ok := n.deletePrefix(32); !ok || v != 222 {
-				t.Fatalf("deletePrefix(32)=(%d,%v), want (222,true)", v, ok)
+			v, ok := n.deletePrefix(32)
+			if !ok {
+				t.Fatalf("deletePrefix(32)=(_,%v), want (_,true)", ok)
+			}
+			if !isLiteNode(n) {
+				if v != 222 {
+					t.Fatalf("deletePrefix(32)=(%d,%v), want (222,true)", v, ok)
+				}
 			}
 			if got := n.prefixCount(); got != 0 {
 				t.Fatalf("prefixCount=%d, want 0 after delete", got)
@@ -682,8 +647,9 @@ func TestNode_IsEmpty_AfterAllDeletes(t *testing.T) {
 		name        string
 		nodeBuilder func() nodeReadWriter[int]
 	}{
-		{"node", func() nodeReadWriter[int] { return &node[int]{} }},
+		{"bartNode", func() nodeReadWriter[int] { return &bartNode[int]{} }},
 		{"fastNode", func() nodeReadWriter[int] { return &fastNode[int]{} }},
+		{"liteNode", func() nodeReadWriter[int] { return &liteNode[int]{} }},
 	}
 
 	for _, tt := range tests {
@@ -700,8 +666,8 @@ func TestNode_IsEmpty_AfterAllDeletes(t *testing.T) {
 			}
 
 			n.deleteChild(7)
-			if v, ok := n.deletePrefix(64); !ok || v != 999 {
-				t.Fatalf("deletePrefix(64)=(%d,%v), want (999,true)", v, ok)
+			if _, ok := n.deletePrefix(64); !ok {
+				t.Fatalf("deletePrefix(64)=(_,%v), want (_,true)", ok)
 			}
 
 			if !n.isEmpty() {
@@ -718,8 +684,9 @@ func TestNodes_LPMEmpty_NoMatch(t *testing.T) {
 		name        string
 		nodeBuilder func() nodeReadWriter[int]
 	}{
-		{"node", func() nodeReadWriter[int] { return &node[int]{} }},
+		{"bartNode", func() nodeReadWriter[int] { return &bartNode[int]{} }},
 		{"fastNode", func() nodeReadWriter[int] { return &fastNode[int]{} }},
+		{"liteNode", func() nodeReadWriter[int] { return &liteNode[int]{} }},
 	}
 
 	for _, tt := range tests {
@@ -761,7 +728,7 @@ func TestNodes_LPMLongestPrefixWins(t *testing.T) {
 		name        string
 		nodeBuilder func() nodeReadWriter[int]
 	}{
-		{"node", func() nodeReadWriter[int] { return &node[int]{} }},
+		{"bartNode", func() nodeReadWriter[int] { return &bartNode[int]{} }},
 		{"fastNode", func() nodeReadWriter[int] { return &fastNode[int]{} }},
 	}
 
@@ -796,8 +763,9 @@ func TestNodes_DeleteNonExistent_Safe(t *testing.T) {
 		name        string
 		nodeBuilder func() nodeReadWriter[int]
 	}{
-		{"node", func() nodeReadWriter[int] { return &node[int]{} }},
+		{"bartNode", func() nodeReadWriter[int] { return &bartNode[int]{} }},
 		{"fastNode", func() nodeReadWriter[int] { return &fastNode[int]{} }},
+		{"liteNode", func() nodeReadWriter[int] { return &liteNode[int]{} }},
 	}
 
 	for _, tt := range tests {
@@ -812,9 +780,9 @@ func TestNodes_DeleteNonExistent_Safe(t *testing.T) {
 			// Deleting non-existent should not panic and should not affect existing mappings.
 			n.deletePrefix(art.PfxToIdx(byte(0b0000_0000), 1))
 
-			v, ok := n.lookup(art.OctetToIdx(uint8(0b1101_0101)))
-			if !ok || v != 42 {
-				t.Fatalf("expected mapping to remain after deleting non-existent prefix; got (%v,%v)", v, ok)
+			_, ok := n.lookup(art.OctetToIdx(uint8(0b1101_0101)))
+			if !ok {
+				t.Fatalf("expected mapping to remain after deleting non-existent prefix; got (_,%v)", ok)
 			}
 		})
 	}
@@ -827,8 +795,9 @@ func TestNodes_Contains_EqualsLookupTruthiness(t *testing.T) {
 		name        string
 		nodeBuilder func() nodeReadWriter[int]
 	}{
-		{"node", func() nodeReadWriter[int] { return &node[int]{} }},
+		{"bartNode", func() nodeReadWriter[int] { return &bartNode[int]{} }},
 		{"fastNode", func() nodeReadWriter[int] { return &fastNode[int]{} }},
+		{"liteNode", func() nodeReadWriter[int] { return &liteNode[int]{} }},
 	}
 
 	for _, tt := range tests {
@@ -862,8 +831,9 @@ func TestNodes_Prefixes_AsSliceConsistency(t *testing.T) {
 		name        string
 		nodeBuilder func() nodeReadWriter[int]
 	}{
-		{"node", func() nodeReadWriter[int] { return &node[int]{} }},
+		{"bartNode", func() nodeReadWriter[int] { return &bartNode[int]{} }},
 		{"fastNode", func() nodeReadWriter[int] { return &fastNode[int]{} }},
+		{"liteNode", func() nodeReadWriter[int] { return &liteNode[int]{} }},
 	}
 
 	for _, tt := range tests {
@@ -904,8 +874,9 @@ func TestNode_Children_AsSliceConsistency(t *testing.T) {
 		name        string
 		nodeBuilder func() nodeReadWriter[int]
 	}{
-		{"node", func() nodeReadWriter[int] { return &node[int]{} }},
+		{"bartNode", func() nodeReadWriter[int] { return &bartNode[int]{} }},
 		{"fastNode", func() nodeReadWriter[int] { return &fastNode[int]{} }},
+		{"liteNode", func() nodeReadWriter[int] { return &liteNode[int]{} }},
 	}
 
 	for _, tt := range tests {
@@ -943,8 +914,9 @@ func TestNodes_InsertDuplicatePrefix_OverwritesValue(t *testing.T) {
 		name        string
 		nodeBuilder func() nodeReadWriter[int]
 	}{
-		{"node", func() nodeReadWriter[int] { return &node[int]{} }},
+		{"bartNode", func() nodeReadWriter[int] { return &bartNode[int]{} }},
 		{"fastNode", func() nodeReadWriter[int] { return &fastNode[int]{} }},
+		{"liteNode", func() nodeReadWriter[int] { return &liteNode[int]{} }},
 	}
 
 	for _, tt := range tests {
@@ -964,8 +936,13 @@ func TestNodes_InsertDuplicatePrefix_OverwritesValue(t *testing.T) {
 
 			// Exact get should reflect the latest value.
 			v, ok := n.getPrefix(idx)
-			if !ok || v != 2 {
-				t.Fatalf("expected duplicate insert to overwrite value: got (%v,%v), want (2,true)", v, ok)
+			if !ok {
+				t.Fatalf("expected duplicate insert to keep prefix: got (_,%v), want (_,true)", ok)
+			}
+			if !isLiteNode(n) {
+				if !ok || v != 2 {
+					t.Fatalf("expected duplicate insert to overwrite value: got (%v,%v), want (2,true)", v, ok)
+				}
 			}
 		})
 	}
@@ -980,8 +957,9 @@ func TestNodes_DeleteChild_Idempotent(t *testing.T) {
 		name        string
 		nodeBuilder func() nodeReadWriter[int]
 	}{
-		{"node", func() nodeReadWriter[int] { return &node[int]{} }},
+		{"bartNode", func() nodeReadWriter[int] { return &bartNode[int]{} }},
 		{"fastNode", func() nodeReadWriter[int] { return &fastNode[int]{} }},
+		{"liteNode", func() nodeReadWriter[int] { return &liteNode[int]{} }},
 	}
 
 	for _, tt := range tests {

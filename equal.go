@@ -29,7 +29,7 @@ func equal[V any](v1, v2 V) bool {
 // equalRec compares two nodes recursively.
 // It checks equality of children/prefixes via bitsets, and recursively
 // descends into sub-nodes or compares leaf/fringe node values.
-func (n *node[V]) equalRec(o *node[V]) bool {
+func (n *bartNode[V]) equalRec(o *bartNode[V]) bool {
 	if n == nil || o == nil {
 		return n == o
 	}
@@ -55,9 +55,9 @@ func (n *node[V]) equalRec(o *node[V]) bool {
 		oKid := o.children.Items[i]
 
 		switch nKid := nKid.(type) {
-		case *node[V]:
+		case *bartNode[V]:
 			// oKid must also be a node
-			oKid, ok := oKid.(*node[V])
+			oKid, ok := oKid.(*bartNode[V])
 			if !ok {
 				return false
 			}
