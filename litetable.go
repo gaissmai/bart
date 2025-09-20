@@ -812,6 +812,7 @@ func (l *liteTable[V]) fprint(w io.Writer, is4 bool) error {
 		is4:  is4,
 	}
 
+	// liteTable has no payload - printVals set to false
 	return fprintRec(n, w, startParent, "", false)
 }
 
@@ -887,7 +888,8 @@ func (l *liteTable[V]) dump(w io.Writer) {
 		fmt.Fprintf(w, "### IPv4: size(%d), nodes(%d), pfxs(%d), leaves(%d), fringes(%d)",
 			l.size4, stats.nodes, stats.pfxs, stats.leaves, stats.fringes)
 
-		dumpRec(&l.root4, w, stridePath{}, 0, true)
+		// liteTable has no payload - printVals set to false
+		dumpRec(&l.root4, w, stridePath{}, 0, true, false)
 	}
 
 	if l.size6 > 0 {
@@ -896,6 +898,7 @@ func (l *liteTable[V]) dump(w io.Writer) {
 		fmt.Fprintf(w, "### IPv6: size(%d), nodes(%d), pfxs(%d), leaves(%d), fringes(%d)",
 			l.size6, stats.nodes, stats.pfxs, stats.leaves, stats.fringes)
 
-		dumpRec(&l.root6, w, stridePath{}, 0, false)
+		// liteTable has no payload - printVals set to false
+		dumpRec(&l.root6, w, stridePath{}, 0, false, false)
 	}
 }

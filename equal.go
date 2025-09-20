@@ -229,11 +229,7 @@ func (n *liteNode[V]) equalRec(o *liteNode[V]) bool {
 			if nKid.prefix != oKid.prefix {
 				return false
 			}
-
-			// liteNode has no payload
-			// if !equal(nKid.value, oKid.value) {
-			// 	return false
-			// }
+			// liteNode has no payload - skip value comparison
 
 		case *fringeNode[V]:
 			// oKid must also be a fringe
@@ -242,10 +238,7 @@ func (n *liteNode[V]) equalRec(o *liteNode[V]) bool {
 				return false
 			}
 
-			// liteNode has no payload
-			// if !equal(nKid.value, oKid.value) {
-			// 	return false
-			// }
+			// liteNode has no payload - skip value comparison
 
 		default:
 			panic("logic error, wrong node type")
