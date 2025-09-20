@@ -8,6 +8,11 @@ import (
 	"testing"
 )
 
+func isLiteTable[V any](tbl tabler[V]) bool {
+	_, ok := tbl.(*liteTable[V])
+	return ok
+}
+
 // ---- Boundary behavior tests for /0, /32, /128 with lastOctetPlusOne ----
 
 func TestBoundaryBehavior_DefaultRoutes(t *testing.T) {
@@ -66,10 +71,14 @@ func TestBoundaryBehavior_DefaultRoutes(t *testing.T) {
 				}
 
 				// Test Get
-				if got, ok := tbl.Get(pfx); !ok {
-					t.Error("default route should be retrievable via Get")
-				} else if got.attributes["metric"] != 1000 {
-					t.Errorf("expected metric 1000, got %d", got.attributes["metric"])
+				got, ok := tbl.Get(pfx)
+				if !ok {
+					t.Fatalf("default route should be retrievable via Get")
+				}
+				if !isLiteTable(tbl) {
+					if got.attributes["metric"] != 1000 {
+						t.Errorf("expected metric 1000, got %d", got.attributes["metric"])
+					}
 				}
 
 				// Test Modify
@@ -77,22 +86,33 @@ func TestBoundaryBehavior_DefaultRoutes(t *testing.T) {
 					if !found {
 						t.Error("default route should be found in Modify")
 					}
-					updated := old.Clone()
-					updated.attributes["metric"] = 500
+					var updated *routeEntry
+					if !isLiteTable(tbl) {
+						updated = old.Clone()
+						updated.attributes["metric"] = 500
+					}
 					return updated, false
 				})
 
-				if got, ok := tbl.Get(pfx); !ok {
+				got, ok = tbl.Get(pfx)
+				if !ok {
 					t.Error("default route should exist after Modify")
-				} else if got.attributes["metric"] != 500 {
-					t.Errorf("expected updated metric 500, got %d", got.attributes["metric"])
+				}
+				if !isLiteTable(tbl) {
+					if got.attributes["metric"] != 500 {
+						t.Errorf("expected updated metric 500, got %d", got.attributes["metric"])
+					}
 				}
 
 				// Test Delete
-				if deleted, exists := tbl.Delete(pfx); !exists {
+				deleted, exists := tbl.Delete(pfx)
+				if !exists {
 					t.Error("default route should exist for deletion")
-				} else if deleted.attributes["metric"] != 500 {
-					t.Error("deleted route should have correct metric")
+				}
+				if !isLiteTable(tbl) {
+					if deleted.attributes["metric"] != 500 {
+						t.Error("deleted route should have correct metric")
+					}
 				}
 
 				if tbl.Size() != 0 {
