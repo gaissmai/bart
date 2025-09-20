@@ -23,18 +23,12 @@ import (
 // The function is optimized for early exit on first match and uses heuristics to
 // choose between set-based and loop-based matching for performance.
 func (n *fastNode[V]) overlaps(o *fastNode[V], depth int) bool {
-	nPfxCount := n.prefixCount()
-	oPfxCount := o.prefixCount()
-
-	nChildCount := n.childCount()
-	oChildCount := o.childCount()
-
 	// ##############################
 	// 1. Test if any routes overlaps
 	// ##############################
 
 	// full cross check
-	if nPfxCount > 0 && oPfxCount > 0 {
+	if n.pfxCount > 0 && o.pfxCount > 0 {
 		if n.overlapsRoutes(o) {
 			return true
 		}
@@ -47,24 +41,18 @@ func (n *fastNode[V]) overlaps(o *fastNode[V], depth int) bool {
 	// swap nodes to help chance on its way,
 	// if the first call to expensive overlapsChildrenIn() is already true,
 	// if both orders are false it doesn't help either
-	if nChildCount > oChildCount {
+	if n.cldCount > o.cldCount {
 		n, o = o, n
-
-		nPfxCount = n.prefixCount()
-		oPfxCount = o.prefixCount()
-
-		nChildCount = n.childCount()
-		oChildCount = o.childCount()
 	}
 
-	if nPfxCount > 0 && oChildCount > 0 {
+	if n.pfxCount > 0 && o.cldCount > 0 {
 		if n.overlapsChildrenIn(o) {
 			return true
 		}
 	}
 
 	// symmetric reverse
-	if oPfxCount > 0 && nChildCount > 0 {
+	if o.pfxCount > 0 && n.cldCount > 0 {
 		if o.overlapsChildrenIn(n) {
 			return true
 		}
@@ -75,7 +63,7 @@ func (n *fastNode[V]) overlaps(o *fastNode[V], depth int) bool {
 	// ###########################################
 
 	// stop condition, n or o have no childs
-	if nChildCount == 0 || oChildCount == 0 {
+	if n.cldCount == 0 || o.cldCount == 0 {
 		return false
 	}
 
@@ -156,13 +144,10 @@ func (n *fastNode[V]) overlapsRoutes(o *fastNode[V]) bool {
 // Bitset-based matching uses precomputed coverage tables
 // to avoid per-address looping. This is critical for high fan-out nodes.
 func (n *fastNode[V]) overlapsChildrenIn(o *fastNode[V]) bool {
-	pfxCount := n.prefixCount()
-	childCount := o.childCount()
-
 	// heuristic, compare benchmarks
 	// when will we range over the children and when will we do bitset calc?
-	magicNumber := 15
-	doRange := childCount < magicNumber || pfxCount > magicNumber
+	magicNumber := uint16(15)
+	doRange := o.cldCount < magicNumber || n.pfxCount > magicNumber
 
 	// do range over, not so many childs and maybe too many prefixes for other algo below
 	if doRange {
@@ -308,7 +293,7 @@ func (n *fastNode[V]) overlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
 
 		// test if any route overlaps prefix´ so far
 		// no best match needed, forward tests without backtracking
-		if n.prefixCount() != 0 && n.contains(art.OctetToIdx(octet)) {
+		if n.pfxCount != 0 && n.contains(art.OctetToIdx(octet)) {
 			return true
 		}
 

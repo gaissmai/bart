@@ -172,6 +172,10 @@ func (n *fastNode[V]) cloneFlat(cloneFn cloneFunc[V]) *fastNode[V] {
 	c.prefixesBitSet = n.prefixesBitSet
 	c.childrenBitSet = n.childrenBitSet
 
+	// copy the counters
+	c.pfxCount = n.pfxCount
+	c.cldCount = n.cldCount
+
 	// it's a clone of the prefixes ...
 	// but the allot algorithm makes it more difficult
 	// see also insertPrefix
@@ -226,13 +230,13 @@ func (n *fastNode[V]) cloneRec(cloneFn cloneFunc[V]) *fastNode[V] {
 	c := n.cloneFlat(cloneFn)
 
 	// Recursively clone all child nodes of type *fastNode[V]
-	for _, octet := range c.childrenBitSet.AsSlice(&[256]uint8{}) {
-		kidAny := *c.children[octet]
+	for _, addr := range c.getChildAddrs() {
+		kidAny := *c.children[addr]
 
 		switch kid := kidAny.(type) {
 		case *fastNode[V]:
 			nodeAny := any(kid.cloneRec(cloneFn))
-			c.children[octet] = &nodeAny
+			c.children[addr] = &nodeAny
 		}
 	}
 
