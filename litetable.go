@@ -18,9 +18,6 @@ import (
 
 // adapter type
 type Lite struct {
-	// used by -copylocks checker from `go vet`.
-	_ [0]sync.Mutex
-
 	liteTable[any]
 }
 
@@ -32,6 +29,11 @@ func (l *Lite) Insert(pfx netip.Prefix) {
 // adapter method, not delegated
 func (l *Lite) Overlaps(o *Lite) {
 	l.liteTable.Overlaps(&o.liteTable)
+}
+
+// adapter method, not delegated
+func (l *Lite) Clone() *Lite {
+	return &Lite{*l.liteTable.Clone()}
 }
 
 // liteTable follows the BART design but with no payload.
@@ -180,6 +182,8 @@ func (l *liteTable[V]) Delete(pfx netip.Prefix) (_ V, found bool) {
 
 // Get returns the associated payload for prefix and true, or false if
 // prefix is not set in the routing table.
+//
+//nolint:unparam
 func (l *liteTable[V]) Get(pfx netip.Prefix) (_ V, ok bool) {
 	var zero V
 
@@ -466,6 +470,8 @@ func (l *liteTable[V]) Contains(ip netip.Addr) bool {
 }
 
 // Lookup, only for interface satisfaction.
+//
+//nolint:unparam
 func (l *liteTable[V]) Lookup(ip netip.Addr) (_ V, ok bool) {
 	var zero V
 	return zero, l.Contains(ip)
@@ -473,6 +479,8 @@ func (l *liteTable[V]) Lookup(ip netip.Addr) (_ V, ok bool) {
 
 // LookupPrefix does a route lookup (longest prefix match) for pfx and
 // returns true, or false if no route matched.
+//
+//nolint:unparam
 func (l *liteTable[V]) LookupPrefix(pfx netip.Prefix) (_ V, ok bool) {
 	_, _, ok = l.lookupPrefixLPM(pfx, false)
 	return
@@ -486,10 +494,13 @@ func (l *liteTable[V]) LookupPrefix(pfx netip.Prefix) (_ V, ok bool) {
 //
 // If LookupPrefixLPM is to be used for IP address lookups,
 // they must be converted to /32 or /128 prefixes.
+//
+//nolint:unparam
 func (l *liteTable[V]) LookupPrefixLPM(pfx netip.Prefix) (lpmPfx netip.Prefix, _ V, ok bool) {
 	return l.lookupPrefixLPM(pfx, true)
 }
 
+//nolint:unparam
 func (l *liteTable[V]) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpmPfx netip.Prefix, _ V, ok bool) {
 	var zero V
 
@@ -672,6 +683,23 @@ func (l *liteTable[V]) Overlaps6(o *liteTable[V]) bool {
 	return l.root6.overlaps(&o.root6, 0)
 }
 
+// Clone returns a copy of the routing table.
+func (l *liteTable[V]) Clone() *liteTable[V] {
+	if l == nil {
+		return nil
+	}
+
+	c := new(liteTable[V])
+
+	c.root4 = *l.root4.cloneRec(nil)
+	c.root6 = *l.root6.cloneRec(nil)
+
+	c.size4 = l.size4
+	c.size6 = l.size6
+
+	return c
+}
+
 // Size returns the prefix count.
 func (l *liteTable[V]) Size() int {
 	return l.size4 + l.size6
@@ -768,7 +796,7 @@ func (l *liteTable[V]) fprint(w io.Writer, is4 bool) error {
 		is4:  is4,
 	}
 
-	return fprintRec(n, w, startParent, "", shouldPrintValues[V]())
+	return fprintRec(n, w, startParent, "", false)
 }
 
 // MarshalText implements the [encoding.TextMarshaler] interface,
