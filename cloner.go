@@ -242,3 +242,58 @@ func (n *fastNode[V]) cloneRec(cloneFn cloneFunc[V]) *fastNode[V] {
 
 	return c
 }
+
+// cloneFlat returns a shallow copy of the current node[V].
+//
+// cloneFn is only used for interface satisfaction.
+func (n *liteNode[V]) cloneFlat(_ cloneFunc[V]) *liteNode[V] {
+	if n == nil {
+		return nil
+	}
+
+	c := new(liteNode[V])
+	if n.isEmpty() {
+		return c
+	}
+
+	// copy simple values
+	c.pfxCount = n.pfxCount
+	c.prefixes = n.prefixes
+
+	// sparse array
+	c.children = *(n.children.Copy())
+
+	// no values to copy
+	return c
+}
+
+// cloneRec performs a recursive deep copy of the node[V] and all its descendants.
+//
+// cloneFn is only used for interface satisfaction.
+//
+// It first creates a shallow clone of the current node using cloneFlat.
+// Then it recursively clones all child nodes of type *liteNode[V],
+// performing a full deep clone down the subtree.
+//
+// Child nodes of type *liteLeafNode and *liteFringeNode are already copied
+// by cloneFlat.
+//
+// Returns a new instance of liteNode[V] which is a complete deep clone of the
+// receiver node with all descendants.
+func (n *liteNode[V]) cloneRec(_ cloneFunc[V]) *liteNode[V] {
+	if n == nil {
+		return nil
+	}
+
+	// Perform a flat clone of the current node.
+	c := n.cloneFlat(nil)
+
+	// Recursively clone all child nodes of type *litNode[V]
+	for i, kidAny := range c.children.Items {
+		if kid, ok := kidAny.(*liteNode[V]); ok {
+			c.children.Items[i] = kid.cloneRec(nil)
+		}
+	}
+
+	return c
+}

@@ -105,13 +105,13 @@ func (n *liteNode[V]) insertPrefix(idx uint8, _ V) (exists bool) {
 
 // prefix is set at the given index.
 //
-//nolint:unused
+//nolint:unused,unparam
 func (n *liteNode[V]) getPrefix(idx uint8) (_ V, exists bool) {
 	exists = n.prefixes.Test(idx)
 	return
 }
 
-//nolint:unused
+//nolint:unused,unparam
 func (n *liteNode[V]) mustGetPrefix(idx uint8) (_ V) {
 	return
 }
@@ -143,7 +143,7 @@ func (n *liteNode[V]) allIndices() iter.Seq2[uint8, V] {
 // deletePrefix removes the prefix at the specified index.
 // Returns true if the prefix existed, and false otherwise.
 //
-//nolint:unparam
+//nolint:unparam,unparam
 func (n *liteNode[V]) deletePrefix(idx uint8) (_ V, exists bool) {
 	if exists = n.prefixes.Test(idx); !exists {
 		return
@@ -228,7 +228,7 @@ func (n *liteNode[V]) contains(idx uint8) bool {
 // does not use an allotment-based approach. Instead, it performs CBT backtracking
 // using a bitset-based operation with a precomputed backtracking pattern specific to idx.
 //
-//nolint:unused
+//nolint:unused,unparam
 func (n *liteNode[V]) lookupIdx(idx uint8) (lpmIdx uint8, _ V, ok bool) {
 	lpmIdx, ok = n.prefixes.IntersectionTop(&lpm.LookupTbl[idx])
 	return
@@ -236,7 +236,7 @@ func (n *liteNode[V]) lookupIdx(idx uint8) (lpmIdx uint8, _ V, ok bool) {
 
 // lookup is just a simple wrapper for lookupIdx.
 //
-//nolint:unused
+//nolint:unused,unparam
 func (n *liteNode[V]) lookup(idx uint8) (_ V, ok bool) {
 	_, _, ok = n.lookupIdx(idx)
 	return
