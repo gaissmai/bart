@@ -111,7 +111,7 @@ func (l *liteTable[V]) Delete(pfx netip.Prefix) (_ V, found bool) {
 
 	// find the trie node
 	for depth, octet := range octets {
-		depth = depth & depthMask // BCE, Delete must be fast
+		depth = depth & depthMask // BCE
 
 		// push current node on stack for path recording
 		stack[depth] = n
@@ -250,7 +250,7 @@ func (l *liteTable[V]) Get(pfx netip.Prefix) (_ V, ok bool) {
 // zero value and a boolean indicating whether the prefix exists.
 // The callback must return a delete flag: del == false inserts or updates,
 // del == true deletes the entry if it exists (otherwise no-op). Modify
-// returns the a boolean indicating whether the entry was actually deleted.
+// returns a boolean indicating whether the entry was actually deleted.
 //
 // The operation is determined by the callback function, which is called with:
 //
@@ -486,7 +486,7 @@ func (l *liteTable[V]) LookupPrefix(pfx netip.Prefix) (_ V, ok bool) {
 	return
 }
 
-// LookupPrefixLPM is similar to [Table.LookupPrefix],
+// LookupPrefixLPM is similar to [Lite.LookupPrefix],
 // but it returns the lpm prefix in addition to value,ok.
 //
 // This method is about 20-30% slower than LookupPrefix and should only
@@ -667,7 +667,7 @@ func (l *liteTable[V]) Overlaps(o *liteTable[V]) bool {
 	return l.Overlaps4(o) || l.Overlaps6(o)
 }
 
-// Overlaps4 is like [Table.Overlaps] but for the v4 routing table only.
+// Overlaps4 is like [Lite.Overlaps] but for the v4 routing table only.
 func (l *liteTable[V]) Overlaps4(o *liteTable[V]) bool {
 	if o == nil || l.size4 == 0 || o.size4 == 0 {
 		return false
@@ -675,7 +675,7 @@ func (l *liteTable[V]) Overlaps4(o *liteTable[V]) bool {
 	return l.root4.overlaps(&o.root4, 0)
 }
 
-// Overlaps6 is like [Table.Overlaps] but for the v6 routing table only.
+// Overlaps6 is like [Lite.Overlaps] but for the v6 routing table only.
 func (l *liteTable[V]) Overlaps6(o *liteTable[V]) bool {
 	if o == nil || l.size6 == 0 || o.size6 == 0 {
 		return false
@@ -724,7 +724,7 @@ func (l *liteTable[V]) sizeUpdate(is4 bool, delta int) {
 }
 
 // String returns a hierarchical tree diagram of the ordered CIDRs
-// as string, just a wrapper for [Table.Fprint].
+// as string, just a wrapper for [Lite.Fprint].
 // If Fprint returns an error, String panics.
 func (l *liteTable[V]) String() string {
 	w := new(strings.Builder)
@@ -800,7 +800,7 @@ func (l *liteTable[V]) fprint(w io.Writer, is4 bool) error {
 }
 
 // MarshalText implements the [encoding.TextMarshaler] interface,
-// just a wrapper for [Table.Fprint].
+// just a wrapper for [Lite.Fprint].
 func (l *liteTable[V]) MarshalText() ([]byte, error) {
 	w := new(bytes.Buffer)
 	if err := l.Fprint(w); err != nil {
