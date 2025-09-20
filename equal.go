@@ -103,3 +103,154 @@ func (n *bartNode[V]) equalRec(o *bartNode[V]) bool {
 
 	return true
 }
+
+// equalRec compares two nodes recursively.
+// It checks equality of children/prefixes via bitsets, and recursively
+// descends into sub-nodes or compares leaf/fringe node values.
+func (n *fastNode[V]) equalRec(o *fastNode[V]) bool {
+	if n == nil || o == nil {
+		return n == o
+	}
+	if n == o {
+		return true
+	}
+
+	if n.prefixesBitSet != o.prefixesBitSet {
+		return false
+	}
+
+	if n.childrenBitSet != o.childrenBitSet {
+		return false
+	}
+
+	for idx, nVal := range n.allIndices() {
+		oVal := o.mustGetPrefix(idx) // mustGet is ok, bitsets are equal
+		if !equal(nVal, oVal) {
+			return false
+		}
+	}
+
+	for addr, nKid := range n.allChildren() {
+		oKid := o.mustGetChild(addr) // mustGet is ok, bitsets are equal
+
+		switch nKid := nKid.(type) {
+		case *fastNode[V]:
+			// oKid must also be a node
+			oKid, ok := oKid.(*fastNode[V])
+			if !ok {
+				return false
+			}
+
+			// compare rec-descent
+			if !nKid.equalRec(oKid) {
+				return false
+			}
+
+		case *leafNode[V]:
+			// oKid must also be a leaf
+			oKid, ok := oKid.(*leafNode[V])
+			if !ok {
+				return false
+			}
+
+			// compare prefixes
+			if nKid.prefix != oKid.prefix {
+				return false
+			}
+
+			// compare values
+			if !equal(nKid.value, oKid.value) {
+				return false
+			}
+
+		case *fringeNode[V]:
+			// oKid must also be a fringe
+			oKid, ok := oKid.(*fringeNode[V])
+			if !ok {
+				return false
+			}
+
+			// compare values
+			if !equal(nKid.value, oKid.value) {
+				return false
+			}
+
+		default:
+			panic("logic error, wrong node type")
+		}
+	}
+
+	return true
+}
+
+// equalRec compares two nodes recursively.
+// It checks equality of children/prefixes via bitsets, and recursively
+// descends into sub-nodes or compares leaf/fringe node values.
+func (n *liteNode[V]) equalRec(o *liteNode[V]) bool {
+	if n == nil || o == nil {
+		return n == o
+	}
+	if n == o {
+		return true
+	}
+
+	if n.prefixes != o.prefixes {
+		return false
+	}
+
+	if n.children.BitSet256 != o.children.BitSet256 {
+		return false
+	}
+
+	for i, nKid := range n.children.Items {
+		oKid := o.children.Items[i]
+
+		switch nKid := nKid.(type) {
+		case *liteNode[V]:
+			// oKid must also be a node
+			oKid, ok := oKid.(*liteNode[V])
+			if !ok {
+				return false
+			}
+
+			// compare rec-descent
+			if !nKid.equalRec(oKid) {
+				return false
+			}
+
+		case *leafNode[V]:
+			// oKid must also be a leaf
+			oKid, ok := oKid.(*leafNode[V])
+			if !ok {
+				return false
+			}
+
+			// compare prefixes
+			if nKid.prefix != oKid.prefix {
+				return false
+			}
+
+			// liteNode has no payload
+			// if !equal(nKid.value, oKid.value) {
+			// 	return false
+			// }
+
+		case *fringeNode[V]:
+			// oKid must also be a fringe
+			_, ok := oKid.(*fringeNode[V])
+			if !ok {
+				return false
+			}
+
+			// liteNode has no payload
+			// if !equal(nKid.value, oKid.value) {
+			// 	return false
+			// }
+
+		default:
+			panic("logic error, wrong node type")
+		}
+	}
+
+	return true
+}

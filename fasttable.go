@@ -679,6 +679,17 @@ func (f *Fast[V]) Clone() *Fast[V] {
 	return c
 }
 
+// Equal checks whether two tables are structurally and semantically equal.
+// It ensures both trees (IPv4-based and IPv6-based) have the same sizes and
+// recursively compares their root nodes.
+func (f *Fast[V]) Equal(o *Fast[V]) bool {
+	if o == nil || f.size4 != o.size4 || f.size6 != o.size6 {
+		return false
+	}
+
+	return f.root4.equalRec(&o.root4) && f.root6.equalRec(&o.root6)
+}
+
 // Overlaps reports whether any route in the receiver table overlaps
 // with a route in the other table, in either direction.
 //
