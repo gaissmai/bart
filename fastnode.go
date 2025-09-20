@@ -36,7 +36,14 @@ type fastNode[V any] struct {
 	prefixesBitSet bitset.BitSet256 // for count and fast bitset operations
 	childrenBitSet bitset.BitSet256 // for count and fast bitset operations
 
+	// pfxCount is an O(1) counter tracking the number of prefixes in this node.
+	// This replaces expensive prefixesBitSet.Size() calls with direct counter access.
+	// Automatically maintained during insertPrefix() and deletePrefix() operations.
 	pfxCount uint16
+
+	// cldCount is an O(1) counter tracking the number of child nodes in this node.
+	// This replaces expensive childrenBitSet.Size() calls with direct counter access.
+	// Automatically maintained during insertChild() and deleteChild() operations.
 	cldCount uint16
 }
 
