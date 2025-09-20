@@ -58,11 +58,11 @@ func (n *fastNode[V]) overlaps(o *fastNode[V], depth int) bool {
 		}
 	}
 
-	// ###########################################
-	// 3. childs with same octet in nodes n and o
-	// ###########################################
+	// ############################################
+	// 3. children with same octet in nodes n and o
+	// ############################################
 
-	// stop condition, n or o have no childs
+	// stop condition, n or o have no children
 	if n.cldCount == 0 || o.cldCount == 0 {
 		return false
 	}
@@ -149,7 +149,7 @@ func (n *fastNode[V]) overlapsChildrenIn(o *fastNode[V]) bool {
 	magicNumber := uint16(15)
 	doRange := o.cldCount < magicNumber || n.pfxCount > magicNumber
 
-	// do range over, not so many childs and maybe too many prefixes for other algo below
+	// do range over, not so many children and maybe too many prefixes for other algo below
 	if doRange {
 		for _, addr := range o.childrenBitSet.AsSlice(&[256]uint8{}) {
 			if n.contains(art.OctetToIdx(addr)) {
@@ -160,7 +160,7 @@ func (n *fastNode[V]) overlapsChildrenIn(o *fastNode[V]) bool {
 	}
 
 	// do bitset intersection, alloted route table with child octets
-	// maybe too many childs for range-over or not so many prefixes to
+	// maybe too many children for range-over or not so many prefixes to
 	// build the alloted routing table from them
 
 	// use allot table with prefixes as bitsets, bitsets are precalculated.
