@@ -22,7 +22,7 @@ import (
 //
 // The function is optimized for early exit on first match and uses heuristics to
 // choose between set-based and loop-based matching for performance.
-func (n *node[V]) overlaps(o *node[V], depth int) bool {
+func (n *bartNode[V]) overlaps(o *bartNode[V], depth int) bool {
 	nPfxCount := n.prefixes.Len()
 	oPfxCount := o.prefixes.Len()
 
@@ -92,7 +92,7 @@ func (n *node[V]) overlaps(o *node[V], depth int) bool {
 // It first checks for direct bitset intersection (identical indices),
 // then walks both prefix sets using lpmTest to detect if any
 // of the n-prefixes is contained in o, or vice versa.
-func (n *node[V]) overlapsRoutes(o *node[V]) bool {
+func (n *bartNode[V]) overlapsRoutes(o *bartNode[V]) bool {
 	// some prefixes are identical, trivial overlap
 	if n.prefixes.Intersects(&o.prefixes.BitSet256) {
 		return true
@@ -155,7 +155,7 @@ func (n *node[V]) overlapsRoutes(o *node[V]) bool {
 //
 // Bitset-based matching uses precomputed coverage tables
 // to avoid per-address looping. This is critical for high fan-out nodes.
-func (n *node[V]) overlapsChildrenIn(o *node[V]) bool {
+func (n *bartNode[V]) overlapsChildrenIn(o *bartNode[V]) bool {
 	pfxCount := n.prefixes.Len()
 	childCount := o.children.Len()
 
@@ -194,7 +194,7 @@ func (n *node[V]) overlapsChildrenIn(o *node[V]) bool {
 // For each shared address, the corresponding child nodes (of any type)
 // are compared using overlapsTwoChilds, which handles all
 // node/leaf/fringe combinations.
-func (n *node[V]) overlapsSameChildren(o *node[V], depth int) bool {
+func (n *bartNode[V]) overlapsSameChildren(o *bartNode[V], depth int) bool {
 	// intersect the child bitsets from n with o
 	commonChildren := n.children.Intersection(&o.children.BitSet256)
 
@@ -244,9 +244,9 @@ func overlapsTwoChilds[V any](nChild, oChild any, depth int) bool {
 	//  fringe, fringe  --> true
 	//
 	switch nKind := nChild.(type) {
-	case *node[V]: // node, ...
+	case *bartNode[V]: // node, ...
 		switch oKind := oChild.(type) {
-		case *node[V]: // node, node
+		case *bartNode[V]: // node, node
 			return nKind.overlaps(oKind, depth)
 		case *leafNode[V]: // node, leaf
 			return nKind.overlapsPrefixAtDepth(oKind.prefix, depth)
@@ -258,7 +258,7 @@ func overlapsTwoChilds[V any](nChild, oChild any, depth int) bool {
 
 	case *leafNode[V]:
 		switch oKind := oChild.(type) {
-		case *node[V]: // leaf, node
+		case *bartNode[V]: // leaf, node
 			return oKind.overlapsPrefixAtDepth(nKind.prefix, depth)
 		case *leafNode[V]: // leaf, leaf
 			return oKind.prefix.Overlaps(nKind.prefix)
@@ -289,7 +289,7 @@ func overlapsTwoChilds[V any](nChild, oChild any, depth int) bool {
 //
 // This function underlies the top-level OverlapsPrefix behavior and handles details of
 // trie traversal across varying prefix lengths and compression levels.
-func (n *node[V]) overlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
+func (n *bartNode[V]) overlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
 	ip := pfx.Addr()
 	octets := ip.AsSlice()
 	lastOctetPlusOne, lastBits := lastOctetPlusOneAndLastBits(pfx)
@@ -318,7 +318,7 @@ func (n *node[V]) overlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
 
 		// next child, node or leaf
 		switch kid := n.mustGetChild(octet).(type) {
-		case *node[V]:
+		case *bartNode[V]:
 			n = kid
 			continue
 
@@ -348,7 +348,7 @@ func (n *node[V]) overlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
 // using fast bitwise set intersections instead of explicit range comparisons.
 // This enables high-performance overlap checks on a single stride level
 // without descending further into the trie.
-func (n *node[V]) overlapsIdx(idx uint8) bool {
+func (n *bartNode[V]) overlapsIdx(idx uint8) bool {
 	// 1. Test if any route in this node overlaps prefix?
 	if n.contains(idx) {
 		return true
