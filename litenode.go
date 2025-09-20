@@ -26,8 +26,8 @@ import (
 //     via backtracking along the complete binary tree (CBT) encoded in this bitset.
 //   - **Child management**: Child pointers are held in a sparse-array of at most
 //     256 entries. A child can be another *liteNode[V] for further traversal, or
-//     a path-compressed terminal node: *liteLeafNode (explicit prefix storage)
-//     or *liteFringeNode (implicit prefix at stride boundary).
+//     a path-compressed terminal node: *leafNode (explicit prefix storage)
+//     or *fringeNode (implicit prefix at stride boundary).
 //
 // Fields:
 //   - prefixes: BitSet256 indicating which prefix indices are occupied.
@@ -154,7 +154,7 @@ func (n *liteNode[V]) deletePrefix(idx uint8) (_ V, exists bool) {
 }
 
 // insertChild adds a child node at the specified address (0-255).
-// The child can be a *liteNode[V], *liteLeafNode, or *liteFringeNode.
+// The child can be a *liteNode[V], *leafNode, or *fringeNode.
 // Returns true if a child already existed at that address.
 func (n *liteNode[V]) insertChild(addr uint8, child any) (exists bool) {
 	return n.children.InsertAt(addr, child)
@@ -242,29 +242,6 @@ func (n *liteNode[V]) lookup(idx uint8) (_ V, ok bool) {
 	return
 }
 
-// liteLeafNode represents a path-compressed routing entry that stores only the prefix.
-// Leaf nodes are used when a prefix doesn't align with stride boundaries
-// and is stored as a compressed path to save memory.
-type liteLeafNode struct {
-	prefix netip.Prefix
-}
-
-// newLiteLeafNode creates a new leaf node with the specified prefix.
-func newLiteLeafNode(pfx netip.Prefix) *liteLeafNode {
-	return &liteLeafNode{prefix: pfx}
-}
-
-// liteFringeNode represents a path-compressed routing entry with an implicit prefix
-// defined by the node's position in the trie. No prefix nor value is stored.
-// Fringes are used for prefixes that align exactly with stride boundaries
-// (/8, /16, /24, etc.) to save memory by not storing redundant prefix information.
-type liteFringeNode struct{}
-
-// newLiteFringeNode creates a new fringe node.
-func newLiteFringeNode() *liteFringeNode {
-	return new(liteFringeNode)
-}
-
 // insertAtDepth inserts a network prefix and its associated value into the
 // trie starting at the specified byte depth.
 //
@@ -296,9 +273,9 @@ func (n *liteNode[V]) insertAtDepth(pfx netip.Prefix, depth int) (exists bool) {
 		if !n.children.Test(octet) {
 			// insert prefix path compressed as leaf or fringe
 			if isFringe(depth, pfx) {
-				return n.insertChild(octet, newLiteFringeNode())
+				return n.insertChild(octet, newFringeNode(zero))
 			}
-			return n.insertChild(octet, newLiteLeafNode(pfx))
+			return n.insertChild(octet, newLeafNode(pfx, zero))
 		}
 
 		// ... or descend down the trie
@@ -309,7 +286,7 @@ func (n *liteNode[V]) insertAtDepth(pfx netip.Prefix, depth int) (exists bool) {
 		case *liteNode[V]:
 			n = kid // descend down to next trie level
 
-		case *liteLeafNode:
+		case *leafNode[V]:
 			// reached a path compressed prefix
 			if kid.prefix == pfx {
 				// exists
@@ -326,7 +303,7 @@ func (n *liteNode[V]) insertAtDepth(pfx netip.Prefix, depth int) (exists bool) {
 			n.insertChild(octet, newNode)
 			n = newNode
 
-		case *liteFringeNode:
+		case *fringeNode[V]:
 			// reached a path compressed fringe
 			if isFringe(depth, pfx) {
 				// exists
@@ -386,13 +363,13 @@ func (n *liteNode[V]) purgeAndCompress(stack []*liteNode[V], octets []uint8, is4
 				// fast exit, we are at an intermediate path node
 				// no further delete/compress upwards the stack is possible
 				return
-			case *liteLeafNode:
+			case *leafNode[V]:
 				// just one leaf, delete this node and reinsert the leaf above
 				parent.deleteChild(octet)
 
 				// ... (re)insert the leaf at parents depth
 				parent.insertAtDepth(kid.prefix, depth)
-			case *liteFringeNode:
+			case *fringeNode[V]:
 				// just one fringe, delete this node and reinsert the fringe as leaf above
 				parent.deleteChild(octet)
 

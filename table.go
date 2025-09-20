@@ -1348,7 +1348,7 @@ func (t *Table[V]) fprint(w io.Writer, is4 bool) error {
 		is4:  is4,
 	}
 
-	return fprintRec(n, w, startParent, "", shouldPrintValues[V](n))
+	return fprintRec(n, w, startParent, "", shouldPrintValues[V]())
 }
 
 // MarshalText implements the [encoding.TextMarshaler] interface,

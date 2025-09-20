@@ -18,12 +18,12 @@ import (
 
 // adapter type
 type Lite struct {
-	liteTable[any]
+	liteTable[struct{}]
 }
 
 // adapter method, not delegated
 func (l *Lite) Insert(pfx netip.Prefix) {
-	l.liteTable.Insert(pfx, nil)
+	l.liteTable.Insert(pfx, struct{}{})
 }
 
 // adapter method, not delegated
@@ -142,7 +142,7 @@ func (l *liteTable[V]) Delete(pfx netip.Prefix) (_ V, found bool) {
 		case *liteNode[V]:
 			n = kid // descend down to next trie level
 
-		case *liteFringeNode:
+		case *fringeNode[V]:
 			// if pfx is no fringe at this depth, fast exit
 			if !isFringe(depth, pfx) {
 				return
@@ -157,7 +157,7 @@ func (l *liteTable[V]) Delete(pfx netip.Prefix) (_ V, found bool) {
 
 			return zero, true
 
-		case *liteLeafNode:
+		case *leafNode[V]:
 			// Attention: pfx must be masked to be comparable!
 			if kid.prefix != pfx {
 				return
@@ -223,14 +223,14 @@ func (l *liteTable[V]) Get(pfx netip.Prefix) (_ V, ok bool) {
 		case *liteNode[V]:
 			n = kid // descend down to next trie level
 
-		case *liteFringeNode:
+		case *fringeNode[V]:
 			// reached a path compressed fringe, stop traversing
 			if isFringe(depth, pfx) {
 				return zero, true
 			}
 			return
 
-		case *liteLeafNode:
+		case *leafNode[V]:
 			// reached a path compressed prefix, stop traversing
 			if kid.prefix == pfx {
 				return zero, true
@@ -346,9 +346,9 @@ func (l *liteTable[V]) Modify(pfx netip.Prefix, cb func(zero V, found bool) (_ V
 
 			// insert
 			if isFringe(depth, pfx) {
-				n.insertChild(octet, newLiteFringeNode())
+				n.insertChild(octet, newFringeNode(zero))
 			} else {
-				n.insertChild(octet, newLiteLeafNode(pfx))
+				n.insertChild(octet, newLeafNode(pfx, zero))
 			}
 
 			l.sizeUpdate(is4, 1)
@@ -362,7 +362,7 @@ func (l *liteTable[V]) Modify(pfx netip.Prefix, cb func(zero V, found bool) (_ V
 		case *liteNode[V]:
 			n = kid // descend down to next trie level
 
-		case *liteLeafNode:
+		case *leafNode[V]:
 			if kid.prefix == pfx {
 				_, del := cb(zero, true)
 
@@ -390,7 +390,7 @@ func (l *liteTable[V]) Modify(pfx netip.Prefix, cb func(zero V, found bool) (_ V
 			n.insertChild(octet, newNode)
 			n = newNode
 
-		case *liteFringeNode:
+		case *fringeNode[V]:
 			// update existing value if prefix is fringe
 			if isFringe(depth, pfx) {
 				_, del := cb(zero, true)
@@ -454,11 +454,11 @@ func (l *liteTable[V]) Contains(ip netip.Addr) bool {
 		case *liteNode[V]:
 			n = kid // descend down to next trie level
 
-		case *liteFringeNode:
+		case *fringeNode[V]:
 			// fringe is the default-route for all possible octets below
 			return true
 
-		case *liteLeafNode:
+		case *leafNode[V]:
 			return kid.prefix.Contains(ip)
 
 		default:
@@ -550,14 +550,14 @@ LOOP:
 			n = kid
 			continue LOOP // descend down to next trie level
 
-		case *liteLeafNode:
+		case *leafNode[V]:
 			// reached a path compressed prefix, stop traversing
 			if kid.prefix.Bits() > bits || !kid.prefix.Contains(ip) {
 				break LOOP
 			}
 			return kid.prefix, zero, true
 
-		case *liteFringeNode:
+		case *fringeNode[V]:
 			// the bits of the fringe are defined by the depth
 			// maybe the LPM isn't needed, saves some cycles
 			fringeBits := (depth + 1) << 3

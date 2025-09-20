@@ -36,13 +36,8 @@ type DumpListNode[V any] struct {
 	Subnets []DumpListNode[V] `json:"subnets,omitempty"`
 }
 
-func shouldPrintValues[V any](n nodeReader[V]) bool {
+func shouldPrintValues[V any]() bool {
 	var zero V
-
-	// nothing to print, liteNode has no values
-	if _, ok := n.(*liteNode[V]); ok {
-		return false
-	}
 
 	_, isEmptyStruct := any(zero).(struct{})
 	return !isEmptyStruct
@@ -209,15 +204,6 @@ func directItemsRec[V any](n nodeReader[V], parentIdx uint8, path stridePath, de
 				}
 				directItems = append(directItems, item)
 
-			case *liteLeafNode: // path-compressed child, stop's recursion for this child
-				item := trieItem[V]{
-					n:    nil,
-					is4:  is4,
-					cidr: kid.prefix,
-					// val:  kid.value,
-				}
-				directItems = append(directItems, item)
-
 			case *fringeNode[V]: // path-compressed fringe, stop's recursion for this child
 				item := trieItem[V]{
 					n:   nil,
@@ -225,16 +211,6 @@ func directItemsRec[V any](n nodeReader[V], parentIdx uint8, path stridePath, de
 					// get the prefix back from trie
 					cidr: cidrForFringe(path[:], depth, is4, addr),
 					val:  kid.value,
-				}
-				directItems = append(directItems, item)
-
-			case *liteFringeNode: // path-compressed fringe, stop's recursion for this child
-				item := trieItem[V]{
-					n:   nil,
-					is4: is4,
-					// get the prefix back from trie
-					cidr: cidrForFringe(path[:], depth, is4, addr),
-					// val:  kid.value,
 				}
 				directItems = append(directItems, item)
 
