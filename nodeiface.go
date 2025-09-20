@@ -7,7 +7,7 @@ import "iter"
 
 // compile time check
 var (
-	_ nodeReadWriter[any] = (*node[any])(nil)
+	_ nodeReadWriter[any] = (*bartNode[any])(nil)
 	_ nodeReadWriter[any] = (*fastNode[any])(nil)
 	_ nodeReadWriter[any] = (*liteNode[any])(nil)
 )
