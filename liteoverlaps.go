@@ -159,9 +159,10 @@ func (n *liteNode[V]) overlapsChildrenIn(o *liteNode[V]) bool {
 	pfxCount := n.prefixCount()
 	childCount := o.children.Len()
 
-	// heuristic, compare benchmarks
 	// when will we range over the children and when will we do bitset calc?
-	magicNumber := 15
+	// heuristic, magic number retrieved by micro benchmarks
+	const magicNumber = 15
+
 	doRange := childCount < magicNumber || pfxCount > magicNumber
 
 	// do range over, not so many children and maybe too many prefixes for other algo below
@@ -198,24 +199,19 @@ func (n *liteNode[V]) overlapsSameChildren(o *liteNode[V], depth int) bool {
 	// intersect the child bitsets from n with o
 	commonChildren := n.children.Intersection(&o.children.BitSet256)
 
-	addr := uint8(0)
-	ok := true
-	for ok {
-		if addr, ok = commonChildren.NextSet(addr); ok {
-			nChild := n.mustGetChild(addr)
-			oChild := o.mustGetChild(addr)
+	for addr, ok := commonChildren.NextSet(0); ok; {
+		nChild := n.mustGetChild(addr)
+		oChild := o.mustGetChild(addr)
 
-			if liteOverlapsTwoChilds[V](nChild, oChild, depth+1) {
-				return true
-			}
-
-			if addr == 255 {
-				// stop, don't overflow uint8!
-				ok = false
-			} else {
-				addr++
-			}
+		if liteOverlapsTwoChilds[V](nChild, oChild, depth+1) {
+			return true
 		}
+
+		if addr == 255 {
+			break // Prevent uint8 overflow
+		}
+
+		addr, ok = commonChildren.NextSet(addr + 1)
 	}
 	return false
 }
