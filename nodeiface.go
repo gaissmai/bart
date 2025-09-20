@@ -9,12 +9,12 @@ import "iter"
 var (
 	_ nodeReadWriter[any] = (*node[any])(nil)
 	_ nodeReadWriter[any] = (*fastNode[any])(nil)
-	_ nodeReadWriter[any] = (*slimNode[any])(nil)
+	_ nodeReadWriter[any] = (*liteNode[any])(nil)
 )
 
 // nodeReadWriter is a generic interface that abstracts tree node operations
 // for testing, dumping and traversal.
-// Note: Implementations like slimNode do not store V; value-returning
+// Note: Implementations like liteNode do not store V; value-returning
 // methods will yield the zero value while still reporting presence.
 type nodeReadWriter[V any] interface {
 	nodeReader[V]
