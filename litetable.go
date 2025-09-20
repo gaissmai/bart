@@ -32,6 +32,11 @@ func (l *Lite) Overlaps(o *Lite) bool {
 }
 
 // adapter method, not delegated
+func (l *Lite) Equal(o *Lite) bool {
+	return l.liteTable.Equal(&o.liteTable)
+}
+
+// adapter method, not delegated
 func (l *Lite) Clone() *Lite {
 	return &Lite{*l.liteTable.Clone()}
 }
@@ -698,6 +703,17 @@ func (l *liteTable[V]) Clone() *liteTable[V] {
 	c.size6 = l.size6
 
 	return c
+}
+
+// Equal checks whether two tables are structurally and semantically equal.
+// It ensures both trees (IPv4-based and IPv6-based) have the same sizes and
+// recursively compares their root nodes.
+func (l *liteTable[V]) Equal(o *liteTable[V]) bool {
+	if o == nil || l.size4 != o.size4 || l.size6 != o.size6 {
+		return false
+	}
+
+	return l.root4.equalRec(&o.root4) && l.root6.equalRec(&o.root6)
 }
 
 // Size returns the prefix count.
