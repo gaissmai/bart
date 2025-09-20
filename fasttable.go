@@ -686,12 +686,15 @@ func (f *Fast[V]) Clone() *Fast[V] {
 // This is useful for conflict detection, policy enforcement,
 // or validating mutually exclusive routing domains.
 func (f *Fast[V]) Overlaps(o *Fast[V]) bool {
+	if o == nil {
+		return false
+	}
 	return f.Overlaps4(o) || f.Overlaps6(o)
 }
 
 // Overlaps4 is like [Table.Overlaps] but for the v4 routing table only.
 func (f *Fast[V]) Overlaps4(o *Fast[V]) bool {
-	if f.size4 == 0 || o.size4 == 0 {
+	if o == nil || f.size4 == 0 || o.size4 == 0 {
 		return false
 	}
 	return f.root4.overlaps(&o.root4, 0)
@@ -699,7 +702,7 @@ func (f *Fast[V]) Overlaps4(o *Fast[V]) bool {
 
 // Overlaps6 is like [Table.Overlaps] but for the v6 routing table only.
 func (f *Fast[V]) Overlaps6(o *Fast[V]) bool {
-	if f.size6 == 0 || o.size6 == 0 {
+	if o == nil || f.size6 == 0 || o.size6 == 0 {
 		return false
 	}
 	return f.root6.overlaps(&o.root6, 0)

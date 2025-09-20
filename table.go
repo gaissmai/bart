@@ -1098,12 +1098,15 @@ func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 // This is useful for conflict detection, policy enforcement,
 // or validating mutually exclusive routing domains.
 func (t *Table[V]) Overlaps(o *Table[V]) bool {
+	if o == nil {
+		return false
+	}
 	return t.Overlaps4(o) || t.Overlaps6(o)
 }
 
 // Overlaps4 is like [Table.Overlaps] but for the v4 routing table only.
 func (t *Table[V]) Overlaps4(o *Table[V]) bool {
-	if t.size4 == 0 || o.size4 == 0 {
+	if o == nil || t.size4 == 0 || o.size4 == 0 {
 		return false
 	}
 	return t.root4.overlaps(&o.root4, 0)
@@ -1111,7 +1114,7 @@ func (t *Table[V]) Overlaps4(o *Table[V]) bool {
 
 // Overlaps6 is like [Table.Overlaps] but for the v6 routing table only.
 func (t *Table[V]) Overlaps6(o *Table[V]) bool {
-	if t.size6 == 0 || o.size6 == 0 {
+	if o == nil || t.size6 == 0 || o.size6 == 0 {
 		return false
 	}
 	return t.root6.overlaps(&o.root6, 0)
