@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"iter"
 	"net/netip"
 	"strings"
 	"sync"
@@ -714,6 +715,47 @@ func (l *liteTable[V]) Equal(o *liteTable[V]) bool {
 	}
 
 	return l.root4.equalRec(&o.root4) && l.root6.equalRec(&o.root6)
+}
+
+// All returns an iterator over all prefix–value pairs in the table.
+//
+// The entries from both IPv4 and IPv6 subtries are yielded using an internal recursive traversal.
+// The iteration order is unspecified and may vary between calls; for a stable order, use AllSorted.
+//
+// You can use All directly in a for-range loop without providing a yield function.
+// The Go compiler automatically synthesizes the yield callback for you:
+//
+//	for prefix, _ := range t.All() {
+//	    fmt.Println(prefix)
+//	}
+//
+// Under the hood, the loop body is passed as a yield function to the iterator.
+// If you break or return from the loop, iteration stops early as expected.
+//
+// IMPORTANT: Modifying or deleting entries during iteration is not allowed,
+// as this would interfere with the internal traversal and may corrupt or
+// prematurely terminate the iteration.
+//
+// If mutation of the table during traversal is required,
+// use [Lite.WalkPersist] instead.
+func (l *liteTable[V]) All() iter.Seq2[netip.Prefix, V] {
+	return func(yield func(netip.Prefix, V) bool) {
+		_ = l.root4.allRec(stridePath{}, 0, true, yield) && l.root6.allRec(stridePath{}, 0, false, yield)
+	}
+}
+
+// All4 is like [Lite.All] but only for the v4 routing table.
+func (l *liteTable[V]) All4() iter.Seq2[netip.Prefix, V] {
+	return func(yield func(netip.Prefix, V) bool) {
+		_ = l.root4.allRec(stridePath{}, 0, true, yield)
+	}
+}
+
+// All6 is like [Lite.All] but only for the v6 routing table.
+func (l *liteTable[V]) All6() iter.Seq2[netip.Prefix, V] {
+	return func(yield func(netip.Prefix, V) bool) {
+		_ = l.root6.allRec(stridePath{}, 0, false, yield)
+	}
 }
 
 // Size returns the prefix count.
