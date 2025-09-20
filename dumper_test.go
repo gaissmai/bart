@@ -18,7 +18,7 @@ func TestUnifiedDumper_NodeTypes(t *testing.T) {
 	t.Parallel()
 
 	nodeBuilder := map[string]func() nodeReadWriter[any]{
-		"node":     func() nodeReadWriter[any] { return &node[any]{} },
+		"node":     func() nodeReadWriter[any] { return &bartNode[any]{} },
 		"fastNode": func() nodeReadWriter[any] { return &fastNode[any]{} },
 		"liteNode": func() nodeReadWriter[any] { return &liteNode[any]{} },
 	}
@@ -69,7 +69,7 @@ func TestUnifiedDumper_TypedNilHandling(t *testing.T) {
 	t.Parallel()
 
 	nodeBuilder := map[string]func() nodeReader[any]{
-		"node":     func() nodeReader[any] { return (*node[any])(nil) },
+		"node":     func() nodeReader[any] { return (*bartNode[any])(nil) },
 		"fastNode": func() nodeReader[any] { return (*fastNode[any])(nil) },
 		"liteNode": func() nodeReader[any] { return (*liteNode[any])(nil) },
 	}

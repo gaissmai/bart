@@ -24,7 +24,7 @@ func TestZeroValueState(t *testing.T) {
 		name        string
 		nodeBuilder func() nodeReader[string]
 	}{
-		{"node", func() nodeReader[string] { return &node[string]{} }},
+		{"bartNode", func() nodeReader[string] { return &bartNode[string]{} }},
 		{"fastNode", func() nodeReader[string] { return &fastNode[string]{} }},
 		{"liteNode", func() nodeReader[string] { return &liteNode[string]{} }},
 	}
@@ -68,7 +68,7 @@ func TestEmptyNodeIterators(t *testing.T) {
 		name        string
 		nodeBuilder func() nodeReader[string]
 	}{
-		{"node", func() nodeReader[string] { return &node[string]{} }},
+		{"bartNode", func() nodeReader[string] { return &bartNode[string]{} }},
 		{"fastNode", func() nodeReader[string] { return &fastNode[string]{} }},
 		{"liteNode", func() nodeReader[string] { return &liteNode[string]{} }},
 	}
@@ -105,7 +105,7 @@ func TestAllIndices(t *testing.T) {
 		name        string
 		nodeBuilder func() nodeReadWriter[string]
 	}{
-		{"node", func() nodeReadWriter[string] { return &node[string]{} }},
+		{"bartNode", func() nodeReadWriter[string] { return &bartNode[string]{} }},
 		{"fastNode", func() nodeReadWriter[string] { return &fastNode[string]{} }},
 		{"liteNode", func() nodeReadWriter[string] { return &liteNode[string]{} }},
 	}
@@ -177,8 +177,8 @@ func TestAllChildren(t *testing.T) {
 		nodeBuilder func() nodeReadWriter[string]
 	}{
 		{
-			name:        "node",
-			nodeBuilder: func() nodeReadWriter[string] { return &node[string]{} },
+			name:        "bartNode",
+			nodeBuilder: func() nodeReadWriter[string] { return &bartNode[string]{} },
 		},
 		{
 			name:        "fastNode",
@@ -245,7 +245,7 @@ func TestImplementsNoder(t *testing.T) {
 		name        string
 		nodeBuilder func() nodeReadWriter[string]
 	}{
-		{"node", func() nodeReadWriter[string] { return &node[string]{} }},
+		{"bartNode", func() nodeReadWriter[string] { return &bartNode[string]{} }},
 		{"fastNode", func() nodeReadWriter[string] { return &fastNode[string]{} }},
 		{"liteNode", func() nodeReadWriter[string] { return &liteNode[string]{} }},
 	}
@@ -330,7 +330,7 @@ func TestIteratorConsistency(t *testing.T) {
 		name        string
 		nodeBuilder func() nodeReader[string]
 	}{
-		{"node", func() nodeReader[string] { return &node[string]{} }},
+		{"bartNode", func() nodeReader[string] { return &bartNode[string]{} }},
 		{"fastNode", func() nodeReader[string] { return &fastNode[string]{} }},
 		{"liteNode", func() nodeReader[string] { return &liteNode[string]{} }},
 	}
@@ -411,7 +411,7 @@ func TestNodes_MultipleChildrenLifecycle(t *testing.T) {
 		name        string
 		nodeBuilder func() nodeReadWriter[string]
 	}{
-		{"node", func() nodeReadWriter[string] { return &node[string]{} }},
+		{"bartNode", func() nodeReadWriter[string] { return &bartNode[string]{} }},
 		{"fastNode", func() nodeReadWriter[string] { return &fastNode[string]{} }},
 		{"liteNode", func() nodeReadWriter[string] { return &liteNode[string]{} }},
 	}
@@ -488,7 +488,7 @@ func TestNodes_NearestAncestorWins_AcrossMultipleLevels(t *testing.T) {
 		name        string
 		nodeBuilder func() nodeReadWriter[int]
 	}{
-		{"node", func() nodeReadWriter[int] { return &node[int]{} }},
+		{"bartNode", func() nodeReadWriter[int] { return &bartNode[int]{} }},
 		{"fastNode", func() nodeReadWriter[int] { return &fastNode[int]{} }},
 		{"liteNode", func() nodeReadWriter[int] { return &liteNode[int]{} }},
 	}
@@ -558,7 +558,7 @@ func TestNodes_Lookup_NoAncestorPath(t *testing.T) {
 		name        string
 		nodeBuilder func() nodeReadWriter[int]
 	}{
-		{"node", func() nodeReadWriter[int] { return &node[int]{} }},
+		{"bartNode", func() nodeReadWriter[int] { return &bartNode[int]{} }},
 		{"fastNode", func() nodeReadWriter[int] { return &fastNode[int]{} }},
 		{"liteNode", func() nodeReadWriter[int] { return &liteNode[int]{} }},
 	}
@@ -596,7 +596,7 @@ func TestNodes_GetPrefix_And_OverwriteSemantics(t *testing.T) {
 		name        string
 		nodeBuilder func() nodeReadWriter[int]
 	}{
-		{"node", func() nodeReadWriter[int] { return &node[int]{} }},
+		{"bartNode", func() nodeReadWriter[int] { return &bartNode[int]{} }},
 		{"fastNode", func() nodeReadWriter[int] { return &fastNode[int]{} }},
 		{"liteNode", func() nodeReadWriter[int] { return &liteNode[int]{} }},
 	}
@@ -647,7 +647,7 @@ func TestNode_IsEmpty_AfterAllDeletes(t *testing.T) {
 		name        string
 		nodeBuilder func() nodeReadWriter[int]
 	}{
-		{"node", func() nodeReadWriter[int] { return &node[int]{} }},
+		{"bartNode", func() nodeReadWriter[int] { return &bartNode[int]{} }},
 		{"fastNode", func() nodeReadWriter[int] { return &fastNode[int]{} }},
 		{"liteNode", func() nodeReadWriter[int] { return &liteNode[int]{} }},
 	}
@@ -684,7 +684,7 @@ func TestNodes_LPMEmpty_NoMatch(t *testing.T) {
 		name        string
 		nodeBuilder func() nodeReadWriter[int]
 	}{
-		{"node", func() nodeReadWriter[int] { return &node[int]{} }},
+		{"bartNode", func() nodeReadWriter[int] { return &bartNode[int]{} }},
 		{"fastNode", func() nodeReadWriter[int] { return &fastNode[int]{} }},
 		{"liteNode", func() nodeReadWriter[int] { return &liteNode[int]{} }},
 	}
@@ -728,7 +728,7 @@ func TestNodes_LPMLongestPrefixWins(t *testing.T) {
 		name        string
 		nodeBuilder func() nodeReadWriter[int]
 	}{
-		{"node", func() nodeReadWriter[int] { return &node[int]{} }},
+		{"bartNode", func() nodeReadWriter[int] { return &bartNode[int]{} }},
 		{"fastNode", func() nodeReadWriter[int] { return &fastNode[int]{} }},
 	}
 
@@ -763,7 +763,7 @@ func TestNodes_DeleteNonExistent_Safe(t *testing.T) {
 		name        string
 		nodeBuilder func() nodeReadWriter[int]
 	}{
-		{"node", func() nodeReadWriter[int] { return &node[int]{} }},
+		{"bartNode", func() nodeReadWriter[int] { return &bartNode[int]{} }},
 		{"fastNode", func() nodeReadWriter[int] { return &fastNode[int]{} }},
 		{"liteNode", func() nodeReadWriter[int] { return &liteNode[int]{} }},
 	}
@@ -795,7 +795,7 @@ func TestNodes_Contains_EqualsLookupTruthiness(t *testing.T) {
 		name        string
 		nodeBuilder func() nodeReadWriter[int]
 	}{
-		{"node", func() nodeReadWriter[int] { return &node[int]{} }},
+		{"bartNode", func() nodeReadWriter[int] { return &bartNode[int]{} }},
 		{"fastNode", func() nodeReadWriter[int] { return &fastNode[int]{} }},
 		{"liteNode", func() nodeReadWriter[int] { return &liteNode[int]{} }},
 	}
@@ -831,7 +831,7 @@ func TestNodes_Prefixes_AsSliceConsistency(t *testing.T) {
 		name        string
 		nodeBuilder func() nodeReadWriter[int]
 	}{
-		{"node", func() nodeReadWriter[int] { return &node[int]{} }},
+		{"bartNode", func() nodeReadWriter[int] { return &bartNode[int]{} }},
 		{"fastNode", func() nodeReadWriter[int] { return &fastNode[int]{} }},
 		{"liteNode", func() nodeReadWriter[int] { return &liteNode[int]{} }},
 	}
@@ -874,7 +874,7 @@ func TestNode_Children_AsSliceConsistency(t *testing.T) {
 		name        string
 		nodeBuilder func() nodeReadWriter[int]
 	}{
-		{"node", func() nodeReadWriter[int] { return &node[int]{} }},
+		{"bartNode", func() nodeReadWriter[int] { return &bartNode[int]{} }},
 		{"fastNode", func() nodeReadWriter[int] { return &fastNode[int]{} }},
 		{"liteNode", func() nodeReadWriter[int] { return &liteNode[int]{} }},
 	}
@@ -914,7 +914,7 @@ func TestNodes_InsertDuplicatePrefix_OverwritesValue(t *testing.T) {
 		name        string
 		nodeBuilder func() nodeReadWriter[int]
 	}{
-		{"node", func() nodeReadWriter[int] { return &node[int]{} }},
+		{"bartNode", func() nodeReadWriter[int] { return &bartNode[int]{} }},
 		{"fastNode", func() nodeReadWriter[int] { return &fastNode[int]{} }},
 		{"liteNode", func() nodeReadWriter[int] { return &liteNode[int]{} }},
 	}
@@ -957,7 +957,7 @@ func TestNodes_DeleteChild_Idempotent(t *testing.T) {
 		name        string
 		nodeBuilder func() nodeReadWriter[int]
 	}{
-		{"node", func() nodeReadWriter[int] { return &node[int]{} }},
+		{"bartNode", func() nodeReadWriter[int] { return &bartNode[int]{} }},
 		{"fastNode", func() nodeReadWriter[int] { return &fastNode[int]{} }},
 		{"liteNode", func() nodeReadWriter[int] { return &liteNode[int]{} }},
 	}
