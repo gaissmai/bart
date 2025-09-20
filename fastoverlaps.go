@@ -144,9 +144,9 @@ func (n *fastNode[V]) overlapsRoutes(o *fastNode[V]) bool {
 // Bitset-based matching uses precomputed coverage tables
 // to avoid per-address looping. This is critical for high fan-out nodes.
 func (n *fastNode[V]) overlapsChildrenIn(o *fastNode[V]) bool {
-	// heuristic, compare benchmarks
 	// when will we range over the children and when will we do bitset calc?
-	magicNumber := uint16(15)
+	// heuristic, magic number retrieved by micro benchmarks
+	const magicNumber = 15
 	doRange := o.cldCount < magicNumber || n.pfxCount > magicNumber
 
 	// do range over, not so many children and maybe too many prefixes for other algo below
@@ -183,24 +183,19 @@ func (n *fastNode[V]) overlapsSameChildren(o *fastNode[V], depth int) bool {
 	// intersect the child bitsets from n with o
 	commonChildren := n.childrenBitSet.Intersection(&o.childrenBitSet)
 
-	addr := uint8(0)
-	ok := true
-	for ok {
-		if addr, ok = commonChildren.NextSet(addr); ok {
-			nChild := n.mustGetChild(addr)
-			oChild := o.mustGetChild(addr)
+	for addr, ok := commonChildren.NextSet(0); ok; {
+		nChild := n.mustGetChild(addr)
+		oChild := o.mustGetChild(addr)
 
-			if fastOverlapsTwoChilds[V](nChild, oChild, depth+1) {
-				return true
-			}
-
-			if addr == 255 {
-				// stop, don't overflow uint8!
-				ok = false
-			} else {
-				addr++
-			}
+		if fastOverlapsTwoChilds[V](nChild, oChild, depth+1) {
+			return true
 		}
+
+		if addr == 255 {
+			break // Prevent uint8 overflow
+		}
+
+		addr, ok = commonChildren.NextSet(addr + 1)
 	}
 	return false
 }
