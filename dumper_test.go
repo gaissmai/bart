@@ -20,6 +20,7 @@ func TestUnifiedDumper_NodeTypes(t *testing.T) {
 	nodeBuilder := map[string]func() nodeReadWriter[any]{
 		"node":     func() nodeReadWriter[any] { return &node[any]{} },
 		"fastNode": func() nodeReadWriter[any] { return &fastNode[any]{} },
+		"liteNode": func() nodeReadWriter[any] { return &liteNode[any]{} },
 	}
 
 	for nodeTypeName, nodeBuilder := range nodeBuilder {
@@ -70,6 +71,7 @@ func TestUnifiedDumper_TypedNilHandling(t *testing.T) {
 	nodeBuilder := map[string]func() nodeReader[any]{
 		"node":     func() nodeReader[any] { return (*node[any])(nil) },
 		"fastNode": func() nodeReader[any] { return (*fastNode[any])(nil) },
+		"liteNode": func() nodeReader[any] { return (*liteNode[any])(nil) },
 	}
 
 	for nodeTypeName, createNilNode := range nodeBuilder {
@@ -89,7 +91,7 @@ func TestUnifiedDumper_TypedNilHandling(t *testing.T) {
 	}
 }
 
-// Test unified Table and Fast dumping using zero values
+// Test unified tables dumping using zero values
 //
 //nolint:tparallel
 func TestUnifiedDumper_TableTypes(t *testing.T) {
@@ -222,42 +224,45 @@ func TestUnifiedDumper_DefaultRouteV4(t *testing.T) {
 indexs(#1): [1]
 prefxs(#1): 0.0.0.0/0
 `
-	type tabler interface {
+	type zeroT = struct{}
+	var zero zeroT
+
+	type tabler[V zeroT] interface {
+		Insert(netip.Prefix, V)
 		dump(io.Writer)
 	}
 
-	testCases := []struct {
+	type testCase[V zeroT] struct {
 		name      string
-		table     tabler
-		setupData func(tabler)
-	}{
+		table     tabler[V]
+		setupData func(tabler[V])
+	}
+
+	testCases := []testCase[zeroT]{
 		{
 			name:  "Table",
-			table: &Table[struct{}]{},
-			setupData: func(tbl tabler) {
-				foo := tbl.(*Table[struct{}])
+			table: &Table[zeroT]{},
+			setupData: func(tbl tabler[zeroT]) {
 				for _, pfx := range pfxs {
-					foo.Insert(pfx, struct{}{})
+					tbl.Insert(pfx, zero)
 				}
 			},
 		},
 		{
 			name:  "Fast",
-			table: &Fast[struct{}]{},
-			setupData: func(tbl tabler) {
-				foo := tbl.(*Fast[struct{}])
+			table: &Fast[zeroT]{},
+			setupData: func(tbl tabler[zeroT]) {
 				for _, pfx := range pfxs {
-					foo.Insert(pfx, struct{}{})
+					tbl.Insert(pfx, zero)
 				}
 			},
 		},
 		{
-			name:  "Lite",
-			table: &Lite{},
-			setupData: func(tbl tabler) {
-				foo := tbl.(*Lite)
+			name:  "liteTable",
+			table: &liteTable[zeroT]{},
+			setupData: func(tbl tabler[zeroT]) {
 				for _, pfx := range pfxs {
-					foo.Insert(pfx)
+					tbl.Insert(pfx, zero)
 				}
 			},
 		},
@@ -284,42 +289,45 @@ func TestUnifiedDumper_DefaultRouteV6(t *testing.T) {
 indexs(#1): [1]
 prefxs(#1): ::/0
 `
-	type tabler interface {
+	type zeroT = struct{}
+	var zero zeroT
+
+	type tabler[V zeroT] interface {
+		Insert(netip.Prefix, V)
 		dump(io.Writer)
 	}
 
-	testCases := []struct {
+	type testCase[V zeroT] struct {
 		name      string
-		table     tabler
-		setupData func(tabler)
-	}{
+		table     tabler[V]
+		setupData func(tabler[V])
+	}
+
+	testCases := []testCase[zeroT]{
 		{
 			name:  "Table",
-			table: &Table[struct{}]{},
-			setupData: func(tbl tabler) {
-				foo := tbl.(*Table[struct{}])
+			table: &Table[zeroT]{},
+			setupData: func(tbl tabler[zeroT]) {
 				for _, pfx := range pfxs {
-					foo.Insert(pfx, struct{}{})
+					tbl.Insert(pfx, zero)
 				}
 			},
 		},
 		{
 			name:  "Fast",
-			table: &Fast[struct{}]{},
-			setupData: func(tbl tabler) {
-				foo := tbl.(*Fast[struct{}])
+			table: &Fast[zeroT]{},
+			setupData: func(tbl tabler[zeroT]) {
 				for _, pfx := range pfxs {
-					foo.Insert(pfx, struct{}{})
+					tbl.Insert(pfx, zero)
 				}
 			},
 		},
 		{
-			name:  "Lite",
-			table: &Lite{},
-			setupData: func(tbl tabler) {
-				foo := tbl.(*Lite)
+			name:  "liteTable",
+			table: &liteTable[zeroT]{},
+			setupData: func(tbl tabler[zeroT]) {
 				for _, pfx := range pfxs {
-					foo.Insert(pfx)
+					tbl.Insert(pfx, zero)
 				}
 			},
 		},
@@ -381,42 +389,46 @@ childs(#3): 10 127 192
 ..octets(#1): [1]
 ..fringe(#1): 1:{192.168.1.0/24}
 `
-	type tabler interface {
+
+	type zeroT = struct{}
+	var zero zeroT
+
+	type tabler[V zeroT] interface {
+		Insert(netip.Prefix, V)
 		dump(io.Writer)
 	}
 
-	testCases := []struct {
+	type testCase[V zeroT] struct {
 		name      string
-		table     tabler
-		setupData func(tabler)
-	}{
+		table     tabler[V]
+		setupData func(tabler[V])
+	}
+
+	testCases := []testCase[zeroT]{
 		{
 			name:  "Table",
-			table: &Table[struct{}]{},
-			setupData: func(tbl tabler) {
-				foo := tbl.(*Table[struct{}])
+			table: &Table[zeroT]{},
+			setupData: func(tbl tabler[zeroT]) {
 				for _, pfx := range pfxs {
-					foo.Insert(pfx, struct{}{})
+					tbl.Insert(pfx, zero)
 				}
 			},
 		},
 		{
 			name:  "Fast",
-			table: &Fast[struct{}]{},
-			setupData: func(tbl tabler) {
-				foo := tbl.(*Fast[struct{}])
+			table: &Fast[zeroT]{},
+			setupData: func(tbl tabler[zeroT]) {
 				for _, pfx := range pfxs {
-					foo.Insert(pfx, struct{}{})
+					tbl.Insert(pfx, zero)
 				}
 			},
 		},
 		{
-			name:  "Lite",
-			table: &Lite{},
-			setupData: func(tbl tabler) {
-				foo := tbl.(*Lite)
+			name:  "liteTable",
+			table: &liteTable[zeroT]{},
+			setupData: func(tbl tabler[zeroT]) {
 				for _, pfx := range pfxs {
-					foo.Insert(pfx)
+					tbl.Insert(pfx, zero)
 				}
 			},
 		},
@@ -448,47 +460,50 @@ prefxs(#2): ::/0 2000::/3
 octets(#2): [32 254]
 leaves(#2): 0x20:{2001:db8::/32} 0xfe:{fe80::/10}
 `
-	type tabler interface {
+
+	type zeroT = struct{}
+	var zero zeroT
+
+	type tabler[V zeroT] interface {
+		Insert(netip.Prefix, V)
 		dump(io.Writer)
 	}
 
-	testCases := []struct {
+	type testCase[V zeroT] struct {
 		name      string
-		table     tabler
-		setupData func(tabler)
-	}{
+		table     tabler[V]
+		setupData func(tabler[V])
+	}
+
+	testCases := []testCase[zeroT]{
 		{
 			name:  "Table",
-			table: &Table[struct{}]{},
-			setupData: func(tbl tabler) {
-				foo := tbl.(*Table[struct{}])
+			table: &Table[zeroT]{},
+			setupData: func(tbl tabler[zeroT]) {
 				for _, pfx := range pfxs {
-					foo.Insert(pfx, struct{}{})
+					tbl.Insert(pfx, zero)
 				}
 			},
 		},
 		{
 			name:  "Fast",
-			table: &Fast[struct{}]{},
-			setupData: func(tbl tabler) {
-				foo := tbl.(*Fast[struct{}])
+			table: &Fast[zeroT]{},
+			setupData: func(tbl tabler[zeroT]) {
 				for _, pfx := range pfxs {
-					foo.Insert(pfx, struct{}{})
+					tbl.Insert(pfx, zero)
 				}
 			},
 		},
 		{
-			name:  "Lite",
-			table: &Lite{},
-			setupData: func(tbl tabler) {
-				foo := tbl.(*Lite)
+			name:  "liteTable",
+			table: &liteTable[zeroT]{},
+			setupData: func(tbl tabler[zeroT]) {
 				for _, pfx := range pfxs {
-					foo.Insert(pfx)
+					tbl.Insert(pfx, zero)
 				}
 			},
 		},
 	}
-
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.setupData(tc.table)
@@ -556,47 +571,50 @@ prefxs(#2): ::/0 2000::/3
 octets(#2): [32 254]
 leaves(#2): 0x20:{2001:db8::/32} 0xfe:{fe80::/10}
 `
-	type tabler interface {
+
+	type zeroT = struct{}
+	var zero zeroT
+
+	type tabler[V zeroT] interface {
+		Insert(netip.Prefix, V)
 		dump(io.Writer)
 	}
 
-	testCases := []struct {
+	type testCase[V zeroT] struct {
 		name      string
-		table     tabler
-		setupData func(tabler)
-	}{
+		table     tabler[V]
+		setupData func(tabler[V])
+	}
+
+	testCases := []testCase[zeroT]{
 		{
 			name:  "Table",
-			table: &Table[struct{}]{},
-			setupData: func(tbl tabler) {
-				foo := tbl.(*Table[struct{}])
+			table: &Table[zeroT]{},
+			setupData: func(tbl tabler[zeroT]) {
 				for _, pfx := range pfxs {
-					foo.Insert(pfx, struct{}{})
+					tbl.Insert(pfx, zero)
 				}
 			},
 		},
 		{
 			name:  "Fast",
-			table: &Fast[struct{}]{},
-			setupData: func(tbl tabler) {
-				foo := tbl.(*Fast[struct{}])
+			table: &Fast[zeroT]{},
+			setupData: func(tbl tabler[zeroT]) {
 				for _, pfx := range pfxs {
-					foo.Insert(pfx, struct{}{})
+					tbl.Insert(pfx, zero)
 				}
 			},
 		},
 		{
-			name:  "Lite",
-			table: &Lite{},
-			setupData: func(tbl tabler) {
-				foo := tbl.(*Lite)
+			name:  "liteTable",
+			table: &liteTable[zeroT]{},
+			setupData: func(tbl tabler[zeroT]) {
 				for _, pfx := range pfxs {
-					foo.Insert(pfx)
+					tbl.Insert(pfx, zero)
 				}
 			},
 		},
 	}
-
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.setupData(tc.table)
