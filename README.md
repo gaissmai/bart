@@ -56,7 +56,7 @@ type bartNode[V any] struct {
 type liteNode[V any] struct {
     prefixes bitset.BitSet256      // 32 bytes (presence only)
     children sparse.Array256[any]  // 56 + m×16 bytes
-    pfxCount uint16               // 2 bytes + padding
+    pfxCount uint16                // 2 bytes + padding
 }
 ```
 **Memory Usage:** **96 bytes + m×16 bytes** (no value storage)
@@ -64,11 +64,11 @@ type liteNode[V any] struct {
 #### fastNode[V] - Fixed Array Node
 ```go
 type fastNode[V any] struct {
-    prefixes [256]*V              // 2,048 bytes
-    children [256]*any            // 2,048 bytes
-    prefixesBitSet bitset.BitSet256 // 32 bytes
-    childrenBitSet bitset.BitSet256 // 32 bytes
-    pfxCount uint16               // 2 bytes + padding
+    prefixes [256]*V                 // 2,048 bytes
+    children [256]*any               // 2,048 bytes
+    prefixesBitSet bitset.BitSet256  // 32 bytes
+    childrenBitSet bitset.BitSet256  // 32 bytes
+    pfxCount uint16                  // 2 bytes + padding
 }
 ```
 **Memory Usage:** **4,168 bytes** (fixed, regardless of occupancy)
