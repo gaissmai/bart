@@ -843,7 +843,7 @@ func (t *Fast[V]) fprint(w io.Writer, is4 bool) error {
 		is4:  is4,
 	}
 
-	return fprintRec(n, w, startParent, "", shouldPrintValues[V]())
+	return fprintRec(n, w, startParent, "", shouldPrintValues[V](n))
 }
 
 // MarshalText implements the [encoding.TextMarshaler] interface,
