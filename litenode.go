@@ -13,21 +13,21 @@ import (
 	"github.com/gaissmai/bart/internal/sparse"
 )
 
-// slimNode is the core building block of the slimmed-down BART trie.
+// liteNode is the core building block of the slimmed-down BART trie.
 //
-// Each slimNode represents one stride (8 bits) of the address space and stores
+// Each liteNode represents one stride (8 bits) of the address space and stores
 // both routing prefixes and child pointers for further trie traversal. It is
 // designed as a memory-efficient alternative to classic ART-style nodes,
 // using compact bitsets and sparse arrays instead of full lookup tables.
 //
-// A slimNode has two main responsibilities:
+// A liteNode has two main responsibilities:
 //   - **Prefix storage**: Up to 256 possible prefixes (one per stride index) are
 //     managed in a BitSet (prefixes). Lookups use longest-prefix match (LPM)
 //     via backtracking along the complete binary tree (CBT) encoded in this bitset.
 //   - **Child management**: Child pointers are held in a sparse-array of at most
-//     256 entries. A child can be another *slimNode[V] for further traversal, or
-//     a path-compressed terminal node: *slimLeafNode (explicit prefix storage)
-//     or *slimFringeNode (implicit prefix at stride boundary).
+//     256 entries. A child can be another *liteNode[V] for further traversal, or
+//     a path-compressed terminal node: *liteLeafNode (explicit prefix storage)
+//     or *liteFringeNode (implicit prefix at stride boundary).
 //
 // Fields:
 //   - prefixes: BitSet256 indicating which prefix indices are occupied.
@@ -41,19 +41,19 @@ import (
 //
 // Generic design note:
 //
-//	slimNode is *pseudo-generic*: the type parameter V does not occur in the
+//	liteNode is *pseudo-generic*: the type parameter V does not occur in the
 //	struct fields itself. Instead, it is a **phantom type** used solely to make
-//	slimNode[V] satisfy the generic interface nodeReadWriter[V].
-//	This allows slimNode, fastNode, and node to be interchangeable under the
+//	liteNode[V] satisfy the generic interface nodeReadWriter[V].
+//	This allows liteNode, fastNode, and node to be interchangeable under the
 //	same interface abstraction, enabling generic algorithms for insertion,
 //	lookup, dumping, and traversal, regardless of the internal representation.
 //	The compiler enforces type correctness at the interface boundary, while
-//	the internal layout of slimNode stays lean (no value payloads).
+//	the internal layout of liteNode stays lean (no value payloads).
 //
 // Memory model:
 //   - Prefix presence is tracked only via bitset (values are not stored directly).
-//   - No values are stored; Slim tracks presence only.
-//   - slimNode acts solely as the internal routing structure.
+//   - No values are stored; lite tracks presence only.
+//   - liteNode acts solely as the internal routing structure.
 //
 // Usage notes:
 //   - Routing insertions place prefixes either into the prefix table (if aligned)
@@ -61,7 +61,7 @@ import (
 //   - Lookup/contains use the precomputed CBT-backtracking bitset (lpm.LookupTbl)
 //     for fast longest-prefix match within stride.
 //   - purgeAndCompress reclaims empty / sparse nodes on unwind to keep the trie compact.
-type slimNode[V any] struct {
+type liteNode[V any] struct {
 	prefixes bitset.BitSet256
 	children sparse.Array256[any]
 	pfxCount uint16
@@ -72,7 +72,7 @@ type slimNode[V any] struct {
 // during trie optimization.
 //
 //nolint:unused
-func (n *slimNode[V]) isEmpty() bool {
+func (n *liteNode[V]) isEmpty() bool {
 	if n == nil {
 		return true
 	}
@@ -82,19 +82,19 @@ func (n *slimNode[V]) isEmpty() bool {
 // prefixCount returns the number of prefixes stored in this node.
 //
 //nolint:unused
-func (n *slimNode[V]) prefixCount() int {
+func (n *liteNode[V]) prefixCount() int {
 	return int(n.pfxCount)
 }
 
 // childCount returns the number of slots used in this node.
-func (n *slimNode[V]) childCount() int {
+func (n *liteNode[V]) childCount() int {
 	return n.children.Len()
 }
 
 // insertPrefix adds a routing entry at the specified index.
 // It returns true if a prefix already existed at that index (indicating an update),
 // false if this is a new insertion.
-func (n *slimNode[V]) insertPrefix(idx uint8, _ V) (exists bool) {
+func (n *liteNode[V]) insertPrefix(idx uint8, _ V) (exists bool) {
 	if exists = n.prefixes.Test(idx); exists {
 		return
 	}
@@ -106,13 +106,13 @@ func (n *slimNode[V]) insertPrefix(idx uint8, _ V) (exists bool) {
 // prefix is set at the given index.
 //
 //nolint:unused
-func (n *slimNode[V]) getPrefix(idx uint8) (_ V, exists bool) {
+func (n *liteNode[V]) getPrefix(idx uint8) (_ V, exists bool) {
 	exists = n.prefixes.Test(idx)
 	return
 }
 
 //nolint:unused
-func (n *slimNode[V]) mustGetPrefix(idx uint8) (_ V) {
+func (n *liteNode[V]) mustGetPrefix(idx uint8) (_ V) {
 	return
 }
 
@@ -121,7 +121,7 @@ func (n *slimNode[V]) mustGetPrefix(idx uint8) (_ V) {
 // for prefix storage within the 8-bit stride.
 //
 //nolint:unused
-func (n *slimNode[V]) getIndices() []uint8 {
+func (n *liteNode[V]) getIndices() []uint8 {
 	return n.prefixes.AsSlice(&[256]uint8{})
 }
 
@@ -129,7 +129,7 @@ func (n *slimNode[V]) getIndices() []uint8 {
 // Each iteration yields the prefix index (uint8) and its associated value (V).
 //
 //nolint:unused
-func (n *slimNode[V]) allIndices() iter.Seq2[uint8, V] {
+func (n *liteNode[V]) allIndices() iter.Seq2[uint8, V] {
 	var zero V
 	return func(yield func(uint8, V) bool) {
 		for _, idx := range n.prefixes.AsSlice(&[256]uint8{}) {
@@ -144,7 +144,7 @@ func (n *slimNode[V]) allIndices() iter.Seq2[uint8, V] {
 // Returns true if the prefix existed, and false otherwise.
 //
 //nolint:unparam
-func (n *slimNode[V]) deletePrefix(idx uint8) (_ V, exists bool) {
+func (n *liteNode[V]) deletePrefix(idx uint8) (_ V, exists bool) {
 	if exists = n.prefixes.Test(idx); !exists {
 		return
 	}
@@ -154,9 +154,9 @@ func (n *slimNode[V]) deletePrefix(idx uint8) (_ V, exists bool) {
 }
 
 // insertChild adds a child node at the specified address (0-255).
-// The child can be a *slimNode[V], *slimLeafNode, or *slimFringeNode.
+// The child can be a *liteNode[V], *liteLeafNode, or *liteFringeNode.
 // Returns true if a child already existed at that address.
-func (n *slimNode[V]) insertChild(addr uint8, child any) (exists bool) {
+func (n *liteNode[V]) insertChild(addr uint8, child any) (exists bool) {
 	return n.children.InsertAt(addr, child)
 }
 
@@ -164,7 +164,7 @@ func (n *slimNode[V]) insertChild(addr uint8, child any) (exists bool) {
 // Returns the child and true if found, or nil and false if not present.
 //
 //nolint:unused
-func (n *slimNode[V]) getChild(addr uint8) (any, bool) {
+func (n *liteNode[V]) getChild(addr uint8) (any, bool) {
 	return n.children.Get(addr)
 }
 
@@ -172,7 +172,7 @@ func (n *slimNode[V]) getChild(addr uint8) (any, bool) {
 // This is useful for iterating over all child nodes without checking every possible address.
 //
 //nolint:unused
-func (n *slimNode[V]) getChildAddrs() []uint8 {
+func (n *liteNode[V]) getChildAddrs() []uint8 {
 	return n.children.AsSlice(&[256]uint8{})
 }
 
@@ -180,7 +180,7 @@ func (n *slimNode[V]) getChildAddrs() []uint8 {
 // Each iteration yields the child's address (uint8) and the child node (any).
 //
 //nolint:unused
-func (n *slimNode[V]) allChildren() iter.Seq2[uint8, any] {
+func (n *liteNode[V]) allChildren() iter.Seq2[uint8, any] {
 	return func(yield func(addr uint8, child any) bool) {
 		addrs := n.children.AsSlice(&[256]uint8{})
 		for i, addr := range addrs {
@@ -194,13 +194,13 @@ func (n *slimNode[V]) allChildren() iter.Seq2[uint8, any] {
 
 // mustGetChild retrieves the child at the specified address, panicking if not found.
 // This method should only be used when the caller is certain the child exists.
-func (n *slimNode[V]) mustGetChild(addr uint8) any {
+func (n *liteNode[V]) mustGetChild(addr uint8) any {
 	return n.children.MustGet(addr)
 }
 
 // deleteChild removes the child node at the specified address.
 // This operation is idempotent - removing a non-existent child is safe.
-func (n *slimNode[V]) deleteChild(addr uint8) (exists bool) {
+func (n *liteNode[V]) deleteChild(addr uint8) (exists bool) {
 	_, exists = n.children.DeleteAt(addr)
 	return
 }
@@ -213,7 +213,7 @@ func (n *slimNode[V]) deleteChild(addr uint8) (exists bool) {
 // The prefix table is structured as a complete binary tree (CBT), and LPM testing
 // is done via a bitset operation that maps the traversal path from the given index
 // toward its possible ancestors.
-func (n *slimNode[V]) contains(idx uint8) bool {
+func (n *liteNode[V]) contains(idx uint8) bool {
 	return n.prefixes.Intersects(&lpm.LookupTbl[idx])
 }
 
@@ -229,7 +229,7 @@ func (n *slimNode[V]) contains(idx uint8) bool {
 // using a bitset-based operation with a precomputed backtracking pattern specific to idx.
 //
 //nolint:unused
-func (n *slimNode[V]) lookupIdx(idx uint8) (lpmIdx uint8, _ V, ok bool) {
+func (n *liteNode[V]) lookupIdx(idx uint8) (lpmIdx uint8, _ V, ok bool) {
 	lpmIdx, ok = n.prefixes.IntersectionTop(&lpm.LookupTbl[idx])
 	return
 }
@@ -237,32 +237,32 @@ func (n *slimNode[V]) lookupIdx(idx uint8) (lpmIdx uint8, _ V, ok bool) {
 // lookup is just a simple wrapper for lookupIdx.
 //
 //nolint:unused
-func (n *slimNode[V]) lookup(idx uint8) (_ V, ok bool) {
+func (n *liteNode[V]) lookup(idx uint8) (_ V, ok bool) {
 	_, _, ok = n.lookupIdx(idx)
 	return
 }
 
-// slimLeafNode represents a path-compressed routing entry that stores only the prefix.
+// liteLeafNode represents a path-compressed routing entry that stores only the prefix.
 // Leaf nodes are used when a prefix doesn't align with stride boundaries
 // and is stored as a compressed path to save memory.
-type slimLeafNode struct {
+type liteLeafNode struct {
 	prefix netip.Prefix
 }
 
-// newSlimLeafNode creates a new leaf node with the specified prefix.
-func newSlimLeafNode(pfx netip.Prefix) *slimLeafNode {
-	return &slimLeafNode{prefix: pfx}
+// newLiteLeafNode creates a new leaf node with the specified prefix.
+func newLiteLeafNode(pfx netip.Prefix) *liteLeafNode {
+	return &liteLeafNode{prefix: pfx}
 }
 
-// slimFringeNode represents a path-compressed routing entry with an implicit prefix
+// liteFringeNode represents a path-compressed routing entry with an implicit prefix
 // defined by the node's position in the trie. No prefix nor value is stored.
 // Fringes are used for prefixes that align exactly with stride boundaries
 // (/8, /16, /24, etc.) to save memory by not storing redundant prefix information.
-type slimFringeNode struct{}
+type liteFringeNode struct{}
 
-// newSlimFringeNode creates a new fringe node.
-func newSlimFringeNode() *slimFringeNode {
-	return new(slimFringeNode)
+// newLiteFringeNode creates a new fringe node.
+func newLiteFringeNode() *liteFringeNode {
+	return new(liteFringeNode)
 }
 
 // insertAtDepth inserts a network prefix and its associated value into the
@@ -278,7 +278,7 @@ func newSlimFringeNode() *slimFringeNode {
 //   - depth: The current depth in the trie (0-based byte index)
 //
 // Returns true if a prefix already existed and was updated, false for new insertions.
-func (n *slimNode[V]) insertAtDepth(pfx netip.Prefix, depth int) (exists bool) {
+func (n *liteNode[V]) insertAtDepth(pfx netip.Prefix, depth int) (exists bool) {
 	var zero V
 	ip := pfx.Addr() // the pfx must be in canonical form
 	octets := ip.AsSlice()
@@ -296,9 +296,9 @@ func (n *slimNode[V]) insertAtDepth(pfx netip.Prefix, depth int) (exists bool) {
 		if !n.children.Test(octet) {
 			// insert prefix path compressed as leaf or fringe
 			if isFringe(depth, pfx) {
-				return n.insertChild(octet, newSlimFringeNode())
+				return n.insertChild(octet, newLiteFringeNode())
 			}
-			return n.insertChild(octet, newSlimLeafNode(pfx))
+			return n.insertChild(octet, newLiteLeafNode(pfx))
 		}
 
 		// ... or descend down the trie
@@ -306,10 +306,10 @@ func (n *slimNode[V]) insertAtDepth(pfx netip.Prefix, depth int) (exists bool) {
 
 		// kid is node or leaf or fringe at addr
 		switch kid := kid.(type) {
-		case *slimNode[V]:
+		case *liteNode[V]:
 			n = kid // descend down to next trie level
 
-		case *slimLeafNode:
+		case *liteLeafNode:
 			// reached a path compressed prefix
 			if kid.prefix == pfx {
 				// exists
@@ -320,13 +320,13 @@ func (n *slimNode[V]) insertAtDepth(pfx netip.Prefix, depth int) (exists bool) {
 			// push the leaf down
 			// insert new child at current leaf position (addr)
 			// descend down, replace n with new child
-			newNode := new(slimNode[V])
+			newNode := new(liteNode[V])
 			newNode.insertAtDepth(kid.prefix, depth+1)
 
 			n.insertChild(octet, newNode)
 			n = newNode
 
-		case *slimFringeNode:
+		case *liteFringeNode:
 			// reached a path compressed fringe
 			if isFringe(depth, pfx) {
 				// exists
@@ -337,7 +337,7 @@ func (n *slimNode[V]) insertAtDepth(pfx netip.Prefix, depth int) (exists bool) {
 			// push the fringe down, it becomes a default route (idx=1)
 			// insert new child at current leaf position (addr)
 			// descend down, replace n with new child
-			newNode := new(slimNode[V])
+			newNode := new(liteNode[V])
 			newNode.insertPrefix(1, zero)
 
 			n.insertChild(octet, newNode)
@@ -367,7 +367,7 @@ func (n *slimNode[V]) insertAtDepth(pfx netip.Prefix, depth int) (exists bool) {
 //   - stack: Array of parent nodes to process during unwinding
 //   - octets: The path of octets taken to reach the current position
 //   - is4: True for IPv4 processing, false for IPv6
-func (n *slimNode[V]) purgeAndCompress(stack []*slimNode[V], octets []uint8, is4 bool) {
+func (n *liteNode[V]) purgeAndCompress(stack []*liteNode[V], octets []uint8, is4 bool) {
 	// unwind the stack
 	for depth := len(stack) - 1; depth >= 0; depth-- {
 		parent := stack[depth]
@@ -382,17 +382,17 @@ func (n *slimNode[V]) purgeAndCompress(stack []*slimNode[V], octets []uint8, is4
 
 		case n.pfxCount == 0 && childCount == 1:
 			switch kid := n.children.Items[0].(type) {
-			case *slimNode[V]:
+			case *liteNode[V]:
 				// fast exit, we are at an intermediate path node
 				// no further delete/compress upwards the stack is possible
 				return
-			case *slimLeafNode:
+			case *liteLeafNode:
 				// just one leaf, delete this node and reinsert the leaf above
 				parent.deleteChild(octet)
 
 				// ... (re)insert the leaf at parents depth
 				parent.insertAtDepth(kid.prefix, depth)
-			case *slimFringeNode:
+			case *liteFringeNode:
 				// just one fringe, delete this node and reinsert the fringe as leaf above
 				parent.deleteChild(octet)
 
