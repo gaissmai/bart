@@ -55,7 +55,7 @@ func (n *fastNode[V]) isEmpty() bool {
 	if n == nil {
 		return true
 	}
-	return (n.prefixesBitSet.Size() + n.childrenBitSet.Size()) == 0
+	return n.pfxCount == 0 && n.cldCount == 0
 }
 
 // getChild returns the child node at the specified address and true if it exists.
@@ -250,7 +250,7 @@ func (n *fastNode[V]) lookup(idx uint8) (val V, ok bool) {
 func (n *fastNode[V]) lookupIdx(idx uint8) (baseIdx uint8, val V, ok bool) {
 	// top is the idx of the longest-prefix-match
 	if top, ok := n.prefixesBitSet.IntersectionTop(&lpm.LookupTbl[idx]); ok {
-		return top, *n.prefixes[idx], true
+		return top, *n.prefixes[top], true
 	}
 	return
 }
