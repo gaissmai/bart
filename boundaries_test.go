@@ -26,8 +26,8 @@ func TestBoundaryBehavior_DefaultRoutes(t *testing.T) {
 			builder: func() tabler[*routeEntry] { return &Fast[*routeEntry]{} },
 		},
 		{
-			name:    "Slim",
-			builder: func() tabler[*routeEntry] { return &slimTable[*routeEntry]{} },
+			name:    "Lite",
+			builder: func() tabler[*routeEntry] { return &liteTable[*routeEntry]{} },
 		},
 	}
 
