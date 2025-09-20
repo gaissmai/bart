@@ -25,8 +25,13 @@ type Lite struct {
 }
 
 // adapter method, not delegated
-func (t *Lite) Insert(pfx netip.Prefix) {
-	t.liteTable.Insert(pfx, nil)
+func (l *Lite) Insert(pfx netip.Prefix) {
+	l.liteTable.Insert(pfx, nil)
+}
+
+// adapter method, not delegated
+func (l *Lite) Overlaps(o *Lite) {
+	l.liteTable.Overlaps(&o.liteTable)
 }
 
 // liteTable follows the BART design but with no payload.
@@ -606,6 +611,41 @@ LOOP:
 	}
 
 	return
+}
+
+// Overlaps reports whether any route in the receiver table overlaps
+// with a route in the other table, in either direction.
+//
+// The overlap check is bidirectional: it returns true if any IP prefix
+// in the receiver is covered by the other table, or vice versa.
+// This includes partial overlaps, exact matches, and supernet/subnet relationships.
+//
+// Both IPv4 and IPv6 route trees are compared independently. If either
+// tree has overlapping routes, the function returns true.
+//
+// This is useful for conflict detection, policy enforcement,
+// or validating mutually exclusive routing domains.
+func (l *liteTable[V]) Overlaps(o *liteTable[V]) bool {
+	if o == nil {
+		return false
+	}
+	return l.Overlaps4(o) || l.Overlaps6(o)
+}
+
+// Overlaps4 is like [Table.Overlaps] but for the v4 routing table only.
+func (l *liteTable[V]) Overlaps4(o *liteTable[V]) bool {
+	if o == nil || l.size4 == 0 || o.size4 == 0 {
+		return false
+	}
+	return l.root4.overlaps(&o.root4, 0)
+}
+
+// Overlaps6 is like [Table.Overlaps] but for the v6 routing table only.
+func (l *liteTable[V]) Overlaps6(o *liteTable[V]) bool {
+	if o == nil || l.size6 == 0 || o.size6 == 0 {
+		return false
+	}
+	return l.root6.overlaps(&o.root6, 0)
 }
 
 // Size returns the prefix count.
