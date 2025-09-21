@@ -154,7 +154,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, found bool) V) (newVa
 	var zero V
 
 	if !pfx.IsValid() {
-		return
+		return newVal
 	}
 
 	// canonicalize prefix
@@ -449,7 +449,7 @@ func (t *Table[V]) GetAndDelete(pfx netip.Prefix) (val V, found bool) {
 // or the zero value and false if prefix is not set in the routing table.
 func (t *Table[V]) Delete(pfx netip.Prefix) (val V, found bool) {
 	if !pfx.IsValid() {
-		return
+		return val, found
 	}
 
 	// canonicalize prefix
@@ -481,7 +481,7 @@ func (t *Table[V]) Delete(pfx netip.Prefix) (val V, found bool) {
 			// try to delete prefix in trie node
 			val, found = n.deletePrefix(art.PfxToIdx(octet, lastBits))
 			if !found {
-				return
+				return val, found
 			}
 
 			t.sizeUpdate(is4, -1)
@@ -491,7 +491,7 @@ func (t *Table[V]) Delete(pfx netip.Prefix) (val V, found bool) {
 		}
 
 		if !n.children.Test(octet) {
-			return
+			return val, found
 		}
 		kid := n.mustGetChild(octet)
 
@@ -503,7 +503,7 @@ func (t *Table[V]) Delete(pfx netip.Prefix) (val V, found bool) {
 		case *fringeNode[V]:
 			// if pfx is no fringe at this depth, fast exit
 			if !isFringe(depth, pfx) {
-				return
+				return val, found
 			}
 
 			// pfx is fringe at depth, delete fringe
@@ -518,7 +518,7 @@ func (t *Table[V]) Delete(pfx netip.Prefix) (val V, found bool) {
 		case *leafNode[V]:
 			// Attention: pfx must be masked to be comparable!
 			if kid.prefix != pfx {
-				return
+				return val, found
 			}
 
 			// prefix is equal leaf, delete leaf
@@ -535,14 +535,14 @@ func (t *Table[V]) Delete(pfx netip.Prefix) (val V, found bool) {
 		}
 	}
 
-	return
+	return val, found
 }
 
 // Get returns the associated payload for prefix and true, or false if
 // prefix is not set in the routing table.
 func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 	if !pfx.IsValid() {
-		return
+		return val, ok
 	}
 
 	// canonicalize the prefix
@@ -568,7 +568,7 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 		}
 
 		if !n.children.Test(octet) {
-			return
+			return val, ok
 		}
 		kid := n.mustGetChild(octet)
 
@@ -582,14 +582,14 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 			if isFringe(depth, pfx) {
 				return kid.value, true
 			}
-			return
+			return val, ok
 
 		case *leafNode[V]:
 			// reached a path compressed prefix, stop traversing
 			if kid.prefix == pfx {
 				return kid.value, true
 			}
-			return
+			return val, ok
 
 		default:
 			panic("logic error, wrong node type")
@@ -654,7 +654,7 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 // This is the core routing table operation used for packet forwarding decisions.
 func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	if !ip.IsValid() {
-		return
+		return val, ok
 	}
 
 	is4 := ip.Is4()
@@ -722,7 +722,7 @@ LOOP:
 		}
 	}
 
-	return
+	return val, ok
 }
 
 // LookupPrefix does a route lookup (longest prefix match) for pfx and
@@ -746,7 +746,7 @@ func (t *Table[V]) LookupPrefixLPM(pfx netip.Prefix) (lpmPfx netip.Prefix, val V
 
 func (t *Table[V]) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpmPfx netip.Prefix, val V, ok bool) {
 	if !pfx.IsValid() {
-		return
+		return lpmPfx, val, ok
 	}
 
 	// canonicalize the prefix
@@ -864,7 +864,7 @@ LOOP:
 		}
 	}
 
-	return
+	return lpmPfx, val, ok
 }
 
 // Supernets returns an iterator over all supernet routes that cover the given prefix pfx.

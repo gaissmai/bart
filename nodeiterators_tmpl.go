@@ -110,11 +110,11 @@ func (n *_NODE_TYPE[V]) allRecSorted(path stridePath, depth int, is4 bool, yield
 
 	childCursor := 0
 
-	// yield indices and childs in CIDR sort order
+	// yield indices and children in CIDR sort order
 	for _, pfxIdx := range allIndices {
 		pfxOctet, _ := art.IdxToPfx(pfxIdx)
 
-		// yield all childs before idx
+		// yield all children before idx
 		for j := childCursor; j < len(allChildAddrs); j++ {
 			childAddr := allChildAddrs[j]
 

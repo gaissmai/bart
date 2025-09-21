@@ -57,7 +57,7 @@ func (t *goldTable[V]) update(pfx netip.Prefix, cb func(V, bool) V) (val V) {
 		if ent.pfx == pfx {
 			// update val
 			(*t)[i].val = cb(ent.val, true)
-			return
+			return val
 		}
 	}
 	// new val
@@ -93,7 +93,7 @@ func (t goldTable[V]) lookup(addr netip.Addr) (val V, ok bool) {
 			bestLen = item.pfx.Bits()
 		}
 	}
-	return
+	return val, ok
 }
 
 func (t goldTable[V]) lookupPfx(pfx netip.Prefix) (val V, ok bool) {
@@ -107,7 +107,7 @@ func (t goldTable[V]) lookupPfx(pfx netip.Prefix) (val V, ok bool) {
 			bestLen = item.pfx.Bits()
 		}
 	}
-	return
+	return val, ok
 }
 
 func (t goldTable[V]) lookupPfxLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) {
@@ -122,7 +122,7 @@ func (t goldTable[V]) lookupPfxLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, o
 			bestLen = item.pfx.Bits()
 		}
 	}
-	return
+	return lpm, val, ok
 }
 
 func (t goldTable[V]) subnets(pfx netip.Prefix) []netip.Prefix {
