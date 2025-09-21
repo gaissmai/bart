@@ -169,8 +169,8 @@ func (n *fastNode[V]) cloneFlat(cloneFn cloneFunc[V]) *fastNode[V] {
 	}
 
 	// copy the bitsets
-	c.prefixesBitSet = n.prefixesBitSet
-	c.childrenBitSet = n.childrenBitSet
+	c.prefixes.BitSet256 = n.prefixes.BitSet256
+	c.children.BitSet256 = n.children.BitSet256
 
 	// copy the counters
 	c.pfxCount = n.pfxCount
@@ -180,7 +180,7 @@ func (n *fastNode[V]) cloneFlat(cloneFn cloneFunc[V]) *fastNode[V] {
 	// but the allot algorithm makes it more difficult
 	// see also insertPrefix
 	for _, idx := range n.getIndices() {
-		origValPtr := n.prefixes[idx]
+		origValPtr := n.prefixes.items[idx]
 		newValPtr := new(V)
 
 		if cloneFn == nil {
@@ -189,26 +189,26 @@ func (n *fastNode[V]) cloneFlat(cloneFn cloneFunc[V]) *fastNode[V] {
 			*newValPtr = cloneFn(*origValPtr) // clone the value
 		}
 
-		oldValPtr := c.prefixes[idx]
+		oldValPtr := c.prefixes.items[idx]
 		c.allot(idx, oldValPtr, newValPtr)
 	}
 
 	// flat clone of the children
 	for _, addr := range n.getChildAddrs() {
-		kidAny := *n.children[addr]
+		kidAny := *n.children.items[addr]
 
 		switch kid := kidAny.(type) {
 		case *fastNode[V]:
 			// just copy the pointer
-			c.children[addr] = n.children[addr]
+			c.children.items[addr] = n.children.items[addr]
 
 		case *leafNode[V]:
 			leafAny := any(kid.cloneLeaf(cloneFn))
-			c.children[addr] = &leafAny
+			c.children.items[addr] = &leafAny
 
 		case *fringeNode[V]:
 			fringeAny := any(kid.cloneFringe(cloneFn))
-			c.children[addr] = &fringeAny
+			c.children.items[addr] = &fringeAny
 
 		default:
 			panic("logic error, wrong node type")
@@ -231,12 +231,12 @@ func (n *fastNode[V]) cloneRec(cloneFn cloneFunc[V]) *fastNode[V] {
 
 	// Recursively clone all child nodes of type *fastNode[V]
 	for _, addr := range c.getChildAddrs() {
-		kidAny := *c.children[addr]
+		kidAny := *c.children.items[addr]
 
 		switch kid := kidAny.(type) {
 		case *fastNode[V]:
 			nodeAny := any(kid.cloneRec(cloneFn))
-			c.children[addr] = &nodeAny
+			c.children.items[addr] = &nodeAny
 		}
 	}
 
