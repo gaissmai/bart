@@ -71,7 +71,7 @@ type liteNode[V any] struct {
 // and no child nodes. Empty nodes are candidates for compression or removal
 // during trie optimization.
 //
-//nolint:unused
+//nolint:unused // used via nodeReader interface
 func (n *liteNode[V]) isEmpty() bool {
 	if n == nil {
 		return true
@@ -81,7 +81,7 @@ func (n *liteNode[V]) isEmpty() bool {
 
 // prefixCount returns the number of prefixes stored in this node.
 //
-//nolint:unused
+//nolint:unused // used via nodeReader interface
 func (n *liteNode[V]) prefixCount() int {
 	return int(n.pfxCount)
 }
@@ -105,13 +105,13 @@ func (n *liteNode[V]) insertPrefix(idx uint8, _ V) (exists bool) {
 
 // prefix is set at the given index.
 //
-//nolint:unused,unparam
+//nolint:unparam,unused  // used via nodeReader interface
 func (n *liteNode[V]) getPrefix(idx uint8) (_ V, exists bool) {
 	exists = n.prefixes.Test(idx)
 	return
 }
 
-//nolint:unused,unparam
+//nolint:unparam,unused // used via nodeReader interface
 func (n *liteNode[V]) mustGetPrefix(idx uint8) (_ V) {
 	return
 }
@@ -120,17 +120,17 @@ func (n *liteNode[V]) mustGetPrefix(idx uint8) (_ V) {
 // The indices correspond to positions in the complete binary tree representation used
 // for prefix storage within the 8-bit stride.
 //
-//nolint:unused
+//nolint:unused // used via nodeReader interface
 func (n *liteNode[V]) getIndices() []uint8 {
 	return n.prefixes.AsSlice(&[256]uint8{})
 }
 
-//nolint:unused
+//nolint:unused // used via nodeReader interface
 func (n *liteNode[V]) getChildrenBitSet() *bitset.BitSet256 {
 	return &n.children.BitSet256
 }
 
-//nolint:unused
+//nolint:unused // used via nodeReader interface
 func (n *liteNode[V]) getPrefixesBitSet() *bitset.BitSet256 {
 	return &n.prefixes
 }
@@ -138,7 +138,7 @@ func (n *liteNode[V]) getPrefixesBitSet() *bitset.BitSet256 {
 // allIndices returns an iterator over all prefix entries.
 // Each iteration yields the prefix index (uint8) and its associated value (V).
 //
-//nolint:unused
+//nolint:unused // used via nodeReader interface
 func (n *liteNode[V]) allIndices() iter.Seq2[uint8, V] {
 	var zero V
 	return func(yield func(uint8, V) bool) {
@@ -153,7 +153,7 @@ func (n *liteNode[V]) allIndices() iter.Seq2[uint8, V] {
 // deletePrefix removes the prefix at the specified index.
 // Returns true if the prefix existed, and false otherwise.
 //
-//nolint:unparam,unparam
+//nolint:unparam,unused // used via NodeReadWriter interface
 func (n *liteNode[V]) deletePrefix(idx uint8) (_ V, exists bool) {
 	if exists = n.prefixes.Test(idx); !exists {
 		return
@@ -173,7 +173,7 @@ func (n *liteNode[V]) insertChild(addr uint8, child any) (exists bool) {
 // getChild retrieves the child node at the specified address.
 // Returns the child and true if found, or nil and false if not present.
 //
-//nolint:unused
+//nolint:unused // used via nodeReader interface
 func (n *liteNode[V]) getChild(addr uint8) (any, bool) {
 	return n.children.Get(addr)
 }
@@ -181,7 +181,7 @@ func (n *liteNode[V]) getChild(addr uint8) (any, bool) {
 // getChildAddrs returns a slice of all addresses (0-255) that have children in this node.
 // This is useful for iterating over all child nodes without checking every possible address.
 //
-//nolint:unused
+//nolint:unused // used via nodeReader interface
 func (n *liteNode[V]) getChildAddrs() []uint8 {
 	return n.children.AsSlice(&[256]uint8{})
 }
@@ -189,7 +189,7 @@ func (n *liteNode[V]) getChildAddrs() []uint8 {
 // allChildren returns an iterator over all child nodes.
 // Each iteration yields the child's address (uint8) and the child node (any).
 //
-//nolint:unused
+//nolint:unused // used via nodeReader interface
 func (n *liteNode[V]) allChildren() iter.Seq2[uint8, any] {
 	return func(yield func(addr uint8, child any) bool) {
 		addrs := n.children.AsSlice(&[256]uint8{})
@@ -238,7 +238,7 @@ func (n *liteNode[V]) contains(idx uint8) bool {
 // does not use an allotment-based approach. Instead, it performs CBT backtracking
 // using a bitset-based operation with a precomputed backtracking pattern specific to idx.
 //
-//nolint:unused,unparam
+//nolint:unparam,unused // used via nodeReader interface
 func (n *liteNode[V]) lookupIdx(idx uint8) (lpmIdx uint8, _ V, ok bool) {
 	lpmIdx, ok = n.prefixes.IntersectionTop(&lpm.LookupTbl[idx])
 	return
@@ -246,7 +246,7 @@ func (n *liteNode[V]) lookupIdx(idx uint8) (lpmIdx uint8, _ V, ok bool) {
 
 // lookup is just a simple wrapper for lookupIdx.
 //
-//nolint:unused,unparam
+//nolint:unparam,unused // used via nodeReader interface
 func (n *liteNode[V]) lookup(idx uint8) (_ V, ok bool) {
 	_, _, ok = n.lookupIdx(idx)
 	return

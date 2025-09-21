@@ -83,7 +83,7 @@ func (n *fastNode[V]) getChild(addr uint8) (any, bool) {
 // Panics if no child exists at addr. This method should only be called
 // when the caller has verified the child exists.
 //
-//nolint:unused
+//nolint:unused // used via nodeReader interface
 func (n *fastNode[V]) mustGetChild(addr uint8) any {
 	// panics if n.children[addr] is nil
 	return *n.children.items[addr]
@@ -98,7 +98,7 @@ func (n *fastNode[V]) getChildAddrs() []uint8 {
 // allChildren returns an iterator over all child nodes.
 // Each iteration yields the child's address (uint8) and the child node (any).
 //
-//nolint:unused
+//nolint:unused // used via nodeReader interface
 func (n *fastNode[V]) allChildren() iter.Seq2[uint8, any] {
 	return func(yield func(addr uint8, child any) bool) {
 		for _, addr := range n.children.AsSlice(&[256]uint8{}) {
@@ -182,17 +182,17 @@ func (n *fastNode[V]) getPrefix(idx uint8) (val V, exists bool) {
 // Panics if no prefix exists at idx. This method should only be called
 // when the caller has verified the prefix exists.
 //
-//nolint:unused
+//nolint:unused // used via nodeReader interface
 func (n *fastNode[V]) mustGetPrefix(idx uint8) V {
 	return *n.prefixes.items[idx]
 }
 
-//nolint:unused
+//nolint:unused // used via nodeReader interface
 func (n *fastNode[V]) getChildrenBitSet() *bitset.BitSet256 {
 	return &n.children.BitSet256
 }
 
-//nolint:unused
+//nolint:unused // used via nodeReader interface
 func (n *fastNode[V]) getPrefixesBitSet() *bitset.BitSet256 {
 	return &n.prefixes.BitSet256
 }
@@ -206,7 +206,7 @@ func (n *fastNode[V]) getIndices() []uint8 {
 // allIndices returns an iterator over all prefix entries.
 // Each iteration yields the prefix index (uint8) and its associated value (V).
 //
-//nolint:unused
+//nolint:unused // used via nodeReader interface
 func (n *fastNode[V]) allIndices() iter.Seq2[uint8, V] {
 	return func(yield func(uint8, V) bool) {
 		for _, idx := range n.prefixes.AsSlice(&[256]uint8{}) {
