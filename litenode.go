@@ -263,7 +263,8 @@ func (n *liteNode[V]) insertAtDepth(pfx netip.Prefix, depth int) (exists bool) {
 
 	// find the proper trie node to insert prefix
 	// start with prefix octet at depth
-	for _, octet := range octets[depth:] {
+	for depth := depth; depth < len(octets); depth++ {
+		octet := octets[depth]
 		// last masked octet: insert/override prefix/val into node
 		if depth == lastOctetPlusOne {
 			return n.insertPrefix(art.PfxToIdx(octet, lastBits), zero)
@@ -323,8 +324,6 @@ func (n *liteNode[V]) insertAtDepth(pfx netip.Prefix, depth int) (exists bool) {
 		default:
 			panic("logic error, wrong node type")
 		}
-
-		depth++
 	}
 
 	panic("unreachable")

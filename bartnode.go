@@ -56,7 +56,7 @@ type bartNode[V any] struct {
 	// Entries in children may be:
 	//   - *bartNode[V]   -> internal child node for further traversal
 	//   - *leafNode[V]   -> path-comp. node (depth < maxDepth - 1)
-	//   - *fringeNode[V] -> path-comp. node (depth == maxDepth - 1, stride-aligned: /8, /16, ... /128))
+	//   - *fringeNode[V] -> path-comp. node (depth == maxDepth - 1, stride-aligned: /8, /16, ... /128)
 	//
 	// Note: Both *leafNode and *fringeNode entries are only created by path compression.
 	// Prefixes that match exactly at the maximum trie depth (depth == maxDepth) are
@@ -302,7 +302,9 @@ func (n *bartNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists 
 
 	// find the proper trie node to insert prefix
 	// start with prefix octet at depth
-	for _, octet := range octets[depth:] {
+	for depth := depth; depth < len(octets); depth++ {
+		octet := octets[depth]
+
 		// last masked octet: insert/override prefix/val into node
 		if depth == lastOctetPlusOne {
 			return n.insertPrefix(art.PfxToIdx(octet, lastBits), val)
@@ -367,7 +369,6 @@ func (n *bartNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists 
 			panic("logic error, wrong node type")
 		}
 
-		depth++
 	}
 
 	panic("unreachable")
