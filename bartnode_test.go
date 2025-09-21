@@ -206,7 +206,7 @@ func BenchmarkNodePrefixDelete(b *testing.B) {
 			for b.Loop() {
 				route := routes[i%len(routes)]
 				idx := art.PfxToIdx(route.octet, route.bits)
-				this.insertPrefix(idx, 0)
+				this.deletePrefix(idx)
 				i++
 			}
 		})
