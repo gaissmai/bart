@@ -26,11 +26,7 @@ type fastNode[V any] struct {
 		items [256]*V
 	}
 
-	children struct {
-		bitset.BitSet256
-		items [256]*any
-	}
-	// items: **fastNode or path-compressed **leaf- or **fringeNode
+	// children.items: **fastNode or path-compressed **leaf- or **fringeNode
 	// an array of "pointers to" the empty interface,
 	// and not an array of empty interfaces.
 	//
@@ -40,6 +36,10 @@ type fastNode[V any] struct {
 	// Since many slots are nil, this reduces memory by 30%.
 	// The added indirection does not have a measurable performance impact,
 	// but makes the code uglier.
+	children struct {
+		bitset.BitSet256
+		items [256]*any
+	}
 
 	// pfxCount is an O(1) counter tracking the number of prefixes in this node.
 	// This replaces expensive prefixesBitSet.Size() calls with direct counter access.
