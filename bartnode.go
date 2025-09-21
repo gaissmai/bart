@@ -180,7 +180,7 @@ func (n *bartNode[V]) mustGetChild(addr uint8) any {
 // This operation is idempotent - removing a non-existent child is safe.
 func (n *bartNode[V]) deleteChild(addr uint8) (exists bool) {
 	_, exists = n.children.DeleteAt(addr)
-	return
+	return exists
 }
 
 // contains returns true if an index (idx) has any matching longest-prefix
@@ -212,13 +212,13 @@ func (n *bartNode[V]) lookupIdx(idx uint8) (baseIdx uint8, val V, ok bool) {
 	if top, ok := n.prefixes.IntersectionTop(&lpm.LookupTbl[idx]); ok {
 		return top, n.mustGetPrefix(top), true
 	}
-	return
+	return baseIdx, val, ok
 }
 
 // lookup is just a simple wrapper for lookupIdx.
 func (n *bartNode[V]) lookup(idx uint8) (val V, ok bool) {
 	_, val, ok = n.lookupIdx(idx)
-	return
+	return val, ok
 }
 
 // leafNode represents a path-compressed routing entry that stores both prefix and value.

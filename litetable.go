@@ -283,7 +283,7 @@ func (l *liteTable[V]) Get(pfx netip.Prefix) (_ V, ok bool) {
 //	Delete:   | (zero, true)  | (_, true)  | (zero, true)
 func (l *liteTable[V]) Modify(pfx netip.Prefix, cb func(zero V, found bool) (_ V, del bool)) (zero V, deleted bool) {
 	if !pfx.IsValid() {
-		return
+		return zero, deleted
 	}
 
 	// canonicalize prefix
