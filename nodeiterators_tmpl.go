@@ -1,3 +1,9 @@
+// Copyright (c) 2025 Karl Gaissmaier
+// SPDX-License-Identifier: MIT
+
+//go:generate ./scripts/geniterators.sh
+//go:build ignore
+
 package bart
 
 import (
@@ -21,7 +27,7 @@ import (
 //
 // The traversal order is not defined. This implementation favors simplicity
 // and runtime efficiency over consistency of iteration sequence.
-func (n *bartNode[V]) allRec(path stridePath, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
+func (n *_NODE_TYPE[V]) allRec(path stridePath, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
 	for _, idx := range n.prefixes.AsSlice(&[256]uint8{}) {
 		cidr := cidrFromPath(path, depth, is4, idx)
 		val := n.mustGetPrefix(idx)
@@ -37,97 +43,7 @@ func (n *bartNode[V]) allRec(path stridePath, depth int, is4 bool, yield func(ne
 	for _, addr := range n.children.AsSlice(&[256]uint8{}) {
 		anyKid := n.mustGetChild(addr)
 		switch kid := anyKid.(type) {
-		case *bartNode[V]:
-			// rec-descent with this node
-			path[depth] = addr
-			if !kid.allRec(path, depth+1, is4, yield) {
-				// early exit
-				return false
-			}
-		case *leafNode[V]:
-			// callback for this leaf
-			if !yield(kid.prefix, kid.value) {
-				// early exit
-				return false
-			}
-		case *fringeNode[V]:
-			fringePfx := cidrForFringe(path[:], depth, is4, addr)
-			// callback for this fringe
-			if !yield(fringePfx, kid.value) {
-				// early exit
-				return false
-			}
-
-		default:
-			panic("logic error, wrong node type")
-		}
-	}
-
-	return true
-}
-
-func (n *liteNode[V]) allRec(path stridePath, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
-	for _, idx := range n.prefixes.AsSlice(&[256]uint8{}) {
-		cidr := cidrFromPath(path, depth, is4, idx)
-		val := n.mustGetPrefix(idx)
-
-		// callback for this prefix and val
-		if !yield(cidr, val) {
-			// early exit
-			return false
-		}
-	}
-
-	// for all children (nodes and leaves) in this node do ...
-	for _, addr := range n.children.AsSlice(&[256]uint8{}) {
-		anyKid := n.mustGetChild(addr)
-		switch kid := anyKid.(type) {
-		case *liteNode[V]:
-			// rec-descent with this node
-			path[depth] = addr
-			if !kid.allRec(path, depth+1, is4, yield) {
-				// early exit
-				return false
-			}
-		case *leafNode[V]:
-			// callback for this leaf
-			if !yield(kid.prefix, kid.value) {
-				// early exit
-				return false
-			}
-		case *fringeNode[V]:
-			fringePfx := cidrForFringe(path[:], depth, is4, addr)
-			// callback for this fringe
-			if !yield(fringePfx, kid.value) {
-				// early exit
-				return false
-			}
-
-		default:
-			panic("logic error, wrong node type")
-		}
-	}
-
-	return true
-}
-
-func (n *fastNode[V]) allRec(path stridePath, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
-	for _, idx := range n.prefixes.AsSlice(&[256]uint8{}) {
-		cidr := cidrFromPath(path, depth, is4, idx)
-		val := n.mustGetPrefix(idx)
-
-		// callback for this prefix and val
-		if !yield(cidr, val) {
-			// early exit
-			return false
-		}
-	}
-
-	// for all children (nodes and leaves) in this node do ...
-	for _, addr := range n.children.AsSlice(&[256]uint8{}) {
-		anyKid := n.mustGetChild(addr)
-		switch kid := anyKid.(type) {
-		case *fastNode[V]:
+		case *_NODE_TYPE[V]:
 			// rec-descent with this node
 			path[depth] = addr
 			if !kid.allRec(path, depth+1, is4, yield) {
@@ -182,7 +98,7 @@ func (n *fastNode[V]) allRec(path stridePath, depth int, is4 bool, yield func(ne
 //   - yield: callback function invoked for each prefix/value pair
 //
 // Returns false if yield function requests early termination.
-func (n *bartNode[V]) allRecSorted(path stridePath, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
+func (n *_NODE_TYPE[V]) allRecSorted(path stridePath, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
 	// get slice of all child octets, sorted by addr
 	allChildAddrs := n.children.AsSlice(&[256]uint8{})
 
@@ -207,8 +123,9 @@ func (n *bartNode[V]) allRecSorted(path stridePath, depth int, is4 bool, yield f
 			}
 
 			// yield the node (rec-descent) or leaf
-			switch kid := n.children.Items[j].(type) {
-			case *bartNode[V]:
+			anyKid := n.mustGetChild(childAddr)
+			switch kid := anyKid.(type) {
+			case *_NODE_TYPE[V]:
 				path[depth] = childAddr
 				if !kid.allRecSorted(path, depth+1, is4, yield) {
 					return false
@@ -243,8 +160,9 @@ func (n *bartNode[V]) allRecSorted(path stridePath, depth int, is4 bool, yield f
 	// yield the rest of leaves and nodes (rec-descent)
 	for j := childCursor; j < len(allChildAddrs); j++ {
 		addr := allChildAddrs[j]
-		switch kid := n.children.Items[j].(type) {
-		case *bartNode[V]:
+		anyKid := n.mustGetChild(addr)
+		switch kid := anyKid.(type) {
+		case *_NODE_TYPE[V]:
 			path[depth] = addr
 			if !kid.allRecSorted(path, depth+1, is4, yield) {
 				return false
