@@ -3,7 +3,9 @@
 
 package bart
 
-import "iter"
+import (
+	"iter"
+)
 
 // compile time check
 var (
