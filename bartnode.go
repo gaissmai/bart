@@ -56,7 +56,7 @@ type bartNode[V any] struct {
 	// Entries in children may be:
 	//   - *bartNode[V]   -> internal child node for further traversal
 	//   - *leafNode[V]   -> path-comp. node (depth < maxDepth - 1)
-	//   - *fringeNode[V] -> path-comp. node (depth == maxDepth - 1, stride-aligned: /8, /16, ... /128))
+	//   - *fringeNode[V] -> path-comp. node (depth == maxDepth - 1, stride-aligned: /8, /16, ... /128)
 	//
 	// Note: Both *leafNode and *fringeNode entries are only created by path compression.
 	// Prefixes that match exactly at the maximum trie depth (depth == maxDepth) are
