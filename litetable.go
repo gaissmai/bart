@@ -911,6 +911,8 @@ func (l *liteTable[V]) DumpList6() []DumpListNode[V] {
 }
 
 // dumpString is just a wrapper for dump.
+//
+//nolint:unused
 func (l *liteTable[V]) dumpString() string {
 	w := new(strings.Builder)
 	l.dump(w)

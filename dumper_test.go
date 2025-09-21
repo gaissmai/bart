@@ -11,6 +11,29 @@ import (
 	"testing"
 )
 
+type zeroStructT = struct{}
+
+var zeroStruct zeroStructT
+
+type tablerTiny interface {
+	Insert(netip.Prefix, zeroStructT)
+	String() string
+	dump(io.Writer)
+	dumpString() string
+}
+
+var tables = map[string]func() tablerTiny{
+	"Table":     func() tablerTiny { return new(Table[zeroStructT]) },
+	"Fast":      func() tablerTiny { return new(Fast[zeroStructT]) },
+	"liteTable": func() tablerTiny { return new(liteTable[zeroStructT]) },
+}
+
+func insertAll(tbl tablerTiny, pfxs []netip.Prefix) {
+	for _, p := range pfxs {
+		tbl.Insert(p, zeroStruct)
+	}
+}
+
 // Test unified dumper functionality across node types
 //
 //nolint:tparallel
@@ -18,13 +41,15 @@ func TestUnifiedDumper_NodeTypes(t *testing.T) {
 	t.Parallel()
 
 	nodeBuilder := map[string]func() nodeReadWriter[any]{
-		"node":     func() nodeReadWriter[any] { return &bartNode[any]{} },
+		"bartNode": func() nodeReadWriter[any] { return &bartNode[any]{} },
 		"fastNode": func() nodeReadWriter[any] { return &fastNode[any]{} },
 		"liteNode": func() nodeReadWriter[any] { return &liteNode[any]{} },
 	}
 
 	for nodeTypeName, build := range nodeBuilder {
 		t.Run(nodeTypeName+"_EmptyNodeStats", func(t *testing.T) {
+			t.Parallel()
+
 			// Test nodeStats
 			n := build()
 			stats := nodeStats(n)
@@ -35,6 +60,8 @@ func TestUnifiedDumper_NodeTypes(t *testing.T) {
 		})
 
 		t.Run(nodeTypeName+"_WithPrefix", func(t *testing.T) {
+			t.Parallel()
+
 			n := build()
 			n.insertPrefix(128, "test-value")
 
@@ -46,6 +73,8 @@ func TestUnifiedDumper_NodeTypes(t *testing.T) {
 		})
 
 		t.Run(nodeTypeName+"_DumpToWriter", func(t *testing.T) {
+			t.Parallel()
+
 			var buf strings.Builder
 			path := stridePath{}
 
@@ -69,7 +98,7 @@ func TestUnifiedDumper_TypedNilHandling(t *testing.T) {
 	t.Parallel()
 
 	nodeBuilder := map[string]func() nodeReader[any]{
-		"node":     func() nodeReader[any] { return (*bartNode[any])(nil) },
+		"bartNode": func() nodeReader[any] { return (*bartNode[any])(nil) },
 		"fastNode": func() nodeReader[any] { return (*fastNode[any])(nil) },
 		"liteNode": func() nodeReader[any] { return (*liteNode[any])(nil) },
 	}
@@ -97,123 +126,101 @@ func TestUnifiedDumper_TypedNilHandling(t *testing.T) {
 func TestUnifiedDumper_TableTypes(t *testing.T) {
 	t.Parallel()
 
-	type tabler interface {
-		dump(io.Writer)
-		dumpString() string
-		String() string
-	}
-
 	pfxs := []netip.Prefix{
 		mpp("192.168.1.0/24"),
 		mpp("2001:db8::/32"),
 	}
 
-	testCases := []struct {
-		name      string
-		table     tabler
-		setupData func(tabler)
-	}{
-		{
-			name:  "Table",
-			table: &Table[struct{}]{},
-			setupData: func(tbl tabler) {
-				foo := tbl.(*Table[struct{}])
-				for _, pfx := range pfxs {
-					foo.Insert(pfx, struct{}{})
-				}
-			},
-		},
-		{
-			name:  "Fast",
-			table: &Fast[struct{}]{},
-			setupData: func(tbl tabler) {
-				foo := tbl.(*Fast[struct{}])
-				for _, pfx := range pfxs {
-					foo.Insert(pfx, struct{}{})
-				}
-			},
-		},
-		{
-			name:  "Lite",
-			table: &Lite{},
-			setupData: func(tbl tabler) {
-				foo := tbl.(*Lite)
-				for _, pfx := range pfxs {
-					foo.Insert(pfx)
-				}
-			},
-		},
-	}
+	for name, builder := range tables {
+		t.Run(name+"_EmptyTableString", func(t *testing.T) {
+			t.Parallel()
 
-	for _, tc := range testCases {
-		t.Run(tc.name+"_EmptyTableString", func(t *testing.T) {
-			output := tc.table.String()
+			tbl := builder()
+			output := tbl.String()
 			if output != "" {
-				t.Errorf("Expected empty string for empty %s table, got: %s", tc.name, output)
+				t.Errorf("Expected empty string for empty %s table, got: %s", name, output)
 			}
 		})
 
-		t.Run(tc.name+"_WithDataString", func(t *testing.T) {
-			tc.setupData(tc.table)
+		t.Run(name+"_WithDataString", func(t *testing.T) {
+			t.Parallel()
 
-			output := tc.table.String()
+			tbl := builder()
+			insertAll(tbl, pfxs)
+
+			output := tbl.String()
 			if !strings.Contains(output, pfxs[0].String()) || !strings.Contains(output, pfxs[1].String()) {
-				t.Errorf("Expected %s table output to contain inserted routes, got: %s", tc.name, output)
+				t.Errorf("Expected %s table output to contain inserted routes, got: %s", name, output)
 			}
 		})
 
-		t.Run(tc.name+"_EmptyTableDump", func(t *testing.T) {
+		t.Run(name+"_EmptyTableDump", func(t *testing.T) {
+			t.Parallel()
+
+			tbl := builder()
+
 			defer func() {
 				if r := recover(); r != nil {
-					t.Errorf("%s table dump panicked: %v", tc.name, r)
+					t.Errorf("%s table dump panicked: %v", name, r)
 				}
 			}()
 
 			var buf strings.Builder
-			tc.table.dump(&buf)
+			tbl.dump(&buf)
 		})
 
-		t.Run(tc.name+"_WithDataDump", func(t *testing.T) {
-			tc.setupData(tc.table)
+		t.Run(name+"_WithDataDump", func(t *testing.T) {
+			t.Parallel()
 
 			defer func() {
 				if r := recover(); r != nil {
-					t.Errorf("%s table dump panicked: %v", tc.name, r)
+					t.Errorf("%s table dump panicked: %v", name, r)
 				}
 			}()
 
+			tbl := builder()
+			insertAll(tbl, pfxs)
+
 			var buf strings.Builder
-			tc.table.dump(&buf)
+			tbl.dump(&buf)
 		})
 
-		t.Run(tc.name+"_EmptyTableDumpString", func(t *testing.T) {
+		t.Run(name+"_EmptyTableDumpString", func(t *testing.T) {
+			t.Parallel()
+
 			defer func() {
 				if r := recover(); r != nil {
-					t.Errorf("%s table dump panicked: %v", tc.name, r)
+					t.Errorf("%s table dump panicked: %v", name, r)
 				}
 			}()
 
-			_ = tc.table.dumpString()
+			tbl := builder()
+			_ = tbl.dumpString()
 		})
 
-		t.Run(tc.name+"_IPv4AndIPv6Headers", func(t *testing.T) {
-			tc.setupData(tc.table)
+		t.Run(name+"_IPv4AndIPv6Headers", func(t *testing.T) {
+			t.Parallel()
+
+			tbl := builder()
+			insertAll(tbl, pfxs)
 
 			var buf strings.Builder
-			tc.table.dump(&buf)
+			tbl.dump(&buf)
 
 			out := buf.String()
 			if !strings.Contains(out, "### IPv4: size(1)") {
-				t.Fatalf("%s table dump, missing IPv4 header: %q", tc.name, out)
+				t.Fatalf("%s table dump, missing IPv4 header: %q", name, out)
 			}
 			if !strings.Contains(out, "### IPv6: size(1)") {
-				t.Fatalf("%s table dump, missing IPv6 header: %q", tc.name, out)
+				t.Fatalf("%s table dump, missing IPv6 header: %q", name, out)
 			}
 		})
 	}
 }
 
 func TestUnifiedDumper_DefaultRouteV4(t *testing.T) {
+	t.Parallel()
+
 	pfxs := []netip.Prefix{
 		mpp("0.0.0.0/0"),
 	}
@@ -224,61 +231,23 @@ func TestUnifiedDumper_DefaultRouteV4(t *testing.T) {
 indexs(#1): [1]
 prefxs(#1): 0.0.0.0/0
 `
-	type zeroT = struct{}
-	var zero zeroT
+	for name, builder := range tables {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 
-	type tabler[V zeroT] interface {
-		Insert(netip.Prefix, V)
-		dump(io.Writer)
-	}
+			tbl := builder()
+			insertAll(tbl, pfxs)
 
-	type testCase[V zeroT] struct {
-		name      string
-		table     tabler[V]
-		setupData func(tabler[V])
-	}
-
-	testCases := []testCase[zeroT]{
-		{
-			name:  "Table",
-			table: &Table[zeroT]{},
-			setupData: func(tbl tabler[zeroT]) {
-				for _, pfx := range pfxs {
-					tbl.Insert(pfx, zero)
-				}
-			},
-		},
-		{
-			name:  "Fast",
-			table: &Fast[zeroT]{},
-			setupData: func(tbl tabler[zeroT]) {
-				for _, pfx := range pfxs {
-					tbl.Insert(pfx, zero)
-				}
-			},
-		},
-		{
-			name:  "liteTable",
-			table: &liteTable[zeroT]{},
-			setupData: func(tbl tabler[zeroT]) {
-				for _, pfx := range pfxs {
-					tbl.Insert(pfx, zero)
-				}
-			},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			tc.setupData(tc.table)
-			if err := checkDump(tc.table, want); err != nil {
-				t.Errorf("%T table dump: %v", tc.table, err)
+			if err := checkDump(tbl, want); err != nil {
+				t.Errorf("%s table dump: %v", name, err)
 			}
 		})
 	}
 }
 
 func TestUnifiedDumper_DefaultRouteV6(t *testing.T) {
+	t.Parallel()
+
 	pfxs := []netip.Prefix{
 		mpp("::/0"),
 	}
@@ -289,61 +258,23 @@ func TestUnifiedDumper_DefaultRouteV6(t *testing.T) {
 indexs(#1): [1]
 prefxs(#1): ::/0
 `
-	type zeroT = struct{}
-	var zero zeroT
+	for name, builder := range tables {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 
-	type tabler[V zeroT] interface {
-		Insert(netip.Prefix, V)
-		dump(io.Writer)
-	}
+			tbl := builder()
+			insertAll(tbl, pfxs)
 
-	type testCase[V zeroT] struct {
-		name      string
-		table     tabler[V]
-		setupData func(tabler[V])
-	}
-
-	testCases := []testCase[zeroT]{
-		{
-			name:  "Table",
-			table: &Table[zeroT]{},
-			setupData: func(tbl tabler[zeroT]) {
-				for _, pfx := range pfxs {
-					tbl.Insert(pfx, zero)
-				}
-			},
-		},
-		{
-			name:  "Fast",
-			table: &Fast[zeroT]{},
-			setupData: func(tbl tabler[zeroT]) {
-				for _, pfx := range pfxs {
-					tbl.Insert(pfx, zero)
-				}
-			},
-		},
-		{
-			name:  "liteTable",
-			table: &liteTable[zeroT]{},
-			setupData: func(tbl tabler[zeroT]) {
-				for _, pfx := range pfxs {
-					tbl.Insert(pfx, zero)
-				}
-			},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			tc.setupData(tc.table)
-			if err := checkDump(tc.table, want); err != nil {
-				t.Errorf("%T table dump: %v", tc.table, err)
+			if err := checkDump(tbl, want); err != nil {
+				t.Errorf("%s table dump: %v", name, err)
 			}
 		})
 	}
 }
 
 func TestUnifiedDumper_SampleV4(t *testing.T) {
+	t.Parallel()
+
 	pfxs := []netip.Prefix{
 		mpp("172.16.0.0/12"),
 		mpp("10.0.0.0/24"),
@@ -390,61 +321,23 @@ childs(#3): 10 127 192
 ..fringe(#1): 1:{192.168.1.0/24}
 `
 
-	type zeroT = struct{}
-	var zero zeroT
+	for name, builder := range tables {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 
-	type tabler[V zeroT] interface {
-		Insert(netip.Prefix, V)
-		dump(io.Writer)
-	}
+			tbl := builder()
+			insertAll(tbl, pfxs)
 
-	type testCase[V zeroT] struct {
-		name      string
-		table     tabler[V]
-		setupData func(tabler[V])
-	}
-
-	testCases := []testCase[zeroT]{
-		{
-			name:  "Table",
-			table: &Table[zeroT]{},
-			setupData: func(tbl tabler[zeroT]) {
-				for _, pfx := range pfxs {
-					tbl.Insert(pfx, zero)
-				}
-			},
-		},
-		{
-			name:  "Fast",
-			table: &Fast[zeroT]{},
-			setupData: func(tbl tabler[zeroT]) {
-				for _, pfx := range pfxs {
-					tbl.Insert(pfx, zero)
-				}
-			},
-		},
-		{
-			name:  "liteTable",
-			table: &liteTable[zeroT]{},
-			setupData: func(tbl tabler[zeroT]) {
-				for _, pfx := range pfxs {
-					tbl.Insert(pfx, zero)
-				}
-			},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			tc.setupData(tc.table)
-			if err := checkDump(tc.table, want); err != nil {
-				t.Errorf("%T table dump: %v", tc.table, err)
+			if err := checkDump(tbl, want); err != nil {
+				t.Errorf("%s table dump: %v", name, err)
 			}
 		})
 	}
 }
 
 func TestUnifiedDumper_SampleV6(t *testing.T) {
+	t.Parallel()
+
 	pfxs := []netip.Prefix{
 		mpp("::/0"),
 		mpp("fe80::/10"),
@@ -461,60 +354,23 @@ octets(#2): [32 254]
 leaves(#2): 0x20:{2001:db8::/32} 0xfe:{fe80::/10}
 `
 
-	type zeroT = struct{}
-	var zero zeroT
+	for name, builder := range tables {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 
-	type tabler[V zeroT] interface {
-		Insert(netip.Prefix, V)
-		dump(io.Writer)
-	}
+			tbl := builder()
+			insertAll(tbl, pfxs)
 
-	type testCase[V zeroT] struct {
-		name      string
-		table     tabler[V]
-		setupData func(tabler[V])
-	}
-
-	testCases := []testCase[zeroT]{
-		{
-			name:  "Table",
-			table: &Table[zeroT]{},
-			setupData: func(tbl tabler[zeroT]) {
-				for _, pfx := range pfxs {
-					tbl.Insert(pfx, zero)
-				}
-			},
-		},
-		{
-			name:  "Fast",
-			table: &Fast[zeroT]{},
-			setupData: func(tbl tabler[zeroT]) {
-				for _, pfx := range pfxs {
-					tbl.Insert(pfx, zero)
-				}
-			},
-		},
-		{
-			name:  "liteTable",
-			table: &liteTable[zeroT]{},
-			setupData: func(tbl tabler[zeroT]) {
-				for _, pfx := range pfxs {
-					tbl.Insert(pfx, zero)
-				}
-			},
-		},
-	}
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			tc.setupData(tc.table)
-			if err := checkDump(tc.table, want); err != nil {
-				t.Errorf("%T table dump: %v", tc.table, err)
+			if err := checkDump(tbl, want); err != nil {
+				t.Errorf("%s table dump: %v", name, err)
 			}
 		})
 	}
 }
 
 func TestUnifiedDumper_Sample(t *testing.T) {
+	t.Parallel()
+
 	pfxs := []netip.Prefix{
 		mpp("fe80::/10"),
 		mpp("172.16.0.0/12"),
@@ -572,54 +428,15 @@ octets(#2): [32 254]
 leaves(#2): 0x20:{2001:db8::/32} 0xfe:{fe80::/10}
 `
 
-	type zeroT = struct{}
-	var zero zeroT
+	for name, builder := range tables {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 
-	type tabler[V zeroT] interface {
-		Insert(netip.Prefix, V)
-		dump(io.Writer)
-	}
+			tbl := builder()
+			insertAll(tbl, pfxs)
 
-	type testCase[V zeroT] struct {
-		name      string
-		table     tabler[V]
-		setupData func(tabler[V])
-	}
-
-	testCases := []testCase[zeroT]{
-		{
-			name:  "Table",
-			table: &Table[zeroT]{},
-			setupData: func(tbl tabler[zeroT]) {
-				for _, pfx := range pfxs {
-					tbl.Insert(pfx, zero)
-				}
-			},
-		},
-		{
-			name:  "Fast",
-			table: &Fast[zeroT]{},
-			setupData: func(tbl tabler[zeroT]) {
-				for _, pfx := range pfxs {
-					tbl.Insert(pfx, zero)
-				}
-			},
-		},
-		{
-			name:  "liteTable",
-			table: &liteTable[zeroT]{},
-			setupData: func(tbl tabler[zeroT]) {
-				for _, pfx := range pfxs {
-					tbl.Insert(pfx, zero)
-				}
-			},
-		},
-	}
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			tc.setupData(tc.table)
-			if err := checkDump(tc.table, want); err != nil {
-				t.Errorf("%T table dump: %v", tc.table, err)
+			if err := checkDump(tbl, want); err != nil {
+				t.Errorf("%s table dump: %v", name, err)
 			}
 		})
 	}
