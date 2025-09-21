@@ -166,8 +166,9 @@ func (n *bartNode[V]) overlapsChildrenIn(o *bartNode[V]) bool {
 	doRange := childCount < magicNumber || pfxCount > magicNumber
 
 	// do range over, not so many children and maybe too many prefixes for other algo below
+	var buf [256]uint8
 	if doRange {
-		for _, addr := range o.children.AsSlice(&[256]uint8{}) {
+		for _, addr := range o.children.AsSlice(&buf) {
 			if n.contains(art.OctetToIdx(addr)) {
 				return true
 			}
@@ -180,7 +181,7 @@ func (n *bartNode[V]) overlapsChildrenIn(o *bartNode[V]) bool {
 	// build the alloted routing table from them
 
 	// use allot table with prefixes as bitsets, bitsets are precalculated.
-	for _, idx := range n.prefixes.AsSlice(&[256]uint8{}) {
+	for _, idx := range n.prefixes.AsSlice(&buf) {
 		if o.children.Intersects(&allot.FringeRoutesLookupTbl[idx]) {
 			return true
 		}

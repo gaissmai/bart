@@ -92,7 +92,8 @@ func (n *fastNode[V]) mustGetChild(addr uint8) any {
 // getChildAddrs returns a slice containing all addresses that have child nodes.
 // The addresses are returned in ascending order.
 func (n *fastNode[V]) getChildAddrs() []uint8 {
-	return n.children.AsSlice(&[256]uint8{})
+	var buf [256]uint8
+	return n.children.AsSlice(&buf)
 }
 
 // allChildren returns an iterator over all child nodes.
@@ -101,7 +102,8 @@ func (n *fastNode[V]) getChildAddrs() []uint8 {
 //nolint:unused // used via nodeReader interface
 func (n *fastNode[V]) allChildren() iter.Seq2[uint8, any] {
 	return func(yield func(addr uint8, child any) bool) {
-		for _, addr := range n.children.AsSlice(&[256]uint8{}) {
+		var buf [256]uint8
+		for _, addr := range n.children.AsSlice(&buf) {
 			child := *n.children.items[addr]
 			if !yield(addr, child) {
 				return
@@ -195,7 +197,8 @@ func (n *fastNode[V]) getPrefixesBitSet() *bitset.BitSet256 {
 // getIndices returns a slice containing all prefix indices that have values stored.
 // The indices are returned in ascending order.
 func (n *fastNode[V]) getIndices() []uint8 {
-	return n.prefixes.AsSlice(&[256]uint8{})
+	var buf [256]uint8
+	return n.prefixes.AsSlice(&buf)
 }
 
 // allIndices returns an iterator over all prefix entries.
@@ -204,7 +207,8 @@ func (n *fastNode[V]) getIndices() []uint8 {
 //nolint:unused // used via nodeReader interface
 func (n *fastNode[V]) allIndices() iter.Seq2[uint8, V] {
 	return func(yield func(uint8, V) bool) {
-		for _, idx := range n.prefixes.AsSlice(&[256]uint8{}) {
+		var buf [256]uint8
+		for _, idx := range n.prefixes.AsSlice(&buf) {
 			val := n.mustGetPrefix(idx)
 			if !yield(idx, val) {
 				return
@@ -333,7 +337,7 @@ func (n *fastNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists 
 
 	// find the proper trie node to insert prefix
 	// start with prefix octet at depth
-	for depth := depth; depth < len(octets); depth++ {
+	for ; depth < len(octets); depth++ {
 		octet := octets[depth]
 
 		// last masked octet: insert/override prefix/val into node
