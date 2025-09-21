@@ -32,7 +32,7 @@ for nodeType in "${NODE_TYPES[@]}"; do
     
     if [[ -f "${output_file}" ]]; then
         echo "✓ Generated ${output_file}"
-				generated_files+=("$output_file")
+        generated_files+=("$output_file")
     else
         echo "✗ Failed to generate ${output_file}" >&2
         exit 1
