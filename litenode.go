@@ -125,10 +125,12 @@ func (n *liteNode[V]) getIndices() []uint8 {
 	return n.prefixes.AsSlice(&[256]uint8{})
 }
 
+//nolint:unused
 func (n *liteNode[V]) getChildrenBitSet() *bitset.BitSet256 {
 	return &n.children.BitSet256
 }
 
+//nolint:unused
 func (n *liteNode[V]) getPrefixesBitSet() *bitset.BitSet256 {
 	return &n.prefixes
 }

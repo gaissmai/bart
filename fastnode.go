@@ -114,20 +114,21 @@ func (n *fastNode[V]) allChildren() iter.Seq2[uint8, any] {
 // Returns true if a child already existed at addr (overwrite case),
 // false if this is a new insertion.
 func (n *fastNode[V]) insertChild(addr uint8, child any) (exists bool) {
-	if n.children.items[addr] == nil {
-		exists = false
-		n.children.Set(addr)
-		n.cldCount++
-	} else {
-		exists = true
+	if p := n.children.items[addr]; p != nil {
+		// Reuse existing *any slot to cut allocations and GC churn
+		*p = child // overwrite
+		return true
 	}
 
-	// force clear ownership; taking &c makes it escape to heap so the pointer remains valid.
-	// This reduces per-slot memory for nil entries versus storing `any` directly.
-	c := child
-	n.children.items[addr] = &c
+	n.children.Set(addr)
+	n.cldCount++
 
-	return exists
+	// pointer to any reduces per-slot memory for nil entries versus storing `any` directly.
+	// force clear ownership; taking &c makes it escape to heap so the pointer remains valid.
+	c := child
+	n.children.items[addr] = &c // escape on first insert only
+
+	return false
 }
 
 // deleteChild removes the child node at the specified address.
@@ -186,10 +187,12 @@ func (n *fastNode[V]) mustGetPrefix(idx uint8) V {
 	return *n.prefixes.items[idx]
 }
 
+//nolint:unused
 func (n *fastNode[V]) getChildrenBitSet() *bitset.BitSet256 {
 	return &n.children.BitSet256
 }
 
+//nolint:unused
 func (n *fastNode[V]) getPrefixesBitSet() *bitset.BitSet256 {
 	return &n.prefixes.BitSet256
 }

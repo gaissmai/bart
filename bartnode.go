@@ -85,10 +85,12 @@ func (n *bartNode[V]) childCount() int {
 	return n.children.Len()
 }
 
+//nolint:unused
 func (n *bartNode[V]) getChildrenBitSet() *bitset.BitSet256 {
 	return &n.children.BitSet256
 }
 
+//nolint:unused
 func (n *bartNode[V]) getPrefixesBitSet() *bitset.BitSet256 {
 	return &n.prefixes.BitSet256
 }
