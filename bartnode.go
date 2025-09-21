@@ -103,7 +103,8 @@ func (n *bartNode[V]) getPrefix(idx uint8) (val V, exists bool) {
 //
 //nolint:unused // used via nodeReader interface
 func (n *bartNode[V]) getIndices() []uint8 {
-	return n.prefixes.AsSlice(&[256]uint8{})
+	var buf [256]uint8
+	return n.prefixes.AsSlice(&buf)
 }
 
 // allIndices returns an iterator over all prefix entries.
@@ -112,7 +113,8 @@ func (n *bartNode[V]) getIndices() []uint8 {
 //nolint:unused // used via nodeReader interface
 func (n *bartNode[V]) allIndices() iter.Seq2[uint8, V] {
 	return func(yield func(uint8, V) bool) {
-		for _, idx := range n.prefixes.AsSlice(&[256]uint8{}) {
+		var buf [256]uint8
+		for _, idx := range n.prefixes.AsSlice(&buf) {
 			val := n.mustGetPrefix(idx)
 			if !yield(idx, val) {
 				return
@@ -151,7 +153,8 @@ func (n *bartNode[V]) getChild(addr uint8) (any, bool) {
 //
 //nolint:unused // used via nodeReader interface
 func (n *bartNode[V]) getChildAddrs() []uint8 {
-	return n.children.AsSlice(&[256]uint8{})
+	var buf [256]uint8
+	return n.children.AsSlice(&buf)
 }
 
 // allChildren returns an iterator over all child nodes.
@@ -160,7 +163,8 @@ func (n *bartNode[V]) getChildAddrs() []uint8 {
 //nolint:unused // used via nodeReader interface
 func (n *bartNode[V]) allChildren() iter.Seq2[uint8, any] {
 	return func(yield func(addr uint8, child any) bool) {
-		addrs := n.children.AsSlice(&[256]uint8{})
+		var buf [256]uint8
+		addrs := n.children.AsSlice(&buf)
 		for i, addr := range addrs {
 			child := n.children.Items[i]
 			if !yield(addr, child) {
@@ -302,7 +306,7 @@ func (n *bartNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists 
 
 	// find the proper trie node to insert prefix
 	// start with prefix octet at depth
-	for depth := depth; depth < len(octets); depth++ {
+	for ; depth < len(octets); depth++ {
 		octet := octets[depth]
 
 		// last masked octet: insert/override prefix/val into node
@@ -506,7 +510,9 @@ func (n *bartNode[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxIdx uint
 	pfxFirstAddr, pfxLastAddr := art.IdxToRange(pfxIdx)
 
 	allCoveredIndices := make([]uint8, 0, maxItems)
-	for _, idx := range n.prefixes.AsSlice(&[256]uint8{}) {
+
+	var buf [256]uint8
+	for _, idx := range n.prefixes.AsSlice(&buf) {
 		thisFirstAddr, thisLastAddr := art.IdxToRange(idx)
 
 		if thisFirstAddr >= pfxFirstAddr && thisLastAddr <= pfxLastAddr {
@@ -520,7 +526,7 @@ func (n *bartNode[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxIdx uint
 	// 2. collect all covered child addrs by prefix
 
 	allCoveredChildAddrs := make([]uint8, 0, maxItems)
-	for _, addr := range n.children.AsSlice(&[256]uint8{}) {
+	for _, addr := range n.children.AsSlice(&buf) {
 		if addr >= pfxFirstAddr && addr <= pfxLastAddr {
 			allCoveredChildAddrs = append(allCoveredChildAddrs, addr)
 		}

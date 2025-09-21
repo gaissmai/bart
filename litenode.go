@@ -122,7 +122,8 @@ func (n *liteNode[V]) mustGetPrefix(idx uint8) (_ V) {
 //
 //nolint:unused // used via nodeReader interface
 func (n *liteNode[V]) getIndices() []uint8 {
-	return n.prefixes.AsSlice(&[256]uint8{})
+	var buf [256]uint8
+	return n.prefixes.AsSlice(&buf)
 }
 
 // allIndices returns an iterator over all prefix entries.
@@ -132,7 +133,8 @@ func (n *liteNode[V]) getIndices() []uint8 {
 func (n *liteNode[V]) allIndices() iter.Seq2[uint8, V] {
 	var zero V
 	return func(yield func(uint8, V) bool) {
-		for _, idx := range n.prefixes.AsSlice(&[256]uint8{}) {
+		var buf [256]uint8
+		for _, idx := range n.prefixes.AsSlice(&buf) {
 			if !yield(idx, zero) {
 				return
 			}
@@ -173,7 +175,8 @@ func (n *liteNode[V]) getChild(addr uint8) (any, bool) {
 //
 //nolint:unused // used via nodeReader interface
 func (n *liteNode[V]) getChildAddrs() []uint8 {
-	return n.children.AsSlice(&[256]uint8{})
+	var buf [256]uint8
+	return n.children.AsSlice(&buf)
 }
 
 // allChildren returns an iterator over all child nodes.
@@ -182,7 +185,8 @@ func (n *liteNode[V]) getChildAddrs() []uint8 {
 //nolint:unused // used via nodeReader interface
 func (n *liteNode[V]) allChildren() iter.Seq2[uint8, any] {
 	return func(yield func(addr uint8, child any) bool) {
-		addrs := n.children.AsSlice(&[256]uint8{})
+		var buf [256]uint8
+		addrs := n.children.AsSlice(&buf)
 		for i, addr := range addrs {
 			child := n.children.Items[i]
 			if !yield(addr, child) {
@@ -263,7 +267,7 @@ func (n *liteNode[V]) insertAtDepth(pfx netip.Prefix, depth int) (exists bool) {
 
 	// find the proper trie node to insert prefix
 	// start with prefix octet at depth
-	for depth := depth; depth < len(octets); depth++ {
+	for ; depth < len(octets); depth++ {
 		octet := octets[depth]
 		// last masked octet: insert/override prefix/val into node
 		if depth == lastOctetPlusOne {
