@@ -1225,21 +1225,21 @@ func (t *Table[V]) Size6() int {
 // use [Table.WalkPersist] instead.
 func (t *Table[V]) All() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
-		_ = allRec(&t.root4, stridePath{}, 0, true, yield) && allRec(&t.root6, stridePath{}, 0, false, yield)
+		_ = t.root4.allRec(stridePath{}, 0, true, yield) && t.root6.allRec(stridePath{}, 0, false, yield)
 	}
 }
 
 // All4 is like [Table.All] but only for the v4 routing table.
 func (t *Table[V]) All4() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
-		_ = allRec(&t.root4, stridePath{}, 0, true, yield)
+		_ = t.root4.allRec(stridePath{}, 0, true, yield)
 	}
 }
 
 // All6 is like [Table.All] but only for the v6 routing table.
 func (t *Table[V]) All6() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
-		_ = allRec(&t.root6, stridePath{}, 0, false, yield)
+		_ = t.root6.allRec(stridePath{}, 0, false, yield)
 	}
 }
 

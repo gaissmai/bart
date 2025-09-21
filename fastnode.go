@@ -188,11 +188,6 @@ func (n *fastNode[V]) mustGetPrefix(idx uint8) V {
 }
 
 //nolint:unused // used via nodeReader interface
-func (n *fastNode[V]) getChildrenBitSet() *bitset.BitSet256 {
-	return &n.children.BitSet256
-}
-
-//nolint:unused // used via nodeReader interface
 func (n *fastNode[V]) getPrefixesBitSet() *bitset.BitSet256 {
 	return &n.prefixes.BitSet256
 }

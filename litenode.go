@@ -125,16 +125,6 @@ func (n *liteNode[V]) getIndices() []uint8 {
 	return n.prefixes.AsSlice(&[256]uint8{})
 }
 
-//nolint:unused // used via nodeReader interface
-func (n *liteNode[V]) getChildrenBitSet() *bitset.BitSet256 {
-	return &n.children.BitSet256
-}
-
-//nolint:unused // used via nodeReader interface
-func (n *liteNode[V]) getPrefixesBitSet() *bitset.BitSet256 {
-	return &n.prefixes
-}
-
 // allIndices returns an iterator over all prefix entries.
 // Each iteration yields the prefix index (uint8) and its associated value (V).
 //
