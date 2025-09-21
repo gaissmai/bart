@@ -37,7 +37,7 @@ type liteNode struct {
  ```go
 type fastNode[V any] struct {
     prefixes [256]*V                // 2,048 bytes
-    children [256]*childRef         // 2,048 bytes
+    children [256]*childRef         // 2,048 bytes (8 B pointers to childRef)
     prefixesBitSet bitset.BitSet256 // 32 bytes
     childrenBitSet bitset.BitSet256 // 32 bytes
     pfxCount uint16                 // 2 bytes + padding
