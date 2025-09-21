@@ -21,8 +21,16 @@ import (
 //
 // See doc/artlookup.pdf for the mapping mechanics and prefix tree details.
 type fastNode[V any] struct {
-	prefixes [256]*V
-	children [256]*any // **fastNode or path-compressed **leaf- or **fringeNode
+	prefixes struct {
+		bitset.BitSet256
+		items [256]*V
+	}
+
+	children struct {
+		bitset.BitSet256
+		items [256]*any
+	}
+	// items: **fastNode or path-compressed **leaf- or **fringeNode
 	// an array of "pointers to" the empty interface,
 	// and not an array of empty interfaces.
 	//
@@ -32,9 +40,6 @@ type fastNode[V any] struct {
 	// Since many slots are nil, this reduces memory by 30%.
 	// The added indirection does not have a measurable performance impact,
 	// but makes the code uglier.
-
-	prefixesBitSet bitset.BitSet256 // for count and fast bitset operations
-	childrenBitSet bitset.BitSet256 // for count and fast bitset operations
 
 	// pfxCount is an O(1) counter tracking the number of prefixes in this node.
 	// This replaces expensive prefixesBitSet.Size() calls with direct counter access.
@@ -68,7 +73,7 @@ func (n *fastNode[V]) isEmpty() bool {
 // getChild returns the child node at the specified address and true if it exists.
 // If no child exists at addr, returns nil and false.
 func (n *fastNode[V]) getChild(addr uint8) (any, bool) {
-	if anyPtr := n.children[addr]; anyPtr != nil {
+	if anyPtr := n.children.items[addr]; anyPtr != nil {
 		return *anyPtr, true
 	}
 	return nil, false
@@ -81,13 +86,13 @@ func (n *fastNode[V]) getChild(addr uint8) (any, bool) {
 //nolint:unused
 func (n *fastNode[V]) mustGetChild(addr uint8) any {
 	// panics if n.children[addr] is nil
-	return *n.children[addr]
+	return *n.children.items[addr]
 }
 
 // getChildAddrs returns a slice containing all addresses that have child nodes.
 // The addresses are returned in ascending order.
 func (n *fastNode[V]) getChildAddrs() []uint8 {
-	return n.childrenBitSet.AsSlice(&[256]uint8{})
+	return n.children.AsSlice(&[256]uint8{})
 }
 
 // allChildren returns an iterator over all child nodes.
@@ -96,8 +101,8 @@ func (n *fastNode[V]) getChildAddrs() []uint8 {
 //nolint:unused
 func (n *fastNode[V]) allChildren() iter.Seq2[uint8, any] {
 	return func(yield func(addr uint8, child any) bool) {
-		for _, addr := range n.childrenBitSet.AsSlice(&[256]uint8{}) {
-			child := *n.children[addr]
+		for _, addr := range n.children.AsSlice(&[256]uint8{}) {
+			child := *n.children.items[addr]
 			if !yield(addr, child) {
 				return
 			}
@@ -109,9 +114,9 @@ func (n *fastNode[V]) allChildren() iter.Seq2[uint8, any] {
 // Returns true if a child already existed at addr (overwrite case),
 // false if this is a new insertion.
 func (n *fastNode[V]) insertChild(addr uint8, child any) (exists bool) {
-	if n.children[addr] == nil {
+	if n.children.items[addr] == nil {
 		exists = false
-		n.childrenBitSet.Set(addr)
+		n.children.Set(addr)
 		n.cldCount++
 	} else {
 		exists = true
@@ -120,7 +125,7 @@ func (n *fastNode[V]) insertChild(addr uint8, child any) (exists bool) {
 	// force clear ownership; taking &c makes it escape to heap so the pointer remains valid.
 	// This reduces per-slot memory for nil entries versus storing `any` directly.
 	c := child
-	n.children[addr] = &c
+	n.children.items[addr] = &c
 
 	return exists
 }
@@ -128,13 +133,13 @@ func (n *fastNode[V]) insertChild(addr uint8, child any) (exists bool) {
 // deleteChild removes the child node at the specified address.
 // This operation is idempotent - removing a non-existent child is safe.
 func (n *fastNode[V]) deleteChild(addr uint8) (exists bool) {
-	if n.children[addr] == nil {
+	if n.children.items[addr] == nil {
 		return false
 	}
 	n.cldCount--
 
-	n.childrenBitSet.Clear(addr)
-	n.children[addr] = nil
+	n.children.Clear(addr)
+	n.children.items[addr] = nil
 	return true
 }
 
@@ -142,8 +147,8 @@ func (n *fastNode[V]) deleteChild(addr uint8) (exists bool) {
 // It returns true if a prefix already existed at that index (indicating an update),
 // false if this is a new insertion.
 func (n *fastNode[V]) insertPrefix(idx uint8, val V) (exists bool) {
-	if exists = n.prefixesBitSet.Test(idx); !exists {
-		n.prefixesBitSet.Set(idx)
+	if exists = n.prefixes.Test(idx); !exists {
+		n.prefixes.Set(idx)
 		n.pfxCount++
 	}
 
@@ -155,7 +160,7 @@ func (n *fastNode[V]) insertPrefix(idx uint8, val V) (exists bool) {
 	valPtr := new(V)
 	*valPtr = val
 
-	oldValPtr := n.prefixes[idx]
+	oldValPtr := n.prefixes.items[idx]
 
 	// overwrite oldValPtr with valPtr
 	n.allot(idx, oldValPtr, valPtr)
@@ -166,8 +171,8 @@ func (n *fastNode[V]) insertPrefix(idx uint8, val V) (exists bool) {
 // getPrefix returns the value for the given prefix index and true if it exists.
 // If no prefix exists at idx, returns the zero value and false.
 func (n *fastNode[V]) getPrefix(idx uint8) (val V, exists bool) {
-	if exists = n.prefixesBitSet.Test(idx); exists {
-		val = *n.prefixes[idx]
+	if exists = n.prefixes.Test(idx); exists {
+		val = *n.prefixes.items[idx]
 	}
 	return
 }
@@ -178,13 +183,13 @@ func (n *fastNode[V]) getPrefix(idx uint8) (val V, exists bool) {
 //
 //nolint:unused
 func (n *fastNode[V]) mustGetPrefix(idx uint8) V {
-	return *n.prefixes[idx]
+	return *n.prefixes.items[idx]
 }
 
 // getIndices returns a slice containing all prefix indices that have values stored.
 // The indices are returned in ascending order.
 func (n *fastNode[V]) getIndices() []uint8 {
-	return n.prefixesBitSet.AsSlice(&[256]uint8{})
+	return n.prefixes.AsSlice(&[256]uint8{})
 }
 
 // allIndices returns an iterator over all prefix entries.
@@ -193,7 +198,7 @@ func (n *fastNode[V]) getIndices() []uint8 {
 //nolint:unused
 func (n *fastNode[V]) allIndices() iter.Seq2[uint8, V] {
 	return func(yield func(uint8, V) bool) {
-		for _, idx := range n.prefixesBitSet.AsSlice(&[256]uint8{}) {
+		for _, idx := range n.prefixes.AsSlice(&[256]uint8{}) {
 			val := n.mustGetPrefix(idx)
 			if !yield(idx, val) {
 				return
@@ -206,19 +211,19 @@ func (n *fastNode[V]) allIndices() iter.Seq2[uint8, V] {
 // Returns the removed value and true if the prefix existed,
 // or the zero value and false if no prefix was found at idx.
 func (n *fastNode[V]) deletePrefix(idx uint8) (val V, exists bool) {
-	if exists = n.prefixesBitSet.Test(idx); !exists {
+	if exists = n.prefixes.Test(idx); !exists {
 		// Route entry doesn't exist
 		return
 	}
 	n.pfxCount--
 
-	valPtr := n.prefixes[idx]
-	parentValPtr := n.prefixes[idx>>1]
+	valPtr := n.prefixes.items[idx]
+	parentValPtr := n.prefixes.items[idx>>1]
 
 	// delete -> overwrite valPtr with parentValPtr
 	n.allot(idx, valPtr, parentValPtr)
 
-	n.prefixesBitSet.Clear(idx)
+	n.prefixes.Clear(idx)
 	return *valPtr, true
 }
 
@@ -230,7 +235,7 @@ func (n *fastNode[V]) deletePrefix(idx uint8) (val V, exists bool) {
 // exists for the given index by probing the slot at idx (children inherit
 // ancestor pointers via allot).
 func (n *fastNode[V]) contains(idx uint8) (ok bool) {
-	return n.prefixes[idx] != nil
+	return n.prefixes.items[idx] != nil
 }
 
 // lookup performs a longest-prefix match (LPM) lookup for the given index
@@ -241,7 +246,7 @@ func (n *fastNode[V]) contains(idx uint8) (ok bool) {
 // algorithm's hierarchical structure to find the most specific
 // matching prefix.
 func (n *fastNode[V]) lookup(idx uint8) (val V, ok bool) {
-	if valPtr := n.prefixes[idx]; valPtr != nil {
+	if valPtr := n.prefixes.items[idx]; valPtr != nil {
 		return *valPtr, true
 	}
 	return
@@ -256,8 +261,8 @@ func (n *fastNode[V]) lookup(idx uint8) (val V, ok bool) {
 // Its semantics are identical to [node.lookupIdx].
 func (n *fastNode[V]) lookupIdx(idx uint8) (baseIdx uint8, val V, ok bool) {
 	// top is the idx of the longest-prefix-match
-	if top, ok := n.prefixesBitSet.IntersectionTop(&lpm.LookupTbl[idx]); ok {
-		return top, *n.prefixes[top], true
+	if top, ok := n.prefixes.IntersectionTop(&lpm.LookupTbl[idx]); ok {
+		return top, *n.prefixes.items[top], true
 	}
 	return
 }
@@ -290,12 +295,12 @@ func (n *fastNode[V]) allot(idx uint8, oldValPtr, valPtr *V) {
 		idx = stack[i]
 
 		// stop this allot path, idx already points to a more specific route.
-		if n.prefixes[idx] != oldValPtr {
+		if n.prefixes.items[idx] != oldValPtr {
 			continue // take next path from stack
 		}
 
 		// overwrite
-		n.prefixes[idx] = valPtr
+		n.prefixes.items[idx] = valPtr
 
 		// max idx is 255, so stop the duplication at 128 and above
 		if idx >= 128 {
@@ -416,8 +421,8 @@ func (n *fastNode[V]) purgeAndCompress(stack []*fastNode[V], octets []uint8, is4
 			parent.deleteChild(octet)
 
 		case pfxCount == 0 && childCount == 1:
-			addr, _ := n.childrenBitSet.FirstSet() // single child must be first child
-			kidAny := *n.children[addr]
+			addr, _ := n.children.FirstSet() // single child must be first child
+			kidAny := *n.children.items[addr]
 
 			switch kid := kidAny.(type) {
 			case *fastNode[V]:
@@ -447,8 +452,8 @@ func (n *fastNode[V]) purgeAndCompress(stack []*fastNode[V], octets []uint8, is4
 			parent.deleteChild(octet)
 
 			// get prefix/val back from idx ...
-			idx, _ := n.prefixesBitSet.FirstSet() // single idx must be first bit set
-			val := *n.prefixes[idx]
+			idx, _ := n.prefixes.FirstSet() // single idx must be first bit set
+			val := *n.prefixes.items[idx]
 
 			// ... and octet path
 			path := stridePath{}
