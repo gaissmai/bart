@@ -10,6 +10,7 @@ import (
 	"slices"
 
 	"github.com/gaissmai/bart/internal/art"
+	"github.com/gaissmai/bart/internal/bitset"
 	"github.com/gaissmai/bart/internal/lpm"
 	"github.com/gaissmai/bart/internal/sparse"
 )
@@ -82,6 +83,14 @@ func (n *bartNode[V]) prefixCount() int {
 // childCount returns the number of slots used in this node.
 func (n *bartNode[V]) childCount() int {
 	return n.children.Len()
+}
+
+func (n *bartNode[V]) getChildrenBitSet() *bitset.BitSet256 {
+	return &n.children.BitSet256
+}
+
+func (n *bartNode[V]) getPrefixesBitSet() *bitset.BitSet256 {
+	return &n.prefixes.BitSet256
 }
 
 // insertPrefix adds a routing entry at the specified index with the given value.

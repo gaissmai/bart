@@ -772,21 +772,21 @@ func (f *Fast[V]) Size6() int {
 // use [Fast.WalkPersist] instead.
 func (f *Fast[V]) All() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
-		_ = f.root4.allRec(stridePath{}, 0, true, yield) && f.root6.allRec(stridePath{}, 0, false, yield)
+		_ = allRec(&f.root4, stridePath{}, 0, true, yield) && allRec(&f.root6, stridePath{}, 0, false, yield)
 	}
 }
 
 // All4 is like [Fast.All] but only for the v4 routing table.
 func (f *Fast[V]) All4() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
-		_ = f.root4.allRec(stridePath{}, 0, true, yield)
+		_ = allRec(&f.root4, stridePath{}, 0, true, yield)
 	}
 }
 
 // All6 is like [Fast.All] but only for the v6 routing table.
 func (f *Fast[V]) All6() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
-		_ = f.root6.allRec(stridePath{}, 0, false, yield)
+		_ = allRec(&f.root6, stridePath{}, 0, false, yield)
 	}
 }
 

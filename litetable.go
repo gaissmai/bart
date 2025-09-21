@@ -740,21 +740,21 @@ func (l *liteTable[V]) Equal(o *liteTable[V]) bool {
 // use [Lite.WalkPersist] instead.
 func (l *liteTable[V]) All() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
-		_ = l.root4.allRec(stridePath{}, 0, true, yield) && l.root6.allRec(stridePath{}, 0, false, yield)
+		_ = allRec(&l.root4, stridePath{}, 0, true, yield) && allRec(&l.root6, stridePath{}, 0, false, yield)
 	}
 }
 
 // All4 is like [Lite.All] but only for the v4 routing table.
 func (l *liteTable[V]) All4() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
-		_ = l.root4.allRec(stridePath{}, 0, true, yield)
+		_ = allRec(&l.root4, stridePath{}, 0, true, yield)
 	}
 }
 
 // All6 is like [Lite.All] but only for the v6 routing table.
 func (l *liteTable[V]) All6() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
-		_ = l.root6.allRec(stridePath{}, 0, false, yield)
+		_ = allRec(&l.root6, stridePath{}, 0, false, yield)
 	}
 }
 

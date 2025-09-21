@@ -19,8 +19,10 @@ package bart
 //
 // Returns the number of duplicate prefixes that were overwritten during merging.
 func (n *bartNode[V]) unionRec(cloneFn cloneFunc[V], o *bartNode[V], depth int) (duplicates int) {
+	buf := [256]uint8{}
+
 	// for all prefixes in other node do ...
-	for i, oIdx := range o.prefixes.AsSlice(&[256]uint8{}) {
+	for i, oIdx := range o.prefixes.AsSlice(&buf) {
 		// clone/copy the value from other node at idx
 		clonedVal := cloneFn(o.prefixes.Items[i])
 
@@ -32,7 +34,7 @@ func (n *bartNode[V]) unionRec(cloneFn cloneFunc[V], o *bartNode[V], depth int) 
 	}
 
 	// for all child addrs in other node do ...
-	for i, addr := range o.children.AsSlice(&[256]uint8{}) {
+	for i, addr := range o.children.AsSlice(&buf) {
 		//  12 possible combinations to union this child and other child
 		//
 		//  THIS,   OTHER: (always clone the other kid!)
@@ -206,8 +208,10 @@ func (n *bartNode[V]) unionRec(cloneFn cloneFunc[V], o *bartNode[V], depth int) 
 
 // unionRecPersist is similar to unionRec but performs an immutable union of nodes.
 func (n *bartNode[V]) unionRecPersist(cloneFn cloneFunc[V], o *bartNode[V], depth int) (duplicates int) {
+	buf := [256]uint8{}
+
 	// for all prefixes in other node do ...
-	for i, oIdx := range o.prefixes.AsSlice(&[256]uint8{}) {
+	for i, oIdx := range o.prefixes.AsSlice(&buf) {
 		// clone/copy the value from other node
 		clonedVal := cloneFn(o.prefixes.Items[i])
 
@@ -219,7 +223,7 @@ func (n *bartNode[V]) unionRecPersist(cloneFn cloneFunc[V], o *bartNode[V], dept
 	}
 
 	// for all child addrs in other node do ...
-	for i, addr := range o.children.AsSlice(&[256]uint8{}) {
+	for i, addr := range o.children.AsSlice(&buf) {
 		//  12 possible combinations to union this child and other child
 		//
 		//  THIS,   OTHER: (always clone the other kid!)

@@ -3,7 +3,11 @@
 
 package bart
 
-import "iter"
+import (
+	"iter"
+
+	"github.com/gaissmai/bart/internal/bitset"
+)
 
 // compile time check
 var (
@@ -43,6 +47,9 @@ type nodeReader[V any] interface {
 
 	getChildAddrs() []uint8
 	getIndices() []uint8
+
+	getChildrenBitSet() *bitset.BitSet256
+	getPrefixesBitSet() *bitset.BitSet256
 
 	allChildren() iter.Seq2[uint8, any]
 	allIndices() iter.Seq2[uint8, V]

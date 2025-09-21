@@ -1,6 +1,7 @@
 package bart
 
 import (
+	"fmt"
 	"net/netip"
 	"slices"
 
@@ -21,8 +22,10 @@ import (
 //
 // The traversal order is not defined. This implementation favors simplicity
 // and runtime efficiency over consistency of iteration sequence.
-func (n *bartNode[V]) allRec(path stridePath, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
-	for _, idx := range n.prefixes.AsSlice(&[256]uint8{}) {
+func allRec[N nodeReader[V], V any](n N, path stridePath, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
+	buf := [256]uint8{}
+
+	for _, idx := range n.getPrefixesBitSet().AsSlice(&buf) {
 		cidr := cidrFromPath(path, depth, is4, idx)
 		val := n.mustGetPrefix(idx)
 
@@ -34,13 +37,13 @@ func (n *bartNode[V]) allRec(path stridePath, depth int, is4 bool, yield func(ne
 	}
 
 	// for all children (nodes and leaves) in this node do ...
-	for _, addr := range n.children.AsSlice(&[256]uint8{}) {
+	for _, addr := range n.getChildrenBitSet().AsSlice(&buf) {
 		anyKid := n.mustGetChild(addr)
 		switch kid := anyKid.(type) {
-		case *bartNode[V]:
+		case N:
 			// rec-descent with this node
 			path[depth] = addr
-			if !kid.allRec(path, depth+1, is4, yield) {
+			if !allRec(kid, path, depth+1, is4, yield) {
 				// early exit
 				return false
 			}
@@ -59,97 +62,7 @@ func (n *bartNode[V]) allRec(path stridePath, depth int, is4 bool, yield func(ne
 			}
 
 		default:
-			panic("logic error, wrong node type")
-		}
-	}
-
-	return true
-}
-
-func (n *liteNode[V]) allRec(path stridePath, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
-	for _, idx := range n.prefixes.AsSlice(&[256]uint8{}) {
-		cidr := cidrFromPath(path, depth, is4, idx)
-		val := n.mustGetPrefix(idx)
-
-		// callback for this prefix and val
-		if !yield(cidr, val) {
-			// early exit
-			return false
-		}
-	}
-
-	// for all children (nodes and leaves) in this node do ...
-	for _, addr := range n.children.AsSlice(&[256]uint8{}) {
-		anyKid := n.mustGetChild(addr)
-		switch kid := anyKid.(type) {
-		case *liteNode[V]:
-			// rec-descent with this node
-			path[depth] = addr
-			if !kid.allRec(path, depth+1, is4, yield) {
-				// early exit
-				return false
-			}
-		case *leafNode[V]:
-			// callback for this leaf
-			if !yield(kid.prefix, kid.value) {
-				// early exit
-				return false
-			}
-		case *fringeNode[V]:
-			fringePfx := cidrForFringe(path[:], depth, is4, addr)
-			// callback for this fringe
-			if !yield(fringePfx, kid.value) {
-				// early exit
-				return false
-			}
-
-		default:
-			panic("logic error, wrong node type")
-		}
-	}
-
-	return true
-}
-
-func (n *fastNode[V]) allRec(path stridePath, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
-	for _, idx := range n.prefixes.AsSlice(&[256]uint8{}) {
-		cidr := cidrFromPath(path, depth, is4, idx)
-		val := n.mustGetPrefix(idx)
-
-		// callback for this prefix and val
-		if !yield(cidr, val) {
-			// early exit
-			return false
-		}
-	}
-
-	// for all children (nodes and leaves) in this node do ...
-	for _, addr := range n.children.AsSlice(&[256]uint8{}) {
-		anyKid := n.mustGetChild(addr)
-		switch kid := anyKid.(type) {
-		case *fastNode[V]:
-			// rec-descent with this node
-			path[depth] = addr
-			if !kid.allRec(path, depth+1, is4, yield) {
-				// early exit
-				return false
-			}
-		case *leafNode[V]:
-			// callback for this leaf
-			if !yield(kid.prefix, kid.value) {
-				// early exit
-				return false
-			}
-		case *fringeNode[V]:
-			fringePfx := cidrForFringe(path[:], depth, is4, addr)
-			// callback for this fringe
-			if !yield(fringePfx, kid.value) {
-				// early exit
-				return false
-			}
-
-		default:
-			panic("logic error, wrong node type")
+			panic(fmt.Errorf("logic error, wrong node type: %T", kid))
 		}
 	}
 
