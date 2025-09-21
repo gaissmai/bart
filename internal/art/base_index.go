@@ -68,7 +68,7 @@ func IdxToPfx(idx uint8) (octet, pfxLen uint8) {
 	// Shift the masked prefix bits back to their original position.
 	octet = (idx & mask) << shiftBits
 
-	return
+	return octet, pfxLen
 }
 
 // PfxBits returns the bit position of a prefix represented by a base index at a given trie depth.
@@ -120,7 +120,7 @@ func IdxToRange(idx uint8) (first, last uint8) {
 	// This gives the maximum octet value that still matches the prefix.
 	last = first | ^NetMask(pfxLen)
 
-	return
+	return first, last
 }
 
 // NetMask returns an 8-bit left-aligned network mask for the given number of prefix bits.
