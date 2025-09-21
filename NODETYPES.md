@@ -36,14 +36,19 @@ type liteNode struct {
 ### fastNode[V] - Fixed Array Node
  ```go
 type fastNode[V any] struct {
-    prefixes [256]*V                // 2,048 bytes
-    children [256]*childRef         // 2,048 bytes (8 B pointers to childRef)
-    prefixesBitSet bitset.BitSet256 // 32 bytes
-    childrenBitSet bitset.BitSet256 // 32 bytes
-    pfxCount uint16                 // 2 bytes + padding
+    prefixes struct {
+        bitset.BitSet256
+        items [256]*V
+    }                                // 2,048 + 32 bytes BitSet256
+    children struct {
+        bitset.BitSet256
+        items [256]*any              // pointer-to-interface for 8‑byte nils
+    }                                // 2,048 + 32 bytes BitSet256
+    pfxCount uint16
+    cldCount uint16                  // + padding
  }
  ```
-**Memory Usage:** **4,160 bytes** (fixed, regardless of occupancy)
+**Memory Usage:** **4,168 bytes** (fixed, regardless of occupancy)
  
 ## Real-World Example
 **Scenario:** Node with 10 prefixes, 5 children
@@ -52,7 +57,7 @@ type fastNode[V any] struct {
  |-----------|------|----------|----------|-----------|------------------|
  | liteNode | 96 | 0 | 5×16=80 | 176 bytes | **17** |
  | bartNode[int] | 112 | 10×8=80 | 5×16=80 | 272 bytes | **27** |
- | fastNode[int] | 4,160 | 0 | 0 | 4,160 bytes | **416** |
+ | fastNode[int] | 4,168 | 0 | 0 | 4,160 bytes | **417** |
  
 ¹ Values assume childRef = 16 bytes and pointer to payload = 8 bytes
  

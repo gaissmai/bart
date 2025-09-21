@@ -115,11 +115,11 @@ func (n *fastNode[V]) equalRec(o *fastNode[V]) bool {
 		return true
 	}
 
-	if n.prefixesBitSet != o.prefixesBitSet {
+	if n.prefixes.BitSet256 != o.prefixes.BitSet256 {
 		return false
 	}
 
-	if n.childrenBitSet != o.childrenBitSet {
+	if n.children.BitSet256 != o.children.BitSet256 {
 		return false
 	}
 
