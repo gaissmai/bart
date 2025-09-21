@@ -266,7 +266,7 @@ func (f *Fast[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del 
 // Its semantics are identical to [Table.Delete].
 func (f *Fast[V]) Delete(pfx netip.Prefix) (val V, exists bool) {
 	if !pfx.IsValid() {
-		return
+		return val, exists
 	}
 
 	// canonicalize prefix
@@ -305,7 +305,7 @@ func (f *Fast[V]) Delete(pfx netip.Prefix) (val V, exists bool) {
 
 		kidAny, ok := n.getChild(octet)
 		if !ok {
-			return
+			return val, exists
 		}
 
 		// kid is node or leaf or fringe at octet
@@ -316,7 +316,7 @@ func (f *Fast[V]) Delete(pfx netip.Prefix) (val V, exists bool) {
 		case *fringeNode[V]:
 			// if pfx is no fringe at this depth, fast exit
 			if !isFringe(depth, pfx) {
-				return
+				return val, exists
 			}
 
 			// pfx is fringe at depth, delete fringe
@@ -330,7 +330,7 @@ func (f *Fast[V]) Delete(pfx netip.Prefix) (val V, exists bool) {
 		case *leafNode[V]:
 			// Attention: pfx must be masked to be comparable!
 			if kid.prefix != pfx {
-				return
+				return val, exists
 			}
 
 			// prefix is equal leaf, delete leaf
@@ -346,7 +346,7 @@ func (f *Fast[V]) Delete(pfx netip.Prefix) (val V, exists bool) {
 		}
 	}
 
-	return
+	return val, exists
 }
 
 // Get retrieves the value associated with an exact prefix match.
@@ -361,7 +361,7 @@ func (f *Fast[V]) Delete(pfx netip.Prefix) (val V, exists bool) {
 // Its semantics are identical to [Table.Get].
 func (f *Fast[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 	if !pfx.IsValid() {
-		return
+		return val, ok
 	}
 
 	// canonicalize the prefix
@@ -383,7 +383,7 @@ func (f *Fast[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 
 		kidAny, exists := n.getChild(octet)
 		if !exists {
-			return
+			return val, ok
 		}
 
 		// kid is node or leaf or fringe at octet
@@ -396,14 +396,14 @@ func (f *Fast[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 			if isFringe(depth, pfx) {
 				return kid.value, true
 			}
-			return
+			return val, ok
 
 		case *leafNode[V]:
 			// reached a path compressed prefix, stop traversing
 			if kid.prefix == pfx {
 				return kid.value, true
 			}
-			return
+			return val, ok
 
 		default:
 			panic("logic error, wrong node type")
@@ -469,7 +469,7 @@ func (f *Fast[V]) Contains(ip netip.Addr) bool {
 // Its semantics are identical to [Table.Lookup].
 func (f *Fast[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	if !ip.IsValid() {
-		return
+		return val, ok
 	}
 
 	is4 := ip.Is4()
@@ -535,7 +535,7 @@ func (f *Fast[V]) LookupPrefixLPM(pfx netip.Prefix) (lpmPfx netip.Prefix, val V,
 
 func (f *Fast[V]) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpmPfx netip.Prefix, val V, ok bool) {
 	if !pfx.IsValid() {
-		return
+		return lpmPfx, val, ok
 	}
 
 	// canonicalize the prefix
@@ -652,7 +652,7 @@ LOOP:
 		// continue rewinding the stack
 	}
 
-	return
+	return lpmPfx, val, ok
 }
 
 // Clone creates a deep copy of the routing table, including all prefixes and values.

@@ -166,7 +166,7 @@ func (n *fastNode[V]) insertPrefix(idx uint8, val V) (exists bool) {
 	// overwrite oldValPtr with valPtr
 	n.allot(idx, oldValPtr, valPtr)
 
-	return
+	return exists
 }
 
 // getPrefix returns the value for the given prefix index and true if it exists.
@@ -175,7 +175,7 @@ func (n *fastNode[V]) getPrefix(idx uint8) (val V, exists bool) {
 	if exists = n.prefixes.Test(idx); exists {
 		val = *n.prefixes.items[idx]
 	}
-	return
+	return val, exists
 }
 
 // mustGetPrefix returns the value for the given prefix index.
@@ -219,7 +219,7 @@ func (n *fastNode[V]) allIndices() iter.Seq2[uint8, V] {
 func (n *fastNode[V]) deletePrefix(idx uint8) (val V, exists bool) {
 	if exists = n.prefixes.Test(idx); !exists {
 		// Route entry doesn't exist
-		return
+		return val, exists
 	}
 	n.pfxCount--
 
@@ -255,7 +255,7 @@ func (n *fastNode[V]) lookup(idx uint8) (val V, ok bool) {
 	if valPtr := n.prefixes.items[idx]; valPtr != nil {
 		return *valPtr, true
 	}
-	return
+	return val, ok
 }
 
 // lookupIdx performs a longest-prefix match (LPM) lookup for the given index (idx)
@@ -270,7 +270,7 @@ func (n *fastNode[V]) lookupIdx(idx uint8) (baseIdx uint8, val V, ok bool) {
 	if top, ok := n.prefixes.IntersectionTop(&lpm.LookupTbl[idx]); ok {
 		return top, *n.prefixes.items[top], true
 	}
-	return
+	return baseIdx, val, ok
 }
 
 // allot updates entries whose stored valPtr matches oldValPtr, in the

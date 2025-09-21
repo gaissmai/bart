@@ -96,11 +96,11 @@ func (n *liteNode[V]) childCount() int {
 // false if this is a new insertion.
 func (n *liteNode[V]) insertPrefix(idx uint8, _ V) (exists bool) {
 	if exists = n.prefixes.Test(idx); exists {
-		return
+		return exists
 	}
 	n.prefixes.Set(idx)
 	n.pfxCount++
-	return
+	return exists
 }
 
 // prefix is set at the given index.
@@ -202,7 +202,7 @@ func (n *liteNode[V]) mustGetChild(addr uint8) any {
 // This operation is idempotent - removing a non-existent child is safe.
 func (n *liteNode[V]) deleteChild(addr uint8) (exists bool) {
 	_, exists = n.children.DeleteAt(addr)
-	return
+	return exists
 }
 
 // contains returns true if an index (idx) has any matching longest-prefix

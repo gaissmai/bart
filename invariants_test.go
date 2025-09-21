@@ -185,5 +185,5 @@ func genBacktrackingPath(i uint8) (path bitset.BitSet256) {
 	for ; i > 0; i >>= 1 {
 		path.Set(i)
 	}
-	return
+	return path
 }

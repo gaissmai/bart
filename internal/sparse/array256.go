@@ -77,7 +77,7 @@ func (a *Array256[T]) Get(i uint8) (value T, ok bool) {
 	if a.Test(i) {
 		return a.Items[a.Rank(i)-1], true
 	}
-	return
+	return value, ok
 }
 
 // MustGet returns the value at index i without checking if it exists.
@@ -135,7 +135,7 @@ func (a *Array256[T]) InsertAt(i uint8, value T) (exists bool) {
 // If i is not present, the zero value and false are returned.
 func (a *Array256[T]) DeleteAt(i uint8) (value T, exists bool) {
 	if a.Len() == 0 || !a.Test(i) {
-		return
+		return value, exists
 	}
 
 	rank0 := a.Rank(i) - 1
