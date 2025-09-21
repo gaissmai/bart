@@ -48,6 +48,7 @@ type nodeReader[V any] interface {
 	getChildAddrs() []uint8
 	getIndices() []uint8
 
+	// Read-only views; callers must not mutate the returned bitsets.
 	getChildrenBitSet() *bitset.BitSet256
 	getPrefixesBitSet() *bitset.BitSet256
 
