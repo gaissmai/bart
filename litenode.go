@@ -267,7 +267,7 @@ func (n *liteNode[V]) insertAtDepth(pfx netip.Prefix, depth int) (exists bool) {
 
 	// find the proper trie node to insert prefix
 	// start with prefix octet at depth
-	for depth := depth; depth < len(octets); depth++ {
+	for ; depth < len(octets); depth++ {
 		octet := octets[depth]
 		// last masked octet: insert/override prefix/val into node
 		if depth == lastOctetPlusOne {
