@@ -211,12 +211,12 @@ func (n *bartNode[V]) contains(idx uint8) bool {
 // via the baseIndex function. Unlike the original ART algorithm, this implementation
 // does not use an allotment-based approach. Instead, it performs CBT backtracking
 // using a bitset-based operation with a precomputed backtracking pattern specific to idx.
-func (n *bartNode[V]) lookupIdx(idx uint8) (baseIdx uint8, val V, ok bool) {
+func (n *bartNode[V]) lookupIdx(idx uint8) (top uint8, val V, ok bool) {
 	// top is the idx of the longest-prefix-match
-	if top, ok := n.prefixes.IntersectionTop(&lpm.LookupTbl[idx]); ok {
+	if top, ok = n.prefixes.IntersectionTop(&lpm.LookupTbl[idx]); ok {
 		return top, n.mustGetPrefix(top), true
 	}
-	return baseIdx, val, ok
+	return top, val, ok
 }
 
 // lookup is just a simple wrapper for lookupIdx.
