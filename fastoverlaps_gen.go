@@ -1,6 +1,8 @@
 // Copyright (c) 2025 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
+// Code generated from file "nodeoverlaps_tmpl.go"; DO NOT EDIT.
+
 package bart
 
 import (
@@ -23,12 +25,18 @@ import (
 // The function is optimized for early exit on first match and uses heuristics to
 // choose between set-based and loop-based matching for performance.
 func (n *fastNode[V]) overlaps(o *fastNode[V], depth int) bool {
+	nPfxCount := n.prefixCount()
+	oPfxCount := o.prefixCount()
+
+	nChildCount := n.childCount()
+	oChildCount := o.childCount()
+
 	// ##############################
 	// 1. Test if any routes overlaps
 	// ##############################
 
 	// full cross check
-	if n.pfxCount > 0 && o.pfxCount > 0 {
+	if nPfxCount > 0 && oPfxCount > 0 {
 		if n.overlapsRoutes(o) {
 			return true
 		}
@@ -41,18 +49,24 @@ func (n *fastNode[V]) overlaps(o *fastNode[V], depth int) bool {
 	// swap nodes to help chance on its way,
 	// if the first call to expensive overlapsChildrenIn() is already true,
 	// if both orders are false it doesn't help either
-	if n.cldCount > o.cldCount {
+	if nChildCount > oChildCount {
 		n, o = o, n
+
+		nPfxCount = n.prefixCount()
+		oPfxCount = o.prefixCount()
+
+		nChildCount = n.childCount()
+		oChildCount = o.childCount()
 	}
 
-	if n.pfxCount > 0 && o.cldCount > 0 {
+	if nPfxCount > 0 && oChildCount > 0 {
 		if n.overlapsChildrenIn(o) {
 			return true
 		}
 	}
 
 	// symmetric reverse
-	if o.pfxCount > 0 && n.cldCount > 0 {
+	if oPfxCount > 0 && nChildCount > 0 {
 		if o.overlapsChildrenIn(n) {
 			return true
 		}
@@ -63,7 +77,7 @@ func (n *fastNode[V]) overlaps(o *fastNode[V], depth int) bool {
 	// ############################################
 
 	// stop condition, n or o have no children
-	if n.cldCount == 0 || o.cldCount == 0 {
+	if nChildCount == 0 || oChildCount == 0 {
 		return false
 	}
 
@@ -144,10 +158,14 @@ func (n *fastNode[V]) overlapsRoutes(o *fastNode[V]) bool {
 // Bitset-based matching uses precomputed coverage tables
 // to avoid per-address looping. This is critical for high fan-out nodes.
 func (n *fastNode[V]) overlapsChildrenIn(o *fastNode[V]) bool {
+	pfxCount := n.prefixCount()
+	childCount := o.childCount()
+
 	// when will we range over the children and when will we do bitset calc?
 	// heuristic, magic number retrieved by micro benchmarks
 	const magicNumber = 15
-	doRange := o.cldCount < magicNumber || n.pfxCount > magicNumber
+
+	doRange := childCount < magicNumber || pfxCount > magicNumber
 
 	// do range over, not so many children and maybe too many prefixes for other algo below
 	var buf [256]uint8
@@ -178,7 +196,7 @@ func (n *fastNode[V]) overlapsChildrenIn(o *fastNode[V]) bool {
 // between node n and node o recursively.
 //
 // For each shared address, the corresponding child nodes (of any type)
-// are compared using fastOverlapsTwoChilds, which handles all
+// are compared using fastNodeOverlapsTwoChilds, which handles all
 // node/leaf/fringe combinations.
 func (n *fastNode[V]) overlapsSameChildren(o *fastNode[V], depth int) bool {
 	// intersect the child bitsets from n with o
@@ -188,7 +206,7 @@ func (n *fastNode[V]) overlapsSameChildren(o *fastNode[V], depth int) bool {
 		nChild := n.mustGetChild(addr)
 		oChild := o.mustGetChild(addr)
 
-		if fastOverlapsTwoChilds[V](nChild, oChild, depth+1) {
+		if fastNodeOverlapsTwoChilds[V](nChild, oChild, depth+1) {
 			return true
 		}
 
@@ -201,7 +219,7 @@ func (n *fastNode[V]) overlapsSameChildren(o *fastNode[V], depth int) bool {
 	return false
 }
 
-// fastOverlapsTwoChilds checks two child entries for semantic overlap.
+// fastNodeOverlapsTwoChilds checks two child entries for semantic overlap.
 //
 // Handles all 3x3 combinations of node kinds (node, leaf, fringe).
 //
@@ -209,7 +227,7 @@ func (n *fastNode[V]) overlapsSameChildren(o *fastNode[V], depth int) bool {
 // for node/leaf mismatches, and returns true immediately if either side is fringe.
 //
 // Supports path-compressed routing structures without requiring full expansion.
-func fastOverlapsTwoChilds[V any](nChild, oChild any, depth int) bool {
+func fastNodeOverlapsTwoChilds[V any](nChild, oChild any, depth int) bool {
 	//  3x3 possible different combinations for n and o
 	//
 	//  node, node    --> overlaps rec descent
@@ -289,11 +307,11 @@ func (n *fastNode[V]) overlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
 
 		// test if any route overlaps prefix´ so far
 		// no best match needed, forward tests without backtracking
-		if n.pfxCount != 0 && n.contains(art.OctetToIdx(octet)) {
+		if n.prefixCount() != 0 && n.contains(art.OctetToIdx(octet)) {
 			return true
 		}
 
-		if _, ok := n.getChild(octet); !ok {
+		if !n.children.Test(octet) {
 			return false
 		}
 

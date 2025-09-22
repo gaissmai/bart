@@ -1,6 +1,8 @@
 // Copyright (c) 2025 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
+// Code generated from file "nodeoverlaps_tmpl.go"; DO NOT EDIT.
+
 package bart
 
 import (
@@ -26,8 +28,8 @@ func (n *liteNode[V]) overlaps(o *liteNode[V], depth int) bool {
 	nPfxCount := n.prefixCount()
 	oPfxCount := o.prefixCount()
 
-	nChildCount := n.children.Len()
-	oChildCount := o.children.Len()
+	nChildCount := n.childCount()
+	oChildCount := o.childCount()
 
 	// ##############################
 	// 1. Test if any routes overlaps
@@ -53,8 +55,8 @@ func (n *liteNode[V]) overlaps(o *liteNode[V], depth int) bool {
 		nPfxCount = n.prefixCount()
 		oPfxCount = o.prefixCount()
 
-		nChildCount = n.children.Len()
-		oChildCount = o.children.Len()
+		nChildCount = n.childCount()
+		oChildCount = o.childCount()
 	}
 
 	if nPfxCount > 0 && oChildCount > 0 {
@@ -157,7 +159,7 @@ func (n *liteNode[V]) overlapsRoutes(o *liteNode[V]) bool {
 // to avoid per-address looping. This is critical for high fan-out nodes.
 func (n *liteNode[V]) overlapsChildrenIn(o *liteNode[V]) bool {
 	pfxCount := n.prefixCount()
-	childCount := o.children.Len()
+	childCount := o.childCount()
 
 	// when will we range over the children and when will we do bitset calc?
 	// heuristic, magic number retrieved by micro benchmarks
@@ -194,7 +196,7 @@ func (n *liteNode[V]) overlapsChildrenIn(o *liteNode[V]) bool {
 // between node n and node o recursively.
 //
 // For each shared address, the corresponding child nodes (of any type)
-// are compared using overlapsTwoChilds, which handles all
+// are compared using liteNodeOverlapsTwoChilds, which handles all
 // node/leaf/fringe combinations.
 func (n *liteNode[V]) overlapsSameChildren(o *liteNode[V], depth int) bool {
 	// intersect the child bitsets from n with o
@@ -204,7 +206,7 @@ func (n *liteNode[V]) overlapsSameChildren(o *liteNode[V], depth int) bool {
 		nChild := n.mustGetChild(addr)
 		oChild := o.mustGetChild(addr)
 
-		if liteOverlapsTwoChilds[V](nChild, oChild, depth+1) {
+		if liteNodeOverlapsTwoChilds[V](nChild, oChild, depth+1) {
 			return true
 		}
 
@@ -217,7 +219,7 @@ func (n *liteNode[V]) overlapsSameChildren(o *liteNode[V], depth int) bool {
 	return false
 }
 
-// liteOverlapsTwoChilds checks two child entries for semantic overlap.
+// liteNodeOverlapsTwoChilds checks two child entries for semantic overlap.
 //
 // Handles all 3x3 combinations of node kinds (node, leaf, fringe).
 //
@@ -225,7 +227,7 @@ func (n *liteNode[V]) overlapsSameChildren(o *liteNode[V], depth int) bool {
 // for node/leaf mismatches, and returns true immediately if either side is fringe.
 //
 // Supports path-compressed routing structures without requiring full expansion.
-func liteOverlapsTwoChilds[V any](nChild, oChild any, depth int) bool {
+func liteNodeOverlapsTwoChilds[V any](nChild, oChild any, depth int) bool {
 	//  3x3 possible different combinations for n and o
 	//
 	//  node, node    --> overlaps rec descent
