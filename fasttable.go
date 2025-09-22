@@ -790,6 +790,38 @@ func (f *Fast[V]) All6() iter.Seq2[netip.Prefix, V] {
 	}
 }
 
+// AllSorted returns an iterator over all prefix–value pairs in the table,
+// ordered in canonical CIDR prefix sort order.
+//
+// This can be used directly with a for-range loop; the Go compiler provides the yield function implicitly.
+//
+//	for prefix, value := range t.AllSorted() {
+//	    fmt.Println(prefix, value)
+//	}
+//
+// The traversal is stable and predictable across calls.
+// Iteration stops early if you break out of the loop.
+func (t *Fast[V]) AllSorted() iter.Seq2[netip.Prefix, V] {
+	return func(yield func(netip.Prefix, V) bool) {
+		_ = t.root4.allRecSorted(stridePath{}, 0, true, yield) &&
+			t.root6.allRecSorted(stridePath{}, 0, false, yield)
+	}
+}
+
+// AllSorted4 is like [Fast.AllSorted] but only for the v4 routing table.
+func (t *Fast[V]) AllSorted4() iter.Seq2[netip.Prefix, V] {
+	return func(yield func(netip.Prefix, V) bool) {
+		_ = t.root4.allRecSorted(stridePath{}, 0, true, yield)
+	}
+}
+
+// AllSorted6 is like [Fast.AllSorted] but only for the v6 routing table.
+func (t *Fast[V]) AllSorted6() iter.Seq2[netip.Prefix, V] {
+	return func(yield func(netip.Prefix, V) bool) {
+		_ = t.root6.allRecSorted(stridePath{}, 0, false, yield)
+	}
+}
+
 // dumpString is just a wrapper for dump.
 func (f *Fast[V]) dumpString() string {
 	w := new(strings.Builder)
@@ -824,7 +856,7 @@ func (f *Fast[V]) dump(w io.Writer) {
 }
 
 // String returns a hierarchical tree diagram of the ordered CIDRs
-// as string, just a wrapper for [Table.Fprint].
+// as string, just a wrapper for [Fast.Fprint].
 // If Fprint returns an error, String panics.
 func (f *Fast[V]) String() string {
 	w := new(strings.Builder)
@@ -900,7 +932,7 @@ func (f *Fast[V]) fprint(w io.Writer, is4 bool) error {
 }
 
 // MarshalText implements the [encoding.TextMarshaler] interface,
-// just a wrapper for [Table.Fprint].
+// just a wrapper for [Fast.Fprint].
 func (f *Fast[V]) MarshalText() ([]byte, error) {
 	w := new(bytes.Buffer)
 	if err := f.Fprint(w); err != nil {
