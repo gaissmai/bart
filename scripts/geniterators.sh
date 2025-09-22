@@ -44,11 +44,11 @@ done
 
 # Run goimports on generated files
 if command -v goimports >/dev/null 2>&1; then
-    echo "Running goimports on generated files..."
-    goimports -w "${generated_files[@]}"
-    echo "✓ goimports completed"
+    echo "Running gofmt on generated files..."
+    gofmt -w "${generated_files[@]}"
+    echo "✓ gofmt completed"
 else
-    echo "⚠ goimports not found, skipping formatting"
+    echo "⚠ gofmt not found, skipping formatting"
 fi
 
 echo "Template generation complete!"
