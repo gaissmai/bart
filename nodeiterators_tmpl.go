@@ -102,10 +102,12 @@ func (n *_NODE_TYPE[V]) allRec(path stridePath, depth int, is4 bool, yield func(
 // Returns false if yield function requests early termination.
 func (n *_NODE_TYPE[V]) allRecSorted(path stridePath, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
 	// get slice of all child octets, sorted by addr
-	allChildAddrs := n.children.AsSlice(&[256]uint8{})
+	var childBuf [256]uint8
+	allChildAddrs := n.children.AsSlice(&childBuf)
 
 	// get slice of all indexes, sorted by idx
-	allIndices := n.prefixes.AsSlice(&[256]uint8{})
+	var idxBuf [256]uint8
+	allIndices := n.prefixes.AsSlice(&idxBuf)
 
 	// sort indices in CIDR sort order
 	slices.SortFunc(allIndices, cmpIndexRank)
