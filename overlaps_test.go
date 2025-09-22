@@ -105,8 +105,9 @@ func TestOverlapsCompare(t *testing.T) {
 
 func TestOverlapsPrefixCompare(t *testing.T) {
 	t.Parallel()
+	n := workLoadN()
 	prng := rand.New(rand.NewPCG(42, 42))
-	pfxs := randomPrefixes(prng, 100_000)
+	pfxs := randomPrefixes(prng, n)
 
 	gold := new(goldTable[int])
 	gold.insertMany(pfxs)
@@ -116,7 +117,7 @@ func TestOverlapsPrefixCompare(t *testing.T) {
 		fast.Insert(pfx.pfx, pfx.val)
 	}
 
-	tests := randomPrefixes(prng, 10_000)
+	tests := randomPrefixes(prng, n)
 	for _, tt := range tests {
 		gotGold := gold.overlapsPrefix(tt.pfx)
 		gotFast := fast.OverlapsPrefix(tt.pfx)
