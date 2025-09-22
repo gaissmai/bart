@@ -233,8 +233,8 @@ func (n *liteNode[V]) contains(idx uint8) bool {
 // using a bitset-based operation with a precomputed backtracking pattern specific to idx.
 //
 //nolint:unparam,unused // used via nodeReader interface
-func (n *liteNode[V]) lookupIdx(idx uint8) (lpmIdx uint8, _ V, ok bool) {
-	lpmIdx, ok = n.prefixes.IntersectionTop(&lpm.LookupTbl[idx])
+func (n *liteNode[V]) lookupIdx(idx uint8) (top uint8, _ V, ok bool) {
+	top, ok = n.prefixes.IntersectionTop(&lpm.LookupTbl[idx])
 	return
 }
 
