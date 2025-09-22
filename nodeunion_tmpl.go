@@ -2,10 +2,33 @@
 // SPDX-License-Identifier: MIT
 
 // Usage: go generate tags=ignore
-//go:generate ./scripts/geniterators.sh
+//go:generate ./scripts/gen-monomorphized-methods.sh
 //go:build ignore
 
 package bart
+
+// ### GENERATE DELETE START ###
+import (
+	"net/netip"
+
+	"github.com/gaissmai/bart/internal/bitset"
+)
+
+type _NODE_TYPE[V any] struct {
+	prefixes bitset.BitSet256
+	children bitset.BitSet256
+}
+
+func (n *_NODE_TYPE[V]) mustGetPrefix(uint8) (val V)                      { return }
+func (n *_NODE_TYPE[V]) mustGetChild(uint8) (child any)                   { return }
+func (n *_NODE_TYPE[V]) insertPrefix(uint8, V) (exists bool)              { return }
+func (n *_NODE_TYPE[V]) getChild(uint8) (child any, ok bool)              { return }
+func (n *_NODE_TYPE[V]) insertChild(uint8, any) (exists bool)             { return }
+func (n *_NODE_TYPE[V]) cloneRec(cloneFunc[V]) (c *_NODE_TYPE[V])         { return }
+func (n *_NODE_TYPE[V]) cloneFlat(cloneFunc[V]) (c *_NODE_TYPE[V])        { return }
+func (n *_NODE_TYPE[V]) insertAtDepth(netip.Prefix, V, int) (exists bool) { return }
+
+// ### GENERATE DELETE END ###
 
 // unionRec recursively merges another node o into the receiver node n.
 //
@@ -254,7 +277,7 @@ func (n *_NODE_TYPE[V]) unionRecPersist(cloneFn cloneFunc[V], o *_NODE_TYPE[V], 
 		//  fringe, fringe  <-- just overwrite value
 		//
 		// try to get child at same addr from n
-		thisChild, thisExists := n.getChild(addr)
+		thisAny, thisExists := n.getChild(addr)
 		if !thisExists { // NULL, ... slot at addr is empty
 			switch otherKid := otherAny.(type) {
 			case *_NODE_TYPE[V]: // NULL, node
@@ -274,7 +297,7 @@ func (n *_NODE_TYPE[V]) unionRecPersist(cloneFn cloneFunc[V], o *_NODE_TYPE[V], 
 			}
 		}
 
-		switch thisKid := thisChild.(type) {
+		switch thisKid := thisAny.(type) {
 		case *_NODE_TYPE[V]: // node, ...
 			// CLONE the node
 
@@ -286,8 +309,8 @@ func (n *_NODE_TYPE[V]) unionRecPersist(cloneFn cloneFunc[V], o *_NODE_TYPE[V], 
 
 			switch otherKid := otherAny.(type) {
 			case *_NODE_TYPE[V]: // node, node
-				// both childs have node at addr, call union rec-descent on child nodes
-				duplicates += thisKid.unionRec(cloneFn, otherKid.cloneRec(cloneFn), depth+1)
+				// both childs have node at addr, persistent union rec-descent on this node
+				duplicates += thisKid.unionRecPersist(cloneFn, otherKid.cloneRec(cloneFn), depth+1)
 				continue
 
 			case *leafNode[V]: // node, leaf
@@ -319,7 +342,7 @@ func (n *_NODE_TYPE[V]) unionRecPersist(cloneFn cloneFunc[V], o *_NODE_TYPE[V], 
 				// insert the new node at current addr
 				n.insertChild(addr, nc)
 
-				// unionRec this new node with other kid node
+				// new node, unionRec new node, persist not necessary
 				duplicates += nc.unionRec(cloneFn, otherKid.cloneRec(cloneFn), depth+1)
 				continue
 
@@ -377,7 +400,7 @@ func (n *_NODE_TYPE[V]) unionRecPersist(cloneFn cloneFunc[V], o *_NODE_TYPE[V], 
 				// insert the new node at current addr
 				n.insertChild(addr, nc)
 
-				// unionRec this new node with other kid node
+				// new node, unionRec new node, persist not necessary
 				duplicates += nc.unionRec(cloneFn, otherKid.cloneRec(cloneFn), depth+1)
 				continue
 

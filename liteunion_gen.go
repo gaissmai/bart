@@ -252,7 +252,7 @@ func (n *liteNode[V]) unionRecPersist(cloneFn cloneFunc[V], o *liteNode[V], dept
 		//  fringe, fringe  <-- just overwrite value
 		//
 		// try to get child at same addr from n
-		thisChild, thisExists := n.getChild(addr)
+		thisAny, thisExists := n.getChild(addr)
 		if !thisExists { // NULL, ... slot at addr is empty
 			switch otherKid := otherAny.(type) {
 			case *liteNode[V]: // NULL, node
@@ -272,7 +272,7 @@ func (n *liteNode[V]) unionRecPersist(cloneFn cloneFunc[V], o *liteNode[V], dept
 			}
 		}
 
-		switch thisKid := thisChild.(type) {
+		switch thisKid := thisAny.(type) {
 		case *liteNode[V]: // node, ...
 			// CLONE the node
 
@@ -284,8 +284,8 @@ func (n *liteNode[V]) unionRecPersist(cloneFn cloneFunc[V], o *liteNode[V], dept
 
 			switch otherKid := otherAny.(type) {
 			case *liteNode[V]: // node, node
-				// both childs have node at addr, call union rec-descent on child nodes
-				duplicates += thisKid.unionRec(cloneFn, otherKid.cloneRec(cloneFn), depth+1)
+				// both childs have node at addr, persistent union rec-descent on this node
+				duplicates += thisKid.unionRecPersist(cloneFn, otherKid.cloneRec(cloneFn), depth+1)
 				continue
 
 			case *leafNode[V]: // node, leaf
@@ -317,7 +317,7 @@ func (n *liteNode[V]) unionRecPersist(cloneFn cloneFunc[V], o *liteNode[V], dept
 				// insert the new node at current addr
 				n.insertChild(addr, nc)
 
-				// unionRec this new node with other kid node
+				// new node, unionRec new node, persist not necessary
 				duplicates += nc.unionRec(cloneFn, otherKid.cloneRec(cloneFn), depth+1)
 				continue
 
@@ -375,7 +375,7 @@ func (n *liteNode[V]) unionRecPersist(cloneFn cloneFunc[V], o *liteNode[V], dept
 				// insert the new node at current addr
 				n.insertChild(addr, nc)
 
-				// unionRec this new node with other kid node
+				// new node, unionRec new node, persist not necessary
 				duplicates += nc.unionRec(cloneFn, otherKid.cloneRec(cloneFn), depth+1)
 				continue
 
