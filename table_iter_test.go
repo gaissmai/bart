@@ -54,13 +54,13 @@ func TestAll4RangeOverFunc(t *testing.T) {
 		count := 0
 		for range rtbl.All4() {
 			count++
-			if count >= 1000 {
+			if count >= n {
 				break
 			}
 		}
 
 		// check if iteration stopped with error
-		if count != 1000 {
+		if count != n {
 			t.Fatalf("expected to break exactly at 1000, got %d", count)
 		}
 	})
@@ -109,13 +109,13 @@ func TestAll6RangeOverFunc(t *testing.T) {
 		count := 0
 		for range rtbl.All6() {
 			count++
-			if count >= 1000 {
+			if count >= n {
 				break
 			}
 		}
 
 		// check if iteration stopped with error
-		if count != 1000 {
+		if count != n {
 			t.Fatalf("expected to break exactly at 1000, got %d", count)
 		}
 	})
@@ -164,13 +164,13 @@ func TestAllRangeOverFunc(t *testing.T) {
 		count := 0
 		for range rtbl.All() {
 			count++
-			if count >= 1000 {
+			if count >= n {
 				break
 			}
 		}
 
 		// check if iteration stopped with error
-		if count != 1000 {
+		if count != n {
 			t.Fatalf("expected to break exactly at 1000, got %d", count)
 		}
 	})
@@ -219,13 +219,13 @@ func TestAll4SortedIter(t *testing.T) {
 		count := 0
 		for range rtbl.AllSorted4() {
 			count++
-			if count >= 1000 {
+			if count >= n {
 				break
 			}
 		}
 
 		// check if iteration stopped with error
-		if count != 1000 {
+		if count != n {
 			t.Fatalf("expected to break exactly at 1000, got %d", count)
 		}
 	})
@@ -274,13 +274,13 @@ func TestAll6SortedRangeOverFunc(t *testing.T) {
 		count := 0
 		for range rtbl.AllSorted6() {
 			count++
-			if count >= 1000 {
+			if count >= n {
 				break
 			}
 		}
 
 		// check if iteration stopped with error
-		if count != 1000 {
+		if count != n {
 			t.Fatalf("expected to break exactly at 1000, got %d", count)
 		}
 	})
@@ -329,13 +329,13 @@ func TestAllSortedRangeOverFunc(t *testing.T) {
 		count := 0
 		for range rtbl.AllSorted() {
 			count++
-			if count >= 1000 {
+			if count >= n {
 				break
 			}
 		}
 
 		// check if iteration stopped with error
-		if count != 1000 {
+		if count != n {
 			t.Fatalf("expected to break exactly at 1000, got %d", count)
 		}
 	})
@@ -389,9 +389,11 @@ func TestSupernetsEdgeCase(t *testing.T) {
 
 func TestSupernetsCompare(t *testing.T) {
 	t.Parallel()
+	n := workLoadN()
+
 	prng := rand.New(rand.NewPCG(42, 42))
 
-	pfxs := randomRealWorldPrefixes(prng, 1_000)
+	pfxs := randomRealWorldPrefixes(prng, n)
 
 	fast := new(Table[int])
 	gold := new(goldTable[int])
@@ -401,7 +403,7 @@ func TestSupernetsCompare(t *testing.T) {
 		gold.insert(pfx, i)
 	}
 
-	for _, pfx := range randomRealWorldPrefixes(prng, 100_000) {
+	for _, pfx := range randomRealWorldPrefixes(prng, n) {
 		t.Run("subtest", func(t *testing.T) {
 			t.Parallel()
 			gotGold := gold.supernets(pfx)
@@ -461,9 +463,11 @@ func TestSubnets(t *testing.T) {
 	})
 
 	t.Run("default gateway", func(t *testing.T) {
+		n := workLoadN()
 		prng := rand.New(rand.NewPCG(42, 42))
-		want4 := 95_555
-		want6 := 105_555
+
+		want4 := n - n/2
+		want6 := n + n/2
 
 		rtbl := new(Table[int])
 		for i, pfx := range randomRealWorldPrefixes4(prng, want4) {
@@ -498,9 +502,10 @@ func TestSubnets(t *testing.T) {
 
 func TestSubnetsCompare(t *testing.T) {
 	t.Parallel()
+	n := workLoadN()
 	prng := rand.New(rand.NewPCG(42, 42))
 
-	pfxs := randomRealWorldPrefixes(prng, 1_000)
+	pfxs := randomRealWorldPrefixes(prng, n)
 
 	fast := new(Table[int])
 	gold := new(goldTable[int])
@@ -510,7 +515,7 @@ func TestSubnetsCompare(t *testing.T) {
 		gold.insert(pfx, i)
 	}
 
-	for _, pfx := range randomRealWorldPrefixes(prng, 100_000) {
+	for _, pfx := range randomRealWorldPrefixes(prng, n) {
 		t.Run("subtest", func(t *testing.T) {
 			t.Parallel()
 
