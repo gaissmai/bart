@@ -257,7 +257,6 @@ func (n *liteNode[V]) cloneFlat(_ cloneFunc[V]) *liteNode[V] {
 	}
 
 	// copy simple values
-	c.pfxCount = n.pfxCount
 	c.prefixes = n.prefixes
 
 	// sparse array
