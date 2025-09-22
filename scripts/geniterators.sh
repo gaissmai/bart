@@ -22,13 +22,16 @@ readonly NODE_TYPES=("bartNode" "fastNode" "liteNode")
 generated_files=()
 
 for nodeType in "${NODE_TYPES[@]}"; do
-    output_file="${nodeType/Node/}${template_file/_tmpl/_gen}"
+    # build output filename e.g. bartiterators_gen.go
+    output_file="${nodeType,,}"                             # lowercase e.g. bartNode -> bartnode
+    output_file="${output_file}${template_file/_tmpl/_gen}" # concat with mangled template filename
+    output_file="${output_file//node/}"                     # remove node in filename
     
     # Remove go:generate directives and build constraint, add generated header, substitute node type
     sed -e '/go.generate /d' \
         -e "s|^//go:build ignore.*$|// Code generated from file \"${template_file}\"; DO NOT EDIT.|" \
         -e "s|_NODE_TYPE|${nodeType}|g" \
-        ${template_file} > "${output_file}"
+        "${template_file}" > "${output_file}"
     
     if [[ -f "${output_file}" ]]; then
         echo "✓ Generated ${output_file}"
