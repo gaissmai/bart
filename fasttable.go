@@ -734,6 +734,27 @@ func (f *Fast[V]) sizeUpdate(is4 bool, delta int) {
 	f.size6 += delta
 }
 
+// Union merges another routing table into the receiver table, modifying it in-place.
+//
+// All prefixes and values from the other table (o) are inserted into the receiver.
+// If a duplicate prefix exists in both tables, the value from o replaces the existing entry.
+// This duplicate is shallow-copied by default, but if the value type V implements the
+// Cloner interface, the value is deeply cloned before insertion. See also Fast.Clone.
+func (f *Fast[V]) Union(o *Fast[V]) {
+	// Create a cloning function for deep copying values;
+	// returns nil if V does not implement the Cloner interface.
+	cloneFn := cloneFnFactory[V]()
+	if cloneFn == nil {
+		cloneFn = copyVal
+	}
+
+	dup4 := f.root4.unionRec(cloneFn, &o.root4, 0)
+	dup6 := f.root6.unionRec(cloneFn, &o.root6, 0)
+
+	f.size4 += o.size4 - dup4
+	f.size6 += o.size6 - dup6
+}
+
 // Size returns the prefix count.
 func (f *Fast[V]) Size() int {
 	return f.size4 + f.size6
