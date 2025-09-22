@@ -185,7 +185,7 @@ func testUnionLite(t *testing.T, prefixes1, prefixes2 []goldTableItem[int]) {
 
 	// Verify results
 	actual := make(map[netip.Prefix]bool)
-	for pfx := range lite1.liteTable.All() {
+	for pfx := range lite1.All() {
 		actual[pfx] = true
 	}
 
