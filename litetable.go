@@ -447,7 +447,7 @@ func (l *liteTable[V]) Contains(ip netip.Addr) bool {
 
 	for _, octet := range ip.AsSlice() {
 		// for contains, any lpm match is good enough, no backtracking needed
-		if n.pfxCount != 0 && n.contains(art.OctetToIdx(octet)) {
+		if n.prefixes.count != 0 && n.contains(art.OctetToIdx(octet)) {
 			return true
 		}
 
@@ -594,7 +594,7 @@ LOOP:
 		n = stack[depth]
 
 		// longest prefix match, skip if node has no prefixes
-		if n.pfxCount == 0 {
+		if n.prefixes.count == 0 {
 			continue
 		}
 

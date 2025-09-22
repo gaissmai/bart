@@ -62,9 +62,12 @@ import (
 //     for fast longest-prefix match within stride.
 //   - purgeAndCompress reclaims empty / sparse nodes on unwind to keep the trie compact.
 type liteNode[V any] struct {
-	prefixes bitset.BitSet256
 	children sparse.Array256[any]
-	pfxCount uint16
+	prefixes struct {
+		bitset.BitSet256
+		// no values
+		count uint16
+	}
 }
 
 // isEmpty returns true if the node contains no routing entries (prefixes)
@@ -76,14 +79,14 @@ func (n *liteNode[V]) isEmpty() bool {
 	if n == nil {
 		return true
 	}
-	return n.pfxCount == 0 && n.children.Len() == 0
+	return n.prefixes.count == 0 && n.children.Len() == 0
 }
 
 // prefixCount returns the number of prefixes stored in this node.
 //
 //nolint:unused // used via nodeReader interface
 func (n *liteNode[V]) prefixCount() int {
-	return int(n.pfxCount)
+	return int(n.prefixes.count)
 }
 
 // childCount returns the number of slots used in this node.
@@ -99,7 +102,7 @@ func (n *liteNode[V]) insertPrefix(idx uint8, _ V) (exists bool) {
 		return exists
 	}
 	n.prefixes.Set(idx)
-	n.pfxCount++
+	n.prefixes.count++
 	return exists
 }
 
@@ -151,7 +154,7 @@ func (n *liteNode[V]) deletePrefix(idx uint8) (_ V, exists bool) {
 		return
 	}
 	n.prefixes.Clear(idx)
-	n.pfxCount--
+	n.prefixes.count--
 	return
 }
 
@@ -357,11 +360,11 @@ func (n *liteNode[V]) purgeAndCompress(stack []*liteNode[V], octets []uint8, is4
 		childCount := n.childCount()
 
 		switch {
-		case n.pfxCount == 0 && childCount == 0:
+		case n.prefixes.count == 0 && childCount == 0:
 			// just delete this empty node from parent
 			parent.deleteChild(octet)
 
-		case n.pfxCount == 0 && childCount == 1:
+		case n.prefixes.count == 0 && childCount == 1:
 			switch kid := n.children.Items[0].(type) {
 			case *liteNode[V]:
 				// fast exit, we are at an intermediate path node
@@ -388,7 +391,7 @@ func (n *liteNode[V]) purgeAndCompress(stack []*liteNode[V], octets []uint8, is4
 				parent.insertAtDepth(fringePfx, zero, depth)
 			}
 
-		case n.pfxCount == 1 && childCount == 0:
+		case n.prefixes.count == 1 && childCount == 0:
 			// just one prefix, delete this node and reinsert the idx as leaf above
 			parent.deleteChild(octet)
 
