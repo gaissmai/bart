@@ -269,12 +269,12 @@ func (n *fastNode[V]) lookup(idx uint8) (val V, ok bool) {
 // matching prefix exists at this level; otherwise, ok is false.
 //
 // Its semantics are identical to [node.lookupIdx].
-func (n *fastNode[V]) lookupIdx(idx uint8) (baseIdx uint8, val V, ok bool) {
+func (n *fastNode[V]) lookupIdx(idx uint8) (top uint8, val V, ok bool) {
 	// top is the idx of the longest-prefix-match
-	if top, ok := n.prefixes.IntersectionTop(&lpm.LookupTbl[idx]); ok {
+	if top, ok = n.prefixes.IntersectionTop(&lpm.LookupTbl[idx]); ok {
 		return top, *n.prefixes.items[top], true
 	}
-	return baseIdx, val, ok
+	return top, val, ok
 }
 
 // allot updates entries whose stored valPtr matches oldValPtr, in the
