@@ -61,7 +61,7 @@ func TestAll4RangeOverFunc(t *testing.T) {
 
 		// check if iteration stopped with error
 		if count != n {
-			t.Fatalf("expected to break exactly at 1000, got %d", count)
+			t.Fatalf("expected to break exactly at %d, got %d", n, count)
 		}
 	})
 }
@@ -116,7 +116,7 @@ func TestAll6RangeOverFunc(t *testing.T) {
 
 		// check if iteration stopped with error
 		if count != n {
-			t.Fatalf("expected to break exactly at 1000, got %d", count)
+			t.Fatalf("expected to break exactly at %d, got %d", n, count)
 		}
 	})
 }
@@ -171,7 +171,7 @@ func TestAllRangeOverFunc(t *testing.T) {
 
 		// check if iteration stopped with error
 		if count != n {
-			t.Fatalf("expected to break exactly at 1000, got %d", count)
+			t.Fatalf("expected to break exactly at %d, got %d", n, count)
 		}
 	})
 }
@@ -226,7 +226,7 @@ func TestAll4SortedIter(t *testing.T) {
 
 		// check if iteration stopped with error
 		if count != n {
-			t.Fatalf("expected to break exactly at 1000, got %d", count)
+			t.Fatalf("expected to break exactly at %d, got %d", n, count)
 		}
 	})
 }
@@ -281,7 +281,7 @@ func TestAll6SortedRangeOverFunc(t *testing.T) {
 
 		// check if iteration stopped with error
 		if count != n {
-			t.Fatalf("expected to break exactly at 1000, got %d", count)
+			t.Fatalf("expected to break exactly at %d, got %d", n, count)
 		}
 	})
 }
@@ -336,7 +336,7 @@ func TestAllSortedRangeOverFunc(t *testing.T) {
 
 		// check if iteration stopped with error
 		if count != n {
-			t.Fatalf("expected to break exactly at 1000, got %d", count)
+			t.Fatalf("expected to break exactly at %d, got %d", n, count)
 		}
 	})
 }
