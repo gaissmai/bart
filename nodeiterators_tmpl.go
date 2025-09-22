@@ -2,17 +2,20 @@
 // SPDX-License-Identifier: MIT
 
 // Usage: go generate tags=ignore
-//go:generate ./scripts/geniterators.sh
+//go:generate ./scripts/gen-monomorphized-methods.sh
 //go:build ignore
 
 package bart
 
+// ### GENERATE DELETE START ###
 import (
 	"net/netip"
 	"slices"
 
 	"github.com/gaissmai/bart/internal/art"
 )
+
+// ### GENERATE DELETE END ###
 
 // allRec recursively traverses the trie starting at the current node,
 // applying the provided yield function to every stored prefix and value.
