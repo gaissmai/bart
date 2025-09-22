@@ -1,5 +1,5 @@
 #!/bin/bash
-# Generate iterator methods for all node types from template
+# Generate monomorphized methods for all node types from template files.
 
 set -euo pipefail
 
@@ -13,7 +13,7 @@ if [[ ! -f "$template_file" ]]; then
     exit 1
 fi
 
-echo "Generating iterator methods from template..."
+echo "START: Generating monomorphized methods from template '${GOFILE}' ..."
 
 # Node types to generate
 readonly NODE_TYPES=("bartNode" "fastNode" "liteNode")
@@ -28,9 +28,10 @@ for nodeType in "${NODE_TYPES[@]}"; do
     output_file="${output_file//node/}"                     # remove node in filename
     
     # Remove go:generate directives and build constraint, add generated header, substitute node type
-    sed -e '/go.generate /d' \
+    sed -e '/go.generate /d'                                                                         \
         -e "s|^//go:build ignore.*$|// Code generated from file \"${template_file}\"; DO NOT EDIT.|" \
-        -e "s|_NODE_TYPE|${nodeType}|g" \
+        -e '/GENERATE DELETE START/,/GENERATE DELETE END/d'                                                            \
+        -e "s|_NODE_TYPE|${nodeType}|g"                                                              \
         "${template_file}" > "${output_file}"
     
     if [[ -f "${output_file}" ]]; then
@@ -42,13 +43,16 @@ for nodeType in "${NODE_TYPES[@]}"; do
     fi
 done
 
+echo
+
 # Run goimports on generated files
 if command -v goimports >/dev/null 2>&1; then
-    echo "Running gofmt on generated files..."
-    gofmt -w "${generated_files[@]}"
-    echo "✓ gofmt completed"
+    echo "Running goimports on generated files..."
+    goimports -w "${generated_files[@]}"
+    echo "✓ goimports completed"
 else
-    echo "⚠ gofmt not found, skipping formatting"
+    echo "⚠ goimports not found, skipping formatting"
 fi
 
-echo "Template generation complete!"
+echo "END: Template generation complete!"
+echo

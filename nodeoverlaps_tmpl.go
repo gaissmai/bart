@@ -2,10 +2,12 @@
 // SPDX-License-Identifier: MIT
 
 // Usage: go generate tags=ignore
-//go:generate ./scripts/geniterators.sh
+//go:generate ./scripts/gen-monomorphized-methods.sh
 //go:build ignore
 
 package bart
+
+// ### GENERATE DELETE START ###
 
 import (
 	"net/netip"
@@ -13,6 +15,8 @@ import (
 	"github.com/gaissmai/bart/internal/allot"
 	"github.com/gaissmai/bart/internal/art"
 )
+
+// ### GENERATE DELETE END ###
 
 // overlaps recursively compares two trie nodes and returns true
 // if any of their prefixes or descendants overlap.
