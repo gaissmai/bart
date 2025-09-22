@@ -189,11 +189,6 @@ func (n *fastNode[V]) mustGetPrefix(idx uint8) V {
 	return *n.prefixes.items[idx]
 }
 
-//nolint:unused // used via nodeReader interface
-func (n *fastNode[V]) getPrefixesBitSet() *bitset.BitSet256 {
-	return &n.prefixes.BitSet256
-}
-
 // getIndices returns a slice containing all prefix indices that have values stored.
 // The indices are returned in ascending order.
 func (n *fastNode[V]) getIndices() []uint8 {
