@@ -33,6 +33,11 @@ func (l *Lite) Overlaps(o *Lite) bool {
 }
 
 // adapter method, not delegated
+func (l *Lite) Union(o *Lite) {
+	l.liteTable.Union(&o.liteTable)
+}
+
+// adapter method, not delegated
 func (l *Lite) Equal(o *Lite) bool {
 	return l.liteTable.Equal(&o.liteTable)
 }
@@ -689,6 +694,27 @@ func (l *liteTable[V]) Overlaps6(o *liteTable[V]) bool {
 		return false
 	}
 	return l.root6.overlaps(&o.root6, 0)
+}
+
+// Union merges another routing table into the receiver table, modifying it in-place.
+//
+// All prefixes and values from the other table (o) are inserted into the receiver.
+// If a duplicate prefix exists in both tables, the value from o replaces the existing entry.
+// This duplicate is shallow-copied by default, but if the value type V implements the
+// Cloner interface, the value is deeply cloned before insertion. See also Lite.Clone.
+func (l *liteTable[V]) Union(o *liteTable[V]) {
+	// Create a cloning function for deep copying values;
+	// returns nil if V does not implement the Cloner interface.
+	cloneFn := cloneFnFactory[V]()
+	if cloneFn == nil {
+		cloneFn = copyVal
+	}
+
+	dup4 := l.root4.unionRec(cloneFn, &o.root4, 0)
+	dup6 := l.root6.unionRec(cloneFn, &o.root6, 0)
+
+	l.size4 += o.size4 - dup4
+	l.size6 += o.size6 - dup6
 }
 
 // Clone returns a copy of the routing table.
