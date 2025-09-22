@@ -262,7 +262,7 @@ func (n *liteNode[V]) lookup(idx uint8) (_ V, ok bool) {
 //   - depth: The current depth in the trie (0-based byte index)
 //
 // Returns true if a prefix already existed and was updated, false for new insertions.
-func (n *liteNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool) {
+func (n *liteNode[V]) insertAtDepth(pfx netip.Prefix, zero V, depth int) (exists bool) {
 	ip := pfx.Addr() // the pfx must be in canonical form
 	octets := ip.AsSlice()
 	lastOctetPlusOne, lastBits := lastOctetPlusOneAndLastBits(pfx)
@@ -273,16 +273,16 @@ func (n *liteNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists 
 		octet := octets[depth]
 		// last masked octet: insert/override prefix/val into node
 		if depth == lastOctetPlusOne {
-			return n.insertPrefix(art.PfxToIdx(octet, lastBits), val)
+			return n.insertPrefix(art.PfxToIdx(octet, lastBits), zero)
 		}
 
 		// reached end of trie path ...
 		if !n.children.Test(octet) {
 			// insert prefix path compressed as leaf or fringe
 			if isFringe(depth, pfx) {
-				return n.insertChild(octet, newFringeNode(val))
+				return n.insertChild(octet, newFringeNode(zero))
 			}
-			return n.insertChild(octet, newLeafNode(pfx, val))
+			return n.insertChild(octet, newLeafNode(pfx, zero))
 		}
 
 		// ... or descend down the trie
@@ -303,9 +303,10 @@ func (n *liteNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists 
 			// create new node
 			// push the leaf down
 			// insert new child at current leaf position (addr)
+			// lite has no values
 			// descend down, replace n with new child
 			newNode := new(liteNode[V])
-			newNode.insertAtDepth(kid.prefix, val, depth+1)
+			newNode.insertAtDepth(kid.prefix, zero, depth+1)
 
 			n.insertChild(octet, newNode)
 			n = newNode
@@ -320,9 +321,10 @@ func (n *liteNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists 
 			// create new node
 			// push the fringe down, it becomes a default route (idx=1)
 			// insert new child at current leaf position (addr)
+			// lite has no values
 			// descend down, replace n with new child
 			newNode := new(liteNode[V])
-			newNode.insertPrefix(1, val)
+			newNode.insertPrefix(1, zero)
 
 			n.insertChild(octet, newNode)
 			n = newNode
