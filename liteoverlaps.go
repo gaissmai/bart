@@ -94,7 +94,7 @@ func (n *liteNode[V]) overlaps(o *liteNode[V], depth int) bool {
 // of the n-prefixes is contained in o, or vice versa.
 func (n *liteNode[V]) overlapsRoutes(o *liteNode[V]) bool {
 	// some prefixes are identical, trivial overlap
-	if n.prefixes.Intersects(&o.prefixes) {
+	if n.prefixes.Intersects(&o.prefixes.BitSet256) {
 		return true
 	}
 
