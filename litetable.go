@@ -760,6 +760,38 @@ func (l *liteTable[V]) All6() iter.Seq2[netip.Prefix, V] {
 	}
 }
 
+// AllSorted returns an iterator over all prefix–value pairs in the table,
+// ordered in canonical CIDR prefix sort order.
+//
+// This can be used directly with a for-range loop; the Go compiler provides the yield function implicitly.
+//
+//	for prefix, value := range t.AllSorted() {
+//	    fmt.Println(prefix, value)
+//	}
+//
+// The traversal is stable and predictable across calls.
+// Iteration stops early if you break out of the loop.
+func (l *liteTable[V]) AllSorted() iter.Seq2[netip.Prefix, V] {
+	return func(yield func(netip.Prefix, V) bool) {
+		_ = l.root4.allRecSorted(stridePath{}, 0, true, yield) &&
+			l.root6.allRecSorted(stridePath{}, 0, false, yield)
+	}
+}
+
+// AllSorted4 is like [Table.AllSorted] but only for the v4 routing table.
+func (l *liteTable[V]) AllSorted4() iter.Seq2[netip.Prefix, V] {
+	return func(yield func(netip.Prefix, V) bool) {
+		_ = l.root4.allRecSorted(stridePath{}, 0, true, yield)
+	}
+}
+
+// AllSorted6 is like [Table.AllSorted] but only for the v6 routing table.
+func (l *liteTable[V]) AllSorted6() iter.Seq2[netip.Prefix, V] {
+	return func(yield func(netip.Prefix, V) bool) {
+		_ = l.root6.allRecSorted(stridePath{}, 0, false, yield)
+	}
+}
+
 // Size returns the prefix count.
 func (l *liteTable[V]) Size() int {
 	return l.size4 + l.size6
