@@ -7,13 +7,20 @@ set -euo pipefail
 template_file="${GOFILE}"
 
 # Check if template exists
-if [[ ! -f "$template_file" ]]; then
+if [[ ! -f "${template_file}" ]]; then
     echo "Error: Template file '$template_file' not found" >&2
     echo "GOFILE=${GOFILE:-<not set>}" >&2
     exit 1
 fi
 
 echo "START: Generating monomorphized methods from template '${GOFILE}' ..."
+
+#!/bin/bash
+
+if grep -q "TODO" "${template_file}"; then
+	echo "✗ Aborting, found pattern 'TODO' in template" >&2
+	exit 1
+fi
 
 # Node types to generate
 readonly NODE_TYPES=("bartNode" "fastNode" "liteNode")
@@ -51,7 +58,16 @@ if command -v goimports >/dev/null 2>&1; then
     goimports -w "${generated_files[@]}"
     echo "✓ goimports completed"
 else
-    echo "⚠ goimports not found, skipping formatting"
+    echo "⚠ goimports not found, skipping imports"
+fi
+
+# Run gofumpt on generated files
+if command -v gofumpt >/dev/null 2>&1; then
+    echo "Running gofumpt on generated files..."
+    gofumpt -w "${generated_files[@]}"
+    echo "✓ gofumpt completed"
+else
+    echo "⚠ gofumpt not found, skipping formatting"
 fi
 
 echo "END: Template generation complete!"

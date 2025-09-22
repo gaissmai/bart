@@ -15,18 +15,18 @@ import (
 )
 
 type _NODE_TYPE[V any] struct {
-	prefixes bitset.BitSet256
-	children bitset.BitSet256
+	prefixes struct{ bitset.BitSet256 }
+	children struct{ bitset.BitSet256 }
 }
 
-func (n *_NODE_TYPE[V]) mustGetPrefix(uint8) (val V)                      { return }
-func (n *_NODE_TYPE[V]) mustGetChild(uint8) (child any)                   { return }
-func (n *_NODE_TYPE[V]) insertPrefix(uint8, V) (exists bool)              { return }
-func (n *_NODE_TYPE[V]) getChild(uint8) (child any, ok bool)              { return }
-func (n *_NODE_TYPE[V]) insertChild(uint8, any) (exists bool)             { return }
-func (n *_NODE_TYPE[V]) cloneRec(cloneFunc[V]) (c *_NODE_TYPE[V])         { return }
-func (n *_NODE_TYPE[V]) cloneFlat(cloneFunc[V]) (c *_NODE_TYPE[V])        { return }
-func (n *_NODE_TYPE[V]) insertAtDepth(netip.Prefix, V, int) (exists bool) { return }
+func (n *_NODE_TYPE[V]) mustGetPrefix(uint8) (val V)                      { return val }
+func (n *_NODE_TYPE[V]) mustGetChild(uint8) (child any)                   { return child }
+func (n *_NODE_TYPE[V]) insertPrefix(uint8, V) (exists bool)              { return exists }
+func (n *_NODE_TYPE[V]) getChild(uint8) (child any, ok bool)              { return child, ok }
+func (n *_NODE_TYPE[V]) insertChild(uint8, any) (exists bool)             { return exists }
+func (n *_NODE_TYPE[V]) cloneRec(cloneFunc[V]) (c *_NODE_TYPE[V])         { return c }
+func (n *_NODE_TYPE[V]) cloneFlat(cloneFunc[V]) (c *_NODE_TYPE[V])        { return c }
+func (n *_NODE_TYPE[V]) insertAtDepth(netip.Prefix, V, int) (exists bool) { return exists }
 
 // ### GENERATE DELETE END ###
 
@@ -342,8 +342,8 @@ func (n *_NODE_TYPE[V]) unionRecPersist(cloneFn cloneFunc[V], o *_NODE_TYPE[V], 
 				// insert the new node at current addr
 				n.insertChild(addr, nc)
 
-				// new node, unionRec new node, persist not necessary
-				duplicates += nc.unionRec(cloneFn, otherKid.cloneRec(cloneFn), depth+1)
+				// unionRecPersist with cloned otherKid
+				duplicates += nc.unionRecPersist(cloneFn, otherKid.cloneRec(cloneFn), depth+1)
 				continue
 
 			case *leafNode[V]: // leaf, leaf
@@ -400,8 +400,8 @@ func (n *_NODE_TYPE[V]) unionRecPersist(cloneFn cloneFunc[V], o *_NODE_TYPE[V], 
 				// insert the new node at current addr
 				n.insertChild(addr, nc)
 
-				// new node, unionRec new node, persist not necessary
-				duplicates += nc.unionRec(cloneFn, otherKid.cloneRec(cloneFn), depth+1)
+				// unionRecPersist with cloned otherKid
+				duplicates += nc.unionRecPersist(cloneFn, otherKid.cloneRec(cloneFn), depth+1)
 				continue
 
 			case *leafNode[V]: // fringe, leaf
