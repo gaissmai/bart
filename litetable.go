@@ -74,6 +74,8 @@ func (l *liteTable[V]) rootNodeByVersion(is4 bool) *liteNode[V] {
 // insert adds a prefix to the table (idempotent).
 // If the prefix already exists, the operation is a no-op.
 func (l *liteTable[V]) Insert(pfx netip.Prefix, _ V) {
+	var zero V
+
 	if !pfx.IsValid() {
 		return
 	}
@@ -84,7 +86,7 @@ func (l *liteTable[V]) Insert(pfx netip.Prefix, _ V) {
 	is4 := pfx.Addr().Is4()
 	n := l.rootNodeByVersion(is4)
 
-	if exists := n.insertAtDepth(pfx, 0); exists {
+	if exists := n.insertAtDepth(pfx, zero, 0); exists {
 		return
 	}
 
@@ -391,7 +393,7 @@ func (l *liteTable[V]) Modify(pfx netip.Prefix, cb func(zero V, found bool) (_ V
 			// insert new child at current leaf position (octet)
 			// descend down, replace n with new child
 			newNode := new(liteNode[V])
-			newNode.insertAtDepth(kid.prefix, depth+1)
+			newNode.insertAtDepth(kid.prefix, zero, depth+1)
 
 			n.insertChild(octet, newNode)
 			n = newNode
