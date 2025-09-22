@@ -21,7 +21,7 @@ import (
 // workLoadN to adjust loops for tests with -short
 func workLoadN() int {
 	if testing.Short() {
-		return 10
+		return 1_000
 	}
 	return 10_000
 }
