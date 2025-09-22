@@ -1,6 +1,10 @@
 // Copyright (c) 2025 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
+// Usage: go generate tags=ignore
+//go:generate ./scripts/geniterators.sh
+//go:build ignore
+
 package bart
 
 // unionRec recursively merges another node o into the receiver node n.
@@ -12,19 +16,20 @@ package bart
 //
 // The union handles all possible combinations of child node types (node, leaf, fringe)
 // between the two nodes. Structural conflicts are resolved by creating new intermediate
-// *bartNode[V] objects and pushing both children further down the trie. Leaves and fringes
+// *_NODE_TYPE[V] objects and pushing both children further down the trie. Leaves and fringes
 // are also recursively relocated as needed to preserve prefix semantics.
 //
 // The merge operation is destructive on the receiver n, but leaves the source node o unchanged.
 //
 // Returns the number of duplicate prefixes that were overwritten during merging.
-func (n *bartNode[V]) unionRec(cloneFn cloneFunc[V], o *bartNode[V], depth int) (duplicates int) {
+func (n *_NODE_TYPE[V]) unionRec(cloneFn cloneFunc[V], o *_NODE_TYPE[V], depth int) (duplicates int) {
 	buf := [256]uint8{}
 
 	// for all prefixes in other node do ...
-	for i, oIdx := range o.prefixes.AsSlice(&buf) {
+	for _, oIdx := range o.prefixes.AsSlice(&buf) {
 		// clone/copy the value from other node at idx
-		clonedVal := cloneFn(o.prefixes.Items[i])
+		val := o.mustGetPrefix(oIdx)
+		clonedVal := cloneFn(val)
 
 		// insert/overwrite cloned value from o into n
 		if n.insertPrefix(oIdx, clonedVal) {
@@ -34,7 +39,9 @@ func (n *bartNode[V]) unionRec(cloneFn cloneFunc[V], o *bartNode[V], depth int) 
 	}
 
 	// for all child addrs in other node do ...
-	for i, addr := range o.children.AsSlice(&buf) {
+	for _, addr := range o.children.AsSlice(&buf) {
+		otherAny := o.mustGetChild(addr)
+
 		//  12 possible combinations to union this child and other child
 		//
 		//  THIS,   OTHER: (always clone the other kid!)
@@ -58,8 +65,8 @@ func (n *bartNode[V]) unionRec(cloneFn cloneFunc[V], o *bartNode[V], depth int) 
 		// try to get child at same addr from n
 		thisChild, thisExists := n.getChild(addr)
 		if !thisExists { // NULL, ... slot at addr is empty
-			switch otherKid := o.children.Items[i].(type) {
-			case *bartNode[V]: // NULL, node
+			switch otherKid := otherAny.(type) {
+			case *_NODE_TYPE[V]: // NULL, node
 				n.insertChild(addr, otherKid.cloneRec(cloneFn))
 				continue
 
@@ -77,9 +84,9 @@ func (n *bartNode[V]) unionRec(cloneFn cloneFunc[V], o *bartNode[V], depth int) 
 		}
 
 		switch thisKid := thisChild.(type) {
-		case *bartNode[V]: // node, ...
-			switch otherKid := o.children.Items[i].(type) {
-			case *bartNode[V]: // node, node
+		case *_NODE_TYPE[V]: // node, ...
+			switch otherKid := otherAny.(type) {
+			case *_NODE_TYPE[V]: // node, node
 				// both childs have node at addr, call union rec-descent on child nodes
 				duplicates += thisKid.unionRec(cloneFn, otherKid.cloneRec(cloneFn), depth+1)
 				continue
@@ -102,10 +109,10 @@ func (n *bartNode[V]) unionRec(cloneFn cloneFunc[V], o *bartNode[V], depth int) 
 			}
 
 		case *leafNode[V]: // leaf, ...
-			switch otherKid := o.children.Items[i].(type) {
-			case *bartNode[V]: // leaf, node
+			switch otherKid := otherAny.(type) {
+			case *_NODE_TYPE[V]: // leaf, node
 				// create new node
-				nc := new(bartNode[V])
+				nc := new(_NODE_TYPE[V])
 
 				// push this leaf down
 				nc.insertAtDepth(thisKid.prefix, thisKid.value, depth+1)
@@ -126,7 +133,7 @@ func (n *bartNode[V]) unionRec(cloneFn cloneFunc[V], o *bartNode[V], depth int) 
 				}
 
 				// create new node
-				nc := new(bartNode[V])
+				nc := new(_NODE_TYPE[V])
 
 				// push this leaf down
 				nc.insertAtDepth(thisKid.prefix, thisKid.value, depth+1)
@@ -143,7 +150,7 @@ func (n *bartNode[V]) unionRec(cloneFn cloneFunc[V], o *bartNode[V], depth int) 
 
 			case *fringeNode[V]: // leaf, fringe
 				// create new node
-				nc := new(bartNode[V])
+				nc := new(_NODE_TYPE[V])
 
 				// push this leaf down
 				nc.insertAtDepth(thisKid.prefix, thisKid.value, depth+1)
@@ -160,10 +167,10 @@ func (n *bartNode[V]) unionRec(cloneFn cloneFunc[V], o *bartNode[V], depth int) 
 			}
 
 		case *fringeNode[V]: // fringe, ...
-			switch otherKid := o.children.Items[i].(type) {
-			case *bartNode[V]: // fringe, node
+			switch otherKid := otherAny.(type) {
+			case *_NODE_TYPE[V]: // fringe, node
 				// create new node
-				nc := new(bartNode[V])
+				nc := new(_NODE_TYPE[V])
 
 				// push this fringe down, it becomes the default route
 				nc.insertPrefix(1, thisKid.value)
@@ -177,7 +184,7 @@ func (n *bartNode[V]) unionRec(cloneFn cloneFunc[V], o *bartNode[V], depth int) 
 
 			case *leafNode[V]: // fringe, leaf
 				// create new node
-				nc := new(bartNode[V])
+				nc := new(_NODE_TYPE[V])
 
 				// push this fringe down, it becomes the default route
 				nc.insertPrefix(1, thisKid.value)
@@ -207,13 +214,14 @@ func (n *bartNode[V]) unionRec(cloneFn cloneFunc[V], o *bartNode[V], depth int) 
 }
 
 // unionRecPersist is similar to unionRec but performs an immutable union of nodes.
-func (n *bartNode[V]) unionRecPersist(cloneFn cloneFunc[V], o *bartNode[V], depth int) (duplicates int) {
+func (n *_NODE_TYPE[V]) unionRecPersist(cloneFn cloneFunc[V], o *_NODE_TYPE[V], depth int) (duplicates int) {
 	buf := [256]uint8{}
 
 	// for all prefixes in other node do ...
-	for i, oIdx := range o.prefixes.AsSlice(&buf) {
+	for _, oIdx := range o.prefixes.AsSlice(&buf) {
 		// clone/copy the value from other node
-		clonedVal := cloneFn(o.prefixes.Items[i])
+		val := o.mustGetPrefix(oIdx)
+		clonedVal := cloneFn(val)
 
 		// insert/overwrite cloned value from o into n
 		if exists := n.insertPrefix(oIdx, clonedVal); exists {
@@ -223,7 +231,8 @@ func (n *bartNode[V]) unionRecPersist(cloneFn cloneFunc[V], o *bartNode[V], dept
 	}
 
 	// for all child addrs in other node do ...
-	for i, addr := range o.children.AsSlice(&buf) {
+	for _, addr := range o.children.AsSlice(&buf) {
+		otherAny := o.mustGetChild(addr)
 		//  12 possible combinations to union this child and other child
 		//
 		//  THIS,   OTHER: (always clone the other kid!)
@@ -247,8 +256,8 @@ func (n *bartNode[V]) unionRecPersist(cloneFn cloneFunc[V], o *bartNode[V], dept
 		// try to get child at same addr from n
 		thisChild, thisExists := n.getChild(addr)
 		if !thisExists { // NULL, ... slot at addr is empty
-			switch otherKid := o.children.Items[i].(type) {
-			case *bartNode[V]: // NULL, node
+			switch otherKid := otherAny.(type) {
+			case *_NODE_TYPE[V]: // NULL, node
 				n.insertChild(addr, otherKid.cloneRec(cloneFn))
 				continue
 
@@ -266,7 +275,7 @@ func (n *bartNode[V]) unionRecPersist(cloneFn cloneFunc[V], o *bartNode[V], dept
 		}
 
 		switch thisKid := thisChild.(type) {
-		case *bartNode[V]: // node, ...
+		case *_NODE_TYPE[V]: // node, ...
 			// CLONE the node
 
 			// thisKid points now to cloned kid
@@ -275,8 +284,8 @@ func (n *bartNode[V]) unionRecPersist(cloneFn cloneFunc[V], o *bartNode[V], dept
 			// replace kid with cloned thisKid
 			n.insertChild(addr, thisKid)
 
-			switch otherKid := o.children.Items[i].(type) {
-			case *bartNode[V]: // node, node
+			switch otherKid := otherAny.(type) {
+			case *_NODE_TYPE[V]: // node, node
 				// both childs have node at addr, call union rec-descent on child nodes
 				duplicates += thisKid.unionRec(cloneFn, otherKid.cloneRec(cloneFn), depth+1)
 				continue
@@ -299,10 +308,10 @@ func (n *bartNode[V]) unionRecPersist(cloneFn cloneFunc[V], o *bartNode[V], dept
 			}
 
 		case *leafNode[V]: // leaf, ...
-			switch otherKid := o.children.Items[i].(type) {
-			case *bartNode[V]: // leaf, node
+			switch otherKid := otherAny.(type) {
+			case *_NODE_TYPE[V]: // leaf, node
 				// create new node
-				nc := new(bartNode[V])
+				nc := new(_NODE_TYPE[V])
 
 				// push this leaf down
 				nc.insertAtDepth(thisKid.prefix, thisKid.value, depth+1)
@@ -323,7 +332,7 @@ func (n *bartNode[V]) unionRecPersist(cloneFn cloneFunc[V], o *bartNode[V], dept
 				}
 
 				// create new node
-				nc := new(bartNode[V])
+				nc := new(_NODE_TYPE[V])
 
 				// push this leaf down
 				nc.insertAtDepth(thisKid.prefix, thisKid.value, depth+1)
@@ -340,7 +349,7 @@ func (n *bartNode[V]) unionRecPersist(cloneFn cloneFunc[V], o *bartNode[V], dept
 
 			case *fringeNode[V]: // leaf, fringe
 				// create new node
-				nc := new(bartNode[V])
+				nc := new(_NODE_TYPE[V])
 
 				// push this leaf down
 				nc.insertAtDepth(thisKid.prefix, thisKid.value, depth+1)
@@ -357,10 +366,10 @@ func (n *bartNode[V]) unionRecPersist(cloneFn cloneFunc[V], o *bartNode[V], dept
 			}
 
 		case *fringeNode[V]: // fringe, ...
-			switch otherKid := o.children.Items[i].(type) {
-			case *bartNode[V]: // fringe, node
+			switch otherKid := otherAny.(type) {
+			case *_NODE_TYPE[V]: // fringe, node
 				// create new node
-				nc := new(bartNode[V])
+				nc := new(_NODE_TYPE[V])
 
 				// push this fringe down, it becomes the default route
 				nc.insertPrefix(1, thisKid.value)
@@ -374,7 +383,7 @@ func (n *bartNode[V]) unionRecPersist(cloneFn cloneFunc[V], o *bartNode[V], dept
 
 			case *leafNode[V]: // fringe, leaf
 				// create new node
-				nc := new(bartNode[V])
+				nc := new(_NODE_TYPE[V])
 
 				// push this fringe down, it becomes the default route
 				nc.insertPrefix(1, thisKid.value)
