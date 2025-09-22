@@ -126,9 +126,9 @@ func (n *fastNode[V]) insertChild(addr uint8, child any) (exists bool) {
 	n.cldCount++
 
 	// pointer to any reduces per-slot memory for nil entries versus storing `any` directly.
-	// force clear ownership; taking &c makes it escape to heap so the pointer remains valid.
-	c := child
-	n.children.items[addr] = &c // escape on first insert only
+	p := new(any)
+	*p = child
+	n.children.items[addr] = p
 
 	return false
 }
