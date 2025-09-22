@@ -259,8 +259,7 @@ func (n *liteNode[V]) lookup(idx uint8) (_ V, ok bool) {
 //   - depth: The current depth in the trie (0-based byte index)
 //
 // Returns true if a prefix already existed and was updated, false for new insertions.
-func (n *liteNode[V]) insertAtDepth(pfx netip.Prefix, depth int) (exists bool) {
-	var zero V
+func (n *liteNode[V]) insertAtDepth(pfx netip.Prefix, val V, depth int) (exists bool) {
 	ip := pfx.Addr() // the pfx must be in canonical form
 	octets := ip.AsSlice()
 	lastOctetPlusOne, lastBits := lastOctetPlusOneAndLastBits(pfx)
@@ -271,16 +270,16 @@ func (n *liteNode[V]) insertAtDepth(pfx netip.Prefix, depth int) (exists bool) {
 		octet := octets[depth]
 		// last masked octet: insert/override prefix/val into node
 		if depth == lastOctetPlusOne {
-			return n.insertPrefix(art.PfxToIdx(octet, lastBits), zero)
+			return n.insertPrefix(art.PfxToIdx(octet, lastBits), val)
 		}
 
 		// reached end of trie path ...
 		if !n.children.Test(octet) {
 			// insert prefix path compressed as leaf or fringe
 			if isFringe(depth, pfx) {
-				return n.insertChild(octet, newFringeNode(zero))
+				return n.insertChild(octet, newFringeNode(val))
 			}
-			return n.insertChild(octet, newLeafNode(pfx, zero))
+			return n.insertChild(octet, newLeafNode(pfx, val))
 		}
 
 		// ... or descend down the trie
@@ -303,7 +302,7 @@ func (n *liteNode[V]) insertAtDepth(pfx netip.Prefix, depth int) (exists bool) {
 			// insert new child at current leaf position (addr)
 			// descend down, replace n with new child
 			newNode := new(liteNode[V])
-			newNode.insertAtDepth(kid.prefix, depth+1)
+			newNode.insertAtDepth(kid.prefix, val, depth+1)
 
 			n.insertChild(octet, newNode)
 			n = newNode
@@ -320,7 +319,7 @@ func (n *liteNode[V]) insertAtDepth(pfx netip.Prefix, depth int) (exists bool) {
 			// insert new child at current leaf position (addr)
 			// descend down, replace n with new child
 			newNode := new(liteNode[V])
-			newNode.insertPrefix(1, zero)
+			newNode.insertPrefix(1, val)
 
 			n.insertChild(octet, newNode)
 			n = newNode
@@ -348,6 +347,8 @@ func (n *liteNode[V]) insertAtDepth(pfx netip.Prefix, depth int) (exists bool) {
 //   - octets: The path of octets taken to reach the current position
 //   - is4: True for IPv4 processing, false for IPv6
 func (n *liteNode[V]) purgeAndCompress(stack []*liteNode[V], octets []uint8, is4 bool) {
+	var zero V
+
 	// unwind the stack
 	for depth := len(stack) - 1; depth >= 0; depth-- {
 		parent := stack[depth]
@@ -371,7 +372,7 @@ func (n *liteNode[V]) purgeAndCompress(stack []*liteNode[V], octets []uint8, is4
 				parent.deleteChild(octet)
 
 				// ... (re)insert the leaf at parents depth
-				parent.insertAtDepth(kid.prefix, depth)
+				parent.insertAtDepth(kid.prefix, zero, depth)
 			case *fringeNode[V]:
 				// just one fringe, delete this node and reinsert the fringe as leaf above
 				parent.deleteChild(octet)
@@ -384,7 +385,7 @@ func (n *liteNode[V]) purgeAndCompress(stack []*liteNode[V], octets []uint8, is4
 				fringePfx := cidrForFringe(octets, depth+1, is4, lastOctet)
 
 				// ... (re)reinsert prefix/value at parents depth
-				parent.insertAtDepth(fringePfx, depth)
+				parent.insertAtDepth(fringePfx, zero, depth)
 			}
 
 		case n.pfxCount == 1 && childCount == 0:
@@ -402,7 +403,7 @@ func (n *liteNode[V]) purgeAndCompress(stack []*liteNode[V], octets []uint8, is4
 			pfx := cidrFromPath(path, depth+1, is4, idx)
 
 			// ... (re)insert prefix/value at parents depth
-			parent.insertAtDepth(pfx, depth)
+			parent.insertAtDepth(pfx, zero, depth)
 		}
 
 		// climb up the stack
