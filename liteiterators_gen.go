@@ -27,7 +27,8 @@ import (
 // The traversal order is not defined. This implementation favors simplicity
 // and runtime efficiency over consistency of iteration sequence.
 func (n *liteNode[V]) allRec(path stridePath, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
-	for _, idx := range n.prefixes.AsSlice(&[256]uint8{}) {
+	var buf [256]uint8
+	for _, idx := range n.prefixes.AsSlice(&buf) {
 		cidr := cidrFromPath(path, depth, is4, idx)
 		val := n.mustGetPrefix(idx)
 
@@ -39,7 +40,7 @@ func (n *liteNode[V]) allRec(path stridePath, depth int, is4 bool, yield func(ne
 	}
 
 	// for all children (nodes and leaves) in this node do ...
-	for _, addr := range n.children.AsSlice(&[256]uint8{}) {
+	for _, addr := range n.children.AsSlice(&buf) {
 		anyKid := n.mustGetChild(addr)
 		switch kid := anyKid.(type) {
 		case *liteNode[V]:
