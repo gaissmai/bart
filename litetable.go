@@ -731,6 +731,8 @@ func (l *liteTable[V]) Union(o *liteTable[V]) {
 // UnionPersist is similar to [Union] but the receiver isn't modified.
 //
 // All nodes touched during union are cloned and a new liteTable is returned.
+// If o is nil or empty, no nodes are touched and the receiver may be
+// returned unchanged.
 func (l *liteTable[V]) UnionPersist(o *liteTable[V]) *liteTable[V] {
 	if o == nil || (o.size4 == 0 && o.size6 == 0) {
 		return l

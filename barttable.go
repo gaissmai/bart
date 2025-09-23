@@ -1154,6 +1154,8 @@ func (t *Table[V]) Union(o *Table[V]) {
 // UnionPersist is similar to [Union] but the receiver isn't modified.
 //
 // All nodes touched during union are cloned and a new Table is returned.
+// If o is nil or empty, no nodes are touched and the receiver may be
+// returned unchanged.
 func (t *Table[V]) UnionPersist(o *Table[V]) *Table[V] {
 	if o == nil || (o.size4 == 0 && o.size6 == 0) {
 		return t
