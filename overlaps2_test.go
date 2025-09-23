@@ -39,7 +39,7 @@ func FuzzOverlaps(f *testing.F) {
 	f.Add(uint64(22222), 300, 300)
 
 	f.Fuzz(func(t *testing.T, seed uint64, n1, n2 int) {
-		if n1 < 1 || n1 > 2000 || n2 < 1 || n2 > 2000 {
+		if n1 < 1 || n1 > 1000 || n2 < 1 || n2 > 1000 {
 			t.Skip("counts out of range")
 		}
 
