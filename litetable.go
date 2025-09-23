@@ -17,7 +17,10 @@ import (
 	"github.com/gaissmai/bart/internal/lpm"
 )
 
-// adapter type
+// Lite is a prefix-only table that embeds a private liteTable[struct{}].
+//
+// It is intentionally not nil-receiver safe: calling methods on a nil *Lite
+// will panic by design.
 type Lite struct {
 	liteTable[struct{}]
 }
