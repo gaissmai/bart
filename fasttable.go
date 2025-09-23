@@ -761,7 +761,7 @@ func (f *Fast[V]) Union(o *Fast[V]) {
 
 // UnionPersist is similar to [Union] but the receiver isn't modified.
 //
-// All nodes touched during union are cloned and a new Fast is returned.
+// All nodes touched during union are cloned and a new *Fast is returned.
 // If o is nil or empty, no nodes are touched and the receiver may be
 // returned unchanged.
 func (f *Fast[V]) UnionPersist(o *Fast[V]) *Fast[V] {

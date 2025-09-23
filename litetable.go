@@ -26,7 +26,7 @@ type Lite struct {
 }
 
 // Insert adds a pfx to the tree.
-// If pfx is already present in the tree, its a no-op.
+// If pfx is already present in the tree, it's a no-op.
 func (l *Lite) Insert(pfx netip.Prefix) {
 	l.liteTable.Insert(pfx, struct{}{})
 }
@@ -65,7 +65,7 @@ func (l *Lite) Union(o *Lite) {
 
 // UnionPersist is similar to [Union] but the receiver isn't modified.
 //
-// All nodes touched during union are cloned and a new Table is returned.
+// All nodes touched during union are cloned and a new *Lite is returned.
 // If o is nil or empty, no nodes are touched and the receiver may be
 // returned unchanged.
 func (l *Lite) UnionPersist(o *Lite) *Lite {
@@ -81,6 +81,9 @@ func (l *Lite) UnionPersist(o *Lite) *Lite {
 // It ensures both trees (IPv4-based and IPv6-based) have the same sizes and
 // recursively compares their root nodes.
 func (l *Lite) Equal(o *Lite) bool {
+	if o == nil {
+		return false
+	}
 	return l.liteTable.Equal(&o.liteTable)
 }
 
@@ -716,6 +719,9 @@ func (l *liteTable[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 // This is useful for conflict detection, policy enforcement,
 // or validating mutually exclusive routing domains.
 func (l *liteTable[V]) Overlaps(o *liteTable[V]) bool {
+	if o == nil {
+		return false
+	}
 	return l.Overlaps4(o) || l.Overlaps6(o)
 }
 
@@ -891,14 +897,14 @@ func (l *liteTable[V]) AllSorted() iter.Seq2[netip.Prefix, V] {
 	}
 }
 
-// AllSorted4 is like [Table.AllSorted] but only for the v4 routing table.
+// AllSorted4 is like [Lite.AllSorted] but only for the v4 routing table.
 func (l *liteTable[V]) AllSorted4() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
 		_ = l.root4.allRecSorted(stridePath{}, 0, true, yield)
 	}
 }
 
-// AllSorted6 is like [Table.AllSorted] but only for the v6 routing table.
+// AllSorted6 is like [Lite.AllSorted] but only for the v6 routing table.
 func (l *liteTable[V]) AllSorted6() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
 		_ = l.root6.allRecSorted(stridePath{}, 0, false, yield)
