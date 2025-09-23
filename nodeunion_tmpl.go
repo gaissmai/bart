@@ -344,7 +344,7 @@ func (n *_NODE_TYPE[V]) unionRecPersist(cloneFn cloneFunc[V], o *_NODE_TYPE[V], 
 				// insert the new node at current addr
 				n.insertChild(addr, nc)
 
-				// unionRec with cloned otherKid
+				// unionRec (destructive) on a fresh node with a cloned otherKid: persist-safe
 				duplicates += nc.unionRec(cloneFn, otherKid.cloneRec(cloneFn), depth+1)
 				continue
 
@@ -402,7 +402,7 @@ func (n *_NODE_TYPE[V]) unionRecPersist(cloneFn cloneFunc[V], o *_NODE_TYPE[V], 
 				// insert the new node at current addr
 				n.insertChild(addr, nc)
 
-				// unionRec with cloned otherKid
+				// unionRec (destructive) on a fresh node with a cloned otherKid: persist-safe
 				duplicates += nc.unionRec(cloneFn, otherKid.cloneRec(cloneFn), depth+1)
 				continue
 
