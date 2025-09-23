@@ -675,7 +675,7 @@ LOOP:
 //	for supernet, val := range table.Supernets(netip.MustParsePrefix("192.0.2.128/25")) {
 //	    fmt.Println("Matched covering route:", supernet, "->", val)
 //	}
-func (t *Fast[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
+func (f *Fast[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
 		if !pfx.IsValid() {
 			return
@@ -689,7 +689,7 @@ func (t *Fast[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 		octets := ip.AsSlice()
 		lastOctetPlusOne, lastBits := lastOctetPlusOneAndLastBits(pfx)
 
-		n := t.rootNodeByVersion(is4)
+		n := f.rootNodeByVersion(is4)
 
 		// stack of the traversed nodes for reverse ordering of supernets
 		stack := [maxTreeDepth]*fastNode[V]{}
@@ -796,7 +796,7 @@ func (t *Fast[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 //	for sub, val := range table.Subnets(netip.MustParsePrefix("10.0.0.0/8")) {
 //	    fmt.Println("Covered:", sub, "->", val)
 //	}
-func (t *Fast[V]) Subnets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
+func (f *Fast[V]) Subnets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
 		if !pfx.IsValid() {
 			return
@@ -811,7 +811,7 @@ func (t *Fast[V]) Subnets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 		octets := ip.AsSlice()
 		lastOctetPlusOne, lastBits := lastOctetPlusOneAndLastBits(pfx)
 
-		n := t.rootNodeByVersion(is4)
+		n := f.rootNodeByVersion(is4)
 
 		// find the trie node
 		for depth, octet := range octets {
@@ -889,6 +889,30 @@ func (f *Fast[V]) Equal(o *Fast[V]) bool {
 	}
 
 	return f.root4.equalRec(&o.root4) && f.root6.equalRec(&o.root6)
+}
+
+// OverlapsPrefix reports whether any route in the table overlaps with the given pfx or vice versa.
+//
+// The check is bidirectional: it returns true if the input prefix is covered by an existing
+// route, or if any stored route is itself contained within the input prefix.
+//
+// Internally, the function normalizes the prefix and descends the relevant trie branch,
+// using stride-based logic to identify overlap without performing a full lookup.
+//
+// This is useful for containment tests, route validation, or policy checks using prefix
+// semantics without retrieving exact matches.
+func (f *Fast[V]) OverlapsPrefix(pfx netip.Prefix) bool {
+	if !pfx.IsValid() {
+		return false
+	}
+
+	// canonicalize the prefix
+	pfx = pfx.Masked()
+
+	is4 := pfx.Addr().Is4()
+	n := f.rootNodeByVersion(is4)
+
+	return n.overlapsPrefixAtDepth(pfx, 0)
 }
 
 // Overlaps reports whether any route in the receiver table overlaps
@@ -1070,24 +1094,24 @@ func (f *Fast[V]) All6() iter.Seq2[netip.Prefix, V] {
 //
 // The traversal is stable and predictable across calls.
 // Iteration stops early if you break out of the loop.
-func (t *Fast[V]) AllSorted() iter.Seq2[netip.Prefix, V] {
+func (f *Fast[V]) AllSorted() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
-		_ = t.root4.allRecSorted(stridePath{}, 0, true, yield) &&
-			t.root6.allRecSorted(stridePath{}, 0, false, yield)
+		_ = f.root4.allRecSorted(stridePath{}, 0, true, yield) &&
+			f.root6.allRecSorted(stridePath{}, 0, false, yield)
 	}
 }
 
 // AllSorted4 is like [Fast.AllSorted] but only for the v4 routing table.
-func (t *Fast[V]) AllSorted4() iter.Seq2[netip.Prefix, V] {
+func (f *Fast[V]) AllSorted4() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
-		_ = t.root4.allRecSorted(stridePath{}, 0, true, yield)
+		_ = f.root4.allRecSorted(stridePath{}, 0, true, yield)
 	}
 }
 
 // AllSorted6 is like [Fast.AllSorted] but only for the v6 routing table.
-func (t *Fast[V]) AllSorted6() iter.Seq2[netip.Prefix, V] {
+func (f *Fast[V]) AllSorted6() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
-		_ = t.root6.allRecSorted(stridePath{}, 0, false, yield)
+		_ = f.root6.allRecSorted(stridePath{}, 0, false, yield)
 	}
 }
 
