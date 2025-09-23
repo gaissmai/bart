@@ -92,7 +92,7 @@ func (n *liteNode[V]) unionRec(cloneFn cloneFunc[V], o *liteNode[V], depth int) 
 			case *leafNode[V]: // node, leaf
 				// push this cloned leaf down, count duplicate entry
 				clonedLeaf := otherKid.cloneLeaf(cloneFn)
-				if thisKid.insertAtDepth(clonedLeaf.prefix, clonedLeaf.value, depth+1) {
+				if thisKid.insertAtDepthPersist(cloneFn, clonedLeaf.prefix, clonedLeaf.value, depth+1) {
 					duplicates++
 				}
 				continue
@@ -291,7 +291,7 @@ func (n *liteNode[V]) unionRecPersist(cloneFn cloneFunc[V], o *liteNode[V], dept
 			case *leafNode[V]: // node, leaf
 				// push this cloned leaf down, count duplicate entry
 				clonedLeaf := otherKid.cloneLeaf(cloneFn)
-				if thisKid.insertAtDepth(clonedLeaf.prefix, clonedLeaf.value, depth+1) {
+				if thisKid.insertAtDepthPersist(cloneFn, clonedLeaf.prefix, clonedLeaf.value, depth+1) {
 					duplicates++
 				}
 				continue
@@ -317,8 +317,8 @@ func (n *liteNode[V]) unionRecPersist(cloneFn cloneFunc[V], o *liteNode[V], dept
 				// insert the new node at current addr
 				n.insertChild(addr, nc)
 
-				// unionRecPersist with cloned otherKid
-				duplicates += nc.unionRecPersist(cloneFn, otherKid.cloneRec(cloneFn), depth+1)
+				// unionRec with cloned otherKid
+				duplicates += nc.unionRec(cloneFn, otherKid.cloneRec(cloneFn), depth+1)
 				continue
 
 			case *leafNode[V]: // leaf, leaf
@@ -375,8 +375,8 @@ func (n *liteNode[V]) unionRecPersist(cloneFn cloneFunc[V], o *liteNode[V], dept
 				// insert the new node at current addr
 				n.insertChild(addr, nc)
 
-				// unionRecPersist with cloned otherKid
-				duplicates += nc.unionRecPersist(cloneFn, otherKid.cloneRec(cloneFn), depth+1)
+				// unionRec with cloned otherKid
+				duplicates += nc.unionRec(cloneFn, otherKid.cloneRec(cloneFn), depth+1)
 				continue
 
 			case *leafNode[V]: // fringe, leaf
