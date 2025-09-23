@@ -1,7 +1,7 @@
 // Copyright (c) 2025 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
-// Usage: go generate tags=ignore
+// Usage: go generate -tags=ignore ./...
 //go:generate ./scripts/gen-monomorphized-methods.sh
 //go:build ignore
 
