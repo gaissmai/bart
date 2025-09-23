@@ -31,54 +31,11 @@ func (l *Lite) Insert(pfx netip.Prefix) {
 	l.liteTable.Insert(pfx, struct{}{})
 }
 
-// Subnets returns an iterator over all prefix–value pairs in the routing table
-// that are fully contained within the given prefix pfx.
-//
-// Entries are returned in CIDR sort order.
-//
-// Example:
-//
-//	for sub := range table.Subnets(netip.MustParsePrefix("10.0.0.0/8")) {
-//	    fmt.Println("Covered:", sub)
-//	}
-func (l *Lite) Subnets(pfx netip.Prefix) iter.Seq[netip.Prefix] {
-	// wrap a iter.Seq2 in a iter.Seq
-	seq2 := l.liteTable.Subnets(pfx)
-
+// dropSeq2 converts a Seq2[netip.Prefix, V] into a Seq[netip.Prefix] by discarding the value.
+func dropSeq2[V any](seq2 iter.Seq2[netip.Prefix, V]) iter.Seq[netip.Prefix] {
 	return func(yield func(netip.Prefix) bool) {
-		seq2(func(pfx netip.Prefix, _ struct{}) bool {
-			return yield(pfx)
-		})
-	}
-}
-
-// Supernets returns an iterator over all supernet routes that cover the given prefix pfx.
-//
-// The traversal searches both exact-length and shorter (less specific) prefixes that
-// overlap or include pfx. Starting from the most specific position in the trie,
-// it walks upward through parent nodes and yields any matching entries found at each level.
-//
-// The iteration order is reverse-CIDR: from longest prefix match (LPM) towards
-// least-specific routes.
-//
-// The search is protocol-specific (IPv4 or IPv6) and stops immediately if the yield
-// function returns false. If pfx is invalid, the function silently returns.
-//
-// This can be used to enumerate all covering supernet routes in routing-based
-// policy engines, diagnostics tools, or fallback resolution logic.
-//
-// Example:
-//
-//	for supernet := range table.Supernets(netip.MustParsePrefix("192.0.2.128/25")) {
-//	    fmt.Println("Matched covering route:", supernet)
-//	}
-func (l *Lite) Supernets(pfx netip.Prefix) iter.Seq[netip.Prefix] {
-	// wrap a iter.Seq2 in a iter.Seq
-	seq2 := l.liteTable.Supernets(pfx)
-
-	return func(yield func(netip.Prefix) bool) {
-		seq2(func(pfx netip.Prefix, _ struct{}) bool {
-			return yield(pfx)
+		seq2(func(p netip.Prefix, _ V) bool {
+			return yield(p)
 		})
 	}
 }
@@ -105,38 +62,17 @@ func (l *Lite) Supernets(pfx netip.Prefix) iter.Seq[netip.Prefix] {
 // If mutation of the table during traversal is required,
 // use [Lite.WalkPersist] instead.
 func (l *Lite) All() iter.Seq[netip.Prefix] {
-	// wrap a iter.Seq2 in a iter.Seq
-	seq2 := l.liteTable.All()
-
-	return func(yield func(netip.Prefix) bool) {
-		seq2(func(pfx netip.Prefix, _ struct{}) bool {
-			return yield(pfx)
-		})
-	}
+	return dropSeq2(l.liteTable.All())
 }
 
 // All4 is like [Lite.All] but only for the v4 routing table.
 func (l *Lite) All4() iter.Seq[netip.Prefix] {
-	// wrap a iter.Seq2 in a iter.Seq
-	seq2 := l.liteTable.All4()
-
-	return func(yield func(netip.Prefix) bool) {
-		seq2(func(pfx netip.Prefix, _ struct{}) bool {
-			return yield(pfx)
-		})
-	}
+	return dropSeq2(l.liteTable.All4())
 }
 
 // All6 is like [Lite.All] but only for the v6 routing table.
 func (l *Lite) All6() iter.Seq[netip.Prefix] {
-	// wrap a iter.Seq2 in a iter.Seq
-	seq2 := l.liteTable.All6()
-
-	return func(yield func(netip.Prefix) bool) {
-		seq2(func(pfx netip.Prefix, _ struct{}) bool {
-			return yield(pfx)
-		})
-	}
+	return dropSeq2(l.liteTable.All6())
 }
 
 // AllSorted returns an iterator over all prefixes in the table,
@@ -158,38 +94,55 @@ func (l *Lite) All6() iter.Seq[netip.Prefix] {
 // If mutation of the table during traversal is required,
 // use [Lite.WalkPersist] instead.
 func (l *Lite) AllSorted() iter.Seq[netip.Prefix] {
-	// wrap a iter.Seq2 in a iter.Seq
-	seq2 := l.liteTable.AllSorted()
-
-	return func(yield func(netip.Prefix) bool) {
-		seq2(func(pfx netip.Prefix, _ struct{}) bool {
-			return yield(pfx)
-		})
-	}
+	return dropSeq2(l.liteTable.AllSorted())
 }
 
 // AllSorted4 is like [Lite.AllSorted] but only for the v4 routing table.
 func (l *Lite) AllSorted4() iter.Seq[netip.Prefix] {
-	// wrap a iter.Seq2 in a iter.Seq
-	seq2 := l.liteTable.AllSorted4()
-
-	return func(yield func(netip.Prefix) bool) {
-		seq2(func(pfx netip.Prefix, _ struct{}) bool {
-			return yield(pfx)
-		})
-	}
+	return dropSeq2(l.liteTable.AllSorted4())
 }
 
 // AllSorted6 is like [Lite.AllSorted] but only for the v6 routing table.
 func (l *Lite) AllSorted6() iter.Seq[netip.Prefix] {
-	// wrap a iter.Seq2 in a iter.Seq
-	seq2 := l.liteTable.AllSorted6()
+	return dropSeq2(l.liteTable.AllSorted6())
+}
 
-	return func(yield func(netip.Prefix) bool) {
-		seq2(func(pfx netip.Prefix, _ struct{}) bool {
-			return yield(pfx)
-		})
-	}
+// Subnets returns an iterator over all prefix–value pairs in the routing table
+// that are fully contained within the given prefix pfx.
+//
+// Entries are returned in CIDR sort order.
+//
+// Example:
+//
+//	for sub := range table.Subnets(netip.MustParsePrefix("10.0.0.0/8")) {
+//	    fmt.Println("Covered:", sub)
+//	}
+func (l *Lite) Subnets(pfx netip.Prefix) iter.Seq[netip.Prefix] {
+	return dropSeq2(l.liteTable.Subnets(pfx))
+}
+
+// Supernets returns an iterator over all supernet routes that cover the given prefix pfx.
+//
+// The traversal searches both exact-length and shorter (less specific) prefixes that
+// overlap or include pfx. Starting from the most specific position in the trie,
+// it walks upward through parent nodes and yields any matching entries found at each level.
+//
+// The iteration order is reverse-CIDR: from longest prefix match (LPM) towards
+// least-specific routes.
+//
+// The search is protocol-specific (IPv4 or IPv6) and stops immediately if the yield
+// function returns false. If pfx is invalid, the function silently returns.
+//
+// This can be used to enumerate all covering supernet routes in routing-based
+// policy engines, diagnostics tools, or fallback resolution logic.
+//
+// Example:
+//
+//	for supernet := range table.Supernets(netip.MustParsePrefix("192.0.2.128/25")) {
+//	    fmt.Println("Matched covering route:", supernet)
+//	}
+func (l *Lite) Supernets(pfx netip.Prefix) iter.Seq[netip.Prefix] {
+	return dropSeq2(l.liteTable.Supernets(pfx))
 }
 
 // Overlaps reports whether any route in the receiver table overlaps
