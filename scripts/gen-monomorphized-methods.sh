@@ -15,8 +15,6 @@ fi
 
 echo "START: Generating monomorphized methods from template '${GOFILE}' ..."
 
-#!/bin/bash
-
 if grep -q "TODO" "${template_file}"; then
 	echo "✗ Aborting, found pattern 'TODO' in template" >&2
 	exit 1
@@ -35,10 +33,11 @@ for nodeType in "${NODE_TYPES[@]}"; do
     output_file="${output_file//node/}"                     # remove node in filename
     
     # Remove go:generate directives and build constraint, add generated header, substitute node type
-    sed -e '/go.generate /d'                                                                         \
+    sed -e '/^\/\/go:generate\b/d' \
+        -e '/Usage:.*go generate\b/d' \
         -e "s|^//go:build ignore.*$|// Code generated from file \"${template_file}\"; DO NOT EDIT.|" \
-        -e '/GENERATE DELETE START/,/GENERATE DELETE END/d'                                                            \
-        -e "s|_NODE_TYPE|${nodeType}|g"                                                              \
+        -e '/GENERATE DELETE START/,/GENERATE DELETE END/d' \
+        -e "s|_NODE_TYPE|${nodeType}|g" \
         "${template_file}" > "${output_file}"
     
     if [[ -f "${output_file}" ]]; then
