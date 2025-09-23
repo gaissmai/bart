@@ -9,12 +9,20 @@ import (
 	"testing"
 )
 
-// ---------- helpers ----------
+// verifySortedCIDR asserts the slice is sorted in natural CIDR order.
+func verifySortedCIDR(t *testing.T, list []netip.Prefix) {
+	t.Helper()
+	for i := 1; i < len(list); i++ {
+		if cmpPrefix(list[i-1], list[i]) > 0 {
+			t.Fatalf("order violation at %d: %v > %v", i-1, list[i-1], list[i])
+		}
+	}
+}
+
 // isSubnetOf reports whether p is fully contained in q (same address family).
-// Logic:
-// - families must match (both v4 or both v6)
-// - a subnet must have a prefix length >= its supernet
-// - compare the network part of p at q's length against q's masked network
+// Families must match; a subnet must have a prefix length >= its supernet.
+// Compares the network of p at q's length with q's canonical (Masked) network.
+// Note: use netip.PrefixFrom(addr,bits) (single return) to avoid multi-value errors.
 func isSubnetOf(p, q netip.Prefix) bool {
 	if p.Addr().Is4() != q.Addr().Is4() {
 		return false
@@ -26,10 +34,8 @@ func isSubnetOf(p, q netip.Prefix) bool {
 }
 
 // isSupernetOf reports whether r is a supernet of p (same address family).
-// Logic is the inverse direction:
-// - families must match
-// - a supernet must have a prefix length <= that of the subnet
-// - compare the network part of p at r's length against r's masked network
+// Families must match; a supernet must have a prefix length <= the subnet.
+// Compares the network of p at r's length with r's canonical (Masked) network.
 func isSupernetOf(r, p netip.Prefix) bool {
 	if r.Addr().Is4() != p.Addr().Is4() {
 		return false
@@ -40,23 +46,13 @@ func isSupernetOf(r, p netip.Prefix) bool {
 	return netip.PrefixFrom(p.Addr(), r.Bits()).Masked() == r.Masked()
 }
 
-func verifySortedCIDR(t *testing.T, list []netip.Prefix) {
-	t.Helper()
-	for i := 1; i < len(list); i++ {
-		if cmpPrefix(list[i-1], list[i]) > 0 {
-			t.Fatalf("order violation at %d: %v > %v", i-1, list[i-1], list[i])
-		}
-	}
-}
-
-// ---------- All4 / All6 (and Sorted) ----------
+// ---------------- All4 / All6 (counts and family checks) ----------------
 
 func TestAll4All6_Table(t *testing.T) {
 	t.Parallel()
-	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 1))
-	pfxs := randomPrefixes(prng, n)
+	pfxs := randomPrefixes(prng, 500)
 
 	tbl := new(Table[int])
 	var n4, n6 int
@@ -71,8 +67,7 @@ func TestAll4All6_Table(t *testing.T) {
 
 	seen4 := map[netip.Prefix]bool{}
 	seen6 := map[netip.Prefix]bool{}
-	got4, got6 := 0, 0
-
+	got4 := 0
 	for p := range tbl.All4() {
 		if !p.Addr().Is4() {
 			t.Fatalf("All4 yielded non-IPv4: %v", p)
@@ -83,6 +78,7 @@ func TestAll4All6_Table(t *testing.T) {
 		seen4[p] = true
 		got4++
 	}
+	got6 := 0
 	for p := range tbl.All6() {
 		if p.Addr().Is4() {
 			t.Fatalf("All6 yielded IPv4: %v", p)
@@ -101,10 +97,9 @@ func TestAll4All6_Table(t *testing.T) {
 
 func TestAll4All6_Fast(t *testing.T) {
 	t.Parallel()
-	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(43, 1))
-	pfxs := randomPrefixes(prng, n)
+	pfxs := randomPrefixes(prng, 500)
 
 	f := new(Fast[int])
 	var n4, n6 int
@@ -119,8 +114,7 @@ func TestAll4All6_Fast(t *testing.T) {
 
 	seen4 := map[netip.Prefix]bool{}
 	seen6 := map[netip.Prefix]bool{}
-	got4, got6 := 0, 0
-
+	got4 := 0
 	for p := range f.All4() {
 		if !p.Addr().Is4() {
 			t.Fatalf("All4 yielded non-IPv4: %v", p)
@@ -131,6 +125,7 @@ func TestAll4All6_Fast(t *testing.T) {
 		seen4[p] = true
 		got4++
 	}
+	got6 := 0
 	for p := range f.All6() {
 		if p.Addr().Is4() {
 			t.Fatalf("All6 yielded IPv4: %v", p)
@@ -141,6 +136,7 @@ func TestAll4All6_Fast(t *testing.T) {
 		seen6[p] = true
 		got6++
 	}
+
 	if got4 != n4 || got6 != n6 {
 		t.Fatalf("mismatch counts: want4=%d got4=%d, want6=%d got6=%d", n4, got4, n6, got6)
 	}
@@ -148,10 +144,9 @@ func TestAll4All6_Fast(t *testing.T) {
 
 func TestAll4All6_liteTable(t *testing.T) {
 	t.Parallel()
-	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(44, 1))
-	pfxs := randomPrefixes(prng, n)
+	pfxs := randomPrefixes(prng, 500)
 
 	lt := new(liteTable[int])
 	var n4, n6 int
@@ -166,8 +161,7 @@ func TestAll4All6_liteTable(t *testing.T) {
 
 	seen4 := map[netip.Prefix]bool{}
 	seen6 := map[netip.Prefix]bool{}
-	got4, got6 := 0, 0
-
+	got4 := 0
 	for p := range lt.All4() {
 		if !p.Addr().Is4() {
 			t.Fatalf("All4 yielded non-IPv4: %v", p)
@@ -178,6 +172,7 @@ func TestAll4All6_liteTable(t *testing.T) {
 		seen4[p] = true
 		got4++
 	}
+	got6 := 0
 	for p := range lt.All6() {
 		if p.Addr().Is4() {
 			t.Fatalf("All6 yielded IPv4: %v", p)
@@ -188,6 +183,7 @@ func TestAll4All6_liteTable(t *testing.T) {
 		seen6[p] = true
 		got6++
 	}
+
 	if got4 != n4 || got6 != n6 {
 		t.Fatalf("mismatch counts: want4=%d got4=%d, want6=%d got6=%d", n4, got4, n6, got6)
 	}
@@ -195,10 +191,9 @@ func TestAll4All6_liteTable(t *testing.T) {
 
 func TestAll4All6_Lite(t *testing.T) {
 	t.Parallel()
-	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(45, 1))
-	pfxs := randomPrefixes(prng, n)
+	pfxs := randomPrefixes(prng, 500)
 
 	l := new(Lite)
 	var n4, n6 int
@@ -213,8 +208,7 @@ func TestAll4All6_Lite(t *testing.T) {
 
 	seen4 := map[netip.Prefix]bool{}
 	seen6 := map[netip.Prefix]bool{}
-	got4, got6 := 0, 0
-
+	got4 := 0
 	for p := range l.All4() {
 		if !p.Addr().Is4() {
 			t.Fatalf("All4 yielded non-IPv4: %v", p)
@@ -225,6 +219,7 @@ func TestAll4All6_Lite(t *testing.T) {
 		seen4[p] = true
 		got4++
 	}
+	got6 := 0
 	for p := range l.All6() {
 		if p.Addr().Is4() {
 			t.Fatalf("All6 yielded IPv4: %v", p)
@@ -235,19 +230,19 @@ func TestAll4All6_Lite(t *testing.T) {
 		seen6[p] = true
 		got6++
 	}
+
 	if got4 != n4 || got6 != n6 {
 		t.Fatalf("mismatch counts: want4=%d got4=%d, want6=%d got6=%d", n4, got4, n6, got6)
 	}
 }
 
-// Sorted variants: ensure CIDR order within each family.
+// ---------------- AllSorted4 / AllSorted6 (order checks) ----------------
 
 func TestAllSorted4AllSorted6_Table(t *testing.T) {
 	t.Parallel()
-	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(46, 1))
-	pfxs := randomPrefixes(prng, n)
+	pfxs := randomPrefixes(prng, 400)
 
 	tbl := new(Table[int])
 	for i, it := range pfxs {
@@ -267,10 +262,9 @@ func TestAllSorted4AllSorted6_Table(t *testing.T) {
 
 func TestAllSorted4AllSorted6_Fast(t *testing.T) {
 	t.Parallel()
-	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(47, 1))
-	pfxs := randomPrefixes(prng, n)
+	pfxs := randomPrefixes(prng, 400)
 
 	f := new(Fast[int])
 	for i, it := range pfxs {
@@ -290,10 +284,9 @@ func TestAllSorted4AllSorted6_Fast(t *testing.T) {
 
 func TestAllSorted4AllSorted6_liteTable(t *testing.T) {
 	t.Parallel()
-	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(48, 1))
-	pfxs := randomPrefixes(prng, n)
+	pfxs := randomPrefixes(prng, 400)
 
 	lt := new(liteTable[int])
 	for i, it := range pfxs {
@@ -313,10 +306,9 @@ func TestAllSorted4AllSorted6_liteTable(t *testing.T) {
 
 func TestAllSorted4AllSorted6_Lite(t *testing.T) {
 	t.Parallel()
-	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(49, 1))
-	pfxs := randomPrefixes(prng, n)
+	pfxs := randomPrefixes(prng, 400)
 
 	l := new(Lite)
 	for _, it := range pfxs {
@@ -334,14 +326,17 @@ func TestAllSorted4AllSorted6_Lite(t *testing.T) {
 	verifySortedCIDR(t, s6)
 }
 
-// ---------- Fuzz: Subnets ----------
+// ---------------- Fuzz: Subnets ----------------
 
 //nolint:gocyclo
 func FuzzSubnets(f *testing.F) {
-	// seed corpus
+	// Seed corpus
 	f.Add(uint64(12345), 150, 30)
 	f.Add(uint64(67890), 400, 60)
 	f.Add(uint64(54321), 800, 100)
+	// Edge-case leaning seeds
+	f.Add(uint64(0), 64, 16)    // bias towards small sets
+	f.Add(^uint64(0), 1024, 64) // large sets
 
 	f.Fuzz(func(t *testing.T, seed uint64, n, nq int) {
 		if n < 10 || n > 5000 || nq < 1 || nq > 200 {
@@ -350,7 +345,7 @@ func FuzzSubnets(f *testing.F) {
 
 		prng := rand.New(rand.NewPCG(seed, 13))
 		pfxs := randomPrefixes(prng, n)
-		queries := randomPrefixes(prng, nq) // we’ll use their pfx fields as queries
+		queries := randomPrefixes(prng, nq)
 
 		// Table
 		{
@@ -373,8 +368,7 @@ func FuzzSubnets(f *testing.F) {
 					got[p] = true
 				}
 				if len(got) != len(want) {
-					t.Fatalf("Table.Subnets size mismatch for %v: want %d got %d",
-						q.pfx, len(want), len(got))
+					t.Fatalf("Table.Subnets size mismatch for %v: want %d got %d", q.pfx, len(want), len(got))
 				}
 				for p := range want {
 					if !got[p] {
@@ -405,8 +399,7 @@ func FuzzSubnets(f *testing.F) {
 					got[p] = true
 				}
 				if len(got) != len(want) {
-					t.Fatalf("Fast.Subnets size mismatch for %v: want %d got %d",
-						q.pfx, len(want), len(got))
+					t.Fatalf("Fast.Subnets size mismatch for %v: want %d got %d", q.pfx, len(want), len(got))
 				}
 				for p := range want {
 					if !got[p] {
@@ -437,8 +430,7 @@ func FuzzSubnets(f *testing.F) {
 					got[p] = true
 				}
 				if len(got) != len(want) {
-					t.Fatalf("liteTable.Subnets size mismatch for %v: want %d got %d",
-						q.pfx, len(want), len(got))
+					t.Fatalf("liteTable.Subnets size mismatch for %v: want %d got %d", q.pfx, len(want), len(got))
 				}
 				for p := range want {
 					if !got[p] {
@@ -448,7 +440,7 @@ func FuzzSubnets(f *testing.F) {
 			}
 		}
 
-		// Lite (prefix-only)
+		// Lite
 		{
 			l := new(Lite)
 			for _, it := range pfxs {
@@ -469,8 +461,7 @@ func FuzzSubnets(f *testing.F) {
 					got[p] = true
 				}
 				if len(got) != len(want) {
-					t.Fatalf("Lite.Subnets size mismatch for %v: want %d got %d",
-						q.pfx, len(want), len(got))
+					t.Fatalf("Lite.Subnets size mismatch for %v: want %d got %d", q.pfx, len(want), len(got))
 				}
 				for p := range want {
 					if !got[p] {
@@ -482,14 +473,17 @@ func FuzzSubnets(f *testing.F) {
 	})
 }
 
-// ---------- Fuzz: Supernets ----------
+// ---------------- Fuzz: Supernets ----------------
 
 //nolint:gocyclo
 func FuzzSupernets(f *testing.F) {
-	// seed corpus
+	// Seed corpus
 	f.Add(uint64(222), 150, 30)
 	f.Add(uint64(333), 400, 60)
 	f.Add(uint64(444), 800, 100)
+	// Edge-case leaning seeds
+	f.Add(uint64(0), 64, 16)    // bias towards small sets
+	f.Add(^uint64(0), 1024, 64) // large sets
 
 	f.Fuzz(func(t *testing.T, seed uint64, n, nq int) {
 		if n < 10 || n > 5000 || nq < 1 || nq > 200 {
@@ -521,8 +515,7 @@ func FuzzSupernets(f *testing.F) {
 					got[p] = true
 				}
 				if len(got) != len(want) {
-					t.Fatalf("Table.Supernets size mismatch for %v: want %d got %d",
-						q.pfx, len(want), len(got))
+					t.Fatalf("Table.Supernets size mismatch for %v: want %d got %d", q.pfx, len(want), len(got))
 				}
 				for p := range want {
 					if !got[p] {
@@ -553,8 +546,7 @@ func FuzzSupernets(f *testing.F) {
 					got[p] = true
 				}
 				if len(got) != len(want) {
-					t.Fatalf("Fast.Supernets size mismatch for %v: want %d got %d",
-						q.pfx, len(want), len(got))
+					t.Fatalf("Fast.Supernets size mismatch for %v: want %d got %d", q.pfx, len(want), len(got))
 				}
 				for p := range want {
 					if !got[p] {
@@ -585,8 +577,7 @@ func FuzzSupernets(f *testing.F) {
 					got[p] = true
 				}
 				if len(got) != len(want) {
-					t.Fatalf("liteTable.Supernets size mismatch for %v: want %d got %d",
-						q.pfx, len(want), len(got))
+					t.Fatalf("liteTable.Supernets size mismatch for %v: want %d got %d", q.pfx, len(want), len(got))
 				}
 				for p := range want {
 					if !got[p] {
@@ -596,7 +587,7 @@ func FuzzSupernets(f *testing.F) {
 			}
 		}
 
-		// Lite (prefix-only)
+		// Lite
 		{
 			l := new(Lite)
 			for _, it := range pfxs {
@@ -617,8 +608,7 @@ func FuzzSupernets(f *testing.F) {
 					got[p] = true
 				}
 				if len(got) != len(want) {
-					t.Fatalf("Lite.Supernets size mismatch for %v: want %d got %d",
-						q.pfx, len(want), len(got))
+					t.Fatalf("Lite.Supernets size mismatch for %v: want %d got %d", q.pfx, len(want), len(got))
 				}
 				for p := range want {
 					if !got[p] {
