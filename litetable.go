@@ -81,7 +81,7 @@ func (l *Lite) UnionPersist(o *Lite) *Lite {
 // It ensures both trees (IPv4-based and IPv6-based) have the same sizes and
 // recursively compares their root nodes.
 func (l *Lite) Equal(o *Lite) bool {
-	if o == nil {
+	if o == nil || l.size4 != o.size4 || l.size6 != o.size6 {
 		return false
 	}
 	return l.liteTable.Equal(&o.liteTable)
