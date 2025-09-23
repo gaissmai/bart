@@ -1133,6 +1133,10 @@ func (t *Table[V]) Overlaps6(o *Table[V]) bool {
 // This duplicate is shallow-copied by default, but if the value type V implements the
 // Cloner interface, the value is deeply cloned before insertion. See also Table.Clone.
 func (t *Table[V]) Union(o *Table[V]) {
+	if o == nil || (o.size4 == 0 && o.size6 == 0) {
+		return
+	}
+
 	// Create a cloning function for deep copying values;
 	// returns nil if V does not implement the Cloner interface.
 	cloneFn := cloneFnFactory[V]()
@@ -1151,6 +1155,10 @@ func (t *Table[V]) Union(o *Table[V]) {
 //
 // All nodes touched during union are cloned and a new Table is returned.
 func (t *Table[V]) UnionPersist(o *Table[V]) *Table[V] {
+	if o == nil || (o.size4 == 0 && o.size6 == 0) {
+		return t
+	}
+
 	// Create a cloning function for deep copying values;
 	// returns nil if V does not implement the Cloner interface.
 	cloneFn := cloneFnFactory[V]()

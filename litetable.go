@@ -710,6 +710,10 @@ func (l *liteTable[V]) Overlaps6(o *liteTable[V]) bool {
 // This duplicate is shallow-copied by default, but if the value type V implements the
 // Cloner interface, the value is deeply cloned before insertion. See also Lite.Clone.
 func (l *liteTable[V]) Union(o *liteTable[V]) {
+	if o == nil || (o.size4 == 0 && o.size6 == 0) {
+		return
+	}
+
 	// Create a cloning function for deep copying values;
 	// returns nil if V does not implement the Cloner interface.
 	cloneFn := cloneFnFactory[V]()
@@ -727,26 +731,30 @@ func (l *liteTable[V]) Union(o *liteTable[V]) {
 // UnionPersist is similar to [Union] but the receiver isn't modified.
 //
 // All nodes touched during union are cloned and a new liteTable is returned.
-func (t *liteTable[V]) UnionPersist(o *liteTable[V]) *liteTable[V] {
+func (l *liteTable[V]) UnionPersist(o *liteTable[V]) *liteTable[V] {
+	if o == nil || (o.size4 == 0 && o.size6 == 0) {
+		return l
+	}
+
 	// Create a cloning function for deep copying values;
 	// returns nil if V does not implement the Cloner interface.
 	cloneFn := cloneFnFactory[V]()
 
 	// new liteTable with root nodes just copied.
 	pt := &liteTable[V]{
-		root4: t.root4,
-		root6: t.root6,
+		root4: l.root4,
+		root6: l.root6,
 		//
-		size4: t.size4,
-		size6: t.size6,
+		size4: l.size4,
+		size6: l.size6,
 	}
 
 	// only clone the root node if there is something to union
 	if o.size4 != 0 {
-		pt.root4 = *t.root4.cloneFlat(cloneFn)
+		pt.root4 = *l.root4.cloneFlat(cloneFn)
 	}
 	if o.size6 != 0 {
-		pt.root6 = *t.root6.cloneFlat(cloneFn)
+		pt.root6 = *l.root6.cloneFlat(cloneFn)
 	}
 
 	if cloneFn == nil {
