@@ -196,7 +196,7 @@ func (n *fastNode[V]) overlapsChildrenIn(o *fastNode[V]) bool {
 // between node n and node o recursively.
 //
 // For each shared address, the corresponding child nodes (of any type)
-// are compared using fastNodeOverlapsTwoChilds, which handles all
+// are compared using fastNodeOverlapsTwoChildren, which handles all
 // node/leaf/fringe combinations.
 func (n *fastNode[V]) overlapsSameChildren(o *fastNode[V], depth int) bool {
 	// intersect the child bitsets from n with o
@@ -206,7 +206,7 @@ func (n *fastNode[V]) overlapsSameChildren(o *fastNode[V], depth int) bool {
 		nChild := n.mustGetChild(addr)
 		oChild := o.mustGetChild(addr)
 
-		if fastNodeOverlapsTwoChilds[V](nChild, oChild, depth+1) {
+		if fastNodeOverlapsTwoChildren[V](nChild, oChild, depth+1) {
 			return true
 		}
 
@@ -219,7 +219,7 @@ func (n *fastNode[V]) overlapsSameChildren(o *fastNode[V], depth int) bool {
 	return false
 }
 
-// fastNodeOverlapsTwoChilds checks two child entries for semantic overlap.
+// fastNodeOverlapsTwoChildren checks two child entries for semantic overlap.
 //
 // Handles all 3x3 combinations of node kinds (node, leaf, fringe).
 //
@@ -227,7 +227,7 @@ func (n *fastNode[V]) overlapsSameChildren(o *fastNode[V], depth int) bool {
 // for node/leaf mismatches, and returns true immediately if either side is fringe.
 //
 // Supports path-compressed routing structures without requiring full expansion.
-func fastNodeOverlapsTwoChilds[V any](nChild, oChild any, depth int) bool {
+func fastNodeOverlapsTwoChildren[V any](nChild, oChild any, depth int) bool {
 	//  3x3 possible different combinations for n and o
 	//
 	//  node, node    --> overlaps rec descent
