@@ -26,7 +26,7 @@ func (n *_NODE_TYPE[V]) getChild(uint8) (child any, ok bool)       { return chil
 func (n *_NODE_TYPE[V]) insertChild(uint8, any) (exists bool)      { return exists }
 func (n *_NODE_TYPE[V]) cloneRec(cloneFunc[V]) (c *_NODE_TYPE[V])  { return c }
 func (n *_NODE_TYPE[V]) cloneFlat(cloneFunc[V]) (c *_NODE_TYPE[V]) { return c }
-func (n *_NODE_TYPE[V]) insertAtDepthPersist(cloneFunc[V], netip.Prefix, V, int) (exists bool) {
+func (n *_NODE_TYPE[V]) insertPersist(cloneFunc[V], netip.Prefix, V, int) (exists bool) {
 	return exists
 }
 
@@ -119,7 +119,7 @@ func (n *_NODE_TYPE[V]) unionRec(cloneFn cloneFunc[V], o *_NODE_TYPE[V], depth i
 			case *leafNode[V]: // node, leaf
 				// push this cloned leaf down, count duplicate entry
 				clonedLeaf := otherKid.cloneLeaf(cloneFn)
-				if thisKid.insertAtDepth(clonedLeaf.prefix, clonedLeaf.value, depth+1) {
+				if thisKid.insert(clonedLeaf.prefix, clonedLeaf.value, depth+1) {
 					duplicates++
 				}
 				continue
@@ -140,7 +140,7 @@ func (n *_NODE_TYPE[V]) unionRec(cloneFn cloneFunc[V], o *_NODE_TYPE[V], depth i
 				nc := new(_NODE_TYPE[V])
 
 				// push this leaf down
-				nc.insertAtDepth(thisKid.prefix, thisKid.value, depth+1)
+				nc.insert(thisKid.prefix, thisKid.value, depth+1)
 
 				// insert the new node at current addr
 				n.insertChild(addr, nc)
@@ -161,11 +161,11 @@ func (n *_NODE_TYPE[V]) unionRec(cloneFn cloneFunc[V], o *_NODE_TYPE[V], depth i
 				nc := new(_NODE_TYPE[V])
 
 				// push this leaf down
-				nc.insertAtDepth(thisKid.prefix, thisKid.value, depth+1)
+				nc.insert(thisKid.prefix, thisKid.value, depth+1)
 
 				// insert at depth cloned leaf, maybe duplicate
 				clonedLeaf := otherKid.cloneLeaf(cloneFn)
-				if nc.insertAtDepth(clonedLeaf.prefix, clonedLeaf.value, depth+1) {
+				if nc.insert(clonedLeaf.prefix, clonedLeaf.value, depth+1) {
 					duplicates++
 				}
 
@@ -178,7 +178,7 @@ func (n *_NODE_TYPE[V]) unionRec(cloneFn cloneFunc[V], o *_NODE_TYPE[V], depth i
 				nc := new(_NODE_TYPE[V])
 
 				// push this leaf down
-				nc.insertAtDepth(thisKid.prefix, thisKid.value, depth+1)
+				nc.insert(thisKid.prefix, thisKid.value, depth+1)
 
 				// push this cloned fringe down, it becomes the default route
 				clonedFringe := otherKid.cloneFringe(cloneFn)
@@ -216,7 +216,7 @@ func (n *_NODE_TYPE[V]) unionRec(cloneFn cloneFunc[V], o *_NODE_TYPE[V], depth i
 
 				// push this cloned leaf down
 				clonedLeaf := otherKid.cloneLeaf(cloneFn)
-				if nc.insertAtDepth(clonedLeaf.prefix, clonedLeaf.value, depth+1) {
+				if nc.insert(clonedLeaf.prefix, clonedLeaf.value, depth+1) {
 					duplicates++
 				}
 
@@ -318,7 +318,7 @@ func (n *_NODE_TYPE[V]) unionRecPersist(cloneFn cloneFunc[V], o *_NODE_TYPE[V], 
 			case *leafNode[V]: // node, leaf
 				// push this cloned leaf down, count duplicate entry
 				clonedLeaf := otherKid.cloneLeaf(cloneFn)
-				if thisKid.insertAtDepthPersist(cloneFn, clonedLeaf.prefix, clonedLeaf.value, depth+1) {
+				if thisKid.insertPersist(cloneFn, clonedLeaf.prefix, clonedLeaf.value, depth+1) {
 					duplicates++
 				}
 				continue
@@ -339,7 +339,7 @@ func (n *_NODE_TYPE[V]) unionRecPersist(cloneFn cloneFunc[V], o *_NODE_TYPE[V], 
 				nc := new(_NODE_TYPE[V])
 
 				// push this leaf down
-				nc.insertAtDepth(thisKid.prefix, thisKid.value, depth+1)
+				nc.insert(thisKid.prefix, thisKid.value, depth+1)
 
 				// insert the new node at current addr
 				n.insertChild(addr, nc)
@@ -360,11 +360,11 @@ func (n *_NODE_TYPE[V]) unionRecPersist(cloneFn cloneFunc[V], o *_NODE_TYPE[V], 
 				nc := new(_NODE_TYPE[V])
 
 				// push this leaf down
-				nc.insertAtDepth(thisKid.prefix, thisKid.value, depth+1)
+				nc.insert(thisKid.prefix, thisKid.value, depth+1)
 
 				// insert at depth cloned leaf, maybe duplicate
 				clonedLeaf := otherKid.cloneLeaf(cloneFn)
-				if nc.insertAtDepth(clonedLeaf.prefix, clonedLeaf.value, depth+1) {
+				if nc.insert(clonedLeaf.prefix, clonedLeaf.value, depth+1) {
 					duplicates++
 				}
 
@@ -377,7 +377,7 @@ func (n *_NODE_TYPE[V]) unionRecPersist(cloneFn cloneFunc[V], o *_NODE_TYPE[V], 
 				nc := new(_NODE_TYPE[V])
 
 				// push this leaf down
-				nc.insertAtDepth(thisKid.prefix, thisKid.value, depth+1)
+				nc.insert(thisKid.prefix, thisKid.value, depth+1)
 
 				// push this cloned fringe down, it becomes the default route
 				clonedFringe := otherKid.cloneFringe(cloneFn)
@@ -415,7 +415,7 @@ func (n *_NODE_TYPE[V]) unionRecPersist(cloneFn cloneFunc[V], o *_NODE_TYPE[V], 
 
 				// push this cloned leaf down
 				clonedLeaf := otherKid.cloneLeaf(cloneFn)
-				if nc.insertAtDepth(clonedLeaf.prefix, clonedLeaf.value, depth+1) {
+				if nc.insert(clonedLeaf.prefix, clonedLeaf.value, depth+1) {
 					duplicates++
 				}
 

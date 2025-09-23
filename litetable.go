@@ -136,7 +136,7 @@ func (l *liteTable[V]) Insert(pfx netip.Prefix, _ V) {
 	is4 := pfx.Addr().Is4()
 	n := l.rootNodeByVersion(is4)
 
-	if exists := n.insertAtDepth(pfx, zero, 0); exists {
+	if exists := n.insert(pfx, zero, 0); exists {
 		return
 	}
 
@@ -443,7 +443,7 @@ func (l *liteTable[V]) Modify(pfx netip.Prefix, cb func(zero V, found bool) (_ V
 			// insert new child at current leaf position (octet)
 			// descend down, replace n with new child
 			newNode := new(liteNode[V])
-			newNode.insertAtDepth(kid.prefix, zero, depth+1)
+			newNode.insert(kid.prefix, zero, depth+1)
 
 			n.insertChild(octet, newNode)
 			n = newNode
