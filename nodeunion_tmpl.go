@@ -119,7 +119,7 @@ func (n *_NODE_TYPE[V]) unionRec(cloneFn cloneFunc[V], o *_NODE_TYPE[V], depth i
 			case *leafNode[V]: // node, leaf
 				// push this cloned leaf down, count duplicate entry
 				clonedLeaf := otherKid.cloneLeaf(cloneFn)
-				if thisKid.insertAtDepthPersist(cloneFn, clonedLeaf.prefix, clonedLeaf.value, depth+1) {
+				if thisKid.insertAtDepth(clonedLeaf.prefix, clonedLeaf.value, depth+1) {
 					duplicates++
 				}
 				continue
