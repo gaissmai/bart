@@ -31,7 +31,6 @@ func FuzzTableUnion(f *testing.F) {
 		prefixes2 := randomPrefixes(prng, count2)
 
 		t.Run("Table", func(t *testing.T) {
-			t.Parallel()
 			testUnionTable(t, prefixes1, prefixes2)
 		})
 	})
@@ -95,7 +94,6 @@ func FuzzUnionPersist(f *testing.F) {
 		prefixes2 := randomPrefixes(prng, count2)
 
 		t.Run("Table", func(t *testing.T) {
-			t.Parallel()
 			testUnionPersistTable(t, prefixes1, prefixes2)
 		})
 	})
@@ -337,6 +335,7 @@ func TestUnionDeterministic(t *testing.T) {
 
 			// Test Union for each table type
 			t.Run("Table_Union", func(t *testing.T) {
+				t.Parallel()
 				tbl1 := new(Table[int])
 				tbl2 := new(Table[int])
 
@@ -353,6 +352,7 @@ func TestUnionDeterministic(t *testing.T) {
 			})
 
 			t.Run("Fast_Union", func(t *testing.T) {
+				t.Parallel()
 				tbl1 := new(Fast[int])
 				tbl2 := new(Fast[int])
 
@@ -369,6 +369,7 @@ func TestUnionDeterministic(t *testing.T) {
 			})
 
 			t.Run("liteTable_Union", func(t *testing.T) {
+				t.Parallel()
 				tbl1 := new(liteTable[int])
 				tbl2 := new(liteTable[int])
 
@@ -387,6 +388,7 @@ func TestUnionDeterministic(t *testing.T) {
 
 			// Test UnionPersist for Table
 			t.Run("Table_UnionPersist", func(t *testing.T) {
+				t.Parallel()
 				tbl1 := new(Table[int])
 				tbl2 := new(Table[int])
 
