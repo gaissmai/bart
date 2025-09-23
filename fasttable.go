@@ -755,6 +755,44 @@ func (f *Fast[V]) Union(o *Fast[V]) {
 	f.size6 += o.size6 - dup6
 }
 
+// UnionPersist is similar to [Union] but the receiver isn't modified.
+//
+// All nodes touched during union are cloned and a new Fast is returned.
+func (t *Fast[V]) UnionPersist(o *Fast[V]) *Fast[V] {
+	// Create a cloning function for deep copying values;
+	// returns nil if V does not implement the Cloner interface.
+	cloneFn := cloneFnFactory[V]()
+
+	// new Fast with root nodes just copied.
+	pt := &Fast[V]{
+		root4: t.root4,
+		root6: t.root6,
+		//
+		size4: t.size4,
+		size6: t.size6,
+	}
+
+	// only clone the root node if there is something to union
+	if o.size4 != 0 {
+		pt.root4 = *t.root4.cloneFlat(cloneFn)
+	}
+	if o.size6 != 0 {
+		pt.root6 = *t.root6.cloneFlat(cloneFn)
+	}
+
+	if cloneFn == nil {
+		cloneFn = copyVal
+	}
+
+	dup4 := pt.root4.unionRecPersist(cloneFn, &o.root4, 0)
+	dup6 := pt.root6.unionRecPersist(cloneFn, &o.root6, 0)
+
+	pt.size4 += o.size4 - dup4
+	pt.size6 += o.size6 - dup6
+
+	return pt
+}
+
 // Size returns the prefix count.
 func (f *Fast[V]) Size() int {
 	return f.size4 + f.size6

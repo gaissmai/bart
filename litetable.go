@@ -38,6 +38,13 @@ func (l *Lite) Union(o *Lite) {
 }
 
 // adapter method, not delegated
+func (l *Lite) UnionPersist(o *Lite) *Lite {
+	tbl := l.liteTable.UnionPersist(&o.liteTable)
+	//nolint:govet // copy of *tbl is here by intention
+	return &Lite{*tbl}
+}
+
+// adapter method, not delegated
 func (l *Lite) Equal(o *Lite) bool {
 	return l.liteTable.Equal(&o.liteTable)
 }
@@ -715,6 +722,44 @@ func (l *liteTable[V]) Union(o *liteTable[V]) {
 
 	l.size4 += o.size4 - dup4
 	l.size6 += o.size6 - dup6
+}
+
+// UnionPersist is similar to [Union] but the receiver isn't modified.
+//
+// All nodes touched during union are cloned and a new liteTable is returned.
+func (t *liteTable[V]) UnionPersist(o *liteTable[V]) *liteTable[V] {
+	// Create a cloning function for deep copying values;
+	// returns nil if V does not implement the Cloner interface.
+	cloneFn := cloneFnFactory[V]()
+
+	// new liteTable with root nodes just copied.
+	pt := &liteTable[V]{
+		root4: t.root4,
+		root6: t.root6,
+		//
+		size4: t.size4,
+		size6: t.size6,
+	}
+
+	// only clone the root node if there is something to union
+	if o.size4 != 0 {
+		pt.root4 = *t.root4.cloneFlat(cloneFn)
+	}
+	if o.size6 != 0 {
+		pt.root6 = *t.root6.cloneFlat(cloneFn)
+	}
+
+	if cloneFn == nil {
+		cloneFn = copyVal
+	}
+
+	dup4 := pt.root4.unionRecPersist(cloneFn, &o.root4, 0)
+	dup6 := pt.root6.unionRecPersist(cloneFn, &o.root6, 0)
+
+	pt.size4 += o.size4 - dup4
+	pt.size6 += o.size6 - dup6
+
+	return pt
 }
 
 // Clone returns a copy of the routing table.
