@@ -136,7 +136,7 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	is4 := pfx.Addr().Is4()
 	n := t.rootNodeByVersion(is4)
 
-	if exists := n.insertAtDepth(pfx, val, 0); exists {
+	if exists := n.insert(pfx, val, 0); exists {
 		return
 	}
 
@@ -217,7 +217,7 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(val V, found bool) V) (newVa
 			// insert new child at current leaf position (octet)
 			// descend down, replace n with new child
 			newNode := new(bartNode[V])
-			newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
+			newNode.insert(kid.prefix, kid.value, depth+1)
 
 			n.insertChild(octet, newNode)
 			n = newNode
@@ -396,7 +396,7 @@ func (t *Table[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del
 			// insert new child at current leaf position (octet)
 			// descend down, replace n with new child
 			newNode := new(bartNode[V])
-			newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
+			newNode.insert(kid.prefix, kid.value, depth+1)
 
 			n.insertChild(octet, newNode)
 			n = newNode

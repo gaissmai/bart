@@ -85,7 +85,7 @@ func (f *Fast[V]) Insert(pfx netip.Prefix, val V) {
 	n := f.rootNodeByVersion(is4)
 
 	// insert prefix
-	if exists := n.insertAtDepth(pfx, val, 0); exists {
+	if exists := n.insert(pfx, val, 0); exists {
 		return
 	}
 
@@ -245,7 +245,7 @@ func (f *Fast[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del 
 			// insert new child at current leaf position (addr)
 			// descend down, replace n with new child
 			newNode := new(fastNode[V])
-			_ = newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
+			_ = newNode.insert(kid.prefix, kid.value, depth+1)
 			_ = n.insertChild(octet, newNode)
 			n = newNode
 

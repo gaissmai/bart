@@ -121,7 +121,7 @@ func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V] {
 			// insert new child at current leaf position (addr)
 			// descend down, replace n with new child
 			newNode := new(bartNode[V])
-			newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
+			newNode.insert(kid.prefix, kid.value, depth+1)
 
 			n.insertChild(octet, newNode)
 			n = newNode
@@ -273,7 +273,7 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 			// Prefixes differ - need to push existing leaf down the trie,
 			// create a new internal node, and insert the original leaf under it.
 			newNode := new(bartNode[V])
-			newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
+			newNode.insert(kid.prefix, kid.value, depth+1)
 
 			// Replace leaf with new node and descend.
 			n.insertChild(addr, newNode)
@@ -462,7 +462,7 @@ func (t *Table[V]) ModifyPersist(pfx netip.Prefix, cb func(val V, ok bool) (newV
 			// insert new child at current leaf position (octet
 			// descend down, replace n with new child
 			newNode := new(bartNode[V])
-			newNode.insertAtDepth(kid.prefix, kid.value, depth+1)
+			newNode.insert(kid.prefix, kid.value, depth+1)
 
 			n.insertChild(octet, newNode)
 			n = newNode
