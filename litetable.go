@@ -31,6 +31,167 @@ func (l *Lite) Insert(pfx netip.Prefix) {
 	l.liteTable.Insert(pfx, struct{}{})
 }
 
+// Subnets returns an iterator over all prefix–value pairs in the routing table
+// that are fully contained within the given prefix pfx.
+//
+// Entries are returned in CIDR sort order.
+//
+// Example:
+//
+//	for sub := range table.Subnets(netip.MustParsePrefix("10.0.0.0/8")) {
+//	    fmt.Println("Covered:", sub)
+//	}
+func (l *Lite) Subnets(pfx netip.Prefix) iter.Seq[netip.Prefix] {
+	// wrap a iter.Seq2 in a iter.Seq
+	seq2 := l.liteTable.Subnets(pfx)
+
+	return func(yield func(netip.Prefix) bool) {
+		seq2(func(pfx netip.Prefix, _ struct{}) bool {
+			return yield(pfx)
+		})
+	}
+}
+
+// Supernets returns an iterator over all supernet routes that cover the given prefix pfx.
+//
+// The traversal searches both exact-length and shorter (less specific) prefixes that
+// overlap or include pfx. Starting from the most specific position in the trie,
+// it walks upward through parent nodes and yields any matching entries found at each level.
+//
+// The iteration order is reverse-CIDR: from longest prefix match (LPM) towards
+// least-specific routes.
+//
+// The search is protocol-specific (IPv4 or IPv6) and stops immediately if the yield
+// function returns false. If pfx is invalid, the function silently returns.
+//
+// This can be used to enumerate all covering supernet routes in routing-based
+// policy engines, diagnostics tools, or fallback resolution logic.
+//
+// Example:
+//
+//	for supernet := range table.Supernets(netip.MustParsePrefix("192.0.2.128/25")) {
+//	    fmt.Println("Matched covering route:", supernet)
+//	}
+func (l *Lite) Supernets(pfx netip.Prefix) iter.Seq[netip.Prefix] {
+	// wrap a iter.Seq2 in a iter.Seq
+	seq2 := l.liteTable.Supernets(pfx)
+
+	return func(yield func(netip.Prefix) bool) {
+		seq2(func(pfx netip.Prefix, _ struct{}) bool {
+			return yield(pfx)
+		})
+	}
+}
+
+// All returns an iterator over all prefixes in the table.
+//
+// The entries from both IPv4 and IPv6 subtries are yielded using an internal recursive traversal.
+// The iteration order is unspecified and may vary between calls; for a stable order, use AllSorted.
+//
+// You can use All directly in a for-range loop without providing a yield function.
+// The Go compiler automatically synthesizes the yield callback for you:
+//
+//	for prefix := range t.All() {
+//	    fmt.Println(prefix)
+//	}
+//
+// Under the hood, the loop body is passed as a yield function to the iterator.
+// If you break or return from the loop, iteration stops early as expected.
+//
+// IMPORTANT: Deleting entries during iteration is not allowed,
+// as this would interfere with the internal traversal and may corrupt or
+// prematurely terminate the iteration.
+//
+// If mutation of the table during traversal is required,
+// use [Lite.WalkPersist] instead.
+func (l *Lite) All() iter.Seq[netip.Prefix] {
+	// wrap a iter.Seq2 in a iter.Seq
+	seq2 := l.liteTable.All()
+
+	return func(yield func(netip.Prefix) bool) {
+		seq2(func(pfx netip.Prefix, _ struct{}) bool {
+			return yield(pfx)
+		})
+	}
+}
+
+// All4 is like [Lite.All] but only for the v4 routing table.
+func (l *Lite) All4() iter.Seq[netip.Prefix] {
+	// wrap a iter.Seq2 in a iter.Seq
+	seq2 := l.liteTable.All4()
+
+	return func(yield func(netip.Prefix) bool) {
+		seq2(func(pfx netip.Prefix, _ struct{}) bool {
+			return yield(pfx)
+		})
+	}
+}
+
+// All6 is like [Lite.All] but only for the v6 routing table.
+func (l *Lite) All6() iter.Seq[netip.Prefix] {
+	// wrap a iter.Seq2 in a iter.Seq
+	seq2 := l.liteTable.All6()
+
+	return func(yield func(netip.Prefix) bool) {
+		seq2(func(pfx netip.Prefix, _ struct{}) bool {
+			return yield(pfx)
+		})
+	}
+}
+
+// AllSorted returns an iterator over all prefixes in the table,
+// ordered in canonical CIDR prefix sort order.
+//
+// This can be used directly with a for-range loop; the Go compiler provides the yield function implicitly.
+//
+//	for prefix := range t.AllSorted() {
+//	    fmt.Println(prefix)
+//	}
+//
+// The traversal is stable and predictable across calls.
+// Iteration stops early if you break out of the loop.
+//
+// IMPORTANT: Deleting entries during iteration is not allowed,
+// as this would interfere with the internal traversal and may corrupt or
+// prematurely terminate the iteration.
+//
+// If mutation of the table during traversal is required,
+// use [Lite.WalkPersist] instead.
+func (l *Lite) AllSorted() iter.Seq[netip.Prefix] {
+	// wrap a iter.Seq2 in a iter.Seq
+	seq2 := l.liteTable.AllSorted()
+
+	return func(yield func(netip.Prefix) bool) {
+		seq2(func(pfx netip.Prefix, _ struct{}) bool {
+			return yield(pfx)
+		})
+	}
+}
+
+// AllSorted4 is like [Lite.AllSorted] but only for the v4 routing table.
+func (l *Lite) AllSorted4() iter.Seq[netip.Prefix] {
+	// wrap a iter.Seq2 in a iter.Seq
+	seq2 := l.liteTable.AllSorted4()
+
+	return func(yield func(netip.Prefix) bool) {
+		seq2(func(pfx netip.Prefix, _ struct{}) bool {
+			return yield(pfx)
+		})
+	}
+}
+
+// AllSorted6 is like [Lite.AllSorted] but only for the v6 routing table.
+func (l *Lite) AllSorted6() iter.Seq[netip.Prefix] {
+	// wrap a iter.Seq2 in a iter.Seq
+	seq2 := l.liteTable.AllSorted6()
+
+	return func(yield func(netip.Prefix) bool) {
+		seq2(func(pfx netip.Prefix, _ struct{}) bool {
+			return yield(pfx)
+		})
+	}
+}
+
 // Overlaps reports whether any route in the receiver table overlaps
 // with a route in the other table, in either direction.
 //
@@ -682,6 +843,206 @@ LOOP:
 	return
 }
 
+// Supernets returns an iterator over all supernet routes that cover the given prefix pfx.
+//
+// The traversal searches both exact-length and shorter (less specific) prefixes that
+// overlap or include pfx. Starting from the most specific position in the trie,
+// it walks upward through parent nodes and yields any matching entries found at each level.
+//
+// The iteration order is reverse-CIDR: from longest prefix match (LPM) towards
+// least-specific routes.
+//
+// The search is protocol-specific (IPv4 or IPv6) and stops immediately if the yield
+// function returns false. If pfx is invalid, the function silently returns.
+//
+// This can be used to enumerate all covering supernet routes in routing-based
+// policy engines, diagnostics tools, or fallback resolution logic.
+//
+// Example:
+//
+//	for supernet, _ := range table.Supernets(netip.MustParsePrefix("192.0.2.128/25")) {
+//	    fmt.Println("Matched covering route:", supernet)
+//	}
+func (l *liteTable[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
+	return func(yield func(netip.Prefix, V) bool) {
+		if !pfx.IsValid() {
+			return
+		}
+
+		// canonicalize the prefix
+		pfx = pfx.Masked()
+
+		ip := pfx.Addr()
+		is4 := ip.Is4()
+		octets := ip.AsSlice()
+		lastOctetPlusOne, lastBits := lastOctetPlusOneAndLastBits(pfx)
+
+		n := l.rootNodeByVersion(is4)
+
+		// stack of the traversed nodes for reverse ordering of supernets
+		stack := [maxTreeDepth]*liteNode[V]{}
+
+		// run variable, used after for loop
+		var depth int
+		var octet byte
+
+		// find last node along this octet path
+	LOOP:
+		for depth, octet = range octets {
+			// stepped one past the last stride of interest; back up to last and exit
+			if depth > lastOctetPlusOne {
+				depth--
+				break
+			}
+			// push current node on stack
+			stack[depth] = n
+
+			// descend down the trie
+			if !n.children.Test(octet) {
+				break LOOP
+			}
+			kid := n.mustGetChild(octet)
+
+			// kid is node or leaf or fringe at octet
+			switch kid := kid.(type) {
+			case *liteNode[V]:
+				n = kid
+				continue LOOP // descend down to next trie level
+
+			case *leafNode[V]:
+				if kid.prefix.Bits() > pfx.Bits() {
+					break LOOP
+				}
+
+				if kid.prefix.Overlaps(pfx) {
+					if !yield(kid.prefix, kid.value) {
+						// early exit
+						return
+					}
+				}
+				// end of trie along this octets path
+				break LOOP
+
+			case *fringeNode[V]:
+				fringePfx := cidrForFringe(octets, depth, is4, octet)
+				if fringePfx.Bits() > pfx.Bits() {
+					break LOOP
+				}
+
+				if fringePfx.Overlaps(pfx) {
+					if !yield(fringePfx, kid.value) {
+						// early exit
+						return
+					}
+				}
+				// end of trie along this octets path
+				break LOOP
+
+			default:
+				panic("logic error, wrong node type")
+			}
+		}
+
+		// start backtracking, unwind the stack
+		for ; depth >= 0; depth-- {
+			n = stack[depth]
+
+			// only the lastOctet may have a different prefix len
+			// all others are just host routes
+			var idx uint8
+			octet = octets[depth]
+			// Last “octet” from prefix, update/insert prefix into node.
+			// Note: For /32 and /128, depth never reaches lastOctetPlusOne (4/16),
+			// so those are handled below via the fringe/leaf path.
+			if depth == lastOctetPlusOne {
+				idx = art.PfxToIdx(octet, lastBits)
+			} else {
+				idx = art.OctetToIdx(octet)
+			}
+
+			// micro benchmarking, skip if there is no match
+			if !n.contains(idx) {
+				continue
+			}
+
+			// yield all the matching prefixes, not just the lpm
+			if !n.eachLookupPrefix(octets, depth, is4, idx, yield) {
+				// early exit
+				return
+			}
+		}
+	}
+}
+
+// Subnets returns an iterator over all prefix–value pairs in the routing table
+// that are fully contained within the given prefix pfx.
+//
+// Entries are returned in CIDR sort order.
+//
+// Example:
+//
+//	for sub, _ := range table.Subnets(netip.MustParsePrefix("10.0.0.0/8")) {
+//	    fmt.Println("Covered:", sub)
+//	}
+func (l *liteTable[V]) Subnets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
+	return func(yield func(netip.Prefix, V) bool) {
+		if !pfx.IsValid() {
+			return
+		}
+
+		// canonicalize the prefix
+		pfx = pfx.Masked()
+
+		// values derived from pfx
+		ip := pfx.Addr()
+		is4 := ip.Is4()
+		octets := ip.AsSlice()
+		lastOctetPlusOne, lastBits := lastOctetPlusOneAndLastBits(pfx)
+
+		n := l.rootNodeByVersion(is4)
+
+		// find the trie node
+		for depth, octet := range octets {
+			// Last “octet” from prefix, update/insert prefix into node.
+			// Note: For /32 and /128, depth never reaches lastOctetPlusOne (4/16),
+			// so those are handled below via the fringe/leaf path.
+			if depth == lastOctetPlusOne {
+				idx := art.PfxToIdx(octet, lastBits)
+				_ = n.eachSubnet(octets, depth, is4, idx, yield)
+				return
+			}
+
+			if !n.children.Test(octet) {
+				return
+			}
+			kid := n.mustGetChild(octet)
+
+			// kid is node or leaf or fringe at octet
+			switch kid := kid.(type) {
+			case *liteNode[V]:
+				n = kid
+				continue // descend down to next trie level
+
+			case *leafNode[V]:
+				if pfx.Bits() <= kid.prefix.Bits() && pfx.Overlaps(kid.prefix) {
+					_ = yield(kid.prefix, kid.value)
+				}
+				return
+
+			case *fringeNode[V]:
+				fringePfx := cidrForFringe(octets, depth, is4, octet)
+				if pfx.Bits() <= fringePfx.Bits() && pfx.Overlaps(fringePfx) {
+					_ = yield(fringePfx, kid.value)
+				}
+				return
+
+			default:
+				panic("logic error, wrong node type")
+			}
+		}
+	}
+}
+
 // OverlapsPrefix reports whether any route in the table overlaps with the given pfx or vice versa.
 //
 // The check is bidirectional: it returns true if the input prefix is covered by an existing
@@ -838,58 +1199,29 @@ func (l *liteTable[V]) Equal(o *liteTable[V]) bool {
 	return l.root4.equalRec(&o.root4) && l.root6.equalRec(&o.root6)
 }
 
-// All returns an iterator over all prefix–value pairs in the table.
-//
-// The entries from both IPv4 and IPv6 subtries are yielded using an internal recursive traversal.
-// The iteration order is unspecified and may vary between calls; for a stable order, use AllSorted.
-//
-// You can use All directly in a for-range loop without providing a yield function.
-// The Go compiler automatically synthesizes the yield callback for you:
-//
-//	for prefix, _ := range t.All() {
-//	    fmt.Println(prefix)
-//	}
-//
-// Under the hood, the loop body is passed as a yield function to the iterator.
-// If you break or return from the loop, iteration stops early as expected.
-//
-// IMPORTANT: Modifying or deleting entries during iteration is not allowed,
-// as this would interfere with the internal traversal and may corrupt or
-// prematurely terminate the iteration.
-//
-// If mutation of the table during traversal is required,
-// use [Lite.WalkPersist] instead.
+// All returns an iterator over all prefixes in the table, the value is always zero.
 func (l *liteTable[V]) All() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
 		_ = l.root4.allRec(stridePath{}, 0, true, yield) && l.root6.allRec(stridePath{}, 0, false, yield)
 	}
 }
 
-// All4 is like [Lite.All] but only for the v4 routing table.
+// All4 is like [liteTable.All] but only for the v4 routing table.
 func (l *liteTable[V]) All4() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
 		_ = l.root4.allRec(stridePath{}, 0, true, yield)
 	}
 }
 
-// All6 is like [Lite.All] but only for the v6 routing table.
+// All6 is like [liteTable.All] but only for the v6 routing table.
 func (l *liteTable[V]) All6() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
 		_ = l.root6.allRec(stridePath{}, 0, false, yield)
 	}
 }
 
-// AllSorted returns an iterator over all prefix–value pairs in the table,
-// ordered in canonical CIDR prefix sort order.
-//
-// This can be used directly with a for-range loop; the Go compiler provides the yield function implicitly.
-//
-//	for prefix, value := range t.AllSorted() {
-//	    fmt.Println(prefix, value)
-//	}
-//
-// The traversal is stable and predictable across calls.
-// Iteration stops early if you break out of the loop.
+// AllSorted returns an iterator over all prefixes in the table, ordered in canonical
+// CIDR prefix sort order. The value is always zero.
 func (l *liteTable[V]) AllSorted() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
 		_ = l.root4.allRecSorted(stridePath{}, 0, true, yield) &&
@@ -897,14 +1229,14 @@ func (l *liteTable[V]) AllSorted() iter.Seq2[netip.Prefix, V] {
 	}
 }
 
-// AllSorted4 is like [Lite.AllSorted] but only for the v4 routing table.
+// AllSorted4 is like [liteNode.AllSorted] but only for the v4 routing table.
 func (l *liteTable[V]) AllSorted4() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
 		_ = l.root4.allRecSorted(stridePath{}, 0, true, yield)
 	}
 }
 
-// AllSorted6 is like [Lite.AllSorted] but only for the v6 routing table.
+// AllSorted6 is like [liteNode.AllSorted] but only for the v6 routing table.
 func (l *liteTable[V]) AllSorted6() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
 		_ = l.root6.allRecSorted(stridePath{}, 0, false, yield)
