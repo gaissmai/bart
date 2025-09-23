@@ -54,7 +54,7 @@ func TestFastCloneFlat(t *testing.T) {
 				n := &fastNode[int]{}
 				pfx := mpp("8.0.0.0/6")
 				val := 42
-				n.insertAtDepth(pfx, val, 0)
+				n.insert(pfx, val, 0)
 				return n
 			},
 			check: func(t *testing.T, got, orig *fastNode[int]) {
@@ -75,15 +75,15 @@ func TestFastCloneFlat(t *testing.T) {
 				n := &fastNode[int]{}
 				pfx := mpp("8.0.0.0/6")
 				val := 6
-				n.insertAtDepth(pfx, val, 0)
+				n.insert(pfx, val, 0)
 
 				pfx = mpp("8.0.0.0/8")
 				val = 8
-				n.insertAtDepth(pfx, val, 0)
+				n.insert(pfx, val, 0)
 
 				pfx = mpp("16.0.0.0/27")
 				val = 27
-				n.insertAtDepth(pfx, val, 0)
+				n.insert(pfx, val, 0)
 
 				return n
 			},
