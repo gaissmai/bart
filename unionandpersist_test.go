@@ -6,13 +6,14 @@ package bart
 import (
 	"fmt"
 	"iter"
+	"maps"
 	"math/rand/v2"
 	"net/netip"
 	"testing"
 )
 
 // FuzzUnion tests that Union correctly merges two tables
-func FuzzUnion(f *testing.F) {
+func FuzzTableUnion(f *testing.F) {
 	// Seed with some initial test cases
 	f.Add(uint64(12345), 50, 30)
 	f.Add(uint64(67890), 100, 75)
@@ -29,25 +30,9 @@ func FuzzUnion(f *testing.F) {
 		prefixes1 := randomPrefixes(prng, count1)
 		prefixes2 := randomPrefixes(prng, count2)
 
-		// Test different table types
 		t.Run("Table", func(t *testing.T) {
 			t.Parallel()
 			testUnionTable(t, prefixes1, prefixes2)
-		})
-
-		t.Run("Fast", func(t *testing.T) {
-			t.Parallel()
-			testUnionFast(t, prefixes1, prefixes2)
-		})
-
-		t.Run("liteTable", func(t *testing.T) {
-			t.Parallel()
-			testUnionLiteTable(t, prefixes1, prefixes2)
-		})
-
-		t.Run("Lite", func(t *testing.T) {
-			t.Parallel()
-			testUnionLite(t, prefixes1, prefixes2)
 		})
 	})
 }
@@ -91,115 +76,6 @@ func testUnionTable(t *testing.T, prefixes1, prefixes2 []goldTableItem[int]) {
 	}
 }
 
-func testUnionFast(t *testing.T, prefixes1, prefixes2 []goldTableItem[int]) {
-	tbl1 := new(Fast[int])
-	tbl2 := new(Fast[int])
-
-	// Populate tables
-	expected := make(map[netip.Prefix]int)
-	for _, item := range prefixes1 {
-		tbl1.Insert(item.pfx, item.val)
-		expected[item.pfx] = item.val
-	}
-	for _, item := range prefixes2 {
-		tbl2.Insert(item.pfx, item.val+10000)
-		expected[item.pfx] = item.val + 10000
-	}
-
-	// Perform union
-	tbl1.Union(tbl2)
-
-	// Verify results
-	actual := make(map[netip.Prefix]int)
-	for pfx, val := range tbl1.All() {
-		actual[pfx] = val
-	}
-
-	if len(actual) != len(expected) {
-		t.Fatalf("Expected %d prefixes, got %d", len(expected), len(actual))
-	}
-
-	for pfx, expectedVal := range expected {
-		actualVal, found := actual[pfx]
-		if !found {
-			t.Fatalf("Expected prefix %v not found", pfx)
-		}
-		if actualVal != expectedVal {
-			t.Fatalf("Prefix %v: expected %d, got %d", pfx, expectedVal, actualVal)
-		}
-	}
-}
-
-func testUnionLiteTable(t *testing.T, prefixes1, prefixes2 []goldTableItem[int]) {
-	tbl1 := new(liteTable[int])
-	tbl2 := new(liteTable[int])
-
-	// Populate tables
-	expected := make(map[netip.Prefix]bool)
-	for _, item := range prefixes1 {
-		tbl1.Insert(item.pfx, item.val)
-		expected[item.pfx] = true
-	}
-	for _, item := range prefixes2 {
-		tbl2.Insert(item.pfx, item.val+10000)
-		expected[item.pfx] = true
-	}
-
-	// Perform union
-	tbl1.Union(tbl2)
-
-	// Verify results (liteTable has no payload)
-	actual := make(map[netip.Prefix]bool)
-	for pfx := range tbl1.All() {
-		actual[pfx] = true
-	}
-
-	if len(actual) != len(expected) {
-		t.Fatalf("Expected %d prefixes, got %d", len(expected), len(actual))
-	}
-
-	for pfx := range expected {
-		if !actual[pfx] {
-			t.Fatalf("Expected prefix %v not found", pfx)
-		}
-	}
-}
-
-func testUnionLite(t *testing.T, prefixes1, prefixes2 []goldTableItem[int]) {
-	lite1 := new(Lite)
-	lite2 := new(Lite)
-
-	// Populate tables
-	expected := make(map[netip.Prefix]bool)
-	for _, item := range prefixes1 {
-		lite1.Insert(item.pfx)
-		expected[item.pfx] = true
-	}
-	for _, item := range prefixes2 {
-		lite2.Insert(item.pfx)
-		expected[item.pfx] = true
-	}
-
-	// Perform union
-	lite1.Union(lite2)
-
-	// Verify results
-	actual := make(map[netip.Prefix]bool)
-	for pfx := range lite1.All() {
-		actual[pfx] = true
-	}
-
-	if len(actual) != len(expected) {
-		t.Fatalf("Expected %d prefixes, got %d", len(expected), len(actual))
-	}
-
-	for pfx := range expected {
-		if !actual[pfx] {
-			t.Fatalf("Expected prefix %v not found", pfx)
-		}
-	}
-}
-
 // FuzzUnionPersist tests that UnionPersist correctly merges without modifying originals
 func FuzzUnionPersist(f *testing.F) {
 	// Seed with some initial test cases
@@ -218,7 +94,6 @@ func FuzzUnionPersist(f *testing.F) {
 		prefixes1 := randomPrefixes(prng, count1)
 		prefixes2 := randomPrefixes(prng, count2)
 
-		// Only Table supports UnionPersist
 		t.Run("Table", func(t *testing.T) {
 			t.Parallel()
 			testUnionPersistTable(t, prefixes1, prefixes2)
@@ -252,10 +127,10 @@ func testUnionPersistTable(t *testing.T, prefixes1, prefixes2 []goldTableItem[in
 	current1 := captureTableState(tbl1)
 	current2 := captureTableState(tbl2)
 
-	if !tableStatesEqual(original1, current1) {
+	if !maps.Equal(original1, current1) {
 		t.Fatal("UnionPersist modified tbl1")
 	}
-	if !tableStatesEqual(original2, current2) {
+	if !maps.Equal(original2, current2) {
 		t.Fatal("UnionPersist modified tbl2")
 	}
 
@@ -319,40 +194,42 @@ func FuzzUnionPersistAliasing(f *testing.F) {
 		resultInitialState := captureTableState(resultTable)
 
 		// TEST 1: Verify original tables unchanged
-		if !tableStatesEqual(tbl1BeforeState, captureTableState(tbl1)) {
+		if !maps.Equal(tbl1BeforeState, captureTableState(tbl1)) {
 			t.Fatal("UnionPersist modified tbl1 (immutability violation)")
 		}
-		if !tableStatesEqual(tbl2BeforeState, captureTableState(tbl2)) {
+		if !maps.Equal(tbl2BeforeState, captureTableState(tbl2)) {
 			t.Fatal("UnionPersist modified tbl2 (immutability violation)")
 		}
 
-		// TEST 2: Modify original tbl1 - result should NOT change
+		// TEST 2: Modify original tbl1 persistent - result should NOT change
 		for _, item := range modifyPrefixes {
-			tbl1.Insert(item.pfx, item.val+20000)
+			tbl1 = tbl1.InsertPersist(item.pfx, item.val+20000)
 		}
+		tbl1State2 := captureTableState(tbl1)
 
-		if !tableStatesEqual(resultInitialState, captureTableState(resultTable)) {
+		if !maps.Equal(resultInitialState, captureTableState(resultTable)) {
 			t.Fatal("Result table changed after modifying tbl1 (aliasing bug)")
 		}
 
-		// TEST 3: Modify original tbl2 - result should NOT change
+		// TEST 3: Modify original tbl2 persistent - result should NOT change
 		for _, item := range modifyPrefixes {
-			tbl2.Insert(item.pfx, item.val+30000)
+			tbl2 = tbl2.InsertPersist(item.pfx, item.val+30000)
 		}
+		tbl2State2 := captureTableState(tbl2)
 
-		if !tableStatesEqual(resultInitialState, captureTableState(resultTable)) {
+		if !maps.Equal(resultInitialState, captureTableState(resultTable)) {
 			t.Fatal("Result table changed after modifying tbl2 (aliasing bug)")
 		}
 
-		// TEST 4: Modify result table - originals should NOT change
+		// TEST 4: Modify result table persistent - original tables should NOT change
 		for _, item := range modifyPrefixes {
-			resultTable.Insert(item.pfx, item.val+40000)
+			resultTable = resultTable.InsertPersist(item.pfx, item.val+40000)
 		}
 
-		if !tableStatesEqual(tbl1BeforeState, captureTableState(tbl1)) {
+		if !maps.Equal(tbl1State2, captureTableState(tbl1)) {
 			t.Fatal("tbl1 changed after modifying result (reverse aliasing)")
 		}
-		if !tableStatesEqual(tbl2BeforeState, captureTableState(tbl2)) {
+		if !maps.Equal(tbl2State2, captureTableState(tbl2)) {
 			t.Fatal("tbl2 changed after modifying result (reverse aliasing)")
 		}
 
@@ -361,8 +238,8 @@ func FuzzUnionPersistAliasing(f *testing.F) {
 		resultTable3 := resultTable.UnionPersist(tbl1)
 
 		// Modify resultTable2
-		testPrefix := netip.MustParsePrefix("10.99.99.0/24")
-		resultTable2.Insert(testPrefix, 55555)
+		testPrefix := mpp("10.99.99.0/24")
+		_ = resultTable2.InsertPersist(testPrefix, 55555)
 
 		// resultTable3 should not be affected
 		if val3, found := resultTable3.Get(testPrefix); found && val3 == 55555 {
@@ -375,10 +252,10 @@ func FuzzUnionPersistAliasing(f *testing.F) {
 		chain3 := chain2.UnionPersist(tbl2)
 
 		// All should be independent
-		testPrefix2 := netip.MustParsePrefix("192.168.99.0/24")
-		chain1.Insert(testPrefix2, 111)
-		chain2.Insert(testPrefix2, 222)
-		chain3.Insert(testPrefix2, 333)
+		testPrefix2 := mpp("192.168.99.0/24")
+		chain1 = chain1.InsertPersist(testPrefix2, 111)
+		chain2 = chain2.InsertPersist(testPrefix2, 222)
+		chain3 = chain3.InsertPersist(testPrefix2, 333)
 
 		val1, _ := chain1.Get(testPrefix2)
 		val2, _ := chain2.Get(testPrefix2)
@@ -464,10 +341,10 @@ func TestUnionDeterministic(t *testing.T) {
 				tbl2 := new(Table[int])
 
 				for i, pfxStr := range tc.prefixes1 {
-					tbl1.Insert(netip.MustParsePrefix(pfxStr), tc.values1[i])
+					tbl1.Insert(mpp(pfxStr), tc.values1[i])
 				}
 				for i, pfxStr := range tc.prefixes2 {
-					tbl2.Insert(netip.MustParsePrefix(pfxStr), tc.values2[i])
+					tbl2.Insert(mpp(pfxStr), tc.values2[i])
 				}
 
 				tbl1.Union(tbl2)
@@ -480,10 +357,10 @@ func TestUnionDeterministic(t *testing.T) {
 				tbl2 := new(Fast[int])
 
 				for i, pfxStr := range tc.prefixes1 {
-					tbl1.Insert(netip.MustParsePrefix(pfxStr), tc.values1[i])
+					tbl1.Insert(mpp(pfxStr), tc.values1[i])
 				}
 				for i, pfxStr := range tc.prefixes2 {
-					tbl2.Insert(netip.MustParsePrefix(pfxStr), tc.values2[i])
+					tbl2.Insert(mpp(pfxStr), tc.values2[i])
 				}
 
 				tbl1.Union(tbl2)
@@ -496,10 +373,10 @@ func TestUnionDeterministic(t *testing.T) {
 				tbl2 := new(liteTable[int])
 
 				for i, pfxStr := range tc.prefixes1 {
-					tbl1.Insert(netip.MustParsePrefix(pfxStr), tc.values1[i])
+					tbl1.Insert(mpp(pfxStr), tc.values1[i])
 				}
 				for i, pfxStr := range tc.prefixes2 {
-					tbl2.Insert(netip.MustParsePrefix(pfxStr), tc.values2[i])
+					tbl2.Insert(mpp(pfxStr), tc.values2[i])
 				}
 
 				tbl1.Union(tbl2)
@@ -514,10 +391,10 @@ func TestUnionDeterministic(t *testing.T) {
 				tbl2 := new(Table[int])
 
 				for i, pfxStr := range tc.prefixes1 {
-					tbl1.Insert(netip.MustParsePrefix(pfxStr), tc.values1[i])
+					tbl1.Insert(mpp(pfxStr), tc.values1[i])
 				}
 				for i, pfxStr := range tc.prefixes2 {
-					tbl2.Insert(netip.MustParsePrefix(pfxStr), tc.values2[i])
+					tbl2.Insert(mpp(pfxStr), tc.values2[i])
 				}
 
 				// Save original state
@@ -527,7 +404,7 @@ func TestUnionDeterministic(t *testing.T) {
 
 				// Verify immutability
 				current1 := captureTableState(tbl1)
-				if !tableStatesEqual(original1, current1) {
+				if !maps.Equal(original1, current1) {
 					t.Fatal("UnionPersist modified original table")
 				}
 
@@ -651,18 +528,6 @@ func captureTableState[V comparable](t *Table[V]) map[netip.Prefix]V {
 		state[pfx] = val
 	}
 	return state
-}
-
-func tableStatesEqual[V comparable](a, b map[netip.Prefix]V) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for pfx, valA := range a {
-		if valB, found := b[pfx]; !found || valA != valB {
-			return false
-		}
-	}
-	return true
 }
 
 func verifyResults[T any](t *testing.T, tbl interface {
