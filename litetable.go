@@ -25,34 +25,66 @@ type Lite struct {
 	liteTable[struct{}]
 }
 
-// adapter method, not delegated
+// Insert adds a pfx to the tree.
+// If pfx is already present in the tree, its a no-op.
 func (l *Lite) Insert(pfx netip.Prefix) {
 	l.liteTable.Insert(pfx, struct{}{})
 }
 
-// adapter method, not delegated
+// Overlaps reports whether any route in the receiver table overlaps
+// with a route in the other table, in either direction.
+//
+// The overlap check is bidirectional: it returns true if any IP prefix
+// in the receiver is covered by the other table, or vice versa.
+// This includes partial overlaps, exact matches, and supernet/subnet relationships.
+//
+// Both IPv4 and IPv6 route trees are compared independently. If either
+// tree has overlapping routes, the function returns true.
+//
+// This is useful for conflict detection, policy enforcement,
+// or validating mutually exclusive routing domains.
+//
+// It is intentionally not nil-receiver safe: calling with a nil *Lite
+// will panic by design.
 func (l *Lite) Overlaps(o *Lite) bool {
+	if o == nil {
+		return false
+	}
 	return l.liteTable.Overlaps(&o.liteTable)
 }
 
-// adapter method, not delegated
+// Union merges another routing table into the receiver table, modifying it in-place.
+//
+// All prefixes from the other table (o) are inserted into the receiver.
 func (l *Lite) Union(o *Lite) {
+	if o == nil {
+		return
+	}
 	l.liteTable.Union(&o.liteTable)
 }
 
-// adapter method, not delegated
+// UnionPersist is similar to [Union] but the receiver isn't modified.
+//
+// All nodes touched during union are cloned and a new Table is returned.
+// If o is nil or empty, no nodes are touched and the receiver may be
+// returned unchanged.
 func (l *Lite) UnionPersist(o *Lite) *Lite {
+	if o == nil || (o.size4 == 0 && o.size6 == 0) {
+		return l
+	}
 	tbl := l.liteTable.UnionPersist(&o.liteTable)
 	//nolint:govet // copy of *tbl is here by intention
 	return &Lite{*tbl}
 }
 
-// adapter method, not delegated
+// Equal checks whether two tables are structurally and semantically equal.
+// It ensures both trees (IPv4-based and IPv6-based) have the same sizes and
+// recursively compares their root nodes.
 func (l *Lite) Equal(o *Lite) bool {
 	return l.liteTable.Equal(&o.liteTable)
 }
 
-// adapter method, not delegated
+// Clone returns a copy of the routing table.
 func (l *Lite) Clone() *Lite {
 	return &Lite{*l.liteTable.Clone()}
 }
@@ -684,9 +716,6 @@ func (l *liteTable[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 // This is useful for conflict detection, policy enforcement,
 // or validating mutually exclusive routing domains.
 func (l *liteTable[V]) Overlaps(o *liteTable[V]) bool {
-	if o == nil {
-		return false
-	}
 	return l.Overlaps4(o) || l.Overlaps6(o)
 }
 
