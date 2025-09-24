@@ -81,7 +81,7 @@ func TestOverlapsCompare(t *testing.T) {
 
 		if gotGold != gotLite {
 			t.Fatalf("Overlaps(...) = %v, want %v\nlite1:\n%s\nlite2:\n%s",
-				gotFast, gotGold, lite.String(), liteInter.String())
+				gotLite, gotGold, lite.String(), liteInter.String())
 		}
 	}
 }
