@@ -83,7 +83,7 @@ func (n *bartNode[V]) childCount() int {
 	return n.children.Len()
 }
 
-// insertPrefix adds a routing entry at the specified index with the given value.
+// insertPrefix adds or updates a routing entry at the specified index with the given value.
 // It returns true if a prefix already existed at that index (indicating an update),
 // false if this is a new insertion.
 func (n *bartNode[V]) insertPrefix(idx uint8, val V) (exists bool) {
