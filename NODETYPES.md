@@ -57,7 +57,7 @@ type fastNode[V any] struct {
  |-----------|------|----------|----------|-----------|------------------|
  | liteNode | 96 | 0 | 5×16=80 | 176 bytes | **17** |
  | bartNode[int] | 112 | 10×8=80 | 5×16=80 | 272 bytes | **27** |
- | fastNode[int] | 4,168 | 0 | 0 | 4,160 bytes | **417** |
+ | fastNode[int] | 4,168 | 0 | 0 | 4,168 bytes | **417** |
  
 ¹ Values assume childRef = 16 bytes and pointer to payload = 8 bytes
  
