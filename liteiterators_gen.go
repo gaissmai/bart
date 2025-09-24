@@ -241,7 +241,7 @@ func (n *liteNode[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxIdx uint
 
 	pfxFirstAddr, pfxLastAddr := art.IdxToRange(pfxIdx)
 
-	allCoveredIndices := make([]uint8, 0, maxItems)
+	allCoveredIndices := make([]uint8, 0, n.prefixCount())
 
 	var buf [256]uint8
 	for _, idx := range n.prefixes.AsSlice(&buf) {
@@ -257,7 +257,7 @@ func (n *liteNode[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxIdx uint
 
 	// 2. collect all covered child addrs by prefix
 
-	allCoveredChildAddrs := make([]uint8, 0, maxItems)
+	allCoveredChildAddrs := make([]uint8, 0, n.childCount())
 	for _, addr := range n.children.AsSlice(&buf) {
 		if addr >= pfxFirstAddr && addr <= pfxLastAddr {
 			allCoveredChildAddrs = append(allCoveredChildAddrs, addr)

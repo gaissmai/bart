@@ -21,6 +21,8 @@ type _NODE_TYPE[V any] struct {
 	children struct{ bitset.BitSet256 }
 }
 
+func (n *_NODE_TYPE[V]) prefixCount() (c int)           { return }
+func (n *_NODE_TYPE[V]) childCount() (c int)            { return }
 func (n *_NODE_TYPE[V]) mustGetPrefix(uint8) (val V)    { return }
 func (n *_NODE_TYPE[V]) mustGetChild(uint8) (child any) { return }
 
@@ -255,7 +257,7 @@ func (n *_NODE_TYPE[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxIdx ui
 
 	pfxFirstAddr, pfxLastAddr := art.IdxToRange(pfxIdx)
 
-	allCoveredIndices := make([]uint8, 0, maxItems)
+	allCoveredIndices := make([]uint8, 0, n.prefixCount())
 
 	var buf [256]uint8
 	for _, idx := range n.prefixes.AsSlice(&buf) {
@@ -271,7 +273,7 @@ func (n *_NODE_TYPE[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxIdx ui
 
 	// 2. collect all covered child addrs by prefix
 
-	allCoveredChildAddrs := make([]uint8, 0, maxItems)
+	allCoveredChildAddrs := make([]uint8, 0, n.childCount())
 	for _, addr := range n.children.AsSlice(&buf) {
 		if addr >= pfxFirstAddr && addr <= pfxLastAddr {
 			allCoveredChildAddrs = append(allCoveredChildAddrs, addr)
