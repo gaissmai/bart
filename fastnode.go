@@ -89,9 +89,8 @@ func (n *fastNode[V]) mustGetChild(addr uint8) any {
 
 // getChildAddrs returns a slice containing all addresses that have child nodes.
 // The addresses are returned in ascending order.
-func (n *fastNode[V]) getChildAddrs() []uint8 {
-	var buf [256]uint8
-	return n.children.AsSlice(&buf)
+func (n *fastNode[V]) getChildAddrs(buf *[256]uint8) []uint8 {
+	return n.children.AsSlice(buf)
 }
 
 // allChildren returns an iterator over all child nodes.
@@ -189,9 +188,8 @@ func (n *fastNode[V]) mustGetPrefix(idx uint8) V {
 
 // getIndices returns a slice containing all prefix indices that have values stored.
 // The indices are returned in ascending order.
-func (n *fastNode[V]) getIndices() []uint8 {
-	var buf [256]uint8
-	return n.prefixes.AsSlice(&buf)
+func (n *fastNode[V]) getIndices(buf *[256]uint8) []uint8 {
+	return n.prefixes.AsSlice(buf)
 }
 
 // allIndices returns an iterator over all prefix entries.
