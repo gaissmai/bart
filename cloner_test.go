@@ -47,6 +47,7 @@ type routeEntryNonCloner struct {
 // ---- cloneFnFactory / cloneVal / copyVal ----
 
 func TestCloneFnFactory_WithCloner(t *testing.T) {
+	t.Parallel()
 	fn := cloneFnFactory[*routeEntry]()
 	if fn == nil {
 		t.Fatalf("expected non-nil clone func when V implements Cloner[V]")
@@ -70,6 +71,7 @@ func TestCloneFnFactory_WithCloner(t *testing.T) {
 }
 
 func TestCloneFnFactory_WithoutCloner(t *testing.T) {
+	t.Parallel()
 	fn := cloneFnFactory[*routeEntryNonCloner]()
 	if fn != nil {
 		t.Fatalf("expected nil clone func when V does not implement Cloner[V]")
@@ -77,6 +79,7 @@ func TestCloneFnFactory_WithoutCloner(t *testing.T) {
 }
 
 func TestCloneVal_WithCloner(t *testing.T) {
+	t.Parallel()
 	in := &routeEntry{
 		nextHop:    netip.MustParseAddr("192.168.1.1"),
 		exitIF:     "wlan0",
@@ -97,6 +100,7 @@ func TestCloneVal_WithCloner(t *testing.T) {
 }
 
 func TestCloneVal_WithoutCloner(t *testing.T) {
+	t.Parallel()
 	in := &routeEntryNonCloner{
 		nextHop: netip.MustParseAddr("172.16.0.1"),
 		exitIF:  "eth1",
@@ -109,6 +113,7 @@ func TestCloneVal_WithoutCloner(t *testing.T) {
 }
 
 func TestCopyVal_Passthrough(t *testing.T) {
+	t.Parallel()
 	in := &routeEntry{
 		nextHop: netip.MustParseAddr("203.0.113.1"),
 		exitIF:  "tun0",
@@ -122,6 +127,7 @@ func TestCopyVal_Passthrough(t *testing.T) {
 // ---- leafNode.cloneLeaf / fringeNode.cloneFringe ----
 
 func TestCloneLeaf_NilCloneFn(t *testing.T) {
+	t.Parallel()
 	prefix := netip.MustParsePrefix("192.0.2.0/24")
 	route := &routeEntry{
 		nextHop:    netip.MustParseAddr("192.0.2.1"),
@@ -144,6 +150,7 @@ func TestCloneLeaf_NilCloneFn(t *testing.T) {
 }
 
 func TestCloneLeaf_WithCloneFn(t *testing.T) {
+	t.Parallel()
 	prefix := netip.MustParsePrefix("198.51.100.0/24")
 	route := &routeEntry{
 		nextHop:    netip.MustParseAddr("198.51.100.1"),
@@ -169,6 +176,7 @@ func TestCloneLeaf_WithCloneFn(t *testing.T) {
 }
 
 func TestCloneFringe_NilAndWithCloneFn(t *testing.T) {
+	t.Parallel()
 	route := &routeEntry{
 		nextHop:    netip.MustParseAddr("10.1.1.1"),
 		exitIF:     "bond0",
@@ -303,6 +311,7 @@ func TestNodeCloneFlat_ShallowChildrenDeepValues(t *testing.T) {
 }
 
 func TestNodeCloneFlat_PanicOnWrongType(t *testing.T) {
+	t.Parallel()
 	n := &bartNode[*routeEntry]{}
 	n.children = *n.children.Copy()
 	// insert a wrong type into children.Items to trigger panic branch
@@ -316,6 +325,7 @@ func TestNodeCloneFlat_PanicOnWrongType(t *testing.T) {
 }
 
 func TestNodeCloneRec_DeepCopiesNodeChildren(t *testing.T) {
+	t.Parallel()
 	// chain of *bartNode: parent[0] -> child[0] -> grandchild
 	parent := &bartNode[*routeEntry]{}
 	child := &bartNode[*routeEntry]{}
@@ -376,6 +386,7 @@ func TestNodeCloneRec_DeepCopiesNodeChildren(t *testing.T) {
 // ---- fastNode.cloneFlat / cloneRec ----
 
 func TestFastNodeCloneFlat_ValuesClonedAndChildrenFlat(t *testing.T) {
+	t.Parallel()
 	fn := &fastNode[*routeEntry]{}
 
 	// insert prefix - default route
@@ -457,6 +468,7 @@ func TestFastNodeCloneFlat_ValuesClonedAndChildrenFlat(t *testing.T) {
 }
 
 func TestFastNodeCloneRec_DeepCopiesFastNodeChildren(t *testing.T) {
+	t.Parallel()
 	parent := &fastNode[*routeEntry]{}
 	child := &fastNode[*routeEntry]{}
 	grand := &fastNode[*routeEntry]{}
