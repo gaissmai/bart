@@ -89,7 +89,7 @@ func (n *liteNode[V]) childCount() int {
 }
 
 // insertPrefix adds a routing entry at the specified index.
-// It returns true if a prefix already existed at that index (indicating an update),
+// It returns true if a prefix already existed at that index
 // false if this is a new insertion.
 func (n *liteNode[V]) insertPrefix(idx uint8, _ V) (exists bool) {
 	if exists = n.prefixes.Test(idx); exists {
