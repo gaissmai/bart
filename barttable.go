@@ -447,95 +447,22 @@ func (t *Table[V]) GetAndDelete(pfx netip.Prefix) (val V, found bool) {
 
 // Delete the prefix and returns the associated payload for prefix and true if found
 // or the zero value and false if prefix is not set in the routing table.
-func (t *Table[V]) Delete(pfx netip.Prefix) (val V, found bool) {
+func (t *Table[V]) Delete(pfx netip.Prefix) (val V, exists bool) {
 	if !pfx.IsValid() {
-		return val, found
+		return val, exists
 	}
 
 	// canonicalize prefix
 	pfx = pfx.Masked()
-
-	// values derived from pfx
-	ip := pfx.Addr()
-	is4 := ip.Is4()
-	octets := ip.AsSlice()
-	lastOctetPlusOne, lastBits := lastOctetPlusOneAndLastBits(pfx)
+	is4 := pfx.Addr().Is4()
 
 	n := t.rootNodeByVersion(is4)
+	val, exists = n.deleteItem(pfx)
 
-	// record the nodes on the path to the deleted node, needed to purge
-	// and/or path compress nodes after the deletion of a prefix
-	stack := [maxTreeDepth]*bartNode[V]{}
-
-	// find the trie node
-	for depth, octet := range octets {
-		depth = depth & depthMask // BCE, Delete must be fast
-
-		// push current node on stack for path recording
-		stack[depth] = n
-
-		// Last “octet” from prefix, update/insert prefix into node.
-		// Note: For /32 and /128, depth never reaches lastOctetPlusOne (4/16),
-		// so those are handled below via the fringe/leaf path.
-		if depth == lastOctetPlusOne {
-			// try to delete prefix in trie node
-			val, found = n.deletePrefix(art.PfxToIdx(octet, lastBits))
-			if !found {
-				return val, found
-			}
-
-			t.sizeUpdate(is4, -1)
-			// remove now-empty nodes and re-path-compress upwards
-			n.purgeAndCompress(stack[:depth], octets, is4)
-			return val, true
-		}
-
-		if !n.children.Test(octet) {
-			return val, found
-		}
-		kid := n.mustGetChild(octet)
-
-		// kid is node or leaf or fringe at octet
-		switch kid := kid.(type) {
-		case *bartNode[V]:
-			n = kid // descend down to next trie level
-
-		case *fringeNode[V]:
-			// if pfx is no fringe at this depth, fast exit
-			if !isFringe(depth, pfx) {
-				return val, found
-			}
-
-			// pfx is fringe at depth, delete fringe
-			n.deleteChild(octet)
-
-			t.sizeUpdate(is4, -1)
-			// remove now-empty nodes and re-path-compress upwards
-			n.purgeAndCompress(stack[:depth], octets, is4)
-
-			return kid.value, true
-
-		case *leafNode[V]:
-			// Attention: pfx must be masked to be comparable!
-			if kid.prefix != pfx {
-				return val, found
-			}
-
-			// prefix is equal leaf, delete leaf
-			n.deleteChild(octet)
-
-			t.sizeUpdate(is4, -1)
-			// remove now-empty nodes and re-path-compress upwards
-			n.purgeAndCompress(stack[:depth], octets, is4)
-
-			return kid.value, true
-
-		default:
-			panic("logic error, wrong node type")
-		}
+	if exists {
+		t.sizeUpdate(is4, -1)
 	}
-
-	return val, found
+	return val, exists
 }
 
 // Get returns the associated payload for prefix and true, or false if

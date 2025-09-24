@@ -26,6 +26,7 @@ func (n *_NODE_TYPE[V]) childCount() (c int)                       { return }
 func (n *_NODE_TYPE[V]) mustGetPrefix(uint8) (val V)               { return }
 func (n *_NODE_TYPE[V]) mustGetChild(uint8) (child any)            { return }
 func (n *_NODE_TYPE[V]) insertPrefix(uint8, V) (exists bool)       { return }
+func (n *_NODE_TYPE[V]) deletePrefix(uint8) (val V, exists bool)   { return }
 func (n *_NODE_TYPE[V]) getChild(uint8) (child any, ok bool)       { return }
 func (n *_NODE_TYPE[V]) insertChild(uint8, any) (exists bool)      { return }
 func (n *_NODE_TYPE[V]) deleteChild(uint8) (exists bool)           { return }
@@ -309,4 +310,87 @@ func (n *_NODE_TYPE[V]) purgeAndCompress(stack []*_NODE_TYPE[V], octets []uint8,
 		// climb up the stack
 		n = parent
 	}
+}
+
+// deleteItem deletes the prefix and returns the associated value and true if the prefix existed,
+// or zero value and false otherwise. The prefix must be in canonical form.
+func (n *_NODE_TYPE[V]) deleteItem(pfx netip.Prefix) (val V, exists bool) {
+	// invariant, prefix must be masked
+
+	// values derived from pfx
+	ip := pfx.Addr()
+	is4 := ip.Is4()
+	octets := ip.AsSlice()
+	lastOctetPlusOne, lastBits := lastOctetPlusOneAndLastBits(pfx)
+
+	// record the nodes on the path to the deleted node, needed to purge
+	// and/or path compress nodes after the deletion of a prefix
+	stack := [maxTreeDepth]*_NODE_TYPE[V]{}
+
+	// find the trie node
+	for depth, octet := range octets {
+		depth = depth & depthMask // BCE, Delete must be fast
+
+		// push current node on stack for path recording
+		stack[depth] = n
+
+		// Last “octet” from prefix, update/insert prefix into node.
+		// Note: For /32 and /128, depth never reaches lastOctetPlusOne (4/16),
+		// so those are handled below via the fringe/leaf path.
+		if depth == lastOctetPlusOne {
+			// try to delete prefix in trie node
+			val, exists = n.deletePrefix(art.PfxToIdx(octet, lastBits))
+			if !exists {
+				return val, exists
+			}
+
+			// remove now-empty nodes and re-path-compress upwards
+			n.purgeAndCompress(stack[:depth], octets, is4)
+			return val, true
+		}
+
+		if !n.children.Test(octet) {
+			return val, exists
+		}
+		kid := n.mustGetChild(octet)
+
+		// kid is node or leaf or fringe at octet
+		switch kid := kid.(type) {
+		case *_NODE_TYPE[V]:
+			n = kid // descend down to next trie level
+
+		case *fringeNode[V]:
+			// if pfx is no fringe at this depth, fast exit
+			if !isFringe(depth, pfx) {
+				return val, exists
+			}
+
+			// pfx is fringe at depth, delete fringe
+			n.deleteChild(octet)
+
+			// remove now-empty nodes and re-path-compress upwards
+			n.purgeAndCompress(stack[:depth], octets, is4)
+
+			return kid.value, true
+
+		case *leafNode[V]:
+			// Attention: pfx must be masked to be comparable!
+			if kid.prefix != pfx {
+				return val, exists
+			}
+
+			// prefix is equal leaf, delete leaf
+			n.deleteChild(octet)
+
+			// remove now-empty nodes and re-path-compress upwards
+			n.purgeAndCompress(stack[:depth], octets, is4)
+
+			return kid.value, true
+
+		default:
+			panic("logic error, wrong node type")
+		}
+	}
+
+	return val, exists
 }
