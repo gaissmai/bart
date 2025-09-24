@@ -47,13 +47,13 @@ func TestZeroValueState(t *testing.T) {
 			}
 
 			// Test that getIndices returns empty slice
-			indices := n.getIndices()
+			indices := n.getIndices(&[256]uint8{})
 			if len(indices) != 0 {
 				t.Errorf("Zero value node getIndices() should be empty, got length %d", len(indices))
 			}
 
 			// Test that getChildAddrs returns empty slice
-			addrs := n.getChildAddrs()
+			addrs := n.getChildAddrs(&[256]uint8{})
 			if len(addrs) != 0 {
 				t.Errorf("Zero value node getChildAddrs() should be empty, got length %d", len(addrs))
 			}
@@ -366,7 +366,7 @@ func TestIteratorConsistency(t *testing.T) {
 			}
 
 			// Test that allIndices and getIndices are consistent
-			directIndices := n.getIndices()
+			directIndices := n.getIndices(&[256]uint8{})
 
 			var iterIndices []uint8
 			var iterValues []string
@@ -848,7 +848,7 @@ func TestNodes_Prefixes_AsSliceConsistency(t *testing.T) {
 			}
 
 			// getIndices is a wrapper for AsSlice()
-			s := n.getIndices()
+			s := n.getIndices(&[256]uint8{})
 
 			// Expect each inserted index to be present exactly once in the slice.
 			if len(s) != len(toInsert) {
@@ -890,7 +890,7 @@ func TestNode_Children_AsSliceConsistency(t *testing.T) {
 			}
 
 			// getChildAddrs is a wrapper for AsSlice
-			s := n.getChildAddrs()
+			s := n.getChildAddrs(&[256]uint8{})
 			if len(s) != len(toInsert) {
 				t.Fatalf("getChildAddrs length=%d, want %d", len(s), len(toInsert))
 			}
@@ -929,7 +929,7 @@ func TestNodes_InsertDuplicatePrefix_OverwritesValue(t *testing.T) {
 			n.insertPrefix(idx, 1)
 			n.insertPrefix(idx, 2) // duplicate insert with different value should overwrite
 
-			s := n.getIndices()
+			s := n.getIndices(&[256]uint8{})
 			if len(s) != 1 || s[0] != idx {
 				t.Fatalf("duplicate insert should result in a single set bit for %d; slice=%v", idx, s)
 			}
@@ -974,7 +974,7 @@ func TestNodes_DeleteChild_Idempotent(t *testing.T) {
 			n.deleteChild(c)
 
 			// No children should remain.
-			if s := n.getChildAddrs(); len(s) != 0 {
+			if s := n.getChildAddrs(&[256]uint8{}); len(s) != 0 {
 				t.Fatalf("expected no children after idempotent deletes, got %v", s)
 			}
 		})

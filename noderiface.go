@@ -38,18 +38,18 @@ type nodeReader[V any] interface {
 	prefixCount() int
 
 	getChild(uint8) (any, bool)
-	getPrefix(idx uint8) (V, bool)
+	getPrefix(uint8) (V, bool)
 
 	mustGetChild(uint8) any
-	mustGetPrefix(idx uint8) V
+	mustGetPrefix(uint8) V
 
-	getChildAddrs() []uint8
-	getIndices() []uint8
+	getChildAddrs(*[256]uint8) []uint8
+	getIndices(*[256]uint8) []uint8
 
 	allChildren() iter.Seq2[uint8, any]
 	allIndices() iter.Seq2[uint8, V]
 
-	contains(idx uint8) bool
-	lookup(idx uint8) (V, bool)
-	lookupIdx(idx uint8) (uint8, V, bool)
+	contains(uint8) bool
+	lookup(uint8) (V, bool)
+	lookupIdx(uint8) (uint8, V, bool)
 }

@@ -101,9 +101,8 @@ func (n *bartNode[V]) getPrefix(idx uint8) (val V, exists bool) {
 // for prefix storage within the 8-bit stride.
 //
 //nolint:unused // used via nodeReader interface
-func (n *bartNode[V]) getIndices() []uint8 {
-	var buf [256]uint8
-	return n.prefixes.AsSlice(&buf)
+func (n *bartNode[V]) getIndices(buf *[256]uint8) []uint8 {
+	return n.prefixes.AsSlice(buf)
 }
 
 // allIndices returns an iterator over all prefix entries.
@@ -151,9 +150,8 @@ func (n *bartNode[V]) getChild(addr uint8) (any, bool) {
 // This is useful for iterating over all child nodes without checking every possible address.
 //
 //nolint:unused // used via nodeReader interface
-func (n *bartNode[V]) getChildAddrs() []uint8 {
-	var buf [256]uint8
-	return n.children.AsSlice(&buf)
+func (n *bartNode[V]) getChildAddrs(buf *[256]uint8) []uint8 {
+	return n.children.AsSlice(buf)
 }
 
 // allChildren returns an iterator over all child nodes.
