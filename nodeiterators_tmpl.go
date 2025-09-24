@@ -278,15 +278,16 @@ func (n *_NODE_TYPE[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxIdx ui
 		}
 	}
 
-	// 3. yield covered indices, pathcomp prefixes and childs in CIDR sort order
+	// 3. yield covered indices, path-compressed prefixes
+	//    and children in CIDR sort order
 
 	addrCursor := 0
 
-	// yield indices and childs in CIDR sort order
+	// yield indices and children in CIDR sort order
 	for _, pfxIdx := range allCoveredIndices {
 		pfxOctet, _ := art.IdxToPfx(pfxIdx)
 
-		// yield all childs before idx
+		// yield all children before idx
 		for j := addrCursor; j < len(allCoveredChildAddrs); j++ {
 			addr := allCoveredChildAddrs[j]
 			if addr >= pfxOctet {
