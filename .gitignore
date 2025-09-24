@@ -23,6 +23,6 @@
 # ...even if they are in subdirectories
 !*/
 
-!doc/*
-!scripts/*
-!testdata/*
+!doc/**
+!scripts/**
+!testdata/**
