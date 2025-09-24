@@ -71,7 +71,7 @@ func (l *fringeNode[V]) cloneFringe(cloneFn cloneFunc[V]) *fringeNode[V] {
 // #   getChildAddrs method calls                                             #
 // ############################################################################
 
-// cloneFlat returns a shallow copy of the current node[V], optionally performing deep copies of values.
+// cloneFlat returns a shallow copy of the current node, optionally performing deep copies of values.
 //
 // If cloneFn is nil, the stored values in prefixes are copied directly without modification.
 // Otherwise, cloneFn is applied to each stored value for deep cloning.
@@ -124,7 +124,7 @@ func (n *bartNode[V]) cloneFlat(cloneFn cloneFunc[V]) *bartNode[V] {
 	return c
 }
 
-// cloneRec performs a recursive deep copy of the node[V] and all its descendants.
+// cloneRec performs a recursive deep copy of the node and all its descendants.
 //
 // If cloneFn is nil, the stored values are copied directly without modification.
 // Otherwise cloneFn is applied to each stored value for deep cloning.
@@ -157,7 +157,7 @@ func (n *bartNode[V]) cloneRec(cloneFn cloneFunc[V]) *bartNode[V] {
 }
 
 // cloneFlat returns a shallow copy of the current fastNode[V],
-// Its semantics are identical to [node.cloneFlat].
+// Its semantics are identical to [bartNode.cloneFlat].
 func (n *fastNode[V]) cloneFlat(cloneFn cloneFunc[V]) *fastNode[V] {
 	if n == nil {
 		return nil
@@ -221,7 +221,7 @@ func (n *fastNode[V]) cloneFlat(cloneFn cloneFunc[V]) *fastNode[V] {
 }
 
 // cloneRec performs a recursive deep copy of the fastNode[V] and all its descendants.
-// Its semantics are identical to [node.cloneRec].
+// Its semantics are identical to [bartNode.cloneRec].
 func (n *fastNode[V]) cloneRec(cloneFn cloneFunc[V]) *fastNode[V] {
 	if n == nil {
 		return nil
@@ -245,7 +245,7 @@ func (n *fastNode[V]) cloneRec(cloneFn cloneFunc[V]) *fastNode[V] {
 	return c
 }
 
-// cloneFlat returns a shallow copy of the current node[V].
+// cloneFlat returns a shallow copy of the current node.
 //
 // cloneFn is only used for interface satisfaction.
 func (n *liteNode[V]) cloneFlat(_ cloneFunc[V]) *liteNode[V] {
@@ -268,7 +268,7 @@ func (n *liteNode[V]) cloneFlat(_ cloneFunc[V]) *liteNode[V] {
 	return c
 }
 
-// cloneRec performs a recursive deep copy of the node[V] and all its descendants.
+// cloneRec performs a recursive deep copy of the node and all its descendants.
 //
 // cloneFn is only used for interface satisfaction.
 //
@@ -276,7 +276,7 @@ func (n *liteNode[V]) cloneFlat(_ cloneFunc[V]) *liteNode[V] {
 // Then it recursively clones all child nodes of type *liteNode[V],
 // performing a full deep clone down the subtree.
 //
-// Child nodes of type *liteLeafNode and *liteFringeNode are already copied
+// Child nodes of type *ileafNode and *fringeNode are already copied
 // by cloneFlat.
 //
 // Returns a new instance of liteNode[V] which is a complete deep clone of the
