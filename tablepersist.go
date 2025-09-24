@@ -681,7 +681,7 @@ func (t *Table[V]) DeletePersist(pfx netip.Prefix) (pt *Table[V], val V, found b
 //
 //		// Delete entries with value 0
 //		case val == 0:
-//			pt = pt.DeletePersist(pfx)
+//			pt, _, _ = pt.DeletePersist(pfx)
 //
 //		// Update even values by doubling them
 //		case val%2 == 0:
