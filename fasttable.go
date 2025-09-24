@@ -271,81 +271,14 @@ func (f *Fast[V]) Delete(pfx netip.Prefix) (val V, exists bool) {
 
 	// canonicalize prefix
 	pfx = pfx.Masked()
-
-	// values derived from pfx
-	ip := pfx.Addr()
-	is4 := ip.Is4()
-	octets := ip.AsSlice()
-	lastOctetPlusOne, lastBits := lastOctetPlusOneAndLastBits(pfx)
+	is4 := pfx.Addr().Is4()
 
 	n := f.rootNodeByVersion(is4)
+	val, exists = n.deleteItem(pfx)
 
-	// record the nodes on the path to the deleted node, needed to purge
-	// and/or path compress nodes after the deletion of a prefix
-	stack := [maxTreeDepth]*fastNode[V]{}
-
-	// find the trie node
-	for depth, octet := range octets {
-		depth = depth & depthMask // BCE
-
-		// push current node on stack for path recording
-		stack[depth] = n
-
-		if depth == lastOctetPlusOne {
-			// try to delete prefix in trie node
-			val, exists = n.deletePrefix(art.PfxToIdx(octet, lastBits))
-			if !exists {
-				return val, false
-			}
-
-			f.sizeUpdate(is4, -1)
-			n.purgeAndCompress(stack[:depth], octets, is4)
-			return val, true
-		}
-
-		kidAny, ok := n.getChild(octet)
-		if !ok {
-			return val, exists
-		}
-
-		// kid is node or leaf or fringe at octet
-		switch kid := kidAny.(type) {
-		case *fastNode[V]:
-			n = kid // descend down to next trie level
-
-		case *fringeNode[V]:
-			// if pfx is no fringe at this depth, fast exit
-			if !isFringe(depth, pfx) {
-				return val, exists
-			}
-
-			// pfx is fringe at depth, delete fringe
-			n.deleteChild(octet)
-
-			f.sizeUpdate(is4, -1)
-			n.purgeAndCompress(stack[:depth], octets, is4)
-
-			return kid.value, true
-
-		case *leafNode[V]:
-			// Attention: pfx must be masked to be comparable!
-			if kid.prefix != pfx {
-				return val, exists
-			}
-
-			// prefix is equal leaf, delete leaf
-			n.deleteChild(octet)
-
-			f.sizeUpdate(is4, -1)
-			n.purgeAndCompress(stack[:depth], octets, is4)
-
-			return kid.value, true
-
-		default:
-			panic("logic error, wrong node type")
-		}
+	if exists {
+		f.sizeUpdate(is4, -1)
 	}
-
 	return val, exists
 }
 
