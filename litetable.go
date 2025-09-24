@@ -531,7 +531,7 @@ func (l *liteTable[V]) Modify(pfx netip.Prefix, cb func(zero V, found bool) (_ V
 // This performs longest-prefix matching and returns true if any prefix
 // in the routing table contains the IP address.
 func (l *liteTable[V]) Contains(ip netip.Addr) bool {
-	// speed is top priority: no explicit test for ip.Isvalid
+	// speed is top priority: no explicit test for ip.IsValid
 	// if ip is invalid, AsSlice() returns nil, Contains returns false.
 	is4 := ip.Is4()
 	n := l.rootNodeByVersion(is4)

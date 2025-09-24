@@ -169,9 +169,9 @@ func (n *_NODE_TYPE[V]) overlapsChildrenIn(o *_NODE_TYPE[V]) bool {
 
 	// when will we range over the children and when will we do bitset calc?
 	// heuristic, magic number retrieved by micro benchmarks
-	const magicNumber = 15
+	const overlapsRangeCutoff = 15
 
-	doRange := childCount < magicNumber || pfxCount > magicNumber
+	doRange := childCount < overlapsRangeCutoff || pfxCount > overlapsRangeCutoff
 
 	// do range over, not so many children and maybe too many prefixes for other algo below
 	var buf [256]uint8
