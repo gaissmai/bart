@@ -124,7 +124,7 @@ func TestAll(t *testing.T) {
 		All() iter.Seq2[netip.Prefix, int]
 	}
 
-	// Test all table types that support AllSorted
+	// Test all table types that support All
 	tables := []struct {
 		name    string
 		builder func() tabler
@@ -145,7 +145,7 @@ func TestAll(t *testing.T) {
 				tbl.Insert(item.pfx, item.val)
 			}
 
-			// Collect all prefixes from AllSorted
+			// Collect all prefixes from All
 			gotPrefixes := make([]netip.Prefix, 0, n)
 			gotValues := make([]int, 0, n)
 
@@ -185,7 +185,7 @@ func TestAll(t *testing.T) {
 			seen := make(map[netip.Prefix]bool, n)
 			for _, pfx := range gotPrefixes {
 				if seen[pfx] {
-					t.Fatalf("%s: Duplicate prefix %v found in AllSorted results", tt.name, pfx)
+					t.Fatalf("%s: Duplicate prefix %v found in All results", tt.name, pfx)
 				}
 				seen[pfx] = true
 			}
