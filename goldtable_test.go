@@ -56,7 +56,8 @@ func (t *goldTable[V]) update(pfx netip.Prefix, cb func(V, bool) V) (val V) {
 	for i, ent := range *t {
 		if ent.pfx == pfx {
 			// update val
-			(*t)[i].val = cb(ent.val, true)
+			val = cb(ent.val, true)
+			(*t)[i].val = val
 			return val
 		}
 	}
