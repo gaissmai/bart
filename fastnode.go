@@ -80,8 +80,6 @@ func (n *fastNode[V]) getChild(addr uint8) (any, bool) {
 // mustGetChild returns the child node at the specified address.
 // Panics if no child exists at addr. This method should only be called
 // when the caller has verified the child exists.
-//
-//nolint:unused // used via nodeReader interface
 func (n *fastNode[V]) mustGetChild(addr uint8) any {
 	// panics if n.children[addr] is nil
 	return *n.children.items[addr]
@@ -95,8 +93,6 @@ func (n *fastNode[V]) getChildAddrs(buf *[256]uint8) []uint8 {
 
 // allChildren returns an iterator over all child nodes.
 // Each iteration yields the child's address (uint8) and the child node (any).
-//
-//nolint:unused // used via nodeReader interface
 func (n *fastNode[V]) allChildren() iter.Seq2[uint8, any] {
 	return func(yield func(addr uint8, child any) bool) {
 		var buf [256]uint8
@@ -180,8 +176,6 @@ func (n *fastNode[V]) getPrefix(idx uint8) (val V, exists bool) {
 // mustGetPrefix returns the value for the given prefix index.
 // Panics if no prefix exists at idx. This method should only be called
 // when the caller has verified the prefix exists.
-//
-//nolint:unused // used via nodeReader interface
 func (n *fastNode[V]) mustGetPrefix(idx uint8) V {
 	return *n.prefixes.items[idx]
 }
@@ -194,8 +188,6 @@ func (n *fastNode[V]) getIndices(buf *[256]uint8) []uint8 {
 
 // allIndices returns an iterator over all prefix entries.
 // Each iteration yields the prefix index (uint8) and its associated value (V).
-//
-//nolint:unused // used via nodeReader interface
 func (n *fastNode[V]) allIndices() iter.Seq2[uint8, V] {
 	return func(yield func(uint8, V) bool) {
 		var buf [256]uint8

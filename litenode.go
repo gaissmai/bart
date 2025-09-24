@@ -140,6 +140,8 @@ func (n *liteNode[V]) allIndices() iter.Seq2[uint8, V] {
 
 // deletePrefix removes the prefix at the specified index.
 // Returns true if the prefix existed, and false otherwise.
+//
+//nolint:unparam
 func (n *liteNode[V]) deletePrefix(idx uint8) (_ V, exists bool) {
 	if exists = n.prefixes.Test(idx); !exists {
 		return
