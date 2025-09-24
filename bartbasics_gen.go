@@ -235,8 +235,8 @@ func (n *bartNode[V]) purgeAndCompress(stack []*bartNode[V], octets []uint8, is4
 			parent.deleteChild(octet)
 
 		case pfxCount == 0 && childCount == 1:
-			addr, _ := n.children.FirstSet() // single addr must be first bit set
-			anyKid := n.mustGetChild(addr)
+			singleAddr, _ := n.children.FirstSet() // single addr must be first bit set
+			anyKid := n.mustGetChild(singleAddr)
 
 			switch kid := anyKid.(type) {
 			case *bartNode[V]:
@@ -253,12 +253,10 @@ func (n *bartNode[V]) purgeAndCompress(stack []*bartNode[V], octets []uint8, is4
 				// just one fringe, delete this node and reinsert the fringe as leaf above
 				parent.deleteChild(octet)
 
-				// get the last octet back, the only item is also the first item
-				lastOctet, _ := n.children.FirstSet()
-
 				// rebuild the prefix with octets, depth, ip version and addr
 				// depth is the parent's depth, so add +1 here for the kid
-				fringePfx := cidrForFringe(octets, depth+1, is4, lastOctet)
+				// lastOctet in cidrForFringe is the only addr (singleAddr)
+				fringePfx := cidrForFringe(octets, depth+1, is4, singleAddr)
 
 				// ... (re)reinsert prefix/value at parents depth
 				parent.insert(fringePfx, kid.value, depth)
