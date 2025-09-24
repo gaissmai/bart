@@ -71,8 +71,6 @@ type liteNode[V any] struct {
 // isEmpty returns true if the node contains no routing entries (prefixes)
 // and no child nodes. Empty nodes are candidates for compression or removal
 // during trie optimization.
-//
-//nolint:unused // used via nodeReader interface
 func (n *liteNode[V]) isEmpty() bool {
 	if n == nil {
 		return true
@@ -81,8 +79,6 @@ func (n *liteNode[V]) isEmpty() bool {
 }
 
 // prefixCount returns the number of prefixes stored in this node.
-//
-//nolint:unused // used via nodeReader interface
 func (n *liteNode[V]) prefixCount() int {
 	return int(n.prefixes.count)
 }
@@ -106,13 +102,13 @@ func (n *liteNode[V]) insertPrefix(idx uint8, _ V) (exists bool) {
 
 // prefix is set at the given index.
 //
-//nolint:unparam,unused  // used via nodeReader interface
+//nolint:unparam
 func (n *liteNode[V]) getPrefix(idx uint8) (_ V, exists bool) {
 	exists = n.prefixes.Test(idx)
 	return
 }
 
-//nolint:unparam,unused // used via nodeReader interface
+//nolint:unparam
 func (n *liteNode[V]) mustGetPrefix(idx uint8) (_ V) {
 	return
 }
@@ -144,8 +140,6 @@ func (n *liteNode[V]) allIndices() iter.Seq2[uint8, V] {
 
 // deletePrefix removes the prefix at the specified index.
 // Returns true if the prefix existed, and false otherwise.
-//
-//nolint:unparam,unused // used via NodeReadWriter interface
 func (n *liteNode[V]) deletePrefix(idx uint8) (_ V, exists bool) {
 	if exists = n.prefixes.Test(idx); !exists {
 		return
@@ -164,8 +158,6 @@ func (n *liteNode[V]) insertChild(addr uint8, child any) (exists bool) {
 
 // getChild retrieves the child node at the specified address.
 // Returns the child and true if found, or nil and false if not present.
-//
-//nolint:unused // used via nodeReader interface
 func (n *liteNode[V]) getChild(addr uint8) (any, bool) {
 	return n.children.Get(addr)
 }
