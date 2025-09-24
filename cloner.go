@@ -179,7 +179,8 @@ func (n *fastNode[V]) cloneFlat(cloneFn cloneFunc[V]) *fastNode[V] {
 	// it's a clone of the prefixes ...
 	// but the allot algorithm makes it more difficult
 	// see also insertPrefix
-	for _, idx := range n.getIndices() {
+	buf := new([256]uint8)
+	for _, idx := range n.getIndices(buf) {
 		origValPtr := n.prefixes.items[idx]
 		newValPtr := new(V)
 
@@ -194,7 +195,7 @@ func (n *fastNode[V]) cloneFlat(cloneFn cloneFunc[V]) *fastNode[V] {
 	}
 
 	// flat clone of the children
-	for _, addr := range n.getChildAddrs() {
+	for _, addr := range n.getChildAddrs(buf) {
 		kidAny := *n.children.items[addr]
 
 		switch kid := kidAny.(type) {
@@ -230,7 +231,8 @@ func (n *fastNode[V]) cloneRec(cloneFn cloneFunc[V]) *fastNode[V] {
 	c := n.cloneFlat(cloneFn)
 
 	// Recursively clone all child nodes of type *fastNode[V]
-	for _, addr := range c.getChildAddrs() {
+	buf := new([256]uint8)
+	for _, addr := range c.getChildAddrs(buf) {
 		kidAny := *c.children.items[addr]
 
 		switch kid := kidAny.(type) {
