@@ -207,7 +207,7 @@ func (n *liteNode[V]) overlapsSameChildren(o *liteNode[V], depth int) bool {
 		nChild := n.mustGetChild(addr)
 		oChild := o.mustGetChild(addr)
 
-		if liteNodeOverlapsTwoChildren[V](nChild, oChild, depth+1) {
+		if n.overlapsTwoChildren(nChild, oChild, depth+1) {
 			return true
 		}
 
@@ -228,7 +228,7 @@ func (n *liteNode[V]) overlapsSameChildren(o *liteNode[V], depth int) bool {
 // for node/leaf mismatches, and returns true immediately if either side is fringe.
 //
 // Supports path-compressed routing structures without requiring full expansion.
-func liteNodeOverlapsTwoChildren[V any](nChild, oChild any, depth int) bool {
+func (n *liteNode[V]) overlapsTwoChildren(nChild, oChild any, depth int) bool {
 	//  3x3 possible different combinations for n and o
 	//
 	//  node, node    --> overlaps rec descent
