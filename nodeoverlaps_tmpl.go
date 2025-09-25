@@ -14,7 +14,18 @@ import (
 
 	"github.com/gaissmai/bart/internal/allot"
 	"github.com/gaissmai/bart/internal/art"
+	"github.com/gaissmai/bart/internal/bitset"
 )
+
+type _NODE_TYPE[V any] struct {
+	prefixes struct{ bitset.BitSet256 }
+	children struct{ bitset.BitSet256 }
+}
+
+func (n *_NODE_TYPE[V]) prefixCount() (c int)           { return }
+func (n *_NODE_TYPE[V]) childCount() (c int)            { return }
+func (n *_NODE_TYPE[V]) mustGetChild(uint8) (child any) { return }
+func (n *_NODE_TYPE[V]) contains(uint8) (ok bool)       { return }
 
 // ### GENERATE DELETE END ###
 
@@ -213,7 +224,7 @@ func (n *_NODE_TYPE[V]) overlapsSameChildren(o *_NODE_TYPE[V], depth int) bool {
 		nChild := n.mustGetChild(addr)
 		oChild := o.mustGetChild(addr)
 
-		if _NODE_TYPEOverlapsTwoChildren[V](nChild, oChild, depth+1) {
+		if n.overlapsTwoChildren(nChild, oChild, depth+1) {
 			return true
 		}
 
@@ -234,7 +245,7 @@ func (n *_NODE_TYPE[V]) overlapsSameChildren(o *_NODE_TYPE[V], depth int) bool {
 // for node/leaf mismatches, and returns true immediately if either side is fringe.
 //
 // Supports path-compressed routing structures without requiring full expansion.
-func _NODE_TYPEOverlapsTwoChildren[V any](nChild, oChild any, depth int) bool {
+func (n *_NODE_TYPE[V]) overlapsTwoChildren(nChild, oChild any, depth int) bool {
 	//  3x3 possible different combinations for n and o
 	//
 	//  node, node    --> overlaps rec descent
