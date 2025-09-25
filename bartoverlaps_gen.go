@@ -220,62 +220,6 @@ func (n *bartNode[V]) overlapsSameChildren(o *bartNode[V], depth int) bool {
 	return false
 }
 
-// bartNodeOverlapsTwoChildren checks two child entries for semantic overlap.
-//
-// Handles all 3x3 combinations of node kinds (node, leaf, fringe).
-//
-// Recurses into subtrees for (node, node), delegates to overlapsPrefixAtDepth
-// for node/leaf mismatches, and returns true immediately if either side is fringe.
-//
-// Supports path-compressed routing structures without requiring full expansion.
-func (n *bartNode[V]) overlapsTwoChildren(nChild, oChild any, depth int) bool {
-	//  3x3 possible different combinations for n and o
-	//
-	//  node, node    --> overlaps rec descent
-	//  node, leaf    --> overlapsPrefixAtDepth
-	//  node, fringe  --> true
-	//
-	//  leaf, node    --> overlapsPrefixAtDepth
-	//  leaf, leaf    --> netip.Prefix.Overlaps
-	//  leaf, fringe  --> true
-	//
-	//  fringe, node    --> true
-	//  fringe, leaf    --> true
-	//  fringe, fringe  --> true
-	//
-	switch nKind := nChild.(type) {
-	case *bartNode[V]: // node, ...
-		switch oKind := oChild.(type) {
-		case *bartNode[V]: // node, node
-			return nKind.overlaps(oKind, depth)
-		case *leafNode[V]: // node, leaf
-			return nKind.overlapsPrefixAtDepth(oKind.prefix, depth)
-		case *fringeNode[V]: // node, fringe
-			return true
-		default:
-			panic("logic error, wrong node type")
-		}
-
-	case *leafNode[V]:
-		switch oKind := oChild.(type) {
-		case *bartNode[V]: // leaf, node
-			return oKind.overlapsPrefixAtDepth(nKind.prefix, depth)
-		case *leafNode[V]: // leaf, leaf
-			return oKind.prefix.Overlaps(nKind.prefix)
-		case *fringeNode[V]: // leaf, fringe
-			return true
-		default:
-			panic("logic error, wrong node type")
-		}
-
-	case *fringeNode[V]:
-		return true
-
-	default:
-		panic("logic error, wrong node type")
-	}
-}
-
 // overlapsPrefixAtDepth returns true if any route in the subtree rooted at this node
 // overlaps with the given pfx, starting the comparison at the specified depth.
 //
@@ -361,4 +305,57 @@ func (n *bartNode[V]) overlapsIdx(idx uint8) bool {
 
 	// 3. Test if prefix overlaps any child in this node
 	return n.children.Intersects(&allot.FringeRoutesLookupTbl[idx])
+}
+
+// overlapsTwoChildren handles all 3x3 combinations of
+// node kinds (node, leaf, fringe).
+//
+//	3x3 possible different combinations for n and o
+//
+//	node, node    --> overlaps rec descent
+//	node, leaf    --> overlapsPrefixAtDepth
+//	node, fringe  --> true
+//
+//	leaf, node    --> overlapsPrefixAtDepth
+//	leaf, leaf    --> netip.Prefix.Overlaps
+//	leaf, fringe  --> true
+//
+//	fringe, node    --> true
+//	fringe, leaf    --> true
+//	fringe, fringe  --> true
+func (n *bartNode[V]) overlapsTwoChildren(nChild, oChild any, depth int) bool {
+	// child type detection
+	nNode, nIsNode := nChild.(*bartNode[V])
+	nLeaf, nIsLeaf := nChild.(*leafNode[V])
+	_, nIsFringe := nChild.(*fringeNode[V])
+
+	oNode, oIsNode := oChild.(*bartNode[V])
+	oLeaf, oIsLeaf := oChild.(*leafNode[V])
+	_, oIsFringe := oChild.(*fringeNode[V])
+
+	// Handle all 9 combinations with a single expression
+	switch {
+	// NODE cases
+	case nIsNode && oIsNode:
+		return nNode.overlaps(oNode, depth)
+	case nIsNode && oIsLeaf:
+		return nNode.overlapsPrefixAtDepth(oLeaf.prefix, depth)
+	case nIsNode && oIsFringe:
+		return true
+
+	// LEAF cases
+	case nIsLeaf && oIsNode:
+		return oNode.overlapsPrefixAtDepth(nLeaf.prefix, depth)
+	case nIsLeaf && oIsLeaf:
+		return oLeaf.prefix.Overlaps(nLeaf.prefix)
+	case nIsLeaf && oIsFringe:
+		return true
+
+	// FRINGE cases
+	case nIsFringe:
+		return true // fringe overlaps with everything
+
+	default:
+		panic("logic error, wrong node type combination")
+	}
 }

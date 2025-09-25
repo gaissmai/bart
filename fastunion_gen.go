@@ -38,174 +38,11 @@ func (n *fastNode[V]) unionRec(cloneFn cloneFunc[V], o *fastNode[V], depth int) 
 
 	// for all child addrs in other node do ...
 	for _, addr := range o.children.AsSlice(&buf) {
-		otherAny := o.mustGetChild(addr)
-
-		//  12 possible combinations to union this child and other child
-		//
-		//  THIS,   OTHER: (always clone the other kid!)
-		//  --------------
-		//  NULL,   node    <-- insert node at addr
-		//  NULL,   leaf    <-- insert leaf at addr
-		//  NULL,   fringe  <-- insert fringe at addr
-
-		//  node,   node    <-- union rec-descent with node
-		//  node,   leaf    <-- insert leaf at depth+1
-		//  node,   fringe  <-- insert fringe at depth+1
-
-		//  leaf,   node    <-- insert new node, push this leaf down, union rec-descent
-		//  leaf,   leaf    <-- insert new node, push both leaves down (!first check equality)
-		//  leaf,   fringe  <-- insert new node, push this leaf and fringe down
-
-		//  fringe, node    <-- insert new node, push this fringe down, union rec-descent
-		//  fringe, leaf    <-- insert new node, push this fringe down, insert other leaf at depth+1
-		//  fringe, fringe  <-- just overwrite value
-		//
-		// try to get child at same addr from n
+		otherChild := o.mustGetChild(addr)
 		thisChild, thisExists := n.getChild(addr)
-		if !thisExists { // NULL, ... slot at addr is empty
-			switch otherKid := otherAny.(type) {
-			case *fastNode[V]: // NULL, node
-				n.insertChild(addr, otherKid.cloneRec(cloneFn))
-				continue
 
-			case *leafNode[V]: // NULL, leaf
-				n.insertChild(addr, otherKid.cloneLeaf(cloneFn))
-				continue
-
-			case *fringeNode[V]: // NULL, fringe
-				n.insertChild(addr, otherKid.cloneFringe(cloneFn))
-				continue
-
-			default:
-				panic("logic error, wrong node type")
-			}
-		}
-
-		switch thisKid := thisChild.(type) {
-		case *fastNode[V]: // node, ...
-			switch otherKid := otherAny.(type) {
-			case *fastNode[V]: // node, node
-				// both childs have node at addr, call union rec-descent on child nodes
-				duplicates += thisKid.unionRec(cloneFn, otherKid.cloneRec(cloneFn), depth+1)
-				continue
-
-			case *leafNode[V]: // node, leaf
-				// push this cloned leaf down, count duplicate entry
-				clonedLeaf := otherKid.cloneLeaf(cloneFn)
-				if thisKid.insert(clonedLeaf.prefix, clonedLeaf.value, depth+1) {
-					duplicates++
-				}
-				continue
-
-			case *fringeNode[V]: // node, fringe
-				// push this fringe down, a fringe becomes a default route one level down
-				clonedFringe := otherKid.cloneFringe(cloneFn)
-				if thisKid.insertPrefix(1, clonedFringe.value) {
-					duplicates++
-				}
-				continue
-			}
-
-		case *leafNode[V]: // leaf, ...
-			switch otherKid := otherAny.(type) {
-			case *fastNode[V]: // leaf, node
-				// create new node
-				nc := new(fastNode[V])
-
-				// push this leaf down
-				nc.insert(thisKid.prefix, thisKid.value, depth+1)
-
-				// insert the new node at current addr
-				n.insertChild(addr, nc)
-
-				// unionRec this new node with other kid node
-				duplicates += nc.unionRec(cloneFn, otherKid.cloneRec(cloneFn), depth+1)
-				continue
-
-			case *leafNode[V]: // leaf, leaf
-				// shortcut, prefixes are equal
-				if thisKid.prefix == otherKid.prefix {
-					thisKid.value = cloneFn(otherKid.value)
-					duplicates++
-					continue
-				}
-
-				// create new node
-				nc := new(fastNode[V])
-
-				// push this leaf down
-				nc.insert(thisKid.prefix, thisKid.value, depth+1)
-
-				// insert at depth cloned leaf, maybe duplicate
-				clonedLeaf := otherKid.cloneLeaf(cloneFn)
-				if nc.insert(clonedLeaf.prefix, clonedLeaf.value, depth+1) {
-					duplicates++
-				}
-
-				// insert the new node at current addr
-				n.insertChild(addr, nc)
-				continue
-
-			case *fringeNode[V]: // leaf, fringe
-				// create new node
-				nc := new(fastNode[V])
-
-				// push this leaf down
-				nc.insert(thisKid.prefix, thisKid.value, depth+1)
-
-				// push this cloned fringe down, it becomes the default route
-				clonedFringe := otherKid.cloneFringe(cloneFn)
-				if nc.insertPrefix(1, clonedFringe.value) {
-					duplicates++
-				}
-
-				// insert the new node at current addr
-				n.insertChild(addr, nc)
-				continue
-			}
-
-		case *fringeNode[V]: // fringe, ...
-			switch otherKid := otherAny.(type) {
-			case *fastNode[V]: // fringe, node
-				// create new node
-				nc := new(fastNode[V])
-
-				// push this fringe down, it becomes the default route
-				nc.insertPrefix(1, thisKid.value)
-
-				// insert the new node at current addr
-				n.insertChild(addr, nc)
-
-				// unionRec this new node with other kid node
-				duplicates += nc.unionRec(cloneFn, otherKid.cloneRec(cloneFn), depth+1)
-				continue
-
-			case *leafNode[V]: // fringe, leaf
-				// create new node
-				nc := new(fastNode[V])
-
-				// push this fringe down, it becomes the default route
-				nc.insertPrefix(1, thisKid.value)
-
-				// push this cloned leaf down
-				clonedLeaf := otherKid.cloneLeaf(cloneFn)
-				if nc.insert(clonedLeaf.prefix, clonedLeaf.value, depth+1) {
-					duplicates++
-				}
-
-				// insert the new node at current addr
-				n.insertChild(addr, nc)
-				continue
-
-			case *fringeNode[V]: // fringe, fringe
-				thisKid.value = otherKid.cloneFringe(cloneFn).value
-				duplicates++
-				continue
-			}
-
-		default:
-			panic("logic error, wrong node type")
-		}
+		// Use helper function to handle all 4x3 combinations
+		duplicates += n.handleMatrix(cloneFn, thisExists, thisChild, otherChild, addr, depth)
 	}
 
 	return duplicates
@@ -230,182 +67,254 @@ func (n *fastNode[V]) unionRecPersist(cloneFn cloneFunc[V], o *fastNode[V], dept
 
 	// for all child addrs in other node do ...
 	for _, addr := range o.children.AsSlice(&buf) {
-		otherAny := o.mustGetChild(addr)
-		//  12 possible combinations to union this child and other child
-		//
-		//  THIS,   OTHER: (always clone the other kid!)
-		//  --------------
-		//  NULL,   node    <-- insert node at addr
-		//  NULL,   leaf    <-- insert leaf at addr
-		//  NULL,   fringe  <-- insert fringe at addr
+		otherChild := o.mustGetChild(addr)
+		thisChild, thisExists := n.getChild(addr)
 
-		//  node,   node    <-- CLONE: union rec-descent with node
-		//  node,   leaf    <-- CLONE: insert leaf at depth+1
-		//  node,   fringe  <-- CLONE: insert fringe at depth+1
+		// Use helper function to handle all 4x3 combinations
+		duplicates += n.handleMatrixPersist(cloneFn, thisExists, thisChild, otherChild, addr, depth)
+	}
 
-		//  leaf,   node    <-- insert new node, push this leaf down, union rec-descent
-		//  leaf,   leaf    <-- insert new node, push both leaves down (!first check equality)
-		//  leaf,   fringe  <-- insert new node, push this leaf and fringe down
+	return duplicates
+}
 
-		//  fringe, node    <-- insert new node, push this fringe down, union rec-descent
-		//  fringe, leaf    <-- insert new node, push this fringe down, insert other leaf at depth+1
-		//  fringe, fringe  <-- just overwrite value
-		//
-		// try to get child at same addr from n
-		thisAny, thisExists := n.getChild(addr)
-		if !thisExists { // NULL, ... slot at addr is empty
-			switch otherKid := otherAny.(type) {
-			case *fastNode[V]: // NULL, node
-				n.insertChild(addr, otherKid.cloneRec(cloneFn))
-				continue
+// handleMatrix, 12 possible combinations to union this child and other child
+//
+//	THIS,   OTHER: (always clone the other kid!)
+//	--------------
+//	NULL,   node    <-- insert node at addr
+//	NULL,   leaf    <-- insert leaf at addr
+//	NULL,   fringe  <-- insert fringe at addr
+//
+//	node,   node    <-- union rec-descent with node
+//	node,   leaf    <-- insert leaf at depth+1
+//	node,   fringe  <-- insert fringe at depth+1
+//
+//	leaf,   node    <-- insert new node, push this leaf down, union rec-descent
+//	leaf,   leaf    <-- insert new node, push both leaves down (!first check equality)
+//	leaf,   fringe  <-- insert new node, push this leaf and fringe down
+//
+//	fringe, node    <-- insert new node, push this fringe down, union rec-descent
+//	fringe, leaf    <-- insert new node, push this fringe down, insert other leaf at depth+1
+//	fringe, fringe  <-- just overwrite value
+func (n *fastNode[V]) handleMatrix(cloneFn cloneFunc[V], thisExists bool, thisChild, otherChild any, addr uint8, depth int) int {
+	// Do ALL type assertions upfront - reduces line noise
+	var (
+		thisNode, thisIsNode     = thisChild.(*fastNode[V])
+		thisLeaf, thisIsLeaf     = thisChild.(*leafNode[V])
+		thisFringe, thisIsFringe = thisChild.(*fringeNode[V])
 
-			case *leafNode[V]: // NULL, leaf
-				n.insertChild(addr, otherKid.cloneLeaf(cloneFn))
-				continue
+		otherNode, otherIsNode     = otherChild.(*fastNode[V])
+		otherLeaf, otherIsLeaf     = otherChild.(*leafNode[V])
+		otherFringe, otherIsFringe = otherChild.(*fringeNode[V])
+	)
 
-			case *fringeNode[V]: // NULL, fringe
-				n.insertChild(addr, otherKid.cloneFringe(cloneFn))
-				continue
-
-			default:
-				panic("logic error, wrong node type")
-			}
+	// just insert cloned child at this empty slot
+	if !thisExists {
+		switch {
+		case otherIsNode:
+			n.insertChild(addr, otherNode.cloneRec(cloneFn))
+		case otherIsLeaf:
+			n.insertChild(addr, &leafNode[V]{prefix: otherLeaf.prefix, value: cloneFn(otherLeaf.value)})
+		case otherIsFringe:
+			n.insertChild(addr, &fringeNode[V]{value: cloneFn(otherFringe.value)})
+		default:
+			panic("logic error, wrong node type")
 		}
+		return 0
+	}
 
-		switch thisKid := thisAny.(type) {
-		case *fastNode[V]: // node, ...
-			// CLONE the node
+	// Case 1: Special cases that DON'T need a new node
 
-			// thisKid points now to cloned kid
-			thisKid = thisKid.cloneFlat(cloneFn)
+	// Special case: fringe + fringe -> just overwrite value
+	if thisIsFringe && otherIsFringe {
+		thisFringe.value = cloneFn(otherFringe.value)
+		return 1
+	}
 
-			// replace kid with cloned thisKid
-			n.insertChild(addr, thisKid)
+	// Special case: leaf + leaf with same prefix -> just overwrite value
+	if thisIsLeaf && otherIsLeaf && thisLeaf.prefix == otherLeaf.prefix {
+		thisLeaf.value = cloneFn(otherLeaf.value)
+		return 1
+	}
 
-			switch otherKid := otherAny.(type) {
-			case *fastNode[V]: // node, node
-				// both childs have node at addr, persistent union rec-descent on this node
-				duplicates += thisKid.unionRecPersist(cloneFn, otherKid.cloneRec(cloneFn), depth+1)
-				continue
-
-			case *leafNode[V]: // node, leaf
-				// push this cloned leaf down, count duplicate entry
-				clonedLeaf := otherKid.cloneLeaf(cloneFn)
-				if thisKid.insertPersist(cloneFn, clonedLeaf.prefix, clonedLeaf.value, depth+1) {
-					duplicates++
-				}
-				continue
-
-			case *fringeNode[V]: // node, fringe
-				// push this fringe down, a fringe becomes a default route one level down
-				clonedFringe := otherKid.cloneFringe(cloneFn)
-				if thisKid.insertPrefix(1, clonedFringe.value) {
-					duplicates++
-				}
-				continue
+	// Case 2: thisChild is already a node - insert into it, no new node needed
+	if thisIsNode {
+		switch {
+		case otherIsNode:
+			return thisNode.unionRec(cloneFn, otherNode, depth+1)
+		case otherIsLeaf:
+			if thisNode.insert(otherLeaf.prefix, cloneFn(otherLeaf.value), depth+1) {
+				return 1
 			}
-
-		case *leafNode[V]: // leaf, ...
-			switch otherKid := otherAny.(type) {
-			case *fastNode[V]: // leaf, node
-				// create new node
-				nc := new(fastNode[V])
-
-				// push this leaf down
-				nc.insert(thisKid.prefix, thisKid.value, depth+1)
-
-				// insert the new node at current addr
-				n.insertChild(addr, nc)
-
-				// unionRec (destructive) on a fresh node with a cloned otherKid: persist-safe
-				duplicates += nc.unionRec(cloneFn, otherKid.cloneRec(cloneFn), depth+1)
-				continue
-
-			case *leafNode[V]: // leaf, leaf
-				// shortcut, prefixes are equal
-				if thisKid.prefix == otherKid.prefix {
-					thisKid.value = cloneFn(otherKid.value)
-					duplicates++
-					continue
-				}
-
-				// create new node
-				nc := new(fastNode[V])
-
-				// push this leaf down
-				nc.insert(thisKid.prefix, thisKid.value, depth+1)
-
-				// insert at depth cloned leaf, maybe duplicate
-				clonedLeaf := otherKid.cloneLeaf(cloneFn)
-				if nc.insert(clonedLeaf.prefix, clonedLeaf.value, depth+1) {
-					duplicates++
-				}
-
-				// insert the new node at current addr
-				n.insertChild(addr, nc)
-				continue
-
-			case *fringeNode[V]: // leaf, fringe
-				// create new node
-				nc := new(fastNode[V])
-
-				// push this leaf down
-				nc.insert(thisKid.prefix, thisKid.value, depth+1)
-
-				// push this cloned fringe down, it becomes the default route
-				clonedFringe := otherKid.cloneFringe(cloneFn)
-				if nc.insertPrefix(1, clonedFringe.value) {
-					duplicates++
-				}
-
-				// insert the new node at current addr
-				n.insertChild(addr, nc)
-				continue
+			return 0
+		case otherIsFringe:
+			if thisNode.insertPrefix(1, cloneFn(otherFringe.value)) {
+				return 1
 			}
-
-		case *fringeNode[V]: // fringe, ...
-			switch otherKid := otherAny.(type) {
-			case *fastNode[V]: // fringe, node
-				// create new node
-				nc := new(fastNode[V])
-
-				// push this fringe down, it becomes the default route
-				nc.insertPrefix(1, thisKid.value)
-
-				// insert the new node at current addr
-				n.insertChild(addr, nc)
-
-				// unionRec (destructive) on a fresh node with a cloned otherKid: persist-safe
-				duplicates += nc.unionRec(cloneFn, otherKid.cloneRec(cloneFn), depth+1)
-				continue
-
-			case *leafNode[V]: // fringe, leaf
-				// create new node
-				nc := new(fastNode[V])
-
-				// push this fringe down, it becomes the default route
-				nc.insertPrefix(1, thisKid.value)
-
-				// push this cloned leaf down
-				clonedLeaf := otherKid.cloneLeaf(cloneFn)
-				if nc.insert(clonedLeaf.prefix, clonedLeaf.value, depth+1) {
-					duplicates++
-				}
-
-				// insert the new node at current addr
-				n.insertChild(addr, nc)
-				continue
-
-			case *fringeNode[V]: // fringe, fringe
-				thisKid.value = otherKid.cloneFringe(cloneFn).value
-				duplicates++
-				continue
-			}
-
+			return 0
 		default:
 			panic("logic error, wrong node type")
 		}
 	}
 
-	return duplicates
+	// Case 3: All remaining cases need a new node
+	// (thisChild is leaf or fringe, and we didn't hit the special cases above)
+
+	nc := new(fastNode[V])
+
+	// Push existing child down into new node
+	switch {
+	case thisIsLeaf:
+		nc.insert(thisLeaf.prefix, thisLeaf.value, depth+1)
+	case thisIsFringe:
+		nc.insertPrefix(1, thisFringe.value)
+	default:
+		panic("logic error, unexpected this child type")
+	}
+
+	// Replace child with new node
+	n.insertChild(addr, nc)
+
+	// Now handle other child
+	switch {
+	case otherIsNode:
+		return nc.unionRec(cloneFn, otherNode, depth+1)
+	case otherIsLeaf:
+		if nc.insert(otherLeaf.prefix, cloneFn(otherLeaf.value), depth+1) {
+			return 1
+		}
+		return 0
+	case otherIsFringe:
+		if nc.insertPrefix(1, cloneFn(otherFringe.value)) {
+			return 1
+		}
+		return 0
+	default:
+		panic("logic error, wrong other node type")
+	}
+}
+
+// handleMatrixPersist, 12 possible combinations to union this child and other child
+//
+//	THIS,   OTHER: (always clone the other kid!)
+//	--------------
+//	NULL,   node    <-- insert node at addr
+//	NULL,   leaf    <-- insert leaf at addr
+//	NULL,   fringe  <-- insert fringe at addr
+//
+//	node,   node    <-- union rec-descent with node
+//	node,   leaf    <-- insert leaf at depth+1
+//	node,   fringe  <-- insert fringe at depth+1
+//
+//	leaf,   node    <-- insert new node, push this leaf down, union rec-descent
+//	leaf,   leaf    <-- insert new node, push both leaves down (!first check equality)
+//	leaf,   fringe  <-- insert new node, push this leaf and fringe down
+//
+//	fringe, node    <-- insert new node, push this fringe down, union rec-descent
+//	fringe, leaf    <-- insert new node, push this fringe down, insert other leaf at depth+1
+//	fringe, fringe  <-- just overwrite value
+func (n *fastNode[V]) handleMatrixPersist(cloneFn cloneFunc[V], thisExists bool, thisChild, otherChild any, addr uint8, depth int) int {
+	// Do ALL type assertions upfront - reduces line noise
+	var (
+		thisNode, thisIsNode     = thisChild.(*fastNode[V])
+		thisLeaf, thisIsLeaf     = thisChild.(*leafNode[V])
+		thisFringe, thisIsFringe = thisChild.(*fringeNode[V])
+
+		otherNode, otherIsNode     = otherChild.(*fastNode[V])
+		otherLeaf, otherIsLeaf     = otherChild.(*leafNode[V])
+		otherFringe, otherIsFringe = otherChild.(*fringeNode[V])
+	)
+
+	// just insert cloned child at this empty slot
+	if !thisExists {
+		switch {
+		case otherIsNode:
+			n.insertChild(addr, otherNode.cloneRec(cloneFn))
+		case otherIsLeaf:
+			n.insertChild(addr, &leafNode[V]{prefix: otherLeaf.prefix, value: cloneFn(otherLeaf.value)})
+		case otherIsFringe:
+			n.insertChild(addr, &fringeNode[V]{value: cloneFn(otherFringe.value)})
+		default:
+			panic("logic error, wrong node type")
+		}
+		return 0
+	}
+
+	// Case 1: Special cases that DON'T need a new node
+
+	// Special case: fringe + fringe -> just overwrite value
+	if thisIsFringe && otherIsFringe {
+		thisFringe.value = cloneFn(otherFringe.value)
+		return 1
+	}
+
+	// Special case: leaf + leaf with same prefix -> just overwrite value
+	if thisIsLeaf && otherIsLeaf && thisLeaf.prefix == otherLeaf.prefix {
+		thisLeaf.value = cloneFn(otherLeaf.value)
+		return 1
+	}
+
+	// Case 2: thisChild is already a node - clone this node, insert into it
+	if thisIsNode {
+		// CLONE the node
+
+		// thisNode points now to cloned kid
+		thisNode = thisNode.cloneFlat(cloneFn)
+
+		// replace kid with cloned thisKid
+		n.insertChild(addr, thisNode)
+
+		switch {
+		case otherIsNode:
+			return thisNode.unionRecPersist(cloneFn, otherNode, depth+1)
+		case otherIsLeaf:
+			if thisNode.insertPersist(cloneFn, otherLeaf.prefix, cloneFn(otherLeaf.value), depth+1) {
+				return 1
+			}
+			return 0
+		case otherIsFringe:
+			if thisNode.insertPrefix(1, cloneFn(otherFringe.value)) {
+				return 1
+			}
+			return 0
+		default:
+			panic("logic error, wrong node type")
+		}
+	}
+
+	// Case 3: All remaining cases need a new node
+	// (thisChild is leaf or fringe, and we didn't hit the special cases above)
+
+	nc := new(fastNode[V])
+
+	// Push existing child down into new node
+	switch {
+	case thisIsLeaf:
+		nc.insert(thisLeaf.prefix, thisLeaf.value, depth+1)
+	case thisIsFringe:
+		nc.insertPrefix(1, thisFringe.value)
+	default:
+		panic("logic error, unexpected this child type")
+	}
+
+	// Replace child with new node
+	n.insertChild(addr, nc)
+
+	// Now handle other child
+	switch {
+	case otherIsNode:
+		return nc.unionRec(cloneFn, otherNode, depth+1)
+	case otherIsLeaf:
+		if nc.insert(otherLeaf.prefix, cloneFn(otherLeaf.value), depth+1) {
+			return 1
+		}
+		return 0
+	case otherIsFringe:
+		if nc.insertPrefix(1, cloneFn(otherFringe.value)) {
+			return 1
+		}
+		return 0
+	default:
+		panic("logic error, wrong other node type")
+	}
 }
