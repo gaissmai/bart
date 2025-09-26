@@ -568,18 +568,18 @@ LOOP:
 
 		switch withLPM {
 		case false: // LookupPrefix
-			if val, ok := n.lookup(idx); ok {
+			if val, ok = n.lookup(idx); ok {
 				return netip.Prefix{}, val, ok
 			}
 
 		case true: // LookupPrefixLPM
-			if topIdx, val, ok := n.lookupIdx(idx); ok {
-				// get the bits from depth and top idx
-				pfxBits := int(art.PfxBits(depth, topIdx))
+			if lpmIdx, val2, ok2 := n.lookupIdx(idx); ok2 {
+				// get the bits from depth and lpmIdx
+				pfxBits := int(art.PfxBits(depth, lpmIdx))
 
 				// calculate the lpmPfx from incoming ip and new mask
 				lpmPfx, _ = ip.Prefix(pfxBits)
-				return lpmPfx, val, ok
+				return lpmPfx, val2, ok2
 			}
 		}
 		// continue rewinding the stack

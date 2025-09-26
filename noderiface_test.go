@@ -295,8 +295,8 @@ func TestImplementsNoder(t *testing.T) {
 			expectedAfterDuplicate[8] = "duplicate" // was overwritten
 
 			for idx := range testData {
-				val, exists := n.deletePrefix(idx)
-				if !exists {
+				val, exists2 := n.deletePrefix(idx)
+				if !exists2 {
 					t.Errorf("deletePrefix(%d): should exist", idx)
 					continue
 				}
