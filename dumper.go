@@ -258,8 +258,8 @@ func (nt nodeType) String() string {
 	}
 }
 
-// stats, only used for dump, tests and benchmarks
-type stats struct {
+// statsT, only used for dump, tests and benchmarks
+type statsT struct {
 	pfxs    int
 	childs  int
 	nodes   int
@@ -271,8 +271,8 @@ type stats struct {
 // and a classification of each child into nodes, leaves, or fringes.
 // It inspects only the direct children of n (not the whole subtree).
 // Panics if a child has an unexpected concrete type.
-func nodeStats[V any](n nodeReader[V]) stats {
-	var s stats
+func nodeStats[V any](n nodeReader[V]) statsT {
+	var s statsT
 
 	s.pfxs = n.prefixCount()
 	s.childs = n.childCount()
@@ -303,8 +303,8 @@ func nodeStats[V any](n nodeReader[V]) stats {
 // subtree. If n is nil or empty, a zeroed stats is returned. The returned
 // stats.nodes includes the current node. The function will panic if a child
 // has an unexpected concrete type.
-func nodeStatsRec[V any](n nodeReader[V]) stats {
-	var s stats
+func nodeStatsRec[V any](n nodeReader[V]) statsT {
+	var s statsT
 	if n == nil || n.isEmpty() {
 		return s
 	}

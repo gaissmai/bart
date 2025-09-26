@@ -130,7 +130,7 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 			idx := art.PfxToIdx(octet, lastBits)
 
 			oldVal, existed := n.getPrefix(idx)
-			newVal := cb(oldVal, existed)
+			newVal = cb(oldVal, existed)
 			n.insertPrefix(idx, newVal)
 
 			if !existed {
@@ -143,7 +143,7 @@ func (t *Table[V]) UpdatePersist(pfx netip.Prefix, cb func(val V, ok bool) V) (p
 
 		// If child node for this address does not exist, insert new leaf or fringe.
 		if !n.children.Test(addr) {
-			newVal := cb(zero, false)
+			newVal = cb(zero, false)
 			if isFringe(depth, pfx) {
 				n.insertChild(addr, newFringeNode(newVal))
 			} else {

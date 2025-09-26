@@ -643,8 +643,8 @@ LOOP:
 		if n.prefixCount() != 0 {
 			idx := art.OctetToIdx(octets[depth])
 			// lookupIdx() manually inlined
-			if lpmIdx, ok := n.prefixes.IntersectionTop(&lpm.LookupTbl[idx]); ok {
-				return n.mustGetPrefix(lpmIdx), ok
+			if lpmIdx, ok2 := n.prefixes.IntersectionTop(&lpm.LookupTbl[idx]); ok2 {
+				return n.mustGetPrefix(lpmIdx), ok2
 			}
 		}
 	}
@@ -772,12 +772,12 @@ LOOP:
 		}
 
 		// manually inlined: lookupIdx(idx)
-		if topIdx, ok := n.prefixes.IntersectionTop(&lpm.LookupTbl[idx]); ok {
+		if topIdx, ok2 := n.prefixes.IntersectionTop(&lpm.LookupTbl[idx]); ok2 {
 			val = n.mustGetPrefix(topIdx)
 
 			// called from LookupPrefix
 			if !withLPM {
-				return netip.Prefix{}, val, ok
+				return netip.Prefix{}, val, ok2
 			}
 
 			// called from LookupPrefixLPM
@@ -787,7 +787,7 @@ LOOP:
 
 			// calculate the lpmPfx from incoming ip and new mask
 			lpmPfx, _ = ip.Prefix(pfxBits)
-			return lpmPfx, val, ok
+			return lpmPfx, val, ok2
 		}
 	}
 
