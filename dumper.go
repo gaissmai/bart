@@ -60,8 +60,8 @@ func dump[V any](n nodeReader[V], w io.Writer, path stridePath, depth int, is4 b
 		indent, hasType(n), depth, ipStridePath(path, depth, is4), bits)
 
 	if nPfxCount := n.prefixCount(); nPfxCount != 0 {
-		buf := new([256]uint8)
-		allIndices := n.getIndices(buf)
+		var buf [256]uint8
+		allIndices := n.getIndices(&buf)
 
 		// print the baseIndices for this node.
 		fmt.Fprintf(w, "%sindexs(#%d): %v\n", indent, nPfxCount, allIndices)
