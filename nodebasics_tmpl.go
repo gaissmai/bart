@@ -28,6 +28,7 @@ func (n *_NODE_TYPE[V]) mustGetChild(uint8) (child any)            { return }
 func (n *_NODE_TYPE[V]) insertPrefix(uint8, V) (exists bool)       { return }
 func (n *_NODE_TYPE[V]) deletePrefix(uint8) (val V, exists bool)   { return }
 func (n *_NODE_TYPE[V]) getChild(uint8) (child any, ok bool)       { return }
+func (n *_NODE_TYPE[V]) getPrefix(uint8) (val V, ok bool)          { return }
 func (n *_NODE_TYPE[V]) insertChild(uint8, any) (exists bool)      { return }
 func (n *_NODE_TYPE[V]) deleteChild(uint8) (exists bool)           { return }
 func (n *_NODE_TYPE[V]) cloneRec(cloneFunc[V]) (c *_NODE_TYPE[V])  { return }
@@ -469,5 +470,51 @@ func (n *_NODE_TYPE[V]) delPersist(cloneFn cloneFunc[V], pfx netip.Prefix) (val 
 	}
 
 	// Should never happen: traversal always returns or panics inside loop.
+	panic("unreachable")
+}
+
+func (n *_NODE_TYPE[V]) get(pfx netip.Prefix) (val V, exists bool) {
+	// invariant, prefix must be masked
+
+	// values derived from pfx
+	ip := pfx.Addr()
+	octets := ip.AsSlice()
+	lastOctetPlusOne, lastBits := lastOctetPlusOneAndLastBits(pfx)
+
+	// find the trie node
+	for depth, octet := range octets {
+		if depth == lastOctetPlusOne {
+			return n.getPrefix(art.PfxToIdx(octet, lastBits))
+		}
+
+		kidAny, ok := n.getChild(octet)
+		if !ok {
+			return val, false
+		}
+
+		// kid is node or leaf or fringe at octet
+		switch kid := kidAny.(type) {
+		case *_NODE_TYPE[V]:
+			n = kid // descend down to next trie level
+
+		case *fringeNode[V]:
+			// reached a path compressed fringe, stop traversing
+			if isFringe(depth, pfx) {
+				return kid.value, true
+			}
+			return val, false
+
+		case *leafNode[V]:
+			// reached a path compressed prefix, stop traversing
+			if kid.prefix == pfx {
+				return kid.value, true
+			}
+			return val, false
+
+		default:
+			panic("logic error, wrong node type")
+		}
+	}
+
 	panic("unreachable")
 }

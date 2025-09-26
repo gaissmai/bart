@@ -447,3 +447,49 @@ func (n *liteNode[V]) delPersist(cloneFn cloneFunc[V], pfx netip.Prefix) (val V,
 	// Should never happen: traversal always returns or panics inside loop.
 	panic("unreachable")
 }
+
+func (n *liteNode[V]) get(pfx netip.Prefix) (val V, exists bool) {
+	// invariant, prefix must be masked
+
+	// values derived from pfx
+	ip := pfx.Addr()
+	octets := ip.AsSlice()
+	lastOctetPlusOne, lastBits := lastOctetPlusOneAndLastBits(pfx)
+
+	// find the trie node
+	for depth, octet := range octets {
+		if depth == lastOctetPlusOne {
+			return n.getPrefix(art.PfxToIdx(octet, lastBits))
+		}
+
+		kidAny, ok := n.getChild(octet)
+		if !ok {
+			return val, false
+		}
+
+		// kid is node or leaf or fringe at octet
+		switch kid := kidAny.(type) {
+		case *liteNode[V]:
+			n = kid // descend down to next trie level
+
+		case *fringeNode[V]:
+			// reached a path compressed fringe, stop traversing
+			if isFringe(depth, pfx) {
+				return kid.value, true
+			}
+			return val, false
+
+		case *leafNode[V]:
+			// reached a path compressed prefix, stop traversing
+			if kid.prefix == pfx {
+				return kid.value, true
+			}
+			return val, false
+
+		default:
+			panic("logic error, wrong node type")
+		}
+	}
+
+	panic("unreachable")
+}
