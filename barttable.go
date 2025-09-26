@@ -543,7 +543,7 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 
 	for _, octet := range ip.AsSlice() {
 		// for contains, any lpm match is good enough, no backtracking needed
-		if n.prefixes.Len() != 0 && n.contains(art.OctetToIdx(octet)) {
+		if n.prefixCount() != 0 && n.contains(art.OctetToIdx(octet)) {
 			return true
 		}
 
@@ -640,11 +640,11 @@ LOOP:
 		n = stack[depth]
 
 		// longest prefix match, skip if node has no prefixes
-		if n.prefixes.Len() != 0 {
+		if n.prefixCount() != 0 {
 			idx := art.OctetToIdx(octets[depth])
 			// lookupIdx() manually inlined
-			if topIdx, ok := n.prefixes.IntersectionTop(&lpm.LookupTbl[idx]); ok {
-				return n.mustGetPrefix(topIdx), true
+			if lpmIdx, ok := n.prefixes.IntersectionTop(&lpm.LookupTbl[idx]); ok {
+				return n.mustGetPrefix(lpmIdx), ok
 			}
 		}
 	}
