@@ -311,11 +311,8 @@ func cidrFromPath(path stridePath, depth int, is4 bool, idx uint8) netip.Prefix 
 
 	octet, pfxLen := art.IdxToPfx(idx)
 
-	// set masked byte in path at depth
+	// set byte in path at depth
 	path[depth] = octet
-
-	// zero/mask the bytes after prefix bits
-	clear(path[depth+1:])
 
 	// make ip addr from octets
 	var ip netip.Addr
@@ -328,8 +325,9 @@ func cidrFromPath(path stridePath, depth int, is4 bool, idx uint8) netip.Prefix 
 	// calc bits with pathLen and pfxLen
 	bits := depth<<3 + int(pfxLen)
 
-	// return a normalized prefix from ip/bits
-	return netip.PrefixFrom(ip, bits)
+	// canonicalize prefix
+	pfx, _ := ip.Prefix(bits)
+	return pfx
 }
 
 // cidrForFringe reconstructs a CIDR prefix for a fringe node from the traversal path.
@@ -363,6 +361,7 @@ func cidrForFringe(octets []byte, depth int, is4 bool, lastOctet uint8) netip.Pr
 	// it's a fringe, bits are always /8, /16, /24, ...
 	bits := (depth + 1) << 3
 
-	// return a (normalized) prefix from ip/bits
-	return netip.PrefixFrom(ip, bits)
+	// canonicalize prefix
+	pfx, _ := ip.Prefix(bits)
+	return pfx
 }
