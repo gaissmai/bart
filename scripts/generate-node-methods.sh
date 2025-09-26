@@ -13,7 +13,7 @@ if [[ ! -f "${template_file}" ]]; then
     exit 1
 fi
 
-echo "START: Generating monomorphized methods from template '${GOFILE}' ..."
+echo "START: Generating monomorphized node methods from template '${GOFILE}' ..."
 
 if grep -q "TODO" "${template_file}"; then
 	echo "✗ Aborting, found pattern 'TODO' in template" >&2
