@@ -22,7 +22,7 @@ if grep -q "TODO" "${template_file}"; then
     DIE "✗ Aborting, found pattern 'TODO' in ${template_file}" >&2
 fi
 
-# Node types to generate
+# Table types to generate
 readonly TABLE_TYPES=("Table" "Fast" "liteTable")
 
 # for goimports, see below
@@ -32,8 +32,8 @@ for tableType in "${TABLE_TYPES[@]}"; do
     # build output filename e.g. bartiterators_gen.go
     output_file="${tableType,,}"                            # lowercase e.g. Fast -> fast
     output_file="${output_file}${template_file/_tmpl/_gen}" # concat with mangled template filename
-    output_file="${output_file/#table/bart}"       # TODO
-    output_file="${output_file/#litetable/lite}"       # TODO
+    output_file="${output_file/#table/bart}"                # tablefoo     -> bartfoo
+    output_file="${output_file/#litetable/lite}"            # litetablefoo -> litefoo
 
     # Remove go:generate directives and build constraint, add generated header, substitute node type
     sed -e '/^\/\/go:generate\b/d' \
