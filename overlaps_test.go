@@ -96,17 +96,17 @@ func TestOverlapsPrefixCompare(t *testing.T) {
 	gold := new(goldTable[int])
 	gold.insertMany(pfxs)
 
-	fast := new(Table[int])
+	bart := new(Table[int])
 	for _, pfx := range pfxs {
-		fast.Insert(pfx.pfx, pfx.val)
+		bart.Insert(pfx.pfx, pfx.val)
 	}
 
 	tests := randomPrefixes(prng, n)
 	for _, tt := range tests {
 		gotGold := gold.overlapsPrefix(tt.pfx)
-		gotFast := fast.OverlapsPrefix(tt.pfx)
-		if gotGold != gotFast {
-			t.Fatalf("overlapsPrefix(%q) = %v, want %v", tt.pfx, gotFast, gotGold)
+		gotBart := bart.OverlapsPrefix(tt.pfx)
+		if gotGold != gotBart {
+			t.Fatalf("overlapsPrefix(%q) = %v, want %v", tt.pfx, gotBart, gotGold)
 		}
 	}
 }
