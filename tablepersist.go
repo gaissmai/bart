@@ -31,9 +31,7 @@ func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V] {
 	// canonicalize prefix
 	pfx = pfx.Masked()
 
-	// Extract address, IP version, and prefix length.
-	ip := pfx.Addr()
-	is4 := ip.Is4()
+	is4 := pfx.Addr().Is4()
 
 	// share size counters; root nodes cloned selectively.
 	pt := &Table[V]{
@@ -61,97 +59,11 @@ func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V] {
 		n = &pt.root6
 	}
 
-	// Prepare traversal info.
-	lastOctetPlusOne, lastBits := lastOctetPlusOneAndLastBits(pfx)
-	octets := ip.AsSlice()
-
-	// Insert the prefix and value using the persist insert method that clones nodes
-	// along the path.
-	for depth, octet := range octets {
-		// last masked octet: insert/override prefix/val into node
-		if depth == lastOctetPlusOne {
-			exists := n.insertPrefix(art.PfxToIdx(octet, lastBits), val)
-			// If prefix did not previously exist, increment size counter.
-			if !exists {
-				pt.sizeUpdate(is4, 1)
-			}
-			return pt
-		}
-
-		if !n.children.Test(octet) {
-			// insert prefix path compressed as leaf or fringe
-			if isFringe(depth, pfx) {
-				n.insertChild(octet, newFringeNode(val))
-			} else {
-				n.insertChild(octet, newLeafNode(pfx, val))
-			}
-
-			// New prefix addition path compressed, update size.
-			pt.sizeUpdate(is4, 1)
-			return pt
-		}
-
-		kid := n.mustGetChild(octet)
-
-		// kid is node or leaf or fringe at octet
-		switch kid := kid.(type) {
-		case *bartNode[V]:
-			// clone the traversed path
-
-			// kid points now to cloned kid
-			kid = kid.cloneFlat(cloneFn)
-
-			// replace kid with clone
-			n.insertChild(octet, kid)
-
-			n = kid
-			continue // descend down to next trie level
-
-		case *leafNode[V]:
-			// reached a path compressed prefix
-			// override value in slot if prefixes are equal
-			if kid.prefix == pfx {
-				kid.value = val
-				// exists
-				return pt
-			}
-
-			// create new node
-			// push the leaf down
-			// insert new child at current leaf position (addr)
-			// descend down, replace n with new child
-			newNode := new(bartNode[V])
-			newNode.insert(kid.prefix, kid.value, depth+1)
-
-			n.insertChild(octet, newNode)
-			n = newNode
-
-		case *fringeNode[V]:
-			// reached a path compressed fringe
-			// override value in slot if pfx is a fringe
-			if isFringe(depth, pfx) {
-				kid.value = val
-				// exists
-				return pt
-			}
-
-			// create new node
-			// push the fringe down, it becomes a default route (idx=1)
-			// insert new child at current leaf position (addr)
-			// descend down, replace n with new child
-			newNode := new(bartNode[V])
-			newNode.insertPrefix(1, kid.value)
-
-			n.insertChild(octet, newNode)
-			n = newNode
-
-		default:
-			panic("logic error, wrong node type")
-		}
+	if !n.insertPersist(cloneFn, pfx, val, 0) {
+		pt.sizeUpdate(is4, 1)
 	}
 
-	// Should never happen: traversal always returns or panics inside loop.
-	panic("unreachable")
+	return pt
 }
 
 // Deprecated: use [Table.ModifyPersist] instead.
@@ -530,8 +442,7 @@ func (t *Table[V]) DeletePersist(pfx netip.Prefix) (pt *Table[V], val V, found b
 	pfx = pfx.Masked()
 
 	// Extract address, IP version, and prefix length.
-	ip := pfx.Addr()
-	is4 := ip.Is4()
+	is4 := pfx.Addr().Is4()
 
 	// share size counters; root nodes cloned selectively.
 	pt = &Table[V]{
@@ -559,102 +470,12 @@ func (t *Table[V]) DeletePersist(pfx netip.Prefix) (pt *Table[V], val V, found b
 		n = &pt.root6
 	}
 
-	// Prepare traversal context.
-	lastOctetPlusOne, lastBits := lastOctetPlusOneAndLastBits(pfx)
-	octets := ip.AsSlice()
-
-	// Stack to keep track of cloned nodes along the path,
-	// needed for purge and path compression after delete.
-	stack := [maxTreeDepth]*bartNode[V]{}
-
-	// Traverse the trie to locate the prefix to delete.
-	for depth, octet := range octets {
-		// Keep track of the cloned node at current depth.
-		stack[depth] = n
-
-		if depth == lastOctetPlusOne {
-			// Attempt to delete the prefix from the node's prefixes.
-			val, found = n.deletePrefix(art.PfxToIdx(octet, lastBits))
-			if !found {
-				// Prefix not found, nothing deleted.
-				return pt, val, false
-			}
-
-			// Adjust stored prefix count for deletion.
-			pt.sizeUpdate(is4, -1)
-
-			// After deletion, purge nodes and compress the path if needed.
-			n.purgeAndCompress(stack[:depth], octets, is4)
-
-			return pt, val, true
-		}
-
-		addr := octet
-
-		// If child node doesn't exist, no prefix to delete.
-		if !n.children.Test(addr) {
-			return pt, val, false
-		}
-
-		// Fetch child node at current address.
-		kid := n.mustGetChild(addr)
-
-		switch kid := kid.(type) {
-		case *bartNode[V]:
-			// Clone the internal node for copy-on-write.
-			kid = kid.cloneFlat(cloneFn)
-
-			// Replace child with cloned node.
-			n.insertChild(addr, kid)
-
-			// Descend to cloned child node.
-			n = kid
-			continue
-
-		case *fringeNode[V]:
-			// Reached a path compressed fringe.
-			if !isFringe(depth, pfx) {
-				// Prefix to delete not found here.
-				return pt, val, false
-			}
-
-			// Delete the fringe node.
-			n.deleteChild(addr)
-
-			// Update size to reflect deletion.
-			pt.sizeUpdate(is4, -1)
-
-			// Purge and compress affected path.
-			n.purgeAndCompress(stack[:depth], octets, is4)
-
-			return pt, kid.value, true
-
-		case *leafNode[V]:
-			// Reached a path compressed leaf node.
-			if kid.prefix != pfx {
-				// Leaf prefix does not match; nothing to delete.
-				return pt, val, false
-			}
-
-			// Delete leaf node.
-			n.deleteChild(addr)
-
-			// Update size to reflect deletion.
-			pt.sizeUpdate(is4, -1)
-
-			// Purge and compress affected path.
-			n.purgeAndCompress(stack[:depth], octets, is4)
-
-			return pt, kid.value, true
-
-		default:
-			// Unexpected node type indicates a logic error.
-			panic("logic error, wrong node type")
-		}
+	val, exists := n.delPersist(cloneFn, pfx)
+	if exists {
+		pt.sizeUpdate(is4, -1)
 	}
 
-	// Should never happen: traversal always returns or panics inside loop.
-	panic("unreachable")
+	return pt, val, exists
 }
 
 // WalkPersist traverses all prefix/value pairs in the table and calls the

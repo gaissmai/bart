@@ -102,22 +102,8 @@ func (n *bartNode[V]) insert(pfx netip.Prefix, val V, depth int) (exists bool) {
 	panic("unreachable")
 }
 
-// insertPersist inserts a network prefix and its associated value into the
-// trie starting at the specified byte depth.
-//
-// The function traverses the prefix address from the given depth and inserts
-// the value either directly into the node's prefix table or as a compressed
-// leaf or fringe node. If a conflicting leaf or fringe exists, it creates
-// a new intermediate node to accommodate both entries.
-//
+// insertPersist is similar to insert but the receiver isn't modified.
 // All nodes touched during insert are cloned.
-//
-// Parameters:
-//   - pfx: The network prefix to insert (must be in canonical form)
-//   - val: The value to associate with the prefix
-//   - depth: The current depth in the trie (0-based byte index)
-//
-// Returns true if a prefix already existed and was updated, false for new insertions.
 func (n *bartNode[V]) insertPersist(cloneFn cloneFunc[V], pfx netip.Prefix, val V, depth int) (exists bool) {
 	ip := pfx.Addr() // the pfx must be in canonical form
 	octets := ip.AsSlice()
@@ -286,9 +272,9 @@ func (n *bartNode[V]) purgeAndCompress(stack []*bartNode[V], octets []uint8, is4
 	}
 }
 
-// deleteItem deletes the prefix and returns the associated value and true if the prefix existed,
+// del deletes the prefix and returns the associated value and true if the prefix existed,
 // or zero value and false otherwise. The prefix must be in canonical form.
-func (n *bartNode[V]) deleteItem(pfx netip.Prefix) (val V, exists bool) {
+func (n *bartNode[V]) del(pfx netip.Prefix) (val V, exists bool) {
 	// invariant, prefix must be masked
 
 	// values derived from pfx
@@ -367,4 +353,97 @@ func (n *bartNode[V]) deleteItem(pfx netip.Prefix) (val V, exists bool) {
 	}
 
 	return val, exists
+}
+
+// delPersist is similar to delete but the receiver isn't modified.
+// All nodes touched during insert are cloned.
+func (n *bartNode[V]) delPersist(cloneFn cloneFunc[V], pfx netip.Prefix) (val V, exists bool) {
+	ip := pfx.Addr() // the pfx must be in canonical form
+	is4 := ip.Is4()
+	octets := ip.AsSlice()
+	lastOctetPlusOne, lastBits := lastOctetPlusOneAndLastBits(pfx)
+
+	// Stack to keep track of cloned nodes along the path,
+	// needed for purge and path compression after delete.
+	stack := [maxTreeDepth]*bartNode[V]{}
+
+	// Traverse the trie to locate the prefix to delete.
+	for depth, octet := range octets {
+		// Keep track of the cloned node at current depth.
+		stack[depth] = n
+
+		if depth == lastOctetPlusOne {
+			// Attempt to delete the prefix from the node's prefixes.
+			val, exists = n.deletePrefix(art.PfxToIdx(octet, lastBits))
+			if !exists {
+				// Prefix not found, nothing deleted.
+				return val, false
+			}
+
+			// After deletion, purge nodes and compress the path if needed.
+			n.purgeAndCompress(stack[:depth], octets, is4)
+
+			return val, true
+		}
+
+		addr := octet
+
+		// If child node doesn't exist, no prefix to delete.
+		if !n.children.Test(addr) {
+			return val, false
+		}
+
+		// Fetch child node at current address.
+		kid := n.mustGetChild(addr)
+
+		switch kid := kid.(type) {
+		case *bartNode[V]:
+			// Clone the internal node for copy-on-write.
+			kid = kid.cloneFlat(cloneFn)
+
+			// Replace child with cloned node.
+			n.insertChild(addr, kid)
+
+			// Descend to cloned child node.
+			n = kid
+			continue
+
+		case *fringeNode[V]:
+			// Reached a path compressed fringe.
+			if !isFringe(depth, pfx) {
+				// Prefix to delete not found here.
+				return val, false
+			}
+
+			// Delete the fringe node.
+			n.deleteChild(addr)
+
+			// Purge and compress affected path.
+			n.purgeAndCompress(stack[:depth], octets, is4)
+
+			return kid.value, true
+
+		case *leafNode[V]:
+			// Reached a path compressed leaf node.
+			if kid.prefix != pfx {
+				// Leaf prefix does not match; nothing to delete.
+				return val, false
+			}
+
+			// Delete leaf node.
+			n.deleteChild(addr)
+
+			// Purge and compress affected path.
+			n.purgeAndCompress(stack[:depth], octets, is4)
+
+			return kid.value, true
+
+		default:
+			// Unexpected node type indicates a logic error.
+			panic("logic error, wrong node type")
+		}
+	}
+
+	// Should never happen: traversal always returns or panics inside loop.
+	panic("unreachable")
 }

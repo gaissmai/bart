@@ -271,7 +271,7 @@ func (l *liteTable[V]) Delete(pfx netip.Prefix) (_ V, exists bool) {
 	is4 := pfx.Addr().Is4()
 
 	n := l.rootNodeByVersion(is4)
-	_, exists = n.deleteItem(pfx)
+	_, exists = n.del(pfx)
 
 	if exists {
 		l.sizeUpdate(is4, -1)
