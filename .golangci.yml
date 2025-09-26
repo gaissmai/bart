@@ -22,6 +22,9 @@ linters:
     - tparallel
     - gochecknoglobals
   settings:
+    govet:
+      enable:
+        - shadow
     gocyclo:
       min-complexity: 30
     gosec:

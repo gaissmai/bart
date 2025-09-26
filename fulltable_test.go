@@ -431,7 +431,7 @@ func BenchmarkFullTableMemory(b *testing.B) {
 
 		s4 := nodeStatsRec(&rt.root4)
 		s6 := nodeStatsRec(&rt.root6)
-		stats := stats{
+		stats := statsT{
 			pfxs:    s4.pfxs + s6.pfxs,
 			childs:  s4.childs + s6.childs,
 			nodes:   s4.nodes + s6.nodes,

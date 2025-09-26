@@ -3580,7 +3580,7 @@ func BenchmarkMem(b *testing.B) {
 
 			s4 := nodeStatsRec(&rt.root4)
 			s6 := nodeStatsRec(&rt.root6)
-			stats := stats{
+			stats := statsT{
 				s4.pfxs + s6.pfxs,
 				s4.childs + s6.childs,
 				s4.nodes + s6.nodes,
