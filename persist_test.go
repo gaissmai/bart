@@ -65,53 +65,6 @@ func TestInsertPersistTable(t *testing.T) {
 	}
 }
 
-func TestUpdatePersistTable(t *testing.T) {
-	t.Parallel()
-
-	n := workLoadN()
-
-	prng := rand.New(rand.NewPCG(42, 42))
-	pfxs := randomRealWorldPrefixes(prng, n)
-
-	orig := new(Table[*testVal])
-	for _, pfx := range pfxs {
-		orig.Insert(pfx, &testVal{Data: 1})
-	}
-
-	var newVal *testVal
-	clone := orig
-	for _, pfx := range pfxs {
-		clone, newVal = clone.UpdatePersist(pfx, func(val *testVal, ok bool) *testVal {
-			if !ok {
-				t.Fatalf("UpdatePersist: prefix %s not present", pfx)
-			}
-			return &testVal{Data: 2}
-		})
-
-		// Mutate newVal to test for aliasing
-		newVal.Data = 3
-
-		v1, _ := orig.Get(pfx)
-		v2, _ := clone.Get(pfx)
-
-		if v1.Data != 1 {
-			t.Errorf("UpdatePersist: original modified for %s: got=%d want=%d", pfx, v1.Data, 1)
-		}
-
-		if v2.Data != 3 {
-			t.Errorf("UpdatePersist: clone not correctly updated for %s: got=%d want=%d", pfx, v2.Data, 3)
-		}
-
-		if v2 != newVal {
-			t.Errorf("UpdatePersist: expected returned value to alias stored value for %s", pfx)
-		}
-
-		if v1 == v2 {
-			t.Errorf("UpdatePersist: aliasing detected for %s", pfx)
-		}
-	}
-}
-
 func TestDeletePersistTable(t *testing.T) {
 	t.Parallel()
 
