@@ -31,34 +31,35 @@ type _TABLE_TYPE[V any] struct {
 	size6 int
 }
 
-func (n *_NODE_TYPE[V]) isEmpty() (ok bool)                                                 { return }
-func (n *_NODE_TYPE[V]) prefixCount() (c int)                                               { return }
-func (n *_NODE_TYPE[V]) childCount() (c int)                                                { return }
-func (n *_NODE_TYPE[V]) getPrefix(uint8) (val V, ok bool)                                   { return }
-func (n *_NODE_TYPE[V]) getChild(uint8) (child any, ok bool)                                { return }
-func (n *_NODE_TYPE[V]) mustGetPrefix(uint8) (val V)                                        { return }
-func (n *_NODE_TYPE[V]) mustGetChild(uint8) (child any)                                     { return }
-func (n *_NODE_TYPE[V]) insert(netip.Prefix, V, int) (exists bool)                          { return }
-func (n *_NODE_TYPE[V]) del(netip.Prefix) (val V, exists bool)                              { return }
-func (n *_NODE_TYPE[V]) get(netip.Prefix) (val V, exists bool)                              { return }
-func (n *_NODE_TYPE[V]) overlapsPrefixAtDepth(netip.Prefix, int) (ok bool)                  { return }
-func (n *_NODE_TYPE[V]) overlaps(*_NODE_TYPE[V], int) (ok bool)                             { return }
-func (n *_NODE_TYPE[V]) unionRec(cloneFunc[V], *_NODE_TYPE[V], int) (dup int)               { return }
-func (n *_NODE_TYPE[V]) unionRecPersist(cloneFunc[V], *_NODE_TYPE[V], int) (dup int)        { return }
-func (n *_NODE_TYPE[V]) equalRec(*_NODE_TYPE[V]) (ok bool)                                  { return }
-func (n *_NODE_TYPE[V]) cloneRec(cloneFunc[V]) (c *_NODE_TYPE[V])                           { return }
-func (n *_NODE_TYPE[V]) cloneFlat(cloneFunc[V]) (c *_NODE_TYPE[V])                          { return }
-func (n *_NODE_TYPE[V]) getChildAddrs(*[256]uint8) (sl []uint8)                             { return }
-func (n *_NODE_TYPE[V]) getIndices(*[256]uint8) (sl []uint8)                                { return }
-func (n *_NODE_TYPE[V]) allChildren() (seq2 iter.Seq2[uint8, any])                          { return }
-func (n *_NODE_TYPE[V]) allIndices() (seq2 iter.Seq2[uint8, V])                             { return }
-func (n *_NODE_TYPE[V]) contains(uint8) (ok bool)                                           { return }
-func (n *_NODE_TYPE[V]) lookup(uint8) (val V, ok bool)                                      { return }
-func (n *_NODE_TYPE[V]) lookupIdx(uint8) (idx uint8, val V, ok bool)                        { return }
-func (n *_NODE_TYPE[V]) supernets(netip.Prefix, func(netip.Prefix, V) bool)                 { return }
-func (n *_NODE_TYPE[V]) subnets(netip.Prefix, func(netip.Prefix, V) bool)                   { return }
-func (n *_NODE_TYPE[V]) allRec(stridePath, int, bool, func(netip.Prefix, V) bool) (ok bool) { return }
-func (n *_NODE_TYPE[V]) allRecSorted(stridePath, int, bool, func(netip.Prefix, V) bool) (ok bool) {
+func (n *_NODE_TYPE[V]) isEmpty() (_ bool)                                                 { return }
+func (n *_NODE_TYPE[V]) prefixCount() (_ int)                                              { return }
+func (n *_NODE_TYPE[V]) childCount() (_ int)                                               { return }
+func (n *_NODE_TYPE[V]) getPrefix(uint8) (_ V, _ bool)                                     { return }
+func (n *_NODE_TYPE[V]) getChild(uint8) (_ any, _ bool)                                    { return }
+func (n *_NODE_TYPE[V]) mustGetPrefix(uint8) (_ V)                                         { return }
+func (n *_NODE_TYPE[V]) mustGetChild(uint8) (_ any)                                        { return }
+func (n *_NODE_TYPE[V]) insert(netip.Prefix, V, int) (_ bool)                              { return }
+func (n *_NODE_TYPE[V]) del(netip.Prefix) (_ V, _ bool)                                    { return }
+func (n *_NODE_TYPE[V]) get(netip.Prefix) (_ V, _ bool)                                    { return }
+func (n *_NODE_TYPE[V]) overlapsPrefixAtDepth(netip.Prefix, int) (_ bool)                  { return }
+func (n *_NODE_TYPE[V]) overlaps(*_NODE_TYPE[V], int) (_ bool)                             { return }
+func (n *_NODE_TYPE[V]) unionRec(cloneFunc[V], *_NODE_TYPE[V], int) (_ int)                { return }
+func (n *_NODE_TYPE[V]) unionRecPersist(cloneFunc[V], *_NODE_TYPE[V], int) (_ int)         { return }
+func (n *_NODE_TYPE[V]) equalRec(*_NODE_TYPE[V]) (_ bool)                                  { return }
+func (n *_NODE_TYPE[V]) cloneRec(cloneFunc[V]) (_ *_NODE_TYPE[V])                          { return }
+func (n *_NODE_TYPE[V]) cloneFlat(cloneFunc[V]) (_ *_NODE_TYPE[V])                         { return }
+func (n *_NODE_TYPE[V]) getChildAddrs(*[256]uint8) (_ []uint8)                             { return }
+func (n *_NODE_TYPE[V]) getIndices(*[256]uint8) (_ []uint8)                                { return }
+func (n *_NODE_TYPE[V]) allChildren() (_ iter.Seq2[uint8, any])                            { return }
+func (n *_NODE_TYPE[V]) allIndices() (_ iter.Seq2[uint8, V])                               { return }
+func (n *_NODE_TYPE[V]) contains(uint8) (_ bool)                                           { return }
+func (n *_NODE_TYPE[V]) lookup(uint8) (_ V, _ bool)                                        { return }
+func (n *_NODE_TYPE[V]) lookupIdx(uint8) (_ uint8, _ V, _ bool)                            { return }
+func (n *_NODE_TYPE[V]) supernets(netip.Prefix, func(netip.Prefix, V) bool)                { return }
+func (n *_NODE_TYPE[V]) subnets(netip.Prefix, func(netip.Prefix, V) bool)                  { return }
+func (n *_NODE_TYPE[V]) modify(netip.Prefix, func(V, bool) (V, bool)) (_ int, _ V, _ bool) { return }
+func (n *_NODE_TYPE[V]) allRec(stridePath, int, bool, func(netip.Prefix, V) bool) (_ bool) { return }
+func (n *_NODE_TYPE[V]) allRecSorted(stridePath, int, bool, func(netip.Prefix, V) bool) (_ bool) {
 	return
 }
 
@@ -167,7 +168,7 @@ func (t *_TABLE_TYPE[V]) Get(pfx netip.Prefix) (val V, exists bool) {
 //	Insert:   | (zero,   false) | (newVal, false) | (newVal, false)
 //	Update:   | (oldVal, true)  | (newVal, false) | (oldVal, false)
 //	Delete:   | (oldVal, true)  | (_,      true)  | (oldVal, true)
-func (t *_TABLE_TYPE[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del bool)) (_ V, deleted bool) {
+func (t *_TABLE_TYPE[V]) Modify(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, del bool)) (_ V, deleted bool) {
 	if !pfx.IsValid() {
 		return
 	}
