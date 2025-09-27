@@ -564,12 +564,14 @@ func (n *liteNode[V]) modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, 
 			return 1, newVal, false
 		}
 
+		// n.children.Test(octet) == true
 		kid := n.mustGetChild(octet)
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
 		case *liteNode[V]:
 			n = kid // descend down to next trie level
+			continue
 
 		case *leafNode[V]:
 			oldVal := kid.value
@@ -592,15 +594,23 @@ func (n *liteNode[V]) modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, 
 				return -1, oldVal, true
 			}
 
-			// create new node
-			// push the leaf down
-			// insert new child at current leaf position (octet)
-			// descend down, replace n with new child
-			newNode := new(liteNode[V])
-			newNode.insert(kid.prefix, kid.value, depth+1)
+			// stop if this is a no-op for zero values
+			newVal, del := cb(zero, false)
+			if del {
+				return 0, zero, false
+			}
 
+			// create new node
+			// insert new child at current leaf position (octet)
+			newNode := new(liteNode[V])
 			n.insertChild(octet, newNode)
-			n = newNode
+
+			// push the leaf down
+			// insert pfx with newVal in new node
+			newNode.insert(kid.prefix, kid.value, depth+1)
+			newNode.insert(pfx, newVal, depth+1)
+
+			return 1, newVal, false
 
 		case *fringeNode[V]:
 			oldVal := kid.value
@@ -622,15 +632,23 @@ func (n *liteNode[V]) modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, 
 				return -1, oldVal, true
 			}
 
-			// create new node
-			// push the fringe down, it becomes a default route (idx=1)
-			// insert new child at current leaf position (octet)
-			// descend down, replace n with new child
-			newNode := new(liteNode[V])
-			newNode.insertPrefix(1, kid.value)
+			// stop if this is a no-op for zero values
+			newVal, del := cb(zero, false)
+			if del {
+				return 0, zero, false
+			}
 
+			// create new node
+			// insert new child at current leaf position (octet)
+			newNode := new(liteNode[V])
 			n.insertChild(octet, newNode)
-			n = newNode
+
+			// push the fringe down, it becomes a default route (idx=1)
+			// insert pfx with newVal in new node
+			newNode.insertPrefix(1, kid.value)
+			newNode.insert(pfx, newVal, depth+1)
+
+			return 1, newVal, false
 
 		default:
 			panic("logic error, wrong node type")

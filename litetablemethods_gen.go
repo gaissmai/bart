@@ -88,8 +88,9 @@ func (t *liteTable[V]) Get(pfx netip.Prefix) (val V, exists bool) {
 // operation: it is called with the current value (or zero if not found)
 // and a boolean indicating whether the prefix exists. The callback must
 // return a new value and a delete flag: del == false inserts or updates,
-// del == true deletes the entry if it exists (otherwise no-op). Modify
-// returns the resulting value and a boolean indicating whether the
+// del == true deletes the entry if it exists (otherwise no-op).
+//
+// Modify returns the resulting value and a boolean indicating whether the
 // entry was actually deleted.
 //
 // The operation is determined by the callback function, which is called with:
