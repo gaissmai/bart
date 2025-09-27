@@ -116,7 +116,7 @@ func (t *Fast[V]) Get(pfx netip.Prefix) (val V, exists bool) {
 //	Insert:   | (zero,   false) | (newVal, false) | (newVal, false)
 //	Update:   | (oldVal, true)  | (newVal, false) | (oldVal, false)
 //	Delete:   | (oldVal, true)  | (_,      true)  | (oldVal, true)
-func (t *Fast[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del bool)) (_ V, deleted bool) {
+func (t *Fast[V]) Modify(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, del bool)) (_ V, deleted bool) {
 	if !pfx.IsValid() {
 		return
 	}
