@@ -20,10 +20,55 @@ type Lite struct {
 	liteTable[struct{}]
 }
 
+// BEGIN OF liteTable WRAPPER
+
 // Insert adds a pfx to the tree.
 // If pfx is already present in the tree, it's a no-op.
 func (l *Lite) Insert(pfx netip.Prefix) {
 	l.liteTable.Insert(pfx, struct{}{})
+}
+
+// InsertPersist is similar to Insert but the receiver isn't modified.
+func (l *Lite) InsertPersist(pfx netip.Prefix) *Lite {
+	lp := l.liteTable.InsertPersist(pfx, struct{}{})
+	//nolint:govet // copy of *tbl is here by intention
+	return &Lite{*lp}
+}
+
+// DeletePersist is similar to Delete but the receiver isn't modified.
+func (l *Lite) DeletePersist(pfx netip.Prefix) (*Lite, bool) {
+	lp, _, exists := l.liteTable.DeletePersist(pfx)
+	//nolint:govet // copy of *tbl is here by intention
+	return &Lite{*lp}, exists
+}
+
+// Clone returns a copy of the routing table.
+func (l *Lite) Clone() *Lite {
+	return &Lite{*l.liteTable.Clone()}
+}
+
+// Union merges another routing table into the receiver table, modifying it in-place.
+//
+// All prefixes from the other table (o) are inserted into the receiver.
+func (l *Lite) Union(o *Lite) {
+	if o == nil {
+		return
+	}
+	l.liteTable.Union(&o.liteTable)
+}
+
+// UnionPersist is similar to [Union] but the receiver isn't modified.
+//
+// All nodes touched during union are cloned and a new *Lite is returned.
+// If o is nil or empty, no nodes are touched and the receiver may be
+// returned unchanged.
+func (l *Lite) UnionPersist(o *Lite) *Lite {
+	if o == nil || (o.size4 == 0 && o.size6 == 0) {
+		return l
+	}
+	tbl := l.liteTable.UnionPersist(&o.liteTable)
+	//nolint:govet // copy of *tbl is here by intention
+	return &Lite{*tbl}
 }
 
 // dropSeq2 converts a Seq2[netip.Prefix, V] into a Seq[netip.Prefix] by discarding the value.
@@ -162,30 +207,6 @@ func (l *Lite) Overlaps(o *Lite) bool {
 	return l.liteTable.Overlaps(&o.liteTable)
 }
 
-// Union merges another routing table into the receiver table, modifying it in-place.
-//
-// All prefixes from the other table (o) are inserted into the receiver.
-func (l *Lite) Union(o *Lite) {
-	if o == nil {
-		return
-	}
-	l.liteTable.Union(&o.liteTable)
-}
-
-// UnionPersist is similar to [Union] but the receiver isn't modified.
-//
-// All nodes touched during union are cloned and a new *Lite is returned.
-// If o is nil or empty, no nodes are touched and the receiver may be
-// returned unchanged.
-func (l *Lite) UnionPersist(o *Lite) *Lite {
-	if o == nil || (o.size4 == 0 && o.size6 == 0) {
-		return l
-	}
-	tbl := l.liteTable.UnionPersist(&o.liteTable)
-	//nolint:govet // copy of *tbl is here by intention
-	return &Lite{*tbl}
-}
-
 // Equal checks whether two tables are structurally and semantically equal.
 // It ensures both trees (IPv4-based and IPv6-based) have the same sizes and
 // recursively compares their root nodes.
@@ -196,10 +217,7 @@ func (l *Lite) Equal(o *Lite) bool {
 	return l.liteTable.Equal(&o.liteTable)
 }
 
-// Clone returns a copy of the routing table.
-func (l *Lite) Clone() *Lite {
-	return &Lite{*l.liteTable.Clone()}
-}
+// END OF liteTable WRAPPER
 
 // liteTable follows the BART design but with no payload.
 // It is ideal for simple IP ACLs (access-control-lists) with plain

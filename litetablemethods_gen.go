@@ -48,6 +48,60 @@ func (t *liteTable[V]) Insert(pfx netip.Prefix, val V) {
 	t.sizeUpdate(is4, 1)
 }
 
+// InsertPersist is similar to Insert but the receiver isn't modified.
+//
+// All nodes touched during insert are cloned and a new liteTable is returned.
+// This is not a full [liteTable.Clone], all untouched nodes are still referenced
+// from both Tables.
+//
+// If the payload type V contains pointers or needs deep copying,
+// it must implement the [bart.Cloner] interface to support correct cloning.
+//
+// This is orders of magnitude slower than Insert,
+// typically taking μsec instead of nsec.
+//
+// The bulk table load could be done with [liteTable.Insert] and then you can
+// use [liteTable.InsertPersist], [liteTable.ModifyPersist] and
+// [liteTable.DeletePersist] for further lock-free ops.
+func (t *liteTable[V]) InsertPersist(pfx netip.Prefix, val V) *liteTable[V] {
+	if !pfx.IsValid() {
+		return t
+	}
+
+	// canonicalize prefix
+	pfx = pfx.Masked()
+	is4 := pfx.Addr().Is4()
+
+	// share size counters; root nodes cloned selectively.
+	pt := &liteTable[V]{
+		size4: t.size4,
+		size6: t.size6,
+	}
+
+	// Create a cloning function for deep copying values;
+	// returns nil if V does not implement the Cloner interface.
+	cloneFn := cloneFnFactory[V]()
+
+	// Clone root node corresponding to the IP version, for copy-on-write.
+	n := &pt.root4
+
+	if is4 {
+		pt.root4 = *t.root4.cloneFlat(cloneFn)
+		pt.root6 = t.root6
+	} else {
+		pt.root4 = t.root4
+		pt.root6 = *t.root6.cloneFlat(cloneFn)
+
+		n = &pt.root6
+	}
+
+	if !n.insertPersist(cloneFn, pfx, val, 0) {
+		pt.sizeUpdate(is4, 1)
+	}
+
+	return pt
+}
+
 // Delete the prefix and returns the associated payload for prefix and true if found
 // or the zero value and false if prefix is not set in the routing table.
 func (t *liteTable[V]) Delete(pfx netip.Prefix) (val V, exists bool) {
@@ -81,6 +135,120 @@ func (t *liteTable[V]) Get(pfx netip.Prefix) (val V, exists bool) {
 	n := t.rootNodeByVersion(is4)
 
 	return n.get(pfx)
+}
+
+// DeletePersist is similar to Delete but does not modify the receiver.
+//
+// It performs a copy-on-write delete operation, cloning all nodes touched during
+// deletion and returning a new liteTable reflecting the change.
+//
+// If the payload type V contains pointers or requires deep copying,
+// it must implement the [bart.Cloner] interface for correct cloning.
+//
+// Due to cloning overhead, DeletePersist is significantly slower than Delete,
+// typically taking μsec instead of nsec.
+func (t *liteTable[V]) DeletePersist(pfx netip.Prefix) (pt *liteTable[V], val V, found bool) {
+	if !pfx.IsValid() {
+		return t, val, false
+	}
+
+	// canonicalize prefix
+	pfx = pfx.Masked()
+
+	// Extract address, IP version, and prefix length.
+	is4 := pfx.Addr().Is4()
+
+	// share size counters; root nodes cloned selectively.
+	pt = &liteTable[V]{
+		size4: t.size4,
+		size6: t.size6,
+	}
+
+	// Create a cloning function for deep copying values;
+	// returns nil if V does not implement the Cloner interface.
+	cloneFn := cloneFnFactory[V]()
+
+	// Clone root node corresponding to the IP version, for copy-on-write.
+	n := &pt.root4
+	if is4 {
+		pt.root4 = *t.root4.cloneFlat(cloneFn)
+		pt.root6 = t.root6
+	} else {
+		pt.root4 = t.root4
+		pt.root6 = *t.root6.cloneFlat(cloneFn)
+
+		n = &pt.root6
+	}
+
+	val, exists := n.deletePersist(cloneFn, pfx)
+	if exists {
+		pt.sizeUpdate(is4, -1)
+	}
+
+	return pt, val, exists
+}
+
+// WalkPersist traverses all prefix/value pairs in the table and calls the
+// provided callback function for each entry. The callback receives the
+// current persistent table, the prefix, and the associated value.
+//
+// The callback must return a (potentially updated) persistent table and a
+// boolean flag indicating whether traversal should continue. Returning
+// false stops the iteration early.
+//
+// IMPORTANT: It is the responsibility of the callback implementation to only
+// use persistent Table operations (e.g. InsertPersist, DeletePersist,
+// ModifyPersist, ...). Using mutating methods like Modidy or Delete
+// inside the callback would break the iteration and may lead
+// to inconsistent results.
+//
+// Example:
+//
+//	pt := t.WalkPersist(func(pt *liteTable[int], pfx netip.Prefix, val int) (*liteTable[int], bool) {
+//		switch {
+//		// Stop iterating if value is <0
+//		case val < 0:
+//			return pt, false
+//
+//		// Delete entries with value 0
+//		case val == 0:
+//			pt, _, _ = pt.DeletePersist(pfx)
+//
+//		// modify even values by doubling them
+//		case val%2 == 0:
+//			pt, _ = pt.ModifyPersist(pfx, func(oldVal int, _ bool) (int, bool) {
+//				return oldVal * 2, false
+//			})
+//
+//		// Leave odd values unchanged
+//		default:
+//			// no-op
+//		}
+//
+//		// Continue iterating
+//		return pt, true
+//	})
+func (t *liteTable[V]) WalkPersist(fn func(*liteTable[V], netip.Prefix, V) (*liteTable[V], bool)) *liteTable[V] {
+	// no-op, callback is nil
+	if fn == nil {
+		return t
+	}
+
+	// create shallow persistent copy
+	pt := &liteTable[V]{
+		root4: t.root4,
+		root6: t.root6,
+		size4: t.size4,
+		size6: t.size6,
+	}
+
+	var proceed bool
+	for pfx, val := range t.All() {
+		if pt, proceed = fn(pt, pfx, val); !proceed {
+			break
+		}
+	}
+	return pt
 }
 
 // Modify applies an insert, update, or delete operation for the value
@@ -132,6 +300,49 @@ func (t *liteTable[V]) Modify(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, del 
 	t.sizeUpdate(is4, delta)
 
 	return val, deleted
+}
+
+func (t *liteTable[V]) ModifyPersist(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, del bool)) (pt *liteTable[V], _ V, deleted bool) {
+	var zero V // zero value of V for default initialization
+
+	if !pfx.IsValid() {
+		return t, zero, false
+	}
+
+	// canonicalize prefix
+	pfx = pfx.Masked()
+
+	// Extract address, version info and prefix length.
+	ip := pfx.Addr()
+	is4 := ip.Is4()
+
+	// share size counters; root nodes cloned selectively.
+	pt = &liteTable[V]{
+		size4: t.size4,
+		size6: t.size6,
+	}
+
+	// Create a cloning function for deep copying values;
+	// returns nil if V does not implement the Cloner interface.
+	cloneFn := cloneFnFactory[V]()
+
+	// Clone root node corresponding to the IP version, for copy-on-write.
+	n := &pt.root4
+
+	if is4 {
+		pt.root4 = *t.root4.cloneFlat(cloneFn)
+		pt.root6 = t.root6
+	} else {
+		pt.root4 = t.root4
+		pt.root6 = *t.root6.cloneFlat(cloneFn)
+
+		n = &pt.root6
+	}
+
+	delta, val, deleted := n.modifyPersist(cloneFn, pfx, cb)
+	pt.sizeUpdate(is4, delta)
+
+	return pt, val, deleted
 }
 
 // Supernets returns an iterator over all supernet routes that cover the given prefix pfx.
