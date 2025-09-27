@@ -486,7 +486,7 @@ func TestTablesModifySemantics(t *testing.T) {
 			prepare: map[netip.Prefix]int{mpp("10.0.0.0/8"): 200},
 			args: args{
 				pfx: mpp("172.16.0.0/12"),
-				cb:  func(val int, found bool) (_ int, del bool) { return 0, false },
+				cb:  func(val int, found bool) (_ int, del bool) { return 0, true },
 			},
 			want:      want{val: 0, deleted: false},
 			finalData: map[netip.Prefix]int{mpp("10.0.0.0/8"): 200},
