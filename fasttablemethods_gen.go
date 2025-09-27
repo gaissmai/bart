@@ -198,7 +198,7 @@ func (t *Fast[V]) DeletePersist(pfx netip.Prefix) (pt *Fast[V], val V, found boo
 //
 // IMPORTANT: It is the responsibility of the callback implementation to only
 // use persistent Table operations (e.g. InsertPersist, DeletePersist,
-// ModifyPersist, ...). Using mutating methods like Update or Delete
+// ModifyPersist, ...). Using mutating methods like Modidy or Delete
 // inside the callback would break the iteration and may lead
 // to inconsistent results.
 //
@@ -214,7 +214,7 @@ func (t *Fast[V]) DeletePersist(pfx netip.Prefix) (pt *Fast[V], val V, found boo
 //		case val == 0:
 //			pt, _, _ = pt.DeletePersist(pfx)
 //
-//		// Update even values by doubling them
+//		// modify even values by doubling them
 //		case val%2 == 0:
 //			pt, _ = pt.ModifyPersist(pfx, func(oldVal int, _ bool) (int, bool) {
 //				return oldVal * 2, false
@@ -304,10 +304,6 @@ func (t *Fast[V]) Modify(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, del bool)
 
 func (t *Fast[V]) ModifyPersist(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, del bool)) (pt *Fast[V], _ V, deleted bool) {
 	var zero V // zero value of V for default initialization
-
-	if !pfx.IsValid() {
-		return t, zero, false
-	}
 
 	if !pfx.IsValid() {
 		return t, zero, false
