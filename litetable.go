@@ -22,20 +22,40 @@ type Lite struct {
 
 // BEGIN OF liteTable WRAPPER
 
-// Insert adds a pfx to the tree.
-// If pfx is already present in the tree, it's a no-op.
+// Insert adds a prefix to the routing table.
+// If the prefix already exists, it's a no-op; otherwise a new entry is created.
+// Invalid prefixes are silently ignored.
+//
+// The prefix is automatically canonicalized using pfx.Masked() to ensure
+// consistent behavior regardless of host bits in the input.
 func (l *Lite) Insert(pfx netip.Prefix) {
 	l.liteTable.Insert(pfx, struct{}{})
 }
 
-// InsertPersist is similar to Insert but the receiver isn't modified.
+// InsertPersist adds a prefix to the routing table using copy-on-write semantics.
+// It creates a new Lite instance with the prefix added while leaving the original
+// unchanged. This enables functional programming patterns and safe concurrent access.
+//
+// The method internally uses a persistent insert mechanism, ensuring
+// structural sharing between the original and new instances for memory efficiency.
+// Only the nodes along the insertion path are cloned; all other nodes are shared.
+//
+// Returns a new Lite instance containing all original prefixes plus the new one.
+// If the prefix already exists, it returns a new instance with the same content.
 func (l *Lite) InsertPersist(pfx netip.Prefix) *Lite {
 	lp := l.liteTable.InsertPersist(pfx, struct{}{})
 	//nolint:govet // copy of *tbl is here by intention
 	return &Lite{*lp}
 }
 
-// DeletePersist is similar to Delete but the receiver isn't modified.
+// DeletePersist removes a prefix using copy-on-write semantics.
+// It creates a new Lite instance with the prefix removed while leaving the
+// original unchanged. This enables functional programming patterns and safe
+// concurrent access.
+//
+// Returns a new Lite instance without the specified prefix and a boolean
+// indicating whether the prefix was found and deleted. If the prefix doesn't
+// exist, it returns a structurally identical copy and false.
 func (l *Lite) DeletePersist(pfx netip.Prefix) (*Lite, bool) {
 	lp, _, exists := l.liteTable.DeletePersist(pfx)
 	//nolint:govet // copy of *tbl is here by intention
@@ -252,7 +272,11 @@ func (l *liteTable[V]) rootNodeByVersion(is4 bool) *liteNode[V] {
 // Returns false for invalid IP addresses.
 //
 // This performs longest-prefix matching and returns true if any prefix
-// in the routing table contains the IP address.
+// in the routing table contains the IP address, regardless of the associated value.
+//
+// It does not return the value nor the prefix of the matching item,
+// but as a test against an allow-/deny-list it's often sufficient
+// and even few nanoseconds faster than [Table.Lookup].
 func (l *liteTable[V]) Contains(ip netip.Addr) bool {
 	// speed is top priority: no explicit test for ip.IsValid
 	// if ip is invalid, AsSlice() returns nil, Contains returns false.
@@ -291,33 +315,45 @@ func (l *liteTable[V]) Contains(ip netip.Addr) bool {
 	return false
 }
 
-// Lookup, only for interface satisfaction.
+// Lookup performs a longest-prefix-match (LPM) for addr.
 //
-//nolint:unparam
+// Note: Lite stores no payload values. The returned value is always the zero
+// value (struct{}{}), so this method is rarely useful. Prefer Contains(addr)
+// to check whether any prefix matches the address. For exact prefix existence
+// use Get(pfx). For prefix-based LPM use LookupPrefix or LookupPrefixLPM.
+//
+// This method exists to satisfy shared interfaces and code generation; its
+// behavior is equivalent to Contains(addr) plus returning a meaningless value.
+//
+// Returns (struct{}{}, true) if any prefix matches addr, otherwise (struct{}{}, false).
 func (l *liteTable[V]) Lookup(ip netip.Addr) (_ V, ok bool) {
 	var zero V
 	return zero, l.Contains(ip)
 }
 
-// LookupPrefix does a route lookup (longest prefix match) for pfx and
-// returns true, or false if no route matched.
+// LookupPrefix performs a longest prefix match lookup for any address within
+// the given prefix. It finds the most specific routing table entry that would
+// match any address in the provided prefix range.
 //
-//nolint:unparam
+// Returns the value and true if a matching prefix is found.
+// Returns zero value and false if no match exists.
 func (l *liteTable[V]) LookupPrefix(pfx netip.Prefix) (_ V, ok bool) {
 	_, _, ok = l.lookupPrefixLPM(pfx, false)
 	return
 }
 
-// LookupPrefixLPM is similar to [Lite.LookupPrefix],
-// but it returns the lpm prefix in addition to value,ok.
+// LookupPrefixLPM performs a longest prefix match lookup for any address within
+// the given prefix. It finds the most specific routing table entry that would
+// match any address in the provided prefix range.
 //
-// This method is about 20-30% slower than LookupPrefix and should only
-// be used if the matching lpm entry is also required for other reasons.
+// This is functionally identical to LookupPrefix but additionally returns the
+// matching prefix (lpmPfx) itself.
 //
-// If LookupPrefixLPM is to be used for IP address lookups,
-// they must be converted to /32 or /128 prefixes.
+// This method is slower than LookupPrefix and should only be used if the
+// matching lpm entry is also required for other reasons.
 //
-//nolint:unparam
+// Returns the matching prefix, the zero value (struct{}{}) and true if found.
+// Returns zero values and false if no match exists.
 func (l *liteTable[V]) LookupPrefixLPM(pfx netip.Prefix) (lpmPfx netip.Prefix, _ V, ok bool) {
 	return l.lookupPrefixLPM(pfx, true)
 }
@@ -408,7 +444,7 @@ LOOP:
 		n = stack[depth]
 
 		// longest prefix match, skip if node has no prefixes
-		if n.prefixes.count == 0 {
+		if n.prefixCount() == 0 {
 			continue
 		}
 
