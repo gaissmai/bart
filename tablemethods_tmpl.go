@@ -39,7 +39,7 @@ func (n *_NODE_TYPE[V]) getChild(uint8) (_ any, _ bool)                         
 func (n *_NODE_TYPE[V]) mustGetPrefix(uint8) (_ V)                                         { return }
 func (n *_NODE_TYPE[V]) mustGetChild(uint8) (_ any)                                        { return }
 func (n *_NODE_TYPE[V]) insert(netip.Prefix, V, int) (_ bool)                              { return }
-func (n *_NODE_TYPE[V]) del(netip.Prefix) (_ V, _ bool)                                    { return }
+func (n *_NODE_TYPE[V]) delete(netip.Prefix) (_ V, _ bool)                                 { return }
 func (n *_NODE_TYPE[V]) get(netip.Prefix) (_ V, _ bool)                                    { return }
 func (n *_NODE_TYPE[V]) overlapsPrefixAtDepth(netip.Prefix, int) (_ bool)                  { return }
 func (n *_NODE_TYPE[V]) overlaps(*_NODE_TYPE[V], int) (_ bool)                             { return }
@@ -112,7 +112,7 @@ func (t *_TABLE_TYPE[V]) Delete(pfx netip.Prefix) (val V, exists bool) {
 	is4 := pfx.Addr().Is4()
 
 	n := t.rootNodeByVersion(is4)
-	val, exists = n.del(pfx)
+	val, exists = n.delete(pfx)
 
 	if exists {
 		t.sizeUpdate(is4, -1)

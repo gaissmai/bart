@@ -272,9 +272,9 @@ func (n *bartNode[V]) purgeAndCompress(stack []*bartNode[V], octets []uint8, is4
 	}
 }
 
-// del deletes the prefix and returns the associated value and true if the prefix existed,
+// delete the prefix and returns the associated value and true if the prefix existed,
 // or zero value and false otherwise. The prefix must be in canonical form.
-func (n *bartNode[V]) del(pfx netip.Prefix) (val V, exists bool) {
+func (n *bartNode[V]) delete(pfx netip.Prefix) (val V, exists bool) {
 	// invariant, prefix must be masked
 
 	// values derived from pfx
@@ -355,9 +355,9 @@ func (n *bartNode[V]) del(pfx netip.Prefix) (val V, exists bool) {
 	return val, exists
 }
 
-// delPersist is similar to delete but the receiver isn't modified.
+// deletePersist is similar to delete but the receiver isn't modified.
 // All nodes touched during insert are cloned.
-func (n *bartNode[V]) delPersist(cloneFn cloneFunc[V], pfx netip.Prefix) (val V, exists bool) {
+func (n *bartNode[V]) deletePersist(cloneFn cloneFunc[V], pfx netip.Prefix) (val V, exists bool) {
 	ip := pfx.Addr() // the pfx must be in canonical form
 	is4 := ip.Is4()
 	octets := ip.AsSlice()
