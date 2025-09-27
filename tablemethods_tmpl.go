@@ -273,7 +273,7 @@ func (t *_TABLE_TYPE[V]) DeletePersist(pfx netip.Prefix) (pt *_TABLE_TYPE[V], va
 //
 //		// modify even values by doubling them
 //		case val%2 == 0:
-//			pt, _ = pt.ModifyPersist(pfx, func(oldVal int, _ bool) (int, bool) {
+//			pt, _, _ = pt.ModifyPersist(pfx, func(oldVal int, _ bool) (int, bool) {
 //				return oldVal * 2, false
 //			})
 //
@@ -359,6 +359,7 @@ func (t *_TABLE_TYPE[V]) Modify(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, de
 	return val, deleted
 }
 
+// ModifyPersist is similar to Modify but the receiver isn't modified.
 func (t *_TABLE_TYPE[V]) ModifyPersist(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, del bool)) (pt *_TABLE_TYPE[V], _ V, deleted bool) {
 	var zero V // zero value of V for default initialization
 
