@@ -8,6 +8,10 @@
 package bart
 
 // ### GENERATE DELETE START ###
+
+// stub code for generator types and methods
+// useful for gopls during development, deleted during go generate
+
 import (
 	"net/netip"
 
@@ -20,19 +24,19 @@ type _NODE_TYPE[V any] struct {
 	children struct{ bitset.BitSet256 }
 }
 
-func (n *_NODE_TYPE[V]) isEmpty() (ok bool)                        { return }
-func (n *_NODE_TYPE[V]) prefixCount() (c int)                      { return }
-func (n *_NODE_TYPE[V]) childCount() (c int)                       { return }
-func (n *_NODE_TYPE[V]) mustGetPrefix(uint8) (val V)               { return }
-func (n *_NODE_TYPE[V]) mustGetChild(uint8) (child any)            { return }
-func (n *_NODE_TYPE[V]) insertPrefix(uint8, V) (exists bool)       { return }
-func (n *_NODE_TYPE[V]) deletePrefix(uint8) (val V, exists bool)   { return }
-func (n *_NODE_TYPE[V]) getChild(uint8) (child any, ok bool)       { return }
-func (n *_NODE_TYPE[V]) getPrefix(uint8) (val V, ok bool)          { return }
-func (n *_NODE_TYPE[V]) insertChild(uint8, any) (exists bool)      { return }
-func (n *_NODE_TYPE[V]) deleteChild(uint8) (exists bool)           { return }
-func (n *_NODE_TYPE[V]) cloneRec(cloneFunc[V]) (c *_NODE_TYPE[V])  { return }
-func (n *_NODE_TYPE[V]) cloneFlat(cloneFunc[V]) (c *_NODE_TYPE[V]) { return }
+func (n *_NODE_TYPE[V]) isEmpty() (_ bool)                         { return }
+func (n *_NODE_TYPE[V]) prefixCount() (_ int)                      { return }
+func (n *_NODE_TYPE[V]) childCount() (_ int)                       { return }
+func (n *_NODE_TYPE[V]) mustGetPrefix(uint8) (_ V)                 { return }
+func (n *_NODE_TYPE[V]) mustGetChild(uint8) (_ any)                { return }
+func (n *_NODE_TYPE[V]) insertPrefix(uint8, V) (_ bool)            { return }
+func (n *_NODE_TYPE[V]) deletePrefix(uint8) (_ V, _ bool)          { return }
+func (n *_NODE_TYPE[V]) getChild(uint8) (_ any, _ bool)            { return }
+func (n *_NODE_TYPE[V]) getPrefix(uint8) (_ V, _ bool)             { return }
+func (n *_NODE_TYPE[V]) insertChild(uint8, any) (_ bool)           { return }
+func (n *_NODE_TYPE[V]) deleteChild(uint8) (_ bool)                { return }
+func (n *_NODE_TYPE[V]) cloneRec(cloneFunc[V]) (_ *_NODE_TYPE[V])  { return }
+func (n *_NODE_TYPE[V]) cloneFlat(cloneFunc[V]) (_ *_NODE_TYPE[V]) { return }
 
 // ### GENERATE DELETE END ###
 
@@ -297,9 +301,9 @@ func (n *_NODE_TYPE[V]) purgeAndCompress(stack []*_NODE_TYPE[V], octets []uint8,
 	}
 }
 
-// del deletes the prefix and returns the associated value and true if the prefix existed,
+// delete the prefix and returns the associated value and true if the prefix existed,
 // or zero value and false otherwise. The prefix must be in canonical form.
-func (n *_NODE_TYPE[V]) del(pfx netip.Prefix) (val V, exists bool) {
+func (n *_NODE_TYPE[V]) delete(pfx netip.Prefix) (val V, exists bool) {
 	// invariant, prefix must be masked
 
 	// values derived from pfx
@@ -380,9 +384,9 @@ func (n *_NODE_TYPE[V]) del(pfx netip.Prefix) (val V, exists bool) {
 	return val, exists
 }
 
-// delPersist is similar to delete but the receiver isn't modified.
+// deletePersist is similar to delete but the receiver isn't modified.
 // All nodes touched during insert are cloned.
-func (n *_NODE_TYPE[V]) delPersist(cloneFn cloneFunc[V], pfx netip.Prefix) (val V, exists bool) {
+func (n *_NODE_TYPE[V]) deletePersist(cloneFn cloneFunc[V], pfx netip.Prefix) (val V, exists bool) {
 	ip := pfx.Addr() // the pfx must be in canonical form
 	is4 := ip.Is4()
 	octets := ip.AsSlice()
@@ -510,6 +514,170 @@ func (n *_NODE_TYPE[V]) get(pfx netip.Prefix) (val V, exists bool) {
 				return kid.value, true
 			}
 			return val, false
+
+		default:
+			panic("logic error, wrong node type")
+		}
+	}
+
+	panic("unreachable")
+}
+
+func (n *_NODE_TYPE[V]) modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del bool)) (delta int, _ V, deleted bool) {
+	var zero V
+
+	ip := pfx.Addr()
+	is4 := ip.Is4()
+	octets := ip.AsSlice()
+	lastOctetPlusOne, lastBits := lastOctetPlusOneAndLastBits(pfx)
+
+	// record the nodes on the path to the deleted node, needed to purge
+	// and/or path compress nodes after the deletion of a prefix
+	stack := [maxTreeDepth]*_NODE_TYPE[V]{}
+
+	// find the proper trie node to update prefix
+	for depth, octet := range octets {
+		// push current node on stack for path recording
+		stack[depth] = n
+
+		// Last “octet” from prefix, update/insert prefix into node.
+		// Note: For /32 and /128, depth never reaches lastOctetPlusOne (4/16),
+		// so those are handled below via the fringe/leaf path.
+		if depth == lastOctetPlusOne {
+			idx := art.PfxToIdx(octet, lastBits)
+
+			oldVal, existed := n.getPrefix(idx)
+			newVal, del := cb(oldVal, existed)
+
+			// update size if necessary
+			switch {
+			case !existed && del: // no-op
+				return 0, zero, false
+
+			case existed && del: // delete
+				n.deletePrefix(idx)
+				// remove now-empty nodes and re-path-compress upwards
+				n.purgeAndCompress(stack[:depth], octets, is4)
+				return -1, oldVal, true
+
+			case !existed: // insert
+				n.insertPrefix(idx, newVal)
+				return 1, newVal, false
+
+			case existed: // update
+				n.insertPrefix(idx, newVal)
+				return 0, oldVal, false
+
+			default:
+				panic("unreachable")
+			}
+
+		}
+
+		// go down in tight loop to last octet
+		if !n.children.Test(octet) {
+			// insert prefix path compressed
+
+			newVal, del := cb(zero, false)
+			if del {
+				return 0, zero, false // no-op
+			}
+
+			// insert
+			if isFringe(depth, pfx) {
+				n.insertChild(octet, newFringeNode(newVal))
+			} else {
+				n.insertChild(octet, newLeafNode(pfx, newVal))
+			}
+
+			return 1, newVal, false
+		}
+
+		// n.children.Test(octet) == true
+		kid := n.mustGetChild(octet)
+
+		// kid is node or leaf or fringe at octet
+		switch kid := kid.(type) {
+		case *_NODE_TYPE[V]:
+			n = kid // descend down to next trie level
+			continue
+
+		case *leafNode[V]:
+			oldVal := kid.value
+
+			// update existing value if prefixes are equal
+			if kid.prefix == pfx {
+				newVal, del := cb(oldVal, true)
+
+				if !del {
+					kid.value = newVal
+					return 0, oldVal, false // update
+				}
+
+				// delete
+				n.deleteChild(octet)
+
+				// remove now-empty nodes and re-path-compress upwards
+				n.purgeAndCompress(stack[:depth], octets, is4)
+
+				return -1, oldVal, true
+			}
+
+			// stop if this is a no-op for zero values
+			newVal, del := cb(zero, false)
+			if del {
+				return 0, zero, false
+			}
+
+			// create new node
+			// insert new child at current leaf position (octet)
+			newNode := new(_NODE_TYPE[V])
+			n.insertChild(octet, newNode)
+
+			// push the leaf down
+			// insert pfx with newVal in new node
+			newNode.insert(kid.prefix, kid.value, depth+1)
+			newNode.insert(pfx, newVal, depth+1)
+
+			return 1, newVal, false
+
+		case *fringeNode[V]:
+			oldVal := kid.value
+
+			// update existing value if prefix is fringe
+			if isFringe(depth, pfx) {
+				newVal, del := cb(kid.value, true)
+				if !del {
+					kid.value = newVal
+					return 0, oldVal, false // update
+				}
+
+				// delete
+				n.deleteChild(octet)
+
+				// remove now-empty nodes and re-path-compress upwards
+				n.purgeAndCompress(stack[:depth], octets, is4)
+
+				return -1, oldVal, true
+			}
+
+			// stop if this is a no-op for zero values
+			newVal, del := cb(zero, false)
+			if del {
+				return 0, zero, false
+			}
+
+			// create new node
+			// insert new child at current leaf position (octet)
+			newNode := new(_NODE_TYPE[V])
+			n.insertChild(octet, newNode)
+
+			// push the fringe down, it becomes a default route (idx=1)
+			// insert pfx with newVal in new node
+			newNode.insertPrefix(1, kid.value)
+			newNode.insert(pfx, newVal, depth+1)
+
+			return 1, newVal, false
 
 		default:
 			panic("logic error, wrong node type")

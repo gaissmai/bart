@@ -9,6 +9,9 @@ package bart
 
 // ### GENERATE DELETE START ###
 
+// stub code for generator types and methods
+// useful for gopls during development, deleted during go generate
+
 import (
 	"net/netip"
 
