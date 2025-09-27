@@ -83,6 +83,42 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, exists bool) {
 	return n.get(pfx)
 }
 
+// Supernets returns an iterator over all supernet routes that cover the given prefix pfx.
+//
+// The traversal searches both exact-length and shorter (less specific) prefixes that
+// overlap or include pfx. Starting from the most specific position in the trie,
+// it walks upward through parent nodes and yields any matching entries found at each level.
+//
+// The iteration order is reverse-CIDR: from longest prefix match (LPM) towards
+// least-specific routes.
+//
+// The search is protocol-specific (IPv4 or IPv6) and stops immediately if the yield
+// function returns false. If pfx is invalid, the function silently returns.
+//
+// This can be used to enumerate all covering supernet routes in routing-based
+// policy engines, diagnostics tools, or fallback resolution logic.
+//
+// Example:
+//
+//	for supernet, val := range table.Supernets(netip.MustParsePrefix("192.0.2.128/25")) {
+//	    fmt.Println("Matched covering route:", supernet, "->", val)
+//	}
+func (f *Table[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
+	return func(yield func(netip.Prefix, V) bool) {
+		if !pfx.IsValid() {
+			return
+		}
+
+		// canonicalize the prefix
+		pfx = pfx.Masked()
+
+		is4 := pfx.Addr().Is4()
+		n := f.rootNodeByVersion(is4)
+
+		n.supernets(pfx, yield)
+	}
+}
+
 // OverlapsPrefix reports whether any route in the table overlaps with the given pfx or vice versa.
 //
 // The check is bidirectional: it returns true if the input prefix is covered by an existing

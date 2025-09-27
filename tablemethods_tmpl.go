@@ -8,6 +8,10 @@
 package bart
 
 // ### GENERATE DELETE START ###
+
+// stub code for generator types and methods
+// useful for gopls during development, deleted during go generate
+
 import (
 	"bytes"
 	"encoding/json"
@@ -18,17 +22,15 @@ import (
 	"strings"
 )
 
-type (
-	_NODE_TYPE[V any]  struct{}
-	_TABLE_TYPE[V any] struct {
-		root4 _NODE_TYPE[V]
-		root6 _NODE_TYPE[V]
-		size4 int
-		size6 int
-	}
-)
+type _NODE_TYPE[V any] struct{}
 
-// node method helpers
+type _TABLE_TYPE[V any] struct {
+	root4 _NODE_TYPE[V]
+	root6 _NODE_TYPE[V]
+	size4 int
+	size6 int
+}
+
 func (n *_NODE_TYPE[V]) isEmpty() (ok bool)                                                 { return }
 func (n *_NODE_TYPE[V]) prefixCount() (c int)                                               { return }
 func (n *_NODE_TYPE[V]) childCount() (c int)                                                { return }
@@ -53,12 +55,12 @@ func (n *_NODE_TYPE[V]) allIndices() (seq2 iter.Seq2[uint8, V])                 
 func (n *_NODE_TYPE[V]) contains(uint8) (ok bool)                                           { return }
 func (n *_NODE_TYPE[V]) lookup(uint8) (val V, ok bool)                                      { return }
 func (n *_NODE_TYPE[V]) lookupIdx(uint8) (idx uint8, val V, ok bool)                        { return }
+func (n *_NODE_TYPE[V]) supernets(netip.Prefix, func(netip.Prefix, V) bool)                 { return }
 func (n *_NODE_TYPE[V]) allRec(stridePath, int, bool, func(netip.Prefix, V) bool) (ok bool) { return }
 func (n *_NODE_TYPE[V]) allRecSorted(stridePath, int, bool, func(netip.Prefix, V) bool) (ok bool) {
 	return
 }
 
-// table method helpers
 func (t *_TABLE_TYPE[V]) rootNodeByVersion(is4 bool) (n *_NODE_TYPE[V]) { return }
 
 // ### GENERATE DELETE END ###
@@ -129,6 +131,42 @@ func (t *_TABLE_TYPE[V]) Get(pfx netip.Prefix) (val V, exists bool) {
 	n := t.rootNodeByVersion(is4)
 
 	return n.get(pfx)
+}
+
+// Supernets returns an iterator over all supernet routes that cover the given prefix pfx.
+//
+// The traversal searches both exact-length and shorter (less specific) prefixes that
+// overlap or include pfx. Starting from the most specific position in the trie,
+// it walks upward through parent nodes and yields any matching entries found at each level.
+//
+// The iteration order is reverse-CIDR: from longest prefix match (LPM) towards
+// least-specific routes.
+//
+// The search is protocol-specific (IPv4 or IPv6) and stops immediately if the yield
+// function returns false. If pfx is invalid, the function silently returns.
+//
+// This can be used to enumerate all covering supernet routes in routing-based
+// policy engines, diagnostics tools, or fallback resolution logic.
+//
+// Example:
+//
+//	for supernet, val := range table.Supernets(netip.MustParsePrefix("192.0.2.128/25")) {
+//	    fmt.Println("Matched covering route:", supernet, "->", val)
+//	}
+func (f *_TABLE_TYPE[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
+	return func(yield func(netip.Prefix, V) bool) {
+		if !pfx.IsValid() {
+			return
+		}
+
+		// canonicalize the prefix
+		pfx = pfx.Masked()
+
+		is4 := pfx.Addr().Is4()
+		n := f.rootNodeByVersion(is4)
+
+		n.supernets(pfx, yield)
+	}
 }
 
 // OverlapsPrefix reports whether any route in the table overlaps with the given pfx or vice versa.

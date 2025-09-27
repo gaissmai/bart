@@ -8,6 +8,10 @@
 package bart
 
 // ### GENERATE DELETE START ###
+
+// stub code for generator types and methods
+// useful for gopls during development, deleted during go generate
+
 import (
 	"net/netip"
 	"slices"
@@ -25,6 +29,7 @@ func (n *_NODE_TYPE[V]) prefixCount() (c int)           { return }
 func (n *_NODE_TYPE[V]) childCount() (c int)            { return }
 func (n *_NODE_TYPE[V]) mustGetPrefix(uint8) (val V)    { return }
 func (n *_NODE_TYPE[V]) mustGetChild(uint8) (child any) { return }
+func (n *_NODE_TYPE[V]) contains(uint8) (ok bool)       { return }
 
 // ### GENERATE DELETE END ###
 
@@ -359,4 +364,104 @@ func (n *_NODE_TYPE[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxIdx ui
 	}
 
 	return true
+}
+
+func (n *_NODE_TYPE[V]) supernets(pfx netip.Prefix, yield func(netip.Prefix, V) bool) {
+	ip := pfx.Addr()
+	is4 := ip.Is4()
+	octets := ip.AsSlice()
+	lastOctetPlusOne, lastBits := lastOctetPlusOneAndLastBits(pfx)
+
+	// stack of the traversed nodes for reverse ordering of supernets
+	stack := [maxTreeDepth]*_NODE_TYPE[V]{}
+
+	// run variable, used after for loop
+	var depth int
+	var octet byte
+
+	// find last node along this octet path
+LOOP:
+	for depth, octet = range octets {
+		// stepped one past the last stride of interest; back up to last and exit
+		if depth > lastOctetPlusOne {
+			depth--
+			break
+		}
+		// push current node on stack
+		stack[depth] = n
+
+		// descend down the trie
+		if !n.children.Test(octet) {
+			break LOOP
+		}
+		kid := n.mustGetChild(octet)
+
+		// kid is node or leaf or fringe at octet
+		switch kid := kid.(type) {
+		case *_NODE_TYPE[V]:
+			n = kid
+			continue LOOP // descend down to next trie level
+
+		case *leafNode[V]:
+			if kid.prefix.Bits() > pfx.Bits() {
+				break LOOP
+			}
+
+			if kid.prefix.Overlaps(pfx) {
+				if !yield(kid.prefix, kid.value) {
+					// early exit
+					return
+				}
+			}
+			// end of trie along this octets path
+			break LOOP
+
+		case *fringeNode[V]:
+			fringePfx := cidrForFringe(octets, depth, is4, octet)
+			if fringePfx.Bits() > pfx.Bits() {
+				break LOOP
+			}
+
+			if fringePfx.Overlaps(pfx) {
+				if !yield(fringePfx, kid.value) {
+					// early exit
+					return
+				}
+			}
+			// end of trie along this octets path
+			break LOOP
+
+		default:
+			panic("logic error, wrong node type")
+		}
+	}
+
+	// start backtracking, unwind the stack
+	for ; depth >= 0; depth-- {
+		n = stack[depth]
+
+		// only the lastOctet may have a different prefix len
+		// all others are just host routes
+		var idx uint8
+		octet = octets[depth]
+		// Last “octet” from prefix, update/insert prefix into node.
+		// Note: For /32 and /128, depth never reaches lastOctetPlusOne (4/16),
+		// so those are handled below via the fringe/leaf path.
+		if depth == lastOctetPlusOne {
+			idx = art.PfxToIdx(octet, lastBits)
+		} else {
+			idx = art.OctetToIdx(octet)
+		}
+
+		// micro benchmarking, skip if there is no match
+		if !n.contains(idx) {
+			continue
+		}
+
+		// yield all the matching prefixes, not just the lpm
+		if !n.eachLookupPrefix(octets, depth, is4, idx, yield) {
+			// early exit
+			return
+		}
+	}
 }
