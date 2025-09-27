@@ -444,3 +444,51 @@ LOOP:
 		}
 	}
 }
+
+func (n *fastNode[V]) subnets(pfx netip.Prefix, yield func(netip.Prefix, V) bool) {
+	// values derived from pfx
+	ip := pfx.Addr()
+	is4 := ip.Is4()
+	octets := ip.AsSlice()
+	lastOctetPlusOne, lastBits := lastOctetPlusOneAndLastBits(pfx)
+
+	// find the trie node
+	for depth, octet := range octets {
+		// Last “octet” from prefix, update/insert prefix into node.
+		// Note: For /32 and /128, depth never reaches lastOctetPlusOne (4/16),
+		// so those are handled below via the fringe/leaf path.
+		if depth == lastOctetPlusOne {
+			idx := art.PfxToIdx(octet, lastBits)
+			_ = n.eachSubnet(octets, depth, is4, idx, yield)
+			return
+		}
+
+		if !n.children.Test(octet) {
+			return
+		}
+		kid := n.mustGetChild(octet)
+
+		// kid is node or leaf or fringe at octet
+		switch kid := kid.(type) {
+		case *fastNode[V]:
+			n = kid
+			continue // descend down to next trie level
+
+		case *leafNode[V]:
+			if pfx.Bits() <= kid.prefix.Bits() && pfx.Overlaps(kid.prefix) {
+				_ = yield(kid.prefix, kid.value)
+			}
+			return
+
+		case *fringeNode[V]:
+			fringePfx := cidrForFringe(octets, depth, is4, octet)
+			if pfx.Bits() <= fringePfx.Bits() && pfx.Overlaps(fringePfx) {
+				_ = yield(fringePfx, kid.value)
+			}
+			return
+
+		default:
+			panic("logic error, wrong node type")
+		}
+	}
+}

@@ -83,6 +83,56 @@ func (t *liteTable[V]) Get(pfx netip.Prefix) (val V, exists bool) {
 	return n.get(pfx)
 }
 
+// Modify applies an insert, update, or delete operation for the value
+// associated with the given prefix. The supplied callback decides the
+// operation: it is called with the current value (or zero if not found)
+// and a boolean indicating whether the prefix exists. The callback must
+// return a new value and a delete flag: del == false inserts or updates,
+// del == true deletes the entry if it exists (otherwise no-op). Modify
+// returns the resulting value and a boolean indicating whether the
+// entry was actually deleted.
+//
+// The operation is determined by the callback function, which is called with:
+//
+//	val:   the current value (or zero value if not found)
+//	found: true if the prefix currently exists, false otherwise
+//
+// The callback returns:
+//
+//	val: the new value to insert or update (ignored if del == true)
+//	del: true to delete the entry, false to insert or update
+//
+// Modify returns:
+//
+//	val:     the zero, old, or new value depending on the operation (see table)
+//	deleted: true if the entry was deleted, false otherwise
+//
+// Summary:
+//
+//	Operation | cb-input        | cb-return       | Modify-return
+//	---------------------------------------------------------------
+//	No-op:    | (zero,   false) | (_,      true)  | (zero,   false)
+//	Insert:   | (zero,   false) | (newVal, false) | (newVal, false)
+//	Update:   | (oldVal, true)  | (newVal, false) | (oldVal, false)
+//	Delete:   | (oldVal, true)  | (_,      true)  | (oldVal, true)
+func (t *liteTable[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del bool)) (_ V, deleted bool) {
+	if !pfx.IsValid() {
+		return
+	}
+
+	// canonicalize prefix
+	pfx = pfx.Masked()
+
+	is4 := pfx.Addr().Is4()
+
+	n := t.rootNodeByVersion(is4)
+
+	delta, val, deleted := n.modify(pfx, cb)
+	t.sizeUpdate(is4, delta)
+
+	return val, deleted
+}
+
 // Supernets returns an iterator over all supernet routes that cover the given prefix pfx.
 //
 // The traversal searches both exact-length and shorter (less specific) prefixes that
@@ -103,7 +153,7 @@ func (t *liteTable[V]) Get(pfx netip.Prefix) (val V, exists bool) {
 //	for supernet, val := range table.Supernets(netip.MustParsePrefix("192.0.2.128/25")) {
 //	    fmt.Println("Matched covering route:", supernet, "->", val)
 //	}
-func (f *liteTable[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
+func (t *liteTable[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
 		if !pfx.IsValid() {
 			return
@@ -113,9 +163,33 @@ func (f *liteTable[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 		pfx = pfx.Masked()
 
 		is4 := pfx.Addr().Is4()
-		n := f.rootNodeByVersion(is4)
+		n := t.rootNodeByVersion(is4)
 
 		n.supernets(pfx, yield)
+	}
+}
+
+// Subnets returns an iterator over all prefix–value pairs in the routing table
+// that are fully contained within the given prefix pfx.
+//
+// Entries are returned in CIDR sort order.
+//
+// Example:
+//
+//	for sub, val := range table.Subnets(netip.MustParsePrefix("10.0.0.0/8")) {
+//	    fmt.Println("Covered:", sub, "->", val)
+//	}
+func (t *liteTable[V]) Subnets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
+	return func(yield func(netip.Prefix, V) bool) {
+		if !pfx.IsValid() {
+			return
+		}
+
+		pfx = pfx.Masked()
+		is4 := pfx.Addr().Is4()
+
+		n := t.rootNodeByVersion(is4)
+		n.subnets(pfx, yield)
 	}
 }
 
