@@ -493,3 +493,149 @@ func (n *bartNode[V]) get(pfx netip.Prefix) (val V, exists bool) {
 
 	panic("unreachable")
 }
+
+func (n *bartNode[V]) modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del bool)) (delta int, _ V, deleted bool) {
+	var zero V
+
+	ip := pfx.Addr()
+	is4 := ip.Is4()
+	octets := ip.AsSlice()
+	lastOctetPlusOne, lastBits := lastOctetPlusOneAndLastBits(pfx)
+
+	// record the nodes on the path to the deleted node, needed to purge
+	// and/or path compress nodes after the deletion of a prefix
+	stack := [maxTreeDepth]*bartNode[V]{}
+
+	// find the proper trie node to update prefix
+	for depth, octet := range octets {
+		// push current node on stack for path recording
+		stack[depth] = n
+
+		// Last “octet” from prefix, update/insert prefix into node.
+		// Note: For /32 and /128, depth never reaches lastOctetPlusOne (4/16),
+		// so those are handled below via the fringe/leaf path.
+		if depth == lastOctetPlusOne {
+			idx := art.PfxToIdx(octet, lastBits)
+
+			oldVal, existed := n.getPrefix(idx)
+			newVal, del := cb(oldVal, existed)
+
+			// update size if necessary
+			switch {
+			case !existed && del: // no-op
+				return 0, zero, false
+
+			case existed && del: // delete
+				n.deletePrefix(idx)
+				// remove now-empty nodes and re-path-compress upwards
+				n.purgeAndCompress(stack[:depth], octets, is4)
+				return -1, oldVal, true
+
+			case !existed: // insert
+				n.insertPrefix(idx, newVal)
+				return 1, newVal, false
+
+			case existed: // update
+				n.insertPrefix(idx, newVal)
+				return 0, oldVal, false
+
+			default:
+				panic("unreachable")
+			}
+
+		}
+
+		// go down in tight loop to last octet
+		if !n.children.Test(octet) {
+			// insert prefix path compressed
+
+			newVal, del := cb(zero, false)
+			if del {
+				return 0, zero, false // no-op
+			}
+
+			// insert
+			if isFringe(depth, pfx) {
+				n.insertChild(octet, newFringeNode(newVal))
+			} else {
+				n.insertChild(octet, newLeafNode(pfx, newVal))
+			}
+
+			return 1, newVal, false
+		}
+
+		kid := n.mustGetChild(octet)
+
+		// kid is node or leaf or fringe at octet
+		switch kid := kid.(type) {
+		case *bartNode[V]:
+			n = kid // descend down to next trie level
+
+		case *leafNode[V]:
+			oldVal := kid.value
+
+			// update existing value if prefixes are equal
+			if kid.prefix == pfx {
+				newVal, del := cb(oldVal, true)
+
+				if !del {
+					kid.value = newVal
+					return 0, oldVal, false // update
+				}
+
+				// delete
+				n.deleteChild(octet)
+
+				// remove now-empty nodes and re-path-compress upwards
+				n.purgeAndCompress(stack[:depth], octets, is4)
+
+				return -1, oldVal, true
+			}
+
+			// create new node
+			// push the leaf down
+			// insert new child at current leaf position (octet)
+			// descend down, replace n with new child
+			newNode := new(bartNode[V])
+			newNode.insert(kid.prefix, kid.value, depth+1)
+
+			n.insertChild(octet, newNode)
+			n = newNode
+
+		case *fringeNode[V]:
+			oldVal := kid.value
+
+			// update existing value if prefix is fringe
+			if isFringe(depth, pfx) {
+				newVal, del := cb(kid.value, true)
+				if !del {
+					kid.value = newVal
+					return 0, oldVal, false // update
+				}
+
+				// delete
+				n.deleteChild(octet)
+
+				// remove now-empty nodes and re-path-compress upwards
+				n.purgeAndCompress(stack[:depth], octets, is4)
+
+				return -1, oldVal, true
+			}
+
+			// create new node
+			// push the fringe down, it becomes a default route (idx=1)
+			// insert new child at current leaf position (octet)
+			// descend down, replace n with new child
+			newNode := new(bartNode[V])
+			newNode.insertPrefix(1, kid.value)
+
+			n.insertChild(octet, newNode)
+			n = newNode
+
+		default:
+			panic("logic error, wrong node type")
+		}
+	}
+
+	panic("unreachable")
+}

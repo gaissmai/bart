@@ -10,24 +10,6 @@ import (
 	"github.com/gaissmai/bart/internal/sparse"
 )
 
-// strideLen represents the byte stride length for the multibit trie.
-// Each stride processes 8 bits (1 byte) at a time.
-const strideLen = 8
-
-// maxItems defines the maximum number of prefixes or children that can be stored in a single node.
-// This corresponds to 256 possible values for an 8-bit stride.
-const maxItems = 256
-
-// maxTreeDepth represents the maximum depth of the trie structure.
-// For IPv6 addresses, this allows up to 16 bytes of depth.
-const maxTreeDepth = 16
-
-// depthMask is used for bounds check elimination (BCE) when accessing depth-indexed arrays.
-const depthMask = maxTreeDepth - 1
-
-// stridePath represents a path through the trie, with a maximum depth of 16 octets for IPv6.
-type stridePath [maxTreeDepth]uint8
-
 // bartNode is a trie level bartNode in the multibit routing table.
 //
 // Each bartNode contains two conceptually different arrays:
