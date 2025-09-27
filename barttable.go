@@ -272,12 +272,15 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 	return false
 }
 
-// Lookup performs longest-prefix matching for the given IP address and returns
-// the associated value of the most specific matching prefix.
-// Returns the zero value of V and false if no prefix matches.
-// Returns false for invalid IP addresses.
+// Lookup performs a longest prefix match (LPM) lookup for the given address.
+// It finds the most specific (longest) prefix in the routing table that
+// contains the given address and returns its associated value.
 //
-// This is the core routing table operation used for packet forwarding decisions.
+// This is the fundamental operation for IP routing decisions, finding the
+// best matching route for a destination address.
+//
+// Returns the associated value and true if a matching prefix is found.
+// Returns zero value and false if no prefix contains the address.
 func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	if !ip.IsValid() {
 		return val, ok
@@ -351,21 +354,32 @@ LOOP:
 	return val, ok
 }
 
-// LookupPrefix does a route lookup (longest prefix match) for pfx and
-// returns the associated value and true, or false if no route matched.
+// LookupPrefix performs a longest prefix match lookup for any address within
+// the given prefix. It finds the most specific routing table entry that would
+// match any address in the provided prefix range.
+//
+// This is functionally identical to LookupPrefixLPM but returns only the
+// associated value, not the matching prefix itself.
+//
+// Returns the value and true if a matching prefix is found.
+// Returns zero value and false if no match exists.
 func (t *Table[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
 	_, val, ok = t.lookupPrefixLPM(pfx, false)
 	return val, ok
 }
 
-// LookupPrefixLPM is similar to [Table.LookupPrefix],
-// but it returns the lpm prefix in addition to value,ok.
+// LookupPrefixLPM performs a longest prefix match lookup for any address within
+// the given prefix. It finds the most specific routing table entry that would
+// match any address in the provided prefix range.
 //
-// This method is about 20-30% slower than LookupPrefix and should only
-// be used if the matching lpm entry is also required for other reasons.
+// This is functionally identical to LookupPrefix but additionally returns the
+// matching prefix (lpmPfx) itself along with the value.
 //
-// If LookupPrefixLPM is to be used for IP address lookups,
-// they must be converted to /32 or /128 prefixes.
+// This method is slower than LookupPrefix and should only be used if the
+// matching lpm entry is also required for other reasons.
+//
+// Returns the matching prefix, its associated value, and true if found.
+// Returns zero values and false if no match exists.
 func (t *Table[V]) LookupPrefixLPM(pfx netip.Prefix) (lpmPfx netip.Prefix, val V, ok bool) {
 	return t.lookupPrefixLPM(pfx, true)
 }
