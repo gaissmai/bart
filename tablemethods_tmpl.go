@@ -159,8 +159,14 @@ func (t *_TABLE_TYPE[V]) InsertPersist(pfx netip.Prefix, val V) *_TABLE_TYPE[V] 
 	return pt
 }
 
-// Delete the prefix and returns the associated payload for prefix and true if found
-// or the zero value and false if prefix is not set in the routing table.
+// Delete removes the exact prefix pfx from the table.
+//
+// This is an exact-match operation (no LPM). If pfx exists, the entry is
+// removed and the previous value is returned with ok=true. If pfx does not
+// exist or pfx is invalid, the table is left unchanged and the
+// zero value of V and ok=false are returned.
+//
+// The prefix is canonicalized (Masked) before lookup.
 func (t *_TABLE_TYPE[V]) Delete(pfx netip.Prefix) (val V, exists bool) {
 	if !pfx.IsValid() {
 		return val, exists
@@ -255,7 +261,7 @@ func (t *_TABLE_TYPE[V]) DeletePersist(pfx netip.Prefix) (pt *_TABLE_TYPE[V], va
 //
 // IMPORTANT: It is the responsibility of the callback implementation to only
 // use persistent Table operations (e.g. InsertPersist, DeletePersist,
-// ModifyPersist, ...). Using mutating methods like Modidy or Delete
+// ModifyPersist, ...). Using mutating methods like Modify or Delete
 // inside the callback would break the iteration and may lead
 // to inconsistent results.
 //
@@ -406,14 +412,11 @@ func (t *_TABLE_TYPE[V]) ModifyPersist(pfx netip.Prefix, cb func(_ V, ok bool) (
 // Supernets returns an iterator over all supernet routes that cover the given prefix pfx.
 //
 // The traversal searches both exact-length and shorter (less specific) prefixes that
-// overlap or include pfx. Starting from the most specific position in the trie,
+// include pfx. Starting from the most specific position in the trie,
 // it walks upward through parent nodes and yields any matching entries found at each level.
 //
 // The iteration order is reverse-CIDR: from longest prefix match (LPM) towards
 // least-specific routes.
-//
-// The search is protocol-specific (IPv4 or IPv6) and stops immediately if the yield
-// function returns false. If pfx is invalid, the function silently returns.
 //
 // This can be used to enumerate all covering supernet routes in routing-based
 // policy engines, diagnostics tools, or fallback resolution logic.
@@ -421,8 +424,11 @@ func (t *_TABLE_TYPE[V]) ModifyPersist(pfx netip.Prefix, cb func(_ V, ok bool) (
 // Example:
 //
 //	for supernet, val := range table.Supernets(netip.MustParsePrefix("192.0.2.128/25")) {
-//	    fmt.Println("Matched covering route:", supernet, "->", val)
+//	    fmt.Println("Covered by:", supernet, "->", val)
 //	}
+//
+// The iteration can be stopped early by breaking from the range loop.
+// Returns an empty iterator if the prefix is invalid.
 func (t *_TABLE_TYPE[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
 		if !pfx.IsValid() {
@@ -439,16 +445,19 @@ func (t *_TABLE_TYPE[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] 
 	}
 }
 
-// Subnets returns an iterator over all prefix–value pairs in the routing table
-// that are fully contained within the given prefix pfx.
-//
-// Entries are returned in CIDR sort order.
+// Subnets returns an iterator over all subnets of the given prefix pfx
+// in reverse natural CIDR sort order (from most specific to least specific).
+// This includes prefixes of the same length (exact match) and longer
+// (more specific) prefixes that are contained within the given prefix.
 //
 // Example:
 //
 //	for sub, val := range table.Subnets(netip.MustParsePrefix("10.0.0.0/8")) {
 //	    fmt.Println("Covered:", sub, "->", val)
 //	}
+//
+// The iteration can be stopped early by breaking from the range loop.
+// Returns an empty iterator if the prefix is invalid.
 func (t *_TABLE_TYPE[V]) Subnets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
 		if !pfx.IsValid() {
@@ -463,7 +472,8 @@ func (t *_TABLE_TYPE[V]) Subnets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 	}
 }
 
-// OverlapsPrefix reports whether any route in the table overlaps with the given pfx or vice versa.
+// OverlapsPrefix reports whether any prefix in the routing table overlaps with
+// the given prefix. Two prefixes overlap if they share any IP addresses.
 //
 // The check is bidirectional: it returns true if the input prefix is covered by an existing
 // route, or if any stored route is itself contained within the input prefix.
@@ -682,7 +692,8 @@ func (t *_TABLE_TYPE[V]) All6() iter.Seq2[netip.Prefix, V] {
 // AllSorted returns an iterator over all prefix–value pairs in the table,
 // ordered in canonical CIDR prefix sort order.
 //
-// This can be used directly with a for-range loop; the Go compiler provides the yield function implicitly.
+// This can be used directly with a for-range loop;
+// the Go compiler provides the yield function implicitly:
 //
 //	for prefix, value := range t.AllSorted() {
 //	    fmt.Println(prefix, value)
@@ -690,6 +701,8 @@ func (t *_TABLE_TYPE[V]) All6() iter.Seq2[netip.Prefix, V] {
 //
 // The traversal is stable and predictable across calls.
 // Iteration stops early if you break out of the loop.
+//
+// Modifying the table during iteration may produce undefined results.
 func (t *_TABLE_TYPE[V]) AllSorted() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
 		_ = t.root4.allRecSorted(stridePath{}, 0, true, yield) &&

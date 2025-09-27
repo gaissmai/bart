@@ -108,7 +108,6 @@ func (n *liteNode[V]) getPrefix(idx uint8) (_ V, exists bool) {
 	return
 }
 
-//nolint:unparam
 func (n *liteNode[V]) mustGetPrefix(idx uint8) (_ V) {
 	return
 }
