@@ -24,19 +24,19 @@ type _NODE_TYPE[V any] struct {
 	children struct{ bitset.BitSet256 }
 }
 
-func (n *_NODE_TYPE[V]) isEmpty() (ok bool)                        { return }
-func (n *_NODE_TYPE[V]) prefixCount() (c int)                      { return }
-func (n *_NODE_TYPE[V]) childCount() (c int)                       { return }
-func (n *_NODE_TYPE[V]) mustGetPrefix(uint8) (val V)               { return }
-func (n *_NODE_TYPE[V]) mustGetChild(uint8) (child any)            { return }
-func (n *_NODE_TYPE[V]) insertPrefix(uint8, V) (exists bool)       { return }
-func (n *_NODE_TYPE[V]) deletePrefix(uint8) (val V, exists bool)   { return }
-func (n *_NODE_TYPE[V]) getChild(uint8) (child any, ok bool)       { return }
-func (n *_NODE_TYPE[V]) getPrefix(uint8) (val V, ok bool)          { return }
-func (n *_NODE_TYPE[V]) insertChild(uint8, any) (exists bool)      { return }
-func (n *_NODE_TYPE[V]) deleteChild(uint8) (exists bool)           { return }
-func (n *_NODE_TYPE[V]) cloneRec(cloneFunc[V]) (c *_NODE_TYPE[V])  { return }
-func (n *_NODE_TYPE[V]) cloneFlat(cloneFunc[V]) (c *_NODE_TYPE[V]) { return }
+func (n *_NODE_TYPE[V]) isEmpty() (_ bool)                         { return }
+func (n *_NODE_TYPE[V]) prefixCount() (_ int)                      { return }
+func (n *_NODE_TYPE[V]) childCount() (_ int)                       { return }
+func (n *_NODE_TYPE[V]) mustGetPrefix(uint8) (_ V)                 { return }
+func (n *_NODE_TYPE[V]) mustGetChild(uint8) (_ any)                { return }
+func (n *_NODE_TYPE[V]) insertPrefix(uint8, V) (_ bool)            { return }
+func (n *_NODE_TYPE[V]) deletePrefix(uint8) (_ V, _ bool)          { return }
+func (n *_NODE_TYPE[V]) getChild(uint8) (_ any, _ bool)            { return }
+func (n *_NODE_TYPE[V]) getPrefix(uint8) (_ V, _ bool)             { return }
+func (n *_NODE_TYPE[V]) insertChild(uint8, any) (_ bool)           { return }
+func (n *_NODE_TYPE[V]) deleteChild(uint8) (_ bool)                { return }
+func (n *_NODE_TYPE[V]) cloneRec(cloneFunc[V]) (_ *_NODE_TYPE[V])  { return }
+func (n *_NODE_TYPE[V]) cloneFlat(cloneFunc[V]) (_ *_NODE_TYPE[V]) { return }
 
 // ### GENERATE DELETE END ###
 
@@ -301,9 +301,9 @@ func (n *_NODE_TYPE[V]) purgeAndCompress(stack []*_NODE_TYPE[V], octets []uint8,
 	}
 }
 
-// del deletes the prefix and returns the associated value and true if the prefix existed,
+// delete the prefix and returns the associated value and true if the prefix existed,
 // or zero value and false otherwise. The prefix must be in canonical form.
-func (n *_NODE_TYPE[V]) del(pfx netip.Prefix) (val V, exists bool) {
+func (n *_NODE_TYPE[V]) delete(pfx netip.Prefix) (val V, exists bool) {
 	// invariant, prefix must be masked
 
 	// values derived from pfx
@@ -384,9 +384,9 @@ func (n *_NODE_TYPE[V]) del(pfx netip.Prefix) (val V, exists bool) {
 	return val, exists
 }
 
-// delPersist is similar to delete but the receiver isn't modified.
+// deletePersist is similar to delete but the receiver isn't modified.
 // All nodes touched during insert are cloned.
-func (n *_NODE_TYPE[V]) delPersist(cloneFn cloneFunc[V], pfx netip.Prefix) (val V, exists bool) {
+func (n *_NODE_TYPE[V]) deletePersist(cloneFn cloneFunc[V], pfx netip.Prefix) (val V, exists bool) {
 	ip := pfx.Addr() // the pfx must be in canonical form
 	is4 := ip.Is4()
 	octets := ip.AsSlice()
