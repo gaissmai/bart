@@ -131,31 +131,6 @@ func TestInsertPersist_IPv6(t *testing.T) {
 	}
 }
 
-// ---- Minimal test for deprecated UpdatePersist ----
-
-func TestUpdatePersist_BasicFunctionality(t *testing.T) {
-	t.Parallel()
-	t0 := &Table[*routeEntry]{}
-	p := netip.MustParsePrefix("10.0.0.0/8")
-
-	expectedRoute := newRoute("10.0.0.1", "eth0", 99)
-	pt, newVal := t0.UpdatePersist(p, func(val *routeEntry, ok bool) *routeEntry {
-		if ok {
-			t.Fatalf("expected ok=false for missing prefix")
-		}
-		return expectedRoute
-	})
-
-	if newVal.nextHop != expectedRoute.nextHop || newVal.exitIF != expectedRoute.exitIF {
-		t.Fatalf("returned route should match expected")
-	}
-	if v, ok := pt.Get(p.Masked()); !ok {
-		t.Fatalf("expected inserted route")
-	} else if v.nextHop != expectedRoute.nextHop {
-		t.Fatalf("stored route should match expected")
-	}
-}
-
 // ---- Comprehensive tests for ModifyPersist ----
 
 func TestModifyPersist_Insert_Update_Delete_Paths(t *testing.T) {
@@ -326,26 +301,6 @@ func TestDeletePersist_InvalidPrefix_ReturnsOriginal(t *testing.T) {
 	pt, val, found := t0.DeletePersist(netip.Prefix{})
 	if pt != t0 || found || val != nil {
 		t.Fatalf("expected original table, nil value and found=false for invalid prefix")
-	}
-}
-
-// ---- GetAndDeletePersist ----
-
-func TestGetAndDeletePersist_ForwardsToDeletePersist(t *testing.T) {
-	t.Parallel()
-	t0 := &Table[*routeEntry]{}
-	p := netip.MustParsePrefix("10.0.0.0/8")
-	route := newRoute("10.0.0.1", "eth0", 123)
-	t1 := t0.InsertPersist(p, route)
-
-	pt1, v1, ok1 := t1.DeletePersist(p)
-	pt2, v2, ok2 := t1.GetAndDeletePersist(p)
-
-	if ok1 != ok2 || pt1.Size() != pt2.Size() {
-		t.Fatalf("GetAndDeletePersist must mirror DeletePersist results")
-	}
-	if v1.nextHop != v2.nextHop || v1.exitIF != v2.exitIF {
-		t.Fatalf("GetAndDeletePersist and DeletePersist should return same route")
 	}
 }
 

@@ -2039,49 +2039,6 @@ func TestModifyCompare(t *testing.T) {
 	}
 }
 
-func TestUpdatePersistCompare(t *testing.T) {
-	t.Parallel()
-
-	n := workLoadN()
-
-	prng := rand.New(rand.NewPCG(42, 42))
-	pfxs := randomPrefixes(prng, n)
-	imu := new(Table[int])
-	mut := new(Table[int])
-
-	// Update as insert
-	for _, pfx := range pfxs {
-		imu, _ = imu.UpdatePersist(pfx.pfx, func(int, bool) int { return pfx.val })
-		mut.Update(pfx.pfx, func(int, bool) int { return pfx.val })
-	}
-
-	for _, pfx := range pfxs {
-		imuVal, imuOk := imu.Get(pfx.pfx)
-		mutVal, mutOk := mut.Get(pfx.pfx)
-
-		if !getsEqual(mutVal, mutOk, imuVal, imuOk) {
-			t.Fatalf("Get(%q) = (%v, %v), want (%v, %v)", pfx.pfx, imuVal, imuOk, mutVal, mutOk)
-		}
-	}
-
-	cb := func(val int, _ bool) int { return val + 1 }
-
-	// Update as update
-	for _, pfx := range pfxs[:len(pfxs)/2] {
-		imu, _ = imu.UpdatePersist(pfx.pfx, cb)
-		mut.Update(pfx.pfx, cb)
-	}
-
-	for _, pfx := range pfxs {
-		bartVal, bartOK := mut.Get(pfx.pfx)
-		immuVal, immuOK := imu.Get(pfx.pfx)
-
-		if !getsEqual(bartVal, bartOK, immuVal, immuOK) {
-			t.Fatalf("Get(%q) = (%v, %v), want (%v, %v)", pfx.pfx, immuVal, immuOK, bartVal, bartOK)
-		}
-	}
-}
-
 func TestModifyPersistCompare(t *testing.T) {
 	t.Parallel()
 
@@ -2833,68 +2790,6 @@ func TestCloneShallow(t *testing.T) {
 
 	if *got != *want {
 		t.Errorf("memory aliasing after shallow copy, values must be equal:\nvalues(%d, %d)", *got, *want)
-	}
-}
-
-func TestUpdatePersistDeep(t *testing.T) {
-	t.Parallel()
-	prng := rand.New(rand.NewPCG(42, 42))
-
-	tbl := new(Table[*MyInt])
-	val1 := MyInt(1)
-	pfx := mpp("10.0.0.1/32")
-	tbl.Insert(pfx, &val1)
-
-	val2 := val1
-	immu, _ := tbl.UpdatePersist(pfx, func(*MyInt, bool) *MyInt { return &val2 })
-
-	want, _ := tbl.Get(pfx)
-	got, _ := immu.Get(pfx)
-
-	if *got != *want || got == want {
-		t.Errorf("value with Cloner interface, pointers must be different:\nvalues(%d, %d)\n(ptr(%v, %v)",
-			*got, *want, got, want)
-	}
-
-	// change val1, value after UpdatePersist must now be different
-	val1 = 2
-	want, _ = tbl.Get(pfx)
-	got, _ = immu.Get(pfx)
-
-	if *got == *want {
-		t.Errorf("memory aliasing after UpdatePersist, values must be different:\nvalues(%d, %d)", *got, *want)
-	}
-
-	pfxs := randomRealWorldPrefixes(prng, 100_000)
-	tbl = new(Table[*MyInt])
-	for i, pfx := range pfxs {
-		i := MyInt(i)
-		tbl.Insert(pfx, &i)
-	}
-
-	immu = tbl
-	for i, pfx := range pfxs {
-		// increment value by 1, no memory aliasing with tbl values
-		immu, _ = immu.UpdatePersist(pfx, func(oldVal *MyInt, ok bool) *MyInt {
-			if !ok {
-				t.Fatalf("UpdatePersist, expected old value at %d", i)
-			}
-			newVal := *oldVal + 1
-			return &newVal
-		})
-	}
-
-	for i, pfx := range pfxs {
-		got1, _ := tbl.Get(pfx)
-		got2, _ := immu.Get(pfx)
-
-		if int(*got1) != i {
-			t.Fatalf("UpdatePersist, want: %d, got: %d", i, *got1)
-		}
-
-		if int(*got2) != i+1 {
-			t.Fatalf("UpdatePersist, want: %d, got: %d", i+1, *got2)
-		}
 	}
 }
 
