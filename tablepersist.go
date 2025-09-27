@@ -470,7 +470,7 @@ func (t *Table[V]) DeletePersist(pfx netip.Prefix) (pt *Table[V], val V, found b
 		n = &pt.root6
 	}
 
-	val, exists := n.delPersist(cloneFn, pfx)
+	val, exists := n.deletePersist(cloneFn, pfx)
 	if exists {
 		pt.sizeUpdate(is4, -1)
 	}
