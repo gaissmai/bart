@@ -27,40 +27,55 @@ using a fast mapping function derived from Donald E. Knuth’s
 **Allotment Routing Table** (ART) algorithm, to map the possible prefixes
 at each level into a complete binary tree.
 
-BART implements three different internal node types, each optimized for specific
+BART implements three different routing tables, each optimized for specific
 use cases:
-- **liteNode**
-- **bartNode**
-- **fastNode**
+- **Lite**
+- **Table**
+- **Fast**
 
-For **bartNode** this binary tree is represented with popcount‑compressed
+For **Table** this binary tree is represented with popcount‑compressed
 sparse arrays for **level compression**.
 Combined with a **novel path and fringe compression**, this design reduces
-memory consumption by nearly
-[two orders of magnitude](https://github.com/gaissmai/iprbench)
-compared to classical ART.
+memory consumption by nearly two orders of magnitude compared to classical ART.
 
-For **fastNode** this binary tree is represented with fixed arrays
+For **Fast** this binary tree is represented with fixed arrays
 without level compression (classical ART), but combined with the same
 novel **path and fringe compression** from BART, this design
 reduces memory consumption by more than an order of magnitude compared
 to classical ART and thus makes ART usable in the first place for large
 routing tables.
 
-**liteNode** is a special form of bartNode, but without a payload, and therefore
-has the lowest memory overhead while maintaining the same lookup times as bart.
+**Lite** is a special form of **Table**, but without a payload, and therefore
+has the lowest memory overhead while maintaining the same lookup times.
 
 ## Comparison
  
- | Aspect | bartNode[V] | liteNode | fastNode[V] |
+ | Aspect | Table | Lite | Fast |
  |--------|-------------|-------------|-------------|
  | **Per-level Speed** | ⚡ **O(1)** | ⚡ **O(1)** | 🚀 **O(1), ~40% faster per level** |
  | **Overall Lookup** | O(trie_depth) | O(trie_depth) | O(trie_depth) |
  | **IPv4 Performance** | ~3 level traversals | ~3 level traversals | ~3 level traversals |
  | **IPv6 Performance** | ~6 level traversals | ~6 level traversals | ~6 level traversals |
  | **IPv6 vs IPv4** | ~2× slower | ~2× slower | ~2× slower |
- | **Memory** | neutral | efficient | inefficient |
+ | **Memory** | efficient | very efficient | inefficient |
+
+## When to Use Each Type
+
+### 🎯 **Table[V]** - The Balanced Choice                                                                        
+- **Recommended** for most routing table use cases
+- Near-optimal per-level performance with excellent memory efficiency
+- Perfect balance for both IPv4 and IPv6 routing tables (use it for RIB)
  
+### 🪶 **Lite** - The Minimalist
+- **Specialized** for prefix-only operations, no payload
+- Same per-level performance as *Table[V]* but 35% less memory
+- Ideal for IPv4/IPv6 allowlists and set-based operations (use it for ACL)
+ 
+### 🚀 **Fast[V]** - The Performance Champion
+- **40% faster per-level** when memory constraints allow
+- Best choice for lookup-intensive applications (use it for FIB)
+- Consider memory cost vs benefit for IPv6 (6+ level traversals)
+
 ## Usage and Compilation
 
 Example: simple ACL
