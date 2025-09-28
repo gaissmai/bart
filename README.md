@@ -48,18 +48,59 @@ routing tables.
 **bart.Lite** is a special form of **bart.Table**, but without a payload, and therefore
 has the lowest memory overhead while maintaining the same lookup times.
 
+## Getting Started
+
+### Example: simple ACL with bart.Lite
+
+```go
+package main
+
+import (
+  "net/netip"
+
+  "github.com/gaissmai/bart"
+)
+
+var a = netip.MustParseAddr
+var p = netip.MustParsePrefix
+
+func main() {
+  // Simple ACL with bart.Lite
+  allowList := new(bart.Lite)
+
+  // Add allowed networks
+  allowList.Insert(p("192.168.0.0/16"))
+  allowList.Insert(p("2001:db8::/32"))
+
+  // Test some IPs
+  testIPs := []netip.Addr{
+    a("192.168.1.100"), // allowed
+    a("2001:db8::1"),   // allowed
+    a("172.16.0.1"),    // denied
+  }
+
+  for _, ip := range testIPs {
+    if allowList.Contains(ip) {
+      // ALLOWED
+    } else {
+      // DENIED
+    }
+  }
+}
+```
+
 ## Comparison
  
  | Aspect | Table | Lite | Fast |
  |--------|-------------|-------------|-------------|
- | **Per-level Speed** | ⚡ **O(1)** | ⚡ **O(1)** | 🚀 **O(1), ~40% faster per level** |
+ | **Per-level Speed** | ⚡ **O(1)** | ⚡ **O(1)** | 🚀 **O(1), 50-100% faster** |
  | **Overall Lookup** | O(trie_depth) | O(trie_depth) | O(trie_depth) |
  | **IPv4 Performance** | ~3 level traversals | ~3 level traversals | ~3 level traversals |
  | **IPv6 Performance** | ~6 level traversals | ~6 level traversals | ~6 level traversals |
  | **IPv6 vs IPv4** | ~2× slower | ~2× slower | ~2× slower |
  | **Memory** | efficient | very efficient | inefficient |
 
-A more detailed description can be found [here](#NODETYPES.md).
+A more detailed description can be found in [NODETYPES.md](NODETYPES.md).
 
 ## When to Use Each Type
 
@@ -74,47 +115,8 @@ A more detailed description can be found [here](#NODETYPES.md).
 - Ideal for IPv4/IPv6 allowlists and set-based operations (use it for ACL)
  
 ### 🚀 **bart.Fast[V]** - The Performance Champion
-- **40% faster per-level** when memory constraints allow
+- **50-100% faster** when memory constraints allow
 - Best choice for lookup-intensive applications (use it for FIB)
-
-## Usage and Compilation
-
-Example: simple ACL with bart.Lite
-
-```go
-package main
-
-import (
-  "net/netip"
-
-  "github.com/gaissmai/bart"
-)
-
-func main() {
-  // Simple ACL with bart.Lite
-  allowlist := new(bart.Lite)
-
-  // Add allowed networks
-  allowlist.Insert(netip.MustParsePrefix("192.168.0.0/16"))
-  allowlist.Insert(netip.MustParsePrefix("2001:db8::/32"))
-
-  // Test some IPs
-  testIPs := []netip.Addr{
-    netip.MustParseAddr("192.168.1.100"), // allowed
-    netip.MustParseAddr("2001:db8::1"),   // allowed
-    netip.MustParseAddr("172.16.0.1"),    // denied
-  }
-
-  for _, ip := range testIPs {
-    if allowlist.Contains(ip) {
-      // ALLOWED
-    } else {
-      // DENIED
-    }
-  }
-}
-```
-
 
 ## Bitset Efficiency
 
@@ -183,7 +185,7 @@ has no payload.
 import "github.com/gaissmai/bart"
 
 type Table[V any] struct {
-	// Has unexported fields.
+  // Has unexported fields.
 }
 
 func (t *Table[V]) Contains(netip.Addr) bool
@@ -242,29 +244,29 @@ func (t *Table[V]) DumpList6() []DumpListNode[V]
 
 Please see the extensive [benchmarks](https://github.com/gaissmai/iprbench) comparing `bart` with other IP routing table implementations.
 
-Just a teaser, `Contains` and `Lookup` against the Tier1 full Internet routing table with
-random IP address probes:
+Just a teaser, `Fast.Contains` and `Fast.Lookup` against the Tier1 full
+Internet routing table with random IP address probes:
 
-```
-$ GOAMD64=v3 go test -run=xxx -bench=FullM/Contains -cpu=1
+```text
+$ GOAMD64=v3 go test -run=xxx -bench=FastFullM/Contains$ -cpu=1
 goos: linux
 goarch: amd64
 pkg: github.com/gaissmai/bart
 cpu: Intel(R) Core(TM) i5-8250U CPU @ 1.60GHz
-BenchmarkFullMatch4/Contains        82013714	        13.59 ns/op
-BenchmarkFullMatch6/Contains        64516006	        18.66 ns/op
-BenchmarkFullMiss4/Contains         75341578	        15.94 ns/op
-BenchmarkFullMiss6/Contains         148116180	         8.122 ns/op
+BenchmarkFastFullMatch4/Contains         197461012         6.10 ns/op
+BenchmarkFastFullMatch6/Contains         147105548         8.15 ns/op
+BenchmarkFastFullMiss4/Contains          145924266         8.20 ns/op
+BenchmarkFastFullMiss6/Contains          180898081         6.61 ns/op
 
-$ GOAMD64=v3 go test -run=xxx -bench=FullM/Lookup -skip=/x -cpu=1
+$ GOAMD64=v3 go test -run=xxx -bench=FastFullM/Lookup$ -cpu=1
 goos: linux
 goarch: amd64
 pkg: github.com/gaissmai/bart
 cpu: Intel(R) Core(TM) i5-8250U CPU @ 1.60GHz
-BenchmarkFullMatch4/Lookup         	54616323	        22.02 ns/op
-BenchmarkFullMatch6/Lookup         	30073657	        39.98 ns/op
-BenchmarkFullMiss4/Lookup          	55132899	        21.90 ns/op
-BenchmarkFullMiss6/Lookup          	100000000	        11.12 ns/op
+BenchmarkFastFullMatch4/Lookup           100000000        10.48 ns/op
+BenchmarkFastFullMatch6/Lookup           93258969         12.91 ns/op
+BenchmarkFastFullMiss4/Lookup            121576359         9.87 ns/op
+BenchmarkFastFullMiss6/Lookup            152891322         7.86 ns/op
 ```
 
 ## Compatibility Guarantees
