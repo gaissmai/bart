@@ -215,11 +215,22 @@ func (t *_TABLE_TYPE[V]) DeletePersist(pfx netip.Prefix) (pt *_TABLE_TYPE[V], va
 		return t, val, false
 	}
 
+	// Avoid cloning for DeletePersist no-ops
+	// make a cheap test in front of expensive operation
+	if _, exists := t.Get(pfx); !exists {
+		return t, val, false
+	}
+
 	// canonicalize prefix
 	pfx = pfx.Masked()
-
-	// Extract address, IP version, and prefix length.
 	is4 := pfx.Addr().Is4()
+
+	// Preflight check: avoid cloning if prefix doesn't exist
+	node := t.rootNodeByVersion(is4)
+	val, found = node.get(pfx)
+	if !found {
+		return t, val, false
+	}
 
 	// share size counters; root nodes cloned selectively.
 	pt = &_TABLE_TYPE[V]{
@@ -372,9 +383,7 @@ func (t *_TABLE_TYPE[V]) ModifyPersist(pfx netip.Prefix, cb func(_ V, ok bool) (
 		return t, zero, false
 	}
 
-	// canonicalize prefix
-	pfx = pfx.Masked()
-
+	// make a cheap test in front of expensive operation
 	oldVal, ok := t.Get(pfx)
 	val := oldVal
 
@@ -391,13 +400,13 @@ func (t *_TABLE_TYPE[V]) ModifyPersist(pfx netip.Prefix, cb func(_ V, ok bool) (
 		return t, zero, false
 
 	case !ok && !del: // insert
-		return t.InsertPersist(pfx, newVal), newVal, false
+		return t.InsertPersist(pfx.Masked(), newVal), newVal, false
 
 	case ok && !del: // update
-		return t.InsertPersist(pfx, newVal), oldVal, false
+		return t.InsertPersist(pfx.Masked(), newVal), oldVal, false
 
 	case ok && del: // delete
-		pt, _, _ := t.DeletePersist(pfx)
+		pt, _, _ := t.DeletePersist(pfx.Masked())
 		return pt, oldVal, true
 	}
 
