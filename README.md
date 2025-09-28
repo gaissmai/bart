@@ -59,7 +59,7 @@ has the lowest memory overhead while maintaining the same lookup times.
  | **IPv6 vs IPv4** | ~2× slower | ~2× slower | ~2× slower |
  | **Memory** | efficient | very efficient | inefficient |
 
-A more detailed description can be found [here](NODETYPES.md).
+A more detailed description can be found in [NODETYPES.md](NODETYPES.md).
 
 ## When to Use Each Type
 
@@ -90,19 +90,22 @@ import (
   "github.com/gaissmai/bart"
 )
 
+var p = netip.MustParsePrefix
+var a = netip.MustParseAddr
+
 func main() {
   // Simple ACL with bart.Lite
   allowlist := new(bart.Lite)
 
   // Add allowed networks
-  allowlist.Insert(netip.MustParsePrefix("192.168.0.0/16"))
-  allowlist.Insert(netip.MustParsePrefix("2001:db8::/32"))
+  allowlist.Insert(p("192.168.0.0/16"))
+  allowlist.Insert(p("2001:db8::/32"))
 
   // Test some IPs
   testIPs := []netip.Addr{
-    netip.MustParseAddr("192.168.1.100"), // allowed
-    netip.MustParseAddr("2001:db8::1"),   // allowed
-    netip.MustParseAddr("172.16.0.1"),    // denied
+    a("192.168.1.100"), // allowed
+    a("2001:db8::1"),   // allowed
+    a("172.16.0.1"),    // denied
   }
 
   for _, ip := range testIPs {
