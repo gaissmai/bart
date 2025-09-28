@@ -157,7 +157,8 @@ func (n *bartNode[V]) cloneRec(cloneFn cloneFunc[V]) *bartNode[V] {
 }
 
 // cloneFlat returns a shallow copy of the current fastNode[V],
-// Its semantics are identical to [bartNode.cloneFlat].
+// Its semantics are identical to [bartNode.cloneFlat] but the
+// implementation is more complex.
 func (n *fastNode[V]) cloneFlat(cloneFn cloneFunc[V]) *fastNode[V] {
 	if n == nil {
 		return nil
@@ -168,13 +169,11 @@ func (n *fastNode[V]) cloneFlat(cloneFn cloneFunc[V]) *fastNode[V] {
 		return c
 	}
 
-	// copy the bitsets
-	c.prefixes.BitSet256 = n.prefixes.BitSet256
-	c.children.BitSet256 = n.children.BitSet256
-
-	// copy the counters
+	// Copy counters and bitsets (by value).
 	c.pfxCount = n.pfxCount
 	c.cldCount = n.cldCount
+	c.prefixes.BitSet256 = n.prefixes.BitSet256
+	c.children.BitSet256 = n.children.BitSet256
 
 	// it's a clone of the prefixes ...
 	// but the allot algorithm makes it more difficult
@@ -182,6 +181,9 @@ func (n *fastNode[V]) cloneFlat(cloneFn cloneFunc[V]) *fastNode[V] {
 	buf := new([256]uint8)
 	for _, idx := range n.getIndices(buf) {
 		origValPtr := n.prefixes.items[idx]
+		if origValPtr == nil {
+			panic("logic error, bit is set but val pointer is nil")
+		}
 		newValPtr := new(V)
 
 		if cloneFn == nil {
@@ -190,7 +192,7 @@ func (n *fastNode[V]) cloneFlat(cloneFn cloneFunc[V]) *fastNode[V] {
 			*newValPtr = cloneFn(*origValPtr) // clone the value
 		}
 
-		oldValPtr := c.prefixes.items[idx]
+		oldValPtr := c.prefixes.items[idx] // likely nil initially
 		c.allot(idx, oldValPtr, newValPtr)
 	}
 
@@ -201,7 +203,7 @@ func (n *fastNode[V]) cloneFlat(cloneFn cloneFunc[V]) *fastNode[V] {
 		switch kid := kidAny.(type) {
 		case *fastNode[V]:
 			// just copy the pointer
-			c.children.items[addr] = n.children.items[addr]
+			c.children.items[addr] = &kidAny
 
 		case *leafNode[V]:
 			leafAny := any(kid.cloneLeaf(cloneFn))
