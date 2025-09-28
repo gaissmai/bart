@@ -9,29 +9,58 @@
 
 # package bart
 
-The bart package provides a **Balanced Routing Table (BART)** for extremely
-fast IP-to-CIDR lookups and related tasks such as:
+The bart package provides some **Balanced Routing Tables (BART)** for
+fastest IP-to-CIDR lookups and related tasks such as:
 
-- **ACL** fast checks, quickly determine whether an IP address matches any of millions of CIDR rules.
-- **RIB** efficient storage, handle very large routing tables with low memory overhead, while keeping lookups fast.
+- **ACL** determine extremely fast whether an IP address matches any of millions of CIDR rules.
+- **RIB** handle very large routing tables with low memory overhead, while keeping lookups fast.
 - **FIB** high-speed lookups, achieve LPM in constant-time for packet forwarding in the datapath.
 
-BART is designed for workloads where both speed and memory efficiency matter,
-making it a good fit for firewalls, routers, or any system that needs large-scale
+BART is designed for workloads where both speed and/or memory efficiency matter,
+making it a best fit for firewalls, routers, or any system that needs large-scale
 IP prefix matching.
 
 ## Overview
 
-BART is balanced in terms of both memory usage and lookup time for longest-prefix matches.
-It is implemented as a multibit trie with a fixed stride of 8 bits, using a fast mapping
-function derived from Donald E. Knuth’s **Allotment Routing Table** (ART) algorithm, to map
-the possible prefixes at each level into a complete binary tree.
+BART is implemented as a multibit trie with a fixed stride of 8 bits,
+using a fast mapping function derived from Donald E. Knuth’s
+**Allotment Routing Table** (ART) algorithm, to map the possible prefixes
+at each level into a complete binary tree.
 
-This binary tree is represented with popcount‑compressed sparse arrays for **level compression**.
-Combined with a **novel path compression**, this design reduces memory consumption by nearly
-two [orders of magnitude](https://github.com/gaissmai/iprbench) compared to ART,
-while delivering even faster lookup times for prefix searches (see linked benchmarks).
+BART implements three different internal node types, each optimized for specific
+use cases:
+- **liteNode
+- **bartNode
+- **fastNode
 
+For **bartNode** this binary tree is represented with popcount‑compressed
+sparse arrays for **level compression**.
+Combined with a **novel path and fringe compression**, this design reduces
+memory consumption by nearly
+[two orders of magnitude](https://github.com/gaissmai/iprbench)
+compared to classical ART.
+
+For **fastNode** this binary tree is represented with fixed arrays
+without level compression (classical ART), but combined with the same
+novel **path and fringe compression** from BART, this design
+[reduces memory consumption](https://github.com/gaissmai/iprbench) by more
+than an order of magnitude compared to classical ART and thus makes ART
+usable in the first place for large routing tables.
+
+**liteNode** is a special form of bartNode, but without a payload, and therefore
+has the lowest memory overhead while maintaining the same lookup times as bart.
+
+## Comparison
+ 
+ | Aspect | bartNode[V] | liteNode | fastNode[V] |
+ |--------|-------------|-------------|-------------|
+ | **Per-level Speed** | ⚡ **O(1)** | ⚡ **O(1)** | 🚀 **O(1), ~40% faster per level** |
+ | **Overall Lookup** | O(trie_depth) | O(trie_depth) | O(trie_depth) |
+ | **IPv4 Performance** | ~3 level traversals | ~3 level traversals | ~3 level traversals |
+ | **IPv6 Performance** | ~6 level traversals | ~6 level traversals | ~6 level traversals |
+ | **IPv6 vs IPv4** | ~2× slower | ~2× slower | ~2× slower |
+ | **Memory** | efficient | neutral | inefficient |
+ 
 ## Usage and Compilation
 
 Example: simple ACL
@@ -83,7 +112,6 @@ See the [Go minimum requirements](https://go.dev/wiki/MinimumRequirements#archit
 GOAMD64=v3 go build
 ```
 
-
 ## Bitset Efficiency
 
 Due to the novel path compression, BART always operates on a fixed internal 256-bit length.
@@ -118,14 +146,15 @@ But as always, it depends on the specific use case.
 See the concurrent tests for concrete examples of this pattern:
 - [ExampleLite](example_lite_concurrent_test.go)
 - [ExampleTable](example_table_concurrent_test.go)
+- [ExampleFast](example_fast_concurrent_test.go)
 
 
 ## Additional Use Cases
 
 Beyond high-performance prefix matching, BART also excels at detecting overlaps
 between two routing tables.
-In internal benchmarks `BenchmarkTableOverlaps` the check runs in a few nanoseconds
-per query with zero heap allocations on a modern CPU.
+In internal benchmarks the check runs in a few nanoseconds per query with zero
+heap allocations on a modern CPU.
 
 ## API
 
