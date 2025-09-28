@@ -27,7 +27,7 @@ func (v *testVal) Clone() *testVal {
 
 // #######################################
 
-// ExampleTable_concurrent demonstrates safe concurrent usage of bart.
+// ExampleTable_concurrent demonstrates safe concurrent usage of bart.Table.
 // This example is intended to be run with the Go race detector enabled
 // (use `go test -race -run=ExampleTable_concurrent`)
 // to verify that concurrent access is safe and free of data races.
