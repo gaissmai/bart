@@ -376,14 +376,15 @@ func (t *_TABLE_TYPE[V]) ModifyPersist(pfx netip.Prefix, cb func(_ V, ok bool) (
 	pfx = pfx.Masked()
 
 	oldVal, ok := t.Get(pfx)
+	val := oldVal
 
 	// to clone or not to clone ...
 	cloneFn := cloneFnFactory[V]()
 	if cloneFn != nil && ok {
-		oldVal = cloneFn(oldVal)
+		val = cloneFn(oldVal)
 	}
 
-	newVal, del := cb(oldVal, ok)
+	newVal, del := cb(val, ok)
 
 	switch {
 	case !ok && del: // no-op
