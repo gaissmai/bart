@@ -310,8 +310,7 @@ func (t *Table[V]) Modify(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, del bool
 
 // ModifyPersist is similar to Modify but the receiver isn't modified.
 func (t *Table[V]) ModifyPersist(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, del bool)) (pt *Table[V], _ V, deleted bool) {
-	var zero V // zero value of V for default initialization
-
+	var zero V
 	if !pfx.IsValid() {
 		return t, zero, false
 	}
@@ -319,37 +318,32 @@ func (t *Table[V]) ModifyPersist(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, d
 	// canonicalize prefix
 	pfx = pfx.Masked()
 
-	// Extract address, version info and prefix length.
-	ip := pfx.Addr()
-	is4 := ip.Is4()
+	oldVal, ok := t.Get(pfx)
 
-	// share size counters; root nodes cloned selectively.
-	pt = &Table[V]{
-		size4: t.size4,
-		size6: t.size6,
-	}
-
-	// Create a cloning function for deep copying values;
-	// returns nil if V does not implement the Cloner interface.
+	// to clone or not to clone ...
 	cloneFn := cloneFnFactory[V]()
-
-	// Clone root node corresponding to the IP version, for copy-on-write.
-	n := &pt.root4
-
-	if is4 {
-		pt.root4 = *t.root4.cloneFlat(cloneFn)
-		pt.root6 = t.root6
-	} else {
-		pt.root4 = t.root4
-		pt.root6 = *t.root6.cloneFlat(cloneFn)
-
-		n = &pt.root6
+	if cloneFn != nil && ok {
+		oldVal = cloneFn(oldVal)
 	}
 
-	delta, val, deleted := n.modifyPersist(cloneFn, pfx, cb)
-	pt.sizeUpdate(is4, delta)
+	newVal, del := cb(oldVal, ok)
 
-	return pt, val, deleted
+	switch {
+	case !ok && del: // no-op
+		return t, zero, false
+
+	case !ok && !del: // insert
+		return t.InsertPersist(pfx, newVal), newVal, false
+
+	case ok && !del: // update
+		return t.InsertPersist(pfx, newVal), oldVal, false
+
+	case ok && del: // delete
+		pt, _, _ := t.DeletePersist(pfx)
+		return pt, oldVal, true
+	}
+
+	panic("unreachable")
 }
 
 // Supernets returns an iterator over all supernet routes that cover the given prefix pfx.
