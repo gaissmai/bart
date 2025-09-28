@@ -12,18 +12,15 @@ import (
 
 // Fast follows the original ART design by Knuth in using fixed
 // 256-slot arrays at each level.
-// In contrast to the original, this variant introduces a new form of path
-// compression. This keeps memory usage within a reasonable range while
-// preserving the high lookup speed of the pure array-based ART algorithm.
 //
-// Both [bart.Fast] and [bart.Table] use the same path compression, but they
-// differ in how levels are represented:
+// Both [bart.Fast] and [bart.Table] use the same novel path and fringe
+// compression, but they differ in how levels are represented:
 //
-//   - [bart.Fast]:   uncompressed  fixed level arrays + path compression
+//   - [bart.Fast]:  uncompressed  fixed level arrays + path compression
 //   - [bart.Table]: popcount-compressed level arrays + path compression
 //
 // As a result:
-//   - [bart.Fast] sacrifices memory efficiency to achieve 50-100% higher speed
+//   - [bart.Fast]  sacrifices memory efficiency to achieve 50-100% higher speed
 //   - [bart.Table] minimizes memory consumption as much as possible
 //
 // Which variant is preferable depends on the use case: [bart.Fast] is most
