@@ -29,9 +29,9 @@ at each level into a complete binary tree.
 
 BART implements three different internal node types, each optimized for specific
 use cases:
-- **liteNode
-- **bartNode
-- **fastNode
+- **liteNode**
+- **bartNode**
+- **fastNode**
 
 For **bartNode** this binary tree is represented with popcount‑compressed
 sparse arrays for **level compression**.
@@ -59,7 +59,7 @@ has the lowest memory overhead while maintaining the same lookup times as bart.
  | **IPv4 Performance** | ~3 level traversals | ~3 level traversals | ~3 level traversals |
  | **IPv6 Performance** | ~6 level traversals | ~6 level traversals | ~6 level traversals |
  | **IPv6 vs IPv4** | ~2× slower | ~2× slower | ~2× slower |
- | **Memory** | efficient | neutral | inefficient |
+ | **Memory** | neutral | efficient | inefficient |
  
 ## Usage and Compilation
 
