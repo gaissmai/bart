@@ -10,7 +10,7 @@ import (
 	"github.com/gaissmai/bart"
 )
 
-// If the payload V either contains a pointer or is a pointer,
+// If the payload V either contains or is a pointer,
 // it must implement the [bart.Cloner] interface.
 var _ bart.Cloner[*testVal] = (*testVal)(nil)
 
@@ -27,7 +27,7 @@ var _ bart.Cloner[*testVal] = (*testVal)(nil)
 // or take a long time in comparison to reads,
 // providing high performance for concurrent workloads.
 //
-// If the payload V either contains a pointer or is a pointer,
+// If the payload V either contains or is a pointer,
 // it must implement the [bart.Cloner] interface.
 func ExampleFast_concurrent() {
 	var tblAtomicPtr atomic.Pointer[bart.Fast[*testVal]]

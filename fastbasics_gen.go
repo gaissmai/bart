@@ -356,7 +356,7 @@ func (n *fastNode[V]) delete(pfx netip.Prefix) (val V, exists bool) {
 }
 
 // deletePersist is similar to delete but the receiver isn't modified.
-// All nodes touched during insert are cloned.
+// All nodes touched during delete are cloned.
 func (n *fastNode[V]) deletePersist(cloneFn cloneFunc[V], pfx netip.Prefix) (val V, exists bool) {
 	ip := pfx.Addr() // the pfx must be in canonical form
 	is4 := ip.Is4()
