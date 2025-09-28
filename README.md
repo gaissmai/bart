@@ -29,23 +29,23 @@ at each level into a complete binary tree.
 
 BART implements three different routing tables, each optimized for specific
 use cases:
-- **Lite**
-- **Table**
-- **Fast**
+- **bart.Lite**
+- **bart.Table**
+- **bart.Fast**
 
-For **Table** this binary tree is represented with popcount‑compressed
+For **bart.Table** this binary tree is represented with popcount‑compressed
 sparse arrays for **level compression**.
 Combined with a **novel path and fringe compression**, this design reduces
 memory consumption by nearly two orders of magnitude compared to classical ART.
 
-For **Fast** this binary tree is represented with fixed arrays
+For **bart.Fast** this binary tree is represented with fixed arrays
 without level compression (classical ART), but combined with the same
-novel **path and fringe compression** from BART, this design
+novel **path and fringe compression** from BART. This design
 reduces memory consumption by more than an order of magnitude compared
 to classical ART and thus makes ART usable in the first place for large
 routing tables.
 
-**Lite** is a special form of **Table**, but without a payload, and therefore
+**bart.Lite** is a special form of **bart.Table**, but without a payload, and therefore
 has the lowest memory overhead while maintaining the same lookup times.
 
 ## Comparison
@@ -61,24 +61,23 @@ has the lowest memory overhead while maintaining the same lookup times.
 
 ## When to Use Each Type
 
-### 🎯 **Table[V]** - The Balanced Choice                                                                        
+### 🎯 **bart.Table[V]** - The Balanced Choice                                                                        
 - **Recommended** for most routing table use cases
 - Near-optimal per-level performance with excellent memory efficiency
 - Perfect balance for both IPv4 and IPv6 routing tables (use it for RIB)
  
-### 🪶 **Lite** - The Minimalist
+### 🪶 **bart.Lite** - The Minimalist
 - **Specialized** for prefix-only operations, no payload
-- Same per-level performance as *Table[V]* but 35% less memory
+- Same per-level performance as *bart.Table[V]* but 35% less memory
 - Ideal for IPv4/IPv6 allowlists and set-based operations (use it for ACL)
  
-### 🚀 **Fast[V]** - The Performance Champion
+### 🚀 **bart.Fast[V]** - The Performance Champion
 - **40% faster per-level** when memory constraints allow
 - Best choice for lookup-intensive applications (use it for FIB)
-- Consider memory cost vs benefit for IPv6 (6+ level traversals)
 
 ## Usage and Compilation
 
-Example: simple ACL
+Example: simple ACL with bart.Lite
 
 ```go
 package main
@@ -114,6 +113,9 @@ func main() {
 }
 ```
 
+
+## Bitset Efficiency
+
 The BART algorithm is based on fixed-size bit vectors and precomputed lookup tables.
 Lookups are executed entirely with fast, cache-resident bitmask operations, which
 modern CPUs accelerate using specialized instructions such as POPCNT, LZCNT, and TZCNT.
@@ -126,11 +128,7 @@ See the [Go minimum requirements](https://go.dev/wiki/MinimumRequirements#archit
 # Example for AMD64, choose v2/v3/v4 to match your CPU features.
 GOAMD64=v3 go build
 ```
-
-## Bitset Efficiency
-
-Due to the novel path compression, BART always operates on a fixed internal 256-bit length.
-Critical loops over these bitsets can be unrolled for additional speed,
+Critical loops over these fixed-size bitsets can be unrolled for additional speed,
 ensuring predictable memory access and efficient use of CPU pipelines.
 
 ```go
@@ -142,7 +140,6 @@ func (b *BitSet256) popcnt() (cnt int) {
   return
 }
 ```
-
 Future Go versions with SIMD intrinsics for `uint64` vectors may unlock
 additional speedups on compatible hardware.
 
