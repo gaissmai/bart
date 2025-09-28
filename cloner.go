@@ -181,9 +181,6 @@ func (n *fastNode[V]) cloneFlat(cloneFn cloneFunc[V]) *fastNode[V] {
 	buf := new([256]uint8)
 	for _, idx := range n.getIndices(buf) {
 		origValPtr := n.prefixes.items[idx]
-		if origValPtr == nil {
-			panic("logic error, bit is set but val pointer is nil")
-		}
 		newValPtr := new(V)
 
 		if cloneFn == nil {
@@ -202,7 +199,7 @@ func (n *fastNode[V]) cloneFlat(cloneFn cloneFunc[V]) *fastNode[V] {
 
 		switch kid := kidAny.(type) {
 		case *fastNode[V]:
-			// just copy the pointer
+			// link with new *any pointer
 			c.children.items[addr] = &kidAny
 
 		case *leafNode[V]:
