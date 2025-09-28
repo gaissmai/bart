@@ -10,10 +10,11 @@ import (
 	"github.com/gaissmai/bart"
 )
 
-// ExampleLite_concurrent demonstrates safe concurrent usage of bart.Lite.
-//
+// #######################################
+
+// ExampleFast_concurrent demonstrates safe concurrent usage of bart.Fast.
 // This example is intended to be run with the Go race detector enabled
-// (use `go test -race -run=ExampleLite_concurrent`)
+// (use `go test -race -run=ExampleFast_concurrent`)
 // to verify that concurrent access is safe and free of data races.
 //
 // This example demonstrates how multiple goroutines perform lock-free, concurrent reads
@@ -21,20 +22,24 @@ import (
 // This concurrency pattern is useful when reads are frequent and writes are rare
 // or take a long time in comparison to reads,
 // providing high performance for concurrent workloads.
-func ExampleLite_concurrent() {
-	var liteAtomicPtr atomic.Pointer[bart.Lite]
-	var liteMutex sync.Mutex
+//
+// If the payload V either contains a pointer or is a pointer,
+// it must implement the [bart.Cloner] interface.
+func ExampleFast_concurrent() {
+	var tblAtomicPtr atomic.Pointer[bart.Fast[*testVal]]
+	var tblMutex sync.Mutex
 
-	baseTbl := new(bart.Lite)
-	liteAtomicPtr.Store(baseTbl)
+	baseTbl := new(bart.Fast[*testVal])
+	tblAtomicPtr.Store(baseTbl)
 
 	wg := sync.WaitGroup{}
+
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for range 10_000 {
+		for range 100_000 {
 			for _, ip := range exampleIPs {
-				_ = liteAtomicPtr.Load().Contains(ip)
+				_, _ = tblAtomicPtr.Load().Lookup(ip)
 			}
 		}
 	}()
@@ -42,34 +47,34 @@ func ExampleLite_concurrent() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for range 1000 {
-			liteMutex.Lock()
-			tbl := liteAtomicPtr.Load()
+		for range 1_000 {
+			tblMutex.Lock()
+			tbl := tblAtomicPtr.Load()
 
 			// batch of inserts
 			for _, pfx := range examplePrefixes {
-				tbl = tbl.InsertPersist(pfx)
+				tbl = tbl.InsertPersist(pfx, &testVal{data: 0})
 			}
 
-			liteAtomicPtr.Store(tbl)
-			liteMutex.Unlock()
+			tblAtomicPtr.Store(tbl)
+			tblMutex.Unlock()
 		}
 	}()
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for range 1000 {
-			liteMutex.Lock()
-			tbl := liteAtomicPtr.Load()
+		for range 1_000 {
+			tblMutex.Lock()
+			tbl := tblAtomicPtr.Load()
 
 			// batch of deletes
 			for _, pfx := range examplePrefixes {
-				tbl, _ = tbl.DeletePersist(pfx)
+				tbl, _, _ = tbl.DeletePersist(pfx)
 			}
 
-			liteAtomicPtr.Store(tbl)
-			liteMutex.Unlock()
+			tblAtomicPtr.Store(tbl)
+			tblMutex.Unlock()
 		}
 	}()
 
