@@ -11,7 +11,7 @@ func TestLiteModifySemantics(t *testing.T) {
 
 	type args struct {
 		pfx netip.Prefix
-		cb  func(val struct{}, found bool) (struct{}, bool)
+		cb  func(exists bool) (del bool)
 	}
 
 	type want struct {
@@ -31,11 +31,11 @@ func TestLiteModifySemantics(t *testing.T) {
 			prepare: []string{"10.0.0.0/8"},
 			args: args{
 				pfx: mpp("192.168.1.0/24"),
-				cb: func(val struct{}, found bool) (struct{}, bool) {
+				cb: func(found bool) (del bool) {
 					if found {
 						t.Error("should not be found for new prefix")
 					}
-					return struct{}{}, false // insert
+					return false // insert
 				},
 			},
 			want:     want{deleted: false, present: true},
@@ -47,11 +47,11 @@ func TestLiteModifySemantics(t *testing.T) {
 			prepare: []string{"2001:db8::/32"},
 			args: args{
 				pfx: mpp("fe80::/64"),
-				cb: func(val struct{}, found bool) (struct{}, bool) {
+				cb: func(found bool) (del bool) {
 					if found {
 						t.Error("should not be found for new prefix")
 					}
-					return struct{}{}, false // insert
+					return false // insert
 				},
 			},
 			want:     want{deleted: false, present: true},
@@ -63,11 +63,11 @@ func TestLiteModifySemantics(t *testing.T) {
 			prepare: []string{"192.168.1.0/24", "10.0.0.0/8"},
 			args: args{
 				pfx: mpp("192.168.1.0/24"),
-				cb: func(val struct{}, found bool) (struct{}, bool) {
+				cb: func(found bool) (del bool) {
 					if !found {
 						t.Error("should be found for existing prefix")
 					}
-					return struct{}{}, true // delete
+					return true // delete
 				},
 			},
 			want:     want{deleted: true, present: false},
@@ -79,11 +79,11 @@ func TestLiteModifySemantics(t *testing.T) {
 			prepare: []string{"2001:db8::/32", "fe80::/64"},
 			args: args{
 				pfx: mpp("2001:db8::/32"),
-				cb: func(val struct{}, found bool) (struct{}, bool) {
+				cb: func(found bool) (del bool) {
 					if !found {
 						t.Error("should be found for existing prefix")
 					}
-					return struct{}{}, true // delete
+					return true // delete
 				},
 			},
 			want:     want{deleted: true, present: false},
@@ -95,11 +95,11 @@ func TestLiteModifySemantics(t *testing.T) {
 			prepare: []string{"192.168.1.0/24"},
 			args: args{
 				pfx: mpp("192.168.1.0/24"),
-				cb: func(val struct{}, found bool) (struct{}, bool) {
+				cb: func(found bool) (del bool) {
 					if !found {
 						t.Error("should be found")
 					}
-					return struct{}{}, false // keep existing
+					return false // keep existing
 				},
 			},
 			want:     want{deleted: false, present: true},
@@ -111,11 +111,11 @@ func TestLiteModifySemantics(t *testing.T) {
 			prepare: []string{"10.0.0.0/8"},
 			args: args{
 				pfx: mpp("172.16.0.0/12"),
-				cb: func(val struct{}, found bool) (struct{}, bool) {
+				cb: func(found bool) (del bool) {
 					if found {
 						t.Error("should not be found")
 					}
-					return struct{}{}, true // no insert (del=true for no-op)
+					return true // no insert (del=true for no-op)
 				},
 			},
 			want:     want{deleted: false, present: false},
@@ -127,11 +127,11 @@ func TestLiteModifySemantics(t *testing.T) {
 			prepare: []string{"10.0.0.0/8"},
 			args: args{
 				pfx: mpp("172.16.0.0/12"),
-				cb: func(val struct{}, found bool) (struct{}, bool) {
+				cb: func(found bool) (del bool) {
 					if found {
 						t.Error("should not be found")
 					}
-					return struct{}{}, true // attempt delete (no-op)
+					return true // attempt delete (no-op)
 				},
 			},
 			want:     want{deleted: false, present: false},
@@ -144,8 +144,8 @@ func TestLiteModifySemantics(t *testing.T) {
 			prepare: []string{},
 			args: args{
 				pfx: mpp("0.0.0.0/0"),
-				cb: func(val struct{}, found bool) (struct{}, bool) {
-					return struct{}{}, false // insert
+				cb: func(found bool) (del bool) {
+					return false // insert
 				},
 			},
 			want:     want{deleted: false, present: true},
@@ -157,8 +157,8 @@ func TestLiteModifySemantics(t *testing.T) {
 			prepare: []string{},
 			args: args{
 				pfx: mpp("::/0"),
-				cb: func(val struct{}, found bool) (struct{}, bool) {
-					return struct{}{}, false // insert
+				cb: func(found bool) (del bool) {
+					return false // insert
 				},
 			},
 			want:     want{deleted: false, present: true},
@@ -170,8 +170,8 @@ func TestLiteModifySemantics(t *testing.T) {
 			prepare: []string{},
 			args: args{
 				pfx: mpp("192.168.1.1/32"),
-				cb: func(val struct{}, found bool) (struct{}, bool) {
-					return struct{}{}, false // insert
+				cb: func(found bool) (del bool) {
+					return false // insert
 				},
 			},
 			want:     want{deleted: false, present: true},
@@ -183,8 +183,8 @@ func TestLiteModifySemantics(t *testing.T) {
 			prepare: []string{},
 			args: args{
 				pfx: mpp("2001:db8::1/128"),
-				cb: func(val struct{}, found bool) (struct{}, bool) {
-					return struct{}{}, false // insert
+				cb: func(found bool) (del bool) {
+					return false // insert
 				},
 			},
 			want:     want{deleted: false, present: true},
@@ -201,13 +201,13 @@ func TestLiteModifySemantics(t *testing.T) {
 			// Setup: Insert initial prefixes using Modify
 			for _, pfxStr := range tt.prepare {
 				pfx := mpp(pfxStr)
-				lite.Modify(pfx, func(_ struct{}, _ bool) (struct{}, bool) {
-					return struct{}{}, false // insert
+				lite.Modify(pfx, func(exists bool) (del bool) {
+					return false // insert
 				})
 			}
 
 			// Execute the test operation
-			_, deleted := lite.Modify(tt.args.pfx, tt.args.cb)
+			deleted := lite.Modify(tt.args.pfx, tt.args.cb)
 
 			// Verify return values
 			if deleted != tt.want.deleted {
@@ -252,9 +252,9 @@ func TestLiteModifyInvalidPrefix(t *testing.T) {
 	invalidPrefix := netip.Prefix{} // zero value is invalid
 	callbackInvoked := false
 
-	_, deleted := lite.Modify(invalidPrefix, func(val struct{}, found bool) (struct{}, bool) {
+	deleted := lite.Modify(invalidPrefix, func(found bool) bool {
 		callbackInvoked = true
-		return struct{}{}, false
+		return false
 	})
 
 	if callbackInvoked {
@@ -273,8 +273,8 @@ func TestLiteModifyEdgeCases(t *testing.T) {
 		t.Parallel()
 
 		lite := &Lite{}
-		lite.Modify(mpp("192.168.1.0/24"), func(_ struct{}, _ bool) (struct{}, bool) {
-			return struct{}{}, false
+		lite.Modify(mpp("192.168.1.0/24"), func(bool) bool {
+			return false
 		})
 
 		// Test that panicking callback doesn't corrupt the table
@@ -289,7 +289,7 @@ func TestLiteModifyEdgeCases(t *testing.T) {
 			}
 		}()
 
-		lite.Modify(mpp("192.168.1.0/24"), func(val struct{}, found bool) (struct{}, bool) {
+		lite.Modify(mpp("192.168.1.0/24"), func(bool) bool {
 			panic("intentional panic for testing")
 		})
 	})
@@ -307,17 +307,17 @@ func TestLiteModifyEdgeCases(t *testing.T) {
 		}
 
 		for _, pfxStr := range prefixes {
-			lite.Modify(mpp(pfxStr), func(_ struct{}, _ bool) (struct{}, bool) {
-				return struct{}{}, false // insert
+			lite.Modify(mpp(pfxStr), func(bool) bool {
+				return false // insert
 			})
 		}
 
 		// Delete the middle prefix
-		_, deleted := lite.Modify(mpp("192.168.1.0/24"), func(val struct{}, found bool) (struct{}, bool) {
+		deleted := lite.Modify(mpp("192.168.1.0/24"), func(found bool) bool {
 			if !found {
 				t.Error("expected to find middle prefix")
 			}
-			return struct{}{}, true // delete
+			return true // delete
 		})
 
 		if !deleted {
@@ -344,11 +344,11 @@ func TestLiteModifyEdgeCases(t *testing.T) {
 		lite := &Lite{}
 
 		// Try to delete from empty table
-		_, deleted := lite.Modify(mpp("10.0.0.0/8"), func(val struct{}, found bool) (struct{}, bool) {
+		deleted := lite.Modify(mpp("10.0.0.0/8"), func(found bool) bool {
 			if found {
 				t.Error("should not find anything in empty table")
 			}
-			return struct{}{}, true // attempt delete
+			return true // attempt delete
 		})
 
 		if deleted {
@@ -852,8 +852,8 @@ func TestLiteTableVsTableComparison(t *testing.T) {
 
 	// Test with Lite - no meaningful payload
 	lite := &Lite{}
-	lite.Modify(prefix, func(val struct{}, found bool) (struct{}, bool) {
-		return struct{}{}, false // insert (no meaningful value)
+	lite.Modify(prefix, func(found bool) bool {
+		return false // insert (no meaningful value)
 	})
 
 	if _, found := lite.Get(prefix); !found {
@@ -905,8 +905,8 @@ func FuzzLiteModifyComprehensive(f *testing.F) {
 		halfCount := len(prefixItems) / 2
 		for i := range halfCount {
 			item := prefixItems[i]
-			lite.Modify(item.pfx, func(_ struct{}, _ bool) (struct{}, bool) {
-				return struct{}{}, false // insert
+			lite.Modify(item.pfx, func(bool) bool {
+				return false // insert
 			})
 		}
 
@@ -919,7 +919,7 @@ func FuzzLiteModifyComprehensive(f *testing.F) {
 		var expectedDeleted bool
 
 		// Execute modify operation - skip update ops since Lite has no meaningful payload
-		_, deleted := lite.Modify(targetPrefix, func(val struct{}, found bool) (struct{}, bool) {
+		deleted := lite.Modify(targetPrefix, func(found bool) bool {
 			// Verify callback parameters
 			if found != initialFound {
 				t.Errorf("callback found=%v, but actual found=%v", found, initialFound)
@@ -932,26 +932,26 @@ func FuzzLiteModifyComprehensive(f *testing.F) {
 					expectedSize = initialSize + 1
 					expectedFound = true
 					expectedDeleted = false
-					return struct{}{}, false // insert
+					return false // insert
 				}
 				// Already exists, no change
 				expectedSize = initialSize
 				expectedFound = true
 				expectedDeleted = false
-				return struct{}{}, false // keep existing
+				return false // keep existing
 
 			case 1: // delete if found (mod 3 case 1)
 				if found {
 					expectedSize = initialSize - 1
 					expectedFound = false
 					expectedDeleted = true
-					return struct{}{}, true // delete
+					return true // delete
 				}
 				// Not found, no-op
 				expectedSize = initialSize
 				expectedFound = false
 				expectedDeleted = false
-				return struct{}{}, true // no-op with del=true
+				return true // no-op with del=true
 
 			case 2: // no-op always (mod 3 case 2)
 				expectedSize = initialSize
@@ -959,13 +959,13 @@ func FuzzLiteModifyComprehensive(f *testing.F) {
 				expectedDeleted = false
 
 				if found {
-					return struct{}{}, false // keep existing
+					return false // keep existing
 				} else {
-					return struct{}{}, true // no-op with del=true
+					return true // no-op with del=true
 				}
 			}
 
-			return struct{}{}, false
+			return false
 		})
 
 		// Verify results
