@@ -44,14 +44,15 @@ func ExampleLite_concurrent() {
 		defer wg.Done()
 		for range 1000 {
 			liteMutex.Lock()
-			tbl := liteAtomicPtr.Load()
+			cur := liteAtomicPtr.Load()
 
 			// batch of inserts
+			next := cur
 			for _, pfx := range examplePrefixes {
-				tbl = tbl.InsertPersist(pfx)
+				next = next.InsertPersist(pfx)
 			}
 
-			liteAtomicPtr.Store(tbl)
+			liteAtomicPtr.Store(next)
 			liteMutex.Unlock()
 		}
 	}()
@@ -61,14 +62,15 @@ func ExampleLite_concurrent() {
 		defer wg.Done()
 		for range 1000 {
 			liteMutex.Lock()
-			tbl := liteAtomicPtr.Load()
+			cur := liteAtomicPtr.Load()
 
 			// batch of deletes
+			next := cur
 			for _, pfx := range examplePrefixes {
-				tbl, _ = tbl.DeletePersist(pfx)
+				next, _ = next.DeletePersist(pfx)
 			}
 
-			liteAtomicPtr.Store(tbl)
+			liteAtomicPtr.Store(next)
 			liteMutex.Unlock()
 		}
 	}()
