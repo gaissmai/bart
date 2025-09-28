@@ -657,3 +657,82 @@ func (n *bartNode[V]) modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, 
 
 	panic("unreachable")
 }
+
+// equalRec compares two nodes recursively.
+// It checks equality of children/prefixes via bitsets, and recursively
+// descends into sub-nodes or compares leaf/fringe node values.
+func (n *bartNode[V]) equalRec(o *bartNode[V]) bool {
+	if n == nil || o == nil {
+		return n == o
+	}
+	if n == o {
+		return true
+	}
+
+	if n.prefixes.BitSet256 != o.prefixes.BitSet256 {
+		return false
+	}
+
+	if n.children.BitSet256 != o.children.BitSet256 {
+		return false
+	}
+
+	for idx, nVal := range n.allIndices() {
+		oVal := o.mustGetPrefix(idx) // mustGet is ok, bitsets are equal
+		if !equal(nVal, oVal) {
+			return false
+		}
+	}
+
+	for addr, nKid := range n.allChildren() {
+		oKid := o.mustGetChild(addr) // mustGet is ok, bitsets are equal
+
+		switch nKid := nKid.(type) {
+		case *bartNode[V]:
+			// oKid must also be a node
+			oKid, ok := oKid.(*bartNode[V])
+			if !ok {
+				return false
+			}
+
+			// compare rec-descent
+			if !nKid.equalRec(oKid) {
+				return false
+			}
+
+		case *leafNode[V]:
+			// oKid must also be a leaf
+			oKid, ok := oKid.(*leafNode[V])
+			if !ok {
+				return false
+			}
+
+			// compare prefixes
+			if nKid.prefix != oKid.prefix {
+				return false
+			}
+
+			// compare values
+			if !equal(nKid.value, oKid.value) {
+				return false
+			}
+
+		case *fringeNode[V]:
+			// oKid must also be a fringe
+			oKid, ok := oKid.(*fringeNode[V])
+			if !ok {
+				return false
+			}
+
+			// compare values
+			if !equal(nKid.value, oKid.value) {
+				return false
+			}
+
+		default:
+			panic("logic error, wrong node type")
+		}
+	}
+
+	return true
+}

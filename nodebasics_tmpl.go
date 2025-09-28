@@ -13,6 +13,7 @@ package bart
 // useful for gopls during development, deleted during go generate
 
 import (
+	"iter"
 	"net/netip"
 
 	"github.com/gaissmai/bart/internal/art"
@@ -37,6 +38,8 @@ func (n *_NODE_TYPE[V]) insertChild(uint8, any) (_ bool)           { return }
 func (n *_NODE_TYPE[V]) deleteChild(uint8) (_ bool)                { return }
 func (n *_NODE_TYPE[V]) cloneRec(cloneFunc[V]) (_ *_NODE_TYPE[V])  { return }
 func (n *_NODE_TYPE[V]) cloneFlat(cloneFunc[V]) (_ *_NODE_TYPE[V]) { return }
+func (n *_NODE_TYPE[V]) allIndices() (seq2 iter.Seq2[uint8, V])    { return }
+func (n *_NODE_TYPE[V]) allChildren() (seq2 iter.Seq2[uint8, any]) { return }
 
 // ### GENERATE DELETE END ###
 
@@ -685,4 +688,83 @@ func (n *_NODE_TYPE[V]) modify(pfx netip.Prefix, cb func(val V, found bool) (_ V
 	}
 
 	panic("unreachable")
+}
+
+// equalRec compares two nodes recursively.
+// It checks equality of children/prefixes via bitsets, and recursively
+// descends into sub-nodes or compares leaf/fringe node values.
+func (n *_NODE_TYPE[V]) equalRec(o *_NODE_TYPE[V]) bool {
+	if n == nil || o == nil {
+		return n == o
+	}
+	if n == o {
+		return true
+	}
+
+	if n.prefixes.BitSet256 != o.prefixes.BitSet256 {
+		return false
+	}
+
+	if n.children.BitSet256 != o.children.BitSet256 {
+		return false
+	}
+
+	for idx, nVal := range n.allIndices() {
+		oVal := o.mustGetPrefix(idx) // mustGet is ok, bitsets are equal
+		if !equal(nVal, oVal) {
+			return false
+		}
+	}
+
+	for addr, nKid := range n.allChildren() {
+		oKid := o.mustGetChild(addr) // mustGet is ok, bitsets are equal
+
+		switch nKid := nKid.(type) {
+		case *_NODE_TYPE[V]:
+			// oKid must also be a node
+			oKid, ok := oKid.(*_NODE_TYPE[V])
+			if !ok {
+				return false
+			}
+
+			// compare rec-descent
+			if !nKid.equalRec(oKid) {
+				return false
+			}
+
+		case *leafNode[V]:
+			// oKid must also be a leaf
+			oKid, ok := oKid.(*leafNode[V])
+			if !ok {
+				return false
+			}
+
+			// compare prefixes
+			if nKid.prefix != oKid.prefix {
+				return false
+			}
+
+			// compare values
+			if !equal(nKid.value, oKid.value) {
+				return false
+			}
+
+		case *fringeNode[V]:
+			// oKid must also be a fringe
+			oKid, ok := oKid.(*fringeNode[V])
+			if !ok {
+				return false
+			}
+
+			// compare values
+			if !equal(nKid.value, oKid.value) {
+				return false
+			}
+
+		default:
+			panic("logic error, wrong node type")
+		}
+	}
+
+	return true
 }
