@@ -158,12 +158,6 @@ func (t *liteTable[V]) DeletePersist(pfx netip.Prefix) (pt *liteTable[V], val V,
 		return t, val, false
 	}
 
-	// Avoid cloning for DeletePersist no-ops
-	// make a cheap test in front of expensive operation
-	if _, exists := t.Get(pfx); !exists {
-		return t, val, false
-	}
-
 	// canonicalize prefix
 	pfx = pfx.Masked()
 	is4 := pfx.Addr().Is4()
@@ -197,7 +191,7 @@ func (t *liteTable[V]) DeletePersist(pfx netip.Prefix) (pt *liteTable[V], val V,
 		n = &pt.root6
 	}
 
-	val, exists := n.deletePersist(cloneFn, pfx)
+	_, exists := n.deletePersist(cloneFn, pfx)
 	if exists {
 		pt.sizeUpdate(is4, -1)
 	}
