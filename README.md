@@ -27,43 +27,57 @@ using a fast mapping function derived from Donald E. Knuth’s
 **Allotment Routing Table** (ART) algorithm, to map the possible prefixes
 at each level into a complete binary tree.
 
-BART implements three different internal node types, each optimized for specific
+BART implements three different routing tables, each optimized for specific
 use cases:
-- **liteNode
-- **bartNode
-- **fastNode
+- **bart.Lite**
+- **bart.Table**
+- **bart.Fast**
 
-For **bartNode** this binary tree is represented with popcount‑compressed
+For **bart.Table** this binary tree is represented with popcount‑compressed
 sparse arrays for **level compression**.
 Combined with a **novel path and fringe compression**, this design reduces
-memory consumption by nearly
-[two orders of magnitude](https://github.com/gaissmai/iprbench)
-compared to classical ART.
+memory consumption by nearly two orders of magnitude compared to classical ART.
 
-For **fastNode** this binary tree is represented with fixed arrays
+For **bart.Fast** this binary tree is represented with fixed arrays
 without level compression (classical ART), but combined with the same
-novel **path and fringe compression** from BART, this design
-[reduces memory consumption](https://github.com/gaissmai/iprbench) by more
-than an order of magnitude compared to classical ART and thus makes ART
-usable in the first place for large routing tables.
+novel **path and fringe compression** from BART. This design
+reduces memory consumption by more than an order of magnitude compared
+to classical ART and thus makes ART usable in the first place for large
+routing tables.
 
-**liteNode** is a special form of bartNode, but without a payload, and therefore
-has the lowest memory overhead while maintaining the same lookup times as bart.
+**bart.Lite** is a special form of **bart.Table**, but without a payload, and therefore
+has the lowest memory overhead while maintaining the same lookup times.
 
 ## Comparison
  
- | Aspect | bartNode[V] | liteNode | fastNode[V] |
+ | Aspect | Table | Lite | Fast |
  |--------|-------------|-------------|-------------|
  | **Per-level Speed** | ⚡ **O(1)** | ⚡ **O(1)** | 🚀 **O(1), ~40% faster per level** |
  | **Overall Lookup** | O(trie_depth) | O(trie_depth) | O(trie_depth) |
  | **IPv4 Performance** | ~3 level traversals | ~3 level traversals | ~3 level traversals |
  | **IPv6 Performance** | ~6 level traversals | ~6 level traversals | ~6 level traversals |
  | **IPv6 vs IPv4** | ~2× slower | ~2× slower | ~2× slower |
- | **Memory** | efficient | neutral | inefficient |
+ | **Memory** | efficient | very efficient | inefficient |
+
+## When to Use Each Type
+
+### 🎯 **bart.Table[V]** - The Balanced Choice                                                                        
+- **Recommended** for most routing table use cases
+- Near-optimal per-level performance with excellent memory efficiency
+- Perfect balance for both IPv4 and IPv6 routing tables (use it for RIB)
  
+### 🪶 **bart.Lite** - The Minimalist
+- **Specialized** for prefix-only operations, no payload
+- Same per-level performance as *bart.Table[V]* but 35% less memory
+- Ideal for IPv4/IPv6 allowlists and set-based operations (use it for ACL)
+ 
+### 🚀 **bart.Fast[V]** - The Performance Champion
+- **40% faster per-level** when memory constraints allow
+- Best choice for lookup-intensive applications (use it for FIB)
+
 ## Usage and Compilation
 
-Example: simple ACL
+Example: simple ACL with bart.Lite
 
 ```go
 package main
@@ -99,6 +113,9 @@ func main() {
 }
 ```
 
+
+## Bitset Efficiency
+
 The BART algorithm is based on fixed-size bit vectors and precomputed lookup tables.
 Lookups are executed entirely with fast, cache-resident bitmask operations, which
 modern CPUs accelerate using specialized instructions such as POPCNT, LZCNT, and TZCNT.
@@ -111,11 +128,7 @@ See the [Go minimum requirements](https://go.dev/wiki/MinimumRequirements#archit
 # Example for AMD64, choose v2/v3/v4 to match your CPU features.
 GOAMD64=v3 go build
 ```
-
-## Bitset Efficiency
-
-Due to the novel path compression, BART always operates on a fixed internal 256-bit length.
-Critical loops over these bitsets can be unrolled for additional speed,
+Critical loops over these fixed-size bitsets can be unrolled for additional speed,
 ensuring predictable memory access and efficient use of CPU pipelines.
 
 ```go
@@ -127,7 +140,6 @@ func (b *BitSet256) popcnt() (cnt int) {
   return
 }
 ```
-
 Future Go versions with SIMD intrinsics for `uint64` vectors may unlock
 additional speedups on compatible hardware.
 
@@ -157,6 +169,13 @@ In internal benchmarks the check runs in a few nanoseconds per query with zero
 heap allocations on a modern CPU.
 
 ## API
+
+BART has a rich API for CRUD, lookup, comparison, iteration,
+serialization and persistence. 
+
+**Table** and **Fast** expose the identical API, while **Lite** deviates in
+its methods from the common API when it comes to the payload, since *Lite*
+has no payload.
 
 ```go
   import "github.com/gaissmai/bart"
@@ -216,41 +235,6 @@ heap allocations on a modern CPU.
 
   func (t *Table[V]) DumpList4() []DumpListNode[V]
   func (t *Table[V]) DumpList6() []DumpListNode[V]
-```
-
-A `bart.Lite` wrapper is also included, this is ideal for simple IP
-ACLs (access-control-lists) with plain true/false results and no payload.
-Lite is just a convenience wrapper for Table, instantiated with an empty
-struct as payload.
-
-Lite wraps or adapts some methods where needed and delegates almost all
-other methods unmodified to the underlying Table.
-Some delegated methods are pointless without a payload.
-
-```go
-   type Lite struct {
-     Table[struct{}]
-   }
-
-   func (l *Lite) Exists(pfx netip.Prefix) bool
-   func (l *Lite) Contains(ip netip.Addr) bool
-
-   func (l *Lite) Insert(pfx netip.Prefix)
-   func (l *Lite) Delete(pfx netip.Prefix) bool
-
-   func (l *Lite) InsertPersist(pfx netip.Prefix) *Lite
-   func (l *Lite) DeletePersist(pfx netip.Prefix) (*Lite, bool)
-   func (l *Lite) WalkPersist(fn func(*Lite, netip.Prefix) (*Lite, bool)) *Lite
-
-   func (l *Lite) Clone() *Lite
-   func (l *Lite) Union(o *Lite)
-   func (l *Lite) UnionPersist(o *Lite) *Lite
-
-   func (l *Lite) Overlaps(o *Lite) bool
-   func (l *Lite) Overlaps4(o *Lite) bool
-   func (l *Lite) Overlaps6(o *Lite) bool
-
-   func (l *Lite) Equal(o *Lite) bool
 ```
 
 ## Benchmarks
