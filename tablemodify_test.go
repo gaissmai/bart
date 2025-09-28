@@ -669,6 +669,13 @@ func TestTablesModifySemantics(t *testing.T) {
 							}
 						}
 					}
+
+					// Also ensure the target prefix stays absent in no-op scenarios
+					if _, expect := tt.finalData[tt.args.pfx]; !expect {
+						if _, ok := rt.Get(tt.args.pfx); ok {
+							t.Errorf("[%s] final table: key %v should not be present", tt.name, tt.args.pfx)
+						}
+					}
 				})
 			}
 		})
