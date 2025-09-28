@@ -43,9 +43,9 @@ compared to classical ART.
 For **fastNode** this binary tree is represented with fixed arrays
 without level compression (classical ART), but combined with the same
 novel **path and fringe compression** from BART, this design
-[reduces memory consumption](https://github.com/gaissmai/iprbench) by more
-than an order of magnitude compared to classical ART and thus makes ART
-usable in the first place for large routing tables.
+reduces memory consumption by more than an order of magnitude compared
+to classical ART and thus makes ART usable in the first place for large
+routing tables.
 
 **liteNode** is a special form of bartNode, but without a payload, and therefore
 has the lowest memory overhead while maintaining the same lookup times as bart.
@@ -158,6 +158,13 @@ heap allocations on a modern CPU.
 
 ## API
 
+BART has a rich API for CRUD, lookup, comparison, iteration,
+serialization and persistence. 
+
+**Table** and **Fast** expose the identical API, while **Lite** deviates in
+its methods from the common API when it comes to the payload, since *Lite*
+has no payload.
+
 ```go
   import "github.com/gaissmai/bart"
   
@@ -216,41 +223,6 @@ heap allocations on a modern CPU.
 
   func (t *Table[V]) DumpList4() []DumpListNode[V]
   func (t *Table[V]) DumpList6() []DumpListNode[V]
-```
-
-A `bart.Lite` wrapper is also included, this is ideal for simple IP
-ACLs (access-control-lists) with plain true/false results and no payload.
-Lite is just a convenience wrapper for Table, instantiated with an empty
-struct as payload.
-
-Lite wraps or adapts some methods where needed and delegates almost all
-other methods unmodified to the underlying Table.
-Some delegated methods are pointless without a payload.
-
-```go
-   type Lite struct {
-     Table[struct{}]
-   }
-
-   func (l *Lite) Exists(pfx netip.Prefix) bool
-   func (l *Lite) Contains(ip netip.Addr) bool
-
-   func (l *Lite) Insert(pfx netip.Prefix)
-   func (l *Lite) Delete(pfx netip.Prefix) bool
-
-   func (l *Lite) InsertPersist(pfx netip.Prefix) *Lite
-   func (l *Lite) DeletePersist(pfx netip.Prefix) (*Lite, bool)
-   func (l *Lite) WalkPersist(fn func(*Lite, netip.Prefix) (*Lite, bool)) *Lite
-
-   func (l *Lite) Clone() *Lite
-   func (l *Lite) Union(o *Lite)
-   func (l *Lite) UnionPersist(o *Lite) *Lite
-
-   func (l *Lite) Overlaps(o *Lite) bool
-   func (l *Lite) Overlaps4(o *Lite) bool
-   func (l *Lite) Overlaps6(o *Lite) bool
-
-   func (l *Lite) Equal(o *Lite) bool
 ```
 
 ## Benchmarks
