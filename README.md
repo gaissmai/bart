@@ -74,7 +74,7 @@ A more detailed description can be found in [NODETYPES.md](NODETYPES.md).
 - Ideal for IPv4/IPv6 allowlists and set-based operations (use it for ACL)
  
 ### 🚀 **bart.Fast[V]** - The Performance Champion
-- **40% faster per-level** when memory constraints allow
+- **50-100% faster** when memory constraints allow
 - Best choice for lookup-intensive applications (use it for FIB)
 
 ## Usage and Compilation
@@ -186,7 +186,7 @@ has no payload.
 import "github.com/gaissmai/bart"
 
 type Table[V any] struct {
-	// Has unexported fields.
+  // Has unexported fields.
 }
 
 func (t *Table[V]) Contains(netip.Addr) bool
@@ -254,20 +254,20 @@ goos: linux
 goarch: amd64
 pkg: github.com/gaissmai/bart
 cpu: Intel(R) Core(TM) i5-8250U CPU @ 1.60GHz
-BenchmarkFullMatch4/Contains        82013714	        13.59 ns/op
-BenchmarkFullMatch6/Contains        64516006	        18.66 ns/op
-BenchmarkFullMiss4/Contains         75341578	        15.94 ns/op
-BenchmarkFullMiss6/Contains         148116180	         8.122 ns/op
+BenchmarkFullMatch4/Contains        82013714        13.59 ns/op
+BenchmarkFullMatch6/Contains        64516006        18.66 ns/op
+BenchmarkFullMiss4/Contains         75341578        15.94 ns/op
+BenchmarkFullMiss6/Contains         148116180        8.12 ns/op
 
 $ GOAMD64=v3 go test -run=xxx -bench=FullM/Lookup -skip=/x -cpu=1
 goos: linux
 goarch: amd64
 pkg: github.com/gaissmai/bart
 cpu: Intel(R) Core(TM) i5-8250U CPU @ 1.60GHz
-BenchmarkFullMatch4/Lookup         	54616323	        22.02 ns/op
-BenchmarkFullMatch6/Lookup         	30073657	        39.98 ns/op
-BenchmarkFullMiss4/Lookup          	55132899	        21.90 ns/op
-BenchmarkFullMiss6/Lookup          	100000000	        11.12 ns/op
+BenchmarkFullMatch4/Lookup          54616323        22.02 ns/op
+BenchmarkFullMatch6/Lookup          30073657        39.98 ns/op
+BenchmarkFullMiss4/Lookup           55132899        21.90 ns/op
+BenchmarkFullMiss6/Lookup           100000000       11.12 ns/op
 ```
 
 ## Compatibility Guarantees
