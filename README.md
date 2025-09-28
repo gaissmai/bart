@@ -59,7 +59,7 @@ has the lowest memory overhead while maintaining the same lookup times.
  | **IPv6 vs IPv4** | ~2× slower | ~2× slower | ~2× slower |
  | **Memory** | efficient | very efficient | inefficient |
 
-A more detailed description can be found [here](#NODETYPES.md).
+A more detailed description can be found [here](NODETYPES.md).
 
 ## When to Use Each Type
 
