@@ -180,63 +180,62 @@ its methods from the common API when it comes to the payload, since *Lite*
 has no payload.
 
 ```go
-  import "github.com/gaissmai/bart"
-  
-  type Table[V any] struct {
-  	// Has unexported fields.
-  }
+import "github.com/gaissmai/bart"
 
-  func (t *Table[V]) Contains(ip netip.Addr) bool
-  func (t *Table[V]) Lookup(ip netip.Addr) (V, bool)
+type Table[V any] struct {
+	// Has unexported fields.
+}
 
-  func (t *Table[V]) LookupPrefix(pfx netip.Prefix) (V, bool)
-  func (t *Table[V]) LookupPrefixLPM(pfx netip.Prefix) (netip.Prefix, V, bool)
+func (t *Table[V]) Contains(netip.Addr) bool
+func (t *Table[V]) Lookup(netip.Addr) (V, bool)
 
-  func (t *Table[V]) Insert(pfx netip.Prefix, val V)
-  func (t *Table[V]) Modify(pfx netip.Prefix, func(V, bool) (V, bool)) (V, bool)
-  func (t *Table[V]) Delete(pfx netip.Prefix) (V, bool)
-  func (t *Table[V]) Get(pfx netip.Prefix) (V, bool)
+func (t *Table[V]) LookupPrefix(netip.Prefix) (V, bool)
+func (t *Table[V]) LookupPrefixLPM(netip.Prefix) (netip.Prefix, V, bool)
 
-  func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V]
-  func (t *Table[V]) ModifyPersist(pfx netip.Prefix, func(val V, ok bool) (V, bool)) (*Table[V], V, bool)
-  func (t *Table[V]) DeletePersist(pfx netip.Prefix) (*Table[V], V, bool)
-  func (t *Table[V]) WalkPersist(func(*Table[V], netip.Prefix, V) (*Table[V], bool)) *Table[V]
+func (t *Table[V]) Insert(netip.Prefix, V)
+func (t *Table[V]) Modify(netip.Prefix, cb func(_ V, bool) (_ V, bool)) (_ V, bool)
+func (t *Table[V]) Delete(netip.Prefix) (V, exists bool)
+func (t *Table[V]) Get(netip.Prefix) (V, exists bool)
 
+func (t *Table[V]) InsertPersist(netip.Prefix, V) *Table[V]
+func (t *Table[V]) ModifyPersist(netip.Prefix, cb func(_ V, bool) (_ V, bool)) (*Table[V], _ V, bool)
+func (t *Table[V]) DeletePersist(netip.Prefix) (*Table[V], V, bool)
+func (t *Table[V]) WalkPersist(fn func(*Table[V], netip.Prefix, V) (*Table[V], bool)) *Table[V]
 
-  func (t *Table[V]) Clone() *Table[V]
-  func (t *Table[V]) Union(o *Table[V])
-  func (t *Table[V]) UnionPersist(o *Table[V]) *Table[V]
+func (t *Table[V]) Clone() *Table[V]
+func (t *Table[V]) Union(o *Table[V])
+func (t *Table[V]) UnionPersist(o *Table[V]) *Table[V]
 
-  func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool
+func (t *Table[V]) OverlapsPrefix(netip.Prefix) bool
 
-  func (t *Table[V]) Overlaps(o *Table[V])  bool
-  func (t *Table[V]) Overlaps4(o *Table[V]) bool
-  func (t *Table[V]) Overlaps6(o *Table[V]) bool
+func (t *Table[V]) Overlaps(o *Table[V]) bool
+func (t *Table[V]) Overlaps4(o *Table[V]) bool
+func (t *Table[V]) Overlaps6(o *Table[V]) bool
 
-  func (t *Table[V]) Equal(o *Table[V])  bool
+func (t *Table[V]) Equal(o *Table[V]) bool
 
-  func (t *Table[V]) Subnets(pfx netip.Prefix)   iter.Seq2[netip.Prefix, V]
-  func (t *Table[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V]
+func (t *Table[V]) Subnets(netip.Prefix) iter.Seq2[netip.Prefix, V]
+func (t *Table[V]) Supernets(netip.Prefix) iter.Seq2[netip.Prefix, V]
 
-  func (t *Table[V]) All()  iter.Seq2[netip.Prefix, V]
-  func (t *Table[V]) All4() iter.Seq2[netip.Prefix, V]
-  func (t *Table[V]) All6() iter.Seq2[netip.Prefix, V]
+func (t *Table[V]) All() iter.Seq2[netip.Prefix, V]
+func (t *Table[V]) All4() iter.Seq2[netip.Prefix, V]
+func (t *Table[V]) All6() iter.Seq2[netip.Prefix, V]
 
-  func (t *Table[V]) AllSorted()  iter.Seq2[netip.Prefix, V]
-  func (t *Table[V]) AllSorted4() iter.Seq2[netip.Prefix, V]
-  func (t *Table[V]) AllSorted6() iter.Seq2[netip.Prefix, V]
+func (t *Table[V]) AllSorted() iter.Seq2[netip.Prefix, V]
+func (t *Table[V]) AllSorted4() iter.Seq2[netip.Prefix, V]
+func (t *Table[V]) AllSorted6() iter.Seq2[netip.Prefix, V]
 
-  func (t *Table[V]) Size()  int
-  func (t *Table[V]) Size4() int
-  func (t *Table[V]) Size6() int
+func (t *Table[V]) Size() int
+func (t *Table[V]) Size4() int
+func (t *Table[V]) Size6() int
 
-  func (t *Table[V]) String() string
-  func (t *Table[V]) Fprint(w io.Writer) error
-  func (t *Table[V]) MarshalText() ([]byte, error)
-  func (t *Table[V]) MarshalJSON() ([]byte, error)
+func (t *Table[V]) String() string
+func (t *Table[V]) Fprint(w io.Writer) error
+func (t *Table[V]) MarshalText() ([]byte, error)
+func (t *Table[V]) MarshalJSON() ([]byte, error)
 
-  func (t *Table[V]) DumpList4() []DumpListNode[V]
-  func (t *Table[V]) DumpList6() []DumpListNode[V]
+func (t *Table[V]) DumpList4() []DumpListNode[V]
+func (t *Table[V]) DumpList6() []DumpListNode[V]
 ```
 
 ## Benchmarks

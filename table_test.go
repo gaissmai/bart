@@ -1601,47 +1601,6 @@ func TestDeleteButOne(t *testing.T) {
 	}
 }
 
-func TestGetAndDelete(t *testing.T) {
-	t.Parallel()
-
-	n := workLoadN()
-
-	prng := rand.New(rand.NewPCG(42, 42))
-	// Insert n prefixes, then delete those same prefixes in shuffled
-	// order.
-
-	tbl := new(Table[int])
-	prefixes := randomPrefixes(prng, n)
-
-	// insert the prefixes
-	for _, p := range prefixes {
-		tbl.Insert(p.pfx, p.val)
-	}
-
-	// shuffle the prefixes
-	prng.Shuffle(n, func(i, j int) {
-		prefixes[i], prefixes[j] = prefixes[j], prefixes[i]
-	})
-
-	for _, p := range prefixes {
-		want, _ := tbl.Get(p.pfx)
-		val, ok := tbl.GetAndDelete(p.pfx)
-
-		if !ok {
-			t.Errorf("GetAndDelete, expected true, got %v", ok)
-		}
-
-		if val != want {
-			t.Errorf("GetAndDelete, expected %v, got %v", want, val)
-		}
-
-		val, ok = tbl.GetAndDelete(p.pfx)
-		if ok {
-			t.Errorf("GetAndDelete, expected false, got (%v, %v)", val, ok)
-		}
-	}
-}
-
 func TestGet(t *testing.T) {
 	t.Parallel()
 
@@ -1720,50 +1679,6 @@ func TestGetCompare(t *testing.T) {
 	fast := new(Table[int])
 	for _, pfx := range pfxs {
 		fast.Insert(pfx.pfx, pfx.val)
-	}
-
-	for _, pfx := range pfxs {
-		goldVal, goldOK := gold.get(pfx.pfx)
-		fastVal, fastOK := fast.Get(pfx.pfx)
-
-		if !getsEqual(goldVal, goldOK, fastVal, fastOK) {
-			t.Fatalf("Get(%q) = (%v, %v), want (%v, %v)", pfx.pfx, fastVal, fastOK, goldVal, goldOK)
-		}
-	}
-}
-
-func TestUpdateCompare(t *testing.T) {
-	t.Parallel()
-
-	n := workLoadN()
-
-	prng := rand.New(rand.NewPCG(42, 42))
-	pfxs := randomPrefixes(prng, n)
-
-	gold := new(goldTable[int])
-	gold.insertMany(pfxs)
-
-	fast := new(Table[int])
-	// Update as insert
-	for _, pfx := range pfxs {
-		fast.Update(pfx.pfx, func(int, bool) int { return pfx.val })
-	}
-
-	for _, pfx := range pfxs {
-		goldVal, goldOK := gold.get(pfx.pfx)
-		fastVal, fastOK := fast.Get(pfx.pfx)
-
-		if !getsEqual(goldVal, goldOK, fastVal, fastOK) {
-			t.Fatalf("Get(%q) = (%v, %v), want (%v, %v)", pfx.pfx, fastVal, fastOK, goldVal, goldOK)
-		}
-	}
-
-	cb := func(val int, _ bool) int { return val + 1 }
-
-	// Update as update
-	for _, pfx := range pfxs[:len(pfxs)/2] {
-		gold.update(pfx.pfx, cb)
-		fast.Update(pfx.pfx, cb)
 	}
 
 	for _, pfx := range pfxs {
@@ -2079,79 +1994,6 @@ func TestModifyPersistCompare(t *testing.T) {
 		if !getsEqual(bartVal, bartOK, immuVal, immuOK) {
 			t.Fatalf("Get(%q) = (%v, %v), want (%v, %v)", pfx.pfx, immuVal, immuOK, bartVal, bartOK)
 		}
-	}
-}
-
-//nolint:tparallel
-func TestUpdate(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name string
-		pfx  netip.Prefix
-	}{
-		{
-			name: "default route v4",
-			pfx:  mpp("0.0.0.0/0"),
-		},
-		{
-			name: "default route v6",
-			pfx:  mpp("::/0"),
-		},
-		{
-			name: "set v4 fringe",
-			pfx:  mpp("0.0.0.0/8"),
-		},
-		{
-			name: "set v4",
-			pfx:  mpp("1.2.3.4/32"),
-		},
-		{
-			name: "set v6",
-			pfx:  mpp("2001:db8::/32"),
-		},
-	}
-
-	rt := new(Table[int])
-
-	// just increment val
-	cb := func(val int, ok bool) int {
-		if ok {
-			return val + 1
-		}
-		return 0
-	}
-
-	// update as insert
-	for _, tt := range tests {
-		t.Run(fmt.Sprintf("insert: %s", tt.name), func(t *testing.T) {
-			val := rt.Update(tt.pfx, cb)
-			got, ok := rt.Get(tt.pfx)
-
-			if !ok {
-				t.Errorf("%s: ok=%v, expected: %v", tt.name, ok, true)
-			}
-
-			if got != 0 || got != val {
-				t.Errorf("%s: got=%v, expected: %v", tt.name, got, 0)
-			}
-		})
-	}
-
-	// update as update
-	for _, tt := range tests {
-		t.Run(fmt.Sprintf("update: %s", tt.name), func(t *testing.T) {
-			val := rt.Update(tt.pfx, cb)
-			got, ok := rt.Get(tt.pfx)
-
-			if !ok {
-				t.Errorf("%s: ok=%v, expected: %v", tt.name, ok, true)
-			}
-
-			if got != 1 || got != val {
-				t.Errorf("%s: got=%v, expected: %v", tt.name, got, 1)
-			}
-		})
 	}
 }
 
@@ -2965,13 +2807,13 @@ func TestSize(t *testing.T) {
 	}
 
 	for _, pfx := range pfxs2 {
-		tbl.Update(pfx.pfx, func(any, bool) any { return nil })
+		tbl.Modify(pfx.pfx, func(any, bool) (any, bool) { return nil, false })
 	}
 
 	pfxs1 = append(pfxs1, pfxs2...)
 
 	for _, pfx := range pfxs1[:n] {
-		tbl.Update(pfx.pfx, func(any, bool) any { return nil })
+		tbl.Modify(pfx.pfx, func(any, bool) (any, bool) { return nil, false })
 	}
 
 	for _, pfx := range randomPrefixes(prng, n) {
