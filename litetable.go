@@ -12,10 +12,15 @@ import (
 	"github.com/gaissmai/bart/internal/lpm"
 )
 
-// Lite is a prefix-only table that embeds a private liteTable[struct{}].
+// Lite follows the BART design but with no payload.
+// It is ideal for simple IP ACLs (access-control-lists) with plain
+// true/false results with the smallest memory consumption.
 //
-// It is intentionally not nil-receiver safe: calling methods on a nil *Lite
-// will panic by design.
+// Performance note: Do not pass IPv4-in-IPv6 addresses (e.g., ::ffff:192.0.2.1)
+// as input. The methods do not perform automatic unmapping to avoid unnecessary
+// overhead for the common case where native addresses are used.
+// Users should unmap IPv4-in-IPv6 addresses to their native IPv4 form
+// (e.g., 192.0.2.1) before calling these methods.
 type Lite struct {
 	liteTable[struct{}]
 }
