@@ -44,7 +44,7 @@ func (l *Lite) Insert(pfx netip.Prefix) {
 // If the prefix already exists, it returns a new instance with the same content.
 func (l *Lite) InsertPersist(pfx netip.Prefix) *Lite {
 	lp := l.liteTable.InsertPersist(pfx, struct{}{})
-	//nolint:govet // copy of *tbl is here by intention
+	//nolint:govet // copy of *lp is here by intention
 	return &Lite{*lp}
 }
 
@@ -58,8 +58,28 @@ func (l *Lite) InsertPersist(pfx netip.Prefix) *Lite {
 // exist, it returns a structurally identical copy and false.
 func (l *Lite) DeletePersist(pfx netip.Prefix) (*Lite, bool) {
 	lp, _, exists := l.liteTable.DeletePersist(pfx)
-	//nolint:govet // copy of *tbl is here by intention
+	//nolint:govet // copy of *lp is here by intention
 	return &Lite{*lp}, exists
+}
+
+// Modify applies a modification callback to a prefix in-place.
+// The callback function receives a boolean indicating whether the prefix exists.
+// It should return a boolean indicating whether to delete the prefix.
+// Since Lite is prefix-only, no value handling is needed.
+//
+// If the callback returns del=true for an existing prefix, it will be deleted.
+// If the callback returns del=false for a non-existing prefix, it will be inserted.
+// If the callback returns del=false for an existing prefix, it's a no-op.
+//
+// Returns a boolean indicating whether a prefix was deleted during the operation.
+func (l *Lite) Modify(pfx netip.Prefix, cb func(exists bool) (del bool)) bool {
+	// Adapt the callback to work with liteTable's signature
+	adaptedCb := func(_ struct{}, exists bool) (_ struct{}, del bool) {
+		return struct{}{}, cb(exists)
+	}
+
+	_, deleted := l.liteTable.Modify(pfx, adaptedCb)
+	return deleted
 }
 
 // Clone returns a copy of the routing table.
@@ -86,9 +106,65 @@ func (l *Lite) UnionPersist(o *Lite) *Lite {
 	if o == nil || (o.size4 == 0 && o.size6 == 0) {
 		return l
 	}
-	tbl := l.liteTable.UnionPersist(&o.liteTable)
-	//nolint:govet // copy of *tbl is here by intention
-	return &Lite{*tbl}
+	lp := l.liteTable.UnionPersist(&o.liteTable)
+	//nolint:govet // copy of *lp is here by intention
+	return &Lite{*lp}
+}
+
+// ModifyPersist applies a modification callback to a prefix using copy-on-write semantics.
+// It creates a new Lite instance with the modification applied while leaving the original
+// unchanged. This enables functional programming patterns and safe concurrent access.
+//
+// The callback function receives a boolean indicating whether the prefix exists.
+// It should return a boolean indicating whether to delete the prefix.
+// Since Lite is prefix-only, no value handling is needed.
+//
+// Returns a new Lite instance with the modification applied and a boolean
+// indicating whether a prefix was deleted during the operation.
+func (l *Lite) ModifyPersist(pfx netip.Prefix, cb func(exists bool) (del bool)) (*Lite, bool) {
+	// Adapt the callback to work with liteTable's signature
+	wrappedFn := func(_ struct{}, exists bool) (_ struct{}, del bool) {
+		return struct{}{}, cb(exists)
+	}
+
+	lp, _, deleted := l.liteTable.ModifyPersist(pfx, wrappedFn)
+	//nolint:govet // copy of *lp is here by intention
+	return &Lite{*lp}, deleted
+}
+
+// WalkPersist traverses all prefixes in the table using copy-on-write semantics.
+// The callback function is called for each prefix and can return a modified Lite instance.
+//
+// The callback receives the current Lite instance and a prefix. It should return
+// a potentially modified Lite instance and a boolean indicating whether to continue
+// the traversal (true to continue, false to stop).
+//
+// This method enables functional transformations of the entire table while maintaining
+// immutability of the original instance.
+//
+// Returns a new Lite instance representing the final state after all transformations.
+func (l *Lite) WalkPersist(fn func(*Lite, netip.Prefix) (*Lite, bool)) *Lite {
+	// Handle nil callback
+	if fn == nil {
+		return l
+	}
+
+	// Adapt the callback to work with liteTable's signature
+	wrappedFn := func(lp *liteTable[struct{}], pfx netip.Prefix, _ struct{}) (*liteTable[struct{}], bool) {
+		// Convert liteTable to Lite for the callback
+		//nolint:govet // copy of *lp is here by intention
+		liteInstance := &Lite{*lp}
+
+		// Call the user's callback
+		newLite, cont := fn(liteInstance, pfx)
+
+		// Return the underlying liteTable and continuation flag
+		return &newLite.liteTable, cont
+	}
+
+	lp := l.liteTable.WalkPersist(wrappedFn)
+	//nolint:govet // copy of *lp is here by intention
+	return &Lite{*lp}
 }
 
 // dropSeq2 converts a Seq2[netip.Prefix, V] into a Seq[netip.Prefix] by discarding the value.
@@ -167,7 +243,7 @@ func (l *Lite) AllSorted6() iter.Seq[netip.Prefix] {
 	return dropSeq2(l.liteTable.AllSorted6())
 }
 
-// Subnets returns an iterator over all prefix–value pairs in the routing table
+// Subnets returns an iterator over all prefixes in the routing table
 // that are fully contained within the given prefix pfx.
 //
 // Entries are returned in CIDR sort order.
