@@ -23,7 +23,7 @@ import (
 //   - [bart.Table]: popcount-compressed level arrays + path compression
 //
 // As a result:
-//   - [bart.Fast] sacrifices memory efficiency to achieve 2x higher speed
+//   - [bart.Fast] sacrifices memory efficiency to achieve 50-100% higher speed
 //   - [bart.Table] minimizes memory consumption as much as possible
 //
 // Which variant is preferable depends on the use case: [bart.Fast] is most
