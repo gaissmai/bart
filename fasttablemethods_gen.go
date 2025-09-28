@@ -158,11 +158,22 @@ func (t *Fast[V]) DeletePersist(pfx netip.Prefix) (pt *Fast[V], val V, found boo
 		return t, val, false
 	}
 
+	// Avoid cloning for DeletePersist no-ops
+	// make a cheap test in front of expensive operation
+	if _, exists := t.Get(pfx); !exists {
+		return t, val, false
+	}
+
 	// canonicalize prefix
 	pfx = pfx.Masked()
-
-	// Extract address, IP version, and prefix length.
 	is4 := pfx.Addr().Is4()
+
+	// Preflight check: avoid cloning if prefix doesn't exist
+	node := t.rootNodeByVersion(is4)
+	val, found = node.get(pfx)
+	if !found {
+		return t, val, false
+	}
 
 	// share size counters; root nodes cloned selectively.
 	pt = &Fast[V]{
@@ -315,9 +326,7 @@ func (t *Fast[V]) ModifyPersist(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, de
 		return t, zero, false
 	}
 
-	// canonicalize prefix
-	pfx = pfx.Masked()
-
+	// make a cheap test in front of expensive operation
 	oldVal, ok := t.Get(pfx)
 	val := oldVal
 
@@ -334,13 +343,13 @@ func (t *Fast[V]) ModifyPersist(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, de
 		return t, zero, false
 
 	case !ok && !del: // insert
-		return t.InsertPersist(pfx, newVal), newVal, false
+		return t.InsertPersist(pfx.Masked(), newVal), newVal, false
 
 	case ok && !del: // update
-		return t.InsertPersist(pfx, newVal), oldVal, false
+		return t.InsertPersist(pfx.Masked(), newVal), oldVal, false
 
 	case ok && del: // delete
-		pt, _, _ := t.DeletePersist(pfx)
+		pt, _, _ := t.DeletePersist(pfx.Masked())
 		return pt, oldVal, true
 	}
 
