@@ -135,7 +135,8 @@ func (n *_NODE_TYPE[V]) insert(pfx netip.Prefix, val V, depth int) (exists bool)
 }
 
 // insertPersist is similar to insert but the receiver isn't modified.
-// All nodes touched during insert are cloned.
+// Assumes the caller has pre-cloned the root (COW). It clones the
+// internal nodes along the descent path before mutating them.
 func (n *_NODE_TYPE[V]) insertPersist(cloneFn cloneFunc[V], pfx netip.Prefix, val V, depth int) (exists bool) {
 	ip := pfx.Addr() // the pfx must be in canonical form
 	octets := ip.AsSlice()
@@ -387,8 +388,9 @@ func (n *_NODE_TYPE[V]) delete(pfx netip.Prefix) (val V, exists bool) {
 	return val, exists
 }
 
-// deletePersist is similar to delete but the receiver isn't modified.
-// All nodes touched during delete are cloned.
+// deletePersist is similar to delete but does not mutate the original trie.
+// Assumes the caller has pre-cloned the root (COW). It clones the
+// internal nodes along the descent path before mutating them.
 func (n *_NODE_TYPE[V]) deletePersist(cloneFn cloneFunc[V], pfx netip.Prefix) (val V, exists bool) {
 	ip := pfx.Addr() // the pfx must be in canonical form
 	is4 := ip.Is4()
