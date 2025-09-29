@@ -21,7 +21,7 @@ func TestUnionDeterministic(t *testing.T) {
 		values1   []int
 		prefixes2 []string
 		values2   []int
-		expected  map[string]int
+		expected  map[netip.Prefix]int
 	}{
 		{
 			name:      "No overlap",
@@ -29,11 +29,11 @@ func TestUnionDeterministic(t *testing.T) {
 			values1:   []int{100, 200},
 			prefixes2: []string{"172.16.0.0/12", "203.0.113.0/24"},
 			values2:   []int{300, 400},
-			expected: map[string]int{
-				"10.0.0.0/8":     100,
-				"192.168.1.0/24": 200,
-				"172.16.0.0/12":  300,
-				"203.0.113.0/24": 400,
+			expected: map[netip.Prefix]int{
+				mpp("10.0.0.0/8"):     100,
+				mpp("192.168.1.0/24"): 200,
+				mpp("172.16.0.0/12"):  300,
+				mpp("203.0.113.0/24"): 400,
 			},
 		},
 		{
@@ -42,9 +42,9 @@ func TestUnionDeterministic(t *testing.T) {
 			values1:   []int{100, 200},
 			prefixes2: []string{"10.0.0.0/8", "192.168.1.0/24"},
 			values2:   []int{999, 888},
-			expected: map[string]int{
-				"10.0.0.0/8":     999,
-				"192.168.1.0/24": 888,
+			expected: map[netip.Prefix]int{
+				mpp("10.0.0.0/8"):     999,
+				mpp("192.168.1.0/24"): 888,
 			},
 		},
 		{
@@ -53,11 +53,11 @@ func TestUnionDeterministic(t *testing.T) {
 			values1:   []int{100, 200, 300},
 			prefixes2: []string{"192.168.1.0/24", "203.0.113.0/24"},
 			values2:   []int{777, 400},
-			expected: map[string]int{
-				"10.0.0.0/8":     100,
-				"192.168.1.0/24": 777,
-				"172.16.0.0/12":  300,
-				"203.0.113.0/24": 400,
+			expected: map[netip.Prefix]int{
+				mpp("10.0.0.0/8"):     100,
+				mpp("192.168.1.0/24"): 777,
+				mpp("172.16.0.0/12"):  300,
+				mpp("203.0.113.0/24"): 400,
 			},
 		},
 		{
@@ -66,11 +66,11 @@ func TestUnionDeterministic(t *testing.T) {
 			values1:   []int{100, 200},
 			prefixes2: []string{"192.168.0.0/16", "2001:db8::/32", "::1/128"},
 			values2:   []int{300, 555, 400},
-			expected: map[string]int{
-				"10.0.0.0/8":     100,
-				"2001:db8::/32":  555,
-				"192.168.0.0/16": 300,
-				"::1/128":        400,
+			expected: map[netip.Prefix]int{
+				mpp("10.0.0.0/8"):     100,
+				mpp("2001:db8::/32"):  555,
+				mpp("192.168.0.0/16"): 300,
+				mpp("::1/128"):        400,
 			},
 		},
 	}
@@ -872,7 +872,7 @@ func TestUnionDeterministicExtended(t *testing.T) {
 		values1   []int
 		prefixes2 []string
 		values2   []int
-		expected  map[string]int
+		expected  map[netip.Prefix]int
 	}{
 		{
 			name:      "No overlap",
@@ -880,11 +880,11 @@ func TestUnionDeterministicExtended(t *testing.T) {
 			values1:   []int{100, 200},
 			prefixes2: []string{"172.16.0.0/12", "203.0.113.0/24"},
 			values2:   []int{300, 400},
-			expected: map[string]int{
-				"10.0.0.0/8":     100,
-				"192.168.1.0/24": 200,
-				"172.16.0.0/12":  300,
-				"203.0.113.0/24": 400,
+			expected: map[netip.Prefix]int{
+				mpp("10.0.0.0/8"):     100,
+				mpp("192.168.1.0/24"): 200,
+				mpp("172.16.0.0/12"):  300,
+				mpp("203.0.113.0/24"): 400,
 			},
 		},
 		{
@@ -893,9 +893,9 @@ func TestUnionDeterministicExtended(t *testing.T) {
 			values1:   []int{100, 200},
 			prefixes2: []string{"10.0.0.0/8", "192.168.1.0/24"},
 			values2:   []int{999, 888},
-			expected: map[string]int{
-				"10.0.0.0/8":     999,
-				"192.168.1.0/24": 888,
+			expected: map[netip.Prefix]int{
+				mpp("10.0.0.0/8"):     999,
+				mpp("192.168.1.0/24"): 888,
 			},
 		},
 		{
@@ -904,11 +904,11 @@ func TestUnionDeterministicExtended(t *testing.T) {
 			values1:   []int{100, 200},
 			prefixes2: []string{"192.168.0.0/16", "2001:db8::/32", "::1/128"},
 			values2:   []int{300, 555, 400},
-			expected: map[string]int{
-				"10.0.0.0/8":     100,
-				"2001:db8::/32":  555,
-				"192.168.0.0/16": 300,
-				"::1/128":        400,
+			expected: map[netip.Prefix]int{
+				mpp("10.0.0.0/8"):     100,
+				mpp("2001:db8::/32"):  555,
+				mpp("192.168.0.0/16"): 300,
+				mpp("::1/128"):        400,
 			},
 		},
 	}
@@ -1023,49 +1023,49 @@ func captureTableState[V comparable](t *Table[V]) map[netip.Prefix]V {
 
 func verifyResults[T any](t *testing.T, tbl interface {
 	All() iter.Seq2[netip.Prefix, int]
-}, expected map[string]int,
+}, expected map[netip.Prefix]int,
 ) {
 	t.Helper()
 
-	actual := make(map[string]int)
+	actual := make(map[netip.Prefix]int)
 	for pfx, val := range tbl.All() {
-		actual[pfx.String()] = val
+		actual[pfx] = val
 	}
 
 	if len(actual) != len(expected) {
 		t.Fatalf("Expected %d prefixes, got %d", len(expected), len(actual))
 	}
 
-	for pfxStr, expectedVal := range expected {
-		actualVal, found := actual[pfxStr]
+	for pfx, expectedVal := range expected {
+		actualVal, found := actual[pfx]
 		if !found {
-			t.Errorf("Expected prefix %s not found", pfxStr)
+			t.Errorf("Expected prefix %s not found", pfx)
 			continue
 		}
 		if actualVal != expectedVal {
-			t.Errorf("Prefix %s: expected value %d, got %d", pfxStr, expectedVal, actualVal)
+			t.Errorf("Prefix %s: expected value %d, got %d", pfx, expectedVal, actualVal)
 		}
 	}
 }
 
 func verifyPrefixPresence[T any](t *testing.T, tbl interface {
 	All() iter.Seq2[netip.Prefix, T]
-}, expected map[string]int,
+}, expected map[netip.Prefix]int,
 ) {
 	t.Helper()
 
-	actual := make(map[string]bool)
+	actual := make(map[netip.Prefix]bool)
 	for pfx := range tbl.All() {
-		actual[pfx.String()] = true
+		actual[pfx] = true
 	}
 
 	if len(actual) != len(expected) {
 		t.Fatalf("Expected %d prefixes, got %d", len(expected), len(actual))
 	}
 
-	for pfxStr := range expected {
-		if !actual[pfxStr] {
-			t.Errorf("Expected prefix %s not found", pfxStr)
+	for pfx := range expected {
+		if !actual[pfx] {
+			t.Errorf("Expected prefix %s not found", pfx)
 		}
 	}
 }
