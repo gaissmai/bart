@@ -396,7 +396,7 @@ func (t *liteTable[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 }
 
 // Subnets returns an iterator over all subnets of the given prefix pfx
-// in reverse natural CIDR sort order (from most specific to least specific).
+// in natural CIDR sort order (from most specific to least specific).
 // This includes prefixes of the same length (exact match) and longer
 // (more specific) prefixes that are contained within the given prefix.
 //

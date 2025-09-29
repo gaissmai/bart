@@ -259,7 +259,7 @@ func (l *Lite) AllSorted6() iter.Seq[netip.Prefix] {
 }
 
 // Subnets returns an iterator over all subnets of the given prefix pfx
-// in reverse natural CIDR sort order (from most specific to least specific).
+// in natural CIDR sort order (from most specific to least specific).
 // This includes prefixes of the same length (exact match) and longer
 // (more specific) prefixes that are contained within the given prefix.
 //
