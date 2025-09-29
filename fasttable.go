@@ -302,7 +302,8 @@ LOOP:
 				pfxBits := int(art.PfxBits(depth, lpmIdx))
 
 				// calculate the lpmPfx from incoming ip and new mask
-				// netip.Addr.Prefix already canonicalize the prefix
+				// netip.Addr.Prefix canonicalizes. Invariant: art.PfxBits(depth, topIdx)
+				// yields a valid mask (v4: 0..32, v6: 0..128), so error is impossible.
 				lpmPfx, _ = ip.Prefix(pfxBits)
 				return lpmPfx, val2, ok2
 			}
