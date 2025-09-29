@@ -4,7 +4,6 @@
 package bart
 
 import (
-	"fmt"
 	"iter"
 	"maps"
 	"math/rand/v2"
@@ -159,112 +158,6 @@ func TestUnionDeterministic(t *testing.T) {
 
 				verifyResults[int](t, result, tc.expected)
 			})
-		})
-	}
-}
-
-// BenchmarkUnion benchmarks Union performance
-func BenchmarkUnion(b *testing.B) {
-	sizes := []struct {
-		size1, size2 int
-	}{
-		{100, 50},
-		{1000, 500},
-		{5000, 2500},
-	}
-
-	for _, size := range sizes {
-		// Setup test data once
-		prng := rand.New(rand.NewPCG(42, 42))
-		prefixes1 := randomPrefixes(prng, size.size1)
-		prefixes2 := randomPrefixes(prng, size.size2)
-
-		b.Run(fmt.Sprintf("Table_%dx%d", size.size1, size.size2), func(b *testing.B) {
-			b.ReportAllocs()
-			for b.Loop() {
-				tbl1 := new(Table[int])
-				tbl2 := new(Table[int])
-
-				for _, item := range prefixes1 {
-					tbl1.Insert(item.pfx, item.val)
-				}
-				for _, item := range prefixes2 {
-					tbl2.Insert(item.pfx, item.val)
-				}
-
-				tbl1.Union(tbl2)
-			}
-		})
-
-		b.Run(fmt.Sprintf("Fast_%dx%d", size.size1, size.size2), func(b *testing.B) {
-			b.ReportAllocs()
-			for b.Loop() {
-				tbl1 := new(Fast[int])
-				tbl2 := new(Fast[int])
-
-				for _, item := range prefixes1 {
-					tbl1.Insert(item.pfx, item.val)
-				}
-				for _, item := range prefixes2 {
-					tbl2.Insert(item.pfx, item.val)
-				}
-
-				tbl1.Union(tbl2)
-			}
-		})
-
-		b.Run(fmt.Sprintf("liteTable_%dx%d", size.size1, size.size2), func(b *testing.B) {
-			b.ReportAllocs()
-			for b.Loop() {
-				tbl1 := new(liteTable[int])
-				tbl2 := new(liteTable[int])
-
-				for _, item := range prefixes1 {
-					tbl1.Insert(item.pfx, item.val)
-				}
-				for _, item := range prefixes2 {
-					tbl2.Insert(item.pfx, item.val)
-				}
-
-				tbl1.Union(tbl2)
-			}
-		})
-	}
-}
-
-// BenchmarkUnionPersist benchmarks UnionPersist performance
-func BenchmarkUnionPersist(b *testing.B) {
-	sizes := []struct {
-		size1, size2 int
-	}{
-		{100, 50},
-		{1000, 500},
-		{2000, 1000},
-	}
-
-	for _, size := range sizes {
-		b.Run(fmt.Sprintf("Table_%dx%d", size.size1, size.size2), func(b *testing.B) {
-			// Setup test data
-			prng := rand.New(rand.NewPCG(42, 42))
-			prefixes1 := randomPrefixes(prng, size.size1)
-			prefixes2 := randomPrefixes(prng, size.size2)
-
-			// Pre-populate tables
-			tbl1 := new(Table[int])
-			tbl2 := new(Table[int])
-			for _, item := range prefixes1 {
-				tbl1.Insert(item.pfx, item.val)
-			}
-			for _, item := range prefixes2 {
-				tbl2.Insert(item.pfx, item.val)
-			}
-
-			b.ResetTimer()
-			b.ReportAllocs()
-
-			for b.Loop() {
-				_ = tbl1.UnionPersist(tbl2)
-			}
 		})
 	}
 }
@@ -1114,62 +1007,6 @@ func TestUnionDeterministicExtended(t *testing.T) {
 
 				verifyPrefixPresence[struct{}](t, &result.liteTable, tc.expected)
 			})
-		})
-	}
-}
-
-// Extended BenchmarkUnionPersist to include Fast and Lite
-func BenchmarkUnionPersistExtended(b *testing.B) {
-	sizes := []struct {
-		size1, size2 int
-	}{
-		{100, 50},
-		{1000, 500},
-		{2000, 1000},
-	}
-
-	for _, size := range sizes {
-		// Setup test data
-		prng := rand.New(rand.NewPCG(42, 42))
-		prefixes1 := randomPrefixes(prng, size.size1)
-		prefixes2 := randomPrefixes(prng, size.size2)
-
-		b.Run(fmt.Sprintf("Fast_%dx%d", size.size1, size.size2), func(b *testing.B) {
-			// Pre-populate tables
-			tbl1 := new(Fast[int])
-			tbl2 := new(Fast[int])
-			for _, item := range prefixes1 {
-				tbl1.Insert(item.pfx, item.val)
-			}
-			for _, item := range prefixes2 {
-				tbl2.Insert(item.pfx, item.val)
-			}
-
-			b.ResetTimer()
-			b.ReportAllocs()
-
-			for b.Loop() {
-				_ = tbl1.UnionPersist(tbl2)
-			}
-		})
-
-		b.Run(fmt.Sprintf("Lite_%dx%d", size.size1, size.size2), func(b *testing.B) {
-			// Pre-populate tables
-			tbl1 := new(Lite)
-			tbl2 := new(Lite)
-			for _, item := range prefixes1 {
-				tbl1.Insert(item.pfx)
-			}
-			for _, item := range prefixes2 {
-				tbl2.Insert(item.pfx)
-			}
-
-			b.ResetTimer()
-			b.ReportAllocs()
-
-			for b.Loop() {
-				_ = tbl1.UnionPersist(tbl2)
-			}
 		})
 	}
 }
