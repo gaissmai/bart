@@ -537,7 +537,7 @@ func (t *_TABLE_TYPE[V]) Overlaps6(o *_TABLE_TYPE[V]) bool {
 // This duplicate is shallow-copied by default, but if the value type V implements the
 // Cloner interface, the value is deeply cloned before insertion. See also _TABLE_TYPE.Clone.
 func (t *_TABLE_TYPE[V]) Union(o *_TABLE_TYPE[V]) {
-	if o == nil || (o.size4 == 0 && o.size6 == 0) {
+	if o == nil || o == t || (o.size4 == 0 && o.size6 == 0) {
 		return
 	}
 
@@ -561,7 +561,7 @@ func (t *_TABLE_TYPE[V]) Union(o *_TABLE_TYPE[V]) {
 // If o is nil or empty, no nodes are touched and the receiver may be
 // returned unchanged.
 func (t *_TABLE_TYPE[V]) UnionPersist(o *_TABLE_TYPE[V]) *_TABLE_TYPE[V] {
-	if o == nil || (o.size4 == 0 && o.size6 == 0) {
+	if o == nil || o == t || (o.size4 == 0 && o.size6 == 0) {
 		return t
 	}
 
@@ -605,6 +605,9 @@ func (t *_TABLE_TYPE[V]) UnionPersist(o *_TABLE_TYPE[V]) *_TABLE_TYPE[V] {
 func (t *_TABLE_TYPE[V]) Equal(o *_TABLE_TYPE[V]) bool {
 	if o == nil || t.size4 != o.size4 || t.size6 != o.size6 {
 		return false
+	}
+	if o == t {
+		return true
 	}
 
 	return t.root4.equalRec(&o.root4) && t.root6.equalRec(&o.root6)
