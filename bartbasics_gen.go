@@ -450,6 +450,16 @@ func (n *bartNode[V]) deletePersist(cloneFn cloneFunc[V], pfx netip.Prefix) (val
 	panic("unreachable")
 }
 
+// get retrieves the value associated with the given network prefix.
+// Returns the stored value and true if the prefix exists in this node,
+// zero value and false if the prefix is not found.
+//
+// Parameters:
+//   - pfx: The network prefix to look up (must be in canonical form)
+//
+// Returns:
+//   - val: The value associated with the prefix (zero value if not found)
+//   - exists: True if the prefix was found, false otherwise
 func (n *bartNode[V]) get(pfx netip.Prefix) (val V, exists bool) {
 	// invariant, prefix must be masked
 
@@ -496,6 +506,20 @@ func (n *bartNode[V]) get(pfx netip.Prefix) (val V, exists bool) {
 	panic("unreachable")
 }
 
+// modify performs an in-place modification of a prefix using the provided callback function.
+// The callback receives the current value (if found) and existence flag, and returns
+// a new value and deletion flag. Returns the size delta (-1, 0, +1), previous value,
+// and whether the prefix was deleted. This method handles path traversal, node creation
+// for new paths, and automatic purge/compress operations after deletions.
+//
+// Parameters:
+//   - pfx: The network prefix to modify (must be in canonical form)
+//   - cb: Callback function that receives (currentValue, exists) and returns (newValue, deleteFlag)
+//
+// Returns:
+//   - delta: Size change (-1 for delete, 0 for update/noop, +1 for insert)
+//   - value: The value before or after modification
+//   - deleted: True if the prefix was deleted, false otherwise
 func (n *bartNode[V]) modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del bool)) (delta int, _ V, deleted bool) {
 	var zero V
 
@@ -662,9 +686,13 @@ func (n *bartNode[V]) modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, 
 	panic("unreachable")
 }
 
-// equalRec compares two nodes recursively.
-// It checks equality of children/prefixes via bitsets, and recursively
-// descends into sub-nodes or compares leaf/fringe node values.
+// equalRec performs recursive structural equality comparison between two nodes.
+// Compares prefix and child bitsets, then recursively compares all stored values
+// and child nodes. Returns true if the nodes and their entire subtrees are
+// structurally and semantically identical, false otherwise.
+//
+// The comparison handles different node types (internal nodes, leafNodes, fringeNodes)
+// and uses the equal function for value comparisons to support custom equality logic.
 func (n *bartNode[V]) equalRec(o *bartNode[V]) bool {
 	if n == nil || o == nil {
 		return n == o
