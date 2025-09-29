@@ -480,7 +480,7 @@ func (t *liteTable[V]) Overlaps6(o *liteTable[V]) bool {
 // This duplicate is shallow-copied by default, but if the value type V implements the
 // Cloner interface, the value is deeply cloned before insertion. See also liteTable.Clone.
 func (t *liteTable[V]) Union(o *liteTable[V]) {
-	if o == nil || (o.size4 == 0 && o.size6 == 0) {
+	if o == nil || o == t || (o.size4 == 0 && o.size6 == 0) {
 		return
 	}
 
@@ -504,7 +504,7 @@ func (t *liteTable[V]) Union(o *liteTable[V]) {
 // If o is nil or empty, no nodes are touched and the receiver may be
 // returned unchanged.
 func (t *liteTable[V]) UnionPersist(o *liteTable[V]) *liteTable[V] {
-	if o == nil || (o.size4 == 0 && o.size6 == 0) {
+	if o == nil || o == t || (o.size4 == 0 && o.size6 == 0) {
 		return t
 	}
 
@@ -548,6 +548,9 @@ func (t *liteTable[V]) UnionPersist(o *liteTable[V]) *liteTable[V] {
 func (t *liteTable[V]) Equal(o *liteTable[V]) bool {
 	if o == nil || t.size4 != o.size4 || t.size6 != o.size6 {
 		return false
+	}
+	if o == t {
+		return true
 	}
 
 	return t.root4.equalRec(&o.root4) && t.root6.equalRec(&o.root6)
