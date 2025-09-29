@@ -273,7 +273,7 @@ func (n *bartNode[V]) purgeAndCompress(stack []*bartNode[V], octets []uint8, is4
 	}
 }
 
-// delete the prefix and returns the associated value and true if the prefix existed,
+// delete deletes the prefix and returns the associated value and true if the prefix existed,
 // or zero value and false otherwise. The prefix must be in canonical form.
 func (n *bartNode[V]) delete(pfx netip.Prefix) (val V, exists bool) {
 	// invariant, prefix must be masked

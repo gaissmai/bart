@@ -127,7 +127,7 @@ func lastOctetPlusOneAndLastBits(pfx netip.Prefix) (lastOctetPlusOne int, lastBi
 // but as a test against an allow-/deny-list it's often sufficient
 // and even few nanoseconds faster than [Table.Lookup].
 func (t *Table[V]) Contains(ip netip.Addr) bool {
-	// speed is top priority: no explicit test for ip.Isvalid
+	// speed is top priority: no explicit test for ip.IsValid
 	// if ip is invalid, AsSlice() returns nil, Contains returns false.
 	is4 := ip.Is4()
 	n := t.rootNodeByVersion(is4)
@@ -391,7 +391,8 @@ LOOP:
 			pfxBits := int(art.PfxBits(depth, topIdx))
 
 			// calculate the lpmPfx from incoming ip and new mask
-			// netip.Addr.Prefix already canonicalize the prefix
+			// netip.Addr.Prefix canonicalizes. Invariant: art.PfxBits(depth, topIdx)
+			// yields a valid mask (v4: 0..32, v6: 0..128), so error is impossible.
 			lpmPfx, _ = ip.Prefix(pfxBits)
 			return lpmPfx, val, ok2
 		}
