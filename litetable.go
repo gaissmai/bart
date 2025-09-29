@@ -74,11 +74,12 @@ func (l *Lite) DeletePersist(pfx netip.Prefix) (*Lite, bool) {
 // It should return a boolean indicating whether to delete the prefix.
 // Since Lite is prefix-only, no value handling is needed.
 //
-// If the callback returns del=true for an existing prefix, it will be deleted.
-// If the callback returns del=false for a non-existing prefix, it will be inserted.
-// If the callback returns del=false for an existing prefix, it's a no-op.
+//   - for cb(exists==true)  -> del=true,  delete prefix
+//   - for cb(exists==false) -> del=false, insert prefix
+//   - for cb(exists==true)  -> del=false, no-op
 //
-// Returns a boolean indicating whether a prefix was deleted during the operation.
+// Modify returns a boolean indicating whether a prefix was deleted during
+// the operation.
 func (l *Lite) Modify(pfx netip.Prefix, cb func(exists bool) (del bool)) bool {
 	// Adapt the callback to work with liteTable's signature
 	adaptedCb := func(_ struct{}, exists bool) (_ struct{}, del bool) {
@@ -160,16 +161,23 @@ func (l *Lite) WalkPersist(fn func(*Lite, netip.Prefix) (*Lite, bool)) *Lite {
 	wrappedFn := func(lp *liteTable[struct{}], pfx netip.Prefix, _ struct{}) (*liteTable[struct{}], bool) {
 		// Convert liteTable to Lite for the callback
 		//nolint:govet // copy of *lp is here by intention
-		liteInstance := &Lite{*lp}
+		oldLite := &Lite{*lp}
 
 		// Call the user's callback
-		newLite, cont := fn(liteInstance, pfx)
+		newLite, cont := fn(oldLite, pfx)
+		if newLite == nil {
+			return nil, cont
+		}
 
 		// Return the underlying liteTable and continuation flag
 		return &newLite.liteTable, cont
 	}
 
 	lp := l.liteTable.WalkPersist(wrappedFn)
+	if lp == nil {
+		return nil
+	}
+
 	//nolint:govet // copy of *lp is here by intention
 	return &Lite{*lp}
 }
