@@ -37,16 +37,18 @@ func (l *Lite) Insert(pfx netip.Prefix) {
 	l.liteTable.Insert(pfx, struct{}{})
 }
 
-// InsertPersist adds a prefix to the routing table using copy-on-write semantics.
-// It creates a new Lite instance with the prefix added while leaving the original
-// unchanged. This enables functional programming patterns and safe concurrent access.
+// InsertPersist is similar to Insert but the receiver isn't modified.
 //
-// The method internally uses a persistent insert mechanism, ensuring
-// structural sharing between the original and new instances for memory efficiency.
-// Only the nodes along the insertion path are cloned; all other nodes are shared.
+// All nodes touched during insert are cloned and a new Table is returned.
+// This is not a full [Lite.Clone], all untouched nodes are still referenced
+// from both Tables.
 //
-// Returns a new Lite instance containing all original prefixes plus the new one.
-// If the prefix already exists, it returns a new instance with the same content.
+// This is orders of magnitude slower than Insert,
+// typically taking μsec instead of nsec.
+//
+// The bulk table load could be done with [Lite.Insert] and then you can
+// use [Lite.InsertPersist], [Lite.ModifyPersist] and [Lite.DeletePersist]
+// for further lock-free ops.
 func (l *Lite) InsertPersist(pfx netip.Prefix) *Lite {
 	lp := l.liteTable.InsertPersist(pfx, struct{}{})
 	//nolint:govet // copy of *lp is here by intention
@@ -248,16 +250,19 @@ func (l *Lite) AllSorted6() iter.Seq[netip.Prefix] {
 	return dropSeq2(l.liteTable.AllSorted6())
 }
 
-// Subnets returns an iterator over all prefixes in the routing table
-// that are fully contained within the given prefix pfx.
-//
-// Entries are returned in CIDR sort order.
+// Subnets returns an iterator over all subnets of the given prefix pfx
+// in reverse natural CIDR sort order (from most specific to least specific).
+// This includes prefixes of the same length (exact match) and longer
+// (more specific) prefixes that are contained within the given prefix.
 //
 // Example:
 //
 //	for sub := range table.Subnets(netip.MustParsePrefix("10.0.0.0/8")) {
 //	    fmt.Println("Covered:", sub)
 //	}
+//
+// The iteration can be stopped early by breaking from the range loop.
+// Returns an empty iterator if the prefix is invalid.
 func (l *Lite) Subnets(pfx netip.Prefix) iter.Seq[netip.Prefix] {
 	return dropSeq2(l.liteTable.Subnets(pfx))
 }
@@ -555,7 +560,8 @@ LOOP:
 			pfxBits := int(art.PfxBits(depth, topIdx))
 
 			// calculate the lpmPfx from incoming ip and new mask
-			// netip.Addr.Prefix already canonicalize the prefix
+			// netip.Addr.Prefix canonicalizes. Invariant: art.PfxBits(depth, topIdx)
+			// yields a valid mask (v4: 0..32, v6: 0..128), so error is impossible.
 			lpmPfx, _ = ip.Prefix(pfxBits)
 			return lpmPfx, zero, ok
 		}
