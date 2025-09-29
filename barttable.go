@@ -1,26 +1,6 @@
 // Copyright (c) 2025 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
-// Package bart provides a high-performance Balanced Routing Table (BART).
-//
-// BART is balanced in terms of memory usage and lookup time
-// for longest-prefix match (LPM) queries on IPv4 and IPv6 addresses.
-//
-// Internally, BART is implemented as a multibit trie with a fixed stride of 8 bits.
-// Each level node uses a fast mapping function (adapted from D. E. Knuth's ART algorithm)
-// to arrange all 256 possible prefixes in a complete binary tree structure.
-//
-// Instead of allocating full arrays, BART uses popcount-compressed sparse arrays
-// and aggressive path compression. This results in up to 100x less memory usage
-// than ART, while maintaining or even improving lookup speed.
-//
-// Lookup operations are entirely bit-vector based and rely on precomputed
-// lookup tables. Because the data fits within 256-bit blocks, it allows
-// for extremely efficient, cacheline-aligned access and is accelerated by
-// CPU instructions such as POPCNT, LZCNT, and TZCNT.
-//
-// The fixed 256-bit representation (4x uint64) permits loop unrolling in hot paths,
-// ensuring predictable and fast performance even under high routing load.
 package bart
 
 import (
