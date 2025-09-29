@@ -248,16 +248,19 @@ func (l *Lite) AllSorted6() iter.Seq[netip.Prefix] {
 	return dropSeq2(l.liteTable.AllSorted6())
 }
 
-// Subnets returns an iterator over all prefixes in the routing table
-// that are fully contained within the given prefix pfx.
-//
-// Entries are returned in CIDR sort order.
+// Subnets returns an iterator over all subnets of the given prefix pfx
+// in reverse natural CIDR sort order (from most specific to least specific).
+// This includes prefixes of the same length (exact match) and longer
+// (more specific) prefixes that are contained within the given prefix.
 //
 // Example:
 //
 //	for sub := range table.Subnets(netip.MustParsePrefix("10.0.0.0/8")) {
 //	    fmt.Println("Covered:", sub)
 //	}
+//
+// The iteration can be stopped early by breaking from the range loop.
+// Returns an empty iterator if the prefix is invalid.
 func (l *Lite) Subnets(pfx netip.Prefix) iter.Seq[netip.Prefix] {
 	return dropSeq2(l.liteTable.Subnets(pfx))
 }
