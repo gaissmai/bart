@@ -65,25 +65,42 @@ var a = netip.MustParseAddr
 var p = netip.MustParsePrefix
 
 func main() {
-  // Simple ACL with bart.Lite
   allowList := new(bart.Lite)
 
   // Add allowed networks
   allowList.Insert(p("192.168.0.0/16"))
   allowList.Insert(p("2001:db8::/32"))
+  allowList.Insert(p("10.0.0.0/24"))
 
-  // Test some IPs
+  // Test some IPs with Contains (longest-prefix match)
   testIPs := []netip.Addr{
-    a("192.168.1.100"), // allowed
-    a("2001:db8::1"),   // allowed
-    a("172.16.0.1"),    // denied
+    a("192.168.1.100"), // allowed (matches 192.168.0.0/16)
+    a("2001:db8::1"),   // allowed (matches 2001:db8::/32)
+    a("172.16.0.1"),    // denied (no match)
   }
 
   for _, ip := range testIPs {
     if allowList.Contains(ip) {
-      // ALLOWED
+      fmt.Printf("✅ %s is allowed\n", ip)
     } else {
-      // DENIED
+      fmt.Printf("❌ %s is denied\n", ip)
+    }
+  }
+
+  // Exact-prefix checks with Get (not longest-prefix match)
+  exactPrefixes := []netip.Prefix{
+    p("192.168.0.0/16"),  // exists exactly
+    p("192.168.1.0/24"),  // doesn't exist (would be covered by /16, but not stored exactly)
+    p("10.0.0.0/24"),     // exists exactly
+    p("10.0.0.0/16"),     // doesn't exist (only /24 is stored)
+  }
+
+  fmt.Println("\nExact-prefix checks:")
+  for _, pfx := range exactPrefixes {
+    if allowList.Get(pfx) {
+      fmt.Printf("✅ Exact prefix %s exists in table\n", pfx)
+    } else {
+      fmt.Printf("❌ Exact prefix %s not found in table\n", pfx)
     }
   }
 }
