@@ -459,7 +459,7 @@ func (n *fastNode[V]) subnets(pfx netip.Prefix, yield func(netip.Prefix, V) bool
 		// so those are handled below via the fringe/leaf path.
 		if depth == lastOctetPlusOne {
 			idx := art.PfxToIdx(octet, lastBits)
-			_ = n.eachSubnet(octets, depth, is4, idx, yield)
+			n.eachSubnet(octets, depth, is4, idx, yield)
 			return
 		}
 
@@ -476,16 +476,16 @@ func (n *fastNode[V]) subnets(pfx netip.Prefix, yield func(netip.Prefix, V) bool
 
 		case *leafNode[V]:
 			if pfx.Bits() <= kid.prefix.Bits() && pfx.Overlaps(kid.prefix) {
-				_ = yield(kid.prefix, kid.value)
+				yield(kid.prefix, kid.value)
 			}
-			return
+			return // immediate return
 
 		case *fringeNode[V]:
 			fringePfx := cidrForFringe(octets, depth, is4, octet)
 			if pfx.Bits() <= fringePfx.Bits() && pfx.Overlaps(fringePfx) {
-				_ = yield(fringePfx, kid.value)
+				yield(fringePfx, kid.value)
 			}
-			return
+			return // immediate return
 
 		default:
 			panic("logic error, wrong node type")
