@@ -37,16 +37,18 @@ func (l *Lite) Insert(pfx netip.Prefix) {
 	l.liteTable.Insert(pfx, struct{}{})
 }
 
-// InsertPersist adds a prefix to the routing table using copy-on-write semantics.
-// It creates a new Lite instance with the prefix added while leaving the original
-// unchanged. This enables functional programming patterns and safe concurrent access.
+// InsertPersist is similar to Insert but the receiver isn't modified.
 //
-// The method internally uses a persistent insert mechanism, ensuring
-// structural sharing between the original and new instances for memory efficiency.
-// Only the nodes along the insertion path are cloned; all other nodes are shared.
+// All nodes touched during insert are cloned and a new Table is returned.
+// This is not a full [Lite.Clone], all untouched nodes are still referenced
+// from both Tables.
 //
-// Returns a new Lite instance containing all original prefixes plus the new one.
-// If the prefix already exists, it returns a new instance with the same content.
+// This is orders of magnitude slower than Insert,
+// typically taking μsec instead of nsec.
+//
+// The bulk table load could be done with [Lite.Insert] and then you can
+// use [Lite.InsertPersist], [Lite.ModifyPersist] and [Lite.DeletePersist]
+// for further lock-free ops.
 func (l *Lite) InsertPersist(pfx netip.Prefix) *Lite {
 	lp := l.liteTable.InsertPersist(pfx, struct{}{})
 	//nolint:govet // copy of *lp is here by intention
