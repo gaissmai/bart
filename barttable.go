@@ -127,7 +127,7 @@ func lastOctetPlusOneAndLastBits(pfx netip.Prefix) (lastOctetPlusOne int, lastBi
 // but as a test against an allow-/deny-list it's often sufficient
 // and even few nanoseconds faster than [Table.Lookup].
 func (t *Table[V]) Contains(ip netip.Addr) bool {
-	// speed is top priority: no explicit test for ip.Isvalid
+	// speed is top priority: no explicit test for ip.IsValid
 	// if ip is invalid, AsSlice() returns nil, Contains returns false.
 	is4 := ip.Is4()
 	n := t.rootNodeByVersion(is4)
