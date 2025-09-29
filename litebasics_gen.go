@@ -357,8 +357,8 @@ func (n *liteNode[V]) delete(pfx netip.Prefix) (val V, exists bool) {
 }
 
 // deletePersist is similar to delete but does not mutate the original trie.
-// Assumes the caller has pre-cloned the root (COW). It flat clones internal nodes
-// along the descent path before mutating them.
+// Assumes the caller has pre-cloned the root (COW). It clones the
+// internal nodes along the descent path before mutating them.
 func (n *liteNode[V]) deletePersist(cloneFn cloneFunc[V], pfx netip.Prefix) (val V, exists bool) {
 	ip := pfx.Addr() // the pfx must be in canonical form
 	is4 := ip.Is4()
@@ -510,6 +510,8 @@ func (n *liteNode[V]) modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, 
 
 	// find the proper trie node to update prefix
 	for depth, octet := range octets {
+		depth = depth & depthMask // BCE
+
 		// push current node on stack for path recording
 		stack[depth] = n
 
