@@ -185,8 +185,17 @@ func (t *_TABLE_TYPE[V]) Delete(pfx netip.Prefix) (val V, exists bool) {
 	return val, exists
 }
 
-// Get returns the associated payload for prefix and true, or false if
-// prefix is not set in the routing table.
+// Get performs an exact-prefix lookup and returns whether the exact
+// prefix exists. The prefix is canonicalized (Masked) before lookup.
+//
+// This is an exact-match operation (no LPM). The prefix must match exactly
+// in both address and prefix length to be found. If pfx exists, the
+// associated value (zero value for Lite) and found=true is returned.
+// If pfx does not exist or pfx is invalid, the zero value for V and
+// found=false is returned.
+//
+// For longest-prefix-match (LPM) lookups, use Contains(ip), Lookup(ip),
+// LookupPrefix(pfx) or LookupPrefixLPM(pfx) instead.
 func (t *_TABLE_TYPE[V]) Get(pfx netip.Prefix) (val V, exists bool) {
 	if !pfx.IsValid() {
 		return val, exists
