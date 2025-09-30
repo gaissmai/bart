@@ -494,8 +494,9 @@ LOOP:
 				return netip.Prefix{}, true
 			}
 
-			// sic, get the LPM prefix back, it costs some cycles!
-			fringePfx := cidrForFringe(octets, depth, is4, octet)
+			// get the LPM prefix back from ip and depth
+			// it's a fringe, bits are always /8, /16, /24, ...
+			fringePfx, _ := ip.Prefix((depth + 1) << 3)
 			return fringePfx, true
 
 		default:
@@ -528,7 +529,8 @@ LOOP:
 		}
 
 		// manually inlined: lookupIdx(idx)
-		if topIdx, ok := n.prefixes.IntersectionTop(&lpm.LookupTbl[idx]); ok {
+		var topIdx uint8
+		if topIdx, ok = n.prefixes.IntersectionTop(&lpm.LookupTbl[idx]); ok {
 			// called from LookupPrefix
 			if !withLPM {
 				return netip.Prefix{}, ok
