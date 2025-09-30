@@ -11,7 +11,7 @@ import (
 	"github.com/gaissmai/bart/internal/lpm"
 )
 
-// Table represents a thread-safe IPv4 and IPv6 routing table with payload V.
+// Table represents a IPv4 and IPv6 routing table with payload V.
 //
 // The zero value is ready to use.
 //

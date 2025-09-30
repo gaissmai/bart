@@ -10,26 +10,15 @@ import (
 	"github.com/gaissmai/bart/internal/art"
 )
 
-// Fast follows the original ART design by Knuth in using fixed
-// 256-slot arrays at each level.
+// Fast follows the ART design by Knuth in using fixed arrays at each level
+// combined with the same path and fringe compression invented for BART.
 //
-// Both [bart.Fast] and [bart.Table] use the same novel path and fringe
-// compression, but they differ in how levels are represented:
+// As a result Fast sacrifices memory efficiency to achieve 50-100% higher
+// speed.
 //
-//   - [bart.Fast]:  uncompressed  fixed level arrays + path compression
-//   - [bart.Table]: popcount-compressed level arrays + path compression
+// The zero value is ready to use.
 //
-// As a result:
-//   - [bart.Fast]  sacrifices memory efficiency to achieve 50-100% higher speed
-//   - [bart.Table] minimizes memory consumption as much as possible
-//
-// Which variant is preferable depends on the use case: [bart.Fast] is most
-// beneficial when maximum speed for longest-prefix-match is the top priority,
-// for example in a Forwarding Information Base (FIB).
-//
-// For the full Internet routing table, the [bart.Fast] structure alone requires
-// about 250 MB of memory, with additional space needed for payload such as
-// next hop, interface, and further attributes.
+// A Table must not be copied by value; always pass by pointer.
 //
 // Performance note: Do not pass IPv4-in-IPv6 addresses (e.g., ::ffff:192.0.2.1)
 // as input. The methods do not perform automatic unmapping to avoid unnecessary
