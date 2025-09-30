@@ -114,21 +114,21 @@ func TestUnionDeterministic(t *testing.T) {
 				verifyResults[int](t, tbl1, tc.expected)
 			})
 
-			t.Run("liteTable_Union", func(t *testing.T) {
+			t.Run("Lite_Union", func(t *testing.T) {
 				t.Parallel()
-				tbl1 := new(liteTable[int])
-				tbl2 := new(liteTable[int])
+				tbl1 := new(Lite)
+				tbl2 := new(Lite)
 
-				for i, pfxStr := range tc.prefixes1 {
-					tbl1.Insert(mpp(pfxStr), tc.values1[i])
+				for _, pfxStr := range tc.prefixes1 {
+					tbl1.Insert(mpp(pfxStr))
 				}
-				for i, pfxStr := range tc.prefixes2 {
-					tbl2.Insert(mpp(pfxStr), tc.values2[i])
+				for _, pfxStr := range tc.prefixes2 {
+					tbl2.Insert(mpp(pfxStr))
 				}
 
 				tbl1.Union(tbl2)
 
-				// Only verify prefix presence for liteTable
+				// Only verify prefix presence for Lite
 				verifyPrefixPresence(t, tbl1, tc.expected)
 			})
 
@@ -970,7 +970,7 @@ func TestUnionDeterministicExtended(t *testing.T) {
 				tbl1.Union(tbl2)
 
 				// For Lite, we only verify prefix presence
-				verifyPrefixPresence[struct{}](t, &tbl1.liteTable, tc.expected)
+				verifyPrefixPresence(t, tbl1, tc.expected)
 			})
 
 			// Test Fast_UnionPersist
@@ -1024,7 +1024,7 @@ func TestUnionDeterministicExtended(t *testing.T) {
 					t.Fatal("UnionPersist modified original table")
 				}
 
-				verifyPrefixPresence[struct{}](t, &result.liteTable, tc.expected)
+				verifyPrefixPresence(t, result, tc.expected)
 			})
 		})
 	}
@@ -1067,10 +1067,7 @@ func verifyResults[T any](t *testing.T, tbl interface {
 	}
 }
 
-func verifyPrefixPresence[T any](t *testing.T, tbl interface {
-	All() iter.Seq2[netip.Prefix, T]
-}, expected map[netip.Prefix]int,
-) {
+func verifyPrefixPresence(t *testing.T, tbl *Lite, expected map[netip.Prefix]int) {
 	t.Helper()
 
 	actual := make(map[netip.Prefix]bool)
