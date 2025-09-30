@@ -775,6 +775,38 @@ func FuzzFastUnionPersistAliasing(f *testing.F) {
 		if val3, found := resultTable3.Get(testPrefix); found && val3 == 55555 {
 			t.Fatal("UnionPersist results share memory (deep aliasing bug)")
 		}
+
+		// TEST 5: Multiple UnionPersist operations should be independent
+		resultTable2 = tbl1.UnionPersist(tbl2)
+		resultTable3 = resultTable.UnionPersist(tbl1)
+
+		// Modify resultTable2
+		testPrefix = mpp("10.99.99.0/24")
+		_ = resultTable2.InsertPersist(testPrefix, 55555)
+
+		// resultTable3 should not be affected
+		if val3, found := resultTable3.Get(testPrefix); found && val3 == 55555 {
+			t.Fatal("UnionPersist results share memory (deep aliasing bug)")
+		}
+
+		// TEST 6: Nested UnionPersist chain
+		chain1 := tbl1.UnionPersist(tbl2)
+		chain2 := chain1.UnionPersist(tbl1)
+		chain3 := chain2.UnionPersist(tbl2)
+
+		// All should be independent
+		testPrefix2 := mpp("192.168.99.0/24")
+		chain1 = chain1.InsertPersist(testPrefix2, 111)
+		chain2 = chain2.InsertPersist(testPrefix2, 222)
+		chain3 = chain3.InsertPersist(testPrefix2, 333)
+
+		val1, _ := chain1.Get(testPrefix2)
+		val2, _ := chain2.Get(testPrefix2)
+		val3, _ := chain3.Get(testPrefix2)
+
+		if val1 == val2 || val2 == val3 || val1 == val3 {
+			t.Fatalf("Chained UnionPersist tables share state: %d, %d, %d", val1, val2, val3)
+		}
 	})
 }
 
