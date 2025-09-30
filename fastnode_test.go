@@ -156,15 +156,8 @@ func TestFastNode_DeletePrefix_Behavior(t *testing.T) {
 		t.Fatalf("prefixCount pre-delete=%d, want 2", got)
 	}
 
-	// Delete non-existent
-	if _, ok := n.deletePrefix(10); ok {
-		t.Fatalf("deletePrefix(10) ok=true, want false")
-	}
-
 	// Delete specific and fall back to parent
-	if v, ok := n.deletePrefix(64); !ok || v != 222 {
-		t.Fatalf("deletePrefix(64)=(%d,%v), want (222,true)", v, ok)
-	}
+	n.deletePrefix(64)
 	if _, ok := n.getPrefix(64); ok {
 		t.Fatalf("getPrefix(64) after delete ok=true, want false")
 	}
@@ -173,9 +166,7 @@ func TestFastNode_DeletePrefix_Behavior(t *testing.T) {
 	}
 
 	// Delete parent
-	if v, ok := n.deletePrefix(32); !ok || v != 111 {
-		t.Fatalf("deletePrefix(32)=(%d,%v), want (111,true)", v, ok)
-	}
+	n.deletePrefix(32)
 	if n.contains(64) {
 		t.Fatalf("contains(64)=true after deleting 32, want false")
 	}

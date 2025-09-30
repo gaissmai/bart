@@ -31,7 +31,7 @@ func (n *_NODE_TYPE[V]) childCount() (_ int)                       { return }
 func (n *_NODE_TYPE[V]) mustGetPrefix(uint8) (_ V)                 { return }
 func (n *_NODE_TYPE[V]) mustGetChild(uint8) (_ any)                { return }
 func (n *_NODE_TYPE[V]) insertPrefix(uint8, V) (_ bool)            { return }
-func (n *_NODE_TYPE[V]) deletePrefix(uint8) (_ V, _ bool)          { return }
+func (n *_NODE_TYPE[V]) deletePrefix(uint8) (_ bool)               { return }
 func (n *_NODE_TYPE[V]) getChild(uint8) (_ any, _ bool)            { return }
 func (n *_NODE_TYPE[V]) getPrefix(uint8) (_ V, _ bool)             { return }
 func (n *_NODE_TYPE[V]) insertChild(uint8, any) (_ bool)           { return }
@@ -307,7 +307,7 @@ func (n *_NODE_TYPE[V]) purgeAndCompress(stack []*_NODE_TYPE[V], octets []uint8,
 
 // delete deletes the prefix and returns the associated value and true if the prefix existed,
 // or zero value and false otherwise. The prefix must be in canonical form.
-func (n *_NODE_TYPE[V]) delete(pfx netip.Prefix) (val V, exists bool) {
+func (n *_NODE_TYPE[V]) delete(pfx netip.Prefix) (exists bool) {
 	// invariant, prefix must be masked
 
 	// values derived from pfx
@@ -332,18 +332,17 @@ func (n *_NODE_TYPE[V]) delete(pfx netip.Prefix) (val V, exists bool) {
 		// so those are handled below via the fringe/leaf path.
 		if depth == lastOctetPlusOne {
 			// try to delete prefix in trie node
-			val, exists = n.deletePrefix(art.PfxToIdx(octet, lastBits))
-			if !exists {
-				return val, exists
+			if exists = n.deletePrefix(art.PfxToIdx(octet, lastBits)); !exists {
+				return false
 			}
 
 			// remove now-empty nodes and re-path-compress upwards
 			n.purgeAndCompress(stack[:depth], octets, is4)
-			return val, true
+			return true
 		}
 
 		if !n.children.Test(octet) {
-			return val, exists
+			return false
 		}
 		kid := n.mustGetChild(octet)
 
@@ -355,7 +354,7 @@ func (n *_NODE_TYPE[V]) delete(pfx netip.Prefix) (val V, exists bool) {
 		case *fringeNode[V]:
 			// if pfx is no fringe at this depth, fast exit
 			if !isFringe(depth, pfx) {
-				return val, exists
+				return false
 			}
 
 			// pfx is fringe at depth, delete fringe
@@ -364,12 +363,12 @@ func (n *_NODE_TYPE[V]) delete(pfx netip.Prefix) (val V, exists bool) {
 			// remove now-empty nodes and re-path-compress upwards
 			n.purgeAndCompress(stack[:depth], octets, is4)
 
-			return kid.value, true
+			return true
 
 		case *leafNode[V]:
 			// Attention: pfx must be masked to be comparable!
 			if kid.prefix != pfx {
-				return val, exists
+				return false
 			}
 
 			// prefix is equal leaf, delete leaf
@@ -378,20 +377,20 @@ func (n *_NODE_TYPE[V]) delete(pfx netip.Prefix) (val V, exists bool) {
 			// remove now-empty nodes and re-path-compress upwards
 			n.purgeAndCompress(stack[:depth], octets, is4)
 
-			return kid.value, true
+			return true
 
 		default:
 			panic("logic error, wrong node type")
 		}
 	}
 
-	return val, exists
+	panic("unreachable")
 }
 
 // deletePersist is similar to delete but does not mutate the original trie.
 // Assumes the caller has pre-cloned the root (COW). It clones the
 // internal nodes along the descent path before mutating them.
-func (n *_NODE_TYPE[V]) deletePersist(cloneFn cloneFunc[V], pfx netip.Prefix) (val V, exists bool) {
+func (n *_NODE_TYPE[V]) deletePersist(cloneFn cloneFunc[V], pfx netip.Prefix) (exists bool) {
 	ip := pfx.Addr() // the pfx must be in canonical form
 	is4 := ip.Is4()
 	octets := ip.AsSlice()
@@ -408,23 +407,22 @@ func (n *_NODE_TYPE[V]) deletePersist(cloneFn cloneFunc[V], pfx netip.Prefix) (v
 
 		if depth == lastOctetPlusOne {
 			// Attempt to delete the prefix from the node's prefixes.
-			val, exists = n.deletePrefix(art.PfxToIdx(octet, lastBits))
-			if !exists {
+			if exists = n.deletePrefix(art.PfxToIdx(octet, lastBits)); !exists {
 				// Prefix not found, nothing deleted.
-				return val, false
+				return false
 			}
 
 			// After deletion, purge nodes and compress the path if needed.
 			n.purgeAndCompress(stack[:depth], octets, is4)
 
-			return val, true
+			return true
 		}
 
 		addr := octet
 
 		// If child node doesn't exist, no prefix to delete.
 		if !n.children.Test(addr) {
-			return val, false
+			return false
 		}
 
 		// Fetch child node at current address.
@@ -446,7 +444,7 @@ func (n *_NODE_TYPE[V]) deletePersist(cloneFn cloneFunc[V], pfx netip.Prefix) (v
 			// Reached a path compressed fringe.
 			if !isFringe(depth, pfx) {
 				// Prefix to delete not found here.
-				return val, false
+				return false
 			}
 
 			// Delete the fringe node.
@@ -455,13 +453,13 @@ func (n *_NODE_TYPE[V]) deletePersist(cloneFn cloneFunc[V], pfx netip.Prefix) (v
 			// Purge and compress affected path.
 			n.purgeAndCompress(stack[:depth], octets, is4)
 
-			return kid.value, true
+			return true
 
 		case *leafNode[V]:
 			// Reached a path compressed leaf node.
 			if kid.prefix != pfx {
 				// Leaf prefix does not match; nothing to delete.
-				return val, false
+				return false
 			}
 
 			// Delete leaf node.
@@ -470,7 +468,7 @@ func (n *_NODE_TYPE[V]) deletePersist(cloneFn cloneFunc[V], pfx netip.Prefix) (v
 			// Purge and compress affected path.
 			n.purgeAndCompress(stack[:depth], octets, is4)
 
-			return kid.value, true
+			return true
 
 		default:
 			// Unexpected node type indicates a logic error.
@@ -540,9 +538,11 @@ func (n *_NODE_TYPE[V]) get(pfx netip.Prefix) (val V, exists bool) {
 
 // modify performs an in-place modification of a prefix using the provided callback function.
 // The callback receives the current value (if found) and existence flag, and returns
-// a new value and deletion flag. Returns the size delta (-1, 0, +1), previous value,
-// and whether the prefix was deleted. This method handles path traversal, node creation
-// for new paths, and automatic purge/compress operations after deletions.
+// a new value and deletion flag.
+//
+// modify returns the size delta (-1, 0, +1).
+// This method handles path traversal, node creation for new paths, and automatic
+// purge/compress operations after deletions.
 //
 // Parameters:
 //   - pfx: The network prefix to modify (must be in canonical form)
@@ -550,9 +550,7 @@ func (n *_NODE_TYPE[V]) get(pfx netip.Prefix) (val V, exists bool) {
 //
 // Returns:
 //   - delta: Size change (-1 for delete, 0 for update/noop, +1 for insert)
-//   - value: The value before or after modification
-//   - deleted: True if the prefix was deleted, false otherwise
-func (n *_NODE_TYPE[V]) modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del bool)) (delta int, _ V, deleted bool) {
+func (n *_NODE_TYPE[V]) modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del bool)) (delta int) {
 	var zero V
 
 	ip := pfx.Addr()
@@ -583,21 +581,21 @@ func (n *_NODE_TYPE[V]) modify(pfx netip.Prefix, cb func(val V, found bool) (_ V
 			// update size if necessary
 			switch {
 			case !existed && del: // no-op
-				return 0, zero, false
+				return 0
 
 			case existed && del: // delete
 				n.deletePrefix(idx)
 				// remove now-empty nodes and re-path-compress upwards
 				n.purgeAndCompress(stack[:depth], octets, is4)
-				return -1, oldVal, true
+				return -1
 
 			case !existed: // insert
 				n.insertPrefix(idx, newVal)
-				return 1, newVal, false
+				return 1
 
 			case existed: // update
 				n.insertPrefix(idx, newVal)
-				return 0, oldVal, false
+				return 0
 
 			default:
 				panic("unreachable")
@@ -611,7 +609,7 @@ func (n *_NODE_TYPE[V]) modify(pfx netip.Prefix, cb func(val V, found bool) (_ V
 
 			newVal, del := cb(zero, false)
 			if del {
-				return 0, zero, false // no-op
+				return 0
 			}
 
 			// insert
@@ -621,7 +619,7 @@ func (n *_NODE_TYPE[V]) modify(pfx netip.Prefix, cb func(val V, found bool) (_ V
 				n.insertChild(octet, newLeafNode(pfx, newVal))
 			}
 
-			return 1, newVal, false
+			return 1
 		}
 
 		// n.children.Test(octet) == true
@@ -642,7 +640,7 @@ func (n *_NODE_TYPE[V]) modify(pfx netip.Prefix, cb func(val V, found bool) (_ V
 
 				if !del {
 					kid.value = newVal
-					return 0, oldVal, false // update
+					return 0
 				}
 
 				// delete
@@ -651,13 +649,13 @@ func (n *_NODE_TYPE[V]) modify(pfx netip.Prefix, cb func(val V, found bool) (_ V
 				// remove now-empty nodes and re-path-compress upwards
 				n.purgeAndCompress(stack[:depth], octets, is4)
 
-				return -1, oldVal, true
+				return -1
 			}
 
 			// stop if this is a no-op for zero values
 			newVal, del := cb(zero, false)
 			if del {
-				return 0, zero, false
+				return 0
 			}
 
 			// create new node
@@ -670,17 +668,15 @@ func (n *_NODE_TYPE[V]) modify(pfx netip.Prefix, cb func(val V, found bool) (_ V
 			newNode.insert(kid.prefix, kid.value, depth+1)
 			newNode.insert(pfx, newVal, depth+1)
 
-			return 1, newVal, false
+			return 1
 
 		case *fringeNode[V]:
-			oldVal := kid.value
-
 			// update existing value if prefix is fringe
 			if isFringe(depth, pfx) {
 				newVal, del := cb(kid.value, true)
 				if !del {
 					kid.value = newVal
-					return 0, oldVal, false // update
+					return 0
 				}
 
 				// delete
@@ -689,13 +685,13 @@ func (n *_NODE_TYPE[V]) modify(pfx netip.Prefix, cb func(val V, found bool) (_ V
 				// remove now-empty nodes and re-path-compress upwards
 				n.purgeAndCompress(stack[:depth], octets, is4)
 
-				return -1, oldVal, true
+				return -1
 			}
 
 			// stop if this is a no-op for zero values
 			newVal, del := cb(zero, false)
 			if del {
-				return 0, zero, false
+				return 0
 			}
 
 			// create new node
@@ -708,7 +704,7 @@ func (n *_NODE_TYPE[V]) modify(pfx netip.Prefix, cb func(val V, found bool) (_ V
 			newNode.insertPrefix(1, kid.value)
 			newNode.insert(pfx, newVal, depth+1)
 
-			return 1, newVal, false
+			return 1
 
 		default:
 			panic("logic error, wrong node type")

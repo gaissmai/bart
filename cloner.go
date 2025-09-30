@@ -4,8 +4,9 @@
 package bart
 
 // Cloner is an interface that enables deep cloning of values of type V.
-// If a value implements Cloner[V], Table methods such as InsertPersist, UpdatePersist,
-// DeletePersist, Clone, and Union will use its Clone method to perform deep copies.
+// If a value implements Cloner[V], Table methods such as InsertPersist,
+// ModifyPersist, DeletePersist, UnionPersist, Union and Clone will use
+// its Clone method to perform deep copies.
 type Cloner[V any] interface {
 	Clone() V
 }
@@ -136,7 +137,7 @@ func (n *bartNode[V]) cloneFlat(cloneFn cloneFunc[V]) *bartNode[V] {
 // Child nodes of type *leafNode[V] and *fringeNode[V] are already cloned
 // by cloneFlat.
 //
-// Returns a new instance of node[V] which is a complete deep clone of the
+// Returns a new instance of bartNode[V] which is a complete deep clone of the
 // receiver node with all descendants.
 func (n *bartNode[V]) cloneRec(cloneFn cloneFunc[V]) *bartNode[V] {
 	if n == nil {
@@ -275,7 +276,7 @@ func (n *liteNode[V]) cloneFlat(_ cloneFunc[V]) *liteNode[V] {
 // Then it recursively clones all child nodes of type *liteNode[V],
 // performing a full deep clone down the subtree.
 //
-// Child nodes of type *ileafNode and *fringeNode are already copied
+// Child nodes of type *leafNode and *fringeNode are already copied
 // by cloneFlat.
 //
 // Returns a new instance of liteNode[V] which is a complete deep clone of the
