@@ -102,12 +102,10 @@ func (t *liteTable[V]) InsertPersist(pfx netip.Prefix, val V) *liteTable[V] {
 	return pt
 }
 
-// Delete removes the exact prefix pfx from the table.
+// Delete removes the exact prefix pfx from the table in-place.
 //
 // This is an exact-match operation (no LPM). If pfx exists, the entry is
-// removed and the previous value is returned with ok=true. If pfx does not
-// exist or pfx is invalid, the table is left unchanged and the
-// zero value of V and ok=false are returned.
+// removed. If pfx does not exist or pfx is invalid, the table is left unchanged.
 //
 // The prefix is canonicalized (Masked) before lookup.
 func (t *liteTable[V]) Delete(pfx netip.Prefix) {
