@@ -211,15 +211,14 @@ func (t *Table[V]) Lookup(netip.Addr) (V, bool)
 func (t *Table[V]) LookupPrefix(netip.Prefix) (V, bool)
 func (t *Table[V]) LookupPrefixLPM(netip.Prefix) (netip.Prefix, V, bool)
 
+func (t *Table[V]) Get(netip.Prefix) (V, bool)
 func (t *Table[V]) Insert(netip.Prefix, V)
-func (t *Table[V]) Modify(netip.Prefix, cb func(_ V, bool) (_ V, bool)) (_ V, bool)
-func (t *Table[V]) Delete(netip.Prefix) (V, exists bool)
-func (t *Table[V]) Get(netip.Prefix) (V, exists bool)
+func (t *Table[V]) Delete(netip.Prefix)
+func (t *Table[V]) Modify(netip.Prefix, cb func(V, bool) (V, bool))
 
 func (t *Table[V]) InsertPersist(netip.Prefix, V) *Table[V]
-func (t *Table[V]) ModifyPersist(netip.Prefix, cb func(_ V, bool) (_ V, bool)) (*Table[V], _ V, bool)
-func (t *Table[V]) DeletePersist(netip.Prefix) (*Table[V], V, bool)
-func (t *Table[V]) WalkPersist(fn func(*Table[V], netip.Prefix, V) (*Table[V], bool)) *Table[V]
+func (t *Table[V]) DeletePersist(netip.Prefix) *Table[V]
+func (t *Table[V]) ModifyPersist(netip.Prefix, cb func(V, bool) (V, bool)) *Table[V]
 
 func (t *Table[V]) Clone() *Table[V]
 func (t *Table[V]) Union(o *Table[V])

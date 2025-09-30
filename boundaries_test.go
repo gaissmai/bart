@@ -105,16 +105,7 @@ func TestBoundaryBehavior_DefaultRoutes(t *testing.T) {
 				}
 
 				// Test Delete
-				deleted, exists := tbl.Delete(pfx)
-				if !exists {
-					t.Error("default route should exist for deletion")
-				}
-				if !isLiteTable(tbl) {
-					if deleted.attributes["metric"] != 500 {
-						t.Error("deleted route should have correct metric")
-					}
-				}
-
+				tbl.Delete(pfx)
 				if tbl.Size() != 0 {
 					t.Errorf("expected size 0 after delete, got %d", tbl.Size())
 				}
@@ -203,12 +194,7 @@ func TestBoundaryBehavior_HostRoutes(t *testing.T) {
 				}
 
 				// Test Delete
-				if deleted, exists := tbl.Delete(pfx); !exists {
-					t.Error("host route should exist for deletion")
-				} else if deleted.exitIF != "host-if" {
-					t.Error("deleted route should have updated exitIF")
-				}
-
+				tbl.Delete(pfx)
 				if tbl.Size() != 0 {
 					t.Errorf("expected size 0 after delete, got %d", tbl.Size())
 				}
@@ -328,12 +314,7 @@ func TestBoundaryBehavior_TransitionPaths(t *testing.T) {
 				r := routes[i]
 				pfx := netip.MustParsePrefix(r.prefix)
 
-				if deleted, exists := tbl.Delete(pfx); !exists {
-					t.Errorf("route %s should exist for deletion", r.desc)
-				} else if deleted.attributes["metric"] != r.metric+1000 {
-					t.Errorf("deleted route %s should have modified metric", r.desc)
-				}
-
+				tbl.Delete(pfx)
 				expectedSize := i
 				if tbl.Size() != expectedSize {
 					t.Errorf("expected size %d after deleting %s, got %d", expectedSize, r.desc, tbl.Size())
@@ -528,12 +509,7 @@ func TestBoundaryBehavior_MixedPrefixLengths(t *testing.T) {
 			for _, p := range prefixes {
 				pfx := netip.MustParsePrefix(p.cidr)
 
-				if deleted, exists := tbl.Delete(pfx); !exists {
-					t.Errorf("Delete: route should exist for %s", p.desc)
-				} else if deleted.attributes["metric"] != p.metric+10000 {
-					t.Errorf("Delete returned wrong route for %s", p.desc)
-				}
-
+				tbl.Delete(pfx)
 				expectedSize--
 				if tbl.Size() != expectedSize {
 					t.Errorf("expected size %d after deleting %s, got %d", expectedSize, p.desc, tbl.Size())

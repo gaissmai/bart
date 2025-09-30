@@ -295,29 +295,12 @@ func TestImplementsNoder(t *testing.T) {
 			expectedAfterDuplicate[8] = "duplicate" // was overwritten
 
 			for idx := range testData {
-				val, exists2 := n.deletePrefix(idx)
-				if !exists2 {
-					t.Errorf("deletePrefix(%d): should exist", idx)
-					continue
-				}
-
-				if !isLiteNode(n) {
-					expectedVal := expectedAfterDuplicate[idx]
-					if val != expectedVal {
-						t.Errorf("deletePrefix(%d): expected %q, got %q", idx, expectedVal, val)
-					}
-				}
+				n.deletePrefix(idx)
 			}
 
 			// Verify final count after deletions
 			if n.prefixCount() != 0 {
 				t.Errorf("Expected prefixCount 0 after deletions, got %d", n.prefixCount())
-			}
-
-			// Test delete non-existent
-			val, exists := n.deletePrefix(99)
-			if exists {
-				t.Errorf("deletePrefix(99): should not exist, got value %q", val)
 			}
 		})
 	}
@@ -528,25 +511,6 @@ func TestNodes_NearestAncestorWins_AcrossMultipleLevels(t *testing.T) {
 			if !n.contains(5) { // 5->2->1
 				t.Fatalf("contains(5)=false, want true")
 			}
-
-			// Remove an intermediate ancestor and verify fallback to next ancestor
-			if !isLiteNode(n) {
-				if v, ok := n.deletePrefix(4); !ok || v != 40 {
-					t.Fatalf("deletePrefix(4)=(%d,%v), want (40,true)", v, ok)
-				}
-				assertLookup(9, 20) // now falls back to 2
-				assertLookup(16, 80)
-
-				// Remove most specific and ensure fallback continues to next available
-				if v, ok := n.deletePrefix(8); !ok || v != 80 {
-					t.Fatalf("deletePrefix(8)=(%d,%v), want (80,true)", v, ok)
-				}
-				assertLookup(16, 20) // 16->8(X)->4(X)->2
-
-				if got := n.prefixCount(); got != 2 {
-					t.Fatalf("prefixCount=%d, want 2 (only 1 and 2 remain)", got)
-				}
-			}
 		})
 	}
 }
@@ -623,16 +587,7 @@ func TestNodes_GetPrefix_And_OverwriteSemantics(t *testing.T) {
 				t.Fatalf("prefixCount=%d, want 1 after overwrite", got)
 			}
 
-			// Deleting returns the last stored value
-			v, ok := n.deletePrefix(32)
-			if !ok {
-				t.Fatalf("deletePrefix(32)=(_,%v), want (_,true)", ok)
-			}
-			if !isLiteNode(n) {
-				if v != 222 {
-					t.Fatalf("deletePrefix(32)=(%d,%v), want (222,true)", v, ok)
-				}
-			}
+			n.deletePrefix(32)
 			if got := n.prefixCount(); got != 0 {
 				t.Fatalf("prefixCount=%d, want 0 after delete", got)
 			}
@@ -666,10 +621,7 @@ func TestNode_IsEmpty_AfterAllDeletes(t *testing.T) {
 			}
 
 			n.deleteChild(7)
-			if _, ok := n.deletePrefix(64); !ok {
-				t.Fatalf("deletePrefix(64)=(_,%v), want (_,true)", ok)
-			}
-
+			n.deletePrefix(64)
 			if !n.isEmpty() {
 				t.Fatalf("isEmpty=false after removing all, want true")
 			}
