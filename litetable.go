@@ -54,7 +54,7 @@ func (l *Lite) Get(pfx netip.Prefix) bool {
 //
 // Returns true if any prefix matches addr, otherwise false.
 func (l *Lite) Lookup(ip netip.Addr) bool {
-	return l.liteTable.Contains(ip)
+	return l.Contains(ip)
 }
 
 // LookupPrefix performs a longest prefix match lookup for any address within
@@ -62,7 +62,7 @@ func (l *Lite) Lookup(ip netip.Addr) bool {
 //
 // Returns true if a matching prefix is found, otherwise false.
 func (l *Lite) LookupPrefix(pfx netip.Prefix) bool {
-	_, _, ok := l.liteTable.lookupPrefixLPM(pfx, false)
+	_, _, ok := l.lookupPrefixLPM(pfx, false)
 	return ok
 }
 
@@ -78,7 +78,7 @@ func (l *Lite) LookupPrefix(pfx netip.Prefix) bool {
 //
 // Returns the matching prefix and true if found, otherwise the zero value and false.
 func (l *Lite) LookupPrefixLPM(pfx netip.Prefix) (lpmPfx netip.Prefix, ok bool) {
-	lpmPfx, _, ok = l.liteTable.lookupPrefixLPM(pfx, true)
+	lpmPfx, _, ok = l.lookupPrefixLPM(pfx, true)
 	return
 }
 
