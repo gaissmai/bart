@@ -62,7 +62,7 @@ func (l *Lite) Lookup(ip netip.Addr) bool {
 //
 // Returns true if a matching prefix is found, otherwise false.
 func (l *Lite) LookupPrefix(pfx netip.Prefix) bool {
-	_, _, ok := l.lookupPrefixLPM(pfx, false)
+	_, ok := l.lookupPrefixLPM(pfx, false)
 	return ok
 }
 
@@ -78,8 +78,7 @@ func (l *Lite) LookupPrefix(pfx netip.Prefix) bool {
 //
 // Returns the matching prefix and true if found, otherwise the zero value and false.
 func (l *Lite) LookupPrefixLPM(pfx netip.Prefix) (lpmPfx netip.Prefix, ok bool) {
-	lpmPfx, _, ok = l.lookupPrefixLPM(pfx, true)
-	return lpmPfx, ok
+	return l.lookupPrefixLPM(pfx, true)
 }
 
 // Insert adds a prefix to the routing table.
@@ -424,53 +423,11 @@ func (l *liteTable[V]) Contains(ip netip.Addr) bool {
 	return false
 }
 
-// Lookup performs a longest-prefix-match (LPM) for addr.
-//
-// Note: Lite stores no payload values. The returned value is always the zero
-// value (struct{}{}), so this method is rarely useful. Prefer Contains(addr)
-// to check whether any prefix matches the address. For exact prefix existence
-// use Get(pfx). For prefix-based LPM use LookupPrefix or LookupPrefixLPM.
-//
-// This method exists to satisfy shared interfaces and code generation; its
-// behavior is equivalent to Contains(addr) plus returning a meaningless value.
-//
-// Returns (struct{}{}, true) if any prefix matches addr, otherwise (struct{}{}, false).
-func (l *liteTable[V]) Lookup(ip netip.Addr) (_ V, ok bool) {
-	var zero V
-	return zero, l.Contains(ip)
-}
-
-// LookupPrefix performs a longest prefix match lookup for any address within
+// lookupPrefixLPM performs a longest prefix match lookup for any address within
 // the given prefix. It finds the most specific routing table entry that would
-// match any address in the provided prefix range.
-//
-// Returns the value and true if a matching prefix is found.
-// Returns zero value and false if no match exists.
-func (l *liteTable[V]) LookupPrefix(pfx netip.Prefix) (_ V, ok bool) {
-	_, _, ok = l.lookupPrefixLPM(pfx, false)
-	return
-}
-
-// LookupPrefixLPM performs a longest prefix match lookup for any address within
-// the given prefix. It finds the most specific routing table entry that would
-// match any address in the provided prefix range.
-//
-// This is functionally identical to LookupPrefix but additionally returns the
-// matching prefix (lpmPfx) itself.
-//
-// This method is slower than LookupPrefix and should only be used if the
-// matching lpm entry is also required for other reasons.
-//
-// Returns the matching prefix, the zero value (struct{}{}) and true if found.
-// Returns zero values and false if no match exists.
-func (l *liteTable[V]) LookupPrefixLPM(pfx netip.Prefix) (lpmPfx netip.Prefix, _ V, ok bool) {
-	return l.lookupPrefixLPM(pfx, true)
-}
-
-//nolint:unparam
-func (l *liteTable[V]) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpmPfx netip.Prefix, _ V, ok bool) {
-	var zero V
-
+// match any address in the provided prefix range. Is withLPM is true, it also
+// returns the matching longest prefix.
+func (l *liteTable[V]) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpmPfx netip.Prefix, ok bool) {
 	if !pfx.IsValid() {
 		return
 	}
@@ -522,7 +479,7 @@ LOOP:
 			if kid.prefix.Bits() > bits || !kid.prefix.Contains(ip) {
 				break LOOP
 			}
-			return kid.prefix, zero, true
+			return kid.prefix, true
 
 		case *fringeNode[V]:
 			// the bits of the fringe are defined by the depth
@@ -534,12 +491,12 @@ LOOP:
 
 			// the LPM isn't needed, saves some cycles
 			if !withLPM {
-				return netip.Prefix{}, zero, true
+				return netip.Prefix{}, true
 			}
 
 			// sic, get the LPM prefix back, it costs some cycles!
 			fringePfx := cidrForFringe(octets, depth, is4, octet)
-			return fringePfx, zero, true
+			return fringePfx, true
 
 		default:
 			panic("logic error, wrong node type")
@@ -574,7 +531,7 @@ LOOP:
 		if topIdx, ok := n.prefixes.IntersectionTop(&lpm.LookupTbl[idx]); ok {
 			// called from LookupPrefix
 			if !withLPM {
-				return netip.Prefix{}, zero, ok
+				return netip.Prefix{}, ok
 			}
 
 			// called from LookupPrefixLPM
@@ -586,7 +543,7 @@ LOOP:
 			// netip.Addr.Prefix canonicalizes. Invariant: art.PfxBits(depth, topIdx)
 			// yields a valid mask (v4: 0..32, v6: 0..128), so error is impossible.
 			lpmPfx, _ = ip.Prefix(pfxBits)
-			return lpmPfx, zero, ok
+			return lpmPfx, ok
 		}
 	}
 

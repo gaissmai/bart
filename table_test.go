@@ -29,14 +29,11 @@ func workLoadN() int {
 // tabler is a test-only interface that provides a unified abstraction for
 // testing multiple table implementations (Table and Fast) with the same test suite.
 type tabler[V any] interface {
+	Get(netip.Prefix) (V, bool)
 	Insert(netip.Prefix, V)
 	Delete(netip.Prefix)
 	Modify(netip.Prefix, func(V, bool) (V, bool))
-	Get(netip.Prefix) (V, bool)
 	Contains(netip.Addr) bool
-	Lookup(netip.Addr) (V, bool)
-	LookupPrefix(netip.Prefix) (V, bool)
-	LookupPrefixLPM(netip.Prefix) (netip.Prefix, V, bool)
 	Size() int
 }
 
