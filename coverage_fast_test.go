@@ -35,6 +35,13 @@ func TestFast_Size_ModifyPersist(t *testing.T) {
 		t.Fatalf("ModifyPersist(update) must return a new instance")
 	}
 
+	if got, ok := f2.Get(mpp("10.1.0.0/16")); !ok || got != 160 {
+		t.Fatalf("ModifyPersist(update) get = (ok=%v, val=%d), want ok=true val=160", ok, got)
+	}
+	if got, ok := f.Get(mpp("10.1.0.0/16")); !ok || got != 16 {
+		t.Fatalf("ModifyPersist(update) mutated original table: got=%d, want 16", got)
+	}
+
 	// ModifyPersist: insert
 	f3 := f2.ModifyPersist(mpp("172.16.0.0/12"), func(v int, ok bool) (int, bool) {
 		if ok {
@@ -42,6 +49,10 @@ func TestFast_Size_ModifyPersist(t *testing.T) {
 		}
 		return 777, false
 	})
+
+	if got, ok := f3.Get(mpp("172.16.0.0/12")); !ok || got != 777 {
+		t.Fatalf("ModifyPersist(insert) get = (ok=%v, val=%d), want ok=true val=777", ok, got)
+	}
 
 	// ModifyPersist: delete
 	f4 := f3.ModifyPersist(mpp("10.0.0.0/8"), func(v int, ok bool) (int, bool) {

@@ -65,630 +65,970 @@ var (
 	}
 )
 
-func TestWorstCaseMatch4(t *testing.T) {
+func TestTableWorstCaseMatch4(t *testing.T) {
 	t.Parallel()
 
-	type tables struct {
-		name    string
-		builder func() tabler[string]
-	}
+	t.Run("Contains", func(t *testing.T) {
+		t.Parallel()
+		tbl := new(Table[string])
 
-	testCases := []tables{
-		{
-			name:    "Table",
-			builder: func() tabler[string] { return &Table[string]{} },
-		},
-		{
-			name:    "Fast",
-			builder: func() tabler[string] { return &Fast[string]{} },
-		},
-	}
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
 
-	for _, tc := range testCases {
-		t.Run(tc.name+"_Contains", func(t *testing.T) {
-			t.Parallel()
+		want := true
+		ok := tbl.Contains(worstCaseProbeIP4)
+		if ok != want {
+			t.Errorf("Contains, worst case match IP4, expected OK: %v, got: %v", want, ok)
+		}
+	})
 
-			tbl := tc.builder()
-			for _, p := range worstCasePfxsIP4 {
-				tbl.Insert(p, p.String())
-			}
+	t.Run("Lookup", func(t *testing.T) {
+		t.Parallel()
 
-			want := true
-			ok := tbl.Contains(worstCaseProbeIP4)
-			if ok != want {
-				t.Errorf("%s: Contains, worst case match IP4, expected OK: %v, got: %v", tc.name, want, ok)
-			}
-		})
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
 
-		t.Run(tc.name+"_Lookup", func(t *testing.T) {
-			t.Parallel()
+		want := true
+		_, ok := tbl.Lookup(worstCaseProbeIP4)
+		if ok != want {
+			t.Errorf("Lookup, worst case match IP4, expected OK: %v, got: %v", want, ok)
+		}
+	})
 
-			tbl := tc.builder()
-			for _, p := range worstCasePfxsIP4 {
-				tbl.Insert(p, p.String())
-			}
+	t.Run("LookupPrefix", func(t *testing.T) {
+		t.Parallel()
 
-			want := true
-			_, ok := tbl.Lookup(worstCaseProbeIP4)
-			if ok != want {
-				t.Errorf("%s: Lookup, worst case match IP4, expected OK: %v, got: %v", tc.name, want, ok)
-			}
-		})
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
 
-		t.Run(tc.name+"_LookupPrefix", func(t *testing.T) {
-			t.Parallel()
+		want := true
+		_, ok := tbl.LookupPrefix(worstCaseProbePfx4)
+		if ok != want {
+			t.Errorf("LookupPrefix, worst case match IP4 pfx, expected OK: %v, got: %v", want, ok)
+		}
+	})
 
-			tbl := tc.builder()
-			for _, p := range worstCasePfxsIP4 {
-				tbl.Insert(p, p.String())
-			}
+	t.Run("LookupPrefixLPM", func(t *testing.T) {
+		t.Parallel()
 
-			want := true
-			_, ok := tbl.LookupPrefix(worstCaseProbePfx4)
-			if ok != want {
-				t.Errorf("%s: LookupPrefix, worst case match IP4 pfx, expected OK: %v, got: %v", tc.name, want, ok)
-			}
-		})
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
 
-		t.Run(tc.name+"_LookupPrefixLPM", func(t *testing.T) {
-			t.Parallel()
-
-			tbl := tc.builder()
-			for _, p := range worstCasePfxsIP4 {
-				tbl.Insert(p, p.String())
-			}
-
-			want := true
-			_, _, ok := tbl.LookupPrefixLPM(worstCaseProbePfx4)
-			if ok != want {
-				t.Errorf("%s: LookupPrefixLPM, worst case match IP4 pfx, expected OK: %v, got: %v", tc.name, want, ok)
-			}
-		})
-	}
+		want := true
+		_, _, ok := tbl.LookupPrefixLPM(worstCaseProbePfx4)
+		if ok != want {
+			t.Errorf("LookupPrefixLPM, worst case match IP4 pfx, expected OK: %v, got: %v", want, ok)
+		}
+	})
 }
 
-func TestWorstCaseMiss4(t *testing.T) {
+func TestFastWorstCaseMatch4(t *testing.T) {
 	t.Parallel()
 
-	type tables struct {
-		name    string
-		builder func() tabler[string]
-	}
+	t.Run("Contains", func(t *testing.T) {
+		t.Parallel()
+		tbl := new(Fast[string])
 
-	testCases := []tables{
-		{
-			name:    "Table",
-			builder: func() tabler[string] { return &Table[string]{} },
-		},
-		{
-			name:    "Fast",
-			builder: func() tabler[string] { return &Fast[string]{} },
-		},
-	}
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
 
-	for _, tc := range testCases {
-		t.Run(tc.name+"_Contains", func(t *testing.T) {
-			t.Parallel()
+		want := true
+		ok := tbl.Contains(worstCaseProbeIP4)
+		if ok != want {
+			t.Errorf("Contains, worst case match IP4, expected OK: %v, got: %v", want, ok)
+		}
+	})
 
-			tbl := tc.builder()
-			for _, p := range worstCasePfxsIP4 {
-				tbl.Insert(p, p.String())
-			}
+	t.Run("Lookup", func(t *testing.T) {
+		t.Parallel()
 
-			tbl.Delete(worstCaseProbePfx4) // delete matching prefix
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
 
-			want := false
-			ok := tbl.Contains(worstCaseProbeIP4)
-			if ok != want {
-				t.Errorf("%s: Contains, worst case miss IP4, expected OK: %v, got: %v", tc.name, want, ok)
-			}
-		})
+		want := true
+		_, ok := tbl.Lookup(worstCaseProbeIP4)
+		if ok != want {
+			t.Errorf("Lookup, worst case match IP4, expected OK: %v, got: %v", want, ok)
+		}
+	})
 
-		t.Run(tc.name+"_Lookup", func(t *testing.T) {
-			t.Parallel()
+	t.Run("LookupPrefix", func(t *testing.T) {
+		t.Parallel()
 
-			tbl := tc.builder()
-			for _, p := range worstCasePfxsIP4 {
-				tbl.Insert(p, p.String())
-			}
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
 
-			tbl.Delete(worstCaseProbePfx4) // delete matching prefix
+		want := true
+		_, ok := tbl.LookupPrefix(worstCaseProbePfx4)
+		if ok != want {
+			t.Errorf("LookupPrefix, worst case match IP4 pfx, expected OK: %v, got: %v", want, ok)
+		}
+	})
 
-			want := false
-			_, ok := tbl.Lookup(worstCaseProbeIP4)
-			if ok != want {
-				t.Errorf("%s: Lookup, worst case miss IP4, expected OK: %v, got: %v", tc.name, want, ok)
-			}
-		})
+	t.Run("LookupPrefixLPM", func(t *testing.T) {
+		t.Parallel()
 
-		t.Run(tc.name+"_LookupPrefix", func(t *testing.T) {
-			t.Parallel()
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
 
-			tbl := tc.builder()
-			for _, p := range worstCasePfxsIP4 {
-				tbl.Insert(p, p.String())
-			}
-
-			tbl.Delete(worstCaseProbePfx4) // delete matching prefix
-
-			want := false
-			_, ok := tbl.LookupPrefix(worstCaseProbePfx4)
-			if ok != want {
-				t.Errorf("%s: LookupPrefix, worst case miss IP4 pfx, expected OK: %v, got: %v", tc.name, want, ok)
-			}
-		})
-
-		t.Run(tc.name+"_LookupPfxLPM", func(t *testing.T) {
-			t.Parallel()
-
-			tbl := tc.builder()
-			for _, p := range worstCasePfxsIP4 {
-				tbl.Insert(p, p.String())
-			}
-
-			tbl.Delete(worstCaseProbePfx4) // delete matching prefix
-
-			want := false
-			_, _, ok := tbl.LookupPrefixLPM(worstCaseProbePfx4)
-			if ok != want {
-				t.Errorf("%s: LookupPrefixLPM, worst case miss IP4 pfx, expected OK: %v, got: %v", tc.name, want, ok)
-			}
-		})
-	}
+		want := true
+		_, _, ok := tbl.LookupPrefixLPM(worstCaseProbePfx4)
+		if ok != want {
+			t.Errorf("LookupPrefixLPM, worst case match IP4 pfx, expected OK: %v, got: %v", want, ok)
+		}
+	})
 }
 
-func TestWorstCaseMatch6(t *testing.T) {
+func TestTableWorstCaseMiss4(t *testing.T) {
 	t.Parallel()
 
-	type tables struct {
-		name    string
-		builder func() tabler[string]
-	}
+	t.Run("Contains", func(t *testing.T) {
+		t.Parallel()
 
-	testCases := []tables{
-		{
-			name:    "Table",
-			builder: func() tabler[string] { return &Table[string]{} },
-		},
-		{
-			name:    "Fast",
-			builder: func() tabler[string] { return &Fast[string]{} },
-		},
-	}
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
 
-	for _, tc := range testCases {
-		t.Run(tc.name+"_Contains", func(t *testing.T) {
-			t.Parallel()
+		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
 
-			tbl := tc.builder()
-			for _, p := range worstCasePfxsIP6 {
-				tbl.Insert(p, p.String())
-			}
+		want := false
+		ok := tbl.Contains(worstCaseProbeIP4)
+		if ok != want {
+			t.Errorf("Contains, worst case miss IP4, expected OK: %v, got: %v", want, ok)
+		}
+	})
 
-			want := true
-			ok := tbl.Contains(worstCaseProbeIP6)
-			if ok != want {
-				t.Errorf("%s: Contains, worst case match IP6, expected OK: %v, got: %v", tc.name, want, ok)
-			}
-		})
+	t.Run("Lookup", func(t *testing.T) {
+		t.Parallel()
 
-		t.Run(tc.name+"_Lookup", func(t *testing.T) {
-			t.Parallel()
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
 
-			tbl := tc.builder()
-			for _, p := range worstCasePfxsIP6 {
-				tbl.Insert(p, p.String())
-			}
+		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
 
-			want := true
-			_, ok := tbl.Lookup(worstCaseProbeIP6)
-			if ok != want {
-				t.Errorf("%s: Lookup, worst case match IP6, expected OK: %v, got: %v", tc.name, want, ok)
-			}
-		})
+		want := false
+		_, ok := tbl.Lookup(worstCaseProbeIP4)
+		if ok != want {
+			t.Errorf("Lookup, worst case miss IP4, expected OK: %v, got: %v", want, ok)
+		}
+	})
 
-		t.Run(tc.name+"_LookupPrefix", func(t *testing.T) {
-			t.Parallel()
+	t.Run("LookupPrefix", func(t *testing.T) {
+		t.Parallel()
 
-			tbl := tc.builder()
-			for _, p := range worstCasePfxsIP6 {
-				tbl.Insert(p, p.String())
-			}
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
 
-			want := true
-			_, ok := tbl.LookupPrefix(worstCaseProbePfx6)
-			if ok != want {
-				t.Errorf("%s: LookupPrefix, worst case match IP6 pfx, expected OK: %v, got: %v", tc.name, want, ok)
-			}
-		})
+		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
 
-		t.Run(tc.name+"_LookupPrefixLPM", func(t *testing.T) {
-			t.Parallel()
+		want := false
+		_, ok := tbl.LookupPrefix(worstCaseProbePfx4)
+		if ok != want {
+			t.Errorf("LookupPrefix, worst case miss IP4 pfx, expected OK: %v, got: %v", want, ok)
+		}
+	})
 
-			tbl := tc.builder()
-			for _, p := range worstCasePfxsIP6 {
-				tbl.Insert(p, p.String())
-			}
+	t.Run("LookupPfxLPM", func(t *testing.T) {
+		t.Parallel()
 
-			want := true
-			_, _, ok := tbl.LookupPrefixLPM(worstCaseProbePfx6)
-			if ok != want {
-				t.Errorf("%s: LookupPrefixLPM, worst case match IP6 pfx, expected OK: %v, got: %v", tc.name, want, ok)
-			}
-		})
-	}
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
+
+		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
+
+		want := false
+		_, _, ok := tbl.LookupPrefixLPM(worstCaseProbePfx4)
+		if ok != want {
+			t.Errorf("LookupPrefixLPM, worst case miss IP4 pfx, expected OK: %v, got: %v", want, ok)
+		}
+	})
 }
 
-func TestWorstCaseMiss6(t *testing.T) {
+func TestFastWorstCaseMiss4(t *testing.T) {
 	t.Parallel()
 
-	type tables struct {
-		name    string
-		builder func() tabler[string]
-	}
+	t.Run("Contains", func(t *testing.T) {
+		t.Parallel()
 
-	testCases := []tables{
-		{
-			name:    "Table",
-			builder: func() tabler[string] { return &Table[string]{} },
-		},
-		{
-			name:    "Fast",
-			builder: func() tabler[string] { return &Fast[string]{} },
-		},
-	}
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
 
-	for _, tc := range testCases {
-		t.Run(tc.name+"_Contains", func(t *testing.T) {
-			t.Parallel()
+		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
 
-			tbl := tc.builder()
-			for _, p := range worstCasePfxsIP6 {
-				tbl.Insert(p, p.String())
-			}
+		want := false
+		ok := tbl.Contains(worstCaseProbeIP4)
+		if ok != want {
+			t.Errorf("Contains, worst case miss IP4, expected OK: %v, got: %v", want, ok)
+		}
+	})
 
-			tbl.Delete(worstCaseProbePfx6) // delete matching prefix
+	t.Run("Lookup", func(t *testing.T) {
+		t.Parallel()
 
-			want := false
-			ok := tbl.Contains(worstCaseProbeIP6)
-			if ok != want {
-				t.Errorf("%s: Contains, worst case miss IP6, expected OK: %v, got: %v", tc.name, want, ok)
-			}
-		})
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
 
-		t.Run("Lookup", func(t *testing.T) {
-			t.Parallel()
+		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
 
-			tbl := tc.builder()
-			for _, p := range worstCasePfxsIP6 {
-				tbl.Insert(p, p.String())
-			}
+		want := false
+		_, ok := tbl.Lookup(worstCaseProbeIP4)
+		if ok != want {
+			t.Errorf("Lookup, worst case miss IP4, expected OK: %v, got: %v", want, ok)
+		}
+	})
 
-			tbl.Delete(worstCaseProbePfx6) // delete matching prefix
+	t.Run("LookupPrefix", func(t *testing.T) {
+		t.Parallel()
 
-			want := false
-			_, ok := tbl.Lookup(worstCaseProbeIP6)
-			if ok != want {
-				t.Errorf("%s: Lookup, worst case miss IP6, expected OK: %v, got: %v", tc.name, want, ok)
-			}
-		})
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
 
-		t.Run("LookupPrefix", func(t *testing.T) {
-			t.Parallel()
+		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
 
-			tbl := tc.builder()
-			for _, p := range worstCasePfxsIP6 {
-				tbl.Insert(p, p.String())
-			}
+		want := false
+		_, ok := tbl.LookupPrefix(worstCaseProbePfx4)
+		if ok != want {
+			t.Errorf("LookupPrefix, worst case miss IP4 pfx, expected OK: %v, got: %v", want, ok)
+		}
+	})
 
-			tbl.Delete(worstCaseProbePfx6) // delete matching prefix
+	t.Run("LookupPfxLPM", func(t *testing.T) {
+		t.Parallel()
 
-			want := false
-			_, ok := tbl.LookupPrefix(worstCaseProbePfx6)
-			if ok != want {
-				t.Errorf("%s: LookupPrefix, worst case miss IP6 pfx, expected OK: %v, got: %v", tc.name, want, ok)
-			}
-		})
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
 
-		t.Run("LookupPfxLPM", func(t *testing.T) {
-			t.Parallel()
+		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
 
-			tbl := tc.builder()
-			for _, p := range worstCasePfxsIP6 {
-				tbl.Insert(p, p.String())
-			}
-
-			tbl.Delete(worstCaseProbePfx6) // delete matching prefix
-
-			want := false
-			_, _, ok := tbl.LookupPrefixLPM(worstCaseProbePfx6)
-			if ok != want {
-				t.Errorf("%s: LookupPrefixLPM, worst case miss IP6 pfx, expected OK: %v, got: %v", tc.name, want, ok)
-			}
-		})
-	}
+		want := false
+		_, _, ok := tbl.LookupPrefixLPM(worstCaseProbePfx4)
+		if ok != want {
+			t.Errorf("LookupPrefixLPM, worst case miss IP4 pfx, expected OK: %v, got: %v", want, ok)
+		}
+	})
 }
 
-func BenchmarkWorstCaseMatch4(b *testing.B) {
-	type tables struct {
-		name    string
-		builder func() tabler[string]
-	}
+func TestTableWorstCaseMatch6(t *testing.T) {
+	t.Parallel()
 
-	testCases := []tables{
-		{
-			name:    "Table",
-			builder: func() tabler[string] { return &Table[string]{} },
-		},
-		{
-			name:    "Fast",
-			builder: func() tabler[string] { return &Fast[string]{} },
-		},
-	}
+	t.Run("Contains", func(t *testing.T) {
+		t.Parallel()
 
-	for _, tc := range testCases {
-		b.Run(tc.name+"_Contains", func(b *testing.B) {
-			tbl := tc.builder()
-			for _, p := range worstCasePfxsIP4 {
-				tbl.Insert(p, p.String())
-			}
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
 
-			for b.Loop() {
-				tbl.Contains(worstCaseProbeIP4)
-			}
-		})
+		want := true
+		ok := tbl.Contains(worstCaseProbeIP6)
+		if ok != want {
+			t.Errorf("Contains, worst case match IP6, expected OK: %v, got: %v", want, ok)
+		}
+	})
 
-		b.Run(tc.name+"_Lookup", func(b *testing.B) {
-			tbl := tc.builder()
-			for _, p := range worstCasePfxsIP4 {
-				tbl.Insert(p, p.String())
-			}
-			tbl.Insert(ipv4DefaultRoute, ipv4DefaultRoute.String())
-			tbl.Delete(worstCaseProbePfx4)
+	t.Run("Lookup", func(t *testing.T) {
+		t.Parallel()
 
-			for b.Loop() {
-				tbl.Lookup(worstCaseProbeIP4)
-			}
-		})
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
 
-		b.Run(tc.name+"_LookupPrefix", func(b *testing.B) {
-			tbl := tc.builder()
-			for _, p := range worstCasePfxsIP4 {
-				tbl.Insert(p, p.String())
-			}
-			tbl.Insert(ipv4DefaultRoute, ipv4DefaultRoute.String())
-			tbl.Delete(worstCaseProbePfx4)
+		want := true
+		_, ok := tbl.Lookup(worstCaseProbeIP6)
+		if ok != want {
+			t.Errorf("Lookup, worst case match IP6, expected OK: %v, got: %v", want, ok)
+		}
+	})
 
-			for b.Loop() {
-				tbl.LookupPrefix(worstCaseProbePfx4)
-			}
-		})
+	t.Run("LookupPrefix", func(t *testing.T) {
+		t.Parallel()
 
-		b.Run(tc.name+"_LookupPrefixLPM", func(b *testing.B) {
-			tbl := tc.builder()
-			for _, p := range worstCasePfxsIP4 {
-				tbl.Insert(p, p.String())
-			}
-			tbl.Insert(ipv4DefaultRoute, ipv4DefaultRoute.String())
-			tbl.Delete(worstCaseProbePfx4)
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
 
-			for b.Loop() {
-				tbl.LookupPrefixLPM(worstCaseProbePfx4)
-			}
-		})
-	}
+		want := true
+		_, ok := tbl.LookupPrefix(worstCaseProbePfx6)
+		if ok != want {
+			t.Errorf("LookupPrefix, worst case match IP6 pfx, expected OK: %v, got: %v", want, ok)
+		}
+	})
+
+	t.Run("LookupPrefixLPM", func(t *testing.T) {
+		t.Parallel()
+
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
+
+		want := true
+		_, _, ok := tbl.LookupPrefixLPM(worstCaseProbePfx6)
+		if ok != want {
+			t.Errorf("LookupPrefixLPM, worst case match IP6 pfx, expected OK: %v, got: %v", want, ok)
+		}
+	})
 }
 
-func BenchmarkWorstCaseMiss4(b *testing.B) {
-	type tables struct {
-		name    string
-		builder func() tabler[string]
-	}
+func TestFastWorstCaseMatch6(t *testing.T) {
+	t.Parallel()
 
-	testCases := []tables{
-		{
-			name:    "Table",
-			builder: func() tabler[string] { return &Table[string]{} },
-		},
-		{
-			name:    "Fast",
-			builder: func() tabler[string] { return &Fast[string]{} },
-		},
-	}
+	t.Run("Contains", func(t *testing.T) {
+		t.Parallel()
 
-	for _, tc := range testCases {
-		b.Run(tc.name+"_Contains", func(b *testing.B) {
-			tbl := tc.builder()
-			for _, p := range worstCasePfxsIP4 {
-				tbl.Insert(p, p.String())
-			}
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
 
-			tbl.Delete(worstCaseProbePfx4) // delete matching prefix
+		want := true
+		ok := tbl.Contains(worstCaseProbeIP6)
+		if ok != want {
+			t.Errorf("Contains, worst case match IP6, expected OK: %v, got: %v", want, ok)
+		}
+	})
 
-			for b.Loop() {
-				tbl.Contains(worstCaseProbeIP4)
-			}
-		})
+	t.Run("Lookup", func(t *testing.T) {
+		t.Parallel()
 
-		b.Run(tc.name+"_Lookup", func(b *testing.B) {
-			tbl := tc.builder()
-			for _, p := range worstCasePfxsIP4 {
-				tbl.Insert(p, p.String())
-			}
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
 
-			tbl.Delete(worstCaseProbePfx4) // delete matching prefix
+		want := true
+		_, ok := tbl.Lookup(worstCaseProbeIP6)
+		if ok != want {
+			t.Errorf("Lookup, worst case match IP6, expected OK: %v, got: %v", want, ok)
+		}
+	})
 
-			for b.Loop() {
-				tbl.Lookup(worstCaseProbeIP4)
-			}
-		})
+	t.Run("LookupPrefix", func(t *testing.T) {
+		t.Parallel()
 
-		b.Run(tc.name+"_LookupPrefix", func(b *testing.B) {
-			tbl := tc.builder()
-			for _, p := range worstCasePfxsIP4 {
-				tbl.Insert(p, p.String())
-			}
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
 
-			tbl.Delete(worstCaseProbePfx4) // delete matching prefix
+		want := true
+		_, ok := tbl.LookupPrefix(worstCaseProbePfx6)
+		if ok != want {
+			t.Errorf("LookupPrefix, worst case match IP6 pfx, expected OK: %v, got: %v", want, ok)
+		}
+	})
 
-			for b.Loop() {
-				tbl.LookupPrefix(worstCaseProbePfx4)
-			}
-		})
+	t.Run("LookupPrefixLPM", func(t *testing.T) {
+		t.Parallel()
 
-		b.Run(tc.name+"_LookupPrefixLPM", func(b *testing.B) {
-			tbl := tc.builder()
-			for _, p := range worstCasePfxsIP4 {
-				tbl.Insert(p, p.String())
-			}
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
 
-			tbl.Delete(worstCaseProbePfx4) // delete matching prefix
-
-			for b.Loop() {
-				tbl.LookupPrefixLPM(worstCaseProbePfx4)
-			}
-		})
-	}
+		want := true
+		_, _, ok := tbl.LookupPrefixLPM(worstCaseProbePfx6)
+		if ok != want {
+			t.Errorf("LookupPrefixLPM, worst case match IP6 pfx, expected OK: %v, got: %v", want, ok)
+		}
+	})
 }
 
-func BenchmarkWorstCaseMatch6(b *testing.B) {
-	type tables struct {
-		name    string
-		builder func() tabler[string]
-	}
+func TestTableWorstCaseMiss6(t *testing.T) {
+	t.Parallel()
 
-	testCases := []tables{
-		{
-			name:    "Table",
-			builder: func() tabler[string] { return &Table[string]{} },
-		},
-		{
-			name:    "Fast",
-			builder: func() tabler[string] { return &Fast[string]{} },
-		},
-	}
+	t.Run("Contains", func(t *testing.T) {
+		t.Parallel()
 
-	for _, tc := range testCases {
-		b.Run(tc.name+"_Contains", func(b *testing.B) {
-			tbl := tc.builder()
-			for _, p := range worstCasePfxsIP6 {
-				tbl.Insert(p, p.String())
-			}
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
 
-			for b.Loop() {
-				tbl.Contains(worstCaseProbeIP6)
-			}
-		})
+		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
 
-		b.Run(tc.name+"_Lookup", func(b *testing.B) {
-			tbl := tc.builder()
-			for _, p := range worstCasePfxsIP6 {
-				tbl.Insert(p, p.String())
-			}
-			tbl.Insert(ipv6DefaultRoute, ipv6DefaultRoute.String())
-			tbl.Delete(worstCaseProbePfx6)
+		want := false
+		ok := tbl.Contains(worstCaseProbeIP6)
+		if ok != want {
+			t.Errorf("Contains, worst case miss IP6, expected OK: %v, got: %v", want, ok)
+		}
+	})
 
-			for b.Loop() {
-				tbl.Lookup(worstCaseProbeIP6)
-			}
-		})
+	t.Run("Lookup", func(t *testing.T) {
+		t.Parallel()
 
-		b.Run(tc.name+"_LookupPrefix", func(b *testing.B) {
-			tbl := tc.builder()
-			for _, p := range worstCasePfxsIP6 {
-				tbl.Insert(p, p.String())
-			}
-			tbl.Insert(ipv6DefaultRoute, ipv6DefaultRoute.String())
-			tbl.Delete(worstCaseProbePfx6)
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
 
-			for b.Loop() {
-				tbl.LookupPrefix(worstCaseProbePfx6)
-			}
-		})
+		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
 
-		b.Run(tc.name+"_LookupPrefixLPM", func(b *testing.B) {
-			tbl := tc.builder()
-			for _, p := range worstCasePfxsIP6 {
-				tbl.Insert(p, p.String())
-			}
-			tbl.Insert(ipv6DefaultRoute, ipv6DefaultRoute.String())
-			tbl.Delete(worstCaseProbePfx6)
+		want := false
+		_, ok := tbl.Lookup(worstCaseProbeIP6)
+		if ok != want {
+			t.Errorf("Lookup, worst case miss IP6, expected OK: %v, got: %v", want, ok)
+		}
+	})
 
-			for b.Loop() {
-				tbl.LookupPrefixLPM(worstCaseProbePfx6)
-			}
-		})
-	}
+	t.Run("LookupPrefix", func(t *testing.T) {
+		t.Parallel()
+
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
+
+		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
+
+		want := false
+		_, ok := tbl.LookupPrefix(worstCaseProbePfx6)
+		if ok != want {
+			t.Errorf("LookupPrefix, worst case miss IP6 pfx, expected OK: %v, got: %v", want, ok)
+		}
+	})
+
+	t.Run("LookupPfxLPM", func(t *testing.T) {
+		t.Parallel()
+
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
+
+		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
+
+		want := false
+		_, _, ok := tbl.LookupPrefixLPM(worstCaseProbePfx6)
+		if ok != want {
+			t.Errorf("LookupPrefixLPM, worst case miss IP6 pfx, expected OK: %v, got: %v", want, ok)
+		}
+	})
 }
 
-func BenchmarkWorstCaseMiss6(b *testing.B) {
-	type tables struct {
-		name    string
-		builder func() tabler[string]
-	}
+func TestFastWorstCaseMiss6(t *testing.T) {
+	t.Parallel()
 
-	testCases := []tables{
-		{
-			name:    "Table",
-			builder: func() tabler[string] { return &Table[string]{} },
-		},
-		{
-			name:    "Fast",
-			builder: func() tabler[string] { return &Fast[string]{} },
-		},
-	}
+	t.Run("Contains", func(t *testing.T) {
+		t.Parallel()
 
-	for _, tc := range testCases {
-		b.Run(tc.name+"_Contains", func(b *testing.B) {
-			tbl := tc.builder()
-			for _, p := range worstCasePfxsIP6 {
-				tbl.Insert(p, p.String())
-			}
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
 
-			tbl.Delete(worstCaseProbePfx6) // delete matching prefix
+		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
 
-			for b.Loop() {
-				tbl.Contains(worstCaseProbeIP6)
-			}
-		})
+		want := false
+		ok := tbl.Contains(worstCaseProbeIP6)
+		if ok != want {
+			t.Errorf("Contains, worst case miss IP6, expected OK: %v, got: %v", want, ok)
+		}
+	})
 
-		b.Run(tc.name+"_Lookup", func(b *testing.B) {
-			tbl := tc.builder()
-			for _, p := range worstCasePfxsIP6 {
-				tbl.Insert(p, p.String())
-			}
+	t.Run("Lookup", func(t *testing.T) {
+		t.Parallel()
 
-			tbl.Delete(worstCaseProbePfx6) // delete matching prefix
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
 
-			for b.Loop() {
-				tbl.Lookup(worstCaseProbeIP6)
-			}
-		})
+		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
 
-		b.Run(tc.name+"_LookupPrefix", func(b *testing.B) {
-			tbl := tc.builder()
-			for _, p := range worstCasePfxsIP6 {
-				tbl.Insert(p, p.String())
-			}
+		want := false
+		_, ok := tbl.Lookup(worstCaseProbeIP6)
+		if ok != want {
+			t.Errorf("Lookup, worst case miss IP6, expected OK: %v, got: %v", want, ok)
+		}
+	})
 
-			tbl.Delete(worstCaseProbePfx6) // delete matching prefix
+	t.Run("LookupPrefix", func(t *testing.T) {
+		t.Parallel()
 
-			for b.Loop() {
-				tbl.LookupPrefix(worstCaseProbePfx6)
-			}
-		})
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
 
-		b.Run(tc.name+"_LookupPrefixLPM", func(b *testing.B) {
-			tbl := tc.builder()
-			for _, p := range worstCasePfxsIP6 {
-				tbl.Insert(p, p.String())
-			}
+		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
 
-			tbl.Delete(worstCaseProbePfx6) // delete matching prefix
+		want := false
+		_, ok := tbl.LookupPrefix(worstCaseProbePfx6)
+		if ok != want {
+			t.Errorf("LookupPrefix, worst case miss IP6 pfx, expected OK: %v, got: %v", want, ok)
+		}
+	})
 
-			for b.Loop() {
-				tbl.LookupPrefixLPM(worstCaseProbePfx6)
-			}
-		})
-	}
+	t.Run("LookupPfxLPM", func(t *testing.T) {
+		t.Parallel()
+
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
+
+		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
+
+		want := false
+		_, _, ok := tbl.LookupPrefixLPM(worstCaseProbePfx6)
+		if ok != want {
+			t.Errorf("LookupPrefixLPM, worst case miss IP6 pfx, expected OK: %v, got: %v", want, ok)
+		}
+	})
+}
+
+func BenchmarkTableWorstCaseMatch4(b *testing.B) {
+	b.Run("Contains", func(b *testing.B) {
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
+
+		for b.Loop() {
+			tbl.Contains(worstCaseProbeIP4)
+		}
+	})
+
+	b.Run("Lookup", func(b *testing.B) {
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
+		tbl.Insert(ipv4DefaultRoute, ipv4DefaultRoute.String())
+		tbl.Delete(worstCaseProbePfx4)
+
+		for b.Loop() {
+			tbl.Lookup(worstCaseProbeIP4)
+		}
+	})
+
+	b.Run("LookupPrefix", func(b *testing.B) {
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
+		tbl.Insert(ipv4DefaultRoute, ipv4DefaultRoute.String())
+		tbl.Delete(worstCaseProbePfx4)
+
+		for b.Loop() {
+			tbl.LookupPrefix(worstCaseProbePfx4)
+		}
+	})
+
+	b.Run("LookupPrefixLPM", func(b *testing.B) {
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
+		tbl.Insert(ipv4DefaultRoute, ipv4DefaultRoute.String())
+		tbl.Delete(worstCaseProbePfx4)
+
+		for b.Loop() {
+			tbl.LookupPrefixLPM(worstCaseProbePfx4)
+		}
+	})
+}
+
+func BenchmarkFastWorstCaseMatch4(b *testing.B) {
+	b.Run("Contains", func(b *testing.B) {
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
+
+		for b.Loop() {
+			tbl.Contains(worstCaseProbeIP4)
+		}
+	})
+
+	b.Run("Lookup", func(b *testing.B) {
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
+		tbl.Insert(ipv4DefaultRoute, ipv4DefaultRoute.String())
+		tbl.Delete(worstCaseProbePfx4)
+
+		for b.Loop() {
+			tbl.Lookup(worstCaseProbeIP4)
+		}
+	})
+
+	b.Run("LookupPrefix", func(b *testing.B) {
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
+		tbl.Insert(ipv4DefaultRoute, ipv4DefaultRoute.String())
+		tbl.Delete(worstCaseProbePfx4)
+
+		for b.Loop() {
+			tbl.LookupPrefix(worstCaseProbePfx4)
+		}
+	})
+
+	b.Run("LookupPrefixLPM", func(b *testing.B) {
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
+		tbl.Insert(ipv4DefaultRoute, ipv4DefaultRoute.String())
+		tbl.Delete(worstCaseProbePfx4)
+
+		for b.Loop() {
+			tbl.LookupPrefixLPM(worstCaseProbePfx4)
+		}
+	})
+}
+
+func BenchmarkTableWorstCaseMiss4(b *testing.B) {
+	b.Run("Contains", func(b *testing.B) {
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
+
+		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
+
+		for b.Loop() {
+			tbl.Contains(worstCaseProbeIP4)
+		}
+	})
+
+	b.Run("Lookup", func(b *testing.B) {
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
+
+		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
+
+		for b.Loop() {
+			tbl.Lookup(worstCaseProbeIP4)
+		}
+	})
+
+	b.Run("LookupPrefix", func(b *testing.B) {
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
+
+		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
+
+		for b.Loop() {
+			tbl.LookupPrefix(worstCaseProbePfx4)
+		}
+	})
+
+	b.Run("LookupPrefixLPM", func(b *testing.B) {
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
+
+		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
+
+		for b.Loop() {
+			tbl.LookupPrefixLPM(worstCaseProbePfx4)
+		}
+	})
+}
+
+func BenchmarkFastWorstCaseMiss4(b *testing.B) {
+	b.Run("Contains", func(b *testing.B) {
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
+
+		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
+
+		for b.Loop() {
+			tbl.Contains(worstCaseProbeIP4)
+		}
+	})
+
+	b.Run("Lookup", func(b *testing.B) {
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
+
+		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
+
+		for b.Loop() {
+			tbl.Lookup(worstCaseProbeIP4)
+		}
+	})
+
+	b.Run("LookupPrefix", func(b *testing.B) {
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
+
+		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
+
+		for b.Loop() {
+			tbl.LookupPrefix(worstCaseProbePfx4)
+		}
+	})
+
+	b.Run("LookupPrefixLPM", func(b *testing.B) {
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
+
+		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
+
+		for b.Loop() {
+			tbl.LookupPrefixLPM(worstCaseProbePfx4)
+		}
+	})
+}
+
+func BenchmarkTableWorstCaseMatch6(b *testing.B) {
+	b.Run("Contains", func(b *testing.B) {
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
+
+		for b.Loop() {
+			tbl.Contains(worstCaseProbeIP6)
+		}
+	})
+
+	b.Run("Lookup", func(b *testing.B) {
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
+		tbl.Insert(ipv6DefaultRoute, ipv6DefaultRoute.String())
+		tbl.Delete(worstCaseProbePfx6)
+
+		for b.Loop() {
+			tbl.Lookup(worstCaseProbeIP6)
+		}
+	})
+
+	b.Run("LookupPrefix", func(b *testing.B) {
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
+		tbl.Insert(ipv6DefaultRoute, ipv6DefaultRoute.String())
+		tbl.Delete(worstCaseProbePfx6)
+
+		for b.Loop() {
+			tbl.LookupPrefix(worstCaseProbePfx6)
+		}
+	})
+
+	b.Run("LookupPrefixLPM", func(b *testing.B) {
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
+		tbl.Insert(ipv6DefaultRoute, ipv6DefaultRoute.String())
+		tbl.Delete(worstCaseProbePfx6)
+
+		for b.Loop() {
+			tbl.LookupPrefixLPM(worstCaseProbePfx6)
+		}
+	})
+}
+
+func BenchmarkFastWorstCaseMatch6(b *testing.B) {
+	b.Run("Contains", func(b *testing.B) {
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
+
+		for b.Loop() {
+			tbl.Contains(worstCaseProbeIP6)
+		}
+	})
+
+	b.Run("Lookup", func(b *testing.B) {
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
+		tbl.Insert(ipv6DefaultRoute, ipv6DefaultRoute.String())
+		tbl.Delete(worstCaseProbePfx6)
+
+		for b.Loop() {
+			tbl.Lookup(worstCaseProbeIP6)
+		}
+	})
+
+	b.Run("LookupPrefix", func(b *testing.B) {
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
+		tbl.Insert(ipv6DefaultRoute, ipv6DefaultRoute.String())
+		tbl.Delete(worstCaseProbePfx6)
+
+		for b.Loop() {
+			tbl.LookupPrefix(worstCaseProbePfx6)
+		}
+	})
+
+	b.Run("LookupPrefixLPM", func(b *testing.B) {
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
+		tbl.Insert(ipv6DefaultRoute, ipv6DefaultRoute.String())
+		tbl.Delete(worstCaseProbePfx6)
+
+		for b.Loop() {
+			tbl.LookupPrefixLPM(worstCaseProbePfx6)
+		}
+	})
+}
+
+func BenchmarkTableWorstCaseMiss6(b *testing.B) {
+	b.Run("Contains", func(b *testing.B) {
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
+
+		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
+
+		for b.Loop() {
+			tbl.Contains(worstCaseProbeIP6)
+		}
+	})
+
+	b.Run("Lookup", func(b *testing.B) {
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
+
+		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
+
+		for b.Loop() {
+			tbl.Lookup(worstCaseProbeIP6)
+		}
+	})
+
+	b.Run("LookupPrefix", func(b *testing.B) {
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
+
+		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
+
+		for b.Loop() {
+			tbl.LookupPrefix(worstCaseProbePfx6)
+		}
+	})
+
+	b.Run("LookupPrefixLPM", func(b *testing.B) {
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
+
+		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
+
+		for b.Loop() {
+			tbl.LookupPrefixLPM(worstCaseProbePfx6)
+		}
+	})
+}
+
+func BenchmarkFastWorstCaseMiss6(b *testing.B) {
+	b.Run("Contains", func(b *testing.B) {
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
+
+		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
+
+		for b.Loop() {
+			tbl.Contains(worstCaseProbeIP6)
+		}
+	})
+
+	b.Run("Lookup", func(b *testing.B) {
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
+
+		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
+
+		for b.Loop() {
+			tbl.Lookup(worstCaseProbeIP6)
+		}
+	})
+
+	b.Run("LookupPrefix", func(b *testing.B) {
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
+
+		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
+
+		for b.Loop() {
+			tbl.LookupPrefix(worstCaseProbePfx6)
+		}
+	})
+
+	b.Run("LookupPrefixLPM", func(b *testing.B) {
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
+
+		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
+
+		for b.Loop() {
+			tbl.LookupPrefixLPM(worstCaseProbePfx6)
+		}
+	})
 }
