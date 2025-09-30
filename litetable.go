@@ -18,7 +18,7 @@ import (
 //
 // The zero value is ready to use.
 //
-// A Table must not be copied by value; always pass by pointer.
+// A Lite table must not be copied by value; always pass by pointer.
 //
 // Performance note: Do not pass IPv4-in-IPv6 addresses (e.g., ::ffff:192.0.2.1)
 // as input. The methods do not perform automatic unmapping to avoid unnecessary
