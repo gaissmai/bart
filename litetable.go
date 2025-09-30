@@ -429,7 +429,7 @@ func (l *liteTable[V]) Contains(ip netip.Addr) bool {
 // returns the matching longest prefix.
 func (l *liteTable[V]) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpmPfx netip.Prefix, ok bool) {
 	if !pfx.IsValid() {
-		return
+		return lpmPfx, ok
 	}
 
 	// canonicalize the prefix
@@ -547,5 +547,5 @@ LOOP:
 		}
 	}
 
-	return
+	return lpmPfx, ok
 }
