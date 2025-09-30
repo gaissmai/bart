@@ -79,7 +79,7 @@ func (l *Lite) LookupPrefix(pfx netip.Prefix) bool {
 // Returns the matching prefix and true if found, otherwise the zero value and false.
 func (l *Lite) LookupPrefixLPM(pfx netip.Prefix) (lpmPfx netip.Prefix, ok bool) {
 	lpmPfx, _, ok = l.lookupPrefixLPM(pfx, true)
-	return
+	return lpmPfx, ok
 }
 
 // Insert adds a prefix to the routing table.
