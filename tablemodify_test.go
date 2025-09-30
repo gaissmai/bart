@@ -972,7 +972,7 @@ func FuzzLiteModifyComprehensive(f *testing.F) {
 				}
 			}
 
-			return false
+			panic("unreachable")
 		})
 
 		// Verify results
