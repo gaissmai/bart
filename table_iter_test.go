@@ -4,7 +4,6 @@
 package bart
 
 import (
-	"fmt"
 	"math/rand/v2"
 	"net/netip"
 	"slices"
@@ -529,59 +528,4 @@ func TestSubnetsCompare(t *testing.T) {
 			}
 		})
 	}
-}
-
-//nolint:unused
-func (t *goldTable[V]) lookupPrefixReverse(pfx netip.Prefix) []netip.Prefix {
-	var result []netip.Prefix
-
-	for _, item := range *t {
-		if item.pfx.Overlaps(pfx) && item.pfx.Bits() <= pfx.Bits() {
-			result = append(result, item.pfx)
-		}
-	}
-
-	// b,a reverse sort order!
-	slices.SortFunc(result, func(a, b netip.Prefix) int {
-		return cmpPrefix(b, a)
-	})
-	return result
-}
-
-func BenchmarkSubnets(b *testing.B) {
-	prng := rand.New(rand.NewPCG(42, 42))
-	n := 1_000_000
-
-	rtbl := new(Table[int])
-	for i, pfx := range randomRealWorldPrefixes(prng, n) {
-		rtbl.Insert(pfx, i)
-	}
-
-	probe := mpp("42.150.112.0/20")
-	b.Run(fmt.Sprintf("Subnets(%q) from %d random pfxs", probe, n), func(b *testing.B) {
-		for b.Loop() {
-			for range rtbl.Subnets(probe) {
-				continue
-			}
-		}
-	})
-}
-
-func BenchmarkSupernets(b *testing.B) {
-	prng := rand.New(rand.NewPCG(42, 42))
-	n := 1_000_000
-
-	rtbl := new(Table[int])
-	for i, pfx := range randomRealWorldPrefixes(prng, n) {
-		rtbl.Insert(pfx, i)
-	}
-
-	probe := mpp("42.150.112.0/20")
-	b.Run(fmt.Sprintf("Supernets(%q) from %d random pfxs", probe, n), func(b *testing.B) {
-		for b.Loop() {
-			for range rtbl.Supernets(probe) {
-				continue
-			}
-		}
-	})
 }
