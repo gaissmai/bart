@@ -47,17 +47,17 @@ import (
 
 // ---- Test data helpers ----
 
-func newRoute(nextHop, exitIF string, metric int) *routeEntry {
+func newRoute(nextHop netip.Addr, exitIF string, metric int) *routeEntry {
 	return &routeEntry{
-		nextHop:    netip.MustParseAddr(nextHop),
+		nextHop:    nextHop,
 		exitIF:     exitIF,
 		attributes: map[string]int{"metric": metric, "preference": 100},
 	}
 }
 
-func newRouteNonCloner(nextHop, exitIF string, metric int) *routeEntryNonCloner {
+func newRouteNonCloner(nextHop netip.Addr, exitIF string, metric int) *routeEntryNonCloner {
 	return &routeEntryNonCloner{
-		nextHop:    netip.MustParseAddr(nextHop),
+		nextHop:    nextHop,
 		exitIF:     exitIF,
 		attributes: map[string]int{"metric": metric, "preference": 100},
 	}
@@ -70,7 +70,7 @@ func TestInsertPersist_InvalidPrefix_NoChange(t *testing.T) {
 	t0 := &Table[*routeEntry]{}
 
 	invalid := netip.Prefix{} // not valid; IsValid() == false
-	route := newRoute("10.0.0.1", "eth0", 100)
+	route := newRoute(mpa("10.0.0.1"), "eth0", 100)
 	pt := t0.InsertPersist(invalid, route)
 
 	if t0 != pt {
@@ -88,7 +88,7 @@ func TestInsertPersist_CanonicalizesMasked_OverrideAndSize(t *testing.T) {
 
 	// Insert with host bits set; method should mask to .0/24
 	p1 := netip.MustParsePrefix("192.168.1.123/24")
-	route1 := newRoute("192.168.1.1", "eth0", 100)
+	route1 := newRoute(mpa("192.168.1.1"), "eth0", 100)
 	pt1 := t0.InsertPersist(p1, route1)
 
 	masked := p1.Masked()
@@ -99,7 +99,7 @@ func TestInsertPersist_CanonicalizesMasked_OverrideAndSize(t *testing.T) {
 	}
 
 	// Override same logical prefix with different route
-	route2 := newRoute("192.168.1.2", "eth1", 200)
+	route2 := newRoute(mpa("192.168.1.2"), "eth1", 200)
 	pt2 := pt1.InsertPersist(netip.MustParsePrefix("192.168.1.1/24"), route2)
 	if v, ok := pt2.Get(masked); !ok {
 		t.Fatalf("expected route at %v after override", masked)
@@ -115,9 +115,9 @@ func TestInsertPersist_CanonicalizesMasked_OverrideAndSize(t *testing.T) {
 func TestInsertPersist_IPv6(t *testing.T) {
 	t.Parallel()
 	t0 := &Table[*routeEntry]{}
-	p6 := netip.MustParsePrefix("2001:db8::1/64")
+	p6 := netip.MustParsePrefix("2001:db8::1/64") // not masked
 	route := &routeEntry{
-		nextHop:    netip.MustParseAddr("2001:db8::1"),
+		nextHop:    mpa("2001:db8::1"),
 		exitIF:     "eth0",
 		attributes: map[string]int{"metric": 100, "preference": 50},
 	}
@@ -136,10 +136,10 @@ func TestInsertPersist_IPv6(t *testing.T) {
 func TestModifyPersist_Insert_Update_Delete_Paths(t *testing.T) {
 	t.Parallel()
 	t0 := &Table[*routeEntry]{}
-	p := netip.MustParsePrefix("172.16.0.0/12")
+	p := mpp("172.16.0.0/12")
 
 	// Insert when missing (del=false) - returns (newVal, false)
-	route1 := newRoute("172.16.0.1", "eth0", 111)
+	route1 := newRoute(mpa("172.16.0.1"), "eth0", 111)
 	t1 := t0.ModifyPersist(p, func(val *routeEntry, ok bool) (*routeEntry, bool) {
 		if ok {
 			t.Fatalf("expected ok=false for missing")
@@ -156,7 +156,7 @@ func TestModifyPersist_Insert_Update_Delete_Paths(t *testing.T) {
 	}
 
 	// Update existing (del=false) - returns (oldVal, false)
-	route2 := newRoute("172.16.0.2", "eth1", 222)
+	route2 := newRoute(mpa("172.16.0.2"), "eth1", 222)
 	t2 := t1.ModifyPersist(p, func(val *routeEntry, ok bool) (*routeEntry, bool) {
 		if !ok {
 			t.Fatalf("expected existing route")
@@ -196,7 +196,7 @@ func TestModifyPersist_Insert_Update_Delete_Paths(t *testing.T) {
 func TestModifyPersist_MissingAndDelTrue_NoOp(t *testing.T) {
 	t.Parallel()
 	t0 := &Table[*routeEntry]{}
-	p := netip.MustParsePrefix("10.10.10.0/24")
+	p := mpp("10.10.10.0/24")
 	t1 := t0.ModifyPersist(p, func(val *routeEntry, ok bool) (*routeEntry, bool) {
 		return nil, true
 	})
@@ -209,7 +209,7 @@ func TestModifyPersist_InvalidPrefix_ReturnsOriginal(t *testing.T) {
 	t.Parallel()
 	t0 := &Table[*routeEntry]{}
 	pt := t0.ModifyPersist(netip.Prefix{}, func(val *routeEntry, ok bool) (*routeEntry, bool) {
-		return newRoute("10.0.0.1", "eth0", 100), false
+		return newRoute(mpa("10.0.0.1"), "eth0", 100), false
 	})
 	if pt != t0 {
 		t.Fatalf("expected original table for invalid prefix")
@@ -222,10 +222,10 @@ func TestDeletePersist_Workflow(t *testing.T) {
 	t.Parallel()
 	t0 := &Table[*routeEntry]{}
 
-	pLeaf := netip.MustParsePrefix("192.0.2.0/24")
-	pFringe := netip.MustParsePrefix("198.51.100.0/20")
-	routeLeaf := newRoute("192.0.2.1", "eth0", 10)
-	routeFringe := newRoute("198.51.100.1", "ppp0", 20)
+	pLeaf := mpp("192.0.2.0/24")
+	pFringe := netip.MustParsePrefix("198.51.100.0/20") // not masked
+	routeLeaf := newRoute(mpa("192.0.2.1"), "eth0", 10)
+	routeFringe := newRoute(mpa("198.51.100.1"), "ppp0", 20)
 
 	t1 := t0.InsertPersist(pLeaf, routeLeaf)
 	t2 := t1.InsertPersist(pFringe, routeFringe)
@@ -235,7 +235,7 @@ func TestDeletePersist_Workflow(t *testing.T) {
 	}
 
 	// Delete non-existent should be no-op
-	t3 := t2.DeletePersist(netip.MustParsePrefix("203.0.113.0/24"))
+	t3 := t2.DeletePersist(mpp("203.0.113.0/24"))
 	if t3.Size() != 2 {
 		t.Fatalf("delete of missing prefix should be no-op")
 	}
@@ -275,16 +275,16 @@ func TestUnionPersist_SizesAndValues(t *testing.T) {
 	a := &Table[*routeEntry]{}
 	b := &Table[*routeEntry]{}
 
-	p1 := netip.MustParsePrefix("10.0.0.0/8")
-	p2 := netip.MustParsePrefix("192.168.0.0/16")
-	p3 := netip.MustParsePrefix("2001:db8::/64")
+	p1 := mpp("10.0.0.0/8")
+	p2 := mpp("192.168.0.0/16")
+	p3 := mpp("2001:db8::/64")
 	p2dup := netip.MustParsePrefix("192.168.0.1/16") // same masked prefix as p2
 
-	route1 := newRoute("10.0.0.1", "eth0", 1)
-	route2 := newRoute("192.168.0.1", "eth1", 2)
-	route2dup := newRoute("192.168.0.2", "eth2", 22) // different route for same prefix
+	route1 := newRoute(mpa("10.0.0.1"), "eth0", 1)
+	route2 := newRoute(mpa("192.168.0.1"), "eth1", 2)
+	route2dup := newRoute(mpa("192.168.0.2"), "eth2", 22) // different route for same prefix
 	route3 := &routeEntry{
-		nextHop:    netip.MustParseAddr("2001:db8::1"),
+		nextHop:    mpa("2001:db8::1"),
 		exitIF:     "eth3",
 		attributes: map[string]int{"metric": 3, "preference": 100},
 	}
@@ -329,7 +329,7 @@ func TestInsertPersist_ClonesValues(t *testing.T) {
 	p := netip.MustParsePrefix("10.0.0.0/8")
 
 	// First insert: no clone yet
-	route1 := newRoute("10.0.0.1", "eth0", 100)
+	route1 := newRoute(mpa("10.0.0.1"), "eth0", 100)
 	t1 := t0.InsertPersist(p, route1)
 	if v, ok := t1.Get(p); !ok {
 		t.Fatalf("expected route after first insert")
@@ -339,7 +339,7 @@ func TestInsertPersist_ClonesValues(t *testing.T) {
 
 	// Second persist op duplicates structure and clones existing values into the new table
 	q := netip.MustParsePrefix("192.168.0.0/16")
-	route2 := newRoute("192.168.0.1", "eth1", 1)
+	route2 := newRoute(mpa("192.168.0.1"), "eth1", 1)
 	t2 := t1.InsertPersist(q, route2)
 	if v, ok := t2.Get(p); !ok {
 		t.Fatalf("expected cloned route in new table")
@@ -367,7 +367,7 @@ func TestModifyPersist_ClonesValues(t *testing.T) {
 	p := netip.MustParsePrefix("172.16.0.0/12")
 
 	// Insert via ModifyPersist -> returns (newVal, false), but stored value is un-cloned
-	route1 := newRoute("172.16.0.1", "eth0", 300)
+	route1 := newRoute(mpa("172.16.0.1"), "eth0", 300)
 	t1 := t0.ModifyPersist(p, func(val *routeEntry, ok bool) (*routeEntry, bool) {
 		if ok {
 			t.Fatalf("expected missing prefix")
@@ -382,7 +382,7 @@ func TestModifyPersist_ClonesValues(t *testing.T) {
 
 	// Next persist operation clones existing values into the new table
 	q := netip.MustParsePrefix("10.0.0.0/8")
-	route2 := newRoute("10.0.0.1", "eth1", 1)
+	route2 := newRoute(mpa("10.0.0.1"), "eth1", 1)
 	t2 := t1.InsertPersist(q, route2)
 	if v, ok := t2.Get(q); !ok {
 		t.Fatalf("new route should exist")
@@ -398,7 +398,7 @@ func TestModifyPersist_ClonesValues(t *testing.T) {
 	}
 
 	// Update in-place: ModifyPersist returns oldVal, table gets new value (cloned on future persists)
-	route3 := newRoute("172.16.0.2", "eth2", 400)
+	route3 := newRoute(mpa("172.16.0.2"), "eth2", 400)
 	t3 := t2.ModifyPersist(p, func(val *routeEntry, ok bool) (*routeEntry, bool) {
 		if !ok {
 			t.Fatalf("expected existing route")
@@ -427,7 +427,7 @@ func TestPersist_ClonerValues_CreatesNewInstances(t *testing.T) {
 	t0 := &Table[*routeEntry]{}
 	p := netip.MustParsePrefix("10.0.0.0/8")
 
-	orig := newRoute("10.0.0.1", "eth0", 42)
+	orig := newRoute(mpa("10.0.0.1"), "eth0", 42)
 	t1 := t0.InsertPersist(p, orig)
 
 	// No clone on initial insertion: same pointer
@@ -437,7 +437,7 @@ func TestPersist_ClonerValues_CreatesNewInstances(t *testing.T) {
 
 	// Next persist clones existing values into the new table
 	q := netip.MustParsePrefix("192.168.0.0/16")
-	newRouteVal := newRoute("192.168.0.1", "eth1", 7)
+	newRouteVal := newRoute(mpa("192.168.0.1"), "eth1", 7)
 	t2 := t1.InsertPersist(q, newRouteVal)
 	v2, ok := t2.Get(p)
 	if !ok {
@@ -465,8 +465,8 @@ func TestNonClonerInsertPersist_MultipleRoutes(t *testing.T) {
 	p1 := netip.MustParsePrefix("172.16.0.0/12")
 	p2 := netip.MustParsePrefix("192.168.0.0/16")
 
-	route1 := newRouteNonCloner("10.0.0.1", "eth0", 100)
-	route2 := newRouteNonCloner("10.0.0.2", "eth1", 200)
+	route1 := newRouteNonCloner(mpa("10.0.0.1"), "eth0", 100)
+	route2 := newRouteNonCloner(mpa("10.0.0.2"), "eth1", 200)
 
 	// Insert first route
 	t1 := t0.InsertPersist(p1, route1)
@@ -501,7 +501,7 @@ func TestNonClonerModifyPersist_PointerPreservation(t *testing.T) {
 	p := netip.MustParsePrefix("203.0.113.0/24")
 
 	// Insert with non-cloner helper
-	original := newRouteNonCloner("203.0.113.1", "wan0", 500)
+	original := newRouteNonCloner(mpa("203.0.113.1"), "wan0", 500)
 	t1 := t0.InsertPersist(p, original)
 
 	// Modify without changing the route instance
@@ -538,9 +538,9 @@ func TestNonClonerUnionPersist_SharedReferences(t *testing.T) {
 	p2 := netip.MustParsePrefix("10.2.0.0/16")
 	p3 := netip.MustParsePrefix("10.2.0.1/16") // same masked prefix as p2
 
-	route1 := newRouteNonCloner("10.1.0.1", "eth0", 1)
-	route2 := newRouteNonCloner("10.2.0.1", "eth1", 2)
-	route3 := newRouteNonCloner("10.2.0.2", "eth2", 3) // different route for same prefix
+	route1 := newRouteNonCloner(mpa("10.1.0.1"), "eth0", 1)
+	route2 := newRouteNonCloner(mpa("10.2.0.1"), "eth1", 2)
+	route3 := newRouteNonCloner(mpa("10.2.0.2"), "eth2", 3) // different route for same prefix
 
 	t1 = t1.InsertPersist(p1, route1).InsertPersist(p2, route2)
 	t2 = t2.InsertPersist(p3, route3)
