@@ -222,13 +222,13 @@ func TestLiteModifySemantics(t *testing.T) {
 
 			// Check expected prefixes exist
 			for pfxStr := range finalPrefixSet {
-				if _, found := lite.Get(pfxStr); !found {
+				if found := lite.Get(pfxStr); !found {
 					t.Errorf("Expected prefix %v not found in table", pfxStr)
 				}
 			}
 
 			// Check target prefix presence
-			_, targetFound := lite.Get(tt.args.pfx)
+			targetFound := lite.Get(tt.args.pfx)
 			if targetFound != tt.want.present {
 				t.Errorf("Target prefix %v presence = %v, want %v",
 					tt.args.pfx, targetFound, tt.want.present)
@@ -284,7 +284,7 @@ func TestLiteModifyEdgeCases(t *testing.T) {
 			}
 
 			// Verify table is still consistent after panic
-			if _, found := lite.Get(mpp("192.168.1.0/24")); !found {
+			if found := lite.Get(mpp("192.168.1.0/24")); !found {
 				t.Error("table corrupted after callback panic")
 			}
 		}()
@@ -327,13 +327,13 @@ func TestLiteModifyEdgeCases(t *testing.T) {
 		// Verify other prefixes still exist
 		expected := []string{"192.168.0.0/16", "192.168.1.1/32"}
 		for _, pfxStr := range expected {
-			if _, found := lite.Get(mpp(pfxStr)); !found {
+			if found := lite.Get(mpp(pfxStr)); !found {
 				t.Errorf("prefix %s should still exist", pfxStr)
 			}
 		}
 
 		// Verify deleted prefix is gone
-		if _, found := lite.Get(mpp("192.168.1.0/24")); found {
+		if found := lite.Get(mpp("192.168.1.0/24")); found {
 			t.Error("deleted prefix should not exist")
 		}
 	})
@@ -863,7 +863,7 @@ func TestLiteTableVsTableComparison(t *testing.T) {
 		return false // insert (no meaningful value)
 	})
 
-	if _, found := lite.Get(prefix); !found {
+	if found := lite.Get(prefix); !found {
 		t.Error("Lite table should have prefix present")
 	}
 
@@ -918,7 +918,7 @@ func FuzzLiteModifyComprehensive(f *testing.F) {
 		}
 
 		initialSize := lite.Size()
-		_, initialFound := lite.Get(targetPrefix)
+		initialFound := lite.Get(targetPrefix)
 
 		// Expected outcome tracking
 		var expectedSize int
@@ -981,7 +981,7 @@ func FuzzLiteModifyComprehensive(f *testing.F) {
 				lite.Size(), expectedSize, op%3, initialFound)
 		}
 
-		_, actualFound := lite.Get(targetPrefix)
+		actualFound := lite.Get(targetPrefix)
 		if actualFound != expectedFound {
 			t.Errorf("Get found inconsistent: got %v, expected %v (op=%d, initialFound=%v)",
 				actualFound, expectedFound, op%3, initialFound)
