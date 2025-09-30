@@ -26,17 +26,6 @@ func workLoadN() int {
 	return 10_000
 }
 
-// tabler is a test-only interface that provides a unified abstraction for
-// testing multiple table implementations (Table and Fast) with the same test suite.
-type tabler[V any] interface {
-	Get(netip.Prefix) (V, bool)
-	Insert(netip.Prefix, V)
-	Delete(netip.Prefix)
-	Modify(netip.Prefix, func(V, bool) (V, bool))
-	Contains(netip.Addr) bool
-	Size() int
-}
-
 var mpa = netip.MustParseAddr
 
 var mpp = func(s string) netip.Prefix {
