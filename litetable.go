@@ -92,18 +92,6 @@ func (l *Lite) Insert(pfx netip.Prefix) {
 	l.liteTable.Insert(pfx, struct{}{})
 }
 
-// Delete removes the exact prefix pfx from the table.
-//
-// This is an exact-match operation (no LPM). If pfx exists, the entry is
-// removed and true is returned. If pfx does not exist or pfx is invalid,
-// the table is left unchanged and false is returned.
-//
-// The prefix is canonicalized (Masked) before lookup.
-func (l *Lite) Delete(pfx netip.Prefix) bool {
-	_, ok := l.liteTable.Delete(pfx)
-	return ok
-}
-
 // InsertPersist is similar to Insert but the receiver isn't modified.
 //
 // All nodes touched during insert are cloned and a new Table is returned.
@@ -133,10 +121,10 @@ func (l *Lite) InsertPersist(pfx netip.Prefix) *Lite {
 //
 // Due to cloning overhead, DeletePersist is significantly slower than Delete,
 // typically taking μsec instead of nsec.
-func (l *Lite) DeletePersist(pfx netip.Prefix) (*Lite, bool) {
-	lp, _, exists := l.liteTable.DeletePersist(pfx)
+func (l *Lite) DeletePersist(pfx netip.Prefix) *Lite {
+	lp := l.liteTable.DeletePersist(pfx)
 	//nolint:govet // copy of *lp is here by intention
-	return &Lite{*lp}, exists
+	return &Lite{*lp}
 }
 
 // Modify applies a modification callback to a prefix in-place.
@@ -150,14 +138,13 @@ func (l *Lite) DeletePersist(pfx netip.Prefix) (*Lite, bool) {
 //
 // Modify returns a boolean indicating whether a prefix was deleted during
 // the operation.
-func (l *Lite) Modify(pfx netip.Prefix, cb func(exists bool) (del bool)) bool {
+func (l *Lite) Modify(pfx netip.Prefix, cb func(exists bool) (del bool)) {
 	// Adapt the callback to work with liteTable's signature
 	adaptedCb := func(_ struct{}, exists bool) (_ struct{}, del bool) {
 		return struct{}{}, cb(exists)
 	}
 
-	_, deleted := l.liteTable.Modify(pfx, adaptedCb)
-	return deleted
+	l.liteTable.Modify(pfx, adaptedCb)
 }
 
 // Clone returns a copy of the routing table.
@@ -199,55 +186,13 @@ func (l *Lite) UnionPersist(o *Lite) *Lite {
 //
 // Returns a new Lite instance with the modification applied and a boolean
 // indicating whether a prefix was deleted during the operation.
-func (l *Lite) ModifyPersist(pfx netip.Prefix, cb func(exists bool) (del bool)) (*Lite, bool) {
+func (l *Lite) ModifyPersist(pfx netip.Prefix, cb func(exists bool) (del bool)) *Lite {
 	// Adapt the callback to work with liteTable's signature
 	wrappedFn := func(_ struct{}, exists bool) (_ struct{}, del bool) {
 		return struct{}{}, cb(exists)
 	}
 
-	lp, _, deleted := l.liteTable.ModifyPersist(pfx, wrappedFn)
-	//nolint:govet // copy of *lp is here by intention
-	return &Lite{*lp}, deleted
-}
-
-// WalkPersist traverses all prefixes in the table using copy-on-write semantics.
-// The callback function is called for each prefix and can return a modified Lite instance.
-//
-// The callback receives the current Lite instance and a prefix. It should return
-// a potentially modified Lite instance and a boolean indicating whether to continue
-// the traversal (true to continue, false to stop).
-//
-// This method enables functional transformations of the entire table while maintaining
-// immutability of the original instance.
-//
-// Returns a new Lite instance representing the final state after all transformations.
-func (l *Lite) WalkPersist(fn func(*Lite, netip.Prefix) (*Lite, bool)) *Lite {
-	// Handle nil callback
-	if fn == nil {
-		return l
-	}
-
-	// Adapt the callback to work with liteTable's signature
-	wrappedFn := func(lp *liteTable[struct{}], pfx netip.Prefix, _ struct{}) (*liteTable[struct{}], bool) {
-		// Convert liteTable to Lite for the callback
-		//nolint:govet // copy of *lp is here by intention
-		oldLite := &Lite{*lp}
-
-		// Call the user's callback
-		newLite, cont := fn(oldLite, pfx)
-		if newLite == nil {
-			return nil, cont
-		}
-
-		// Return the underlying liteTable and continuation flag
-		return &newLite.liteTable, cont
-	}
-
-	lp := l.liteTable.WalkPersist(wrappedFn)
-	if lp == nil {
-		return nil
-	}
-
+	lp := l.liteTable.ModifyPersist(pfx, wrappedFn)
 	//nolint:govet // copy of *lp is here by intention
 	return &Lite{*lp}
 }

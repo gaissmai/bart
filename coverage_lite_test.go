@@ -99,72 +99,42 @@ func TestLite_API_Basics(t *testing.T) {
 }
 
 // Test 2: Lite persistent ops — ModifyPersist (insert/update/delete) + WalkPersist
-func TestLite_Persist_ModifyAndWalk(t *testing.T) {
+func TestLite_Persist_Modify(t *testing.T) {
 	t.Parallel()
 
 	// Start empty
 	l := new(Lite)
 
 	// ModifyPersist — insert when not present (exists=false, return false to keep => insert)
-	l, deleted := l.ModifyPersist(mpp("10.0.0.0/8"), func(exists bool) bool {
+	l = l.ModifyPersist(mpp("10.0.0.0/8"), func(exists bool) bool {
 		// return false => do not delete => ensure present (insert when !exists)
 		return false
 	})
-	if deleted {
-		t.Fatal("ModifyPersist(insert): deleted=true, want false")
-	}
 	if ok := l.Get(mpp("10.0.0.0/8")); !ok {
 		t.Fatal("ModifyPersist(insert): prefix not present after insert")
 	}
 
 	// ModifyPersist — update path for presence-only table is a no-op on value (still test callback path)
-	l2, deleted2 := l.ModifyPersist(mpp("10.0.0.0/8"), func(exists bool) bool {
+	l2 := l.ModifyPersist(mpp("10.0.0.0/8"), func(exists bool) bool {
 		if !exists {
 			t.Fatal("ModifyPersist(update): exists=false, want true")
 		}
 		// keep it
 		return false
 	})
-	if deleted2 {
-		t.Fatal("ModifyPersist(update): deleted=true, want false")
-	}
 	if ok := l2.Get(mpp("10.0.0.0/8")); !ok {
 		t.Fatal("ModifyPersist(update): prefix missing after update")
 	}
 
 	// ModifyPersist — delete existing (return true => delete)
-	l3, deleted3 := l2.ModifyPersist(mpp("10.0.0.0/8"), func(exists bool) bool {
+	l3 := l2.ModifyPersist(mpp("10.0.0.0/8"), func(exists bool) bool {
 		if !exists {
 			t.Fatal("ModifyPersist(delete): exists=false, want true")
 		}
 		return true // delete
 	})
-	if !deleted3 {
-		t.Fatal("ModifyPersist(delete): deleted=false, want true")
-	}
 	if ok := l3.Get(mpp("10.0.0.0/8")); ok {
 		t.Fatal("ModifyPersist(delete): prefix still present after delete")
-	}
-
-	// WalkPersist — delete one during walk, continue
-	l4 := new(Lite)
-	l4.Insert(mpp("10.0.0.0/8"))
-	l4.Insert(mpp("192.168.0.0/16"))
-
-	visited := 0
-	l5 := l4.WalkPersist(func(cur *Lite, pfx netip.Prefix) (*Lite, bool) {
-		visited++
-		if pfx.String() == "192.168.0.0/16" {
-			nxt, _ := cur.DeletePersist(pfx)
-			return nxt, true
-		}
-		return cur, true
-	})
-	if visited == 0 {
-		t.Fatal("WalkPersist: visited=0, want >0")
-	}
-	if ok := l5.Get(mpp("192.168.0.0/16")); ok {
-		t.Fatal("WalkPersist: 192.168.0.0/16 still present after deletion in walk")
 	}
 }
 

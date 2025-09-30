@@ -207,12 +207,7 @@ func TestLiteModifySemantics(t *testing.T) {
 			}
 
 			// Execute the test operation
-			deleted := lite.Modify(tt.args.pfx, tt.args.cb)
-
-			// Verify return values
-			if deleted != tt.want.deleted {
-				t.Errorf("Modify() deleted = %v, want %v", deleted, tt.want.deleted)
-			}
+			lite.Modify(tt.args.pfx, tt.args.cb)
 
 			// Verify final table state
 			finalPrefixSet := make(map[netip.Prefix]bool)
@@ -252,16 +247,13 @@ func TestLiteModifyInvalidPrefix(t *testing.T) {
 	invalidPrefix := netip.Prefix{} // zero value is invalid
 	callbackInvoked := false
 
-	deleted := lite.Modify(invalidPrefix, func(found bool) bool {
+	lite.Modify(invalidPrefix, func(found bool) bool {
 		callbackInvoked = true
 		return false
 	})
 
 	if callbackInvoked {
 		t.Error("callback should not be invoked for invalid prefix")
-	}
-	if deleted {
-		t.Error("expected deleted=false for invalid prefix")
 	}
 }
 
@@ -313,16 +305,12 @@ func TestLiteModifyEdgeCases(t *testing.T) {
 		}
 
 		// Delete the middle prefix
-		deleted := lite.Modify(mpp("192.168.1.0/24"), func(found bool) bool {
+		lite.Modify(mpp("192.168.1.0/24"), func(found bool) bool {
 			if !found {
 				t.Error("expected to find middle prefix")
 			}
 			return true // delete
 		})
-
-		if !deleted {
-			t.Error("expected deletion to succeed")
-		}
 
 		// Verify other prefixes still exist
 		expected := []string{"192.168.0.0/16", "192.168.1.1/32"}
@@ -344,16 +332,12 @@ func TestLiteModifyEdgeCases(t *testing.T) {
 		lite := &Lite{}
 
 		// Try to delete from empty table
-		deleted := lite.Modify(mpp("10.0.0.0/8"), func(found bool) bool {
+		lite.Modify(mpp("10.0.0.0/8"), func(found bool) bool {
 			if found {
 				t.Error("should not find anything in empty table")
 			}
 			return true // attempt delete
 		})
-
-		if deleted {
-			t.Error("delete from empty table should not report deletion")
-		}
 
 		if lite.Size() != 0 {
 			t.Error("table should remain empty")
@@ -614,18 +598,18 @@ func TestTablesModifySemantics(t *testing.T) {
 			tableTypes := []struct {
 				name    string
 				builder func() interface {
-					Modify(netip.Prefix, func(int, bool) (int, bool)) (int, bool)
+					Modify(netip.Prefix, func(int, bool) (int, bool))
 					Get(netip.Prefix) (int, bool)
 				}
 			}{
 				{"Table", func() interface {
-					Modify(netip.Prefix, func(int, bool) (int, bool)) (int, bool)
+					Modify(netip.Prefix, func(int, bool) (int, bool))
 					Get(netip.Prefix) (int, bool)
 				} {
 					return &Table[int]{}
 				}},
 				{"Fast", func() interface {
-					Modify(netip.Prefix, func(int, bool) (int, bool)) (int, bool)
+					Modify(netip.Prefix, func(int, bool) (int, bool))
 					Get(netip.Prefix) (int, bool)
 				} {
 					return &Fast[int]{}
@@ -644,13 +628,7 @@ func TestTablesModifySemantics(t *testing.T) {
 					}
 
 					// Execute the test operation
-					got, deleted := rt.Modify(tt.args.pfx, tt.args.cb)
-
-					// Check return values
-					if got != tt.want.val || deleted != tt.want.deleted {
-						t.Errorf("[%s] Modify() = (%v, %v), want (%v, %v)",
-							tt.name, got, deleted, tt.want.val, tt.want.deleted)
-					}
+					rt.Modify(tt.args.pfx, tt.args.cb)
 
 					// Check the final state of the table using Get (following existing pattern)
 					for pfx, wantVal := range tt.finalData {
@@ -688,16 +666,16 @@ func TestTableModifyInvalidPrefix(t *testing.T) {
 	tableTypes := []struct {
 		name    string
 		builder func() interface {
-			Modify(netip.Prefix, func(int, bool) (int, bool)) (int, bool)
+			Modify(netip.Prefix, func(int, bool) (int, bool))
 		}
 	}{
 		{"Table", func() interface {
-			Modify(netip.Prefix, func(int, bool) (int, bool)) (int, bool)
+			Modify(netip.Prefix, func(int, bool) (int, bool))
 		} {
 			return &Table[int]{}
 		}},
 		{"Fast", func() interface {
-			Modify(netip.Prefix, func(int, bool) (int, bool)) (int, bool)
+			Modify(netip.Prefix, func(int, bool) (int, bool))
 		} {
 			return &Fast[int]{}
 		}},
@@ -713,19 +691,13 @@ func TestTableModifyInvalidPrefix(t *testing.T) {
 			invalidPrefix := netip.Prefix{} // zero value is invalid
 			callbackInvoked := false
 
-			val, deleted := table.Modify(invalidPrefix, func(v int, found bool) (int, bool) {
+			table.Modify(invalidPrefix, func(v int, found bool) (int, bool) {
 				callbackInvoked = true
 				return 42, false
 			})
 
 			if callbackInvoked {
 				t.Error("callback should not be invoked for invalid prefix")
-			}
-			if val != 0 {
-				t.Errorf("expected zero value for invalid prefix, got %v", val)
-			}
-			if deleted {
-				t.Error("expected deleted=false for invalid prefix")
 			}
 		})
 	}
@@ -764,13 +736,9 @@ func TestModifyEdgeCases(t *testing.T) {
 		table := &Table[int]{}
 
 		// Insert zero value
-		val, deleted := table.Modify(mpp("192.168.1.0/24"), func(val int, found bool) (int, bool) {
+		table.Modify(mpp("192.168.1.0/24"), func(val int, found bool) (int, bool) {
 			return 0, false // insert zero
 		})
-
-		if val != 0 || deleted {
-			t.Errorf("zero value insert failed: got (%v, %v), want (0, false)", val, deleted)
-		}
 
 		// Verify zero value is stored and retrievable
 		if lookupVal, found := table.Get(mpp("192.168.1.0/24")); !found || lookupVal != 0 {
@@ -784,13 +752,9 @@ func TestModifyEdgeCases(t *testing.T) {
 		table := &Fast[int]{}
 		largeValue := 1<<30 - 1 // Large but valid int
 
-		val, deleted := table.Modify(mpp("10.0.0.0/8"), func(val int, found bool) (int, bool) {
+		table.Modify(mpp("10.0.0.0/8"), func(val int, found bool) (int, bool) {
 			return largeValue, false
 		})
-
-		if val != largeValue || deleted {
-			t.Errorf("large value insert failed: got (%v, %v), want (%v, false)", val, deleted, largeValue)
-		}
 	})
 
 	t.Run("overlapping_prefixes", func(t *testing.T) {
@@ -815,16 +779,12 @@ func TestModifyEdgeCases(t *testing.T) {
 		}
 
 		// Update the middle prefix
-		val, deleted := table.Modify(mpp("192.168.1.0/24"), func(val int, found bool) (int, bool) {
+		table.Modify(mpp("192.168.1.0/24"), func(val int, found bool) (int, bool) {
 			if !found || val != 2 {
 				t.Errorf("expected found=true, val=2, got found=%v, val=%v", found, val)
 			}
 			return 20, false // update
 		})
-
-		if val != 2 || deleted { // Should return old value
-			t.Errorf("update failed: got (%v, %v), want (2, false)", val, deleted)
-		}
 
 		// Verify all prefixes still exist with correct values
 		expected := map[string]int{
@@ -923,10 +883,9 @@ func FuzzLiteModifyComprehensive(f *testing.F) {
 		// Expected outcome tracking
 		var expectedSize int
 		var expectedFound bool
-		var expectedDeleted bool
 
 		// Execute modify operation - skip update ops since Lite has no meaningful payload
-		deleted := lite.Modify(targetPrefix, func(found bool) bool {
+		lite.Modify(targetPrefix, func(found bool) bool {
 			// Verify callback parameters
 			if found != initialFound {
 				t.Errorf("callback found=%v, but actual found=%v", found, initialFound)
@@ -938,32 +897,27 @@ func FuzzLiteModifyComprehensive(f *testing.F) {
 				if !found {
 					expectedSize = initialSize + 1
 					expectedFound = true
-					expectedDeleted = false
 					return false // insert
 				}
 				// Already exists, no change
 				expectedSize = initialSize
 				expectedFound = true
-				expectedDeleted = false
 				return false // keep existing
 
 			case 1: // delete if found (mod 3 case 1)
 				if found {
 					expectedSize = initialSize - 1
 					expectedFound = false
-					expectedDeleted = true
 					return true // delete
 				}
 				// Not found, no-op
 				expectedSize = initialSize
 				expectedFound = false
-				expectedDeleted = false
 				return true // no-op with del=true
 
 			case 2: // no-op always (mod 3 case 2)
 				expectedSize = initialSize
 				expectedFound = found
-				expectedDeleted = false
 
 				if found {
 					return false // keep existing
@@ -985,11 +939,6 @@ func FuzzLiteModifyComprehensive(f *testing.F) {
 		if actualFound != expectedFound {
 			t.Errorf("Get found inconsistent: got %v, expected %v (op=%d, initialFound=%v)",
 				actualFound, expectedFound, op%3, initialFound)
-		}
-
-		if deleted != expectedDeleted {
-			t.Errorf("Deleted flag inconsistent: got %v, expected %v (op=%d, initialFound=%v)",
-				deleted, expectedDeleted, op%3, initialFound)
 		}
 	})
 }
@@ -1029,7 +978,7 @@ func FuzzTableModifyComprehensive(f *testing.F) {
 		targetPrefix := prefixItems[targetIdx].pfx
 
 		tables := []interface {
-			Modify(netip.Prefix, func(int, bool) (int, bool)) (int, bool)
+			Modify(netip.Prefix, func(int, bool) (int, bool))
 			Get(netip.Prefix) (int, bool)
 			Size() int
 		}{
@@ -1053,10 +1002,8 @@ func FuzzTableModifyComprehensive(f *testing.F) {
 			var expectedSize int
 			var expectedFound bool
 			var expectedVal int
-			var expectedReturnVal int
-			var expectedDeleted bool
 
-			returnVal, deleted := table.Modify(targetPrefix, func(val int, found bool) (int, bool) {
+			table.Modify(targetPrefix, func(val int, found bool) (int, bool) {
 				// Verify callback parameters match actual state
 				if found != initialFound {
 					t.Errorf("Table %d: callback found=%v, but actual found=%v",
@@ -1073,16 +1020,12 @@ func FuzzTableModifyComprehensive(f *testing.F) {
 						expectedSize = initialSize + 1
 						expectedFound = true
 						expectedVal = value
-						expectedReturnVal = value
-						expectedDeleted = false
 						return value, false // insert new value
 					}
 					// Already exists, keep existing
 					expectedSize = initialSize
 					expectedFound = true
 					expectedVal = val
-					expectedReturnVal = val
-					expectedDeleted = false
 					return val, false // no change
 
 				case 1: // update if found
@@ -1090,16 +1033,12 @@ func FuzzTableModifyComprehensive(f *testing.F) {
 						expectedSize = initialSize
 						expectedFound = true
 						expectedVal = value
-						expectedReturnVal = val // returns OLD value
-						expectedDeleted = false
 						return value, false // update to new value
 					}
 					// Not found, no-op
 					expectedSize = initialSize
 					expectedFound = false
 					expectedVal = 0
-					expectedReturnVal = 0
-					expectedDeleted = false
 					return 0, true // del=true means no-op
 
 				case 2: // delete if found
@@ -1107,30 +1046,23 @@ func FuzzTableModifyComprehensive(f *testing.F) {
 						expectedSize = initialSize - 1
 						expectedFound = false
 						expectedVal = 0
-						expectedReturnVal = val // returns deleted value
-						expectedDeleted = true
 						return val, true // delete existing
 					}
 					// Not found, no-op
 					expectedSize = initialSize
 					expectedFound = false
 					expectedVal = 0
-					expectedReturnVal = 0
-					expectedDeleted = false
 					return 0, true // del=true means no-op
 
 				case 3: // no-op always
 					expectedSize = initialSize
 					expectedFound = found
-					expectedDeleted = false
 
 					if found {
 						expectedVal = val
-						expectedReturnVal = val
 						return val, false // keep existing value unchanged
 					} else {
 						expectedVal = 0
-						expectedReturnVal = 0
 						return 0, true // del=true means no-op for non-existent
 					}
 				}
@@ -1153,16 +1085,6 @@ func FuzzTableModifyComprehensive(f *testing.F) {
 			if expectedFound && actualVal != expectedVal {
 				t.Errorf("Table %d: Get value inconsistent: got %v, expected %v (op=%d)",
 					tableIdx, actualVal, expectedVal, op%4)
-			}
-
-			if returnVal != expectedReturnVal {
-				t.Errorf("Table %d: Return value inconsistent: got %v, expected %v (op=%d, initialFound=%v)",
-					tableIdx, returnVal, expectedReturnVal, op%4, initialFound)
-			}
-
-			if deleted != expectedDeleted {
-				t.Errorf("Table %d: Deleted flag inconsistent: got %v, expected %v (op=%d, initialFound=%v)",
-					tableIdx, deleted, expectedDeleted, op%4, initialFound)
 			}
 		}
 	})

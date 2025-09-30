@@ -30,8 +30,8 @@ func workLoadN() int {
 // testing multiple table implementations (Table and Fast) with the same test suite.
 type tabler[V any] interface {
 	Insert(netip.Prefix, V)
-	Delete(netip.Prefix) (V, bool)
-	Modify(netip.Prefix, func(V, bool) (V, bool)) (V, bool)
+	Delete(netip.Prefix)
+	Modify(netip.Prefix, func(V, bool) (V, bool))
 	Get(netip.Prefix) (V, bool)
 	Contains(netip.Addr) bool
 	Lookup(netip.Addr) (V, bool)
@@ -94,8 +94,6 @@ func TestInvalid(t *testing.T) {
 	noPanic(t, "InsertPersist", func() { tbl1.InsertPersist(zeroPfx, nil) })
 	noPanic(t, "DeletePersist", func() { tbl1.DeletePersist(zeroPfx) })
 	noPanic(t, "ModifyPersist", func() { tbl1.ModifyPersist(zeroPfx, nil) })
-
-	noPanic(t, "WalkPersist", func() { tbl1.WalkPersist(nil) })
 
 	noPanic(t, "OverlapsPrefix", func() { tbl1.OverlapsPrefix(zeroPfx) })
 
@@ -922,7 +920,7 @@ func TestDeletePersist(t *testing.T) {
 		// must not panic
 		tbl := new(Table[int])
 		checkNumNodes(t, tbl, 0)
-		tbl, _, _ = tbl.DeletePersist(randomPrefix(prng))
+		tbl = tbl.DeletePersist(randomPrefix(prng))
 		checkNumNodes(t, tbl, 0)
 	})
 
@@ -938,7 +936,7 @@ func TestDeletePersist(t *testing.T) {
 			{"10.0.0.1", 1},
 			{"255.255.255.255", -1},
 		})
-		tbl, _, _ = tbl.DeletePersist(mpp("10.0.0.0/8"))
+		tbl = tbl.DeletePersist(mpp("10.0.0.0/8"))
 		checkNumNodes(t, tbl, 0)
 		checkRoutes(t, tbl, []tableTest{
 			{"10.0.0.1", -1},
@@ -959,7 +957,7 @@ func TestDeletePersist(t *testing.T) {
 			{"255.255.255.255", -1},
 		})
 
-		tbl, _, _ = tbl.DeletePersist(mpp("192.168.0.1/32"))
+		tbl = tbl.DeletePersist(mpp("192.168.0.1/32"))
 		checkNumNodes(t, tbl, 0)
 		checkRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", -1},
@@ -982,7 +980,7 @@ func TestDeletePersist(t *testing.T) {
 			{"192.40.0.1", -1},
 		})
 
-		tbl, _, _ = tbl.DeletePersist(mpp("192.180.0.1/32"))
+		tbl = tbl.DeletePersist(mpp("192.180.0.1/32"))
 		checkNumNodes(t, tbl, 1)
 		checkRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
@@ -1009,7 +1007,7 @@ func TestDeletePersist(t *testing.T) {
 			{"192.255.0.1", -1},
 		})
 
-		tbl, _, _ = tbl.DeletePersist(mpp("192.180.0.1/32"))
+		tbl = tbl.DeletePersist(mpp("192.180.0.1/32"))
 		checkNumNodes(t, tbl, 2)
 		checkRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
@@ -1037,7 +1035,7 @@ func TestDeletePersist(t *testing.T) {
 			{"192.255.0.1", -1},
 		})
 
-		tbl, _, _ = tbl.DeletePersist(mpp("192.180.0.1/32"))
+		tbl = tbl.DeletePersist(mpp("192.180.0.1/32"))
 		checkNumNodes(t, tbl, 2)
 		checkRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
@@ -1060,7 +1058,7 @@ func TestDeletePersist(t *testing.T) {
 			{"192.255.0.1", -1},
 		})
 
-		tbl, _, _ = tbl.DeletePersist(mpp("200.0.0.0/32"))
+		tbl = tbl.DeletePersist(mpp("200.0.0.0/32"))
 		checkNumNodes(t, tbl, 1)
 		checkRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
@@ -1084,7 +1082,7 @@ func TestDeletePersist(t *testing.T) {
 			{"192.255.0.1", -1},
 		})
 
-		tbl, _, _ = tbl.DeletePersist(mpp("192.168.0.0/22"))
+		tbl = tbl.DeletePersist(mpp("192.168.0.0/22"))
 		checkNumNodes(t, tbl, 1)
 		checkRoutes(t, tbl, []tableTest{
 			{"192.168.0.1", 1},
@@ -1100,7 +1098,7 @@ func TestDeletePersist(t *testing.T) {
 
 		tbl.Insert(mpp("0.0.0.0/0"), 1)
 		tbl.Insert(mpp("::/0"), 1)
-		tbl, _, _ = tbl.DeletePersist(mpp("0.0.0.0/0"))
+		tbl = tbl.DeletePersist(mpp("0.0.0.0/0"))
 
 		checkNumNodes(t, tbl, 1)
 		checkRoutes(t, tbl, []tableTest{
@@ -1118,10 +1116,10 @@ func TestDeletePersist(t *testing.T) {
 		tbl.Insert(mpp("10.20.0.0/17"), 2)
 		checkNumNodes(t, tbl, 2)
 
-		tbl, _, _ = tbl.DeletePersist(mpp("10.20.0.0/17"))
+		tbl = tbl.DeletePersist(mpp("10.20.0.0/17"))
 		checkNumNodes(t, tbl, 1)
 
-		tbl, _, _ = tbl.DeletePersist(mpp("10.10.0.0/17"))
+		tbl = tbl.DeletePersist(mpp("10.10.0.0/17"))
 		checkNumNodes(t, tbl, 0)
 	})
 }
@@ -1776,10 +1774,7 @@ func TestModifySemantics(t *testing.T) {
 				rt.Modify(pfx, func(_ int, _ bool) (_ int, del bool) { return v, false })
 			}
 
-			got, deleted := rt.Modify(tt.args.pfx, tt.args.cb)
-			if got != tt.want.val || deleted != tt.want.deleted {
-				t.Errorf("[%s] Modify() = (%v, %v), want (%v, %v)", tt.name, got, deleted, tt.want.val, tt.want.deleted)
-			}
+			rt.Modify(tt.args.pfx, tt.args.cb)
 
 			// Check the final state of the table using Get, compares expected and actual table
 			for pfx, wantVal := range tt.finalData {
@@ -1885,10 +1880,7 @@ func TestTableModifyPersistSemantics(t *testing.T) {
 				rt.Modify(pfx, func(_ int, _ bool) (_ int, del bool) { return v, false })
 			}
 
-			prt, got, deleted := rt.ModifyPersist(tt.args.pfx, tt.args.cb)
-			if got != tt.want.val || deleted != tt.want.deleted {
-				t.Errorf("[%s] Modify() = (%v, %v), want (%v, %v)", tt.name, got, deleted, tt.want.val, tt.want.deleted)
-			}
+			prt := rt.ModifyPersist(tt.args.pfx, tt.args.cb)
 
 			// Check the final state of the table using Get, compares expected and actual table
 			for pfx, wantVal := range tt.finalData {
@@ -1966,7 +1958,7 @@ func TestModifyPersistCompare(t *testing.T) {
 
 	// Update as insert
 	for _, pfx := range pfxs {
-		imu, _, _ = imu.ModifyPersist(pfx.pfx, func(int, bool) (int, bool) { return pfx.val, false })
+		imu = imu.ModifyPersist(pfx.pfx, func(int, bool) (int, bool) { return pfx.val, false })
 		mut.Modify(pfx.pfx, func(int, bool) (int, bool) { return pfx.val, false })
 	}
 
@@ -1983,7 +1975,7 @@ func TestModifyPersistCompare(t *testing.T) {
 
 	// Update as update
 	for _, pfx := range pfxs[:len(pfxs)/2] {
-		imu, _, _ = imu.ModifyPersist(pfx.pfx, cb)
+		imu = imu.ModifyPersist(pfx.pfx, cb)
 		mut.Modify(pfx.pfx, cb)
 	}
 
@@ -2113,7 +2105,7 @@ func TestModifyPersistShuffled(t *testing.T) {
 
 		// delete
 		for _, pfx := range toDelete {
-			rt1, _, _ = rt1.ModifyPersist(pfx.pfx, cb)
+			rt1 = rt1.ModifyPersist(pfx.pfx, cb)
 		}
 
 		pfxs2 := append([]goldTableItem[int](nil), pfxs...)
@@ -2132,7 +2124,7 @@ func TestModifyPersistShuffled(t *testing.T) {
 
 		// delete
 		for _, pfx := range toDelete2 {
-			rt2, _, _ = rt2.ModifyPersist(pfx.pfx, cb)
+			rt2 = rt2.ModifyPersist(pfx.pfx, cb)
 		}
 
 		if rt1.String() != rt2.String() {
@@ -2909,104 +2901,6 @@ func TestLastOctetPlusOneAndLastBits(t *testing.T) {
 	}
 }
 
-func TestWalkPersist(t *testing.T) {
-	type testCase struct {
-		name       string
-		input      map[string]string
-		fn         func(*Table[string], netip.Prefix, string) (*Table[string], bool)
-		wantRemain []string // expected entries after filtering, as string prefixes
-	}
-
-	tests := []testCase{
-		{
-			name: "delete nothing",
-			input: map[string]string{
-				"192.168.0.0/16": "netA",
-				"2001:db8::/32":  "netB",
-			},
-			fn: func(pt *Table[string], pfx netip.Prefix, val string) (*Table[string], bool) {
-				return pt, false // do nothing, stop early
-			},
-			wantRemain: []string{"192.168.0.0/16", "2001:db8::/32"},
-		},
-		{
-			name: "delete all",
-			input: map[string]string{
-				"10.0.0.0/8": "internal",
-				"fd00::/8":   "ula",
-			},
-			fn: func(pt *Table[string], pfx netip.Prefix, val string) (*Table[string], bool) {
-				prt, _, _ := pt.DeletePersist(pfx)
-				return prt, true // remove everything
-			},
-			wantRemain: []string{},
-		},
-		{
-			name: "delete only IPv4",
-			input: map[string]string{
-				"172.16.0.0/12":   "corp",
-				"2001:db8:1::/48": "testnet",
-			},
-			fn: func(pt *Table[string], pfx netip.Prefix, val string) (*Table[string], bool) {
-				if pfx.Addr().Is4() {
-					pt, _, _ = pt.DeletePersist(pfx)
-				}
-				return pt, true
-			},
-			wantRemain: []string{"2001:db8:1::/48"},
-		},
-		{
-			name: "predicate based on value",
-			input: map[string]string{
-				"203.0.113.0/24":     "removeMe",
-				"2001:db8:dead::/48": "keepMe",
-			},
-			fn: func(pt *Table[string], pfx netip.Prefix, val string) (*Table[string], bool) {
-				if val == "removeMe" {
-					pt, _, _ = pt.DeletePersist(pfx)
-				}
-				return pt, true
-			},
-			wantRemain: []string{"2001:db8:dead::/48"},
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			// Build initial table.
-			tbl := new(Table[string])
-			for pfx, val := range tc.input {
-				tbl.Insert(mpp(pfx), val)
-			}
-
-			// Apply WalkPersist.
-			got := tbl.WalkPersist(tc.fn)
-
-			// Collect remaining prefixes from result.
-			gotRemain := []string{}
-			for pfx := range got.All() {
-				gotRemain = append(gotRemain, pfx.String())
-			}
-
-			// Compare lengths.
-			if len(gotRemain) != len(tc.wantRemain) {
-				t.Fatalf("expected %d entries, got %d: %v", len(tc.wantRemain), len(gotRemain), gotRemain)
-			}
-
-			// Compare sets (order is not guaranteed).
-			wantMap := map[string]bool{}
-			for _, w := range tc.wantRemain {
-				wantMap[w] = true
-			}
-			for _, g := range gotRemain {
-				if !wantMap[g] {
-					t.Errorf("unexpected remaining prefix: %s", g)
-				}
-			}
-		})
-	}
-}
-
 // ############ benchmarks ################################
 
 var benchRouteCount = []int{1, 2, 5, 10, 100, 1000, 10_000, 100_000, 200_000}
@@ -3076,7 +2970,7 @@ func BenchmarkTableDelete(b *testing.B) {
 				b.StartTimer()
 
 				for _, route := range pfxs {
-					rt, _, _ = rt.DeletePersist(route.pfx)
+					rt = rt.DeletePersist(route.pfx)
 				}
 			}
 			b.ReportMetric(float64(b.Elapsed())/float64(b.N)/float64(len(pfxs)), "ns/route")
@@ -3402,30 +3296,4 @@ func (t *Table[V]) dumpAsGoldTable() goldTable[V] {
 	}
 
 	return tbl
-}
-
-func BenchmarkWalkPersist(b *testing.B) {
-	prng := rand.New(rand.NewPCG(42, 42))
-
-	// Build a reasonably large table before benchmarking.
-	for _, n := range []int{10_000, 100_000, 500_000, 1_000_000} {
-		// callback: delete 1/10 of the entries
-		fn := func(pt *Table[int], pfx netip.Prefix, val int) (*Table[int], bool) {
-			if val%10 == 0 {
-				pt, _, _ = pt.DeletePersist(pfx)
-			}
-			return pt, true
-		}
-
-		b.Run(fmt.Sprintf("size(%d):deleted(%d)", n, n/10), func(b *testing.B) {
-			tbl := new(Table[int])
-			for i, pfx := range randomRealWorldPrefixes(prng, n) {
-				tbl.Insert(pfx, i)
-			}
-
-			for b.Loop() {
-				_ = tbl.WalkPersist(fn)
-			}
-		})
-	}
 }

@@ -670,16 +670,11 @@ func TestFastModifySemantics(t *testing.T) {
 		cb  func(val int, found bool) (_ int, del bool)
 	}
 
-	type want struct {
-		val     int
-		deleted bool
-	}
-
 	tests := []struct {
 		name      string
 		prepare   map[netip.Prefix]int // entries to pre-populate the table
 		args      args
-		want      want
+		want      int
 		finalData map[netip.Prefix]int // expected table contents after the operation
 	}{
 		{
@@ -689,7 +684,7 @@ func TestFastModifySemantics(t *testing.T) {
 				pfx: mpp("10.0.0.0/8"),
 				cb:  func(val int, found bool) (_ int, del bool) { return 0, true },
 			},
-			want:      want{val: 42, deleted: true},
+			want:      42,
 			finalData: map[netip.Prefix]int{mpp("2001:db8::/32"): 4242},
 		},
 
@@ -700,7 +695,7 @@ func TestFastModifySemantics(t *testing.T) {
 				pfx: mpp("2001:db8::/32"),
 				cb:  func(val int, found bool) (_ int, del bool) { return 4242, false },
 			},
-			want:      want{val: 4242, deleted: false},
+			want:      4242,
 			finalData: map[netip.Prefix]int{mpp("10.0.0.0/8"): 42, mpp("2001:db8::/32"): 4242},
 		},
 
@@ -712,7 +707,7 @@ func TestFastModifySemantics(t *testing.T) {
 				pfx: mpp("10.0.0.0/8"),
 				cb:  func(val int, found bool) (_ int, del bool) { return -1, false },
 			},
-			want:      want{val: 42, deleted: false},
+			want:      42,
 			finalData: map[netip.Prefix]int{mpp("10.0.0.0/8"): -1, mpp("2001:db8::/32"): 4242},
 		},
 
@@ -723,7 +718,7 @@ func TestFastModifySemantics(t *testing.T) {
 				pfx: mpp("2001:db8::/32"),
 				cb:  func(val int, found bool) (_ int, del bool) { return 0, true },
 			},
-			want:      want{val: 0, deleted: false},
+			want:      0,
 			finalData: map[netip.Prefix]int{mpp("10.0.0.0/8"): 42},
 		},
 	}
@@ -739,10 +734,7 @@ func TestFastModifySemantics(t *testing.T) {
 				rt.Modify(pfx, func(_ int, _ bool) (_ int, del bool) { return v, false })
 			}
 
-			got, deleted := rt.Modify(tt.args.pfx, tt.args.cb)
-			if got != tt.want.val || deleted != tt.want.deleted {
-				t.Errorf("[%s] Modify() = (%v, %v), want (%v, %v)", tt.name, got, deleted, tt.want.val, tt.want.deleted)
-			}
+			rt.Modify(tt.args.pfx, tt.args.cb)
 
 			// Check the final state of the table using Get, compares expected and actual table
 			for pfx, wantVal := range tt.finalData {
@@ -1099,45 +1091,6 @@ func TestFastDeleteButOne(t *testing.T) {
 
 		if sum != 1 {
 			t.Fatalf("delete but one, only one item must be left, but: %d\n%s", sum, tbl.dumpString())
-		}
-	}
-}
-
-func TestFastDelete(t *testing.T) {
-	t.Parallel()
-	prng := rand.New(rand.NewPCG(42, 42))
-	// Insert N prefixes, then delete those same prefixes in shuffled
-	// order.
-	const N = 10_000
-
-	tbl := new(Fast[int])
-	prefixes := randomPrefixes(prng, N)
-
-	// insert the prefixes
-	for _, p := range prefixes {
-		tbl.Insert(p.pfx, p.val)
-	}
-
-	// shuffle the prefixes
-	prng.Shuffle(N, func(i, j int) {
-		prefixes[i], prefixes[j] = prefixes[j], prefixes[i]
-	})
-
-	for _, p := range prefixes {
-		want, _ := tbl.Get(p.pfx)
-		val, ok := tbl.Delete(p.pfx)
-
-		if !ok {
-			t.Errorf("Delete, expected true, got %v", ok)
-		}
-
-		if val != want {
-			t.Errorf("Delete, expected %v, got %v", want, val)
-		}
-
-		val, ok = tbl.Delete(p.pfx)
-		if ok {
-			t.Errorf("Delete, expected false, got (%v, %v)", val, ok)
 		}
 	}
 }

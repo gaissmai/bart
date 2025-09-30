@@ -39,9 +39,10 @@ func (n *_NODE_TYPE[V]) getChild(uint8) (_ any, _ bool)                         
 func (n *_NODE_TYPE[V]) mustGetPrefix(uint8) (_ V)                                         { return }
 func (n *_NODE_TYPE[V]) mustGetChild(uint8) (_ any)                                        { return }
 func (n *_NODE_TYPE[V]) insert(netip.Prefix, V, int) (_ bool)                              { return }
-func (n *_NODE_TYPE[V]) delete(netip.Prefix) (_ V, _ bool)                                 { return }
+func (n *_NODE_TYPE[V]) modify(netip.Prefix, func(V, bool) (V, bool)) (_ int)              { return }
+func (n *_NODE_TYPE[V]) delete(netip.Prefix) (_ bool)                                      { return }
 func (n *_NODE_TYPE[V]) insertPersist(cloneFunc[V], netip.Prefix, V, int) (_ bool)         { return }
-func (n *_NODE_TYPE[V]) deletePersist(cloneFunc[V], netip.Prefix) (_ V, _ bool)            { return }
+func (n *_NODE_TYPE[V]) deletePersist(cloneFunc[V], netip.Prefix) (_ bool)                 { return }
 func (n *_NODE_TYPE[V]) get(netip.Prefix) (_ V, _ bool)                                    { return }
 func (n *_NODE_TYPE[V]) overlapsPrefixAtDepth(netip.Prefix, int) (_ bool)                  { return }
 func (n *_NODE_TYPE[V]) overlaps(*_NODE_TYPE[V], int) (_ bool)                             { return }
@@ -61,10 +62,6 @@ func (n *_NODE_TYPE[V]) supernets(netip.Prefix, func(netip.Prefix, V) bool)     
 func (n *_NODE_TYPE[V]) subnets(netip.Prefix, func(netip.Prefix, V) bool)                  { return }
 func (n *_NODE_TYPE[V]) allRec(stridePath, int, bool, func(netip.Prefix, V) bool) (_ bool) { return }
 func (n *_NODE_TYPE[V]) allRecSorted(stridePath, int, bool, func(netip.Prefix, V) bool) (_ bool) {
-	return
-}
-func (n *_NODE_TYPE[V]) modify(netip.Prefix, func(V, bool) (V, bool)) (_ int, _ V, _ bool) { return }
-func (n *_NODE_TYPE[V]) modifyPersist(cloneFunc[V], netip.Prefix, func(V, bool) (V, bool)) (_ int, _ V, _ bool) {
 	return
 }
 
@@ -167,9 +164,9 @@ func (t *_TABLE_TYPE[V]) InsertPersist(pfx netip.Prefix, val V) *_TABLE_TYPE[V] 
 // zero value of V and ok=false are returned.
 //
 // The prefix is canonicalized (Masked) before lookup.
-func (t *_TABLE_TYPE[V]) Delete(pfx netip.Prefix) (val V, exists bool) {
+func (t *_TABLE_TYPE[V]) Delete(pfx netip.Prefix) {
 	if !pfx.IsValid() {
-		return val, exists
+		return
 	}
 
 	// canonicalize prefix
@@ -177,12 +174,9 @@ func (t *_TABLE_TYPE[V]) Delete(pfx netip.Prefix) (val V, exists bool) {
 	is4 := pfx.Addr().Is4()
 
 	n := t.rootNodeByVersion(is4)
-	val, exists = n.delete(pfx)
-
-	if exists {
+	if exists := n.delete(pfx); exists {
 		t.sizeUpdate(is4, -1)
 	}
-	return val, exists
 }
 
 // Get performs an exact-prefix lookup and returns whether the exact
@@ -219,9 +213,9 @@ func (t *_TABLE_TYPE[V]) Get(pfx netip.Prefix) (val V, exists bool) {
 //
 // Due to cloning overhead, DeletePersist is significantly slower than Delete,
 // typically taking μsec instead of nsec.
-func (t *_TABLE_TYPE[V]) DeletePersist(pfx netip.Prefix) (pt *_TABLE_TYPE[V], val V, found bool) {
+func (t *_TABLE_TYPE[V]) DeletePersist(pfx netip.Prefix) *_TABLE_TYPE[V] {
 	if !pfx.IsValid() {
-		return t, val, false
+		return t
 	}
 
 	// canonicalize prefix
@@ -229,14 +223,13 @@ func (t *_TABLE_TYPE[V]) DeletePersist(pfx netip.Prefix) (pt *_TABLE_TYPE[V], va
 	is4 := pfx.Addr().Is4()
 
 	// Preflight check: avoid cloning if prefix doesn't exist
-	node := t.rootNodeByVersion(is4)
-	val, found = node.get(pfx)
-	if !found {
-		return t, val, false
+	n := t.rootNodeByVersion(is4)
+	if _, found := n.get(pfx); !found {
+		return t
 	}
 
 	// share size counters; root nodes cloned selectively.
-	pt = &_TABLE_TYPE[V]{
+	pt := &_TABLE_TYPE[V]{
 		size4: t.size4,
 		size6: t.size6,
 	}
@@ -246,78 +239,20 @@ func (t *_TABLE_TYPE[V]) DeletePersist(pfx netip.Prefix) (pt *_TABLE_TYPE[V], va
 	cloneFn := cloneFnFactory[V]()
 
 	// Clone root node corresponding to the IP version, for copy-on-write.
-	n := &pt.root4
 	if is4 {
 		pt.root4 = *t.root4.cloneFlat(cloneFn)
 		pt.root6 = t.root6
+		n = &pt.root4
 	} else {
 		pt.root4 = t.root4
 		pt.root6 = *t.root6.cloneFlat(cloneFn)
-
 		n = &pt.root6
 	}
 
-	_, exists := n.deletePersist(cloneFn, pfx)
-	if exists {
+	if exists := n.deletePersist(cloneFn, pfx); exists {
 		pt.sizeUpdate(is4, -1)
 	}
 
-	return pt, val, exists
-}
-
-// WalkPersist traverses all prefix/value pairs in the table and calls the
-// provided callback function for each entry. The callback receives the
-// current persistent table, the prefix, and the associated value.
-//
-// The callback must return a (potentially updated) persistent table and a
-// boolean flag indicating whether traversal should continue. Returning
-// false stops the iteration early.
-//
-// IMPORTANT: It is the responsibility of the callback implementation to only
-// use persistent Table operations (e.g. InsertPersist, DeletePersist,
-// ModifyPersist, ...). Using mutating methods like Modify or Delete
-// inside the callback would break the iteration and may lead
-// to inconsistent results.
-//
-// Example:
-//
-//	pt := t.WalkPersist(func(pt *_TABLE_TYPE[int], pfx netip.Prefix, val int) (*_TABLE_TYPE[int], bool) {
-//		switch {
-//		// Stop iterating if value is <0
-//		case val < 0:
-//			return pt, false
-//
-//		// Delete entries with value 0
-//		case val == 0:
-//			pt, _, _ = pt.DeletePersist(pfx)
-//
-//		// modify even values by doubling them
-//		case val%2 == 0:
-//			pt, _, _ = pt.ModifyPersist(pfx, func(oldVal int, _ bool) (int, bool) {
-//				return oldVal * 2, false
-//			})
-//
-//		// Leave odd values unchanged
-//		default:
-//			// no-op
-//		}
-//
-//		// Continue iterating
-//		return pt, true
-//	})
-func (t *_TABLE_TYPE[V]) WalkPersist(fn func(*_TABLE_TYPE[V], netip.Prefix, V) (*_TABLE_TYPE[V], bool)) *_TABLE_TYPE[V] {
-	// no-op, callback is nil
-	if fn == nil {
-		return t
-	}
-
-	pt := t
-	var proceed bool
-	for pfx, val := range t.All() {
-		if pt, proceed = fn(pt, pfx, val); !proceed {
-			break
-		}
-	}
 	return pt
 }
 
@@ -348,13 +283,13 @@ func (t *_TABLE_TYPE[V]) WalkPersist(fn func(*_TABLE_TYPE[V], netip.Prefix, V) (
 //
 // Summary:
 //
-//	Operation | cb-input        | cb-return       | Modify-return
-//	---------------------------------------------------------------
-//	No-op:    | (zero,   false) | (_,      true)  | (zero,   false)
-//	Insert:   | (zero,   false) | (newVal, false) | (newVal, false)
-//	Update:   | (oldVal, true)  | (newVal, false) | (oldVal, false)
-//	Delete:   | (oldVal, true)  | (_,      true)  | (oldVal, true)
-func (t *_TABLE_TYPE[V]) Modify(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, del bool)) (_ V, deleted bool) {
+//	| cb-input        | cb-return       | Ops    |
+//	------------------------------------- -----------
+//	| (zero,   false) | (_,      true)  | no-op  |
+//	| (zero,   false) | (newVal, false) | insert |
+//	| (oldVal, true)  | (newVal, false) | update |
+//	| (oldVal, true)  | (_,      true)  | delete |
+func (t *_TABLE_TYPE[V]) Modify(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, del bool)) {
 	if !pfx.IsValid() {
 		return
 	}
@@ -366,17 +301,14 @@ func (t *_TABLE_TYPE[V]) Modify(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, de
 
 	n := t.rootNodeByVersion(is4)
 
-	delta, val, deleted := n.modify(pfx, cb)
+	delta := n.modify(pfx, cb)
 	t.sizeUpdate(is4, delta)
-
-	return val, deleted
 }
 
 // ModifyPersist is similar to Modify but the receiver isn't modified.
-func (t *_TABLE_TYPE[V]) ModifyPersist(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, del bool)) (pt *_TABLE_TYPE[V], _ V, deleted bool) {
-	var zero V
+func (t *_TABLE_TYPE[V]) ModifyPersist(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, del bool)) *_TABLE_TYPE[V] {
 	if !pfx.IsValid() {
-		return t, zero, false
+		return t
 	}
 
 	// make a cheap test in front of expensive operation
@@ -393,17 +325,16 @@ func (t *_TABLE_TYPE[V]) ModifyPersist(pfx netip.Prefix, cb func(_ V, ok bool) (
 
 	switch {
 	case !ok && del: // no-op
-		return t, zero, false
+		return t
 
 	case !ok && !del: // insert
-		return t.InsertPersist(pfx.Masked(), newVal), newVal, false
+		return t.InsertPersist(pfx, newVal)
 
 	case ok && !del: // update
-		return t.InsertPersist(pfx.Masked(), newVal), oldVal, false
+		return t.InsertPersist(pfx, newVal)
 
 	case ok && del: // delete
-		pt, _, _ := t.DeletePersist(pfx.Masked())
-		return pt, oldVal, true
+		return t.DeletePersist(pfx)
 	}
 
 	panic("unreachable")

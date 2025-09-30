@@ -201,12 +201,11 @@ func (n *fastNode[V]) allIndices() iter.Seq2[uint8, V] {
 }
 
 // deletePrefix removes the route at the given index.
-// Returns the removed value and true if the prefix existed,
-// or the zero value and false if no prefix was found at idx.
-func (n *fastNode[V]) deletePrefix(idx uint8) (val V, exists bool) {
+// Returns true if the prefix existed, otherwise false.
+func (n *fastNode[V]) deletePrefix(idx uint8) (exists bool) {
 	if exists = n.prefixes.Test(idx); !exists {
 		// Route entry doesn't exist
-		return val, exists
+		return exists
 	}
 	n.pfxCount--
 
@@ -217,7 +216,7 @@ func (n *fastNode[V]) deletePrefix(idx uint8) (val V, exists bool) {
 	n.allot(idx, valPtr, parentValPtr)
 
 	n.prefixes.Clear(idx)
-	return *valPtr, true
+	return true
 }
 
 // contains returns true if the given index has any matching longest-prefix

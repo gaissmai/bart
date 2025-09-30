@@ -67,7 +67,7 @@ func ExampleLite_concurrent() {
 			// batch of deletes
 			next := cur
 			for _, pfx := range examplePrefixes {
-				next, _ = next.DeletePersist(pfx)
+				next = next.DeletePersist(pfx)
 			}
 
 			liteAtomicPtr.Store(next)

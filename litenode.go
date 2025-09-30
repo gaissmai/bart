@@ -141,13 +141,13 @@ func (n *liteNode[V]) allIndices() iter.Seq2[uint8, V] {
 // Returns true if the prefix existed, and false otherwise.
 //
 //nolint:unparam
-func (n *liteNode[V]) deletePrefix(idx uint8) (_ V, exists bool) {
+func (n *liteNode[V]) deletePrefix(idx uint8) (exists bool) {
 	if exists = n.prefixes.Test(idx); !exists {
-		return
+		return false
 	}
 	n.prefixes.Clear(idx)
 	n.prefixes.count--
-	return
+	return true
 }
 
 // insertChild adds a child node at the specified address (0-255).

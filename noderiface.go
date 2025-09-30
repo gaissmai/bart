@@ -28,7 +28,7 @@ type nodeWriter[V any] interface {
 	insertPrefix(uint8, V) bool
 
 	deleteChild(uint8) bool
-	deletePrefix(uint8) (V, bool)
+	deletePrefix(uint8) bool
 }
 
 type nodeReader[V any] interface {

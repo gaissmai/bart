@@ -140,18 +140,12 @@ func TestModifyPersist_Insert_Update_Delete_Paths(t *testing.T) {
 
 	// Insert when missing (del=false) - returns (newVal, false)
 	route1 := newRoute("172.16.0.1", "eth0", 111)
-	t1, newVal, del := t0.ModifyPersist(p, func(val *routeEntry, ok bool) (*routeEntry, bool) {
+	t1 := t0.ModifyPersist(p, func(val *routeEntry, ok bool) (*routeEntry, bool) {
 		if ok {
 			t.Fatalf("expected ok=false for missing")
 		}
 		return route1, false
 	})
-	if del {
-		t.Fatalf("unexpected delete on insert path")
-	}
-	if newVal.nextHop != route1.nextHop || newVal.exitIF != route1.exitIF {
-		t.Fatalf("returned route should match inserted route")
-	}
 	if v, ok := t1.Get(p.Masked()); !ok {
 		t.Fatalf("insert path failed")
 	} else if v.attributes["metric"] != 111 {
@@ -163,7 +157,7 @@ func TestModifyPersist_Insert_Update_Delete_Paths(t *testing.T) {
 
 	// Update existing (del=false) - returns (oldVal, false)
 	route2 := newRoute("172.16.0.2", "eth1", 222)
-	t2, oldVal2, del2 := t1.ModifyPersist(p, func(val *routeEntry, ok bool) (*routeEntry, bool) {
+	t2 := t1.ModifyPersist(p, func(val *routeEntry, ok bool) (*routeEntry, bool) {
 		if !ok {
 			t.Fatalf("expected existing route")
 		}
@@ -172,12 +166,6 @@ func TestModifyPersist_Insert_Update_Delete_Paths(t *testing.T) {
 		}
 		return route2, false
 	})
-	if del2 {
-		t.Fatalf("unexpected delete on update path")
-	}
-	if oldVal2.attributes["metric"] != 111 { // ModifyPersist returns OLD value for updates!
-		t.Fatalf("update should return old route with metric 111, got %d", oldVal2.attributes["metric"])
-	}
 	if v, ok := t2.Get(p.Masked()); !ok {
 		t.Fatalf("route should exist after update")
 	} else if v.attributes["metric"] != 222 { // Table contains NEW value
@@ -188,7 +176,7 @@ func TestModifyPersist_Insert_Update_Delete_Paths(t *testing.T) {
 	}
 
 	// Delete existing (del=true) - returns (oldVal, true)
-	t3, oldVal3, deleted := t2.ModifyPersist(p, func(val *routeEntry, ok bool) (*routeEntry, bool) {
+	t3 := t2.ModifyPersist(p, func(val *routeEntry, ok bool) (*routeEntry, bool) {
 		if !ok {
 			t.Fatalf("expected existing route")
 		}
@@ -197,12 +185,6 @@ func TestModifyPersist_Insert_Update_Delete_Paths(t *testing.T) {
 		}
 		return val, true
 	})
-	if !deleted {
-		t.Fatalf("delete path failed: deleted=%v", deleted)
-	}
-	if oldVal3.attributes["metric"] != 222 {
-		t.Fatalf("delete should return route with metric 222, got %d", oldVal3.attributes["metric"])
-	}
 	if _, ok := t3.Get(p.Masked()); ok {
 		t.Fatalf("expected prefix to be removed")
 	}
@@ -215,25 +197,22 @@ func TestModifyPersist_MissingAndDelTrue_NoOp(t *testing.T) {
 	t.Parallel()
 	t0 := &Table[*routeEntry]{}
 	p := netip.MustParsePrefix("10.10.10.0/24")
-	t1, val, deleted := t0.ModifyPersist(p, func(val *routeEntry, ok bool) (*routeEntry, bool) {
+	t1 := t0.ModifyPersist(p, func(val *routeEntry, ok bool) (*routeEntry, bool) {
 		return nil, true
 	})
-	if deleted || val != nil {
-		t.Fatalf("expected no-op for missing+del=true (nil, false)")
-	}
 	if t1.Size() != 0 {
 		t.Fatalf("expected no entries after no-op, got size %d", t1.Size())
 	}
 }
 
-func TestModifyPersist_InvalidPrefix_ReturnsOriginalAndZero(t *testing.T) {
+func TestModifyPersist_InvalidPrefix_ReturnsOriginal(t *testing.T) {
 	t.Parallel()
 	t0 := &Table[*routeEntry]{}
-	pt, val, deleted := t0.ModifyPersist(netip.Prefix{}, func(val *routeEntry, ok bool) (*routeEntry, bool) {
+	pt := t0.ModifyPersist(netip.Prefix{}, func(val *routeEntry, ok bool) (*routeEntry, bool) {
 		return newRoute("10.0.0.1", "eth0", 100), false
 	})
-	if pt != t0 || val != nil || deleted {
-		t.Fatalf("expected original table, nil value and deleted=false for invalid prefix")
+	if pt != t0 {
+		t.Fatalf("expected original table for invalid prefix")
 	}
 }
 
@@ -256,22 +235,13 @@ func TestDeletePersist_Workflow(t *testing.T) {
 	}
 
 	// Delete non-existent should be no-op
-	t3, _, found := t2.DeletePersist(netip.MustParsePrefix("203.0.113.0/24"))
-	if found {
-		t.Fatalf("delete of missing prefix should return found=false")
-	}
+	t3 := t2.DeletePersist(netip.MustParsePrefix("203.0.113.0/24"))
 	if t3.Size() != 2 {
 		t.Fatalf("delete of missing prefix should be no-op")
 	}
 
 	// Delete leaf
-	t4, vLeaf, okLeaf := t3.DeletePersist(pLeaf)
-	if !okLeaf {
-		t.Fatalf("delete leaf failed: ok=%v", okLeaf)
-	}
-	if vLeaf.attributes["metric"] != 10 {
-		t.Fatalf("deleted leaf route should have metric 10, got %d", vLeaf.attributes["metric"])
-	}
+	t4 := t3.DeletePersist(pLeaf)
 	if _, ok := t4.Get(pLeaf.Masked()); ok {
 		t.Fatalf("leaf still present after delete")
 	}
@@ -280,13 +250,7 @@ func TestDeletePersist_Workflow(t *testing.T) {
 	}
 
 	// Delete fringe
-	t5, vFringe, okFringe := t4.DeletePersist(pFringe)
-	if !okFringe {
-		t.Fatalf("delete fringe failed: ok=%v", okFringe)
-	}
-	if vFringe.attributes["metric"] != 20 {
-		t.Fatalf("deleted fringe route should have metric 20, got %d", vFringe.attributes["metric"])
-	}
+	t5 := t4.DeletePersist(pFringe)
 	if _, ok := t5.Get(pFringe.Masked()); ok {
 		t.Fatalf("fringe still present after delete")
 	}
@@ -298,93 +262,9 @@ func TestDeletePersist_Workflow(t *testing.T) {
 func TestDeletePersist_InvalidPrefix_ReturnsOriginal(t *testing.T) {
 	t.Parallel()
 	t0 := &Table[*routeEntry]{}
-	pt, val, found := t0.DeletePersist(netip.Prefix{})
-	if pt != t0 || found || val != nil {
-		t.Fatalf("expected original table, nil value and found=false for invalid prefix")
-	}
-}
-
-// ---- WalkPersist ----
-
-func TestWalkPersist_NilCallback_NoOp(t *testing.T) {
-	t.Parallel()
-	t0 := &Table[*routeEntry]{}
-	p := netip.MustParsePrefix("10.0.0.0/8")
-	route := newRoute("10.0.0.1", "eth0", 100)
-	t1 := t0.InsertPersist(p, route)
-	pt := t1.WalkPersist(nil)
-	if pt != t1 {
-		t.Fatalf("nil callback must return original table reference")
-	}
-}
-
-func TestWalkPersist_TransformsValues_StopsEarly(t *testing.T) {
-	t.Parallel()
-	t0 := &Table[*routeEntry]{}
-
-	p1 := netip.MustParsePrefix("10.0.0.0/8")
-	p2 := netip.MustParsePrefix("192.168.0.0/16")
-	p3 := netip.MustParsePrefix("2001:db8::/64")
-
-	route1 := newRoute("10.0.0.1", "eth0", 1)
-	route2 := newRoute("192.168.0.1", "eth1", 2)
-	route3 := &routeEntry{
-		nextHop:    netip.MustParseAddr("2001:db8::1"),
-		exitIF:     "eth2",
-		attributes: map[string]int{"metric": 3, "preference": 100},
-	}
-
-	tbl := t0.InsertPersist(p1, route1).InsertPersist(p2, route2).InsertPersist(p3, route3)
-
-	// Callback increments all route metrics by 10, but stops after processing 2 entries
-	count := 0
-	cb := func(pt *Table[*routeEntry], pfx netip.Prefix, route *routeEntry) (*Table[*routeEntry], bool) {
-		count++
-		pt2, _, _ := pt.ModifyPersist(pfx, func(old *routeEntry, ok bool) (*routeEntry, bool) {
-			updated := old.Clone()
-			updated.attributes["metric"] = old.attributes["metric"] + 10
-			return updated, false
-		})
-		return pt2, count < 2
-	}
-	pt := tbl.WalkPersist(cb)
-
-	if count != 2 {
-		t.Fatalf("expected early stop after 2 items; got %d", count)
-	}
-	if pt.Size() != 3 {
-		t.Fatalf("expected 3 entries after walk; got %d", pt.Size())
-	}
-
-	// Verify that exactly 2 values were incremented
-	var incremented, original int
-	if v, ok := pt.Get(p1.Masked()); ok {
-		switch v.attributes["metric"] {
-		case 11:
-			incremented++
-		case 1:
-			original++
-		}
-	}
-	if v, ok := pt.Get(p2.Masked()); ok {
-		switch v.attributes["metric"] {
-		case 12:
-			incremented++
-		case 2:
-			original++
-		}
-	}
-	if v, ok := pt.Get(p3.Masked()); ok {
-		switch v.attributes["metric"] {
-		case 13:
-			incremented++
-		case 3:
-			original++
-		}
-	}
-
-	if incremented != 2 || original != 1 {
-		t.Fatalf("expected 2 incremented and 1 original value; got %d incremented, %d original", incremented, original)
+	pt := t0.DeletePersist(netip.Prefix{})
+	if pt != t0 {
+		t.Fatalf("expected original table for invalid prefix")
 	}
 }
 
@@ -488,18 +368,12 @@ func TestModifyPersist_ClonesValues(t *testing.T) {
 
 	// Insert via ModifyPersist -> returns (newVal, false), but stored value is un-cloned
 	route1 := newRoute("172.16.0.1", "eth0", 300)
-	t1, newVal, deleted := t0.ModifyPersist(p, func(val *routeEntry, ok bool) (*routeEntry, bool) {
+	t1 := t0.ModifyPersist(p, func(val *routeEntry, ok bool) (*routeEntry, bool) {
 		if ok {
 			t.Fatalf("expected missing prefix")
 		}
 		return route1, false
 	})
-	if deleted {
-		t.Fatalf("insert path should not delete")
-	}
-	if newVal.attributes["metric"] != 300 {
-		t.Fatalf("insert path should return route with metric 300; got %d", newVal.attributes["metric"])
-	}
 	if v, ok := t1.Get(p); !ok {
 		t.Fatalf("stored route should exist after insert")
 	} else if v.attributes["metric"] != 300 {
@@ -525,7 +399,7 @@ func TestModifyPersist_ClonesValues(t *testing.T) {
 
 	// Update in-place: ModifyPersist returns oldVal, table gets new value (cloned on future persists)
 	route3 := newRoute("172.16.0.2", "eth2", 400)
-	t3, oldVal, del2 := t2.ModifyPersist(p, func(val *routeEntry, ok bool) (*routeEntry, bool) {
+	t3 := t2.ModifyPersist(p, func(val *routeEntry, ok bool) (*routeEntry, bool) {
 		if !ok {
 			t.Fatalf("expected existing route")
 		}
@@ -534,12 +408,6 @@ func TestModifyPersist_ClonesValues(t *testing.T) {
 		}
 		return route3, false
 	})
-	if del2 {
-		t.Fatalf("update should not delete")
-	}
-	if oldVal.attributes["metric"] != 300 {
-		t.Fatalf("update should return old metric 300, got %d", oldVal.attributes["metric"])
-	}
 	if v, ok := t3.Get(p); !ok {
 		t.Fatalf("updated route should exist")
 	} else if v.attributes["metric"] != 400 {
@@ -549,73 +417,6 @@ func TestModifyPersist_ClonesValues(t *testing.T) {
 		t.Fatalf("other route should still exist")
 	} else if v.attributes["metric"] != 1 {
 		t.Fatalf("other route should have metric 1; got %d", v.attributes["metric"])
-	}
-}
-
-func TestWalkPersist_ClonesModifiedValues(t *testing.T) {
-	t.Parallel()
-	t0 := &Table[*routeEntry]{}
-
-	p1 := netip.MustParsePrefix("10.0.0.0/8")
-	p2 := netip.MustParsePrefix("192.168.0.0/16")
-
-	route1 := newRoute("10.0.0.1", "eth0", 10)
-	route2 := newRoute("192.168.0.1", "eth1", 20)
-
-	// Build via two persists: after the 2nd insert, both routes exist
-	t1 := t0.InsertPersist(p1, route1).InsertPersist(p2, route2)
-
-	// Walk enumerates current table values and adds 100 to each metric
-	t2 := t1.WalkPersist(func(pt *Table[*routeEntry], pfx netip.Prefix, route *routeEntry) (*Table[*routeEntry], bool) {
-		expectedMetric := 10
-		if pfx.Addr().String() == "192.168.0.0" {
-			expectedMetric = 20
-		}
-		if route.attributes["metric"] != expectedMetric {
-			t.Fatalf("unexpected metric in walk: got %d, expected %d", route.attributes["metric"], expectedMetric)
-		}
-
-		// ModifyPersist operates on a persistent copy (values cloned before cb);
-		// we store metric+100 (no clone at insert boundary).
-		pt2, _, _ := pt.ModifyPersist(pfx, func(old *routeEntry, ok bool) (*routeEntry, bool) {
-			updated := old.Clone()
-			updated.attributes["metric"] = route.attributes["metric"] + 100
-			return updated, false
-		})
-		return pt2, true
-	})
-
-	if v, ok := t2.Get(p1); !ok {
-		t.Fatalf("p1 should exist after walk")
-	} else if v.attributes["metric"] != 110 {
-		t.Fatalf("expected metric 110 after walk; got %d", v.attributes["metric"])
-	}
-
-	if v, ok := t2.Get(p2); !ok {
-		t.Fatalf("p2 should exist after walk")
-	} else if v.attributes["metric"] != 120 {
-		t.Fatalf("expected metric 120 after walk; got %d", v.attributes["metric"])
-	}
-
-	// Another persist should preserve the values
-	q := netip.MustParsePrefix("2001:db8::/64")
-	route3 := &routeEntry{
-		nextHop:    netip.MustParseAddr("2001:db8::1"),
-		exitIF:     "eth2",
-		attributes: map[string]int{"metric": 0, "preference": 100},
-	}
-	t3 := t2.InsertPersist(q, route3)
-
-	if v, ok := t3.Get(p1); !ok {
-		t.Fatalf("p1 should exist after extra persist")
-	} else if v.attributes["metric"] != 110 {
-		t.Fatalf("expected metric 110 after extra persist; got %d", v.attributes["metric"])
-	}
-
-	if v, ok := t3.Get(p2); !ok {
-		t.Fatalf("p2 should exist after extra persist")
-	} else if v.attributes["metric"] != 120 {
-		t.Fatalf("expected metric 120 after extra persist; got %d", v.attributes["metric"])
 	}
 }
 
@@ -653,59 +454,6 @@ func TestPersist_ClonerValues_CreatesNewInstances(t *testing.T) {
 	orig.attributes["metric"] = 999
 	if v2.attributes["metric"] == 999 {
 		t.Fatalf("cloned value in new table should be isolated from original")
-	}
-}
-
-func TestPersist_NonClonerValues_PointerIdentityPreserved(t *testing.T) {
-	t.Parallel()
-
-	t0 := &Table[*routeEntryNonCloner]{}
-	p := netip.MustParsePrefix("10.0.0.0/8")
-
-	// Use the helper function
-	originalPtr := newRouteNonCloner("10.0.0.1", "eth0", 42)
-
-	t1 := t0.InsertPersist(p, originalPtr)
-
-	// Should be the exact same pointer (no cloning)
-	if v, ok := t1.Get(p); !ok || v != originalPtr {
-		t.Fatalf("expected same pointer for non-cloner")
-	}
-
-	// Modify through the original pointer
-	originalPtr.attributes["metric"] = 100
-
-	// Change should be visible in the table (proves no isolation)
-	if v, ok := t1.Get(p); !ok {
-		t.Fatalf("route should exist in table")
-	} else if v.attributes["metric"] != 100 {
-		t.Fatalf("expected metric 100 after modification, got %d", v.attributes["metric"])
-	}
-
-	// Create another table with ModifyPersist
-	t2, returnedPtr, _ := t1.ModifyPersist(p, func(val *routeEntryNonCloner, ok bool) (*routeEntryNonCloner, bool) {
-		if !ok || val != originalPtr {
-			t.Fatalf("expected original pointer in callback")
-		}
-		return originalPtr, false // Return same pointer
-	})
-
-	// For update, ModifyPersist returns old value (which is the same pointer)
-	if returnedPtr != originalPtr {
-		t.Fatalf("ModifyPersist should return original pointer for update")
-	}
-
-	// Both tables should have the same pointer
-	v1, _ := t1.Get(p)
-	v2, _ := t2.Get(p)
-	if v1 != v2 || v1 != originalPtr {
-		t.Fatalf("all tables should reference the same pointer")
-	}
-
-	// Modification affects all tables (no isolation)
-	originalPtr.attributes["metric"] = 200
-	if v1.attributes["metric"] != 200 || v2.attributes["metric"] != 200 {
-		t.Fatalf("modification should affect all tables")
 	}
 }
 
@@ -757,7 +505,7 @@ func TestNonClonerModifyPersist_PointerPreservation(t *testing.T) {
 	t1 := t0.InsertPersist(p, original)
 
 	// Modify without changing the route instance
-	t2, returnedVal, deleted := t1.ModifyPersist(p, func(old *routeEntryNonCloner, found bool) (*routeEntryNonCloner, bool) {
+	t2 := t1.ModifyPersist(p, func(old *routeEntryNonCloner, found bool) (*routeEntryNonCloner, bool) {
 		if !found || old != original {
 			t.Error("should receive original pointer in callback")
 		}
@@ -765,15 +513,6 @@ func TestNonClonerModifyPersist_PointerPreservation(t *testing.T) {
 		old.attributes["preference"] = 200
 		return old, false
 	})
-
-	if deleted {
-		t.Error("should not be deleted")
-	}
-
-	// ModifyPersist should return the same pointer for updates with non-cloners
-	if returnedVal != original {
-		t.Error("should return same pointer for non-cloner update")
-	}
 
 	// Both tables should reference the same instance
 	val1, _ := t1.Get(p)
