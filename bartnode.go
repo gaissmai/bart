@@ -106,10 +106,11 @@ func (n *bartNode[V]) mustGetPrefix(idx uint8) (val V) {
 	return n.prefixes.MustGet(idx)
 }
 
-// deletePrefix removes the prefix at the specified index and returns its value.
-// Returns the deleted value and true if the prefix existed, or zero value and false otherwise.
-func (n *bartNode[V]) deletePrefix(idx uint8) (val V, exists bool) {
-	return n.prefixes.DeleteAt(idx)
+// deletePrefix removes the prefix at the specified index.
+// Returns true if the prefix existed, otherwise false.
+func (n *bartNode[V]) deletePrefix(idx uint8) (exists bool) {
+	_, exists = n.prefixes.DeleteAt(idx)
+	return exists
 }
 
 // insertChild adds a child node at the specified address (0-255).
