@@ -323,8 +323,9 @@ LOOP:
 				return netip.Prefix{}, kid.value, true
 			}
 
-			// sic, get the LPM prefix back, it costs some cycles!
-			fringePfx := cidrForFringe(octets, depth, is4, octet)
+			// get the LPM prefix back from ip and depth
+			// it's a fringe, bits are always /8, /16, /24, ...
+			fringePfx, _ := ip.Prefix((depth + 1) << 3)
 			return fringePfx, kid.value, true
 
 		default:
@@ -357,12 +358,13 @@ LOOP:
 		}
 
 		// manually inlined: lookupIdx(idx)
-		if topIdx, ok2 := n.prefixes.IntersectionTop(&lpm.LookupTbl[idx]); ok2 {
+		var topIdx uint8
+		if topIdx, ok = n.prefixes.IntersectionTop(&lpm.LookupTbl[idx]); ok {
 			val = n.mustGetPrefix(topIdx)
 
 			// called from LookupPrefix
 			if !withLPM {
-				return netip.Prefix{}, val, ok2
+				return netip.Prefix{}, val, ok
 			}
 
 			// called from LookupPrefixLPM
@@ -374,7 +376,7 @@ LOOP:
 			// netip.Addr.Prefix canonicalizes. Invariant: art.PfxBits(depth, topIdx)
 			// yields a valid mask (v4: 0..32, v6: 0..128), so error is impossible.
 			lpmPfx, _ = ip.Prefix(pfxBits)
-			return lpmPfx, val, ok2
+			return lpmPfx, val, ok
 		}
 	}
 

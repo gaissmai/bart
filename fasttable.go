@@ -246,8 +246,9 @@ LOOP:
 				return netip.Prefix{}, kid.value, true
 			}
 
-			// sic, get the LPM prefix back, it costs some cycles!
-			fringePfx := cidrForFringe(octets, depth, is4, octet)
+			// get the LPM prefix back from ip and depth
+			// it's a fringe, bits are always /8, /16, /24, ...
+			fringePfx, _ := ip.Prefix((depth + 1) << 3)
 			return fringePfx, kid.value, true
 
 		default:
