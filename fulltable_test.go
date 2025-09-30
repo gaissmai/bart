@@ -77,13 +77,13 @@ func init() {
 	// find a random match Pfx4
 	for {
 		matchPfx4 = randomRealWorldPrefixes4(prng, 1)[0]
-		if _, ok := lt.LookupPrefix(matchPfx4); ok {
+		if ok := lt.LookupPrefix(matchPfx4); ok {
 			break
 		}
 	}
 	for {
 		matchPfx6 = randomRealWorldPrefixes6(prng, 1)[0]
-		if _, ok := lt.LookupPrefix(matchPfx6); ok {
+		if ok := lt.LookupPrefix(matchPfx6); ok {
 			break
 		}
 	}
@@ -103,13 +103,13 @@ func init() {
 
 	for {
 		missPfx4 = randomRealWorldPrefixes4(prng, 1)[0]
-		if _, ok := lt.LookupPrefix(missPfx4); !ok {
+		if ok := lt.LookupPrefix(missPfx4); !ok {
 			break
 		}
 	}
 	for {
 		missPfx6 = randomRealWorldPrefixes6(prng, 1)[0]
-		if _, ok := lt.LookupPrefix(missPfx6); !ok {
+		if ok := lt.LookupPrefix(missPfx6); !ok {
 			break
 		}
 	}
