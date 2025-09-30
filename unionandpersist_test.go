@@ -158,6 +158,60 @@ func TestUnionDeterministic(t *testing.T) {
 
 				verifyResults[int](t, result, tc.expected)
 			})
+
+			// Test UnionPersist for Fast
+			t.Run("Fast_UnionPersist", func(t *testing.T) {
+				t.Parallel()
+				tbl1 := new(Fast[int])
+				tbl2 := new(Fast[int])
+
+				for i, pfxStr := range tc.prefixes1 {
+					tbl1.Insert(mpp(pfxStr), tc.values1[i])
+				}
+				for i, pfxStr := range tc.prefixes2 {
+					tbl2.Insert(mpp(pfxStr), tc.values2[i])
+				}
+
+				// Save original state
+				original1 := captureFastState(tbl1)
+
+				result := tbl1.UnionPersist(tbl2)
+
+				// Verify immutability
+				current1 := captureFastState(tbl1)
+				if !maps.Equal(original1, current1) {
+					t.Fatal("UnionPersist modified original table")
+				}
+
+				verifyResults[int](t, result, tc.expected)
+			})
+
+			// Test Lite_UnionPersist
+			t.Run("Lite_UnionPersist", func(t *testing.T) {
+				t.Parallel()
+				tbl1 := new(Lite)
+				tbl2 := new(Lite)
+
+				for _, pfxStr := range tc.prefixes1 {
+					tbl1.Insert(mpp(pfxStr))
+				}
+				for _, pfxStr := range tc.prefixes2 {
+					tbl2.Insert(mpp(pfxStr))
+				}
+
+				// Save original state
+				original1 := captureLiteState(tbl1)
+
+				result := tbl1.UnionPersist(tbl2)
+
+				// Verify immutability
+				current1 := captureLiteState(tbl1)
+				if !maps.Equal(original1, current1) {
+					t.Fatal("UnionPersist modified original table")
+				}
+
+				verifyPrefixPresence(t, result, tc.expected)
+			})
 		})
 	}
 }
@@ -347,8 +401,8 @@ func testUnionLite(t *testing.T, prefixes1, prefixes2 []goldTableItem[int]) {
 	}
 }
 
-// FuzzUnionPersist tests that UnionPersist correctly merges without modifying originals
-func FuzzUnionPersist(f *testing.F) {
+// FuzzTableUnionPersist tests that UnionPersist correctly merges without modifying originals
+func FuzzTableUnionPersist(f *testing.F) {
 	// Seed with some initial test cases
 	f.Add(uint64(54321), 40, 60)
 	f.Add(uint64(98765), 80, 120)
@@ -565,8 +619,8 @@ func testUnionPersistLite(t *testing.T, prefixes1, prefixes2 []goldTableItem[int
 	}
 }
 
-// FuzzUnionPersistAliasing tests for potential aliasing/memory sharing bugs
-func FuzzUnionPersistAliasing(f *testing.F) {
+// FuzzTableUnionPersistAliasing tests for potential aliasing/memory sharing bugs
+func FuzzTableUnionPersistAliasing(f *testing.F) {
 	// Seed with initial test cases
 	f.Add(uint64(12345), uint64(67890), 20, 20, 5)
 	f.Add(uint64(11111), uint64(22222), 50, 30, 10)
@@ -879,155 +933,6 @@ func FuzzLiteUnionPersistAliasing(f *testing.F) {
 			t.Fatal("tbl2 changed after modifying result (reverse aliasing)")
 		}
 	})
-}
-
-// Extend TestUnionDeterministic to include Fast and Lite
-func TestUnionDeterministicExtended(t *testing.T) {
-	t.Parallel()
-
-	testCases := []struct {
-		name      string
-		prefixes1 []string
-		values1   []int
-		prefixes2 []string
-		values2   []int
-		expected  map[netip.Prefix]int
-	}{
-		{
-			name:      "No overlap",
-			prefixes1: []string{"10.0.0.0/8", "192.168.1.0/24"},
-			values1:   []int{100, 200},
-			prefixes2: []string{"172.16.0.0/12", "203.0.113.0/24"},
-			values2:   []int{300, 400},
-			expected: map[netip.Prefix]int{
-				mpp("10.0.0.0/8"):     100,
-				mpp("192.168.1.0/24"): 200,
-				mpp("172.16.0.0/12"):  300,
-				mpp("203.0.113.0/24"): 400,
-			},
-		},
-		{
-			name:      "Complete overlap - tbl2 values should win",
-			prefixes1: []string{"10.0.0.0/8", "192.168.1.0/24"},
-			values1:   []int{100, 200},
-			prefixes2: []string{"10.0.0.0/8", "192.168.1.0/24"},
-			values2:   []int{999, 888},
-			expected: map[netip.Prefix]int{
-				mpp("10.0.0.0/8"):     999,
-				mpp("192.168.1.0/24"): 888,
-			},
-		},
-		{
-			name:      "Mixed IPv4 and IPv6",
-			prefixes1: []string{"10.0.0.0/8", "2001:db8::/32"},
-			values1:   []int{100, 200},
-			prefixes2: []string{"192.168.0.0/16", "2001:db8::/32", "::1/128"},
-			values2:   []int{300, 555, 400},
-			expected: map[netip.Prefix]int{
-				mpp("10.0.0.0/8"):     100,
-				mpp("2001:db8::/32"):  555,
-				mpp("192.168.0.0/16"): 300,
-				mpp("::1/128"):        400,
-			},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			// Test Fast_Union
-			t.Run("Fast_Union", func(t *testing.T) {
-				t.Parallel()
-				tbl1 := new(Fast[int])
-				tbl2 := new(Fast[int])
-
-				for i, pfxStr := range tc.prefixes1 {
-					tbl1.Insert(mpp(pfxStr), tc.values1[i])
-				}
-				for i, pfxStr := range tc.prefixes2 {
-					tbl2.Insert(mpp(pfxStr), tc.values2[i])
-				}
-
-				tbl1.Union(tbl2)
-
-				verifyResults[int](t, tbl1, tc.expected)
-			})
-
-			// Test Lite_Union
-			t.Run("Lite_Union", func(t *testing.T) {
-				t.Parallel()
-				tbl1 := new(Lite)
-				tbl2 := new(Lite)
-
-				for _, pfxStr := range tc.prefixes1 {
-					tbl1.Insert(mpp(pfxStr))
-				}
-				for _, pfxStr := range tc.prefixes2 {
-					tbl2.Insert(mpp(pfxStr))
-				}
-
-				tbl1.Union(tbl2)
-
-				// For Lite, we only verify prefix presence
-				verifyPrefixPresence(t, tbl1, tc.expected)
-			})
-
-			// Test Fast_UnionPersist
-			t.Run("Fast_UnionPersist", func(t *testing.T) {
-				t.Parallel()
-				tbl1 := new(Fast[int])
-				tbl2 := new(Fast[int])
-
-				for i, pfxStr := range tc.prefixes1 {
-					tbl1.Insert(mpp(pfxStr), tc.values1[i])
-				}
-				for i, pfxStr := range tc.prefixes2 {
-					tbl2.Insert(mpp(pfxStr), tc.values2[i])
-				}
-
-				// Save original state
-				original1 := captureFastState(tbl1)
-
-				result := tbl1.UnionPersist(tbl2)
-
-				// Verify immutability
-				current1 := captureFastState(tbl1)
-				if !maps.Equal(original1, current1) {
-					t.Fatal("UnionPersist modified original table")
-				}
-
-				verifyResults[int](t, result, tc.expected)
-			})
-
-			// Test Lite_UnionPersist
-			t.Run("Lite_UnionPersist", func(t *testing.T) {
-				t.Parallel()
-				tbl1 := new(Lite)
-				tbl2 := new(Lite)
-
-				for _, pfxStr := range tc.prefixes1 {
-					tbl1.Insert(mpp(pfxStr))
-				}
-				for _, pfxStr := range tc.prefixes2 {
-					tbl2.Insert(mpp(pfxStr))
-				}
-
-				// Save original state
-				original1 := captureLiteState(tbl1)
-
-				result := tbl1.UnionPersist(tbl2)
-
-				// Verify immutability
-				current1 := captureLiteState(tbl1)
-				if !maps.Equal(original1, current1) {
-					t.Fatal("UnionPersist modified original table")
-				}
-
-				verifyPrefixPresence(t, result, tc.expected)
-			})
-		})
-	}
 }
 
 // Helper functions
