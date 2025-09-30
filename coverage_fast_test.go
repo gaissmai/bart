@@ -21,6 +21,9 @@ func TestFast_Size_ModifyPersist(t *testing.T) {
 	if got := f.Size6(); got != 1 {
 		t.Fatalf("Fast.Size6() = %d, want 1", got)
 	}
+	if got := f.Size(); got != 3 {
+		t.Fatalf("Fast.Size() = %d, want 3", got)
+	}
 
 	f2 := f.ModifyPersist(mpp("10.1.0.0/16"), func(v int, ok bool) (int, bool) {
 		if !ok || v != 16 {
