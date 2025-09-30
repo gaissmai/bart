@@ -29,14 +29,11 @@ func workLoadN() int {
 // tabler is a test-only interface that provides a unified abstraction for
 // testing multiple table implementations (Table and Fast) with the same test suite.
 type tabler[V any] interface {
+	Get(netip.Prefix) (V, bool)
 	Insert(netip.Prefix, V)
 	Delete(netip.Prefix)
 	Modify(netip.Prefix, func(V, bool) (V, bool))
-	Get(netip.Prefix) (V, bool)
 	Contains(netip.Addr) bool
-	Lookup(netip.Addr) (V, bool)
-	LookupPrefix(netip.Prefix) (V, bool)
-	LookupPrefixLPM(netip.Prefix) (netip.Prefix, V, bool)
 	Size() int
 }
 
@@ -1691,18 +1688,19 @@ func TestGetCompare(t *testing.T) {
 
 // TestModifySemantics
 //
-// Operation | cb-input        | cb-return       | Modify-return
-// ---------------------------------------------------------------
-// No-op:    | (zero,   false) | (_,      true)  | (zero,   false)
-// Insert:   | (zero,   false) | (newVal, false) | (newVal, false)
-// Update:   | (oldVal, true)  | (newVal, false) | (oldVal, false)
-// Delete:   | (oldVal, true)  | (_,      true)  | (oldVal, true)
+// Operation | cb-input        | cb-return
+// ------------------------------------------
+// No-op:    | (zero,   false) | (_,      true)
+// Insert:   | (zero,   false) | (newVal, false)
+// Update:   | (oldVal, true)  | (newVal, false)
+// Delete:   | (oldVal, true)  | (_,      true)
 func TestModifySemantics(t *testing.T) {
 	t.Parallel()
 
 	type args struct {
-		pfx netip.Prefix
-		cb  func(val int, found bool) (_ int, del bool)
+		pfx    netip.Prefix
+		cb     func(val int, found bool) (_ int, del bool)
+		cbLite func(found bool) (del bool)
 	}
 
 	type want struct {
@@ -1721,8 +1719,9 @@ func TestModifySemantics(t *testing.T) {
 			name:    "Delete existing entry",
 			prepare: map[netip.Prefix]int{mpp("10.0.0.0/8"): 42, mpp("2001:db8::/32"): 4242},
 			args: args{
-				pfx: mpp("10.0.0.0/8"),
-				cb:  func(val int, found bool) (_ int, del bool) { return 0, true },
+				pfx:    mpp("10.0.0.0/8"),
+				cb:     func(val int, found bool) (_ int, del bool) { return 0, true },
+				cbLite: func(found bool) (del bool) { return true },
 			},
 			want:      want{val: 42, deleted: true},
 			finalData: map[netip.Prefix]int{mpp("2001:db8::/32"): 4242},
@@ -1732,8 +1731,9 @@ func TestModifySemantics(t *testing.T) {
 			name:    "Insert new entry",
 			prepare: map[netip.Prefix]int{mpp("10.0.0.0/8"): 42},
 			args: args{
-				pfx: mpp("2001:db8::/32"),
-				cb:  func(val int, found bool) (_ int, del bool) { return 4242, false },
+				pfx:    mpp("2001:db8::/32"),
+				cb:     func(val int, found bool) (_ int, del bool) { return 4242, false },
+				cbLite: func(found bool) (del bool) { return false },
 			},
 			want:      want{val: 4242, deleted: false},
 			finalData: map[netip.Prefix]int{mpp("10.0.0.0/8"): 42, mpp("2001:db8::/32"): 4242},
@@ -1744,8 +1744,9 @@ func TestModifySemantics(t *testing.T) {
 			name:    "Update existing entry",
 			prepare: map[netip.Prefix]int{mpp("10.0.0.0/8"): 42, mpp("2001:db8::/32"): 4242},
 			args: args{
-				pfx: mpp("10.0.0.0/8"),
-				cb:  func(val int, found bool) (_ int, del bool) { return -1, false },
+				pfx:    mpp("10.0.0.0/8"),
+				cb:     func(val int, found bool) (_ int, del bool) { return -1, false },
+				cbLite: func(found bool) (del bool) { return false },
 			},
 			want:      want{val: 42, deleted: false},
 			finalData: map[netip.Prefix]int{mpp("10.0.0.0/8"): -1, mpp("2001:db8::/32"): 4242},
@@ -1755,8 +1756,9 @@ func TestModifySemantics(t *testing.T) {
 			name:    "No-op on missing entry",
 			prepare: map[netip.Prefix]int{mpp("10.0.0.0/8"): 42},
 			args: args{
-				pfx: mpp("2001:db8::/32"),
-				cb:  func(val int, found bool) (_ int, del bool) { return 0, true },
+				pfx:    mpp("2001:db8::/32"),
+				cb:     func(val int, found bool) (_ int, del bool) { return 0, true },
+				cbLite: func(found bool) (del bool) { return true },
 			},
 			want:      want{val: 0, deleted: false},
 			finalData: map[netip.Prefix]int{mpp("10.0.0.0/8"): 42},
@@ -1764,6 +1766,7 @@ func TestModifySemantics(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		// Table
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1777,18 +1780,75 @@ func TestModifySemantics(t *testing.T) {
 			rt.Modify(tt.args.pfx, tt.args.cb)
 
 			// Check the final state of the table using Get, compares expected and actual table
+			got := make(map[netip.Prefix]int, len(tt.finalData))
+			for pfx, val := range rt.All() {
+				got[pfx] = val
+			}
+			if len(got) != len(tt.finalData) {
+				t.Fatalf("[%s] final table size mismatch: got %d, want %d", tt.name, len(got), len(tt.finalData))
+			}
 			for pfx, wantVal := range tt.finalData {
-				gotVal, ok := rt.Get(pfx)
+				gotVal, ok := got[pfx]
 				if !ok || gotVal != wantVal {
-					t.Errorf("[%s] final table: key %v = %v (ok=%v), want %v (ok=true)", tt.name, pfx, gotVal, ok, wantVal)
+					t.Fatalf("[%s] final table: key %v = %v (present=%v), want %v", tt.name, pfx, gotVal, ok, wantVal)
 				}
 			}
-			// Ensure there are no unexpected entries
+		})
+
+		// Fast
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			rt := new(Fast[int])
+
+			// Insert initial entries using Modify
+			for pfx, v := range tt.prepare {
+				rt.Modify(pfx, func(_ int, _ bool) (_ int, del bool) { return v, false })
+			}
+
+			rt.Modify(tt.args.pfx, tt.args.cb)
+
+			// Check the final state of the table using Get, compares expected and actual table
+			got := make(map[netip.Prefix]int, len(tt.finalData))
+			for pfx, val := range rt.All() {
+				got[pfx] = val
+			}
+			if len(got) != len(tt.finalData) {
+				t.Fatalf("[%s] final table size mismatch: got %d, want %d", tt.name, len(got), len(tt.finalData))
+			}
+			for pfx, wantVal := range tt.finalData {
+				gotVal, ok := got[pfx]
+				if !ok || gotVal != wantVal {
+					t.Fatalf("[%s] final table: key %v = %v (present=%v), want %v", tt.name, pfx, gotVal, ok, wantVal)
+				}
+			}
+		})
+
+		// Lite
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			rt := new(Lite)
+
+			// Insert initial entries using Modify
 			for pfx := range tt.prepare {
-				if _, expect := tt.finalData[pfx]; !expect {
-					if _, ok := rt.Get(pfx); ok {
-						t.Errorf("[%s] final table: key %v should not be present", tt.name, pfx)
-					}
+				rt.Modify(pfx, func(_ bool) (del bool) { return false })
+			}
+
+			rt.Modify(tt.args.pfx, tt.args.cbLite)
+
+			// Check the final state of the table using Get, compares expected and actual table
+			for pfx := range tt.finalData {
+				ok := rt.Get(pfx)
+				if !ok {
+					t.Errorf("[%s] final table: pfx %v (ok=%v), want (ok=true)", tt.name, pfx, ok)
+				}
+			}
+
+			// Ensure there are no unexpected entries
+			for pfx := range rt.All() {
+				if _, ok := tt.finalData[pfx]; !ok {
+					t.Errorf("[%s] final table: pfx %v should not be present", tt.name, pfx)
 				}
 			}
 		})
@@ -1797,18 +1857,19 @@ func TestModifySemantics(t *testing.T) {
 
 // TestModifyPersistSemantics
 //
-// Operation | cb-input        | cb-return       | Modify-return
-// ---------------------------------------------------------------
-// No-op:    | (zero,   false) | (_,      true)  | (zero,   false)
-// Insert:   | (zero,   false) | (newVal, false) | (newVal, false)
-// Update:   | (oldVal, true)  | (newVal, false) | (oldVal, false)
-// Delete:   | (oldVal, true)  | (_,      true)  | (oldVal, true)
+// Operation | cb-input        | cb-return
+// ------------------------------------------
+// No-op:    | (zero,   false) | (_,      true)
+// Insert:   | (zero,   false) | (newVal, false)
+// Update:   | (oldVal, true)  | (newVal, false)
+// Delete:   | (oldVal, true)  | (_,      true)
 func TestTableModifyPersistSemantics(t *testing.T) {
 	t.Parallel()
 
 	type args struct {
-		pfx netip.Prefix
-		cb  func(val int, found bool) (_ int, del bool)
+		pfx    netip.Prefix
+		cb     func(val int, found bool) (_ int, del bool)
+		cbLite func(found bool) (del bool)
 	}
 
 	type want struct {
@@ -1827,8 +1888,9 @@ func TestTableModifyPersistSemantics(t *testing.T) {
 			name:    "Delete existing entry",
 			prepare: map[netip.Prefix]int{mpp("10.0.0.0/8"): 42, mpp("2001:db8::/32"): 4242},
 			args: args{
-				pfx: mpp("10.0.0.0/8"),
-				cb:  func(val int, found bool) (_ int, del bool) { return 0, true },
+				pfx:    mpp("10.0.0.0/8"),
+				cb:     func(val int, found bool) (_ int, del bool) { return 0, true },
+				cbLite: func(found bool) (del bool) { return true },
 			},
 			want:      want{val: 42, deleted: true},
 			finalData: map[netip.Prefix]int{mpp("2001:db8::/32"): 4242},
@@ -1838,8 +1900,9 @@ func TestTableModifyPersistSemantics(t *testing.T) {
 			name:    "Insert new entry",
 			prepare: map[netip.Prefix]int{mpp("10.0.0.0/8"): 42},
 			args: args{
-				pfx: mpp("2001:db8::/32"),
-				cb:  func(val int, found bool) (_ int, del bool) { return 4242, false },
+				pfx:    mpp("2001:db8::/32"),
+				cb:     func(val int, found bool) (_ int, del bool) { return 4242, false },
+				cbLite: func(found bool) (del bool) { return false },
 			},
 			want:      want{val: 4242, deleted: false},
 			finalData: map[netip.Prefix]int{mpp("10.0.0.0/8"): 42, mpp("2001:db8::/32"): 4242},
@@ -1850,8 +1913,9 @@ func TestTableModifyPersistSemantics(t *testing.T) {
 			name:    "Update existing entry",
 			prepare: map[netip.Prefix]int{mpp("10.0.0.0/8"): 42, mpp("2001:db8::/32"): 4242},
 			args: args{
-				pfx: mpp("10.0.0.0/8"),
-				cb:  func(val int, found bool) (_ int, del bool) { return -1, false },
+				pfx:    mpp("10.0.0.0/8"),
+				cb:     func(val int, found bool) (_ int, del bool) { return -1, false },
+				cbLite: func(found bool) (del bool) { return false },
 			},
 			want:      want{val: 42, deleted: false},
 			finalData: map[netip.Prefix]int{mpp("10.0.0.0/8"): -1, mpp("2001:db8::/32"): 4242},
@@ -1861,8 +1925,9 @@ func TestTableModifyPersistSemantics(t *testing.T) {
 			name:    "No-op on missing entry",
 			prepare: map[netip.Prefix]int{mpp("10.0.0.0/8"): 42},
 			args: args{
-				pfx: mpp("2001:db8::/32"),
-				cb:  func(val int, found bool) (_ int, del bool) { return 0, true },
+				pfx:    mpp("2001:db8::/32"),
+				cb:     func(val int, found bool) (_ int, del bool) { return 0, true },
+				cbLite: func(found bool) (del bool) { return true },
 			},
 			want:      want{val: 0, deleted: false},
 			finalData: map[netip.Prefix]int{mpp("10.0.0.0/8"): 42},
@@ -1870,6 +1935,7 @@ func TestTableModifyPersistSemantics(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		// Table
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1895,6 +1961,65 @@ func TestTableModifyPersistSemantics(t *testing.T) {
 					if _, ok := prt.Get(pfx); ok {
 						t.Errorf("[%s] final table: key %v should not be present", tt.name, pfx)
 					}
+				}
+			}
+		})
+
+		// Fast
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			rt := new(Fast[int])
+
+			// Insert initial entries using Modify
+			for pfx, v := range tt.prepare {
+				rt.Modify(pfx, func(_ int, _ bool) (_ int, del bool) { return v, false })
+			}
+
+			prt := rt.ModifyPersist(tt.args.pfx, tt.args.cb)
+
+			// Check the final state of the table using Get, compares expected and actual table
+			for pfx, wantVal := range tt.finalData {
+				gotVal, ok := prt.Get(pfx)
+				if !ok || gotVal != wantVal {
+					t.Errorf("[%s] final table: key %v = %v (ok=%v), want %v (ok=true)", tt.name, pfx, gotVal, ok, wantVal)
+				}
+			}
+			// Ensure there are no unexpected entries
+			for pfx := range tt.prepare {
+				if _, expect := tt.finalData[pfx]; !expect {
+					if _, ok := prt.Get(pfx); ok {
+						t.Errorf("[%s] final table: key %v should not be present", tt.name, pfx)
+					}
+				}
+			}
+		})
+
+		// Lite
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			rt := new(Lite)
+
+			// Insert initial entries using Modify
+			for pfx := range tt.prepare {
+				rt.Modify(pfx, func(_ bool) (del bool) { return false })
+			}
+
+			prt := rt.ModifyPersist(tt.args.pfx, tt.args.cbLite)
+
+			// Check the final state of the table using Get, compares expected and actual table
+			for pfx := range tt.finalData {
+				ok := prt.Get(pfx)
+				if !ok {
+					t.Errorf("[%s] final table: pfx %v (ok=%v), want (ok=true)", tt.name, pfx, ok)
+				}
+			}
+
+			// Ensure there are no unexpected entries
+			for pfx := range prt.All() {
+				if _, ok := tt.finalData[pfx]; !ok {
+					t.Errorf("[%s] final table: pfx %v should not be present", tt.name, pfx)
 				}
 			}
 		})

@@ -95,8 +95,78 @@ func TestDeletePersistTable(t *testing.T) {
 	}
 }
 
+// ########## Fast[V]  ##############
+
+func TestInsertPersistFast(t *testing.T) {
+	t.Parallel()
+
+	n := workLoadN()
+
+	prng := rand.New(rand.NewPCG(42, 42))
+	pfxs := randomRealWorldPrefixes(prng, n)
+
+	orig := new(Fast[*testVal])
+	for _, pfx := range pfxs {
+		orig.Insert(pfx, &testVal{Data: 1})
+	}
+
+	clone := orig
+	for _, pfx := range pfxs {
+		clone = clone.InsertPersist(pfx, &testVal{Data: 2})
+
+		// mutate clone's value to ensure it's not aliased
+		v2, _ := clone.Get(pfx)
+		v2.Data = 3
+
+		// original must be unchanged
+		v1, _ := orig.Get(pfx)
+		if v1.Data != 1 {
+			t.Errorf("InsertPersist: original table modified for prefix %s: want %d, got %d", pfx, 1, v1.Data)
+		}
+
+		// cloned table should have the mutated value
+		if v2.Data != 3 {
+			t.Errorf("InsertPersist: mutated value not reflected for prefix %s", pfx)
+		}
+
+		// ensure no aliasing
+		if v1 == v2 {
+			t.Errorf("InsertPersist: pointer aliasing detected for prefix %s", pfx)
+		}
+	}
+}
+
+func TestDeletePersistFast(t *testing.T) {
+	t.Parallel()
+
+	n := workLoadN()
+
+	prng := rand.New(rand.NewPCG(42, 42))
+	pfxs := randomRealWorldPrefixes(prng, n)
+
+	orig := new(Fast[*testVal])
+	for _, pfx := range pfxs {
+		orig.Insert(pfx, &testVal{Data: 1})
+	}
+
+	clone := orig
+	for _, pfx := range pfxs {
+		clone = clone.DeletePersist(pfx)
+
+		// Deleted prefix should be absent in clone
+		_, ok := clone.Get(pfx)
+		if ok {
+			t.Errorf("DeletePersist: prefix %s should've been deleted in clone, but it's still there", pfx)
+		}
+
+		// Original table must be unchanged
+		if v, ok := orig.Get(pfx); !ok || v.Data != 1 {
+			t.Errorf("DeletePersist: original affected for %s", pfx)
+		}
+	}
+}
+
 // ########## Lite ##############
-/*
 
 func TestInsertPersistLite(t *testing.T) {
 	t.Parallel()
@@ -116,8 +186,8 @@ func TestInsertPersistLite(t *testing.T) {
 		clone = clone.InsertPersist(pfx)
 
 		// both tables must have the pfx
-		ok1 := orig.Exists(pfx)
-		ok2 := clone.Exists(pfx)
+		ok1 := orig.Get(pfx)
+		ok2 := clone.Get(pfx)
 
 		if !ok1 {
 			t.Errorf("InsertPersist: original table missing prefix %s", pfx)
@@ -156,15 +226,15 @@ func TestDeletePersistLite(t *testing.T) {
 
 	clone := orig
 	for i, pfx := range pfxs {
-		clone, _ = clone.DeletePersist(pfx)
+		clone = clone.DeletePersist(pfx)
 
 		// test for existence
-		if ok := orig.Exists(pfx); !ok {
+		if ok := orig.Get(pfx); !ok {
 			t.Errorf("DeletePersist: original table missing prefix %s", pfx)
 		}
 
 		// test for absence
-		if ok := clone.Exists(pfx); ok {
+		if ok := clone.Get(pfx); ok {
 			t.Errorf("DeletePersist: prefix %s not deleted in cloned table", pfx)
 		}
 
@@ -180,4 +250,3 @@ func TestDeletePersistLite(t *testing.T) {
 		}
 	}
 }
-*/
