@@ -58,8 +58,7 @@ func TestBoundaryBehavior_DefaultRoutes(t *testing.T) {
 				if !found {
 					t.Error("default route should be found in Modify")
 				}
-				var updated *routeEntry
-				updated = old.Clone()
+				updated := old.Clone()
 				updated.attributes["metric"] = 500
 				return updated, false
 			})
