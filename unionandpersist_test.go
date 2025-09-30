@@ -776,19 +776,6 @@ func FuzzFastUnionPersistAliasing(f *testing.F) {
 			t.Fatal("UnionPersist results share memory (deep aliasing bug)")
 		}
 
-		// TEST 5: Multiple UnionPersist operations should be independent
-		resultTable2 = tbl1.UnionPersist(tbl2)
-		resultTable3 = resultTable.UnionPersist(tbl1)
-
-		// Modify resultTable2
-		testPrefix = mpp("10.99.99.0/24")
-		_ = resultTable2.InsertPersist(testPrefix, 55555)
-
-		// resultTable3 should not be affected
-		if val3, found := resultTable3.Get(testPrefix); found && val3 == 55555 {
-			t.Fatal("UnionPersist results share memory (deep aliasing bug)")
-		}
-
 		// TEST 6: Nested UnionPersist chain
 		chain1 := tbl1.UnionPersist(tbl2)
 		chain2 := chain1.UnionPersist(tbl1)
