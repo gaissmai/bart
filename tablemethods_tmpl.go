@@ -311,14 +311,7 @@ func (t *_TABLE_TYPE[V]) WalkPersist(fn func(*_TABLE_TYPE[V], netip.Prefix, V) (
 		return t
 	}
 
-	// create shallow persistent copy
-	pt := &_TABLE_TYPE[V]{
-		root4: t.root4,
-		root6: t.root6,
-		size4: t.size4,
-		size6: t.size6,
-	}
-
+	pt := t
 	var proceed bool
 	for pfx, val := range t.All() {
 		if pt, proceed = fn(pt, pfx, val); !proceed {
