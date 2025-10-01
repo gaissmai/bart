@@ -620,16 +620,50 @@ func TestOverlapsPrefixGoldenCompare(t *testing.T) {
 	gold.insertMany(pfxs)
 
 	bart := new(Table[int])
+	fast := new(Fast[int])
+	lite := new(liteTable[int])
 	for _, pfx := range pfxs {
 		bart.Insert(pfx.pfx, pfx.val)
+		fast.Insert(pfx.pfx, pfx.val)
+		lite.Insert(pfx.pfx, pfx.val)
 	}
 
-	tests := randomPrefixes(prng, n)
-	for _, tt := range tests {
-		gotGold := gold.overlapsPrefix(tt.pfx)
-		gotBart := bart.OverlapsPrefix(tt.pfx)
-		if gotGold != gotBart {
-			t.Fatalf("overlapsPrefix(%q) = %v, want %v", tt.pfx, gotBart, gotGold)
+	t.Run("Table", func(t *testing.T) {
+		t.Parallel()
+
+		tests := randomPrefixes(prng, n)
+		for _, tt := range tests {
+			gotGold := gold.overlapsPrefix(tt.pfx)
+			gotBart := bart.OverlapsPrefix(tt.pfx)
+			if gotGold != gotBart {
+				t.Fatalf("overlapsPrefix(%q) = %v, want %v", tt.pfx, gotBart, gotGold)
+			}
 		}
-	}
+	})
+
+	t.Run("Fast", func(t *testing.T) {
+		t.Parallel()
+
+		tests := randomPrefixes(prng, n)
+		for _, tt := range tests {
+			gotGold := gold.overlapsPrefix(tt.pfx)
+			gotFast := fast.OverlapsPrefix(tt.pfx)
+			if gotGold != gotFast {
+				t.Fatalf("overlapsPrefix(%q) = %v, want %v", tt.pfx, gotFast, gotGold)
+			}
+		}
+	})
+
+	t.Run("liteTable", func(t *testing.T) {
+		t.Parallel()
+
+		tests := randomPrefixes(prng, n)
+		for _, tt := range tests {
+			gotGold := gold.overlapsPrefix(tt.pfx)
+			gotLite := lite.OverlapsPrefix(tt.pfx)
+			if gotGold != gotLite {
+				t.Fatalf("overlapsPrefix(%q) = %v, want %v", tt.pfx, gotLite, gotGold)
+			}
+		}
+	})
 }
