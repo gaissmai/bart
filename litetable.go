@@ -109,14 +109,12 @@ func (l *Lite) InsertPersist(pfx netip.Prefix) *Lite {
 	return &Lite{*lp}
 }
 
-// DeletePersist removes a prefix using copy-on-write semantics.
-// It creates a new Lite instance with the prefix removed while leaving the
-// original unchanged. This enables functional programming patterns and safe
-// concurrent access.
+// DeletePersist is similar to Delete but does not modify the receiver.
 //
-// Returns a new Lite instance without the specified prefix and a boolean
-// indicating whether the prefix was found and deleted. If the prefix doesn't
-// exist, it returns a structurally identical copy and false.
+// It performs a copy-on-write delete operation, cloning all nodes touched during
+// deletion and returning a new *Lite reflecting the change.
+//
+// If the prefix doesn't exist, it returns a structurally identical copy.
 //
 // Due to cloning overhead, DeletePersist is significantly slower than Delete,
 // typically taking μsec instead of nsec.
@@ -126,17 +124,26 @@ func (l *Lite) DeletePersist(pfx netip.Prefix) *Lite {
 	return &Lite{*lp}
 }
 
-// Modify applies a modification callback to a prefix in-place.
-// The callback function receives a boolean indicating whether the prefix exists.
-// It should return a boolean indicating whether to delete the prefix.
-// Since Lite is prefix-only, no value handling is needed.
+// Modify applies an insert, update, or delete operation for the given
+// prefix.
+// The operation is determined by the callback function, which is called with:
 //
-//   - for cb(exists==true)  -> del=true,  delete prefix
-//   - for cb(exists==false) -> del=false, insert prefix
-//   - for cb(exists==true)  -> del=false, no-op
+//	true:  the prefix is in table
+//	false: the prefix is not in table
 //
-// Modify returns a boolean indicating whether a prefix was deleted during
-// the operation.
+// The callback returns:
+//
+//	true:  delete the entry
+//	false: insert or update
+//
+// Summary:
+//
+//	| input | return | op     |
+//	---------------------------
+//	| false | true   | no-op  |
+//	| false | false  | insert |
+//	| true  | false  | update |
+//	| true  | true   | delete |
 func (l *Lite) Modify(pfx netip.Prefix, cb func(exists bool) (del bool)) {
 	// Adapt the callback to work with liteTable's signature
 	adaptedCb := func(_ struct{}, exists bool) (_ struct{}, del bool) {
@@ -144,6 +151,27 @@ func (l *Lite) Modify(pfx netip.Prefix, cb func(exists bool) (del bool)) {
 	}
 
 	l.liteTable.Modify(pfx, adaptedCb)
+}
+
+// ModifyPersist is similar to Modify but the receiver isn't modified and
+// a new *Lite is returned.
+func (l *Lite) ModifyPersist(pfx netip.Prefix, cb func(exists bool) (del bool)) *Lite {
+	wrappedFn := func(_ struct{}, exists bool) (_ struct{}, del bool) {
+		return struct{}{}, cb(exists)
+	}
+
+	lp := l.liteTable.ModifyPersist(pfx, wrappedFn)
+	//nolint:govet // copy of *lp is here by intention
+	return &Lite{*lp}
+}
+
+// dropSeq2 converts a Seq2[netip.Prefix, V] into a Seq[netip.Prefix] by discarding the value.
+func dropSeq2[V any](seq2 iter.Seq2[netip.Prefix, V]) iter.Seq[netip.Prefix] {
+	return func(yield func(netip.Prefix) bool) {
+		seq2(func(p netip.Prefix, _ V) bool {
+			return yield(p)
+		})
+	}
 }
 
 // Clone returns a copy of the routing table.
@@ -173,36 +201,6 @@ func (l *Lite) UnionPersist(o *Lite) *Lite {
 	lp := l.liteTable.UnionPersist(&o.liteTable)
 	//nolint:govet // copy of *lp is here by intention
 	return &Lite{*lp}
-}
-
-// ModifyPersist applies a modification callback to a prefix using copy-on-write semantics.
-// It creates a new Lite instance with the modification applied while leaving the original
-// unchanged. This enables functional programming patterns and safe concurrent access.
-//
-// The callback function receives a boolean indicating whether the prefix exists.
-// It should return a boolean indicating whether to delete the prefix.
-// Since Lite is prefix-only, no value handling is needed.
-//
-// Returns a new Lite instance with the modification applied and a boolean
-// indicating whether a prefix was deleted during the operation.
-func (l *Lite) ModifyPersist(pfx netip.Prefix, cb func(exists bool) (del bool)) *Lite {
-	// Adapt the callback to work with liteTable's signature
-	wrappedFn := func(_ struct{}, exists bool) (_ struct{}, del bool) {
-		return struct{}{}, cb(exists)
-	}
-
-	lp := l.liteTable.ModifyPersist(pfx, wrappedFn)
-	//nolint:govet // copy of *lp is here by intention
-	return &Lite{*lp}
-}
-
-// dropSeq2 converts a Seq2[netip.Prefix, V] into a Seq[netip.Prefix] by discarding the value.
-func dropSeq2[V any](seq2 iter.Seq2[netip.Prefix, V]) iter.Seq[netip.Prefix] {
-	return func(yield func(netip.Prefix) bool) {
-		seq2(func(p netip.Prefix, _ V) bool {
-			return yield(p)
-		})
-	}
 }
 
 // All returns an iterator over all prefixes in the table.
