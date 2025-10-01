@@ -152,6 +152,8 @@ func (t *Fast[V]) Get(pfx netip.Prefix) (val V, exists bool) {
 // It performs a copy-on-write delete operation, cloning all nodes touched during
 // deletion and returning a new Fast reflecting the change.
 //
+// If the prefix doesn't exist, it returns a structurally identical copy.
+//
 // If the payload type V contains pointers or requires deep copying,
 // it must implement the [bart.Cloner] interface for correct cloning.
 //
@@ -207,9 +209,6 @@ func (t *Fast[V]) DeletePersist(pfx netip.Prefix) *Fast[V] {
 // return a new value and a delete flag: del == false inserts or updates,
 // del == true deletes the entry if it exists (otherwise no-op).
 //
-// Modify returns the resulting value and a boolean indicating whether the
-// entry was actually deleted.
-//
 // The operation is determined by the callback function, which is called with:
 //
 //	val:   the current value (or zero value if not found)
@@ -249,7 +248,8 @@ func (t *Fast[V]) Modify(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, del bool)
 	t.sizeUpdate(is4, delta)
 }
 
-// ModifyPersist is similar to Modify but the receiver isn't modified.
+// ModifyPersist is similar to Modify but the receiver isn't modified and
+// a new *Fast is returned.
 func (t *Fast[V]) ModifyPersist(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, del bool)) *Fast[V] {
 	if !pfx.IsValid() {
 		return t
