@@ -224,15 +224,14 @@ func (n *_NODE_TYPE[V]) allRecSorted(path stridePath, depth int, is4 bool, yield
 //
 // This function is intended for internal use during supernet traversal and
 // does not descend the trie further.
-func (n *_NODE_TYPE[V]) eachLookupPrefix(octets []byte, depth int, is4 bool, pfxIdx uint8, yield func(netip.Prefix, V) bool) (ok bool) {
-	// path needed below more than once in loop
-	var path stridePath
-	copy(path[:], octets)
-
+func (n *_NODE_TYPE[V]) eachLookupPrefix(ip netip.Addr, depth int, pfxIdx uint8, yield func(netip.Prefix, V) bool) (ok bool) {
 	for ; pfxIdx > 0; pfxIdx >>= 1 {
 		if n.prefixes.Test(pfxIdx) {
 			val := n.mustGetPrefix(pfxIdx)
-			cidr := cidrFromPath(path, depth, is4, pfxIdx)
+
+			// get the CIDR back
+			_, pfxLen := art.IdxToPfx(pfxIdx)
+			cidr, _ := ip.Prefix(depth<<3 + int(pfxLen))
 
 			if !yield(cidr, val) {
 				return false
@@ -459,7 +458,7 @@ LOOP:
 		}
 
 		// yield all the matching prefixes, not just the lpm
-		if !n.eachLookupPrefix(octets, depth, is4, idx, yield) {
+		if !n.eachLookupPrefix(ip, depth, idx, yield) {
 			// early exit
 			return
 		}
@@ -502,7 +501,10 @@ func (n *_NODE_TYPE[V]) subnets(pfx netip.Prefix, yield func(netip.Prefix, V) bo
 			return // immediate return
 
 		case *fringeNode[V]:
-			fringePfx := cidrForFringe(octets, depth, is4, octet)
+			// get the LPM prefix back from ip and depth
+			// it's a fringe, bits are always /8, /16, /24, ...
+			fringePfx, _ := ip.Prefix((depth + 1) << 3)
+
 			if pfx.Bits() <= fringePfx.Bits() && pfx.Overlaps(fringePfx) {
 				yield(fringePfx, kid.value)
 			}
