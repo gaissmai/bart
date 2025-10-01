@@ -116,31 +116,30 @@ func TestFastInvalid(t *testing.T) {
 	t.Parallel()
 
 	tbl1 := new(Fast[any])
+	tbl2 := new(Fast[any])
 	var zeroPfx netip.Prefix
 	var zeroIP netip.Addr
 
 	noPanic(t, "Contains", func() { tbl1.Contains(zeroIP) })
 	noPanic(t, "Lookup", func() { tbl1.Lookup(zeroIP) })
 
-	// noPanic(t, "LookupPrefix", func() { tbl1.LookupPrefix(zeroPfx) })
-	// noPanic(t, "LookupPrefixLPM", func() { tbl1.LookupPrefixLPM(zeroPfx) })
+	noPanic(t, "LookupPrefix", func() { tbl1.LookupPrefix(zeroPfx) })
+	noPanic(t, "LookupPrefixLPM", func() { tbl1.LookupPrefixLPM(zeroPfx) })
 
 	noPanic(t, "Insert", func() { tbl1.Insert(zeroPfx, nil) })
 	noPanic(t, "Get", func() { tbl1.Get(zeroPfx) })
 	noPanic(t, "Delete", func() { tbl1.Delete(zeroPfx) })
 	noPanic(t, "Modify", func() { tbl1.Modify(zeroPfx, nil) })
 
-	// noPanic(t, "InsertPersist", func() { tbl1.InsertPersist(zeroPfx, nil) })
-	// noPanic(t, "DeletePersist", func() { tbl1.DeletePersist(zeroPfx) })
-	// noPanic(t, "ModifyPersist", func() { tbl1.ModifyPersist(zeroPfx, nil) })
+	noPanic(t, "InsertPersist", func() { tbl1.InsertPersist(zeroPfx, nil) })
+	noPanic(t, "DeletePersist", func() { tbl1.DeletePersist(zeroPfx) })
+	noPanic(t, "ModifyPersist", func() { tbl1.ModifyPersist(zeroPfx, nil) })
 
-	// noPanic(t, "WalkPersist", func() { tbl1.WalkPersist(nil) })
+	noPanic(t, "OverlapsPrefix", func() { tbl1.OverlapsPrefix(zeroPfx) })
 
-	// noPanic(t, "OverlapsPrefix", func() { tbl1.OverlapsPrefix(zeroPfx) })
-
-	// noPanic(t, "Overlaps", func() { tbl1.Overlaps(tbl2) })
-	// noPanic(t, "Overlaps4", func() { tbl1.Overlaps4(tbl2) })
-	// noPanic(t, "Overlaps6", func() { tbl1.Overlaps6(tbl2) })
+	noPanic(t, "Overlaps", func() { tbl1.Overlaps(tbl2) })
+	noPanic(t, "Overlaps4", func() { tbl1.Overlaps4(tbl2) })
+	noPanic(t, "Overlaps6", func() { tbl1.Overlaps6(tbl2) })
 }
 
 func TestFastInsert(t *testing.T) {
