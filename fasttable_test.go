@@ -654,13 +654,6 @@ func TestFastDeleteEdgeCases(t *testing.T) {
 }
 
 // TestFastModifySemantics
-//
-// Operation | cb-input        | cb-return       | Modify-return
-// ---------------------------------------------------------------
-// No-op:    | (zero,   false) | (_,      true)  | (zero,   false)
-// Insert:   | (zero,   false) | (newVal, false) | (newVal, false)
-// Update:   | (oldVal, true)  | (newVal, false) | (oldVal, false)
-// Delete:   | (oldVal, true)  | (_,      true)  | (oldVal, true)
 func TestFastModifySemantics(t *testing.T) {
 	t.Parallel()
 

@@ -111,15 +111,21 @@ func (l *Lite) InsertPersist(pfx netip.Prefix) *Lite {
 
 // DeletePersist is similar to Delete but does not modify the receiver.
 //
-// It performs a copy-on-write delete operation, cloning all nodes touched during
-// deletion and returning a new *Lite reflecting the change.
+// It performs a copy-on-write delete operation, cloning all nodes
+// touched during deletion and returning a new *Lite reflecting the change.
 //
-// If the prefix doesn't exist, it returns a structurally identical copy.
+// If the prefix is invalid or doesn't exist, the original table is
+// returned unchanged.
 //
-// Due to cloning overhead, DeletePersist is significantly slower than Delete,
+// Due to cloning overhead this is significantly slower than Delete,
 // typically taking μsec instead of nsec.
 func (l *Lite) DeletePersist(pfx netip.Prefix) *Lite {
 	lp := l.liteTable.DeletePersist(pfx)
+	if lp == &l.liteTable {
+		// pfx s invalid or didn't exist
+		return l
+	}
+
 	//nolint:govet // copy of *lp is here by intention
 	return &Lite{*lp}
 }
@@ -136,7 +142,7 @@ func (l *Lite) DeletePersist(pfx netip.Prefix) *Lite {
 //	true:  delete the entry
 //	false: insert or update
 //
-// Summary:
+// Summary of callback semantics:
 //
 //	| input | return | op     |
 //	---------------------------
@@ -144,6 +150,7 @@ func (l *Lite) DeletePersist(pfx netip.Prefix) *Lite {
 //	| false | false  | insert |
 //	| true  | false  | update |
 //	| true  | true   | delete |
+//	---------------------------
 func (l *Lite) Modify(pfx netip.Prefix, cb func(exists bool) (del bool)) {
 	// Adapt the callback to work with liteTable's signature
 	adaptedCb := func(_ struct{}, exists bool) (_ struct{}, del bool) {
@@ -218,12 +225,17 @@ func (l *Lite) UnionPersist(o *Lite) *Lite {
 // Under the hood, the loop body is passed as a yield function to the iterator.
 // If you break or return from the loop, iteration stops early as expected.
 //
-// IMPORTANT: Deleting entries during iteration is not allowed,
+// IMPORTANT: Modifying or deleting entries during iteration is not allowed,
 // as this would interfere with the internal traversal and may corrupt or
-// prematurely terminate the iteration.
-//
-// If mutation of the table during traversal is required,
-// use [Lite.WalkPersist] instead.
+// prematurely terminate the iteration. If mutation of the table during
+// traversal is required use persistent table methods, e.g.
+// 	pl := l
+// 	for pfx := range l.All() {
+// 		if cond(pfx) {
+// 			pl = pl.DeletePersist(pfx)
+// 		}
+// 	}
+
 func (l *Lite) All() iter.Seq[netip.Prefix] {
 	return dropSeq2(l.liteTable.All())
 }
@@ -241,7 +253,8 @@ func (l *Lite) All6() iter.Seq[netip.Prefix] {
 // AllSorted returns an iterator over all prefixes in the table,
 // ordered in canonical CIDR prefix sort order.
 //
-// This can be used directly with a for-range loop; the Go compiler provides the yield function implicitly.
+// This can be used directly with a for-range loop;
+// the Go compiler provides the yield function implicitly.
 //
 //	for prefix := range t.AllSorted() {
 //	    fmt.Println(prefix)
@@ -252,10 +265,8 @@ func (l *Lite) All6() iter.Seq[netip.Prefix] {
 //
 // IMPORTANT: Deleting entries during iteration is not allowed,
 // as this would interfere with the internal traversal and may corrupt or
-// prematurely terminate the iteration.
-//
-// If mutation of the table during traversal is required,
-// use [Lite.WalkPersist] instead.
+// prematurely terminate the iteration. If mutation of the table during
+// traversal is required use persistent table methods.
 func (l *Lite) AllSorted() iter.Seq[netip.Prefix] {
 	return dropSeq2(l.liteTable.AllSorted())
 }
@@ -324,8 +335,8 @@ func (l *Lite) Supernets(pfx netip.Prefix) iter.Seq[netip.Prefix] {
 // This is useful for conflict detection, policy enforcement,
 // or validating mutually exclusive routing domains.
 //
-// It is intentionally not nil-receiver safe: calling with a nil *Lite
-// will panic by design.
+// It is intentionally not nil-receiver safe: calling with a nil
+// receiver will panic by design.
 func (l *Lite) Overlaps(o *Lite) bool {
 	if o == nil {
 		return false

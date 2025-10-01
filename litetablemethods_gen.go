@@ -57,12 +57,8 @@ func (t *liteTable[V]) Insert(pfx netip.Prefix, val V) {
 // If the payload type V contains pointers or needs deep copying,
 // it must implement the [bart.Cloner] interface to support correct cloning.
 //
-// This is orders of magnitude slower than Insert,
+// Due to cloning overhead this is significantly slower than Insert,
 // typically taking μsec instead of nsec.
-//
-// The bulk table load could be done with [liteTable.Insert] and then you can
-// use [liteTable.InsertPersist], [liteTable.ModifyPersist] and
-// [liteTable.DeletePersist] for further lock-free ops.
 func (t *liteTable[V]) InsertPersist(pfx netip.Prefix, val V) *liteTable[V] {
 	if !pfx.IsValid() {
 		return t
@@ -152,12 +148,13 @@ func (t *liteTable[V]) Get(pfx netip.Prefix) (val V, exists bool) {
 // It performs a copy-on-write delete operation, cloning all nodes touched during
 // deletion and returning a new liteTable reflecting the change.
 //
-// If the prefix doesn't exist, it returns a structurally identical copy.
+// If the prefix is invalid or doesn't exist, the original table is
+// returned unchanged.
 //
 // If the payload type V contains pointers or requires deep copying,
 // it must implement the [bart.Cloner] interface for correct cloning.
 //
-// Due to cloning overhead, DeletePersist is significantly slower than Delete,
+// Due to cloning overhead this is significantly slower than Delete,
 // typically taking μsec instead of nsec.
 func (t *liteTable[V]) DeletePersist(pfx netip.Prefix) *liteTable[V] {
 	if !pfx.IsValid() {
@@ -219,19 +216,15 @@ func (t *liteTable[V]) DeletePersist(pfx netip.Prefix) *liteTable[V] {
 //	val: the new value to insert or update (ignored if del == true)
 //	del: true to delete the entry, false to insert or update
 //
-// Modify returns:
-//
-//	val:     the zero, old, or new value depending on the operation (see table)
-//	deleted: true if the entry was deleted, false otherwise
-//
-// Summary:
+// Summary of callback semantics:
 //
 //	| cb-input        | cb-return       | Ops    |
-//	------------------------------------- -----------
+//	------------------------------------- --------
 //	| (zero,   false) | (_,      true)  | no-op  |
 //	| (zero,   false) | (newVal, false) | insert |
 //	| (oldVal, true)  | (newVal, false) | update |
 //	| (oldVal, true)  | (_,      true)  | delete |
+//	------------------------------------- --------
 func (t *liteTable[V]) Modify(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, del bool)) {
 	if !pfx.IsValid() {
 		return
@@ -543,10 +536,15 @@ func (t *liteTable[V]) Size6() int {
 //
 // IMPORTANT: Modifying or deleting entries during iteration is not allowed,
 // as this would interfere with the internal traversal and may corrupt or
-// prematurely terminate the iteration.
+// prematurely terminate the iteration. If mutation of the table during
+// traversal is required use persistent table methods, e.g.
 //
-// If mutation of the table during traversal is required,
-// use [liteTable.WalkPersist] instead.
+//	pt := t // shallow copy of t
+//	for pfx, val := range t.All() {
+//		if cond(pfx, val) {
+//		  pt = pt.DeletePersist(pfx)
+//	  }
+//	}
 func (t *liteTable[V]) All() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
 		_ = t.root4.allRec(stridePath{}, 0, true, yield) && t.root6.allRec(stridePath{}, 0, false, yield)
@@ -580,7 +578,10 @@ func (t *liteTable[V]) All6() iter.Seq2[netip.Prefix, V] {
 // The traversal is stable and predictable across calls.
 // Iteration stops early if you break out of the loop.
 //
-// Modifying the table during iteration may produce undefined results.
+// IMPORTANT: Deleting entries during iteration is not allowed,
+// as this would interfere with the internal traversal and may corrupt or
+// prematurely terminate the iteration. If mutation of the table during
+// traversal is required use persistent table methods.
 func (t *liteTable[V]) AllSorted() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
 		_ = t.root4.allRecSorted(stridePath{}, 0, true, yield) &&
