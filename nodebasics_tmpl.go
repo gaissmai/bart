@@ -306,7 +306,7 @@ func (n *_NODE_TYPE[V]) purgeAndCompress(stack []*_NODE_TYPE[V], octets []uint8,
 }
 
 // delete deletes the prefix and returns the associated value and true if the prefix existed,
-// or zero value and false otherwise. The prefix must be in canonical form.
+// or false otherwise. The prefix must be in canonical form.
 func (n *_NODE_TYPE[V]) delete(pfx netip.Prefix) (exists bool) {
 	// invariant, prefix must be masked
 
