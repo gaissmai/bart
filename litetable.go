@@ -218,12 +218,17 @@ func (l *Lite) UnionPersist(o *Lite) *Lite {
 // Under the hood, the loop body is passed as a yield function to the iterator.
 // If you break or return from the loop, iteration stops early as expected.
 //
-// IMPORTANT: Deleting entries during iteration is not allowed,
+// IMPORTANT: Modifying or deleting entries during iteration is not allowed,
 // as this would interfere with the internal traversal and may corrupt or
-// prematurely terminate the iteration.
-//
-// If mutation of the table during traversal is required,
-// use [Lite.WalkPersist] instead.
+// prematurely terminate the iteration. If mutation of the table during
+// traversal is required use persistent table methods, e.g.
+// 	pl := l
+// 	for pfx := range l.All() {
+// 		if cond(pfx) {
+// 			pl = pl.DeletePersist(pfx)
+// 		}
+// 	}
+
 func (l *Lite) All() iter.Seq[netip.Prefix] {
 	return dropSeq2(l.liteTable.All())
 }
@@ -241,7 +246,8 @@ func (l *Lite) All6() iter.Seq[netip.Prefix] {
 // AllSorted returns an iterator over all prefixes in the table,
 // ordered in canonical CIDR prefix sort order.
 //
-// This can be used directly with a for-range loop; the Go compiler provides the yield function implicitly.
+// This can be used directly with a for-range loop;
+// the Go compiler provides the yield function implicitly.
 //
 //	for prefix := range t.AllSorted() {
 //	    fmt.Println(prefix)
@@ -252,10 +258,8 @@ func (l *Lite) All6() iter.Seq[netip.Prefix] {
 //
 // IMPORTANT: Deleting entries during iteration is not allowed,
 // as this would interfere with the internal traversal and may corrupt or
-// prematurely terminate the iteration.
-//
-// If mutation of the table during traversal is required,
-// use [Lite.WalkPersist] instead.
+// prematurely terminate the iteration. If mutation of the table during
+// traversal is required use persistent table methods.
 func (l *Lite) AllSorted() iter.Seq[netip.Prefix] {
 	return dropSeq2(l.liteTable.AllSorted())
 }

@@ -597,10 +597,15 @@ func (t *_TABLE_TYPE[V]) Size6() int {
 //
 // IMPORTANT: Modifying or deleting entries during iteration is not allowed,
 // as this would interfere with the internal traversal and may corrupt or
-// prematurely terminate the iteration.
+// prematurely terminate the iteration. If mutation of the table during
+// traversal is required use persistent table methods, e.g.
 //
-// If mutation of the table during traversal is required,
-// use [_TABLE_TYPE.WalkPersist] instead.
+//	pt := t // shallow copy of t
+//	for pfx, val := range t.All() {
+//		if cond(pfx, val) {
+//		  pt = pt.DeletePersist(pfx)
+//	  }
+//	}
 func (t *_TABLE_TYPE[V]) All() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
 		_ = t.root4.allRec(stridePath{}, 0, true, yield) && t.root6.allRec(stridePath{}, 0, false, yield)
@@ -634,7 +639,10 @@ func (t *_TABLE_TYPE[V]) All6() iter.Seq2[netip.Prefix, V] {
 // The traversal is stable and predictable across calls.
 // Iteration stops early if you break out of the loop.
 //
-// Modifying the table during iteration may produce undefined results.
+// IMPORTANT: Deleting entries during iteration is not allowed,
+// as this would interfere with the internal traversal and may corrupt or
+// prematurely terminate the iteration. If mutation of the table during
+// traversal is required use persistent table methods.
 func (t *_TABLE_TYPE[V]) AllSorted() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
 		_ = t.root4.allRecSorted(stridePath{}, 0, true, yield) &&
