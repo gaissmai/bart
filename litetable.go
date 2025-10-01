@@ -136,7 +136,7 @@ func (l *Lite) DeletePersist(pfx netip.Prefix) *Lite {
 //	true:  delete the entry
 //	false: insert or update
 //
-// Summary:
+// Summary of callback semantics:
 //
 //	| input | return | op     |
 //	---------------------------
@@ -144,6 +144,7 @@ func (l *Lite) DeletePersist(pfx netip.Prefix) *Lite {
 //	| false | false  | insert |
 //	| true  | false  | update |
 //	| true  | true   | delete |
+//	---------------------------
 func (l *Lite) Modify(pfx netip.Prefix, cb func(exists bool) (del bool)) {
 	// Adapt the callback to work with liteTable's signature
 	adaptedCb := func(_ struct{}, exists bool) (_ struct{}, del bool) {
@@ -328,8 +329,8 @@ func (l *Lite) Supernets(pfx netip.Prefix) iter.Seq[netip.Prefix] {
 // This is useful for conflict detection, policy enforcement,
 // or validating mutually exclusive routing domains.
 //
-// It is intentionally not nil-receiver safe: calling with a nil *Lite
-// will panic by design.
+// It is intentionally not nil-receiver safe: calling with a nil
+// receiver will panic by design.
 func (l *Lite) Overlaps(o *Lite) bool {
 	if o == nil {
 		return false

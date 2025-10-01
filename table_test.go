@@ -1676,13 +1676,6 @@ func TestGetCompare(t *testing.T) {
 }
 
 // TestModifySemantics
-//
-// Operation | cb-input        | cb-return
-// ------------------------------------------
-// No-op:    | (zero,   false) | (_,      true)
-// Insert:   | (zero,   false) | (newVal, false)
-// Update:   | (oldVal, true)  | (newVal, false)
-// Delete:   | (oldVal, true)  | (_,      true)
 func TestModifySemantics(t *testing.T) {
 	t.Parallel()
 
@@ -1847,13 +1840,6 @@ func TestModifySemantics(t *testing.T) {
 }
 
 // TestModifyPersistSemantics
-//
-// Operation | cb-input        | cb-return
-// ------------------------------------------
-// No-op:    | (zero,   false) | (_,      true)
-// Insert:   | (zero,   false) | (newVal, false)
-// Update:   | (oldVal, true)  | (newVal, false)
-// Delete:   | (oldVal, true)  | (_,      true)
 func TestTableModifyPersistSemantics(t *testing.T) {
 	t.Parallel()
 

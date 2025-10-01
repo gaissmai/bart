@@ -219,19 +219,15 @@ func (t *Table[V]) DeletePersist(pfx netip.Prefix) *Table[V] {
 //	val: the new value to insert or update (ignored if del == true)
 //	del: true to delete the entry, false to insert or update
 //
-// Modify returns:
-//
-//	val:     the zero, old, or new value depending on the operation (see table)
-//	deleted: true if the entry was deleted, false otherwise
-//
-// Summary:
+// Summary of callback semantics:
 //
 //	| cb-input        | cb-return       | Ops    |
-//	------------------------------------- -----------
+//	------------------------------------- --------
 //	| (zero,   false) | (_,      true)  | no-op  |
 //	| (zero,   false) | (newVal, false) | insert |
 //	| (oldVal, true)  | (newVal, false) | update |
 //	| (oldVal, true)  | (_,      true)  | delete |
+//	------------------------------------- --------
 func (t *Table[V]) Modify(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, del bool)) {
 	if !pfx.IsValid() {
 		return
@@ -585,7 +581,10 @@ func (t *Table[V]) All6() iter.Seq2[netip.Prefix, V] {
 // The traversal is stable and predictable across calls.
 // Iteration stops early if you break out of the loop.
 //
-// Modifying the table during iteration may produce undefined results.
+// IMPORTANT: Deleting entries during iteration is not allowed,
+// as this would interfere with the internal traversal and may corrupt or
+// prematurely terminate the iteration. If mutation of the table during
+// traversal is required use persistent table methods.
 func (t *Table[V]) AllSorted() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
 		_ = t.root4.allRecSorted(stridePath{}, 0, true, yield) &&

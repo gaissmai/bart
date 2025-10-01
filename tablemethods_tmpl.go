@@ -273,19 +273,15 @@ func (t *_TABLE_TYPE[V]) DeletePersist(pfx netip.Prefix) *_TABLE_TYPE[V] {
 //	val: the new value to insert or update (ignored if del == true)
 //	del: true to delete the entry, false to insert or update
 //
-// Modify returns:
-//
-//	val:     the zero, old, or new value depending on the operation (see table)
-//	deleted: true if the entry was deleted, false otherwise
-//
-// Summary:
+// Summary of callback semantics:
 //
 //	| cb-input        | cb-return       | Ops    |
-//	------------------------------------- -----------
+//	------------------------------------- --------
 //	| (zero,   false) | (_,      true)  | no-op  |
 //	| (zero,   false) | (newVal, false) | insert |
 //	| (oldVal, true)  | (newVal, false) | update |
 //	| (oldVal, true)  | (_,      true)  | delete |
+//	------------------------------------- --------
 func (t *_TABLE_TYPE[V]) Modify(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, del bool)) {
 	if !pfx.IsValid() {
 		return
