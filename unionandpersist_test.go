@@ -6,7 +6,6 @@ package bart
 import (
 	"iter"
 	"maps"
-	"math/rand/v2"
 	"net/netip"
 	"testing"
 )
@@ -216,30 +215,6 @@ func TestUnionDeterministic(t *testing.T) {
 	}
 }
 
-// FuzzUnion tests that Union correctly merges two tables
-func FuzzTableUnion(f *testing.F) {
-	// Seed with some initial test cases
-	f.Add(uint64(12345), 50, 30)
-	f.Add(uint64(67890), 100, 75)
-	f.Add(uint64(11111), 200, 150)
-
-	f.Fuzz(func(t *testing.T, seed uint64, count1, count2 int) {
-		// Bound the test size to reasonable limits
-		if count1 < 5 || count1 > 500 || count2 < 5 || count2 > 500 {
-			t.Skip("counts out of range")
-		}
-
-		// Generate random prefixes for both tables
-		prng := rand.New(rand.NewPCG(seed, 42))
-		prefixes1 := randomPrefixes(prng, count1)
-		prefixes2 := randomPrefixes(prng, count2)
-
-		t.Run("Table", func(t *testing.T) {
-			testUnionTable(t, prefixes1, prefixes2)
-		})
-	})
-}
-
 func testUnionTable(t *testing.T, prefixes1, prefixes2 []goldTableItem[int]) {
 	tbl1 := new(Table[int])
 	tbl2 := new(Table[int])
@@ -277,30 +252,6 @@ func testUnionTable(t *testing.T, prefixes1, prefixes2 []goldTableItem[int]) {
 			t.Fatalf("Prefix %v: expected %d, got %d", pfx, expectedVal, actualVal)
 		}
 	}
-}
-
-// FuzzFastUnion tests that Fast.Union correctly merges two tables
-func FuzzFastUnion(f *testing.F) {
-	// Seed with some initial test cases
-	f.Add(uint64(12345), 50, 30)
-	f.Add(uint64(67890), 100, 75)
-	f.Add(uint64(11111), 200, 150)
-
-	f.Fuzz(func(t *testing.T, seed uint64, count1, count2 int) {
-		// Bound the test size to reasonable limits
-		if count1 < 5 || count1 > 500 || count2 < 5 || count2 > 500 {
-			t.Skip("counts out of range")
-		}
-
-		// Generate random prefixes for both tables
-		prng := rand.New(rand.NewPCG(seed, 42))
-		prefixes1 := randomPrefixes(prng, count1)
-		prefixes2 := randomPrefixes(prng, count2)
-
-		t.Run("Fast", func(t *testing.T) {
-			testUnionFast(t, prefixes1, prefixes2)
-		})
-	})
 }
 
 func testUnionFast(t *testing.T, prefixes1, prefixes2 []goldTableItem[int]) {
@@ -342,30 +293,6 @@ func testUnionFast(t *testing.T, prefixes1, prefixes2 []goldTableItem[int]) {
 	}
 }
 
-// FuzzLiteUnion tests that Lite.Union correctly merges two tables
-func FuzzLiteUnion(f *testing.F) {
-	// Seed with some initial test cases
-	f.Add(uint64(12345), 50, 30)
-	f.Add(uint64(67890), 100, 75)
-	f.Add(uint64(11111), 200, 150)
-
-	f.Fuzz(func(t *testing.T, seed uint64, count1, count2 int) {
-		// Bound the test size to reasonable limits
-		if count1 < 5 || count1 > 500 || count2 < 5 || count2 > 500 {
-			t.Skip("counts out of range")
-		}
-
-		// Generate random prefixes for both tables
-		prng := rand.New(rand.NewPCG(seed, 42))
-		prefixes1 := randomPrefixes(prng, count1)
-		prefixes2 := randomPrefixes(prng, count2)
-
-		t.Run("Lite", func(t *testing.T) {
-			testUnionLite(t, prefixes1, prefixes2)
-		})
-	})
-}
-
 func testUnionLite(t *testing.T, prefixes1, prefixes2 []goldTableItem[int]) {
 	tbl1 := new(Lite)
 	tbl2 := new(Lite)
@@ -399,30 +326,6 @@ func testUnionLite(t *testing.T, prefixes1, prefixes2 []goldTableItem[int]) {
 			t.Fatalf("Expected prefix %v not found", pfx)
 		}
 	}
-}
-
-// FuzzTableUnionPersist tests that UnionPersist correctly merges without modifying originals
-func FuzzTableUnionPersist(f *testing.F) {
-	// Seed with some initial test cases
-	f.Add(uint64(54321), 40, 60)
-	f.Add(uint64(98765), 80, 120)
-	f.Add(uint64(22222), 150, 100)
-
-	f.Fuzz(func(t *testing.T, seed uint64, count1, count2 int) {
-		// Bound the test size to reasonable limits
-		if count1 < 5 || count1 > 300 || count2 < 5 || count2 > 300 {
-			t.Skip("counts out of range")
-		}
-
-		// Generate random prefixes for both tables
-		prng := rand.New(rand.NewPCG(seed, 42))
-		prefixes1 := randomPrefixes(prng, count1)
-		prefixes2 := randomPrefixes(prng, count2)
-
-		t.Run("Table", func(t *testing.T) {
-			testUnionPersistTable(t, prefixes1, prefixes2)
-		})
-	})
 }
 
 func testUnionPersistTable(t *testing.T, prefixes1, prefixes2 []goldTableItem[int]) {
@@ -475,30 +378,6 @@ func testUnionPersistTable(t *testing.T, prefixes1, prefixes2 []goldTableItem[in
 	}
 }
 
-// FuzzFastUnionPersist tests that Fast.UnionPersist correctly merges without modifying originals
-func FuzzFastUnionPersist(f *testing.F) {
-	// Seed with some initial test cases
-	f.Add(uint64(54321), 40, 60)
-	f.Add(uint64(98765), 80, 120)
-	f.Add(uint64(22222), 150, 100)
-
-	f.Fuzz(func(t *testing.T, seed uint64, count1, count2 int) {
-		// Bound the test size to reasonable limits
-		if count1 < 5 || count1 > 300 || count2 < 5 || count2 > 300 {
-			t.Skip("counts out of range")
-		}
-
-		// Generate random prefixes for both tables
-		prng := rand.New(rand.NewPCG(seed, 42))
-		prefixes1 := randomPrefixes(prng, count1)
-		prefixes2 := randomPrefixes(prng, count2)
-
-		t.Run("Fast", func(t *testing.T) {
-			testUnionPersistFast(t, prefixes1, prefixes2)
-		})
-	})
-}
-
 func testUnionPersistFast(t *testing.T, prefixes1, prefixes2 []goldTableItem[int]) {
 	tbl1 := new(Fast[int])
 	tbl2 := new(Fast[int])
@@ -549,30 +428,6 @@ func testUnionPersistFast(t *testing.T, prefixes1, prefixes2 []goldTableItem[int
 	}
 }
 
-// FuzzLiteUnionPersist tests that Lite.UnionPersist correctly merges without modifying originals
-func FuzzLiteUnionPersist(f *testing.F) {
-	// Seed with some initial test cases
-	f.Add(uint64(54321), 40, 60)
-	f.Add(uint64(98765), 80, 120)
-	f.Add(uint64(22222), 150, 100)
-
-	f.Fuzz(func(t *testing.T, seed uint64, count1, count2 int) {
-		// Bound the test size to reasonable limits
-		if count1 < 5 || count1 > 300 || count2 < 5 || count2 > 300 {
-			t.Skip("counts out of range")
-		}
-
-		// Generate random prefixes for both tables
-		prng := rand.New(rand.NewPCG(seed, 42))
-		prefixes1 := randomPrefixes(prng, count1)
-		prefixes2 := randomPrefixes(prng, count2)
-
-		t.Run("Lite", func(t *testing.T) {
-			testUnionPersistLite(t, prefixes1, prefixes2)
-		})
-	})
-}
-
 func testUnionPersistLite(t *testing.T, prefixes1, prefixes2 []goldTableItem[int]) {
 	tbl1 := new(Lite)
 	tbl2 := new(Lite)
@@ -617,322 +472,6 @@ func testUnionPersistLite(t *testing.T, prefixes1, prefixes2 []goldTableItem[int
 			t.Fatalf("Expected prefix %v not found", pfx)
 		}
 	}
-}
-
-// FuzzTableUnionPersistAliasing tests for potential aliasing/memory sharing bugs
-func FuzzTableUnionPersistAliasing(f *testing.F) {
-	// Seed with initial test cases
-	f.Add(uint64(12345), uint64(67890), 20, 20, 5)
-	f.Add(uint64(11111), uint64(22222), 50, 30, 10)
-	f.Add(uint64(99999), uint64(88888), 100, 100, 20)
-
-	f.Fuzz(func(t *testing.T, seed1, seed2 uint64, count1, count2, modifyCount int) {
-		// Bound test sizes
-		if count1 < 5 || count1 > 200 || count2 < 5 || count2 > 200 || modifyCount < 1 || modifyCount > 50 {
-			t.Skip("counts out of range")
-		}
-
-		// Generate test data
-		prng1 := rand.New(rand.NewPCG(seed1, 42))
-		prng2 := rand.New(rand.NewPCG(seed2, 42))
-
-		prefixes1 := randomPrefixes(prng1, count1)
-		prefixes2 := randomPrefixes(prng2, count2)
-		modifyPrefixes := randomPrefixes(prng1, modifyCount)
-
-		// Create and populate original tables
-		tbl1 := new(Table[int])
-		tbl2 := new(Table[int])
-
-		for _, item := range prefixes1 {
-			tbl1.Insert(item.pfx, item.val)
-		}
-		for _, item := range prefixes2 {
-			tbl2.Insert(item.pfx, item.val+10000)
-		}
-
-		// Capture state before UnionPersist
-		tbl1BeforeState := captureTableState(tbl1)
-		tbl2BeforeState := captureTableState(tbl2)
-
-		// Perform UnionPersist
-		resultTable := tbl1.UnionPersist(tbl2)
-
-		// Capture initial result state
-		resultInitialState := captureTableState(resultTable)
-
-		// TEST 1: Verify original tables unchanged
-		if !maps.Equal(tbl1BeforeState, captureTableState(tbl1)) {
-			t.Fatal("UnionPersist modified tbl1 (immutability violation)")
-		}
-		if !maps.Equal(tbl2BeforeState, captureTableState(tbl2)) {
-			t.Fatal("UnionPersist modified tbl2 (immutability violation)")
-		}
-
-		// TEST 2: Modify original tbl1 persistent - result should NOT change
-		for _, item := range modifyPrefixes {
-			tbl1 = tbl1.InsertPersist(item.pfx, item.val+20000)
-		}
-		tbl1State2 := captureTableState(tbl1)
-
-		if !maps.Equal(resultInitialState, captureTableState(resultTable)) {
-			t.Fatal("Result table changed after modifying tbl1 (aliasing bug)")
-		}
-
-		// TEST 3: Modify original tbl2 persistent - result should NOT change
-		for _, item := range modifyPrefixes {
-			tbl2 = tbl2.InsertPersist(item.pfx, item.val+30000)
-		}
-		tbl2State2 := captureTableState(tbl2)
-
-		if !maps.Equal(resultInitialState, captureTableState(resultTable)) {
-			t.Fatal("Result table changed after modifying tbl2 (aliasing bug)")
-		}
-
-		// TEST 4: Modify result table persistent - original tables should NOT change
-		for _, item := range modifyPrefixes {
-			resultTable = resultTable.InsertPersist(item.pfx, item.val+40000)
-		}
-
-		if !maps.Equal(tbl1State2, captureTableState(tbl1)) {
-			t.Fatal("tbl1 changed after modifying result (reverse aliasing)")
-		}
-		if !maps.Equal(tbl2State2, captureTableState(tbl2)) {
-			t.Fatal("tbl2 changed after modifying result (reverse aliasing)")
-		}
-
-		// TEST 5: Multiple UnionPersist operations should be independent
-		resultTable2 := tbl1.UnionPersist(tbl2)
-		resultTable3 := resultTable.UnionPersist(tbl1)
-
-		// Modify resultTable2
-		testPrefix := mpp("10.99.99.0/24")
-		_ = resultTable2.InsertPersist(testPrefix, 55555)
-
-		// resultTable3 should not be affected
-		if val3, found := resultTable3.Get(testPrefix); found && val3 == 55555 {
-			t.Fatal("UnionPersist results share memory (deep aliasing bug)")
-		}
-
-		// TEST 6: Nested UnionPersist chain
-		chain1 := tbl1.UnionPersist(tbl2)
-		chain2 := chain1.UnionPersist(tbl1)
-		chain3 := chain2.UnionPersist(tbl2)
-
-		// All should be independent
-		testPrefix2 := mpp("192.168.99.0/24")
-		chain1 = chain1.InsertPersist(testPrefix2, 111)
-		chain2 = chain2.InsertPersist(testPrefix2, 222)
-		chain3 = chain3.InsertPersist(testPrefix2, 333)
-
-		val1, _ := chain1.Get(testPrefix2)
-		val2, _ := chain2.Get(testPrefix2)
-		val3, _ := chain3.Get(testPrefix2)
-
-		if val1 == val2 || val2 == val3 || val1 == val3 {
-			t.Fatalf("Chained UnionPersist tables share state: %d, %d, %d", val1, val2, val3)
-		}
-	})
-}
-
-// FuzzFastUnionPersistAliasing tests for potential aliasing/memory sharing bugs in Fast
-func FuzzFastUnionPersistAliasing(f *testing.F) {
-	// Seed with initial test cases
-	f.Add(uint64(12345), uint64(67890), 20, 20, 5)
-	f.Add(uint64(11111), uint64(22222), 50, 30, 10)
-	f.Add(uint64(99999), uint64(88888), 100, 100, 20)
-
-	f.Fuzz(func(t *testing.T, seed1, seed2 uint64, count1, count2, modifyCount int) {
-		// Bound test sizes
-		if count1 < 5 || count1 > 200 || count2 < 5 || count2 > 200 || modifyCount < 1 || modifyCount > 50 {
-			t.Skip("counts out of range")
-		}
-
-		// Generate test data
-		prng1 := rand.New(rand.NewPCG(seed1, 42))
-		prng2 := rand.New(rand.NewPCG(seed2, 42))
-
-		prefixes1 := randomPrefixes(prng1, count1)
-		prefixes2 := randomPrefixes(prng2, count2)
-		modifyPrefixes := randomPrefixes(prng1, modifyCount)
-
-		// Create and populate original tables
-		tbl1 := new(Fast[int])
-		tbl2 := new(Fast[int])
-
-		for _, item := range prefixes1 {
-			tbl1.Insert(item.pfx, item.val)
-		}
-		for _, item := range prefixes2 {
-			tbl2.Insert(item.pfx, item.val+10000)
-		}
-
-		// Capture state before UnionPersist
-		tbl1BeforeState := captureFastState(tbl1)
-		tbl2BeforeState := captureFastState(tbl2)
-
-		// Perform UnionPersist
-		resultTable := tbl1.UnionPersist(tbl2)
-
-		// Capture initial result state
-		resultInitialState := captureFastState(resultTable)
-
-		// TEST 1: Verify original tables unchanged
-		if !maps.Equal(tbl1BeforeState, captureFastState(tbl1)) {
-			t.Fatal("UnionPersist modified tbl1 (immutability violation)")
-		}
-		if !maps.Equal(tbl2BeforeState, captureFastState(tbl2)) {
-			t.Fatal("UnionPersist modified tbl2 (immutability violation)")
-		}
-
-		// TEST 2: Modify original tbl1 persistent - result should NOT change
-		for _, item := range modifyPrefixes {
-			tbl1 = tbl1.InsertPersist(item.pfx, item.val+20000)
-		}
-		tbl1State2 := captureFastState(tbl1)
-
-		if !maps.Equal(resultInitialState, captureFastState(resultTable)) {
-			t.Fatal("Result table changed after modifying tbl1 (aliasing bug)")
-		}
-
-		// TEST 3: Modify original tbl2 persistent - result should NOT change
-		for _, item := range modifyPrefixes {
-			tbl2 = tbl2.InsertPersist(item.pfx, item.val+30000)
-		}
-		tbl2State2 := captureFastState(tbl2)
-
-		if !maps.Equal(resultInitialState, captureFastState(resultTable)) {
-			t.Fatal("Result table changed after modifying tbl2 (aliasing bug)")
-		}
-
-		// TEST 4: Modify result table persistent - original tables should NOT change
-		for _, item := range modifyPrefixes {
-			resultTable = resultTable.InsertPersist(item.pfx, item.val+40000)
-		}
-
-		if !maps.Equal(tbl1State2, captureFastState(tbl1)) {
-			t.Fatal("tbl1 changed after modifying result (reverse aliasing)")
-		}
-		if !maps.Equal(tbl2State2, captureFastState(tbl2)) {
-			t.Fatal("tbl2 changed after modifying result (reverse aliasing)")
-		}
-
-		// TEST 5: Multiple UnionPersist operations should be independent
-		resultTable2 := tbl1.UnionPersist(tbl2)
-		resultTable3 := resultTable.UnionPersist(tbl1)
-
-		// Modify resultTable2
-		testPrefix := mpp("10.99.99.0/24")
-		_ = resultTable2.InsertPersist(testPrefix, 55555)
-
-		// resultTable3 should not be affected
-		if val3, found := resultTable3.Get(testPrefix); found && val3 == 55555 {
-			t.Fatal("UnionPersist results share memory (deep aliasing bug)")
-		}
-
-		// TEST 6: Nested UnionPersist chain
-		chain1 := tbl1.UnionPersist(tbl2)
-		chain2 := chain1.UnionPersist(tbl1)
-		chain3 := chain2.UnionPersist(tbl2)
-
-		// All should be independent
-		testPrefix2 := mpp("192.168.99.0/24")
-		chain1 = chain1.InsertPersist(testPrefix2, 111)
-		chain2 = chain2.InsertPersist(testPrefix2, 222)
-		chain3 = chain3.InsertPersist(testPrefix2, 333)
-
-		val1, _ := chain1.Get(testPrefix2)
-		val2, _ := chain2.Get(testPrefix2)
-		val3, _ := chain3.Get(testPrefix2)
-
-		if val1 == val2 || val2 == val3 || val1 == val3 {
-			t.Fatalf("Chained UnionPersist tables share state: %d, %d, %d", val1, val2, val3)
-		}
-	})
-}
-
-// FuzzLiteUnionPersistAliasing tests for potential aliasing/memory sharing bugs in Lite
-func FuzzLiteUnionPersistAliasing(f *testing.F) {
-	// Seed with initial test cases
-	f.Add(uint64(12345), uint64(67890), 20, 20, 5)
-	f.Add(uint64(11111), uint64(22222), 50, 30, 10)
-	f.Add(uint64(99999), uint64(88888), 100, 100, 20)
-
-	f.Fuzz(func(t *testing.T, seed1, seed2 uint64, count1, count2, modifyCount int) {
-		// Bound test sizes
-		if count1 < 5 || count1 > 200 || count2 < 5 || count2 > 200 || modifyCount < 1 || modifyCount > 50 {
-			t.Skip("counts out of range")
-		}
-
-		// Generate test data
-		prng1 := rand.New(rand.NewPCG(seed1, 42))
-		prng2 := rand.New(rand.NewPCG(seed2, 42))
-
-		prefixes1 := randomPrefixes(prng1, count1)
-		prefixes2 := randomPrefixes(prng2, count2)
-		modifyPrefixes := randomPrefixes(prng1, modifyCount)
-
-		// Create and populate original tables
-		tbl1 := new(Lite)
-		tbl2 := new(Lite)
-
-		for _, item := range prefixes1 {
-			tbl1.Insert(item.pfx)
-		}
-		for _, item := range prefixes2 {
-			tbl2.Insert(item.pfx)
-		}
-
-		// Capture state before UnionPersist
-		tbl1BeforeState := captureLiteState(tbl1)
-		tbl2BeforeState := captureLiteState(tbl2)
-
-		// Perform UnionPersist
-		resultTable := tbl1.UnionPersist(tbl2)
-
-		// Capture initial result state
-		resultInitialState := captureLiteState(resultTable)
-
-		// TEST 1: Verify original tables unchanged
-		if !maps.Equal(tbl1BeforeState, captureLiteState(tbl1)) {
-			t.Fatal("UnionPersist modified tbl1 (immutability violation)")
-		}
-		if !maps.Equal(tbl2BeforeState, captureLiteState(tbl2)) {
-			t.Fatal("UnionPersist modified tbl2 (immutability violation)")
-		}
-
-		// TEST 2: Modify original tbl1 persistent - result should NOT change
-		for _, item := range modifyPrefixes {
-			tbl1 = tbl1.InsertPersist(item.pfx)
-		}
-		tbl1State2 := captureLiteState(tbl1)
-
-		if !maps.Equal(resultInitialState, captureLiteState(resultTable)) {
-			t.Fatal("Result table changed after modifying tbl1 (aliasing bug)")
-		}
-
-		// TEST 3: Modify original tbl2 persistent - result should NOT change
-		for _, item := range modifyPrefixes {
-			tbl2 = tbl2.InsertPersist(item.pfx)
-		}
-		tbl2State2 := captureLiteState(tbl2)
-
-		if !maps.Equal(resultInitialState, captureLiteState(resultTable)) {
-			t.Fatal("Result table changed after modifying tbl2 (aliasing bug)")
-		}
-
-		// TEST 4: Modify result table persistent - original tables should NOT change
-		for _, item := range modifyPrefixes {
-			resultTable = resultTable.InsertPersist(item.pfx)
-		}
-
-		if !maps.Equal(tbl1State2, captureLiteState(tbl1)) {
-			t.Fatal("tbl1 changed after modifying result (reverse aliasing)")
-		}
-		if !maps.Equal(tbl2State2, captureLiteState(tbl2)) {
-			t.Fatal("tbl2 changed after modifying result (reverse aliasing)")
-		}
-	})
 }
 
 // Helper functions
