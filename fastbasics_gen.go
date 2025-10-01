@@ -274,7 +274,7 @@ func (n *fastNode[V]) purgeAndCompress(stack []*fastNode[V], octets []uint8, is4
 }
 
 // delete deletes the prefix and returns the associated value and true if the prefix existed,
-// or zero value and false otherwise. The prefix must be in canonical form.
+// or false otherwise. The prefix must be in canonical form.
 func (n *fastNode[V]) delete(pfx netip.Prefix) (exists bool) {
 	// invariant, prefix must be masked
 

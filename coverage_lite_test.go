@@ -98,7 +98,7 @@ func TestLite_API_Basics(t *testing.T) {
 	}
 }
 
-// Test 2: Lite persistent ops — ModifyPersist (insert/update/delete) + WalkPersist
+// Test 2: Lite persistent ops — ModifyPersist (insert/update/delete)
 func TestLite_Persist_Modify(t *testing.T) {
 	t.Parallel()
 
