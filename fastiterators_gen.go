@@ -1,7 +1,7 @@
+// Code generated from file "nodeiterators_tmpl.go"; DO NOT EDIT.
+
 // Copyright (c) 2025 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
-
-// Code generated from file "nodeiterators_tmpl.go"; DO NOT EDIT.
 
 package bart
 
