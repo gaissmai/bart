@@ -40,7 +40,7 @@ const (
 func main() {
 	outFile, err := os.Create(outFname)
 	if err != nil {
-		fmt.Fprint(os.Stderr, err)
+		fmt.Fprint(os.Stderr, DIE, err)
 		os.Exit(1)
 	}
 
