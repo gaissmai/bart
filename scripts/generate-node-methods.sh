@@ -35,9 +35,9 @@ for nodeType in "${NODE_TYPES[@]}"; do
     output_file="${output_file//node/}"                     # remove node in filename
     
     # Remove go:generate directives and build constraint, add generated header, substitute node type
-    sed -e '/^\/\/go:generate\b/d' \
-        -e '/Usage:.*go generate\b/d' \
-        -e "s|^//go:build ignore.*$|// Code generated from file \"${template_file}\"; DO NOT EDIT.|" \
+    sed -e "s|.*REPLACE with generate hint.*|// Code generated from file \"${template_file}\"; DO NOT EDIT.|" \
+        -e '/^\/\/go:build generate\b/d' \
+        -e '/^\/\/go:generate\b/d' \
         -e '/GENERATE DELETE START/,/GENERATE DELETE END/d' \
         -e "s|_NODE_TYPE|${nodeType}|g" \
         "${template_file}" > "${output_file}"

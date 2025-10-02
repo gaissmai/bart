@@ -1,9 +1,10 @@
+// REPLACE with generate hint
+
 // Copyright (c) 2025 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
-// Usage: go generate -tags=ignore ./...
 //go:generate ./scripts/generate-table-methods.sh
-//go:build ignore
+//go:build generate
 
 package bart
 
