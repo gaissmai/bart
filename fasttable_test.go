@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/gaissmai/bart/internal/nodes"
 )
 
 func TestFastCloneFlat(t *testing.T) {
@@ -20,15 +22,15 @@ func TestFastCloneFlat(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		prepare func() *fastNode[int]
-		check   func(t *testing.T, got, orig *fastNode[int])
+		prepare func() *nodes.FastNode[int]
+		check   func(t *testing.T, got, orig *nodes.FastNode[int])
 	}{
 		{
 			name: "nil node returns nil",
-			prepare: func() *fastNode[int] {
+			prepare: func() *nodes.FastNode[int] {
 				return nil
 			},
-			check: func(t *testing.T, got, orig *fastNode[int]) {
+			check: func(t *testing.T, got, orig *nodes.FastNode[int]) {
 				if got != nil {
 					t.Errorf("expected nil, got %+v", got)
 				}
@@ -36,33 +38,33 @@ func TestFastCloneFlat(t *testing.T) {
 		},
 		{
 			name: "empty node",
-			prepare: func() *fastNode[int] {
-				return &fastNode[int]{}
+			prepare: func() *nodes.FastNode[int] {
+				return &nodes.FastNode[int]{}
 			},
-			check: func(t *testing.T, got, orig *fastNode[int]) {
+			check: func(t *testing.T, got, orig *nodes.FastNode[int]) {
 				if got == nil {
 					t.Fatal("got is nil")
 				}
-				if got.prefixCount() != 0 || got.childCount() != 0 {
+				if got.PrefixCount() != 0 || got.ChildCount() != 0 {
 					t.Errorf("expected empty clone, got %+v", got)
 				}
 			},
 		},
 		{
 			name: "node with prefix",
-			prepare: func() *fastNode[int] {
-				n := &fastNode[int]{}
+			prepare: func() *nodes.FastNode[int] {
+				n := &nodes.FastNode[int]{}
 				pfx := mpp("8.0.0.0/6")
 				val := 42
-				n.insert(pfx, val, 0)
+				n.Insert(pfx, val, 0)
 				return n
 			},
-			check: func(t *testing.T, got, orig *fastNode[int]) {
+			check: func(t *testing.T, got, orig *nodes.FastNode[int]) {
 				gotBuf := &strings.Builder{}
 				origBuf := &strings.Builder{}
 
-				dumpRec(got, gotBuf, stridePath{}, 0, true, shouldPrintValues[int]())
-				dumpRec(orig, origBuf, stridePath{}, 0, true, shouldPrintValues[int]())
+				got.DumpRec(gotBuf, stridePath{}, 0, true, shouldPrintValues[int]())
+				orig.DumpRec(origBuf, stridePath{}, 0, true, shouldPrintValues[int]())
 
 				if gotBuf.String() != origBuf.String() {
 					t.Errorf("dump is different\norig:%sgot:%s", origBuf.String(), gotBuf.String())
@@ -71,28 +73,28 @@ func TestFastCloneFlat(t *testing.T) {
 		},
 		{
 			name: "node with prefixes",
-			prepare: func() *fastNode[int] {
-				n := &fastNode[int]{}
+			prepare: func() *nodes.FastNode[int] {
+				n := &nodes.FastNode[int]{}
 				pfx := mpp("8.0.0.0/6")
 				val := 6
-				n.insert(pfx, val, 0)
+				n.Insert(pfx, val, 0)
 
 				pfx = mpp("8.0.0.0/8")
 				val = 8
-				n.insert(pfx, val, 0)
+				n.Insert(pfx, val, 0)
 
 				pfx = mpp("16.0.0.0/27")
 				val = 27
-				n.insert(pfx, val, 0)
+				n.Insert(pfx, val, 0)
 
 				return n
 			},
-			check: func(t *testing.T, got, orig *fastNode[int]) {
+			check: func(t *testing.T, got, orig *nodes.FastNode[int]) {
 				gotBuf := &strings.Builder{}
 				origBuf := &strings.Builder{}
 
-				dumpRec(got, gotBuf, stridePath{}, 0, true, shouldPrintValues[int]())
-				dumpRec(orig, origBuf, stridePath{}, 0, true, shouldPrintValues[int]())
+				got.DumpRec(gotBuf, stridePath{}, 0, true, shouldPrintValues[int]())
+				orig.DumpRec(origBuf, stridePath{}, 0, true, shouldPrintValues[int]())
 
 				if gotBuf.String() != origBuf.String() {
 					t.Errorf("dump is different\norig:%sgot:%s", origBuf.String(), gotBuf.String())
@@ -106,7 +108,7 @@ func TestFastCloneFlat(t *testing.T) {
 			t.Parallel()
 
 			orig := tt.prepare()
-			got := orig.cloneFlat(cloneFn)
+			got := orig.CloneFlat(cloneFn)
 			tt.check(t, got, orig)
 		})
 	}
@@ -1071,15 +1073,15 @@ func TestFastDeleteButOne(t *testing.T) {
 			tbl.Delete(p.pfx)
 		}
 
-		stats4 := nodeStatsRec(&tbl.root4)
-		stats6 := nodeStatsRec(&tbl.root6)
+		stats4 := tbl.root4.StatsRec()
+		stats6 := tbl.root6.StatsRec()
 
-		if nodes := stats4.nodes + stats6.nodes; nodes != 1 {
+		if nodes := stats4.Nodes + stats6.Nodes; nodes != 1 {
 			t.Fatalf("delete but one, want nodes: 1, got: %d\n%s", nodes, tbl.dumpString())
 		}
 
-		sum := stats4.pfxs + stats4.leaves + stats4.fringes +
-			stats6.pfxs + stats6.leaves + stats6.fringes
+		sum := stats4.Pfxs + stats4.Leaves + stats4.Fringes +
+			stats6.Pfxs + stats6.Leaves + stats6.Fringes
 
 		if sum != 1 {
 			t.Fatalf("delete but one, only one item must be left, but: %d\n%s", sum, tbl.dumpString())
@@ -1415,15 +1417,15 @@ func BenchmarkFastMemIP4(b *testing.B) {
 			runtime.GC()
 			runtime.ReadMemStats(&endMem)
 
-			stats := nodeStatsRec(&rt.root4)
+			stats := rt.root4.StatsRec()
 
 			bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
 			b.ReportMetric(roundFloat64(bytes/float64(rt.Size())), "bytes/route")
 
-			b.ReportMetric(float64(stats.nodes), "node")
-			b.ReportMetric(float64(stats.pfxs), "pfxs")
-			b.ReportMetric(float64(stats.leaves), "leaf")
-			b.ReportMetric(float64(stats.fringes), "fringe")
+			b.ReportMetric(float64(stats.Nodes), "node")
+			b.ReportMetric(float64(stats.Pfxs), "pfxs")
+			b.ReportMetric(float64(stats.Leaves), "leaf")
+			b.ReportMetric(float64(stats.Fringes), "fringe")
 			b.ReportMetric(0, "ns/op")
 		})
 	}
@@ -1446,15 +1448,15 @@ func BenchmarkFastMemIP6(b *testing.B) {
 			runtime.GC()
 			runtime.ReadMemStats(&endMem)
 
-			stats := nodeStatsRec(&rt.root6)
+			stats := rt.root6.StatsRec()
 
 			bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
 			b.ReportMetric(roundFloat64(bytes/float64(rt.Size())), "bytes/route")
 
-			b.ReportMetric(float64(stats.nodes), "node")
-			b.ReportMetric(float64(stats.pfxs), "pfxs")
-			b.ReportMetric(float64(stats.leaves), "leaf")
-			b.ReportMetric(float64(stats.fringes), "fringe")
+			b.ReportMetric(float64(stats.Nodes), "node")
+			b.ReportMetric(float64(stats.Pfxs), "pfxs")
+			b.ReportMetric(float64(stats.Leaves), "leaf")
+			b.ReportMetric(float64(stats.Fringes), "fringe")
 			b.ReportMetric(0, "ns/op")
 		})
 	}
@@ -1477,23 +1479,23 @@ func BenchmarkFastMem(b *testing.B) {
 			runtime.GC()
 			runtime.ReadMemStats(&endMem)
 
-			s4 := nodeStatsRec(&rt.root4)
-			s6 := nodeStatsRec(&rt.root6)
-			stats := statsT{
-				s4.pfxs + s6.pfxs,
-				s4.childs + s6.childs,
-				s4.nodes + s6.nodes,
-				s4.leaves + s6.leaves,
-				s4.fringes + s6.fringes,
+			s4 := rt.root4.StatsRec()
+			s6 := rt.root6.StatsRec()
+			stats := nodes.StatsT{
+				Pfxs:    s4.Pfxs + s6.Pfxs,
+				Childs:  s4.Childs + s6.Childs,
+				Nodes:   s4.Nodes + s6.Nodes,
+				Leaves:  s4.Leaves + s6.Leaves,
+				Fringes: s4.Fringes + s6.Fringes,
 			}
 
 			bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
 			b.ReportMetric(roundFloat64(bytes/float64(rt.Size())), "bytes/route")
 
-			b.ReportMetric(float64(stats.nodes), "node")
-			b.ReportMetric(float64(stats.pfxs), "pfxs")
-			b.ReportMetric(float64(stats.leaves), "leaf")
-			b.ReportMetric(float64(stats.fringes), "fringe")
+			b.ReportMetric(float64(stats.Nodes), "node")
+			b.ReportMetric(float64(stats.Pfxs), "pfxs")
+			b.ReportMetric(float64(stats.Leaves), "leaf")
+			b.ReportMetric(float64(stats.Fringes), "fringe")
 			b.ReportMetric(0, "ns/op")
 		})
 	}
@@ -1515,15 +1517,15 @@ func BenchmarkFastFullTableMemory4(b *testing.B) {
 		runtime.GC()
 		runtime.ReadMemStats(&endMem)
 
-		stats := nodeStatsRec(&rt.root4)
+		stats := rt.root4.StatsRec()
 
 		bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
 		b.ReportMetric(roundFloat64(bytes/float64(rt.Size())), "bytes/route")
 
-		b.ReportMetric(float64(stats.pfxs), "pfxs")
-		b.ReportMetric(float64(stats.nodes), "nodes")
-		b.ReportMetric(float64(stats.leaves), "leaves")
-		b.ReportMetric(float64(stats.fringes), "fringes")
+		b.ReportMetric(float64(stats.Pfxs), "pfxs")
+		b.ReportMetric(float64(stats.Nodes), "nodes")
+		b.ReportMetric(float64(stats.Leaves), "leaves")
+		b.ReportMetric(float64(stats.Fringes), "fringes")
 		b.ReportMetric(0, "ns/op")
 	})
 }
@@ -1545,15 +1547,15 @@ func BenchmarkFastFullTableMemory6(b *testing.B) {
 		runtime.GC()
 		runtime.ReadMemStats(&endMem)
 
-		stats := nodeStatsRec(&rt.root6)
+		stats := rt.root6.StatsRec()
 
 		bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
 		b.ReportMetric(roundFloat64(bytes/float64(rt.Size())), "bytes/route")
 
-		b.ReportMetric(float64(stats.pfxs), "pfxs")
-		b.ReportMetric(float64(stats.nodes), "nodes")
-		b.ReportMetric(float64(stats.leaves), "leaves")
-		b.ReportMetric(float64(stats.fringes), "fringes")
+		b.ReportMetric(float64(stats.Pfxs), "pfxs")
+		b.ReportMetric(float64(stats.Nodes), "nodes")
+		b.ReportMetric(float64(stats.Leaves), "leaves")
+		b.ReportMetric(float64(stats.Fringes), "fringes")
 		b.ReportMetric(0, "ns/op")
 	})
 }
@@ -1575,23 +1577,23 @@ func BenchmarkFastFullTableMemory(b *testing.B) {
 		runtime.GC()
 		runtime.ReadMemStats(&endMem)
 
-		s4 := nodeStatsRec(&rt.root4)
-		s6 := nodeStatsRec(&rt.root6)
-		stats := statsT{
-			pfxs:    s4.pfxs + s6.pfxs,
-			childs:  s4.childs + s6.childs,
-			nodes:   s4.nodes + s6.nodes,
-			leaves:  s4.leaves + s6.leaves,
-			fringes: s4.fringes + s6.fringes,
+		s4 := rt.root4.StatsRec()
+		s6 := rt.root6.StatsRec()
+		stats := nodes.StatsT{
+			Pfxs:    s4.Pfxs + s6.Pfxs,
+			Childs:  s4.Childs + s6.Childs,
+			Nodes:   s4.Nodes + s6.Nodes,
+			Leaves:  s4.Leaves + s6.Leaves,
+			Fringes: s4.Fringes + s6.Fringes,
 		}
 
 		bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
 		b.ReportMetric(roundFloat64(bytes/float64(rt.Size())), "bytes/route")
 
-		b.ReportMetric(float64(stats.pfxs), "pfxs")
-		b.ReportMetric(float64(stats.nodes), "nodes")
-		b.ReportMetric(float64(stats.leaves), "leaves")
-		b.ReportMetric(float64(stats.fringes), "fringes")
+		b.ReportMetric(float64(stats.Pfxs), "pfxs")
+		b.ReportMetric(float64(stats.Nodes), "nodes")
+		b.ReportMetric(float64(stats.Leaves), "leaves")
+		b.ReportMetric(float64(stats.Fringes), "fringes")
 		b.ReportMetric(0, "ns/op")
 	})
 }
@@ -1679,9 +1681,9 @@ func BenchmarkFastFullMiss6(b *testing.B) {
 func checkFastNumNodes(t *testing.T, tbl *Fast[int], want int) {
 	t.Helper()
 
-	s4 := nodeStatsRec(&tbl.root4)
-	s6 := nodeStatsRec(&tbl.root6)
-	nodes := s4.nodes + s6.nodes
+	s4 := tbl.root4.StatsRec()
+	s6 := tbl.root6.StatsRec()
+	nodes := s4.Nodes + s6.Nodes
 
 	if got := nodes; got != want {
 		t.Errorf("wrong table dump, got %d nodes want %d", got, want)

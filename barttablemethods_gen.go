@@ -12,7 +12,10 @@ import (
 	"io"
 	"iter"
 	"net/netip"
+	"slices"
 	"strings"
+
+	"github.com/gaissmai/bart/internal/nodes"
 )
 
 func (t *Table[V]) sizeUpdate(is4 bool, delta int) {
@@ -40,7 +43,7 @@ func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	is4 := pfx.Addr().Is4()
 	n := t.rootNodeByVersion(is4)
 
-	if exists := n.insert(pfx, val, 0); exists {
+	if exists := n.Insert(pfx, val, 0); exists {
 		return
 	}
 
@@ -82,16 +85,16 @@ func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V] {
 	n := &pt.root4
 
 	if is4 {
-		pt.root4 = *t.root4.cloneFlat(cloneFn)
+		pt.root4 = *t.root4.CloneFlat(cloneFn)
 		pt.root6 = t.root6
 	} else {
 		pt.root4 = t.root4
-		pt.root6 = *t.root6.cloneFlat(cloneFn)
+		pt.root6 = *t.root6.CloneFlat(cloneFn)
 
 		n = &pt.root6
 	}
 
-	if !n.insertPersist(cloneFn, pfx, val, 0) {
+	if !n.InsertPersist(cloneFn, pfx, val, 0) {
 		pt.sizeUpdate(is4, 1)
 	}
 
@@ -114,7 +117,7 @@ func (t *Table[V]) Delete(pfx netip.Prefix) {
 	is4 := pfx.Addr().Is4()
 
 	n := t.rootNodeByVersion(is4)
-	if exists := n.delete(pfx); exists {
+	if exists := n.Delete(pfx); exists {
 		t.sizeUpdate(is4, -1)
 	}
 }
@@ -140,7 +143,7 @@ func (t *Table[V]) Get(pfx netip.Prefix) (val V, exists bool) {
 	is4 := pfx.Addr().Is4()
 	n := t.rootNodeByVersion(is4)
 
-	return n.get(pfx)
+	return n.Get(pfx)
 }
 
 // DeletePersist is similar to Delete but does not modify the receiver.
@@ -167,7 +170,7 @@ func (t *Table[V]) DeletePersist(pfx netip.Prefix) *Table[V] {
 
 	// Preflight check: avoid cloning if prefix doesn't exist
 	n := t.rootNodeByVersion(is4)
-	if _, found := n.get(pfx); !found {
+	if _, found := n.Get(pfx); !found {
 		return t
 	}
 
@@ -183,16 +186,16 @@ func (t *Table[V]) DeletePersist(pfx netip.Prefix) *Table[V] {
 
 	// Clone root node corresponding to the IP version, for copy-on-write.
 	if is4 {
-		pt.root4 = *t.root4.cloneFlat(cloneFn)
+		pt.root4 = *t.root4.CloneFlat(cloneFn)
 		pt.root6 = t.root6
 		n = &pt.root4
 	} else {
 		pt.root4 = t.root4
-		pt.root6 = *t.root6.cloneFlat(cloneFn)
+		pt.root6 = *t.root6.CloneFlat(cloneFn)
 		n = &pt.root6
 	}
 
-	if exists := n.deletePersist(cloneFn, pfx); exists {
+	if exists := n.DeletePersist(cloneFn, pfx); exists {
 		pt.sizeUpdate(is4, -1)
 	}
 
@@ -237,7 +240,7 @@ func (t *Table[V]) Modify(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, del bool
 
 	n := t.rootNodeByVersion(is4)
 
-	delta := n.modify(pfx, cb)
+	delta := n.Modify(pfx, cb)
 	t.sizeUpdate(is4, delta)
 }
 
@@ -309,7 +312,7 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 		is4 := pfx.Addr().Is4()
 		n := t.rootNodeByVersion(is4)
 
-		n.supernets(pfx, yield)
+		n.Supernets(pfx, yield)
 	}
 }
 
@@ -336,7 +339,7 @@ func (t *Table[V]) Subnets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 		is4 := pfx.Addr().Is4()
 
 		n := t.rootNodeByVersion(is4)
-		n.subnets(pfx, yield)
+		n.Subnets(pfx, yield)
 	}
 }
 
@@ -362,7 +365,7 @@ func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 	is4 := pfx.Addr().Is4()
 	n := t.rootNodeByVersion(is4)
 
-	return n.overlapsPrefixAtDepth(pfx, 0)
+	return n.OverlapsPrefixAtDepth(pfx, 0)
 }
 
 // Overlaps reports whether any route in the receiver table overlaps
@@ -389,7 +392,7 @@ func (t *Table[V]) Overlaps4(o *Table[V]) bool {
 	if o == nil || t.size4 == 0 || o.size4 == 0 {
 		return false
 	}
-	return t.root4.overlaps(&o.root4, 0)
+	return t.root4.Overlaps(&o.root4, 0)
 }
 
 // Overlaps6 is like [Table.Overlaps] but for the v6 routing table only.
@@ -397,7 +400,7 @@ func (t *Table[V]) Overlaps6(o *Table[V]) bool {
 	if o == nil || t.size6 == 0 || o.size6 == 0 {
 		return false
 	}
-	return t.root6.overlaps(&o.root6, 0)
+	return t.root6.Overlaps(&o.root6, 0)
 }
 
 // Union merges another routing table into the receiver table, modifying it in-place.
@@ -414,12 +417,9 @@ func (t *Table[V]) Union(o *Table[V]) {
 	// Create a cloning function for deep copying values;
 	// returns nil if V does not implement the Cloner interface.
 	cloneFn := cloneFnFactory[V]()
-	if cloneFn == nil {
-		cloneFn = copyVal
-	}
 
-	dup4 := t.root4.unionRec(cloneFn, &o.root4, 0)
-	dup6 := t.root6.unionRec(cloneFn, &o.root6, 0)
+	dup4 := t.root4.UnionRec(cloneFn, &o.root4, 0)
+	dup6 := t.root6.UnionRec(cloneFn, &o.root6, 0)
 
 	t.size4 += o.size4 - dup4
 	t.size6 += o.size6 - dup6
@@ -450,18 +450,14 @@ func (t *Table[V]) UnionPersist(o *Table[V]) *Table[V] {
 
 	// only clone the root node if there is something to union
 	if o.size4 != 0 {
-		pt.root4 = *t.root4.cloneFlat(cloneFn)
+		pt.root4 = *t.root4.CloneFlat(cloneFn)
 	}
 	if o.size6 != 0 {
-		pt.root6 = *t.root6.cloneFlat(cloneFn)
+		pt.root6 = *t.root6.CloneFlat(cloneFn)
 	}
 
-	if cloneFn == nil {
-		cloneFn = copyVal
-	}
-
-	dup4 := pt.root4.unionRecPersist(cloneFn, &o.root4, 0)
-	dup6 := pt.root6.unionRecPersist(cloneFn, &o.root6, 0)
+	dup4 := pt.root4.UnionRecPersist(cloneFn, &o.root4, 0)
+	dup6 := pt.root6.UnionRecPersist(cloneFn, &o.root6, 0)
 
 	pt.size4 += o.size4 - dup4
 	pt.size6 += o.size6 - dup6
@@ -480,7 +476,7 @@ func (t *Table[V]) Equal(o *Table[V]) bool {
 		return true
 	}
 
-	return t.root4.equalRec(&o.root4) && t.root6.equalRec(&o.root6)
+	return t.root4.EqualRec(&o.root4) && t.root6.EqualRec(&o.root6)
 }
 
 // Clone returns a copy of the routing table.
@@ -495,8 +491,8 @@ func (t *Table[V]) Clone() *Table[V] {
 
 	cloneFn := cloneFnFactory[V]()
 
-	c.root4 = *t.root4.cloneRec(cloneFn)
-	c.root6 = *t.root6.cloneRec(cloneFn)
+	c.root4 = *t.root4.CloneRec(cloneFn)
+	c.root6 = *t.root6.CloneRec(cloneFn)
 
 	c.size4 = t.size4
 	c.size6 = t.size6
@@ -547,21 +543,21 @@ func (t *Table[V]) Size6() int {
 //	}
 func (t *Table[V]) All() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
-		_ = t.root4.allRec(stridePath{}, 0, true, yield) && t.root6.allRec(stridePath{}, 0, false, yield)
+		_ = t.root4.AllRec(stridePath{}, 0, true, yield) && t.root6.AllRec(stridePath{}, 0, false, yield)
 	}
 }
 
 // All4 is like [Table.All] but only for the v4 routing table.
 func (t *Table[V]) All4() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
-		_ = t.root4.allRec(stridePath{}, 0, true, yield)
+		_ = t.root4.AllRec(stridePath{}, 0, true, yield)
 	}
 }
 
 // All6 is like [Table.All] but only for the v6 routing table.
 func (t *Table[V]) All6() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
-		_ = t.root6.allRec(stridePath{}, 0, false, yield)
+		_ = t.root6.AllRec(stridePath{}, 0, false, yield)
 	}
 }
 
@@ -584,22 +580,22 @@ func (t *Table[V]) All6() iter.Seq2[netip.Prefix, V] {
 // traversal is required use persistent table methods.
 func (t *Table[V]) AllSorted() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
-		_ = t.root4.allRecSorted(stridePath{}, 0, true, yield) &&
-			t.root6.allRecSorted(stridePath{}, 0, false, yield)
+		_ = t.root4.AllRecSorted(stridePath{}, 0, true, yield) &&
+			t.root6.AllRecSorted(stridePath{}, 0, false, yield)
 	}
 }
 
 // AllSorted4 is like [Table.AllSorted] but only for the v4 routing table.
 func (t *Table[V]) AllSorted4() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
-		_ = t.root4.allRecSorted(stridePath{}, 0, true, yield)
+		_ = t.root4.AllRecSorted(stridePath{}, 0, true, yield)
 	}
 }
 
 // AllSorted6 is like [Table.AllSorted] but only for the v6 routing table.
 func (t *Table[V]) AllSorted6() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
-		_ = t.root6.allRecSorted(stridePath{}, 0, false, yield)
+		_ = t.root6.AllRecSorted(stridePath{}, 0, false, yield)
 	}
 }
 
@@ -661,7 +657,7 @@ func (t *Table[V]) Fprint(w io.Writer) error {
 // fprint is the version dependent adapter to fprintRec.
 func (t *Table[V]) fprint(w io.Writer, is4 bool) error {
 	n := t.rootNodeByVersion(is4)
-	if n.isEmpty() {
+	if n.IsEmpty() {
 		return nil
 	}
 
@@ -669,14 +665,14 @@ func (t *Table[V]) fprint(w io.Writer, is4 bool) error {
 		return err
 	}
 
-	startParent := trieItem[V]{
-		n:    nil,
-		idx:  0,
-		path: stridePath{},
-		is4:  is4,
+	startParent := nodes.TrieItem[V]{
+		Node: nil,
+		Idx:  0,
+		Path: stridePath{},
+		Is4:  is4,
 	}
 
-	return fprintRec(n, w, startParent, "", shouldPrintValues[V]())
+	return n.FprintRec(w, startParent, "", shouldPrintValues[V]())
 }
 
 // MarshalText implements the [encoding.TextMarshaler] interface,
@@ -719,7 +715,7 @@ func (t *Table[V]) DumpList4() []DumpListNode[V] {
 	if t == nil {
 		return nil
 	}
-	return dumpListRec(&t.root4, 0, stridePath{}, 0, true)
+	return t.dumpListRec(&t.root4, 0, stridePath{}, 0, true)
 }
 
 // DumpList6 dumps the ipv6 tree into a list of roots and their subnets.
@@ -728,7 +724,43 @@ func (t *Table[V]) DumpList6() []DumpListNode[V] {
 	if t == nil {
 		return nil
 	}
-	return dumpListRec(&t.root6, 0, stridePath{}, 0, false)
+	return t.dumpListRec(&t.root6, 0, stridePath{}, 0, false)
+}
+
+// dumpListRec, build the data structure rec-descent with the help of directItemsRec.
+// anyNode is nodes.BartNode, nodes.FastNode or nodes.LiteNode
+func (t *Table[V]) dumpListRec(anyNode any, parentIdx uint8, path stridePath, depth int, is4 bool) []DumpListNode[V] {
+	// recursion stop condition
+	if anyNode == nil {
+		return nil
+	}
+
+	// the same method is generated for all table types, therefore
+	// type assert to the smallest needed interface.
+	// The panic on wrong type assertion is by intention, MUST NOT happen
+	n := anyNode.(interface {
+		DirectItemsRec(uint8, stridePath, int, bool) []nodes.TrieItem[V]
+	})
+
+	directItems := n.DirectItemsRec(parentIdx, path, depth, is4)
+
+	// sort the items by prefix
+	slices.SortFunc(directItems, func(a, b nodes.TrieItem[V]) int {
+		return cmpPrefix(a.Cidr, b.Cidr)
+	})
+
+	dumpNodes := make([]DumpListNode[V], 0, len(directItems))
+
+	for _, item := range directItems {
+		dumpNodes = append(dumpNodes, DumpListNode[V]{
+			CIDR:  item.Cidr,
+			Value: item.Val,
+			// build it rec-descent, item.Node is also from type any
+			Subnets: t.dumpListRec(item.Node, item.Idx, item.Path, item.Depth, is4),
+		})
+	}
+
+	return dumpNodes
 }
 
 // dumpString is just a wrapper for dump.
@@ -746,20 +778,20 @@ func (t *Table[V]) dump(w io.Writer) {
 	}
 
 	if t.size4 > 0 {
-		stats := nodeStatsRec(&t.root4)
+		stats := t.root4.StatsRec()
 		fmt.Fprintln(w)
 		fmt.Fprintf(w, "### IPv4: size(%d), nodes(%d), pfxs(%d), leaves(%d), fringes(%d)",
-			t.size4, stats.nodes, stats.pfxs, stats.leaves, stats.fringes)
+			t.size4, stats.Nodes, stats.Pfxs, stats.Leaves, stats.Fringes)
 
-		dumpRec(&t.root4, w, stridePath{}, 0, true, shouldPrintValues[V]())
+		t.root4.DumpRec(w, stridePath{}, 0, true, shouldPrintValues[V]())
 	}
 
 	if t.size6 > 0 {
-		stats := nodeStatsRec(&t.root6)
+		stats := t.root6.StatsRec()
 		fmt.Fprintln(w)
 		fmt.Fprintf(w, "### IPv6: size(%d), nodes(%d), pfxs(%d), leaves(%d), fringes(%d)",
-			t.size6, stats.nodes, stats.pfxs, stats.leaves, stats.fringes)
+			t.size6, stats.Nodes, stats.Pfxs, stats.Leaves, stats.Fringes)
 
-		dumpRec(&t.root6, w, stridePath{}, 0, false, shouldPrintValues[V]())
+		t.root6.DumpRec(w, stridePath{}, 0, false, shouldPrintValues[V]())
 	}
 }
