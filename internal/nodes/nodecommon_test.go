@@ -1,7 +1,7 @@
 // Copyright (c) 2025 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
-package bart
+package nodes
 
 import (
 	"fmt"
@@ -11,13 +11,21 @@ import (
 	"github.com/gaissmai/bart/internal/art"
 )
 
+var mpp = func(s string) netip.Prefix {
+	pfx := netip.MustParsePrefix(s)
+	if pfx == pfx.Masked() {
+		return pfx
+	}
+	panic(fmt.Sprintf("%s is not canonicalized as %s", s, pfx.Masked()))
+}
+
 // Test cases for cidrFromPath function
 func TestCidrFromPath(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name     string
-		path     stridePath
+		path     StridePath
 		depth    int
 		is4      bool
 		idx      uint8
@@ -26,7 +34,7 @@ func TestCidrFromPath(t *testing.T) {
 		// IPv4 test cases
 		{
 			name:     "IPv4 default route /0",
-			path:     stridePath{},
+			path:     StridePath{},
 			depth:    0,
 			is4:      true,
 			idx:      1, // art.IdxToPfx(1) = (0, 0) -> 0.0.0.0/0
@@ -34,7 +42,7 @@ func TestCidrFromPath(t *testing.T) {
 		},
 		{
 			name:     "IPv4 /1 prefix 1xxxxxxx",
-			path:     stridePath{},
+			path:     StridePath{},
 			depth:    0,
 			is4:      true,
 			idx:      3, // art.IdxToPfx(3) = (128, 1) -> 128.0.0.0/1
@@ -42,7 +50,7 @@ func TestCidrFromPath(t *testing.T) {
 		},
 		{
 			name:     "IPv4 at depth 1",
-			path:     stridePath{192, 168, 0, 0},
+			path:     StridePath{192, 168, 0, 0},
 			depth:    1,
 			is4:      true,
 			idx:      3, // art.IdxToPfx(3) = (128, 1) -> 192.128.0.0/9
@@ -50,7 +58,7 @@ func TestCidrFromPath(t *testing.T) {
 		},
 		{
 			name:     "IPv4 at depth 2",
-			path:     stridePath{10, 0, 1, 0},
+			path:     StridePath{10, 0, 1, 0},
 			depth:    2,
 			is4:      true,
 			idx:      15, // art.IdxToPfx(15) = (224, 3) -> 10.0.224.0/19
@@ -60,7 +68,7 @@ func TestCidrFromPath(t *testing.T) {
 		// IPv6 test cases - KORRIGIERT
 		{
 			name:     "IPv6 default route /0",
-			path:     stridePath{},
+			path:     StridePath{},
 			depth:    0,
 			is4:      false,
 			idx:      1, // art.IdxToPfx(1) = (0, 0) -> ::/0
@@ -68,7 +76,7 @@ func TestCidrFromPath(t *testing.T) {
 		},
 		{
 			name:     "IPv6 at depth 1",
-			path:     stridePath{0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x00},
+			path:     StridePath{0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x00},
 			depth:    1,
 			is4:      false,
 			idx:      63, // art.IdxToPfx(63) = (248, 5) -> path[1]=0xf8 -> 20f8::/13
@@ -76,7 +84,7 @@ func TestCidrFromPath(t *testing.T) {
 		},
 		{
 			name:     "IPv6 at depth 7",
-			path:     stridePath{0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x01},
+			path:     StridePath{0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x01},
 			depth:    7,
 			is4:      false,
 			idx:      127, // art.IdxToPfx(127) = (252, 6) -> path[7]=0xfc -> 2001:db8:0:fc::/62
@@ -84,7 +92,7 @@ func TestCidrFromPath(t *testing.T) {
 		},
 		{
 			name:     "IPv6 at depth 15",
-			path:     stridePath{0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},
+			path:     StridePath{0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},
 			depth:    15,
 			is4:      false,
 			idx:      255, // art.IdxToPfx(255) = (254, 7) -> path[15]=0xfe -> 2001:db8:0:1::fe/127
@@ -96,7 +104,7 @@ func TestCidrFromPath(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			result := cidrFromPath(tt.path, tt.depth, tt.is4, tt.idx)
+			result := CidrFromPath(tt.path, tt.depth, tt.is4, tt.idx)
 			if result.String() != tt.expected {
 				octet, pfxLen := art.IdxToPfx(tt.idx)
 				t.Errorf("Test %s: cidrFromPath() = %v, want %v (idx %d maps to octet=%d, pfxLen=%d)",
@@ -191,7 +199,7 @@ func TestCidrForFringe(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			result := cidrForFringe(tt.octets, tt.depth, tt.is4, tt.lastOctet)
+			result := CidrForFringe(tt.octets, tt.depth, tt.is4, tt.lastOctet)
 
 			if result.String() != tt.expected {
 				t.Errorf("Test %s: cidrForFringe() = %v, want %v", tt.name, result, tt.expected)
@@ -240,10 +248,10 @@ func TestIsFringe(t *testing.T) {
 			t.Parallel()
 
 			pfx := netip.MustParsePrefix(tt.prefix)
-			result := isFringe(tt.depth, pfx)
+			result := IsFringe(tt.depth, pfx)
 
 			if result != tt.expected {
-				lastOctetPlusOne, lastBits := lastOctetPlusOneAndLastBits(pfx)
+				lastOctetPlusOne, lastBits := LastOctetPlusOneAndLastBits(pfx)
 				t.Errorf("Test %s: isFringe(%d, %v) = %v, want %v (lastOctetPlusOne=%d, lastBits=%d)",
 					tt.name, tt.depth, pfx, result, tt.expected, lastOctetPlusOne, lastBits)
 			}
@@ -275,7 +283,7 @@ func TestCmpIndexRank(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			result := cmpIndexRank(tt.aIdx, tt.bIdx)
+			result := CmpIndexRank(tt.aIdx, tt.bIdx)
 
 			// Check the sign of the result
 			var resultSign int
@@ -306,9 +314,9 @@ func TestCidrFromPathEdgeCases(t *testing.T) {
 	t.Run("IPv4 depth masking", func(t *testing.T) {
 		t.Parallel()
 		// Test that depth masking works correctly (depth & depthMask)
-		path := stridePath{192, 168, 1, 0}
+		path := StridePath{192, 168, 1, 0}
 		// depth 32 should be masked to 0 (32 & 15 = 0)
-		result := cidrFromPath(path, 32, true, 3) // idx 3 = (128, 1)
+		result := CidrFromPath(path, 32, true, 3) // idx 3 = (128, 1)
 		expected := "128.0.0.0/1"                 // depth masked to 0, overwrites path[0] with 128
 		if result.String() != expected {
 			t.Errorf("Expected %s with masked depth, got %s", expected, result.String())
@@ -317,9 +325,9 @@ func TestCidrFromPathEdgeCases(t *testing.T) {
 
 	t.Run("IPv6 depth masking", func(t *testing.T) {
 		t.Parallel()
-		path := stridePath{0x20, 0x01, 0x0d, 0xb8}
+		path := StridePath{0x20, 0x01, 0x0d, 0xb8}
 		// depth 48 should be masked to 0 (48 & 15 = 0)
-		result := cidrFromPath(path, 48, false, 7) // idx 7 = (192, 2)
+		result := CidrFromPath(path, 48, false, 7) // idx 7 = (192, 2)
 		expected := "c000::/2"                     // depth masked to 0, overwrites path[0] with 192
 		if result.String() != expected {
 			t.Errorf("Expected %s with masked depth, got %s", expected, result.String())
@@ -328,8 +336,8 @@ func TestCidrFromPathEdgeCases(t *testing.T) {
 
 	t.Run("Zero path", func(t *testing.T) {
 		t.Parallel()
-		var path stridePath // all zeros
-		result := cidrFromPath(path, 0, true, 1)
+		var path StridePath // all zeros
+		result := CidrFromPath(path, 0, true, 1)
 		expected := "0.0.0.0/0"
 		if result.String() != expected {
 			t.Errorf("cidrFromPath() = %v, want %v", result, expected)
@@ -339,8 +347,8 @@ func TestCidrFromPathEdgeCases(t *testing.T) {
 	t.Run("Path canonicalization", func(t *testing.T) {
 		t.Parallel()
 		// Test that bytes after depth are cleared
-		path := stridePath{10, 20, 30, 40, 50, 60, 70, 80, 90}
-		result := cidrFromPath(path, 2, true, 15) // depth 2, idx 15 = (224, 3)
+		path := StridePath{10, 20, 30, 40, 50, 60, 70, 80, 90}
+		result := CidrFromPath(path, 2, true, 15) // depth 2, idx 15 = (224, 3)
 		// Should result in 10.20.224.0/19 (depth*8 + 3 bits from idx 15)
 		expected := "10.20.224.0/19"
 		if result.String() != expected {
@@ -354,7 +362,7 @@ func TestCidrForFringeEdgeCases(t *testing.T) {
 
 	t.Run("IPv4 empty octets", func(t *testing.T) {
 		t.Parallel()
-		result := cidrForFringe([]byte{}, 0, true, 0)
+		result := CidrForFringe([]byte{}, 0, true, 0)
 		expected := "0.0.0.0/8"
 		if result.String() != expected {
 			t.Errorf("cidrForFringe() = %v, want %v", result, expected)
@@ -363,7 +371,7 @@ func TestCidrForFringeEdgeCases(t *testing.T) {
 
 	t.Run("IPv6 empty octets", func(t *testing.T) {
 		t.Parallel()
-		result := cidrForFringe([]byte{}, 0, false, 0)
+		result := CidrForFringe([]byte{}, 0, false, 0)
 		expected := "::/8"
 		if result.String() != expected {
 			t.Errorf("cidrForFringe() = %v, want %v", result, expected)
@@ -374,7 +382,7 @@ func TestCidrForFringeEdgeCases(t *testing.T) {
 		t.Parallel()
 		octets := []byte{10, 20, 30, 40}
 		// depth 32 should be masked to 0 (32 & 15 = 0)
-		result := cidrForFringe(octets, 32, true, 50)
+		result := CidrForFringe(octets, 32, true, 50)
 		expected := "50.0.0.0/8" // depth masked to 0, so lastOctet goes to path[0]
 		if result.String() != expected {
 			t.Errorf("Expected %s with masked depth, got %s", expected, result.String())
@@ -385,7 +393,7 @@ func TestCidrForFringeEdgeCases(t *testing.T) {
 		t.Parallel()
 		// Test that bytes after depth+1 are cleared
 		octets := []byte{0xac, 0x10, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e}
-		result := cidrForFringe(octets, 2, false, 0x63) // IPv6 depth 2
+		result := CidrForFringe(octets, 2, false, 0x63) // IPv6 depth 2
 		// lastOctet 0x63 goes to path[2], bytes after are cleared
 		expected := "ac10:6300::/24" // (2+1)*8 = 24 bits
 		if result.String() != expected {
@@ -428,8 +436,8 @@ func TestARTIndexSpecialCases(t *testing.T) {
 			}
 
 			// Test in cidrFromPath
-			var path stridePath
-			result := cidrFromPath(path, 0, true, test.idx)
+			var path StridePath
+			result := CidrFromPath(path, 0, true, test.idx)
 			expectedBits := int(test.expectedBits)
 			if result.Bits() != expectedBits {
 				t.Errorf("cidrFromPath with idx %d should have %d bits, got %d",
@@ -441,122 +449,34 @@ func TestARTIndexSpecialCases(t *testing.T) {
 
 // Benchmarks for cidrFromPath
 func BenchmarkCidrFromPath(b *testing.B) {
-	// IPv4 benchmarks at different depths
-	b.Run("IPv4/depth0", func(b *testing.B) {
-		path := stridePath{10, 0, 0, 0}
+	b.Run("IPv4", func(b *testing.B) {
+		path := StridePath{192, 168, 1, 100}
 		for b.Loop() {
-			_ = cidrFromPath(path, 0, true, 3)
+			_ = CidrFromPath(path, 3, true, 255)
 		}
 	})
 
-	b.Run("IPv4/depth1", func(b *testing.B) {
-		path := stridePath{192, 168, 0, 0}
+	b.Run("IPv6", func(b *testing.B) {
+		path := StridePath{0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01}
 		for b.Loop() {
-			_ = cidrFromPath(path, 1, true, 15)
-		}
-	})
-
-	b.Run("IPv4/depth2", func(b *testing.B) {
-		path := stridePath{10, 0, 1, 0}
-		for b.Loop() {
-			_ = cidrFromPath(path, 2, true, 127)
-		}
-	})
-
-	b.Run("IPv4/depth3", func(b *testing.B) {
-		path := stridePath{192, 168, 1, 100}
-		for b.Loop() {
-			_ = cidrFromPath(path, 3, true, 255)
-		}
-	})
-
-	// IPv6 benchmarks at different depths
-	b.Run("IPv6/depth0", func(b *testing.B) {
-		path := stridePath{0x20, 0x01, 0x0d, 0xb8}
-		for b.Loop() {
-			_ = cidrFromPath(path, 0, false, 3)
-		}
-	})
-
-	b.Run("IPv6/depth1", func(b *testing.B) {
-		path := stridePath{0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x00}
-		for b.Loop() {
-			_ = cidrFromPath(path, 1, false, 15)
-		}
-	})
-
-	b.Run("IPv6/depth7", func(b *testing.B) {
-		path := stridePath{0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x01}
-		for b.Loop() {
-			_ = cidrFromPath(path, 7, false, 255)
-		}
-	})
-
-	b.Run("IPv6/depth15", func(b *testing.B) {
-		path := stridePath{0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01}
-		for b.Loop() {
-			_ = cidrFromPath(path, 15, false, 255)
+			_ = CidrFromPath(path, 15, false, 255)
 		}
 	})
 }
 
 // Benchmarks for cidrForFringe
 func BenchmarkCidrForFringe(b *testing.B) {
-	// IPv4 benchmarks
-	b.Run("IPv4/depth0", func(b *testing.B) {
-		octets := []byte{10, 0, 0, 0}
-		for b.Loop() {
-			_ = cidrForFringe(octets, 0, true, 0)
-		}
-	})
-
-	b.Run("IPv4/depth1", func(b *testing.B) {
-		octets := []byte{192, 168, 0, 0}
-		for b.Loop() {
-			_ = cidrForFringe(octets, 1, true, 0)
-		}
-	})
-
-	b.Run("IPv4/depth2", func(b *testing.B) {
-		octets := []byte{10, 0, 1, 0}
-		for b.Loop() {
-			_ = cidrForFringe(octets, 2, true, 0)
-		}
-	})
-
-	b.Run("IPv4/depth3", func(b *testing.B) {
+	b.Run("IPv4", func(b *testing.B) {
 		octets := []byte{192, 168, 1, 100}
 		for b.Loop() {
-			_ = cidrForFringe(octets, 3, true, 0)
+			_ = CidrForFringe(octets, 3, true, 0)
 		}
 	})
 
-	// IPv6 benchmarks
-	b.Run("IPv6/depth0", func(b *testing.B) {
-		octets := []byte{0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
-		for b.Loop() {
-			_ = cidrForFringe(octets, 0, false, 0)
-		}
-	})
-
-	b.Run("IPv6/depth1", func(b *testing.B) {
-		octets := []byte{0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
-		for b.Loop() {
-			_ = cidrForFringe(octets, 1, false, 0)
-		}
-	})
-
-	b.Run("IPv6/depth7", func(b *testing.B) {
-		octets := []byte{0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
-		for b.Loop() {
-			_ = cidrForFringe(octets, 7, false, 0)
-		}
-	})
-
-	b.Run("IPv6/depth15", func(b *testing.B) {
+	b.Run("IPv6", func(b *testing.B) {
 		octets := []byte{0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01}
 		for b.Loop() {
-			_ = cidrForFringe(octets, 15, false, 0)
+			_ = CidrForFringe(octets, 15, false, 0)
 		}
 	})
 }
@@ -583,8 +503,8 @@ func TestIntegration(t *testing.T) {
 				octets[i] = uint8(i + 1) // some non-zero pattern
 			}
 
-			fringe := cidrForFringe(octets, tc.depth, tc.is4, 0)
-			if !isFringe(tc.depth, fringe) {
+			fringe := CidrForFringe(octets, tc.depth, tc.is4, 0)
+			if !IsFringe(tc.depth, fringe) {
 				t.Errorf("Prefix created by cidrForFringe at depth %d (is4=%t) should be detected as fringe: %v",
 					tc.depth, tc.is4, fringe)
 			}
@@ -601,8 +521,8 @@ func TestIntegration(t *testing.T) {
 			octet, pfxLen := art.IdxToPfx(idx)
 
 			// Verify that we can use this in cidrFromPath
-			var path stridePath
-			result := cidrFromPath(path, 0, true, idx)
+			var path StridePath
+			result := CidrFromPath(path, 0, true, idx)
 
 			// The prefix length should be pfxLen
 			if result.Bits() != int(pfxLen) {

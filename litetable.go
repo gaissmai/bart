@@ -10,6 +10,7 @@ import (
 
 	"github.com/gaissmai/bart/internal/art"
 	"github.com/gaissmai/bart/internal/lpm"
+	"github.com/gaissmai/bart/internal/nodes"
 )
 
 // Lite follows the BART design but with no payload.
@@ -369,8 +370,8 @@ type liteTable[V any] struct {
 	// used by -copylocks checker from `go vet`.
 	_ [0]sync.Mutex
 
-	root4 liteNode[V]
-	root6 liteNode[V]
+	root4 nodes.LiteNode[V]
+	root6 nodes.LiteNode[V]
 
 	// the number of prefixes in the routing table
 	size4 int
@@ -378,7 +379,7 @@ type liteTable[V any] struct {
 }
 
 // rootNodeByVersion, root node getter for ip version.
-func (l *liteTable[V]) rootNodeByVersion(is4 bool) *liteNode[V] {
+func (l *liteTable[V]) rootNodeByVersion(is4 bool) *nodes.LiteNode[V] {
 	if is4 {
 		return &l.root4
 	}
@@ -402,27 +403,27 @@ func (l *liteTable[V]) Contains(ip netip.Addr) bool {
 
 	for _, octet := range ip.AsSlice() {
 		// for contains, any lpm match is good enough, no backtracking needed
-		if n.prefixes.count != 0 && n.contains(art.OctetToIdx(octet)) {
+		if n.Prefixes.Count != 0 && n.Contains(art.OctetToIdx(octet)) {
 			return true
 		}
 
 		// stop traversing?
-		if !n.children.Test(octet) {
+		if !n.Children.Test(octet) {
 			return false
 		}
-		kid := n.mustGetChild(octet)
+		kid := n.MustGetChild(octet)
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
-		case *liteNode[V]:
+		case *nodes.LiteNode[V]:
 			n = kid // descend down to next trie level
 
-		case *fringeNode[V]:
+		case *nodes.FringeNode[V]:
 			// fringe is the default-route for all possible octets below
 			return true
 
-		case *leafNode[V]:
-			return kid.prefix.Contains(ip)
+		case *nodes.LeafNode[V]:
+			return kid.Prefix.Contains(ip)
 
 		default:
 			panic("logic error, wrong node type")
@@ -453,7 +454,7 @@ func (l *liteTable[V]) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpmPfx n
 	n := l.rootNodeByVersion(is4)
 
 	// record path to leaf node
-	stack := [maxTreeDepth]*liteNode[V]{}
+	stack := [maxTreeDepth]*nodes.LiteNode[V]{}
 
 	var depth int
 	var octet byte
@@ -472,25 +473,25 @@ LOOP:
 		stack[depth] = n
 
 		// go down in tight loop to leaf node
-		if !n.children.Test(octet) {
+		if !n.Children.Test(octet) {
 			break LOOP
 		}
-		kid := n.mustGetChild(octet)
+		kid := n.MustGetChild(octet)
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
-		case *liteNode[V]:
+		case *nodes.LiteNode[V]:
 			n = kid
 			continue LOOP // descend down to next trie level
 
-		case *leafNode[V]:
+		case *nodes.LeafNode[V]:
 			// reached a path compressed prefix, stop traversing
-			if kid.prefix.Bits() > bits || !kid.prefix.Contains(ip) {
+			if kid.Prefix.Bits() > bits || !kid.Prefix.Contains(ip) {
 				break LOOP
 			}
-			return kid.prefix, true
+			return kid.Prefix, true
 
-		case *fringeNode[V]:
+		case *nodes.FringeNode[V]:
 			// the bits of the fringe are defined by the depth
 			// maybe the LPM isn't needed, saves some cycles
 			fringeBits := (depth + 1) << 3
@@ -520,7 +521,7 @@ LOOP:
 		n = stack[depth]
 
 		// longest prefix match, skip if node has no prefixes
-		if n.prefixCount() == 0 {
+		if n.PrefixCount() == 0 {
 			continue
 		}
 
@@ -539,7 +540,7 @@ LOOP:
 
 		// manually inlined: lookupIdx(idx)
 		var topIdx uint8
-		if topIdx, ok = n.prefixes.IntersectionTop(&lpm.LookupTbl[idx]); ok {
+		if topIdx, ok = n.Prefixes.IntersectionTop(&lpm.LookupTbl[idx]); ok {
 			// called from LookupPrefix
 			if !withLPM {
 				return netip.Prefix{}, ok
