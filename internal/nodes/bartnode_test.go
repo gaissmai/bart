@@ -27,7 +27,7 @@ func workLoadN() int {
 
 func TestInverseIndex(t *testing.T) {
 	t.Parallel()
-	for i := range maxItems {
+	for i := range MaxItems {
 		for bits := range uint8(8) {
 			octet := byte(i & (0xFF << (strideLen - bits)))
 			idx := art.PfxToIdx(octet, bits)
@@ -56,7 +56,7 @@ func TestPrefixInsert(t *testing.T) {
 		fast.InsertPrefix(art.PfxToIdx(pfx.octet, pfx.bits), pfx.val)
 	}
 
-	for i := range maxItems {
+	for i := range MaxItems {
 		//nolint:gosec  // G115: integer overflow conversion int -> uint
 		octet := byte(i)
 		//nolint:gosec  // G115: integer overflow conversion int -> uint
@@ -93,7 +93,7 @@ func TestPrefixDelete(t *testing.T) {
 		t.Fatalf("goldNode has %d entries after deletes, want 50", cnt)
 	}
 
-	for i := range maxItems {
+	for i := range MaxItems {
 		//nolint:gosec  // G115: integer overflow conversion int -> uint
 		octet := byte(i)
 		//nolint:gosec  // G115: integer overflow conversion int -> uint
@@ -165,8 +165,8 @@ func TestOverlapsRoutes(t *testing.T) {
 }
 
 var (
-	prefixCount = []int{10, 20, 50, 100, 200, maxItems - 1}
-	childCount  = []int{10, 20, 50, 100, 200, maxItems - 1}
+	prefixCount = []int{10, 20, 50, 100, 200, MaxItems - 1}
+	childCount  = []int{10, 20, 50, 100, 200, MaxItems - 1}
 )
 
 func BenchmarkNodePrefixInsert(b *testing.B) {
@@ -281,12 +281,12 @@ func BenchmarkNodePrefixesAsSlice(b *testing.B) {
 		this := new(BartNode[any])
 
 		for range nPrefixes {
-			idx := byte(prng.IntN(maxItems))
+			idx := byte(prng.IntN(MaxItems))
 			this.InsertPrefix(idx, nil)
 		}
 
 		b.Run(fmt.Sprintf("Set %d", nPrefixes), func(b *testing.B) {
-			var buf [maxItems]uint8
+			var buf [MaxItems]uint8
 			for b.Loop() {
 				this.Prefixes.AsSlice(&buf)
 			}
@@ -300,7 +300,7 @@ func BenchmarkNodePrefixesAll(b *testing.B) {
 		this := new(BartNode[any])
 
 		for range nPrefixes {
-			idx := byte(prng.IntN(maxItems))
+			idx := byte(prng.IntN(MaxItems))
 			this.InsertPrefix(idx, nil)
 		}
 
@@ -320,13 +320,13 @@ func BenchmarkNodeChildInsert(b *testing.B) {
 
 		for range nchilds {
 			//nolint:gosec  // G115: integer overflow conversion int -> uint
-			octet := uint8(prng.IntN(maxItems))
+			octet := uint8(prng.IntN(MaxItems))
 			this.InsertChild(octet, nil)
 		}
 
 		b.Run(fmt.Sprintf("Into %d", nchilds), func(b *testing.B) {
 			//nolint:gosec  // G115: integer overflow conversion int -> uint
-			octet := uint8(prng.IntN(maxItems))
+			octet := uint8(prng.IntN(MaxItems))
 
 			for b.Loop() {
 				this.InsertChild(octet, nil)
@@ -342,13 +342,13 @@ func BenchmarkNodeChildDelete(b *testing.B) {
 
 		for range nchilds {
 			//nolint:gosec  // G115: integer overflow conversion int -> uint
-			octet := uint8(prng.IntN(maxItems))
+			octet := uint8(prng.IntN(MaxItems))
 			this.InsertChild(octet, nil)
 		}
 
 		b.Run(fmt.Sprintf("From %d", nchilds), func(b *testing.B) {
 			//nolint:gosec  // G115: integer overflow conversion int -> uint
-			octet := uint8(prng.IntN(maxItems))
+			octet := uint8(prng.IntN(MaxItems))
 
 			for b.Loop() {
 				this.DeleteChild(octet)
@@ -363,12 +363,12 @@ func BenchmarkNodeChildrenAsSlice(b *testing.B) {
 		this := new(BartNode[int])
 
 		for range nchilds {
-			octet := byte(prng.IntN(maxItems))
+			octet := byte(prng.IntN(MaxItems))
 			this.InsertChild(octet, nil)
 		}
 
 		b.Run(fmt.Sprintf("Set %d", nchilds), func(b *testing.B) {
-			var buf [maxItems]uint8
+			var buf [MaxItems]uint8
 			for b.Loop() {
 				this.Children.AsSlice(&buf)
 			}
@@ -382,7 +382,7 @@ func BenchmarkNodeChildrenAll(b *testing.B) {
 		this := new(BartNode[int])
 
 		for range nchilds {
-			octet := byte(prng.IntN(maxItems))
+			octet := byte(prng.IntN(MaxItems))
 			this.InsertChild(octet, nil)
 		}
 

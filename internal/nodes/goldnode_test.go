@@ -81,8 +81,8 @@ func (ta *goldNode[V]) overlaps(tb *goldNode[V]) bool {
 }
 
 func allNodePfxs() []goldNodeItem[int] {
-	ret := make([]goldNodeItem[int], 0, maxItems)
-	for idx := 1; idx < maxItems; idx++ {
+	ret := make([]goldNodeItem[int], 0, MaxItems)
+	for idx := 1; idx < MaxItems; idx++ {
 		//nolint:gosec // test-only: idx conversion is safe and deterministic
 		octet, bits := art.IdxToPfx(uint8(idx))
 		ret = append(ret, goldNodeItem[int]{octet, bits, idx})

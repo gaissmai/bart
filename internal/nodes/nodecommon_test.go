@@ -17,7 +17,7 @@ func TestCidrFromPath(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		path     stridePath
+		path     StridePath
 		depth    int
 		is4      bool
 		idx      uint8
@@ -26,7 +26,7 @@ func TestCidrFromPath(t *testing.T) {
 		// IPv4 test cases
 		{
 			name:     "IPv4 default route /0",
-			path:     stridePath{},
+			path:     StridePath{},
 			depth:    0,
 			is4:      true,
 			idx:      1, // art.IdxToPfx(1) = (0, 0) -> 0.0.0.0/0
@@ -34,7 +34,7 @@ func TestCidrFromPath(t *testing.T) {
 		},
 		{
 			name:     "IPv4 /1 prefix 1xxxxxxx",
-			path:     stridePath{},
+			path:     StridePath{},
 			depth:    0,
 			is4:      true,
 			idx:      3, // art.IdxToPfx(3) = (128, 1) -> 128.0.0.0/1
@@ -42,7 +42,7 @@ func TestCidrFromPath(t *testing.T) {
 		},
 		{
 			name:     "IPv4 at depth 1",
-			path:     stridePath{192, 168, 0, 0},
+			path:     StridePath{192, 168, 0, 0},
 			depth:    1,
 			is4:      true,
 			idx:      3, // art.IdxToPfx(3) = (128, 1) -> 192.128.0.0/9
@@ -50,7 +50,7 @@ func TestCidrFromPath(t *testing.T) {
 		},
 		{
 			name:     "IPv4 at depth 2",
-			path:     stridePath{10, 0, 1, 0},
+			path:     StridePath{10, 0, 1, 0},
 			depth:    2,
 			is4:      true,
 			idx:      15, // art.IdxToPfx(15) = (224, 3) -> 10.0.224.0/19
@@ -60,7 +60,7 @@ func TestCidrFromPath(t *testing.T) {
 		// IPv6 test cases - KORRIGIERT
 		{
 			name:     "IPv6 default route /0",
-			path:     stridePath{},
+			path:     StridePath{},
 			depth:    0,
 			is4:      false,
 			idx:      1, // art.IdxToPfx(1) = (0, 0) -> ::/0
@@ -68,7 +68,7 @@ func TestCidrFromPath(t *testing.T) {
 		},
 		{
 			name:     "IPv6 at depth 1",
-			path:     stridePath{0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x00},
+			path:     StridePath{0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x00},
 			depth:    1,
 			is4:      false,
 			idx:      63, // art.IdxToPfx(63) = (248, 5) -> path[1]=0xf8 -> 20f8::/13
@@ -76,7 +76,7 @@ func TestCidrFromPath(t *testing.T) {
 		},
 		{
 			name:     "IPv6 at depth 7",
-			path:     stridePath{0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x01},
+			path:     StridePath{0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x01},
 			depth:    7,
 			is4:      false,
 			idx:      127, // art.IdxToPfx(127) = (252, 6) -> path[7]=0xfc -> 2001:db8:0:fc::/62
@@ -84,7 +84,7 @@ func TestCidrFromPath(t *testing.T) {
 		},
 		{
 			name:     "IPv6 at depth 15",
-			path:     stridePath{0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},
+			path:     StridePath{0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},
 			depth:    15,
 			is4:      false,
 			idx:      255, // art.IdxToPfx(255) = (254, 7) -> path[15]=0xfe -> 2001:db8:0:1::fe/127
@@ -306,7 +306,7 @@ func TestCidrFromPathEdgeCases(t *testing.T) {
 	t.Run("IPv4 depth masking", func(t *testing.T) {
 		t.Parallel()
 		// Test that depth masking works correctly (depth & depthMask)
-		path := stridePath{192, 168, 1, 0}
+		path := StridePath{192, 168, 1, 0}
 		// depth 32 should be masked to 0 (32 & 15 = 0)
 		result := CidrFromPath(path, 32, true, 3) // idx 3 = (128, 1)
 		expected := "128.0.0.0/1"                 // depth masked to 0, overwrites path[0] with 128
@@ -317,7 +317,7 @@ func TestCidrFromPathEdgeCases(t *testing.T) {
 
 	t.Run("IPv6 depth masking", func(t *testing.T) {
 		t.Parallel()
-		path := stridePath{0x20, 0x01, 0x0d, 0xb8}
+		path := StridePath{0x20, 0x01, 0x0d, 0xb8}
 		// depth 48 should be masked to 0 (48 & 15 = 0)
 		result := CidrFromPath(path, 48, false, 7) // idx 7 = (192, 2)
 		expected := "c000::/2"                     // depth masked to 0, overwrites path[0] with 192
@@ -328,7 +328,7 @@ func TestCidrFromPathEdgeCases(t *testing.T) {
 
 	t.Run("Zero path", func(t *testing.T) {
 		t.Parallel()
-		var path stridePath // all zeros
+		var path StridePath // all zeros
 		result := CidrFromPath(path, 0, true, 1)
 		expected := "0.0.0.0/0"
 		if result.String() != expected {
@@ -339,7 +339,7 @@ func TestCidrFromPathEdgeCases(t *testing.T) {
 	t.Run("Path canonicalization", func(t *testing.T) {
 		t.Parallel()
 		// Test that bytes after depth are cleared
-		path := stridePath{10, 20, 30, 40, 50, 60, 70, 80, 90}
+		path := StridePath{10, 20, 30, 40, 50, 60, 70, 80, 90}
 		result := CidrFromPath(path, 2, true, 15) // depth 2, idx 15 = (224, 3)
 		// Should result in 10.20.224.0/19 (depth*8 + 3 bits from idx 15)
 		expected := "10.20.224.0/19"
@@ -428,7 +428,7 @@ func TestARTIndexSpecialCases(t *testing.T) {
 			}
 
 			// Test in cidrFromPath
-			var path stridePath
+			var path StridePath
 			result := CidrFromPath(path, 0, true, test.idx)
 			expectedBits := int(test.expectedBits)
 			if result.Bits() != expectedBits {
@@ -443,28 +443,28 @@ func TestARTIndexSpecialCases(t *testing.T) {
 func BenchmarkCidrFromPath(b *testing.B) {
 	// IPv4 benchmarks at different depths
 	b.Run("IPv4/depth0", func(b *testing.B) {
-		path := stridePath{10, 0, 0, 0}
+		path := StridePath{10, 0, 0, 0}
 		for b.Loop() {
 			_ = CidrFromPath(path, 0, true, 3)
 		}
 	})
 
 	b.Run("IPv4/depth1", func(b *testing.B) {
-		path := stridePath{192, 168, 0, 0}
+		path := StridePath{192, 168, 0, 0}
 		for b.Loop() {
 			_ = CidrFromPath(path, 1, true, 15)
 		}
 	})
 
 	b.Run("IPv4/depth2", func(b *testing.B) {
-		path := stridePath{10, 0, 1, 0}
+		path := StridePath{10, 0, 1, 0}
 		for b.Loop() {
 			_ = CidrFromPath(path, 2, true, 127)
 		}
 	})
 
 	b.Run("IPv4/depth3", func(b *testing.B) {
-		path := stridePath{192, 168, 1, 100}
+		path := StridePath{192, 168, 1, 100}
 		for b.Loop() {
 			_ = CidrFromPath(path, 3, true, 255)
 		}
@@ -472,28 +472,28 @@ func BenchmarkCidrFromPath(b *testing.B) {
 
 	// IPv6 benchmarks at different depths
 	b.Run("IPv6/depth0", func(b *testing.B) {
-		path := stridePath{0x20, 0x01, 0x0d, 0xb8}
+		path := StridePath{0x20, 0x01, 0x0d, 0xb8}
 		for b.Loop() {
 			_ = CidrFromPath(path, 0, false, 3)
 		}
 	})
 
 	b.Run("IPv6/depth1", func(b *testing.B) {
-		path := stridePath{0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x00}
+		path := StridePath{0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x00}
 		for b.Loop() {
 			_ = CidrFromPath(path, 1, false, 15)
 		}
 	})
 
 	b.Run("IPv6/depth7", func(b *testing.B) {
-		path := stridePath{0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x01}
+		path := StridePath{0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x01}
 		for b.Loop() {
 			_ = CidrFromPath(path, 7, false, 255)
 		}
 	})
 
 	b.Run("IPv6/depth15", func(b *testing.B) {
-		path := stridePath{0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01}
+		path := StridePath{0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01}
 		for b.Loop() {
 			_ = CidrFromPath(path, 15, false, 255)
 		}
@@ -601,7 +601,7 @@ func TestIntegration(t *testing.T) {
 			octet, pfxLen := art.IdxToPfx(idx)
 
 			// Verify that we can use this in cidrFromPath
-			var path stridePath
+			var path StridePath
 			result := CidrFromPath(path, 0, true, idx)
 
 			// The prefix length should be pfxLen

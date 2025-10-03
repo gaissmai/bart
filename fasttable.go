@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/gaissmai/bart/internal/art"
+	"github.com/gaissmai/bart/internal/nodes"
 )
 
 // Fast follows the ART design by Knuth in using fixed arrays at each level
@@ -30,8 +31,8 @@ type Fast[V any] struct {
 	_ [0]sync.Mutex
 
 	// the root nodes are fast nodes with fixed size arrays
-	root4 fastNode[V]
-	root6 fastNode[V]
+	root4 nodes.FastNode[V]
+	root6 nodes.FastNode[V]
 
 	// the number of prefixes in the routing table
 	size4 int
@@ -39,7 +40,7 @@ type Fast[V any] struct {
 }
 
 // rootNodeByVersion, root node getter for ip version and trie levels.
-func (f *Fast[V]) rootNodeByVersion(is4 bool) *fastNode[V] {
+func (f *Fast[V]) rootNodeByVersion(is4 bool) *nodes.FastNode[V] {
 	if is4 {
 		return &f.root4
 	}
@@ -62,11 +63,11 @@ func (f *Fast[V]) Contains(ip netip.Addr) bool {
 	n := f.rootNodeByVersion(is4)
 
 	for _, octet := range ip.AsSlice() {
-		if n.contains(art.OctetToIdx(octet)) {
+		if n.Contains(art.OctetToIdx(octet)) {
 			return true
 		}
 
-		kidAny, exists := n.getChild(octet)
+		kidAny, exists := n.GetChild(octet)
 		if !exists {
 			// no next node
 			return false
@@ -74,17 +75,17 @@ func (f *Fast[V]) Contains(ip netip.Addr) bool {
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kidAny.(type) {
-		case *fastNode[V]:
+		case *nodes.FastNode[V]:
 			n = kid // continue
 
-		case *fringeNode[V]:
+		case *nodes.FringeNode[V]:
 			// fringe is the default-route for all possible octets below
 			return true
 
-		case *leafNode[V]:
+		case *nodes.LeafNode[V]:
 			// due to path compression, the octet path between
 			// leaf and prefix may diverge
-			return kid.prefix.Contains(ip)
+			return kid.Prefix.Contains(ip)
 
 		default:
 			panic("logic error, wrong node type")
@@ -111,13 +112,13 @@ func (f *Fast[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	n := f.rootNodeByVersion(is4)
 
 	for _, octet := range ip.AsSlice() {
-		// save the current best LPM val, lookup is cheap for fastNode
-		if bestLPM, ok2 := n.lookup(art.OctetToIdx(octet)); ok2 {
+		// save the current best LPM val, lookup is cheap for nodes.FastNode
+		if bestLPM, ok2 := n.Lookup(art.OctetToIdx(octet)); ok2 {
 			val = bestLPM
 			ok = ok2
 		}
 
-		kidAny, exists := n.getChild(octet)
+		kidAny, exists := n.GetChild(octet)
 		if !exists {
 			// no next node
 			return val, ok
@@ -125,18 +126,18 @@ func (f *Fast[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 
 		// next kid is fast, fringe or leaf node.
 		switch kid := kidAny.(type) {
-		case *fastNode[V]:
+		case *nodes.FastNode[V]:
 			n = kid
 
-		case *fringeNode[V]:
+		case *nodes.FringeNode[V]:
 			// fringe is the default-route for all possible nodes below
-			return kid.value, true
+			return kid.Value, true
 
-		case *leafNode[V]:
+		case *nodes.LeafNode[V]:
 			// due to path compression, the octet path between
 			// leaf and prefix may diverge
-			if kid.prefix.Contains(ip) {
-				return kid.value, true
+			if kid.Prefix.Contains(ip) {
+				return kid.Value, true
 			}
 			// maybe there is a current best value from upper levels
 			return val, ok
@@ -191,12 +192,12 @@ func (f *Fast[V]) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpmPfx netip.
 	bits := pfx.Bits()
 	is4 := ip.Is4()
 	octets := ip.AsSlice()
-	lastOctetPlusOne, lastBits := lastOctetPlusOneAndLastBits(pfx)
+	lastOctetPlusOne, lastBits := LastOctetPlusOneAndLastBits(pfx)
 
 	n := f.rootNodeByVersion(is4)
 
 	// record path to leaf node
-	stack := [maxTreeDepth]*fastNode[V]{}
+	stack := [maxTreeDepth]*nodes.FastNode[V]{}
 
 	var depth int
 	var octet byte
@@ -215,25 +216,25 @@ LOOP:
 		stack[depth] = n
 
 		// go down in tight loop to leaf node
-		kidAny, exists := n.getChild(octet)
+		kidAny, exists := n.GetChild(octet)
 		if !exists {
 			break LOOP
 		}
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kidAny.(type) {
-		case *fastNode[V]:
+		case *nodes.FastNode[V]:
 			n = kid
 			continue LOOP // descend down to next trie level
 
-		case *leafNode[V]:
+		case *nodes.LeafNode[V]:
 			// reached a path compressed prefix, stop traversing
-			if kid.prefix.Bits() > bits || !kid.prefix.Contains(ip) {
+			if kid.Prefix.Bits() > bits || !kid.Prefix.Contains(ip) {
 				break LOOP
 			}
-			return kid.prefix, kid.value, true
+			return kid.Prefix, kid.Value, true
 
-		case *fringeNode[V]:
+		case *nodes.FringeNode[V]:
 			// the bits of the fringe are defined by the depth
 			// maybe the LPM isn't needed, saves some cycles
 			fringeBits := (depth + 1) << 3
@@ -243,13 +244,13 @@ LOOP:
 
 			// the LPM isn't needed, saves some cycles
 			if !withLPM {
-				return netip.Prefix{}, kid.value, true
+				return netip.Prefix{}, kid.Value, true
 			}
 
 			// get the LPM prefix back from ip and depth
 			// it's a fringe, bits are always /8, /16, /24, ...
 			fringePfx, _ := ip.Prefix((depth + 1) << 3)
-			return fringePfx, kid.value, true
+			return fringePfx, kid.Value, true
 
 		default:
 			panic("logic error, wrong node type")
@@ -263,7 +264,7 @@ LOOP:
 		n = stack[depth]
 
 		// longest prefix match, skip if node has no prefixes
-		if n.pfxCount == 0 {
+		if n.PfxCount == 0 {
 			continue
 		}
 
@@ -282,12 +283,12 @@ LOOP:
 
 		switch withLPM {
 		case false: // LookupPrefix
-			if val, ok = n.lookup(idx); ok {
+			if val, ok = n.Lookup(idx); ok {
 				return netip.Prefix{}, val, ok
 			}
 
 		case true: // LookupPrefixLPM
-			if lpmIdx, val2, ok2 := n.lookupIdx(idx); ok2 {
+			if lpmIdx, val2, ok2 := n.LookupIdx(idx); ok2 {
 				// get the bits from depth and lpmIdx
 				pfxBits := int(art.PfxBits(depth, lpmIdx))
 

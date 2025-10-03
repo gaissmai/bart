@@ -66,27 +66,27 @@ func (t *Table[V]) Contains(ip netip.Addr) bool {
 
 	for _, octet := range ip.AsSlice() {
 		// for contains, any lpm match is good enough, no backtracking needed
-		if n.prefixCount() != 0 && n.contains(art.OctetToIdx(octet)) {
+		if n.PrefixCount() != 0 && n.Contains(art.OctetToIdx(octet)) {
 			return true
 		}
 
 		// stop traversing?
-		if !n.children.Test(octet) {
+		if !n.Children.Test(octet) {
 			return false
 		}
-		kid := n.mustGetChild(octet)
+		kid := n.MustGetChild(octet)
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
-		case *bartNode[V]:
+		case *nodes.BartNode[V]:
 			n = kid // descend down to next trie level
 
-		case *fringeNode[V]:
+		case *nodes.FringeNode[V]:
 			// fringe is the default-route for all possible octets below
 			return true
 
-		case *leafNode[V]:
-			return kid.prefix.Contains(ip)
+		case *nodes.LeafNode[V]:
+			return kid.Prefix.Contains(ip)
 
 		default:
 			panic("logic error, wrong node type")
@@ -116,7 +116,7 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	n := t.rootNodeByVersion(is4)
 
 	// stack of the traversed nodes for fast backtracking, if needed
-	stack := [maxTreeDepth]*bartNode[V]{}
+	stack := [maxTreeDepth]*nodes.BartNode[V]{}
 
 	// run variable, used after for loop
 	var depth int
@@ -131,25 +131,25 @@ LOOP:
 		stack[depth] = n
 
 		// go down in tight loop to last octet
-		if !n.children.Test(octet) {
+		if !n.Children.Test(octet) {
 			// no more nodes below octet
 			break LOOP
 		}
-		kid := n.mustGetChild(octet)
+		kid := n.MustGetChild(octet)
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
-		case *bartNode[V]:
+		case *nodes.BartNode[V]:
 			n = kid
 			continue LOOP // descend down to next trie level
 
-		case *fringeNode[V]:
+		case *nodes.FringeNode[V]:
 			// fringe is the default-route for all possible nodes below
-			return kid.value, true
+			return kid.Value, true
 
-		case *leafNode[V]:
-			if kid.prefix.Contains(ip) {
-				return kid.value, true
+		case *nodes.LeafNode[V]:
+			if kid.Prefix.Contains(ip) {
+				return kid.Value, true
 			}
 			// reached a path compressed prefix, stop traversing
 			break LOOP
@@ -166,11 +166,11 @@ LOOP:
 		n = stack[depth]
 
 		// longest prefix match, skip if node has no prefixes
-		if n.prefixCount() != 0 {
+		if n.PrefixCount() != 0 {
 			idx := art.OctetToIdx(octets[depth])
 			// lookupIdx() manually inlined
-			if lpmIdx, ok2 := n.prefixes.IntersectionTop(&lpm.LookupTbl[idx]); ok2 {
-				return n.mustGetPrefix(lpmIdx), ok2
+			if lpmIdx, ok2 := n.Prefixes.IntersectionTop(&lpm.LookupTbl[idx]); ok2 {
+				return n.MustGetPrefix(lpmIdx), ok2
 			}
 		}
 	}
@@ -220,12 +220,12 @@ func (t *Table[V]) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpmPfx netip
 	bits := pfx.Bits()
 	is4 := ip.Is4()
 	octets := ip.AsSlice()
-	lastOctetPlusOne, lastBits := lastOctetPlusOneAndLastBits(pfx)
+	lastOctetPlusOne, lastBits := LastOctetPlusOneAndLastBits(pfx)
 
 	n := t.rootNodeByVersion(is4)
 
 	// record path to leaf node
-	stack := [maxTreeDepth]*bartNode[V]{}
+	stack := [maxTreeDepth]*nodes.BartNode[V]{}
 
 	var depth int
 	var octet byte
@@ -244,25 +244,25 @@ LOOP:
 		stack[depth] = n
 
 		// go down in tight loop to leaf node
-		if !n.children.Test(octet) {
+		if !n.Children.Test(octet) {
 			break LOOP
 		}
-		kid := n.mustGetChild(octet)
+		kid := n.MustGetChild(octet)
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
-		case *bartNode[V]:
+		case *nodes.BartNode[V]:
 			n = kid
 			continue LOOP // descend down to next trie level
 
-		case *leafNode[V]:
+		case *nodes.LeafNode[V]:
 			// reached a path compressed prefix, stop traversing
-			if kid.prefix.Bits() > bits || !kid.prefix.Contains(ip) {
+			if kid.Prefix.Bits() > bits || !kid.Prefix.Contains(ip) {
 				break LOOP
 			}
-			return kid.prefix, kid.value, true
+			return kid.Prefix, kid.Value, true
 
-		case *fringeNode[V]:
+		case *nodes.FringeNode[V]:
 			// the bits of the fringe are defined by the depth
 			// maybe the LPM isn't needed, saves some cycles
 			fringeBits := (depth + 1) << 3
@@ -272,13 +272,13 @@ LOOP:
 
 			// the LPM isn't needed, saves some cycles
 			if !withLPM {
-				return netip.Prefix{}, kid.value, true
+				return netip.Prefix{}, kid.Value, true
 			}
 
 			// get the LPM prefix back from ip and depth
 			// it's a fringe, bits are always /8, /16, /24, ...
 			fringePfx, _ := ip.Prefix((depth + 1) << 3)
-			return fringePfx, kid.value, true
+			return fringePfx, kid.Value, true
 
 		default:
 			panic("logic error, wrong node type")
@@ -292,7 +292,7 @@ LOOP:
 		n = stack[depth]
 
 		// longest prefix match, skip if node has no prefixes
-		if n.prefixes.Len() == 0 {
+		if n.Prefixes.Len() == 0 {
 			continue
 		}
 
@@ -311,8 +311,8 @@ LOOP:
 
 		// manually inlined: lookupIdx(idx)
 		var topIdx uint8
-		if topIdx, ok = n.prefixes.IntersectionTop(&lpm.LookupTbl[idx]); ok {
-			val = n.mustGetPrefix(topIdx)
+		if topIdx, ok = n.Prefixes.IntersectionTop(&lpm.LookupTbl[idx]); ok {
+			val = n.MustGetPrefix(topIdx)
 
 			// called from LookupPrefix
 			if !withLPM {

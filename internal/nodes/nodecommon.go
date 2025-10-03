@@ -15,19 +15,19 @@ import (
 // Each stride processes 8 bits (1 byte) at a time.
 const strideLen = 8
 
-// maxItems defines the maximum number of prefixes or children that can be stored in a single node.
+// MaxItems defines the maximum number of prefixes or children that can be stored in a single node.
 // This corresponds to 256 possible values for an 8-bit stride.
-const maxItems = 256
+const MaxItems = 256
 
-// maxTreeDepth represents the maximum depth of the trie structure.
+// MaxTreeDepth represents the maximum depth of the trie structure.
 // For IPv6 addresses, this allows up to 16 bytes of depth.
-const maxTreeDepth = 16
+const MaxTreeDepth = 16
 
-// depthMask is used for bounds check elimination (BCE) when accessing depth-indexed arrays.
-const depthMask = maxTreeDepth - 1
+// DepthMask is used for bounds check elimination (BCE) when accessing depth-indexed arrays.
+const DepthMask = MaxTreeDepth - 1
 
-// stridePath represents a path through the trie, with a maximum depth of 16 octets for IPv6.
-type stridePath [maxTreeDepth]uint8
+// StridePath represents a path through the trie, with a maximum depth of 16 octets for IPv6.
+type StridePath [MaxTreeDepth]uint8
 
 // LeafNode represents a path-compressed routing entry that stores both prefix and value.
 // Leaf nodes are used when a prefix doesn't align with trie stride boundaries
@@ -113,8 +113,8 @@ func CmpIndexRank(aIdx, bIdx uint8) int {
 //   - idx: The base index from the prefix table
 //
 // Returns the reconstructed netip.Prefix.
-func CidrFromPath(path stridePath, depth int, is4 bool, idx uint8) netip.Prefix {
-	depth = depth & depthMask // BCE
+func CidrFromPath(path StridePath, depth int, is4 bool, idx uint8) netip.Prefix {
+	depth = depth & DepthMask // BCE
 
 	// retrieve the last octet and pfxLen
 	octet, pfxLen := art.IdxToPfx(idx)
@@ -153,9 +153,9 @@ func CidrFromPath(path stridePath, depth int, is4 bool, idx uint8) netip.Prefix 
 //
 // Returns the reconstructed netip.Prefix for the fringe.
 func CidrForFringe(octets []byte, depth int, is4 bool, lastOctet uint8) netip.Prefix {
-	depth = depth & depthMask // BCE
+	depth = depth & DepthMask // BCE
 
-	var path stridePath
+	var path StridePath
 	copy(path[:], octets)
 	path[depth] = lastOctet
 

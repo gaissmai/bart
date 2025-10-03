@@ -1,7 +1,7 @@
 // Copyright (c) 2025 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
-package bart
+package nodes
 
 import (
 	"fmt"
@@ -20,7 +20,7 @@ const (
 	stopNode                 // no children, only prefixes or path-compressed prefixes
 )
 
-// dumpRec recursively descends the trie rooted at n and writes a human-readable
+// DumpRec recursively descends the trie rooted at n and writes a human-readable
 // representation of each visited node to w.
 //
 // It returns immediately if n is nil or empty. For each visited internal node
@@ -29,8 +29,8 @@ const (
 // subnodes). The path slice and depth together represent the byte-wise path
 // from the root to the current node; depth is incremented for each recursion.
 // The is4 flag controls IPv4/IPv6 formatting used by dump.
-func dumpRec[V any](n nodeReader[V], w io.Writer, path stridePath, depth int, is4 bool, printVals bool) {
-	if n == nil || n.isEmpty() {
+func DumpRec[V any](n NodeReader[V], w io.Writer, path StridePath, depth int, is4 bool, printVals bool) {
+	if n == nil || n.IsEmpty() {
 		return
 	}
 
@@ -38,10 +38,10 @@ func dumpRec[V any](n nodeReader[V], w io.Writer, path stridePath, depth int, is
 	dump(n, w, path, depth, is4, printVals)
 
 	// node may have children, rec-descent down
-	for addr, child := range n.allChildren() {
-		if kid, ok := child.(nodeReader[V]); ok {
+	for addr, child := range n.AllChildren() {
+		if kid, ok := child.(NodeReader[V]); ok {
 			path[depth] = addr
-			dumpRec(kid, w, path, depth+1, is4, printVals)
+			DumpRec(kid, w, path, depth+1, is4, printVals)
 		}
 	}
 }
@@ -51,7 +51,7 @@ func dumpRec[V any](n nodeReader[V], w io.Writer, path stridePath, depth int, is
 // and bit count, followed by any stored prefixes (and their values when applicable),
 // the set of child octets, and any path-compressed leaves or fringe entries.
 // `path` and `depth` determine how prefixes and fringe CIDRs are rendered.
-func dump[V any](n nodeReader[V], w io.Writer, path stridePath, depth int, is4 bool, printVals bool) {
+func dump[V any](n NodeReader[V], w io.Writer, path StridePath, depth int, is4 bool, printVals bool) {
 	bits := depth * strideLen
 	indent := strings.Repeat(".", depth)
 
@@ -59,9 +59,9 @@ func dump[V any](n nodeReader[V], w io.Writer, path stridePath, depth int, is4 b
 	fmt.Fprintf(w, "\n%s[%s] depth:  %d path: [%s] / %d\n",
 		indent, hasType(n), depth, ipStridePath(path, depth, is4), bits)
 
-	if nPfxCount := n.prefixCount(); nPfxCount != 0 {
+	if nPfxCount := n.PrefixCount(); nPfxCount != 0 {
 		var buf [256]uint8
-		allIndices := n.getIndices(&buf)
+		allIndices := n.GetIndices(&buf)
 
 		// print the baseIndices for this node.
 		fmt.Fprintf(w, "%sindexs(#%d): %v\n", indent, nPfxCount, allIndices)
@@ -70,7 +70,7 @@ func dump[V any](n nodeReader[V], w io.Writer, path stridePath, depth int, is4 b
 		fmt.Fprintf(w, "%sprefxs(#%d):", indent, nPfxCount)
 
 		for _, idx := range allIndices {
-			pfx := cidrFromPath(path, depth, is4, idx)
+			pfx := CidrFromPath(path, depth, is4, idx)
 			fmt.Fprintf(w, " %s", pfx)
 		}
 
@@ -83,7 +83,7 @@ func dump[V any](n nodeReader[V], w io.Writer, path stridePath, depth int, is4 b
 			fmt.Fprintf(w, "%svalues(#%d):", indent, nPfxCount)
 
 			for _, idx := range allIndices {
-				val := n.mustGetPrefix(idx)
+				val := n.MustGetPrefix(idx)
 				fmt.Fprintf(w, " %#v", val)
 			}
 
@@ -91,25 +91,25 @@ func dump[V any](n nodeReader[V], w io.Writer, path stridePath, depth int, is4 b
 		}
 	}
 
-	if n.childCount() != 0 {
-		allAddrs := make([]uint8, 0, maxItems)
-		childAddrs := make([]uint8, 0, maxItems)
-		leafAddrs := make([]uint8, 0, maxItems)
-		fringeAddrs := make([]uint8, 0, maxItems)
+	if n.ChildCount() != 0 {
+		allAddrs := make([]uint8, 0, MaxItems)
+		childAddrs := make([]uint8, 0, MaxItems)
+		leafAddrs := make([]uint8, 0, MaxItems)
+		fringeAddrs := make([]uint8, 0, MaxItems)
 
 		// the node has recursive child nodes or path-compressed leaves
-		for addr, child := range n.allChildren() {
+		for addr, child := range n.AllChildren() {
 			allAddrs = append(allAddrs, addr)
 
 			switch child.(type) {
-			case nodeReader[V]:
+			case NodeReader[V]:
 				childAddrs = append(childAddrs, addr)
 				continue
 
-			case *fringeNode[V]:
+			case *FringeNode[V]:
 				fringeAddrs = append(fringeAddrs, addr)
 
-			case *leafNode[V]:
+			case *LeafNode[V]:
 				leafAddrs = append(leafAddrs, addr)
 
 			default:
@@ -125,11 +125,11 @@ func dump[V any](n nodeReader[V], w io.Writer, path stridePath, depth int, is4 b
 			fmt.Fprintf(w, "%sleaves(#%d):", indent, leafCount)
 
 			for _, addr := range leafAddrs {
-				kid := n.mustGetChild(addr).(*leafNode[V])
+				kid := n.MustGetChild(addr).(*LeafNode[V])
 				if printVals {
-					fmt.Fprintf(w, " %s:{%s, %v}", addrFmt(addr, is4), kid.prefix, kid.value)
+					fmt.Fprintf(w, " %s:{%s, %v}", addrFmt(addr, is4), kid.Prefix, kid.Value)
 				} else {
-					fmt.Fprintf(w, " %s:{%s}", addrFmt(addr, is4), kid.prefix)
+					fmt.Fprintf(w, " %s:{%s}", addrFmt(addr, is4), kid.Prefix)
 				}
 			}
 
@@ -141,11 +141,11 @@ func dump[V any](n nodeReader[V], w io.Writer, path stridePath, depth int, is4 b
 			fmt.Fprintf(w, "%sfringe(#%d):", indent, fringeCount)
 
 			for _, addr := range fringeAddrs {
-				fringePfx := cidrForFringe(path[:], depth, is4, addr)
+				fringePfx := CidrForFringe(path[:], depth, is4, addr)
 
-				kid := n.mustGetChild(addr).(*fringeNode[V])
+				kid := n.MustGetChild(addr).(*FringeNode[V])
 				if printVals {
-					fmt.Fprintf(w, " %s:{%s, %v}", addrFmt(addr, is4), fringePfx, kid.value)
+					fmt.Fprintf(w, " %s:{%s, %v}", addrFmt(addr, is4), fringePfx, kid.Value)
 				} else {
 					fmt.Fprintf(w, " %s:{%s}", addrFmt(addr, is4), fringePfx)
 				}
@@ -180,24 +180,24 @@ func dump[V any](n nodeReader[V], w io.Writer, path stridePath, depth int, is4 b
 //   - pathNode: has subnodes only (no prefixes, leaves, or fringes)
 //
 // The order of these checks is significant to ensure the correct classification.
-func hasType[V any](n nodeReader[V]) nodeType {
-	s := nodeStats[V](n)
+func hasType[V any](n NodeReader[V]) nodeType {
+	s := NodeStats[V](n)
 
 	// the order is important
 	switch {
-	case s.pfxs == 0 && s.childs == 0:
+	case s.Pfxs == 0 && s.Childs == 0:
 		return nullNode
-	case s.nodes == 0:
+	case s.Nodes == 0:
 		return stopNode
-	case (s.leaves > 0 || s.fringes > 0) && s.nodes > 0 && s.pfxs == 0:
+	case (s.Leaves > 0 || s.Fringes > 0) && s.Nodes > 0 && s.Pfxs == 0:
 		return halfNode
-	case (s.pfxs > 0 || s.leaves > 0 || s.fringes > 0) && s.nodes > 0:
+	case (s.Pfxs > 0 || s.Leaves > 0 || s.Fringes > 0) && s.Nodes > 0:
 		return fullNode
-	case (s.pfxs == 0 && s.leaves == 0 && s.fringes == 0) && s.nodes > 0:
+	case (s.Pfxs == 0 && s.Leaves == 0 && s.Fringes == 0) && s.Nodes > 0:
 		return pathNode
 	default:
 		panic(fmt.Sprintf("UNREACHABLE: pfx: %d, chld: %d, node: %d, leaf: %d, fringe: %d",
-			s.pfxs, s.childs, s.nodes, s.leaves, s.fringes))
+			s.Pfxs, s.Childs, s.Nodes, s.Leaves, s.Fringes))
 	}
 }
 
@@ -214,7 +214,7 @@ func addrFmt(addr byte, is4 bool) string {
 //
 //	127.0.0
 //	2001:0d
-func ipStridePath(path stridePath, depth int, is4 bool) string {
+func ipStridePath(path StridePath, depth int, is4 bool) string {
 	buf := new(strings.Builder)
 
 	if is4 {
@@ -258,35 +258,35 @@ func (nt nodeType) String() string {
 	}
 }
 
-// statsT, only used for dump, tests and benchmarks
-type statsT struct {
-	pfxs    int
-	childs  int
-	nodes   int
-	leaves  int
-	fringes int
+// StatsT, only used for dump, tests and benchmarks
+type StatsT struct {
+	Pfxs    int
+	Childs  int
+	Nodes   int
+	Leaves  int
+	Fringes int
 }
 
-// nodeStats returns immediate statistics for n: counts of prefixes and children,
+// NodeStats returns immediate statistics for n: counts of prefixes and children,
 // and a classification of each child into nodes, leaves, or fringes.
 // It inspects only the direct children of n (not the whole subtree).
 // Panics if a child has an unexpected concrete type.
-func nodeStats[V any](n nodeReader[V]) statsT {
-	var s statsT
+func NodeStats[V any](n NodeReader[V]) StatsT {
+	var s StatsT
 
-	s.pfxs = n.prefixCount()
-	s.childs = n.childCount()
+	s.Pfxs = n.PrefixCount()
+	s.Childs = n.ChildCount()
 
-	for _, child := range n.allChildren() {
+	for _, child := range n.AllChildren() {
 		switch child.(type) {
-		case nodeReader[V]:
-			s.nodes++
+		case NodeReader[V]:
+			s.Nodes++
 
-		case *fringeNode[V]:
-			s.fringes++
+		case *FringeNode[V]:
+			s.Fringes++
 
-		case *leafNode[V]:
-			s.leaves++
+		case *LeafNode[V]:
+			s.Leaves++
 
 		default:
 			panic("logic error, wrong node type")
@@ -296,42 +296,42 @@ func nodeStats[V any](n nodeReader[V]) statsT {
 	return s
 }
 
-// nodeStatsRec returns aggregated statistics for the subtree rooted at n.
+// StatsRec returns aggregated statistics for the subtree rooted at n.
 //
 // It walks the node tree recursively and sums immediate counts (prefixes and
 // child slots) plus the number of nodes, leaves, and fringe nodes in the
 // subtree. If n is nil or empty, a zeroed stats is returned. The returned
 // stats.nodes includes the current node. The function will panic if a child
 // has an unexpected concrete type.
-func nodeStatsRec[V any](n nodeReader[V]) statsT {
-	var s statsT
-	if n == nil || n.isEmpty() {
+func StatsRec[V any](n NodeReader[V]) StatsT {
+	var s StatsT
+	if n == nil || n.IsEmpty() {
 		return s
 	}
 
-	s.pfxs = n.prefixCount()
-	s.childs = n.childCount()
-	s.nodes = 1 // this node
-	s.leaves = 0
-	s.fringes = 0
+	s.Pfxs = n.PrefixCount()
+	s.Childs = n.ChildCount()
+	s.Nodes = 1 // this node
+	s.Leaves = 0
+	s.Fringes = 0
 
-	for _, child := range n.allChildren() {
+	for _, child := range n.AllChildren() {
 		switch kid := child.(type) {
-		case nodeReader[V]:
+		case NodeReader[V]:
 			// rec-descent
-			rs := nodeStatsRec[V](kid)
+			rs := StatsRec[V](kid)
 
-			s.pfxs += rs.pfxs
-			s.childs += rs.childs
-			s.nodes += rs.nodes
-			s.leaves += rs.leaves
-			s.fringes += rs.fringes
+			s.Pfxs += rs.Pfxs
+			s.Childs += rs.Childs
+			s.Nodes += rs.Nodes
+			s.Leaves += rs.Leaves
+			s.Fringes += rs.Fringes
 
-		case *fringeNode[V]:
-			s.fringes++
+		case *FringeNode[V]:
+			s.Fringes++
 
-		case *leafNode[V]:
-			s.leaves++
+		case *LeafNode[V]:
+			s.Leaves++
 
 		default:
 			panic("logic error, wrong node type")

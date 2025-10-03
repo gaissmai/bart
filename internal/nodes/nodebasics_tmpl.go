@@ -291,7 +291,7 @@ func (n *_NODE_TYPE[V]) PurgeAndCompress(stack []*_NODE_TYPE[V], octets []uint8,
 			val := n.MustGetPrefix(idx)
 
 			// ... and octet path
-			path := stridePath{}
+			path := StridePath{}
 			copy(path[:], octets)
 
 			// depth is the parent's depth, so add +1 here for the kid
@@ -319,11 +319,11 @@ func (n *_NODE_TYPE[V]) Delete(pfx netip.Prefix) (exists bool) {
 
 	// record the nodes on the path to the deleted node, needed to purge
 	// and/or path compress nodes after the deletion of a prefix
-	stack := [maxTreeDepth]*_NODE_TYPE[V]{}
+	stack := [MaxTreeDepth]*_NODE_TYPE[V]{}
 
 	// find the trie node
 	for depth, octet := range octets {
-		depth = depth & depthMask // BCE, Delete must be fast
+		depth = depth & DepthMask // BCE, Delete must be fast
 
 		// push current node on stack for path recording
 		stack[depth] = n
@@ -399,7 +399,7 @@ func (n *_NODE_TYPE[V]) DeletePersist(cloneFn CloneFunc[V], pfx netip.Prefix) (e
 
 	// Stack to keep track of cloned nodes along the path,
 	// needed for purge and path compression after delete.
-	stack := [maxTreeDepth]*_NODE_TYPE[V]{}
+	stack := [MaxTreeDepth]*_NODE_TYPE[V]{}
 
 	// Traverse the trie to locate the prefix to delete.
 	for depth, octet := range octets {
@@ -561,11 +561,11 @@ func (n *_NODE_TYPE[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V
 
 	// record the nodes on the path to the deleted node, needed to purge
 	// and/or path compress nodes after the deletion of a prefix
-	stack := [maxTreeDepth]*_NODE_TYPE[V]{}
+	stack := [MaxTreeDepth]*_NODE_TYPE[V]{}
 
 	// find the proper trie node to update prefix
 	for depth, octet := range octets {
-		depth = depth & depthMask // BCE
+		depth = depth & DepthMask // BCE
 
 		// push current node on stack for path recording
 		stack[depth] = n

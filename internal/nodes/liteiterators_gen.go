@@ -12,7 +12,7 @@ import (
 	"github.com/gaissmai/bart/internal/art"
 )
 
-// allRec recursively traverses the trie starting at the current node,
+// AllRec recursively traverses the trie starting at the current node,
 // applying the provided yield function to every stored prefix and value.
 //
 // For each route entry (prefix and value), yield is invoked. If yield returns false,
@@ -26,7 +26,7 @@ import (
 //
 // The traversal order is not defined. This implementation favors simplicity
 // and runtime efficiency over consistency of iteration sequence.
-func (n *LiteNode[V]) allRec(path stridePath, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
+func (n *LiteNode[V]) AllRec(path StridePath, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
 	var buf [256]uint8
 	for _, idx := range n.Prefixes.AsSlice(&buf) {
 		cidr := CidrFromPath(path, depth, is4, idx)
@@ -46,7 +46,7 @@ func (n *LiteNode[V]) allRec(path stridePath, depth int, is4 bool, yield func(ne
 		case *LiteNode[V]:
 			// rec-descent with this node
 			path[depth] = addr
-			if !kid.allRec(path, depth+1, is4, yield) {
+			if !kid.AllRec(path, depth+1, is4, yield) {
 				// early exit
 				return false
 			}
@@ -72,10 +72,10 @@ func (n *LiteNode[V]) allRec(path stridePath, depth int, is4 bool, yield func(ne
 	return true
 }
 
-// allRecSorted recursively traverses the trie in prefix-sorted order and applies
+// AllRecSorted recursively traverses the trie in prefix-sorted order and applies
 // the given yield function to each stored prefix and value.
 //
-// Unlike allRec, this implementation ensures that route entries are visited in
+// Unlike AllRec, this implementation ensures that route entries are visited in
 // canonical prefix sort order. To achieve this,
 // both the prefixes and children of the current node are gathered, sorted,
 // and then interleaved during traversal based on logical octet positioning.
@@ -98,7 +98,7 @@ func (n *LiteNode[V]) allRec(path stridePath, depth int, is4 bool, yield func(ne
 //   - yield: callback function invoked for each prefix/value pair
 //
 // Returns false if yield function requests early termination.
-func (n *LiteNode[V]) allRecSorted(path stridePath, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
+func (n *LiteNode[V]) AllRecSorted(path StridePath, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
 	// get slice of all child octets, sorted by addr
 	var childBuf [256]uint8
 	allChildAddrs := n.Children.AsSlice(&childBuf)
@@ -129,7 +129,7 @@ func (n *LiteNode[V]) allRecSorted(path stridePath, depth int, is4 bool, yield f
 			switch kid := anyKid.(type) {
 			case *LiteNode[V]:
 				path[depth] = childAddr
-				if !kid.allRecSorted(path, depth+1, is4, yield) {
+				if !kid.AllRecSorted(path, depth+1, is4, yield) {
 					return false
 				}
 			case *LeafNode[V]:
@@ -166,7 +166,7 @@ func (n *LiteNode[V]) allRecSorted(path stridePath, depth int, is4 bool, yield f
 		switch kid := anyKid.(type) {
 		case *LiteNode[V]:
 			path[depth] = addr
-			if !kid.allRecSorted(path, depth+1, is4, yield) {
+			if !kid.AllRecSorted(path, depth+1, is4, yield) {
 				return false
 			}
 		case *LeafNode[V]:
@@ -189,7 +189,7 @@ func (n *LiteNode[V]) allRecSorted(path stridePath, depth int, is4 bool, yield f
 	return true
 }
 
-// eachLookupPrefix performs a hierarchical lookup of all matching prefixes
+// EachLookupPrefix performs a hierarchical lookup of all matching prefixes
 // in the current node’s 8-bit stride-based prefix table.
 //
 // The function walks up the trie-internal complete binary tree (CBT),
@@ -203,7 +203,7 @@ func (n *LiteNode[V]) allRecSorted(path stridePath, depth int, is4 bool, yield f
 //
 // This function is intended for internal use during supernet traversal and
 // does not descend the trie further.
-func (n *LiteNode[V]) eachLookupPrefix(ip netip.Addr, depth int, pfxIdx uint8, yield func(netip.Prefix, V) bool) (ok bool) {
+func (n *LiteNode[V]) EachLookupPrefix(ip netip.Addr, depth int, pfxIdx uint8, yield func(netip.Prefix, V) bool) (ok bool) {
 	for ; pfxIdx > 0; pfxIdx >>= 1 {
 		if n.Prefixes.Test(pfxIdx) {
 			val := n.MustGetPrefix(pfxIdx)
@@ -221,7 +221,7 @@ func (n *LiteNode[V]) eachLookupPrefix(ip netip.Addr, depth int, pfxIdx uint8, y
 	return true
 }
 
-// eachSubnet yields all prefix entries and child nodes covered by a given parent prefix,
+// EachSubnet yields all prefix entries and child nodes covered by a given parent prefix,
 // sorted in natural CIDR order, within the current node.
 //
 // The function iterates through all prefixes and children from the node’s stride tables.
@@ -229,13 +229,13 @@ func (n *LiteNode[V]) eachLookupPrefix(ip netip.Addr, depth int, pfxIdx uint8, y
 // are included. Matching entries are buffered, sorted, and passed through to the yield function.
 //
 // Child entries (nodes, leaves, fringes) that fall under the covered address range
-// are processed recursively via allRecSorted to ensure sorted traversal.
+// are processed recursively via AllRecSorted to ensure sorted traversal.
 //
 // This function is intended for internal use by Subnets(), and it assumes the
 // current node is positioned at the point in the trie corresponding to the parent prefix.
-func (n *LiteNode[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxIdx uint8, yield func(netip.Prefix, V) bool) bool {
+func (n *LiteNode[V]) EachSubnet(octets []byte, depth int, is4 bool, pfxIdx uint8, yield func(netip.Prefix, V) bool) bool {
 	// octets as array, needed below more than once
-	var path stridePath
+	var path StridePath
 	copy(path[:], octets)
 
 	pfxFirstAddr, pfxLastAddr := art.IdxToRange(pfxIdx)
@@ -283,7 +283,7 @@ func (n *LiteNode[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxIdx uint
 			switch kid := n.MustGetChild(addr).(type) {
 			case *LiteNode[V]:
 				path[depth] = addr
-				if !kid.allRecSorted(path, depth+1, is4, yield) {
+				if !kid.AllRecSorted(path, depth+1, is4, yield) {
 					return false
 				}
 
@@ -321,7 +321,7 @@ func (n *LiteNode[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxIdx uint
 		switch kid := n.MustGetChild(addr).(type) {
 		case *LiteNode[V]:
 			path[depth] = addr
-			if !kid.allRecSorted(path, depth+1, is4, yield) {
+			if !kid.AllRecSorted(path, depth+1, is4, yield) {
 				return false
 			}
 		case *LeafNode[V]:
@@ -344,14 +344,14 @@ func (n *LiteNode[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxIdx uint
 	return true
 }
 
-func (n *LiteNode[V]) supernets(pfx netip.Prefix, yield func(netip.Prefix, V) bool) {
+func (n *LiteNode[V]) Supernets(pfx netip.Prefix, yield func(netip.Prefix, V) bool) {
 	ip := pfx.Addr()
 	is4 := ip.Is4()
 	octets := ip.AsSlice()
 	lastOctetPlusOne, lastBits := LastOctetPlusOneAndLastBits(pfx)
 
 	// stack of the traversed nodes for reverse ordering of supernets
-	stack := [maxTreeDepth]*LiteNode[V]{}
+	stack := [MaxTreeDepth]*LiteNode[V]{}
 
 	// run variable, used after for loop
 	var depth int
@@ -437,14 +437,14 @@ LOOP:
 		}
 
 		// yield all the matching prefixes, not just the lpm
-		if !n.eachLookupPrefix(ip, depth, idx, yield) {
+		if !n.EachLookupPrefix(ip, depth, idx, yield) {
 			// early exit
 			return
 		}
 	}
 }
 
-func (n *LiteNode[V]) subnets(pfx netip.Prefix, yield func(netip.Prefix, V) bool) {
+func (n *LiteNode[V]) Subnets(pfx netip.Prefix, yield func(netip.Prefix, V) bool) {
 	// values derived from pfx
 	ip := pfx.Addr()
 	is4 := ip.Is4()
@@ -458,7 +458,7 @@ func (n *LiteNode[V]) subnets(pfx netip.Prefix, yield func(netip.Prefix, V) bool
 		// so those are handled below via the fringe/leaf path.
 		if depth == lastOctetPlusOne {
 			idx := art.PfxToIdx(octet, lastBits)
-			n.eachSubnet(octets, depth, is4, idx, yield)
+			n.EachSubnet(octets, depth, is4, idx, yield)
 			return
 		}
 

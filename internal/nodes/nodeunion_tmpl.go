@@ -36,7 +36,7 @@ func (n *_NODE_TYPE[V]) InsertPersist(CloneFunc[V], netip.Prefix, V, int) (exist
 
 // ### GENERATE DELETE END ###
 
-// unionRec recursively merges another node o into the receiver node n.
+// UnionRec recursively merges another node o into the receiver node n.
 //
 // All prefix and child entries from o are cloned and inserted into n.
 // If a prefix already exists in n, its value is overwritten by the value from o,
@@ -51,7 +51,7 @@ func (n *_NODE_TYPE[V]) InsertPersist(CloneFunc[V], netip.Prefix, V, int) (exist
 // The merge operation is destructive on the receiver n, but leaves the source node o unchanged.
 //
 // Returns the number of duplicate prefixes that were overwritten during merging.
-func (n *_NODE_TYPE[V]) unionRec(cloneFn CloneFunc[V], o *_NODE_TYPE[V], depth int) (duplicates int) {
+func (n *_NODE_TYPE[V]) UnionRec(cloneFn CloneFunc[V], o *_NODE_TYPE[V], depth int) (duplicates int) {
 	buf := [256]uint8{}
 
 	// for all prefixes in other node do ...
@@ -79,8 +79,8 @@ func (n *_NODE_TYPE[V]) unionRec(cloneFn CloneFunc[V], o *_NODE_TYPE[V], depth i
 	return duplicates
 }
 
-// unionRecPersist is similar to unionRec but performs an immutable union of nodes.
-func (n *_NODE_TYPE[V]) unionRecPersist(cloneFn CloneFunc[V], o *_NODE_TYPE[V], depth int) (duplicates int) {
+// UnionRecPersist is similar to unionRec but performs an immutable union of nodes.
+func (n *_NODE_TYPE[V]) UnionRecPersist(cloneFn CloneFunc[V], o *_NODE_TYPE[V], depth int) (duplicates int) {
 	buf := [256]uint8{}
 
 	// for all prefixes in other node do ...
@@ -172,7 +172,7 @@ func (n *_NODE_TYPE[V]) handleMatrix(cloneFn CloneFunc[V], thisExists bool, this
 	if thisIsNode {
 		switch {
 		case otherIsNode:
-			return thisNode.unionRec(cloneFn, otherNode, depth+1)
+			return thisNode.UnionRec(cloneFn, otherNode, depth+1)
 		case otherIsLeaf:
 			if thisNode.Insert(otherLeaf.Prefix, cloneFn(otherLeaf.Value), depth+1) {
 				return 1
@@ -209,7 +209,7 @@ func (n *_NODE_TYPE[V]) handleMatrix(cloneFn CloneFunc[V], thisExists bool, this
 	// Now handle other child
 	switch {
 	case otherIsNode:
-		return nc.unionRec(cloneFn, otherNode, depth+1)
+		return nc.UnionRec(cloneFn, otherNode, depth+1)
 	case otherIsLeaf:
 		if nc.Insert(otherLeaf.Prefix, cloneFn(otherLeaf.Value), depth+1) {
 			return 1
@@ -297,7 +297,7 @@ func (n *_NODE_TYPE[V]) handleMatrixPersist(cloneFn CloneFunc[V], thisExists boo
 
 		switch {
 		case otherIsNode:
-			return thisNode.unionRecPersist(cloneFn, otherNode, depth+1)
+			return thisNode.UnionRecPersist(cloneFn, otherNode, depth+1)
 		case otherIsLeaf:
 			if thisNode.InsertPersist(cloneFn, otherLeaf.Prefix, cloneFn(otherLeaf.Value), depth+1) {
 				return 1
@@ -334,7 +334,7 @@ func (n *_NODE_TYPE[V]) handleMatrixPersist(cloneFn CloneFunc[V], thisExists boo
 	// Now handle other child
 	switch {
 	case otherIsNode:
-		return nc.unionRec(cloneFn, otherNode, depth+1)
+		return nc.UnionRec(cloneFn, otherNode, depth+1)
 	case otherIsLeaf:
 		if nc.Insert(otherLeaf.Prefix, cloneFn(otherLeaf.Value), depth+1) {
 			return 1
