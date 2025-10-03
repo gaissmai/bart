@@ -1,40 +1,9 @@
-// REPLACE with generate hint
+// Code generated from file "nodeunion_tmpl.go"; DO NOT EDIT.
 
 // Copyright (c) 2025 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
-//go:generate ./scripts/generate-node-methods.sh
-//go:build generate
-
-package bart
-
-// ### GENERATE DELETE START ###
-
-// stub code for generator types and methods
-// useful for gopls during development, deleted during go generate
-
-import (
-	"net/netip"
-
-	"github.com/gaissmai/bart/internal/bitset"
-)
-
-type _NODE_TYPE[V any] struct {
-	prefixes struct{ bitset.BitSet256 }
-	children struct{ bitset.BitSet256 }
-}
-
-func (n *_NODE_TYPE[V]) mustGetPrefix(uint8) (val V)                                    { return val }
-func (n *_NODE_TYPE[V]) mustGetChild(uint8) (child any)                                 { return child }
-func (n *_NODE_TYPE[V]) insertPrefix(uint8, V) (exists bool)                            { return exists }
-func (n *_NODE_TYPE[V]) getChild(uint8) (child any, ok bool)                            { return child, ok }
-func (n *_NODE_TYPE[V]) insertChild(uint8, any) (exists bool)                           { return exists }
-func (n *_NODE_TYPE[V]) cloneRec(cloneFunc[V]) (c *_NODE_TYPE[V])                       { return c }
-func (n *_NODE_TYPE[V]) cloneFlat(cloneFunc[V]) (c *_NODE_TYPE[V])                      { return c }
-func (n *_NODE_TYPE[V]) insert(netip.Prefix, V, int) (exists bool)                      { return }
-func (n *_NODE_TYPE[V]) insertPersist(cloneFunc[V], netip.Prefix, V, int) (exists bool) { return }
-
-// ### GENERATE DELETE END ###
+package nodes
 
 // unionRec recursively merges another node o into the receiver node n.
 //
@@ -45,32 +14,32 @@ func (n *_NODE_TYPE[V]) insertPersist(cloneFunc[V], netip.Prefix, V, int) (exist
 //
 // The union handles all possible combinations of child node types (node, leaf, fringe)
 // between the two nodes. Structural conflicts are resolved by creating new intermediate
-// *_NODE_TYPE[V] objects and pushing both children further down the trie. Leaves and fringes
+// *FastNode[V] objects and pushing both children further down the trie. Leaves and fringes
 // are also recursively relocated as needed to preserve prefix semantics.
 //
 // The merge operation is destructive on the receiver n, but leaves the source node o unchanged.
 //
 // Returns the number of duplicate prefixes that were overwritten during merging.
-func (n *_NODE_TYPE[V]) unionRec(cloneFn cloneFunc[V], o *_NODE_TYPE[V], depth int) (duplicates int) {
+func (n *FastNode[V]) unionRec(cloneFn CloneFunc[V], o *FastNode[V], depth int) (duplicates int) {
 	buf := [256]uint8{}
 
 	// for all prefixes in other node do ...
-	for _, oIdx := range o.prefixes.AsSlice(&buf) {
+	for _, oIdx := range o.Prefixes.AsSlice(&buf) {
 		// clone/copy the value from other node at idx
-		val := o.mustGetPrefix(oIdx)
+		val := o.MustGetPrefix(oIdx)
 		clonedVal := cloneFn(val)
 
 		// insert/overwrite cloned value from o into n
-		if n.insertPrefix(oIdx, clonedVal) {
+		if n.InsertPrefix(oIdx, clonedVal) {
 			// this prefix is duplicate in n and o
 			duplicates++
 		}
 	}
 
 	// for all child addrs in other node do ...
-	for _, addr := range o.children.AsSlice(&buf) {
-		otherChild := o.mustGetChild(addr)
-		thisChild, thisExists := n.getChild(addr)
+	for _, addr := range o.Children.AsSlice(&buf) {
+		otherChild := o.MustGetChild(addr)
+		thisChild, thisExists := n.GetChild(addr)
 
 		// Use helper function to handle all 4x3 combinations
 		duplicates += n.handleMatrix(cloneFn, thisExists, thisChild, otherChild, addr, depth)
@@ -80,26 +49,26 @@ func (n *_NODE_TYPE[V]) unionRec(cloneFn cloneFunc[V], o *_NODE_TYPE[V], depth i
 }
 
 // unionRecPersist is similar to unionRec but performs an immutable union of nodes.
-func (n *_NODE_TYPE[V]) unionRecPersist(cloneFn cloneFunc[V], o *_NODE_TYPE[V], depth int) (duplicates int) {
+func (n *FastNode[V]) unionRecPersist(cloneFn CloneFunc[V], o *FastNode[V], depth int) (duplicates int) {
 	buf := [256]uint8{}
 
 	// for all prefixes in other node do ...
-	for _, oIdx := range o.prefixes.AsSlice(&buf) {
+	for _, oIdx := range o.Prefixes.AsSlice(&buf) {
 		// clone/copy the value from other node
-		val := o.mustGetPrefix(oIdx)
+		val := o.MustGetPrefix(oIdx)
 		clonedVal := cloneFn(val)
 
 		// insert/overwrite cloned value from o into n
-		if exists := n.insertPrefix(oIdx, clonedVal); exists {
+		if exists := n.InsertPrefix(oIdx, clonedVal); exists {
 			// this prefix is duplicate in n and o
 			duplicates++
 		}
 	}
 
 	// for all child addrs in other node do ...
-	for _, addr := range o.children.AsSlice(&buf) {
-		otherChild := o.mustGetChild(addr)
-		thisChild, thisExists := n.getChild(addr)
+	for _, addr := range o.Children.AsSlice(&buf) {
+		otherChild := o.MustGetChild(addr)
+		thisChild, thisExists := n.GetChild(addr)
 
 		// Use helper function to handle all 4x3 combinations
 		duplicates += n.handleMatrixPersist(cloneFn, thisExists, thisChild, otherChild, addr, depth)
@@ -127,27 +96,27 @@ func (n *_NODE_TYPE[V]) unionRecPersist(cloneFn cloneFunc[V], o *_NODE_TYPE[V], 
 //	fringe, node    <-- insert new node, push this fringe down, union rec-descent
 //	fringe, leaf    <-- insert new node, push this fringe down, insert other leaf at depth+1
 //	fringe, fringe  <-- just overwrite value
-func (n *_NODE_TYPE[V]) handleMatrix(cloneFn cloneFunc[V], thisExists bool, thisChild, otherChild any, addr uint8, depth int) int {
+func (n *FastNode[V]) handleMatrix(cloneFn CloneFunc[V], thisExists bool, thisChild, otherChild any, addr uint8, depth int) int {
 	// Do ALL type assertions upfront - reduces line noise
 	var (
-		thisNode, thisIsNode     = thisChild.(*_NODE_TYPE[V])
-		thisLeaf, thisIsLeaf     = thisChild.(*leafNode[V])
-		thisFringe, thisIsFringe = thisChild.(*fringeNode[V])
+		thisNode, thisIsNode     = thisChild.(*FastNode[V])
+		thisLeaf, thisIsLeaf     = thisChild.(*LeafNode[V])
+		thisFringe, thisIsFringe = thisChild.(*FringeNode[V])
 
-		otherNode, otherIsNode     = otherChild.(*_NODE_TYPE[V])
-		otherLeaf, otherIsLeaf     = otherChild.(*leafNode[V])
-		otherFringe, otherIsFringe = otherChild.(*fringeNode[V])
+		otherNode, otherIsNode     = otherChild.(*FastNode[V])
+		otherLeaf, otherIsLeaf     = otherChild.(*LeafNode[V])
+		otherFringe, otherIsFringe = otherChild.(*FringeNode[V])
 	)
 
 	// just insert cloned child at this empty slot
 	if !thisExists {
 		switch {
 		case otherIsNode:
-			n.insertChild(addr, otherNode.cloneRec(cloneFn))
+			n.InsertChild(addr, otherNode.CloneRec(cloneFn))
 		case otherIsLeaf:
-			n.insertChild(addr, &leafNode[V]{prefix: otherLeaf.prefix, value: cloneFn(otherLeaf.value)})
+			n.InsertChild(addr, &LeafNode[V]{Prefix: otherLeaf.Prefix, Value: cloneFn(otherLeaf.Value)})
 		case otherIsFringe:
-			n.insertChild(addr, &fringeNode[V]{value: cloneFn(otherFringe.value)})
+			n.InsertChild(addr, &FringeNode[V]{Value: cloneFn(otherFringe.Value)})
 		default:
 			panic("logic error, wrong node type")
 		}
@@ -158,13 +127,13 @@ func (n *_NODE_TYPE[V]) handleMatrix(cloneFn cloneFunc[V], thisExists bool, this
 
 	// Special case: fringe + fringe -> just overwrite value
 	if thisIsFringe && otherIsFringe {
-		thisFringe.value = cloneFn(otherFringe.value)
+		thisFringe.Value = cloneFn(otherFringe.Value)
 		return 1
 	}
 
 	// Special case: leaf + leaf with same prefix -> just overwrite value
-	if thisIsLeaf && otherIsLeaf && thisLeaf.prefix == otherLeaf.prefix {
-		thisLeaf.value = cloneFn(otherLeaf.value)
+	if thisIsLeaf && otherIsLeaf && thisLeaf.Prefix == otherLeaf.Prefix {
+		thisLeaf.Value = cloneFn(otherLeaf.Value)
 		return 1
 	}
 
@@ -174,12 +143,12 @@ func (n *_NODE_TYPE[V]) handleMatrix(cloneFn cloneFunc[V], thisExists bool, this
 		case otherIsNode:
 			return thisNode.unionRec(cloneFn, otherNode, depth+1)
 		case otherIsLeaf:
-			if thisNode.insert(otherLeaf.prefix, cloneFn(otherLeaf.value), depth+1) {
+			if thisNode.Insert(otherLeaf.Prefix, cloneFn(otherLeaf.Value), depth+1) {
 				return 1
 			}
 			return 0
 		case otherIsFringe:
-			if thisNode.insertPrefix(1, cloneFn(otherFringe.value)) {
+			if thisNode.InsertPrefix(1, cloneFn(otherFringe.Value)) {
 				return 1
 			}
 			return 0
@@ -191,32 +160,32 @@ func (n *_NODE_TYPE[V]) handleMatrix(cloneFn cloneFunc[V], thisExists bool, this
 	// Case 3: All remaining cases need a new node
 	// (thisChild is leaf or fringe, and we didn't hit the special cases above)
 
-	nc := new(_NODE_TYPE[V])
+	nc := new(FastNode[V])
 
 	// Push existing child down into new node
 	switch {
 	case thisIsLeaf:
-		nc.insert(thisLeaf.prefix, thisLeaf.value, depth+1)
+		nc.Insert(thisLeaf.Prefix, thisLeaf.Value, depth+1)
 	case thisIsFringe:
-		nc.insertPrefix(1, thisFringe.value)
+		nc.InsertPrefix(1, thisFringe.Value)
 	default:
 		panic("logic error, unexpected this child type")
 	}
 
 	// Replace child with new node
-	n.insertChild(addr, nc)
+	n.InsertChild(addr, nc)
 
 	// Now handle other child
 	switch {
 	case otherIsNode:
 		return nc.unionRec(cloneFn, otherNode, depth+1)
 	case otherIsLeaf:
-		if nc.insert(otherLeaf.prefix, cloneFn(otherLeaf.value), depth+1) {
+		if nc.Insert(otherLeaf.Prefix, cloneFn(otherLeaf.Value), depth+1) {
 			return 1
 		}
 		return 0
 	case otherIsFringe:
-		if nc.insertPrefix(1, cloneFn(otherFringe.value)) {
+		if nc.InsertPrefix(1, cloneFn(otherFringe.Value)) {
 			return 1
 		}
 		return 0
@@ -244,27 +213,27 @@ func (n *_NODE_TYPE[V]) handleMatrix(cloneFn cloneFunc[V], thisExists bool, this
 //	fringe, node    <-- insert new node, push this fringe down, union rec-descent
 //	fringe, leaf    <-- insert new node, push this fringe down, insert other leaf at depth+1
 //	fringe, fringe  <-- just overwrite value
-func (n *_NODE_TYPE[V]) handleMatrixPersist(cloneFn cloneFunc[V], thisExists bool, thisChild, otherChild any, addr uint8, depth int) int {
+func (n *FastNode[V]) handleMatrixPersist(cloneFn CloneFunc[V], thisExists bool, thisChild, otherChild any, addr uint8, depth int) int {
 	// Do ALL type assertions upfront - reduces line noise
 	var (
-		thisNode, thisIsNode     = thisChild.(*_NODE_TYPE[V])
-		thisLeaf, thisIsLeaf     = thisChild.(*leafNode[V])
-		thisFringe, thisIsFringe = thisChild.(*fringeNode[V])
+		thisNode, thisIsNode     = thisChild.(*FastNode[V])
+		thisLeaf, thisIsLeaf     = thisChild.(*LeafNode[V])
+		thisFringe, thisIsFringe = thisChild.(*FringeNode[V])
 
-		otherNode, otherIsNode     = otherChild.(*_NODE_TYPE[V])
-		otherLeaf, otherIsLeaf     = otherChild.(*leafNode[V])
-		otherFringe, otherIsFringe = otherChild.(*fringeNode[V])
+		otherNode, otherIsNode     = otherChild.(*FastNode[V])
+		otherLeaf, otherIsLeaf     = otherChild.(*LeafNode[V])
+		otherFringe, otherIsFringe = otherChild.(*FringeNode[V])
 	)
 
 	// just insert cloned child at this empty slot
 	if !thisExists {
 		switch {
 		case otherIsNode:
-			n.insertChild(addr, otherNode.cloneRec(cloneFn))
+			n.InsertChild(addr, otherNode.CloneRec(cloneFn))
 		case otherIsLeaf:
-			n.insertChild(addr, &leafNode[V]{prefix: otherLeaf.prefix, value: cloneFn(otherLeaf.value)})
+			n.InsertChild(addr, &LeafNode[V]{Prefix: otherLeaf.Prefix, Value: cloneFn(otherLeaf.Value)})
 		case otherIsFringe:
-			n.insertChild(addr, &fringeNode[V]{value: cloneFn(otherFringe.value)})
+			n.InsertChild(addr, &FringeNode[V]{Value: cloneFn(otherFringe.Value)})
 		default:
 			panic("logic error, wrong node type")
 		}
@@ -275,13 +244,13 @@ func (n *_NODE_TYPE[V]) handleMatrixPersist(cloneFn cloneFunc[V], thisExists boo
 
 	// Special case: fringe + fringe -> just overwrite value
 	if thisIsFringe && otherIsFringe {
-		thisFringe.value = cloneFn(otherFringe.value)
+		thisFringe.Value = cloneFn(otherFringe.Value)
 		return 1
 	}
 
 	// Special case: leaf + leaf with same prefix -> just overwrite value
-	if thisIsLeaf && otherIsLeaf && thisLeaf.prefix == otherLeaf.prefix {
-		thisLeaf.value = cloneFn(otherLeaf.value)
+	if thisIsLeaf && otherIsLeaf && thisLeaf.Prefix == otherLeaf.Prefix {
+		thisLeaf.Value = cloneFn(otherLeaf.Value)
 		return 1
 	}
 
@@ -290,21 +259,21 @@ func (n *_NODE_TYPE[V]) handleMatrixPersist(cloneFn cloneFunc[V], thisExists boo
 		// CLONE the node
 
 		// thisNode points now to cloned kid
-		thisNode = thisNode.cloneFlat(cloneFn)
+		thisNode = thisNode.CloneFlat(cloneFn)
 
 		// replace kid with cloned thisKid
-		n.insertChild(addr, thisNode)
+		n.InsertChild(addr, thisNode)
 
 		switch {
 		case otherIsNode:
 			return thisNode.unionRecPersist(cloneFn, otherNode, depth+1)
 		case otherIsLeaf:
-			if thisNode.insertPersist(cloneFn, otherLeaf.prefix, cloneFn(otherLeaf.value), depth+1) {
+			if thisNode.InsertPersist(cloneFn, otherLeaf.Prefix, cloneFn(otherLeaf.Value), depth+1) {
 				return 1
 			}
 			return 0
 		case otherIsFringe:
-			if thisNode.insertPrefix(1, cloneFn(otherFringe.value)) {
+			if thisNode.InsertPrefix(1, cloneFn(otherFringe.Value)) {
 				return 1
 			}
 			return 0
@@ -316,32 +285,32 @@ func (n *_NODE_TYPE[V]) handleMatrixPersist(cloneFn cloneFunc[V], thisExists boo
 	// Case 3: All remaining cases need a new node
 	// (thisChild is leaf or fringe, and we didn't hit the special cases above)
 
-	nc := new(_NODE_TYPE[V])
+	nc := new(FastNode[V])
 
 	// Push existing child down into new node
 	switch {
 	case thisIsLeaf:
-		nc.insert(thisLeaf.prefix, thisLeaf.value, depth+1)
+		nc.Insert(thisLeaf.Prefix, thisLeaf.Value, depth+1)
 	case thisIsFringe:
-		nc.insertPrefix(1, thisFringe.value)
+		nc.InsertPrefix(1, thisFringe.Value)
 	default:
 		panic("logic error, unexpected this child type")
 	}
 
 	// Replace child with new node
-	n.insertChild(addr, nc)
+	n.InsertChild(addr, nc)
 
 	// Now handle other child
 	switch {
 	case otherIsNode:
 		return nc.unionRec(cloneFn, otherNode, depth+1)
 	case otherIsLeaf:
-		if nc.insert(otherLeaf.prefix, cloneFn(otherLeaf.value), depth+1) {
+		if nc.Insert(otherLeaf.Prefix, cloneFn(otherLeaf.Value), depth+1) {
 			return 1
 		}
 		return 0
 	case otherIsFringe:
-		if nc.insertPrefix(1, cloneFn(otherFringe.value)) {
+		if nc.InsertPrefix(1, cloneFn(otherFringe.Value)) {
 			return 1
 		}
 		return 0

@@ -9,6 +9,7 @@ import (
 
 	"github.com/gaissmai/bart/internal/art"
 	"github.com/gaissmai/bart/internal/lpm"
+	"github.com/gaissmai/bart/internal/nodes"
 )
 
 // Table represents an IPv4 and IPv6 routing table with payload V.
@@ -32,8 +33,8 @@ type Table[V any] struct {
 	_ [0]sync.Mutex
 
 	// the root nodes, implemented as popcount compressed multibit tries
-	root4 bartNode[V]
-	root6 bartNode[V]
+	root4 nodes.BartNode[V]
+	root6 nodes.BartNode[V]
 
 	// the number of prefixes in the routing table
 	size4 int
@@ -41,60 +42,11 @@ type Table[V any] struct {
 }
 
 // rootNodeByVersion, root node getter for ip version.
-func (t *Table[V]) rootNodeByVersion(is4 bool) *bartNode[V] {
+func (t *Table[V]) rootNodeByVersion(is4 bool) *nodes.BartNode[V] {
 	if is4 {
 		return &t.root4
 	}
 	return &t.root6
-}
-
-// lastOctetPlusOneAndLastBits returns the count of full 8‑bit strides (bits/8)
-// and the leftover bits in the final stride (bits%8) for pfx.
-//
-// lastOctetPlusOne is the count of full 8‑bit strides (bits/8).
-// lastBits is the remaining bit count in the final stride (bits%8),
-//
-// ATTENTION: Split the IP prefixes at 8bit borders, count from 0.
-//
-//	/7, /15, /23, /31, ..., /127
-//
-//	BitPos: [0-7],[8-15],[16-23],[24-31],[32]
-//	BitPos: [0-7],[8-15],[16-23],[24-31],[32-39],[40-47],[48-55],[56-63],...,[120-127],[128]
-//
-//	0.0.0.0/0      => lastOctetPlusOne:  0, lastBits: 0 (default route)
-//	0.0.0.0/7      => lastOctetPlusOne:  0, lastBits: 7
-//	0.0.0.0/8      => lastOctetPlusOne:  1, lastBits: 0 (possible fringe)
-//	10.0.0.0/8     => lastOctetPlusOne:  1, lastBits: 0 (possible fringe)
-//	10.0.0.0/22    => lastOctetPlusOne:  2, lastBits: 6
-//	10.0.0.0/29    => lastOctetPlusOne:  3, lastBits: 5
-//	10.0.0.0/32    => lastOctetPlusOne:  4, lastBits: 0 (possible fringe)
-//
-//	::/0           => lastOctetPlusOne:  0, lastBits: 0 (default route)
-//	::1/128        => lastOctetPlusOne: 16, lastBits: 0 (possible fringe)
-//	2001:db8::/42  => lastOctetPlusOne:  5, lastBits: 2
-//	2001:db8::/56  => lastOctetPlusOne:  7, lastBits: 0 (possible fringe)
-//
-//	/32 and /128 prefixes are special, they never form a new node,
-//	At the end of the trie (IPv4: depth 4, IPv6: depth 16) they are always
-//	inserted as a path‑compressed fringe.
-//
-// We are not splitting at /8, /16, ..., because this would mean that the
-// first node would have 512 prefixes, 9 bits from [0-8]. All remaining nodes
-// would then only have 8 bits from [9-16], [17-24], [25..32], ...
-// but the algorithm would then require a variable length bitset.
-//
-// If you can commit to a fixed size of [4]uint64, then the algorithm is
-// much faster due to modern CPUs.
-//
-// Perhaps a future Go version that supports SIMD instructions for the [4]uint64 vectors
-// will make the algorithm even faster on suitable hardware.
-func lastOctetPlusOneAndLastBits(pfx netip.Prefix) (lastOctetPlusOne int, lastBits uint8) {
-	// lastOctetPlusOne:  range from 0..4 or 0..16 !ATTENTION: not 0..3 or 0..15
-	// lastBits:          range from 0..7
-	bits := pfx.Bits()
-
-	//nolint:gosec  // G115: narrowing conversion is safe here (bits in [0..128])
-	return bits >> 3, uint8(bits & 7)
 }
 
 // Contains reports whether any stored prefix covers the given IP address.

@@ -3,10 +3,10 @@
 // Copyright (c) 2025 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
-//go:generate ./scripts/generate-node-methods.sh
+//go:generate ../../scripts/generate-node-methods.sh
 //go:build generate
 
-package bart
+package nodes
 
 // ### GENERATE DELETE START ###
 
@@ -22,15 +22,15 @@ import (
 )
 
 type _NODE_TYPE[V any] struct {
-	prefixes struct{ bitset.BitSet256 }
-	children struct{ bitset.BitSet256 }
+	Prefixes struct{ bitset.BitSet256 }
+	Children struct{ bitset.BitSet256 }
 }
 
-func (n *_NODE_TYPE[V]) prefixCount() (c int)           { return }
-func (n *_NODE_TYPE[V]) childCount() (c int)            { return }
-func (n *_NODE_TYPE[V]) mustGetPrefix(uint8) (val V)    { return }
-func (n *_NODE_TYPE[V]) mustGetChild(uint8) (child any) { return }
-func (n *_NODE_TYPE[V]) contains(uint8) (ok bool)       { return }
+func (n *_NODE_TYPE[V]) PrefixCount() (c int)           { return }
+func (n *_NODE_TYPE[V]) ChildCount() (c int)            { return }
+func (n *_NODE_TYPE[V]) MustGetPrefix(uint8) (val V)    { return }
+func (n *_NODE_TYPE[V]) MustGetChild(uint8) (child any) { return }
+func (n *_NODE_TYPE[V]) Contains(uint8) (ok bool)       { return }
 
 // ### GENERATE DELETE END ###
 
@@ -50,9 +50,9 @@ func (n *_NODE_TYPE[V]) contains(uint8) (ok bool)       { return }
 // and runtime efficiency over consistency of iteration sequence.
 func (n *_NODE_TYPE[V]) allRec(path stridePath, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
 	var buf [256]uint8
-	for _, idx := range n.prefixes.AsSlice(&buf) {
-		cidr := cidrFromPath(path, depth, is4, idx)
-		val := n.mustGetPrefix(idx)
+	for _, idx := range n.Prefixes.AsSlice(&buf) {
+		cidr := CidrFromPath(path, depth, is4, idx)
+		val := n.MustGetPrefix(idx)
 
 		// callback for this prefix and val
 		if !yield(cidr, val) {
@@ -62,8 +62,8 @@ func (n *_NODE_TYPE[V]) allRec(path stridePath, depth int, is4 bool, yield func(
 	}
 
 	// for all children (nodes and leaves) in this node do ...
-	for _, addr := range n.children.AsSlice(&buf) {
-		anyKid := n.mustGetChild(addr)
+	for _, addr := range n.Children.AsSlice(&buf) {
+		anyKid := n.MustGetChild(addr)
 		switch kid := anyKid.(type) {
 		case *_NODE_TYPE[V]:
 			// rec-descent with this node
@@ -72,16 +72,16 @@ func (n *_NODE_TYPE[V]) allRec(path stridePath, depth int, is4 bool, yield func(
 				// early exit
 				return false
 			}
-		case *leafNode[V]:
+		case *LeafNode[V]:
 			// callback for this leaf
-			if !yield(kid.prefix, kid.value) {
+			if !yield(kid.Prefix, kid.Value) {
 				// early exit
 				return false
 			}
-		case *fringeNode[V]:
-			fringePfx := cidrForFringe(path[:], depth, is4, addr)
+		case *FringeNode[V]:
+			fringePfx := CidrForFringe(path[:], depth, is4, addr)
 			// callback for this fringe
-			if !yield(fringePfx, kid.value) {
+			if !yield(fringePfx, kid.Value) {
 				// early exit
 				return false
 			}
@@ -123,14 +123,14 @@ func (n *_NODE_TYPE[V]) allRec(path stridePath, depth int, is4 bool, yield func(
 func (n *_NODE_TYPE[V]) allRecSorted(path stridePath, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
 	// get slice of all child octets, sorted by addr
 	var childBuf [256]uint8
-	allChildAddrs := n.children.AsSlice(&childBuf)
+	allChildAddrs := n.Children.AsSlice(&childBuf)
 
 	// get slice of all indexes, sorted by idx
 	var idxBuf [256]uint8
-	allIndices := n.prefixes.AsSlice(&idxBuf)
+	allIndices := n.Prefixes.AsSlice(&idxBuf)
 
 	// sort indices in CIDR sort order
-	slices.SortFunc(allIndices, cmpIndexRank)
+	slices.SortFunc(allIndices, CmpIndexRank)
 
 	childCursor := 0
 
@@ -147,21 +147,21 @@ func (n *_NODE_TYPE[V]) allRecSorted(path stridePath, depth int, is4 bool, yield
 			}
 
 			// yield the node (rec-descent) or leaf
-			anyKid := n.mustGetChild(childAddr)
+			anyKid := n.MustGetChild(childAddr)
 			switch kid := anyKid.(type) {
 			case *_NODE_TYPE[V]:
 				path[depth] = childAddr
 				if !kid.allRecSorted(path, depth+1, is4, yield) {
 					return false
 				}
-			case *leafNode[V]:
-				if !yield(kid.prefix, kid.value) {
+			case *LeafNode[V]:
+				if !yield(kid.Prefix, kid.Value) {
 					return false
 				}
-			case *fringeNode[V]:
-				fringePfx := cidrForFringe(path[:], depth, is4, childAddr)
+			case *FringeNode[V]:
+				fringePfx := CidrForFringe(path[:], depth, is4, childAddr)
 				// callback for this fringe
-				if !yield(fringePfx, kid.value) {
+				if !yield(fringePfx, kid.Value) {
 					// early exit
 					return false
 				}
@@ -174,9 +174,9 @@ func (n *_NODE_TYPE[V]) allRecSorted(path stridePath, depth int, is4 bool, yield
 		}
 
 		// yield the prefix for this idx
-		cidr := cidrFromPath(path, depth, is4, pfxIdx)
+		cidr := CidrFromPath(path, depth, is4, pfxIdx)
 		// n.prefixes.Items[i] not possible after sorting allIndices
-		if !yield(cidr, n.mustGetPrefix(pfxIdx)) {
+		if !yield(cidr, n.MustGetPrefix(pfxIdx)) {
 			return false
 		}
 	}
@@ -184,21 +184,21 @@ func (n *_NODE_TYPE[V]) allRecSorted(path stridePath, depth int, is4 bool, yield
 	// yield the rest of leaves and nodes (rec-descent)
 	for j := childCursor; j < len(allChildAddrs); j++ {
 		addr := allChildAddrs[j]
-		anyKid := n.mustGetChild(addr)
+		anyKid := n.MustGetChild(addr)
 		switch kid := anyKid.(type) {
 		case *_NODE_TYPE[V]:
 			path[depth] = addr
 			if !kid.allRecSorted(path, depth+1, is4, yield) {
 				return false
 			}
-		case *leafNode[V]:
-			if !yield(kid.prefix, kid.value) {
+		case *LeafNode[V]:
+			if !yield(kid.Prefix, kid.Value) {
 				return false
 			}
-		case *fringeNode[V]:
-			fringePfx := cidrForFringe(path[:], depth, is4, addr)
+		case *FringeNode[V]:
+			fringePfx := CidrForFringe(path[:], depth, is4, addr)
 			// callback for this fringe
-			if !yield(fringePfx, kid.value) {
+			if !yield(fringePfx, kid.Value) {
 				// early exit
 				return false
 			}
@@ -227,8 +227,8 @@ func (n *_NODE_TYPE[V]) allRecSorted(path stridePath, depth int, is4 bool, yield
 // does not descend the trie further.
 func (n *_NODE_TYPE[V]) eachLookupPrefix(ip netip.Addr, depth int, pfxIdx uint8, yield func(netip.Prefix, V) bool) (ok bool) {
 	for ; pfxIdx > 0; pfxIdx >>= 1 {
-		if n.prefixes.Test(pfxIdx) {
-			val := n.mustGetPrefix(pfxIdx)
+		if n.Prefixes.Test(pfxIdx) {
+			val := n.MustGetPrefix(pfxIdx)
 
 			// get the CIDR back
 			_, pfxLen := art.IdxToPfx(pfxIdx)
@@ -262,10 +262,10 @@ func (n *_NODE_TYPE[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxIdx ui
 
 	pfxFirstAddr, pfxLastAddr := art.IdxToRange(pfxIdx)
 
-	allCoveredIndices := make([]uint8, 0, n.prefixCount())
+	allCoveredIndices := make([]uint8, 0, n.PrefixCount())
 
 	var buf [256]uint8
-	for _, idx := range n.prefixes.AsSlice(&buf) {
+	for _, idx := range n.Prefixes.AsSlice(&buf) {
 		thisFirstAddr, thisLastAddr := art.IdxToRange(idx)
 
 		if thisFirstAddr >= pfxFirstAddr && thisLastAddr <= pfxLastAddr {
@@ -274,12 +274,12 @@ func (n *_NODE_TYPE[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxIdx ui
 	}
 
 	// sort indices in CIDR sort order
-	slices.SortFunc(allCoveredIndices, cmpIndexRank)
+	slices.SortFunc(allCoveredIndices, CmpIndexRank)
 
 	// 2. collect all covered child addrs by prefix
 
-	allCoveredChildAddrs := make([]uint8, 0, n.childCount())
-	for _, addr := range n.children.AsSlice(&buf) {
+	allCoveredChildAddrs := make([]uint8, 0, n.ChildCount())
+	for _, addr := range n.Children.AsSlice(&buf) {
 		if addr >= pfxFirstAddr && addr <= pfxLastAddr {
 			allCoveredChildAddrs = append(allCoveredChildAddrs, addr)
 		}
@@ -302,22 +302,22 @@ func (n *_NODE_TYPE[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxIdx ui
 			}
 
 			// yield the node or leaf?
-			switch kid := n.mustGetChild(addr).(type) {
+			switch kid := n.MustGetChild(addr).(type) {
 			case *_NODE_TYPE[V]:
 				path[depth] = addr
 				if !kid.allRecSorted(path, depth+1, is4, yield) {
 					return false
 				}
 
-			case *leafNode[V]:
-				if !yield(kid.prefix, kid.value) {
+			case *LeafNode[V]:
+				if !yield(kid.Prefix, kid.Value) {
 					return false
 				}
 
-			case *fringeNode[V]:
-				fringePfx := cidrForFringe(path[:], depth, is4, addr)
+			case *FringeNode[V]:
+				fringePfx := CidrForFringe(path[:], depth, is4, addr)
 				// callback for this fringe
-				if !yield(fringePfx, kid.value) {
+				if !yield(fringePfx, kid.Value) {
 					// early exit
 					return false
 				}
@@ -330,9 +330,9 @@ func (n *_NODE_TYPE[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxIdx ui
 		}
 
 		// yield the prefix for this idx
-		cidr := cidrFromPath(path, depth, is4, pfxIdx)
+		cidr := CidrFromPath(path, depth, is4, pfxIdx)
 		// n.prefixes.Items[i] not possible after sorting allIndices
-		if !yield(cidr, n.mustGetPrefix(pfxIdx)) {
+		if !yield(cidr, n.MustGetPrefix(pfxIdx)) {
 			return false
 		}
 	}
@@ -340,20 +340,20 @@ func (n *_NODE_TYPE[V]) eachSubnet(octets []byte, depth int, is4 bool, pfxIdx ui
 	// yield the rest of leaves and nodes (rec-descent)
 	for _, addr := range allCoveredChildAddrs[addrCursor:] {
 		// yield the node or leaf?
-		switch kid := n.mustGetChild(addr).(type) {
+		switch kid := n.MustGetChild(addr).(type) {
 		case *_NODE_TYPE[V]:
 			path[depth] = addr
 			if !kid.allRecSorted(path, depth+1, is4, yield) {
 				return false
 			}
-		case *leafNode[V]:
-			if !yield(kid.prefix, kid.value) {
+		case *LeafNode[V]:
+			if !yield(kid.Prefix, kid.Value) {
 				return false
 			}
-		case *fringeNode[V]:
-			fringePfx := cidrForFringe(path[:], depth, is4, addr)
+		case *FringeNode[V]:
+			fringePfx := CidrForFringe(path[:], depth, is4, addr)
 			// callback for this fringe
-			if !yield(fringePfx, kid.value) {
+			if !yield(fringePfx, kid.Value) {
 				// early exit
 				return false
 			}
@@ -370,7 +370,7 @@ func (n *_NODE_TYPE[V]) supernets(pfx netip.Prefix, yield func(netip.Prefix, V) 
 	ip := pfx.Addr()
 	is4 := ip.Is4()
 	octets := ip.AsSlice()
-	lastOctetPlusOne, lastBits := lastOctetPlusOneAndLastBits(pfx)
+	lastOctetPlusOne, lastBits := LastOctetPlusOneAndLastBits(pfx)
 
 	// stack of the traversed nodes for reverse ordering of supernets
 	stack := [maxTreeDepth]*_NODE_TYPE[V]{}
@@ -391,10 +391,10 @@ LOOP:
 		stack[depth] = n
 
 		// descend down the trie
-		if !n.children.Test(octet) {
+		if !n.Children.Test(octet) {
 			break LOOP
 		}
-		kid := n.mustGetChild(octet)
+		kid := n.MustGetChild(octet)
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
@@ -402,13 +402,13 @@ LOOP:
 			n = kid
 			continue LOOP // descend down to next trie level
 
-		case *leafNode[V]:
-			if kid.prefix.Bits() > pfx.Bits() {
+		case *LeafNode[V]:
+			if kid.Prefix.Bits() > pfx.Bits() {
 				break LOOP
 			}
 
-			if kid.prefix.Overlaps(pfx) {
-				if !yield(kid.prefix, kid.value) {
+			if kid.Prefix.Overlaps(pfx) {
+				if !yield(kid.Prefix, kid.Value) {
 					// early exit
 					return
 				}
@@ -416,14 +416,14 @@ LOOP:
 			// end of trie along this octets path
 			break LOOP
 
-		case *fringeNode[V]:
-			fringePfx := cidrForFringe(octets, depth, is4, octet)
+		case *FringeNode[V]:
+			fringePfx := CidrForFringe(octets, depth, is4, octet)
 			if fringePfx.Bits() > pfx.Bits() {
 				break LOOP
 			}
 
 			if fringePfx.Overlaps(pfx) {
-				if !yield(fringePfx, kid.value) {
+				if !yield(fringePfx, kid.Value) {
 					// early exit
 					return
 				}
@@ -454,7 +454,7 @@ LOOP:
 		}
 
 		// micro benchmarking, skip if there is no match
-		if !n.contains(idx) {
+		if !n.Contains(idx) {
 			continue
 		}
 
@@ -471,7 +471,7 @@ func (n *_NODE_TYPE[V]) subnets(pfx netip.Prefix, yield func(netip.Prefix, V) bo
 	ip := pfx.Addr()
 	is4 := ip.Is4()
 	octets := ip.AsSlice()
-	lastOctetPlusOne, lastBits := lastOctetPlusOneAndLastBits(pfx)
+	lastOctetPlusOne, lastBits := LastOctetPlusOneAndLastBits(pfx)
 
 	// find the trie node
 	for depth, octet := range octets {
@@ -484,10 +484,10 @@ func (n *_NODE_TYPE[V]) subnets(pfx netip.Prefix, yield func(netip.Prefix, V) bo
 			return
 		}
 
-		if !n.children.Test(octet) {
+		if !n.Children.Test(octet) {
 			return
 		}
-		kid := n.mustGetChild(octet)
+		kid := n.MustGetChild(octet)
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
@@ -495,19 +495,19 @@ func (n *_NODE_TYPE[V]) subnets(pfx netip.Prefix, yield func(netip.Prefix, V) bo
 			n = kid
 			continue // descend down to next trie level
 
-		case *leafNode[V]:
-			if pfx.Bits() <= kid.prefix.Bits() && pfx.Overlaps(kid.prefix) {
-				yield(kid.prefix, kid.value)
+		case *LeafNode[V]:
+			if pfx.Bits() <= kid.Prefix.Bits() && pfx.Overlaps(kid.Prefix) {
+				yield(kid.Prefix, kid.Value)
 			}
 			return // immediate return
 
-		case *fringeNode[V]:
+		case *FringeNode[V]:
 			// get the LPM prefix back from ip and depth
 			// it's a fringe, bits are always /8, /16, /24, ...
 			fringePfx, _ := ip.Prefix((depth + 1) << 3)
 
 			if pfx.Bits() <= fringePfx.Bits() && pfx.Overlaps(fringePfx) {
-				yield(fringePfx, kid.value)
+				yield(fringePfx, kid.Value)
 			}
 			return // immediate return
 

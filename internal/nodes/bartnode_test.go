@@ -7,7 +7,7 @@
 // Copyright (c) Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
-package bart
+package nodes
 
 import (
 	"fmt"
@@ -16,6 +16,14 @@ import (
 
 	"github.com/gaissmai/bart/internal/art"
 )
+
+// workLoadN to adjust loops for tests with -short
+func workLoadN() int {
+	if testing.Short() {
+		return 1_000
+	}
+	return 10_000
+}
 
 func TestInverseIndex(t *testing.T) {
 	t.Parallel()
@@ -42,10 +50,10 @@ func TestPrefixInsert(t *testing.T) {
 
 	pfxs := shuffleNodePfxs(prng, allNodePfxs())[:100]
 	gold := new(goldNode[int]).insertMany(pfxs)
-	fast := new(bartNode[int])
+	fast := new(BartNode[int])
 
 	for _, pfx := range pfxs {
-		fast.insertPrefix(art.PfxToIdx(pfx.octet, pfx.bits), pfx.val)
+		fast.InsertPrefix(art.PfxToIdx(pfx.octet, pfx.bits), pfx.val)
 	}
 
 	for i := range maxItems {
@@ -54,7 +62,7 @@ func TestPrefixInsert(t *testing.T) {
 		//nolint:gosec  // G115: integer overflow conversion int -> uint
 		addr := uint8(i)
 		goldVal, goldOK := gold.lpm(octet)
-		_, fastVal, fastOK := fast.lookupIdx(art.OctetToIdx(addr))
+		_, fastVal, fastOK := fast.LookupIdx(art.OctetToIdx(addr))
 		if !getsEqual(fastVal, fastOK, goldVal, goldOK) {
 			t.Fatalf("get(%d) = (%v, %v), want (%v, %v)", octet, fastVal, fastOK, goldVal, goldOK)
 		}
@@ -68,16 +76,16 @@ func TestPrefixDelete(t *testing.T) {
 
 	pfxs := shuffleNodePfxs(prng, allNodePfxs())[:100]
 	gold := new(goldNode[int]).insertMany(pfxs)
-	fast := new(bartNode[int])
+	fast := new(BartNode[int])
 
 	for _, pfx := range pfxs {
-		fast.insertPrefix(art.PfxToIdx(pfx.octet, pfx.bits), pfx.val)
+		fast.InsertPrefix(art.PfxToIdx(pfx.octet, pfx.bits), pfx.val)
 	}
 
 	toDelete := pfxs[:50]
 	for _, pfx := range toDelete {
 		gold.deleteItem(pfx.octet, pfx.bits)
-		fast.deletePrefix(art.PfxToIdx(pfx.octet, pfx.bits))
+		fast.DeletePrefix(art.PfxToIdx(pfx.octet, pfx.bits))
 	}
 
 	// Sanity check that slow table seems to have done the right thing.
@@ -91,7 +99,7 @@ func TestPrefixDelete(t *testing.T) {
 		//nolint:gosec  // G115: integer overflow conversion int -> uint
 		addr := uint8(i)
 		goldVal, goldOK := gold.lpm(octet)
-		_, fastVal, fastOK := fast.lookupIdx(art.OctetToIdx(addr))
+		_, fastVal, fastOK := fast.LookupIdx(art.OctetToIdx(addr))
 		if !getsEqual(fastVal, fastOK, goldVal, goldOK) {
 			t.Fatalf("get(%d) = (%v, %v), want (%v, %v)", octet, fastVal, fastOK, goldVal, goldOK)
 		}
@@ -104,15 +112,15 @@ func TestOverlapsPrefix(t *testing.T) {
 
 	pfxs := shuffleNodePfxs(prng, allNodePfxs())[:100]
 	gold := new(goldNode[int]).insertMany(pfxs)
-	fast := new(bartNode[int])
+	bart := new(BartNode[int])
 
 	for _, pfx := range pfxs {
-		fast.insertPrefix(art.PfxToIdx(pfx.octet, pfx.bits), pfx.val)
+		bart.InsertPrefix(art.PfxToIdx(pfx.octet, pfx.bits), pfx.val)
 	}
 
 	for _, tt := range allNodePfxs() {
 		goldOK := gold.overlapsPrefix(tt.octet, tt.bits)
-		fastOK := fast.overlapsIdx(art.PfxToIdx(tt.octet, tt.bits))
+		fastOK := bart.OverlapsIdx(art.PfxToIdx(tt.octet, tt.bits))
 		if goldOK != fastOK {
 			t.Fatalf("overlapsPrefix(%d, %d) = %v, want %v", tt.octet, tt.bits, fastOK, goldOK)
 		}
@@ -134,22 +142,22 @@ func TestOverlapsRoutes(t *testing.T) {
 		pfxs := all[:numEntries]
 
 		gold := new(goldNode[int]).insertMany(pfxs)
-		fast := new(bartNode[int])
+		fast := new(BartNode[int])
 
 		for _, pfx := range pfxs {
-			fast.insertPrefix(art.PfxToIdx(pfx.octet, pfx.bits), pfx.val)
+			fast.InsertPrefix(art.PfxToIdx(pfx.octet, pfx.bits), pfx.val)
 		}
 
 		inter := all[numEntries : 2*numEntries]
 		goldInter := new(goldNode[int]).insertMany(inter)
-		fastInter := new(bartNode[int])
+		fastInter := new(BartNode[int])
 
 		for _, pfx := range inter {
-			fastInter.insertPrefix(art.PfxToIdx(pfx.octet, pfx.bits), pfx.val)
+			fastInter.InsertPrefix(art.PfxToIdx(pfx.octet, pfx.bits), pfx.val)
 		}
 
 		gotGold := gold.overlaps(goldInter)
-		gotFast := fast.overlapsRoutes(fastInter)
+		gotFast := fast.OverlapsRoutes(fastInter)
 		if gotGold != gotFast {
 			t.Fatalf("node.overlaps = %v, want %v", gotFast, gotGold)
 		}
@@ -166,13 +174,13 @@ func BenchmarkNodePrefixInsert(b *testing.B) {
 	routes := shuffleNodePfxs(prng, allNodePfxs())
 
 	for _, nroutes := range prefixCount {
-		this := new(bartNode[int])
+		this := new(BartNode[int])
 
 		for i, route := range routes {
 			if i >= nroutes {
 				break
 			}
-			this.insertPrefix(art.PfxToIdx(route.octet, route.bits), 0)
+			this.InsertPrefix(art.PfxToIdx(route.octet, route.bits), 0)
 		}
 
 		b.Run(fmt.Sprintf("Into %d", nroutes), func(b *testing.B) {
@@ -180,7 +188,7 @@ func BenchmarkNodePrefixInsert(b *testing.B) {
 			for b.Loop() {
 				route := routes[i%len(routes)]
 				idx := art.PfxToIdx(route.octet, route.bits)
-				this.insertPrefix(idx, 0)
+				this.InsertPrefix(idx, 0)
 				i++
 			}
 		})
@@ -192,13 +200,13 @@ func BenchmarkNodePrefixDelete(b *testing.B) {
 	routes := shuffleNodePfxs(prng, allNodePfxs())
 
 	for _, nroutes := range prefixCount {
-		this := new(bartNode[int])
+		this := new(BartNode[int])
 
 		for i, route := range routes {
 			if i >= nroutes {
 				break
 			}
-			this.insertPrefix(art.PfxToIdx(route.octet, route.bits), 0)
+			this.InsertPrefix(art.PfxToIdx(route.octet, route.bits), 0)
 		}
 
 		b.Run(fmt.Sprintf("From %d", nroutes), func(b *testing.B) {
@@ -206,7 +214,7 @@ func BenchmarkNodePrefixDelete(b *testing.B) {
 			for b.Loop() {
 				route := routes[i%len(routes)]
 				idx := art.PfxToIdx(route.octet, route.bits)
-				this.deletePrefix(idx)
+				this.DeletePrefix(idx)
 				i++
 			}
 		})
@@ -218,15 +226,15 @@ func BenchmarkNodesPrefixLPM(b *testing.B) {
 	routes := shuffleNodePfxs(prng, allNodePfxs())
 
 	for _, nroutes := range prefixCount {
-		this := new(bartNode[int])
-		that := new(fastNode[int])
+		this := new(BartNode[int])
+		that := new(FastNode[int])
 
 		for i, route := range routes {
 			if i >= nroutes {
 				break
 			}
-			this.insertPrefix(art.PfxToIdx(route.octet, route.bits), 0)
-			that.insertPrefix(art.PfxToIdx(route.octet, route.bits), 0)
+			this.InsertPrefix(art.PfxToIdx(route.octet, route.bits), 0)
+			that.InsertPrefix(art.PfxToIdx(route.octet, route.bits), 0)
 		}
 
 		b.Run(fmt.Sprintf("node:    lookup   IN %d", nroutes), func(b *testing.B) {
@@ -234,7 +242,7 @@ func BenchmarkNodesPrefixLPM(b *testing.B) {
 			idx := art.PfxToIdx(route.octet, route.bits)
 
 			for b.Loop() {
-				this.lookup(idx)
+				this.Lookup(idx)
 			}
 		})
 
@@ -243,7 +251,7 @@ func BenchmarkNodesPrefixLPM(b *testing.B) {
 			idx := art.PfxToIdx(route.octet, route.bits)
 
 			for b.Loop() {
-				that.lookup(idx)
+				that.Lookup(idx)
 			}
 		})
 
@@ -252,7 +260,7 @@ func BenchmarkNodesPrefixLPM(b *testing.B) {
 			idx := art.PfxToIdx(route.octet, route.bits)
 
 			for b.Loop() {
-				this.contains(idx)
+				this.Contains(idx)
 			}
 		})
 
@@ -261,7 +269,7 @@ func BenchmarkNodesPrefixLPM(b *testing.B) {
 			idx := art.PfxToIdx(route.octet, route.bits)
 
 			for b.Loop() {
-				that.contains(idx)
+				that.Contains(idx)
 			}
 		})
 	}
@@ -270,17 +278,17 @@ func BenchmarkNodesPrefixLPM(b *testing.B) {
 func BenchmarkNodePrefixesAsSlice(b *testing.B) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, nPrefixes := range prefixCount {
-		this := new(bartNode[any])
+		this := new(BartNode[any])
 
 		for range nPrefixes {
 			idx := byte(prng.IntN(maxItems))
-			this.insertPrefix(idx, nil)
+			this.InsertPrefix(idx, nil)
 		}
 
 		b.Run(fmt.Sprintf("Set %d", nPrefixes), func(b *testing.B) {
 			var buf [maxItems]uint8
 			for b.Loop() {
-				this.prefixes.AsSlice(&buf)
+				this.Prefixes.AsSlice(&buf)
 			}
 		})
 	}
@@ -289,16 +297,16 @@ func BenchmarkNodePrefixesAsSlice(b *testing.B) {
 func BenchmarkNodePrefixesAll(b *testing.B) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, nPrefixes := range prefixCount {
-		this := new(bartNode[any])
+		this := new(BartNode[any])
 
 		for range nPrefixes {
 			idx := byte(prng.IntN(maxItems))
-			this.insertPrefix(idx, nil)
+			this.InsertPrefix(idx, nil)
 		}
 
 		b.Run(fmt.Sprintf("Set %d", nPrefixes), func(b *testing.B) {
 			for b.Loop() {
-				this.prefixes.Bits()
+				this.Prefixes.Bits()
 			}
 		})
 
@@ -308,12 +316,12 @@ func BenchmarkNodePrefixesAll(b *testing.B) {
 func BenchmarkNodeChildInsert(b *testing.B) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, nchilds := range childCount {
-		this := new(bartNode[int])
+		this := new(BartNode[int])
 
 		for range nchilds {
 			//nolint:gosec  // G115: integer overflow conversion int -> uint
 			octet := uint8(prng.IntN(maxItems))
-			this.insertChild(octet, nil)
+			this.InsertChild(octet, nil)
 		}
 
 		b.Run(fmt.Sprintf("Into %d", nchilds), func(b *testing.B) {
@@ -321,7 +329,7 @@ func BenchmarkNodeChildInsert(b *testing.B) {
 			octet := uint8(prng.IntN(maxItems))
 
 			for b.Loop() {
-				this.insertChild(octet, nil)
+				this.InsertChild(octet, nil)
 			}
 		})
 	}
@@ -330,12 +338,12 @@ func BenchmarkNodeChildInsert(b *testing.B) {
 func BenchmarkNodeChildDelete(b *testing.B) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, nchilds := range childCount {
-		this := new(bartNode[int])
+		this := new(BartNode[int])
 
 		for range nchilds {
 			//nolint:gosec  // G115: integer overflow conversion int -> uint
 			octet := uint8(prng.IntN(maxItems))
-			this.insertChild(octet, nil)
+			this.InsertChild(octet, nil)
 		}
 
 		b.Run(fmt.Sprintf("From %d", nchilds), func(b *testing.B) {
@@ -343,7 +351,7 @@ func BenchmarkNodeChildDelete(b *testing.B) {
 			octet := uint8(prng.IntN(maxItems))
 
 			for b.Loop() {
-				this.deleteChild(octet)
+				this.DeleteChild(octet)
 			}
 		})
 	}
@@ -352,17 +360,17 @@ func BenchmarkNodeChildDelete(b *testing.B) {
 func BenchmarkNodeChildrenAsSlice(b *testing.B) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, nchilds := range childCount {
-		this := new(bartNode[int])
+		this := new(BartNode[int])
 
 		for range nchilds {
 			octet := byte(prng.IntN(maxItems))
-			this.insertChild(octet, nil)
+			this.InsertChild(octet, nil)
 		}
 
 		b.Run(fmt.Sprintf("Set %d", nchilds), func(b *testing.B) {
 			var buf [maxItems]uint8
 			for b.Loop() {
-				this.children.AsSlice(&buf)
+				this.Children.AsSlice(&buf)
 			}
 		})
 	}
@@ -371,16 +379,16 @@ func BenchmarkNodeChildrenAsSlice(b *testing.B) {
 func BenchmarkNodeChildrenAll(b *testing.B) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, nchilds := range childCount {
-		this := new(bartNode[int])
+		this := new(BartNode[int])
 
 		for range nchilds {
 			octet := byte(prng.IntN(maxItems))
-			this.insertChild(octet, nil)
+			this.InsertChild(octet, nil)
 		}
 
 		b.Run(fmt.Sprintf("Set %d", nchilds), func(b *testing.B) {
 			for b.Loop() {
-				this.children.Bits()
+				this.Children.Bits()
 			}
 		})
 	}

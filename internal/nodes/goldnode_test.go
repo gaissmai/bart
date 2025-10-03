@@ -1,7 +1,7 @@
 // Copyright (c) 2025 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
-package bart
+package nodes
 
 import (
 	"math/rand/v2"
