@@ -35,7 +35,7 @@ func DumpRec[V any](n NodeReader[V], w io.Writer, path StridePath, depth int, is
 	}
 
 	// dump this node
-	dump(n, w, path, depth, is4, printVals)
+	Dump(n, w, path, depth, is4, printVals)
 
 	// node may have children, rec-descent down
 	for addr, child := range n.AllChildren() {
@@ -46,12 +46,12 @@ func DumpRec[V any](n NodeReader[V], w io.Writer, path StridePath, depth int, is
 	}
 }
 
-// dump writes a human-readable representation of the node `n` to `w`.
+// Dump writes a human-readable representation of the node `n` to `w`.
 // It prints the node type, depth, formatted path (IPv4 vs IPv6 controlled by `is4`),
 // and bit count, followed by any stored prefixes (and their values when applicable),
 // the set of child octets, and any path-compressed leaves or fringe entries.
 // `path` and `depth` determine how prefixes and fringe CIDRs are rendered.
-func dump[V any](n NodeReader[V], w io.Writer, path StridePath, depth int, is4 bool, printVals bool) {
+func Dump[V any](n NodeReader[V], w io.Writer, path StridePath, depth int, is4 bool, printVals bool) {
 	bits := depth * strideLen
 	indent := strings.Repeat(".", depth)
 
@@ -181,7 +181,7 @@ func dump[V any](n NodeReader[V], w io.Writer, path StridePath, depth int, is4 b
 //
 // The order of these checks is significant to ensure the correct classification.
 func hasType[V any](n NodeReader[V]) nodeType {
-	s := NodeStats[V](n)
+	s := Stats[V](n)
 
 	// the order is important
 	switch {
@@ -267,11 +267,11 @@ type StatsT struct {
 	Fringes int
 }
 
-// NodeStats returns immediate statistics for n: counts of prefixes and children,
+// Stats returns immediate statistics for n: counts of prefixes and children,
 // and a classification of each child into nodes, leaves, or fringes.
 // It inspects only the direct children of n (not the whole subtree).
 // Panics if a child has an unexpected concrete type.
-func NodeStats[V any](n NodeReader[V]) StatsT {
+func Stats[V any](n NodeReader[V]) StatsT {
 	var s StatsT
 
 	s.Pfxs = n.PrefixCount()

@@ -9,6 +9,8 @@ import (
 	"net/netip"
 	"strings"
 	"testing"
+
+	"github.com/gaissmai/bart/internal/nodes"
 )
 
 type zeroStructT = struct{}
@@ -40,10 +42,10 @@ func insertAll(tbl tablerTiny, pfxs []netip.Prefix) {
 func TestUnifiedDumper_NodeTypes(t *testing.T) {
 	t.Parallel()
 
-	nodeBuilder := map[string]func() nodeReadWriter[any]{
-		"bartNode": func() nodeReadWriter[any] { return &bartNode[any]{} },
-		"fastNode": func() nodeReadWriter[any] { return &fastNode[any]{} },
-		"liteNode": func() nodeReadWriter[any] { return &liteNode[any]{} },
+	nodeBuilder := map[string]func() nodes.NodeReadWriter[any]{
+		"bartNode": func() nodes.NodeReadWriter[any] { return &nodes.BartNode[any]{} },
+		"fastNode": func() nodes.NodeReadWriter[any] { return &nodes.FastNode[any]{} },
+		"liteNode": func() nodes.NodeReadWriter[any] { return &nodes.LiteNode[any]{} },
 	}
 
 	for nodeTypeName, build := range nodeBuilder {
@@ -52,9 +54,9 @@ func TestUnifiedDumper_NodeTypes(t *testing.T) {
 
 			// Test nodeStats
 			n := build()
-			stats := nodeStats(n)
+			stats := nodes.Stats(n)
 			// For empty nodes, stats should have reasonable values
-			if stats.nodes < 0 || stats.pfxs < 0 {
+			if stats.Nodes < 0 || stats.Pfxs < 0 {
 				t.Errorf("Invalid stats for empty %s: %+v", nodeTypeName, stats)
 			}
 		})
@@ -63,11 +65,11 @@ func TestUnifiedDumper_NodeTypes(t *testing.T) {
 			t.Parallel()
 
 			n := build()
-			n.insertPrefix(128, "test-value")
+			n.InsertPrefix(128, "test-value")
 
 			// Test that we can get stats after insertion
-			stats := nodeStats(n)
-			if stats.pfxs == 0 {
+			stats := nodes.Stats(n)
+			if stats.Pfxs == 0 {
 				t.Errorf("Expected non-zero prefixes after insertion in %s", nodeTypeName)
 			}
 		})
@@ -79,10 +81,10 @@ func TestUnifiedDumper_NodeTypes(t *testing.T) {
 			path := stridePath{}
 
 			n := build()
-			n.insertPrefix(64, "dump-test")
+			n.InsertPrefix(64, "dump-test")
 
 			// Use the dump function that takes io.Writer
-			dump(n, &buf, path, 0, false, shouldPrintValues[any]())
+			nodes.Dump(n, &buf, path, 0, false, nodes.ShouldPrintValues[any]())
 
 			output := buf.String()
 			// Just check that it produces some output without panicking
@@ -97,10 +99,10 @@ func TestUnifiedDumper_NodeTypes(t *testing.T) {
 func TestUnifiedDumper_TypedNilHandling(t *testing.T) {
 	t.Parallel()
 
-	nodeBuilder := map[string]func() nodeReader[any]{
-		"bartNode": func() nodeReader[any] { return (*bartNode[any])(nil) },
-		"fastNode": func() nodeReader[any] { return (*fastNode[any])(nil) },
-		"liteNode": func() nodeReader[any] { return (*liteNode[any])(nil) },
+	nodeBuilder := map[string]func() nodes.NodeReader[any]{
+		"bartNode": func() nodes.NodeReader[any] { return (*nodes.BartNode[any])(nil) },
+		"fastNode": func() nodes.NodeReader[any] { return (*nodes.FastNode[any])(nil) },
+		"liteNode": func() nodes.NodeReader[any] { return (*nodes.LiteNode[any])(nil) },
 	}
 
 	for nodeTypeName, createNilNode := range nodeBuilder {
@@ -115,7 +117,7 @@ func TestUnifiedDumper_TypedNilHandling(t *testing.T) {
 			pn := createNilNode()
 			w := new(strings.Builder)
 			path := stridePath{}
-			dumpRec(pn, w, path, 0, true, shouldPrintValues[any]())
+			nodes.DumpRec(pn, w, path, 0, true, nodes.ShouldPrintValues[any]())
 		})
 	}
 }

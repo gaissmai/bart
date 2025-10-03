@@ -15,6 +15,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/gaissmai/bart/internal/nodes"
 )
 
 // full internet prefix list, gzipped
@@ -367,18 +369,18 @@ func BenchmarkFullTableMemory4(b *testing.B) {
 		runtime.GC()
 		runtime.ReadMemStats(&endMem)
 
-		stats := nodeStatsRec(&rt.root4)
-		if stats.pfxs == 0 {
+		stats := nodes.StatsRec(&rt.root4)
+		if stats.Pfxs == 0 {
 			b.Skip("No prefixes inserted")
 		}
 
 		bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
 		b.ReportMetric(roundFloat64(bytes/float64(rt.Size())), "bytes/route")
 
-		b.ReportMetric(float64(stats.pfxs), "pfxs")
-		b.ReportMetric(float64(stats.nodes), "nodes")
-		b.ReportMetric(float64(stats.leaves), "leaves")
-		b.ReportMetric(float64(stats.fringes), "fringes")
+		b.ReportMetric(float64(stats.Pfxs), "pfxs")
+		b.ReportMetric(float64(stats.Nodes), "nodes")
+		b.ReportMetric(float64(stats.Leaves), "leaves")
+		b.ReportMetric(float64(stats.Fringes), "fringes")
 		b.ReportMetric(0, "ns/op")
 	})
 }
@@ -398,18 +400,18 @@ func BenchmarkFullTableMemory6(b *testing.B) {
 		runtime.GC()
 		runtime.ReadMemStats(&endMem)
 
-		stats := nodeStatsRec(&rt.root6)
-		if stats.pfxs == 0 {
+		stats := nodes.StatsRec(&rt.root6)
+		if stats.Pfxs == 0 {
 			b.Skip("No prefixes inserted")
 		}
 
 		bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
 		b.ReportMetric(roundFloat64(bytes/float64(rt.Size())), "bytes/route")
 
-		b.ReportMetric(float64(stats.pfxs), "pfxs")
-		b.ReportMetric(float64(stats.nodes), "nodes")
-		b.ReportMetric(float64(stats.leaves), "leaves")
-		b.ReportMetric(float64(stats.fringes), "fringes")
+		b.ReportMetric(float64(stats.Pfxs), "pfxs")
+		b.ReportMetric(float64(stats.Nodes), "nodes")
+		b.ReportMetric(float64(stats.Leaves), "leaves")
+		b.ReportMetric(float64(stats.Fringes), "fringes")
 		b.ReportMetric(0, "ns/op")
 	})
 }
@@ -429,27 +431,27 @@ func BenchmarkFullTableMemory(b *testing.B) {
 		runtime.GC()
 		runtime.ReadMemStats(&endMem)
 
-		s4 := nodeStatsRec(&rt.root4)
-		s6 := nodeStatsRec(&rt.root6)
-		stats := statsT{
-			pfxs:    s4.pfxs + s6.pfxs,
-			childs:  s4.childs + s6.childs,
-			nodes:   s4.nodes + s6.nodes,
-			leaves:  s4.leaves + s6.leaves,
-			fringes: s4.fringes + s6.fringes,
+		s4 := nodes.StatsRec(&rt.root4)
+		s6 := nodes.StatsRec(&rt.root6)
+		stats := nodes.StatsT{
+			Pfxs:    s4.Pfxs + s6.Pfxs,
+			Childs:  s4.Childs + s6.Childs,
+			Nodes:   s4.Nodes + s6.Nodes,
+			Leaves:  s4.Leaves + s6.Leaves,
+			Fringes: s4.Fringes + s6.Fringes,
 		}
 
-		if stats.pfxs == 0 {
+		if stats.Pfxs == 0 {
 			b.Skip("No prefixes inserted")
 		}
 
 		bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
 		b.ReportMetric(roundFloat64(bytes/float64(rt.Size())), "bytes/route")
 
-		b.ReportMetric(float64(stats.pfxs), "pfxs")
-		b.ReportMetric(float64(stats.nodes), "nodes")
-		b.ReportMetric(float64(stats.leaves), "leaves")
-		b.ReportMetric(float64(stats.fringes), "fringes")
+		b.ReportMetric(float64(stats.Pfxs), "pfxs")
+		b.ReportMetric(float64(stats.Nodes), "nodes")
+		b.ReportMetric(float64(stats.Leaves), "leaves")
+		b.ReportMetric(float64(stats.Fringes), "fringes")
 		b.ReportMetric(0, "ns/op")
 	})
 }

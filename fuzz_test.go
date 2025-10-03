@@ -5,6 +5,8 @@ import (
 	"math/rand/v2"
 	"net/netip"
 	"testing"
+
+	"github.com/gaissmai/bart/internal/nodes"
 )
 
 func FuzzTableSubnets(f *testing.F) {
@@ -713,7 +715,7 @@ func FuzzTableAllSorted(f *testing.F) {
 
 		// Verify all prefixes are in natural CIDR sort order using existing cmpPrefix function
 		for i := 1; i < len(sortedPrefixes); i++ {
-			if cmpPrefix(sortedPrefixes[i-1], sortedPrefixes[i]) > 0 {
+			if nodes.CmpPrefix(sortedPrefixes[i-1], sortedPrefixes[i]) > 0 {
 				t.Fatalf("CIDR sort order violated at index %d: %v should come before %v",
 					i-1, sortedPrefixes[i-1], sortedPrefixes[i])
 			}
@@ -788,7 +790,7 @@ func FuzzFastAllSorted(f *testing.F) {
 
 		// Verify all prefixes are in natural CIDR sort order using existing cmpPrefix function
 		for i := 1; i < len(sortedPrefixes); i++ {
-			if cmpPrefix(sortedPrefixes[i-1], sortedPrefixes[i]) > 0 {
+			if nodes.CmpPrefix(sortedPrefixes[i-1], sortedPrefixes[i]) > 0 {
 				t.Fatalf("CIDR sort order violated at index %d: %v should come before %v",
 					i-1, sortedPrefixes[i-1], sortedPrefixes[i])
 			}
@@ -861,7 +863,7 @@ func FuzzLiteAllSorted(f *testing.F) {
 
 		// Verify all prefixes are in natural CIDR sort order using existing cmpPrefix function
 		for i := 1; i < len(sortedPrefixes); i++ {
-			if cmpPrefix(sortedPrefixes[i-1], sortedPrefixes[i]) > 0 {
+			if nodes.CmpPrefix(sortedPrefixes[i-1], sortedPrefixes[i]) > 0 {
 				t.Fatalf("CIDR sort order violated at index %d: %v should come before %v",
 					i-1, sortedPrefixes[i-1], sortedPrefixes[i])
 			}

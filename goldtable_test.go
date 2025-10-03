@@ -8,6 +8,8 @@ import (
 	"math/rand/v2"
 	"net/netip"
 	"slices"
+
+	"github.com/gaissmai/bart/internal/nodes"
 )
 
 // goldTable is a simple and slow route table, implemented as a slice of prefixes
@@ -135,7 +137,7 @@ func (t goldTable[V]) subnets(pfx netip.Prefix) []netip.Prefix {
 			result = append(result, item.pfx)
 		}
 	}
-	slices.SortFunc(result, cmpPrefix)
+	slices.SortFunc(result, nodes.CmpPrefix)
 	return result
 }
 
@@ -148,7 +150,7 @@ func (t goldTable[V]) supernets(pfx netip.Prefix) []netip.Prefix {
 			result = append(result, item.pfx)
 		}
 	}
-	slices.SortFunc(result, cmpPrefix)
+	slices.SortFunc(result, nodes.CmpPrefix)
 	slices.Reverse(result)
 	return result
 }
@@ -177,7 +179,7 @@ func (ta *goldTable[V]) overlaps(tb *goldTable[V]) bool {
 // sort, inplace by netip.Prefix, all prefixes are in normalized form
 func (t *goldTable[V]) sort() {
 	slices.SortFunc(*t, func(a, b goldTableItem[V]) int {
-		return cmpPrefix(a.pfx, b.pfx)
+		return nodes.CmpPrefix(a.pfx, b.pfx)
 	})
 }
 

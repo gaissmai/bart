@@ -1,3 +1,6 @@
+// Copyright (c) 2025 Karl Gaissmaier
+// SPDX-License-Identifier: MIT
+
 package bart
 
 import (
@@ -7,15 +10,17 @@ import (
 	"github.com/gaissmai/bart/internal/nodes"
 )
 
+type stridePath = nodes.StridePath
+
 const (
 	maxItems     = nodes.MaxItems
 	maxTreeDepth = nodes.MaxTreeDepth
 	depthMask    = nodes.DepthMask
 )
 
-type stridePath = nodes.StridePath
-
-var LastOctetPlusOneAndLastBits = nodes.LastOctetPlusOneAndLastBits
+func lastOctetPlusOneAndLastBits(pfx netip.Prefix) (lastOctetPlusOne int, lastBits uint8) {
+	return nodes.LastOctetPlusOneAndLastBits(pfx)
+}
 
 // DumpListNode contains CIDR, Value and Subnets, representing the trie
 // in a sorted, recursive representation, especially useful for serialization.

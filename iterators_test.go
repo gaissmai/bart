@@ -7,13 +7,15 @@ import (
 	"math/rand/v2"
 	"net/netip"
 	"testing"
+
+	"github.com/gaissmai/bart/internal/nodes"
 )
 
 // verifySortedCIDR asserts the slice is sorted in natural CIDR order.
 func verifySortedCIDR(t *testing.T, list []netip.Prefix) {
 	t.Helper()
 	for i := 1; i < len(list); i++ {
-		if cmpPrefix(list[i-1], list[i]) > 0 {
+		if nodes.CmpPrefix(list[i-1], list[i]) > 0 {
 			t.Fatalf("order violation at %d: %v > %v", i-1, list[i-1], list[i])
 		}
 	}
