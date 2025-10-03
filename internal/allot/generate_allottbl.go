@@ -75,7 +75,7 @@ func main() {
 	goimports := exec.Command("goimports", "-w", outFname)
 	fmt.Fprintf(os.Stdout, "%s Running goimports on %s\n", INFO, outFname)
 	if out, err := goimports.CombinedOutput(); err != nil {
-		fmt.Fprintf(os.Stderr, "%s %s", DIE, string(out))
+		fmt.Fprintf(os.Stderr, "%s %s\n", DIE, string(out))
 		os.Exit(1)
 	}
 	fmt.Fprintf(os.Stdout, "%s ✓ goimports completed\n", INFO)
@@ -84,7 +84,7 @@ func main() {
 	gofumpt := exec.Command("gofumpt", "-w", outFname)
 	fmt.Fprintf(os.Stdout, "%s Running gofumpt on %s\n", INFO, outFname)
 	if out, err := gofumpt.CombinedOutput(); err != nil {
-		fmt.Fprintf(os.Stderr, "%s %s", DIE, string(out))
+		fmt.Fprintf(os.Stderr, "%s %s\n", DIE, string(out))
 		os.Exit(1)
 	}
 	fmt.Fprintf(os.Stdout, "%s ✓ gofumpt completed\n", INFO)
@@ -134,14 +134,16 @@ func asString(tbl [256]bitset.BitSet256) string {
 	// /* idx:  13 */ {0x204a, 0x0, 0x0, 0x0}, // [1 3 6 13]
 	for idx := 1; idx < 256; idx++ {
 		fmt.Fprintf(&builder, "  /* idx: %3d */ %#v, // ", idx, tbl[idx])
-		if tbl[idx].Size() < 10 {
-			fmt.Fprintf(&builder, "%v\n", tbl[idx].Bits())
+
+		bits := tbl[idx].Bits()
+		if len(bits) < 10 {
+			fmt.Fprintf(&builder, "%v\n", bits)
 		} else {
 			fmt.Fprint(&builder, "[")
-			for _, bit := range tbl[idx].Bits()[:5] {
+			for _, bit := range bits[:5] {
 				fmt.Fprintf(&builder, "%d, ", bit)
 			}
-			fmt.Fprintln(&builder, " ...")
+			fmt.Fprintln(&builder, "... ]")
 		}
 	}
 
