@@ -16,6 +16,8 @@ import (
 	"runtime"
 	"strconv"
 	"testing"
+
+	"github.com/gaissmai/bart/internal/nodes"
 )
 
 // workLoadN to adjust loops for tests with -short
@@ -24,6 +26,16 @@ func workLoadN() int {
 		return 1_000
 	}
 	return 10_000
+}
+
+func getsEqual[V comparable](a V, aOK bool, b V, bOK bool) bool {
+	if !aOK && !bOK {
+		return true
+	}
+	if aOK != bOK {
+		return false
+	}
+	return a == b
 }
 
 var mpa = netip.MustParseAddr
@@ -1569,15 +1581,15 @@ func TestDeleteButOne(t *testing.T) {
 			tbl.Delete(p.pfx)
 		}
 
-		stats4 := nodeStatsRec(&tbl.root4)
-		stats6 := nodeStatsRec(&tbl.root6)
+		stats4 := tbl.root4.StatsRec()
+		stats6 := tbl.root6.StatsRec()
 
-		if nodes := stats4.nodes + stats6.nodes; nodes != 1 {
+		if nodes := stats4.Nodes + stats6.Nodes; nodes != 1 {
 			t.Fatalf("delete but one, want nodes: 1, got: %d\n%s", nodes, tbl.dumpString())
 		}
 
-		sum := stats4.pfxs + stats4.leaves + stats4.fringes +
-			stats6.pfxs + stats6.leaves + stats6.fringes
+		sum := stats4.Pfxs + stats4.Leaves + stats4.Fringes +
+			stats6.Pfxs + stats6.Leaves + stats6.Fringes
 
 		if sum != 1 {
 			t.Fatalf("delete but one, only one item must be left, but: %d\n%s", sum, tbl.dumpString())
@@ -3243,14 +3255,14 @@ func BenchmarkMemIP4(b *testing.B) {
 			runtime.GC()
 			runtime.ReadMemStats(&endMem)
 
-			stats := nodeStatsRec(&rt.root4)
+			stats := rt.root4.StatsRec()
 
 			bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
-			b.ReportMetric(roundFloat64(bytes/float64(stats.pfxs)), "bytes/route")
-			b.ReportMetric(float64(stats.pfxs), "pfxs")
-			b.ReportMetric(float64(stats.nodes), "nodes")
-			b.ReportMetric(float64(stats.leaves), "leaves")
-			b.ReportMetric(float64(stats.fringes), "fringes")
+			b.ReportMetric(roundFloat64(bytes/float64(stats.Pfxs)), "bytes/route")
+			b.ReportMetric(float64(stats.Pfxs), "pfxs")
+			b.ReportMetric(float64(stats.Nodes), "nodes")
+			b.ReportMetric(float64(stats.Leaves), "leaves")
+			b.ReportMetric(float64(stats.Fringes), "fringes")
 			b.ReportMetric(0, "ns/op")
 		})
 	}
@@ -3276,14 +3288,14 @@ func BenchmarkMemIP6(b *testing.B) {
 			runtime.GC()
 			runtime.ReadMemStats(&endMem)
 
-			stats := nodeStatsRec(&rt.root6)
+			stats := rt.root6.StatsRec()
 
 			bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
-			b.ReportMetric(roundFloat64(bytes/float64(stats.pfxs)), "bytes/route")
-			b.ReportMetric(float64(stats.pfxs), "pfxs")
-			b.ReportMetric(float64(stats.nodes), "nodes")
-			b.ReportMetric(float64(stats.leaves), "leaves")
-			b.ReportMetric(float64(stats.fringes), "fringes")
+			b.ReportMetric(roundFloat64(bytes/float64(stats.Pfxs)), "bytes/route")
+			b.ReportMetric(float64(stats.Pfxs), "pfxs")
+			b.ReportMetric(float64(stats.Nodes), "nodes")
+			b.ReportMetric(float64(stats.Leaves), "leaves")
+			b.ReportMetric(float64(stats.Fringes), "fringes")
 			b.ReportMetric(0, "ns/op")
 		})
 	}
@@ -3309,22 +3321,22 @@ func BenchmarkMem(b *testing.B) {
 			runtime.GC()
 			runtime.ReadMemStats(&endMem)
 
-			s4 := nodeStatsRec(&rt.root4)
-			s6 := nodeStatsRec(&rt.root6)
-			stats := statsT{
-				s4.pfxs + s6.pfxs,
-				s4.childs + s6.childs,
-				s4.nodes + s6.nodes,
-				s4.leaves + s6.leaves,
-				s4.fringes + s6.fringes,
+			s4 := rt.root4.StatsRec()
+			s6 := rt.root6.StatsRec()
+			stats := nodes.StatsT{
+				Pfxs:    s4.Pfxs + s6.Pfxs,
+				Childs:  s4.Childs + s6.Childs,
+				Nodes:   s4.Nodes + s6.Nodes,
+				Leaves:  s4.Leaves + s6.Leaves,
+				Fringes: s4.Fringes + s6.Fringes,
 			}
 
 			bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
-			b.ReportMetric(roundFloat64(bytes/float64(stats.pfxs)), "bytes/route")
-			b.ReportMetric(float64(stats.pfxs), "pfxs")
-			b.ReportMetric(float64(stats.nodes), "nodes")
-			b.ReportMetric(float64(stats.leaves), "leaves")
-			b.ReportMetric(float64(stats.fringes), "fringes")
+			b.ReportMetric(roundFloat64(bytes/float64(stats.Pfxs)), "bytes/route")
+			b.ReportMetric(float64(stats.Pfxs), "pfxs")
+			b.ReportMetric(float64(stats.Nodes), "nodes")
+			b.ReportMetric(float64(stats.Leaves), "leaves")
+			b.ReportMetric(float64(stats.Fringes), "fringes")
 			b.ReportMetric(0, "ns/op")
 		})
 	}
@@ -3377,9 +3389,9 @@ func checkRoutes(t *testing.T, tbl *Table[int], tt []tableTest) {
 func checkNumNodes(t *testing.T, tbl *Table[int], want int) {
 	t.Helper()
 
-	s4 := nodeStatsRec(&tbl.root4)
-	s6 := nodeStatsRec(&tbl.root6)
-	nodes := s4.nodes + s6.nodes
+	s4 := tbl.root4.StatsRec()
+	s6 := tbl.root6.StatsRec()
+	nodes := s4.Nodes + s6.Nodes
 
 	if got := nodes; got != want {
 		t.Errorf("wrong table dump, got %d nodes want %d", got, want)
