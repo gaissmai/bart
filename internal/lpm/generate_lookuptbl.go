@@ -66,7 +66,7 @@ func main() {
 	goimports := exec.Command("goimports", "-w", outFname)
 	fmt.Fprintf(os.Stdout, "%s Running goimports on %s\n", INFO, outFname)
 	if out, err := goimports.CombinedOutput(); err != nil {
-		fmt.Fprintf(os.Stderr, "%s %s", DIE, string(out))
+		fmt.Fprintf(os.Stderr, "%s %s\n", DIE, string(out))
 		os.Exit(1)
 	}
 	fmt.Fprintf(os.Stdout, "%s ✓ goimports completed\n", INFO)
@@ -75,7 +75,7 @@ func main() {
 	gofumpt := exec.Command("gofumpt", "-w", outFname)
 	fmt.Fprintf(os.Stdout, "%s Running gofumpt on %s\n", INFO, outFname)
 	if out, err := gofumpt.CombinedOutput(); err != nil {
-		fmt.Fprintf(os.Stderr, "%s %s", DIE, string(out))
+		fmt.Fprintf(os.Stderr, "%s %s\n", DIE, string(out))
 		os.Exit(1)
 	}
 	fmt.Fprintf(os.Stdout, "%s ✓ gofumpt completed\n", INFO)
