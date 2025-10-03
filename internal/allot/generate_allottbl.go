@@ -43,7 +43,7 @@ const (
 func main() {
 	outFile, err := os.Create(outFname)
 	if err != nil {
-		fmt.Fprint(os.Stderr, DIE, err)
+		fmt.Fprintf(os.Stderr, "%s %v\n", DIE, err)
 		os.Exit(1)
 	}
 
@@ -59,14 +59,14 @@ func main() {
 	// ... and execute it with our data
 	err = t.Execute(outFile, data)
 	if err != nil {
-		fmt.Fprint(os.Stderr, DIE, err)
+		fmt.Fprintf(os.Stderr, "%s %v\n", DIE, err)
 		_ = outFile.Close()
 		os.Exit(1)
 	}
 
 	// Ensure the file is properly closed before formatting
 	if err := outFile.Close(); err != nil {
-		fmt.Fprint(os.Stderr, DIE, err)
+		fmt.Fprintf(os.Stderr, "%s %v\n", DIE, err)
 		os.Exit(1)
 	}
 	fmt.Fprintf(os.Stdout, "%s ✓ Generated %s\n", INFO, outFname)
