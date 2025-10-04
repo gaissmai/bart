@@ -353,6 +353,7 @@ func (t *Table[V]) dumpListRec(n *nodes.BartNode[V], parentIdx uint8, path strid
 	dumpNodes := make([]DumpListNode[V], 0, len(directItems))
 
 	for _, item := range directItems {
+		// nextNode == nil is properly handled in dumpListRec
 		nextNode, _ := item.Node.(*nodes.BartNode[V])
 
 		dumpNodes = append(dumpNodes, DumpListNode[V]{

@@ -323,6 +323,7 @@ func (f *Fast[V]) dumpListRec(n *nodes.FastNode[V], parentIdx uint8, path stride
 	dumpNodes := make([]DumpListNode[V], 0, len(directItems))
 
 	for _, item := range directItems {
+		// nextNode == nil is properly handled in dumpListRec
 		nextNode, _ := item.Node.(*nodes.FastNode[V])
 
 		dumpNodes = append(dumpNodes, DumpListNode[V]{
