@@ -136,7 +136,7 @@ func (t *_TABLE_TYPE[V]) InsertPersist(pfx netip.Prefix, val V) *_TABLE_TYPE[V] 
 
 	// Create a cloning function for deep copying values;
 	// returns nil if V does not implement the Cloner interface.
-	cloneFn := nodes.CloneFnFactory[V]()
+	cloneFn := cloneFnFactory[V]()
 
 	// Clone root node corresponding to the IP version, for copy-on-write.
 	n := &pt.root4
@@ -239,7 +239,7 @@ func (t *_TABLE_TYPE[V]) DeletePersist(pfx netip.Prefix) *_TABLE_TYPE[V] {
 
 	// Create a cloning function for deep copying values;
 	// returns nil if V does not implement the Cloner interface.
-	cloneFn := nodes.CloneFnFactory[V]()
+	cloneFn := cloneFnFactory[V]()
 
 	// Clone root node corresponding to the IP version, for copy-on-write.
 	if is4 {
@@ -313,7 +313,7 @@ func (t *_TABLE_TYPE[V]) ModifyPersist(pfx netip.Prefix, cb func(_ V, ok bool) (
 	val := oldVal
 
 	// to clone or not to clone ...
-	cloneFn := nodes.CloneFnFactory[V]()
+	cloneFn := cloneFnFactory[V]()
 	if cloneFn != nil && ok {
 		val = cloneFn(oldVal)
 	}
@@ -473,9 +473,9 @@ func (t *_TABLE_TYPE[V]) Union(o *_TABLE_TYPE[V]) {
 
 	// Create a cloning function for deep copying values;
 	// returns nil if V does not implement the Cloner interface.
-	cloneFn := nodes.CloneFnFactory[V]()
+	cloneFn := cloneFnFactory[V]()
 	if cloneFn == nil {
-		cloneFn = nodes.CopyVal
+		cloneFn = copyVal
 	}
 
 	dup4 := t.root4.UnionRec(cloneFn, &o.root4, 0)
@@ -497,7 +497,7 @@ func (t *_TABLE_TYPE[V]) UnionPersist(o *_TABLE_TYPE[V]) *_TABLE_TYPE[V] {
 
 	// Create a cloning function for deep copying values;
 	// returns nil if V does not implement the Cloner interface.
-	cloneFn := nodes.CloneFnFactory[V]()
+	cloneFn := cloneFnFactory[V]()
 
 	// new _TABLE_TYPE with root nodes just copied.
 	pt := &_TABLE_TYPE[V]{
@@ -517,7 +517,7 @@ func (t *_TABLE_TYPE[V]) UnionPersist(o *_TABLE_TYPE[V]) *_TABLE_TYPE[V] {
 	}
 
 	if cloneFn == nil {
-		cloneFn = nodes.CopyVal
+		cloneFn = copyVal
 	}
 
 	dup4 := pt.root4.UnionRecPersist(cloneFn, &o.root4, 0)
@@ -553,7 +553,7 @@ func (t *_TABLE_TYPE[V]) Clone() *_TABLE_TYPE[V] {
 
 	c := new(_TABLE_TYPE[V])
 
-	cloneFn := nodes.CloneFnFactory[V]()
+	cloneFn := cloneFnFactory[V]()
 
 	c.root4 = *t.root4.CloneRec(cloneFn)
 	c.root6 = *t.root6.CloneRec(cloneFn)

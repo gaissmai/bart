@@ -18,7 +18,7 @@ import (
 func TestFastCloneFlat(t *testing.T) {
 	t.Parallel()
 
-	cloneFn := nodes.CopyVal[int] // just copy
+	cloneFn := copyVal[int] // just copy
 
 	tests := []struct {
 		name    string

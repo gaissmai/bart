@@ -78,7 +78,7 @@ func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V] {
 
 	// Create a cloning function for deep copying values;
 	// returns nil if V does not implement the Cloner interface.
-	cloneFn := nodes.CloneFnFactory[V]()
+	cloneFn := cloneFnFactory[V]()
 
 	// Clone root node corresponding to the IP version, for copy-on-write.
 	n := &pt.root4
@@ -181,7 +181,7 @@ func (t *Table[V]) DeletePersist(pfx netip.Prefix) *Table[V] {
 
 	// Create a cloning function for deep copying values;
 	// returns nil if V does not implement the Cloner interface.
-	cloneFn := nodes.CloneFnFactory[V]()
+	cloneFn := cloneFnFactory[V]()
 
 	// Clone root node corresponding to the IP version, for copy-on-write.
 	if is4 {
@@ -255,7 +255,7 @@ func (t *Table[V]) ModifyPersist(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, d
 	val := oldVal
 
 	// to clone or not to clone ...
-	cloneFn := nodes.CloneFnFactory[V]()
+	cloneFn := cloneFnFactory[V]()
 	if cloneFn != nil && ok {
 		val = cloneFn(oldVal)
 	}
@@ -415,9 +415,9 @@ func (t *Table[V]) Union(o *Table[V]) {
 
 	// Create a cloning function for deep copying values;
 	// returns nil if V does not implement the Cloner interface.
-	cloneFn := nodes.CloneFnFactory[V]()
+	cloneFn := cloneFnFactory[V]()
 	if cloneFn == nil {
-		cloneFn = nodes.CopyVal
+		cloneFn = copyVal
 	}
 
 	dup4 := t.root4.UnionRec(cloneFn, &o.root4, 0)
@@ -439,7 +439,7 @@ func (t *Table[V]) UnionPersist(o *Table[V]) *Table[V] {
 
 	// Create a cloning function for deep copying values;
 	// returns nil if V does not implement the Cloner interface.
-	cloneFn := nodes.CloneFnFactory[V]()
+	cloneFn := cloneFnFactory[V]()
 
 	// new Table with root nodes just copied.
 	pt := &Table[V]{
@@ -459,7 +459,7 @@ func (t *Table[V]) UnionPersist(o *Table[V]) *Table[V] {
 	}
 
 	if cloneFn == nil {
-		cloneFn = nodes.CopyVal
+		cloneFn = copyVal
 	}
 
 	dup4 := pt.root4.UnionRecPersist(cloneFn, &o.root4, 0)
@@ -495,7 +495,7 @@ func (t *Table[V]) Clone() *Table[V] {
 
 	c := new(Table[V])
 
-	cloneFn := nodes.CloneFnFactory[V]()
+	cloneFn := cloneFnFactory[V]()
 
 	c.root4 = *t.root4.CloneRec(cloneFn)
 	c.root6 = *t.root6.CloneRec(cloneFn)

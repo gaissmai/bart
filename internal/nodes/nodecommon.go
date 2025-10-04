@@ -283,35 +283,6 @@ type Cloner[V any] interface {
 // and returns the (possibly cloned) value of type V.
 type CloneFunc[V any] func(V) V
 
-// CloneFnFactory returns a cloneFunc.
-// If V implements Cloner[V], the returned function should perform
-// a deep copy using Clone(), otherwise it returns nil.
-func CloneFnFactory[V any]() CloneFunc[V] {
-	var zero V
-	// you can't assert directly on a type parameter
-	if _, ok := any(zero).(Cloner[V]); ok {
-		return CloneVal[V]
-	}
-	return nil
-}
-
-// CloneVal returns a deep clone of val by calling its Clone method when
-// val implements Cloner[V]. If val does not implement Cloner[V] or the
-// asserted Cloner is nil, val is returned unchanged.
-func CloneVal[V any](val V) V {
-	// you can't assert directly on a type parameter
-	c, ok := any(val).(Cloner[V])
-	if !ok || c == nil {
-		return val
-	}
-	return c.Clone()
-}
-
-// CopyVal just copies the value.
-func CopyVal[V any](val V) V {
-	return val
-}
-
 // CloneLeaf creates and returns a copy of the leafNode receiver.
 // If cloneFn is nil, the value is copied directly without modification.
 // Otherwise, cloneFn is applied to the value for deep cloning.

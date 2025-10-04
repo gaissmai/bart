@@ -50,7 +50,7 @@ type routeEntryNonCloner struct {
 
 func TestCloneFnFactory_WithCloner(t *testing.T) {
 	t.Parallel()
-	fn := nodes.CloneFnFactory[*routeEntry]()
+	fn := cloneFnFactory[*routeEntry]()
 	if fn == nil {
 		t.Fatalf("expected non-nil clone func when V implements Cloner[V]")
 	}
@@ -74,7 +74,7 @@ func TestCloneFnFactory_WithCloner(t *testing.T) {
 
 func TestCloneFnFactory_WithoutCloner(t *testing.T) {
 	t.Parallel()
-	fn := nodes.CloneFnFactory[*routeEntryNonCloner]()
+	fn := cloneFnFactory[*routeEntryNonCloner]()
 	if fn != nil {
 		t.Fatalf("expected nil clone func when V does not implement Cloner[V]")
 	}
@@ -88,7 +88,7 @@ func TestCloneVal_WithCloner(t *testing.T) {
 		attributes: map[string]int{"cost": 50, "bandwidth": 1000},
 	}
 
-	got := nodes.CloneVal[*routeEntry](in)
+	got := cloneVal[*routeEntry](in)
 	want := in.Clone()
 	if got.nextHop != want.nextHop || got.exitIF != want.exitIF {
 		t.Fatalf("expected cloned route, got different values")
@@ -108,7 +108,7 @@ func TestCloneVal_WithoutCloner(t *testing.T) {
 		exitIF:  "eth1",
 	}
 
-	got := nodes.CloneVal[*routeEntryNonCloner](in)
+	got := cloneVal[*routeEntryNonCloner](in)
 	if got != in {
 		t.Fatalf("expected passthrough for non-cloner, got different instance")
 	}
@@ -121,7 +121,7 @@ func TestCopyVal_Passthrough(t *testing.T) {
 		exitIF:  "tun0",
 	}
 
-	if got := nodes.CopyVal[*routeEntry](in); got != in {
+	if got := copyVal[*routeEntry](in); got != in {
 		t.Fatalf("copyVal should return input; want same instance")
 	}
 }
@@ -249,7 +249,7 @@ func TestNodeCloneFlat_ShallowChildrenDeepValues(t *testing.T) {
 	parent.InsertChild(2, leaf)
 	parent.InsertChild(3, fringe)
 
-	fn := nodes.CloneFnFactory[*routeEntry]() // should not be nil
+	fn := cloneFnFactory[*routeEntry]() // should not be nil
 	got := parent.CloneFlat(fn)
 
 	if got == parent {
@@ -345,7 +345,7 @@ func TestNodeCloneRec_DeepCopiesNodeChildren(t *testing.T) {
 	parent.InsertChild(10, child)
 	child.InsertChild(20, grand)
 
-	cloneFn := nodes.CloneFnFactory[*routeEntry]()
+	cloneFn := cloneFnFactory[*routeEntry]()
 	got := parent.CloneRec(cloneFn)
 
 	// Must be a new parent
@@ -421,7 +421,7 @@ func TestFastNodeCloneFlat_ValuesClonedAndChildrenFlat(t *testing.T) {
 	fn.InsertChild(1, fringe)
 	fn.InsertChild(2, childFast)
 
-	got := fn.CloneFlat(nodes.CloneFnFactory[*routeEntry]())
+	got := fn.CloneFlat(cloneFnFactory[*routeEntry]())
 	if got == fn {
 		t.Fatalf("expected new fast node instance")
 	}
@@ -487,7 +487,7 @@ func TestFastNodeCloneRec_DeepCopiesFastNodeChildren(t *testing.T) {
 	parent.InsertChild(10, child)
 	child.InsertChild(20, grand)
 
-	cloneFn := nodes.CloneFnFactory[*routeEntry]()
+	cloneFn := cloneFnFactory[*routeEntry]()
 	got := parent.CloneRec(cloneFn)
 	if got == parent {
 		t.Fatalf("expected new parent")
