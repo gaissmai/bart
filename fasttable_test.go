@@ -63,8 +63,8 @@ func TestFastCloneFlat(t *testing.T) {
 				gotBuf := &strings.Builder{}
 				origBuf := &strings.Builder{}
 
-				got.DumpRec(gotBuf, stridePath{}, 0, true, nodes.ShouldPrintValues[int]())
-				orig.DumpRec(origBuf, stridePath{}, 0, true, nodes.ShouldPrintValues[int]())
+				got.DumpRec(gotBuf, stridePath{}, 0, true, shouldPrintValues[int]())
+				orig.DumpRec(origBuf, stridePath{}, 0, true, shouldPrintValues[int]())
 
 				if gotBuf.String() != origBuf.String() {
 					t.Errorf("dump is different\norig:%sgot:%s", origBuf.String(), gotBuf.String())
@@ -93,8 +93,8 @@ func TestFastCloneFlat(t *testing.T) {
 				gotBuf := &strings.Builder{}
 				origBuf := &strings.Builder{}
 
-				got.DumpRec(gotBuf, stridePath{}, 0, true, nodes.ShouldPrintValues[int]())
-				orig.DumpRec(origBuf, stridePath{}, 0, true, nodes.ShouldPrintValues[int]())
+				got.DumpRec(gotBuf, stridePath{}, 0, true, shouldPrintValues[int]())
+				orig.DumpRec(origBuf, stridePath{}, 0, true, shouldPrintValues[int]())
 
 				if gotBuf.String() != origBuf.String() {
 					t.Errorf("dump is different\norig:%sgot:%s", origBuf.String(), gotBuf.String())

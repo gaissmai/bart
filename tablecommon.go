@@ -21,6 +21,13 @@ func lastOctetPlusOneAndLastBits(pfx netip.Prefix) (lastOctetPlusOne int, lastBi
 	return nodes.LastOctetPlusOneAndLastBits(pfx)
 }
 
+func shouldPrintValues[V any]() bool {
+	var zero V
+
+	_, isEmptyStruct := any(zero).(struct{})
+	return !isEmptyStruct
+}
+
 // DumpListNode contains CIDR, Value and Subnets, representing the trie
 // in a sorted, recursive representation, especially useful for serialization.
 type DumpListNode[V any] struct {

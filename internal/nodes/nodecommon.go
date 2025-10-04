@@ -44,13 +44,6 @@ type TrieItem[V any] struct {
 	Val  V
 }
 
-func ShouldPrintValues[V any]() bool {
-	var zero V
-
-	_, isEmptyStruct := any(zero).(struct{})
-	return !isEmptyStruct
-}
-
 // CmpPrefix, helper function, compare func for prefix sort,
 // all cidrs are already normalized
 func CmpPrefix(a, b netip.Prefix) int {

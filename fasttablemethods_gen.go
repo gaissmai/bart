@@ -678,7 +678,7 @@ func (t *Fast[V]) fprint(w io.Writer, is4 bool) error {
 		Is4:  is4,
 	}
 
-	return n.FprintRec(w, startParent, "", nodes.ShouldPrintValues[V]())
+	return n.FprintRec(w, startParent, "", shouldPrintValues[V]())
 }
 
 // MarshalText implements the [encoding.TextMarshaler] interface,
@@ -753,7 +753,7 @@ func (t *Fast[V]) dump(w io.Writer) {
 		fmt.Fprintf(w, "### IPv4: size(%d), nodes(%d), pfxs(%d), leaves(%d), fringes(%d)",
 			t.size4, stats.Nodes, stats.Pfxs, stats.Leaves, stats.Fringes)
 
-		t.root4.DumpRec(w, stridePath{}, 0, true, nodes.ShouldPrintValues[V]())
+		t.root4.DumpRec(w, stridePath{}, 0, true, shouldPrintValues[V]())
 	}
 
 	if t.size6 > 0 {
@@ -762,6 +762,6 @@ func (t *Fast[V]) dump(w io.Writer) {
 		fmt.Fprintf(w, "### IPv6: size(%d), nodes(%d), pfxs(%d), leaves(%d), fringes(%d)",
 			t.size6, stats.Nodes, stats.Pfxs, stats.Leaves, stats.Fringes)
 
-		t.root6.DumpRec(w, stridePath{}, 0, false, nodes.ShouldPrintValues[V]())
+		t.root6.DumpRec(w, stridePath{}, 0, false, shouldPrintValues[V]())
 	}
 }
