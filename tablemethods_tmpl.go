@@ -35,6 +35,7 @@ type _TABLE_TYPE[V any] struct {
 }
 
 func (n *_NODE_TYPE[V]) IsEmpty() (_ bool)                                               { return }
+func (n *_NODE_TYPE[V]) StatsRec() (_ nodes.StatsT)                                      { return }
 func (n *_NODE_TYPE[V]) PrefixCount() (_ int)                                            { return }
 func (n *_NODE_TYPE[V]) ChildCount() (_ int)                                             { return }
 func (n *_NODE_TYPE[V]) GetPrefix(uint8) (_ V, _ bool)                                   { return }
@@ -63,6 +64,8 @@ func (n *_NODE_TYPE[V]) Lookup(uint8) (_ V, _ bool)                             
 func (n *_NODE_TYPE[V]) LookupIdx(uint8) (_ uint8, _ V, _ bool)                          { return }
 func (n *_NODE_TYPE[V]) Supernets(netip.Prefix, func(netip.Prefix, V) bool)              { return }
 func (n *_NODE_TYPE[V]) Subnets(netip.Prefix, func(netip.Prefix, V) bool)                { return }
+func (n *_NODE_TYPE[V]) FprintRec(io.Writer, nodes.TrieItem[V], string, bool) (_ error)  { return }
+func (n *_NODE_TYPE[V]) DumpRec(io.Writer, stridePath, int, bool, bool)                  { return }
 func (n *_NODE_TYPE[V]) AllRec(stridePath, int, bool, func(netip.Prefix, V) bool) (_ bool) {
 	return
 }
@@ -72,6 +75,9 @@ func (n *_NODE_TYPE[V]) AllRecSorted(stridePath, int, bool, func(netip.Prefix, V
 }
 
 func (t *_TABLE_TYPE[V]) rootNodeByVersion(is4 bool) (n *_NODE_TYPE[V]) { return }
+func (t *_TABLE_TYPE[V]) dumpListRec(*_NODE_TYPE[V], int, stridePath, int, bool) (_ []DumpListNode[V]) {
+	return
+}
 
 // ### GENERATE DELETE END ###
 

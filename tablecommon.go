@@ -9,6 +9,15 @@ import (
 	"github.com/gaissmai/bart/internal/nodes"
 )
 
+// These types, constants, and functions are required in the bart package
+// and in internal/nodes. To prevent drift in implementation or values, they are either aliased, copied or wrapped.
+
+// Cloner is an interface that enables deep cloning of values of type V.
+// If a value implements Cloner[V], Table methods such as InsertPersist,
+// ModifyPersist, DeletePersist, UnionPersist, Union and Clone will use
+// its Clone method to perform deep copies.
+type Cloner[V any] = nodes.Cloner[V]
+
 type stridePath = nodes.StridePath
 
 const (
@@ -21,6 +30,11 @@ func lastOctetPlusOneAndLastBits(pfx netip.Prefix) (lastOctetPlusOne int, lastBi
 	return nodes.LastOctetPlusOneAndLastBits(pfx)
 }
 
+func cmpPrefix(a, b netip.Prefix) int {
+	return nodes.CmpPrefix(a, b)
+}
+
+// TODO
 func shouldPrintValues[V any]() bool {
 	var zero V
 
@@ -34,14 +48,6 @@ type DumpListNode[V any] struct {
 	CIDR    netip.Prefix      `json:"cidr"`
 	Value   V                 `json:"value"`
 	Subnets []DumpListNode[V] `json:"subnets,omitempty"`
-}
-
-// Cloner is an interface that enables deep cloning of values of type V.
-// If a value implements Cloner[V], Table methods such as InsertPersist,
-// ModifyPersist, DeletePersist, UnionPersist, Union and Clone will use
-// its Clone method to perform deep copies.
-type Cloner[V any] interface {
-	Clone() V
 }
 
 // cloneFnFactory returns a CloneFunc.

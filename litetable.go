@@ -574,7 +574,7 @@ func (l *liteTable[V]) dumpListRec(n *nodes.LiteNode[V], parentIdx uint8, path s
 
 	// sort the items by prefix
 	slices.SortFunc(directItems, func(a, b nodes.TrieItem[V]) int {
-		return nodes.CmpPrefix(a.Cidr, b.Cidr)
+		return cmpPrefix(a.Cidr, b.Cidr)
 	})
 
 	dumpNodes := make([]DumpListNode[V], 0, len(directItems))

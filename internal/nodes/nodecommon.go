@@ -32,8 +32,8 @@ type StridePath [MaxTreeDepth]uint8
 // TrieItem, a node has no path information about its predecessors,
 // we collect this during the recursive descent.
 type TrieItem[V any] struct {
-	// for traversing, path/depth/idx is needed to get the CIDR back from the trie.
-	Node  any
+	// for traversing, Path/Depth/Idx is needed to get the CIDR back from the trie.
+	Node  any // BartNode, FastNode, LiteNode
 	Is4   bool
 	Path  StridePath
 	Depth int

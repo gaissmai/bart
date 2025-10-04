@@ -347,7 +347,7 @@ func (t *Table[V]) dumpListRec(n *nodes.BartNode[V], parentIdx uint8, path strid
 
 	// sort the items by prefix
 	slices.SortFunc(directItems, func(a, b nodes.TrieItem[V]) int {
-		return nodes.CmpPrefix(a.Cidr, b.Cidr)
+		return cmpPrefix(a.Cidr, b.Cidr)
 	})
 
 	dumpNodes := make([]DumpListNode[V], 0, len(directItems))

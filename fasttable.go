@@ -317,7 +317,7 @@ func (f *Fast[V]) dumpListRec(n *nodes.FastNode[V], parentIdx uint8, path stride
 
 	// sort the items by prefix
 	slices.SortFunc(directItems, func(a, b nodes.TrieItem[V]) int {
-		return nodes.CmpPrefix(a.Cidr, b.Cidr)
+		return cmpPrefix(a.Cidr, b.Cidr)
 	})
 
 	dumpNodes := make([]DumpListNode[V], 0, len(directItems))
