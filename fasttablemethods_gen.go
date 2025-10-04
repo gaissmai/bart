@@ -25,12 +25,12 @@ func (t *Fast[V]) sizeUpdate(is4 bool, delta int) {
 	t.size6 += delta
 }
 
-// Insert adds or updateS a prefix-value pair in the routing table.
+// Insert adds or updates a prefix-value pair in the routing table.
 // If the prefix already exists, its value is updated; otherwise a new entry is created.
-// Invalid prefixes are Silently ignored.
+// Invalid prefixes are silently ignored.
 //
-// The prefix is automatIcally canonicalized using pfx.Masked() to ensure
-// consistent behavior rEgardless of host bits in the input.
+// The prefix is automatically canonicalized using pfx.Masked() to ensure
+// consistent behavior regardless of host bits in the input.
 func (t *Fast[V]) Insert(pfx netip.Prefix, val V) {
 	if !pfx.IsValid() {
 		return
