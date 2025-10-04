@@ -5,10 +5,18 @@ package nodes
 
 import (
 	"fmt"
-	"io"
 	"strconv"
 	"strings"
 )
+
+// StatsT, only used for dump, tests and benchmarks
+type StatsT struct {
+	Pfxs    int
+	Childs  int
+	Nodes   int
+	Leaves  int
+	Fringes int
+}
 
 type nodeType byte
 
@@ -19,6 +27,139 @@ const (
 	pathNode                 // only children, no prefix nor path-compressed prefixes
 	stopNode                 // no children, only prefixes or path-compressed prefixes
 )
+
+// String implements Stringer for nodeType.
+func (nt nodeType) String() string {
+	switch nt {
+	case nullNode:
+		return "NULL"
+	case fullNode:
+		return "FULL"
+	case halfNode:
+		return "HALF"
+	case pathNode:
+		return "PATH"
+	case stopNode:
+		return "STOP"
+	default:
+		return "unreachable"
+	}
+}
+
+// addrFmt, different format strings for IPv4 and IPv6, decimal versus hex.
+func addrFmt(addr byte, is4 bool) string {
+	if is4 {
+		return fmt.Sprintf("%d", addr)
+	}
+
+	return fmt.Sprintf("0x%02x", addr)
+}
+
+// ip stride path, different formats for IPv4 and IPv6, dotted decimal or hex.
+//
+//	127.0.0
+//	2001:0d
+func ipStridePath(path StridePath, depth int, is4 bool) string {
+	buf := new(strings.Builder)
+
+	if is4 {
+		for i, b := range path[:depth] {
+			if i != 0 {
+				buf.WriteString(".")
+			}
+
+			buf.WriteString(strconv.Itoa(int(b)))
+		}
+
+		return buf.String()
+	}
+
+	for i, b := range path[:depth] {
+		if i != 0 && i%2 == 0 {
+			buf.WriteString(":")
+		}
+
+		fmt.Fprintf(buf, "%02x", b)
+	}
+
+	return buf.String()
+}
+
+/*
+
+// Stats returns immediate statistics for n: counts of prefixes and children,
+// and a classification of each child into nodes, leaves, or fringes.
+// It inspects only the direct children of n (not the whole subtree).
+// Panics if a child has an unexpected concrete type.
+func Stats[V any](n NodeReader[V]) StatsT {
+	var s StatsT
+
+	s.Pfxs = n.PrefixCount()
+	s.Childs = n.ChildCount()
+
+	for _, child := range n.AllChildren() {
+		switch child.(type) {
+		case NodeReader[V]:
+			s.Nodes++
+
+		case *FringeNode[V]:
+			s.Fringes++
+
+		case *LeafNode[V]:
+			s.Leaves++
+
+		default:
+			panic("logic error, wrong node type")
+		}
+	}
+
+	return s
+}
+
+// StatsRec returns aggregated statistics for the subtree rooted at n.
+//
+// It walks the node tree recursively and sums immediate counts (prefixes and
+// child slots) plus the number of nodes, leaves, and fringe nodes in the
+// subtree. If n is nil or empty, a zeroed stats is returned. The returned
+// stats.nodes includes the current node. The function will panic if a child
+// has an unexpected concrete type.
+func StatsRec[V any](n NodeReader[V]) StatsT {
+	var s StatsT
+	if n == nil || n.IsEmpty() {
+		return s
+	}
+
+	s.Pfxs = n.PrefixCount()
+	s.Childs = n.ChildCount()
+	s.Nodes = 1 // this node
+	s.Leaves = 0
+	s.Fringes = 0
+
+	for _, child := range n.AllChildren() {
+		switch kid := child.(type) {
+		case NodeReader[V]:
+			// rec-descent
+			rs := StatsRec[V](kid)
+
+			s.Pfxs += rs.Pfxs
+			s.Childs += rs.Childs
+			s.Nodes += rs.Nodes
+			s.Leaves += rs.Leaves
+			s.Fringes += rs.Fringes
+
+		case *FringeNode[V]:
+			s.Fringes++
+
+		case *LeafNode[V]:
+			s.Leaves++
+
+		default:
+			panic("logic error, wrong node type")
+		}
+	}
+
+	return s
+}
 
 // DumpRec recursively descends the trie rooted at n and writes a human-readable
 // representation of each visited node to w.
@@ -201,142 +342,4 @@ func hasType[V any](n NodeReader[V]) nodeType {
 	}
 }
 
-// addrFmt, different format strings for IPv4 and IPv6, decimal versus hex.
-func addrFmt(addr byte, is4 bool) string {
-	if is4 {
-		return fmt.Sprintf("%d", addr)
-	}
-
-	return fmt.Sprintf("0x%02x", addr)
-}
-
-// ip stride path, different formats for IPv4 and IPv6, dotted decimal or hex.
-//
-//	127.0.0
-//	2001:0d
-func ipStridePath(path StridePath, depth int, is4 bool) string {
-	buf := new(strings.Builder)
-
-	if is4 {
-		for i, b := range path[:depth] {
-			if i != 0 {
-				buf.WriteString(".")
-			}
-
-			buf.WriteString(strconv.Itoa(int(b)))
-		}
-
-		return buf.String()
-	}
-
-	for i, b := range path[:depth] {
-		if i != 0 && i%2 == 0 {
-			buf.WriteString(":")
-		}
-
-		fmt.Fprintf(buf, "%02x", b)
-	}
-
-	return buf.String()
-}
-
-// String implements Stringer for nodeType.
-func (nt nodeType) String() string {
-	switch nt {
-	case nullNode:
-		return "NULL"
-	case fullNode:
-		return "FULL"
-	case halfNode:
-		return "HALF"
-	case pathNode:
-		return "PATH"
-	case stopNode:
-		return "STOP"
-	default:
-		return "unreachable"
-	}
-}
-
-// StatsT, only used for dump, tests and benchmarks
-type StatsT struct {
-	Pfxs    int
-	Childs  int
-	Nodes   int
-	Leaves  int
-	Fringes int
-}
-
-// Stats returns immediate statistics for n: counts of prefixes and children,
-// and a classification of each child into nodes, leaves, or fringes.
-// It inspects only the direct children of n (not the whole subtree).
-// Panics if a child has an unexpected concrete type.
-func Stats[V any](n NodeReader[V]) StatsT {
-	var s StatsT
-
-	s.Pfxs = n.PrefixCount()
-	s.Childs = n.ChildCount()
-
-	for _, child := range n.AllChildren() {
-		switch child.(type) {
-		case NodeReader[V]:
-			s.Nodes++
-
-		case *FringeNode[V]:
-			s.Fringes++
-
-		case *LeafNode[V]:
-			s.Leaves++
-
-		default:
-			panic("logic error, wrong node type")
-		}
-	}
-
-	return s
-}
-
-// StatsRec returns aggregated statistics for the subtree rooted at n.
-//
-// It walks the node tree recursively and sums immediate counts (prefixes and
-// child slots) plus the number of nodes, leaves, and fringe nodes in the
-// subtree. If n is nil or empty, a zeroed stats is returned. The returned
-// stats.nodes includes the current node. The function will panic if a child
-// has an unexpected concrete type.
-func StatsRec[V any](n NodeReader[V]) StatsT {
-	var s StatsT
-	if n == nil || n.IsEmpty() {
-		return s
-	}
-
-	s.Pfxs = n.PrefixCount()
-	s.Childs = n.ChildCount()
-	s.Nodes = 1 // this node
-	s.Leaves = 0
-	s.Fringes = 0
-
-	for _, child := range n.AllChildren() {
-		switch kid := child.(type) {
-		case NodeReader[V]:
-			// rec-descent
-			rs := StatsRec[V](kid)
-
-			s.Pfxs += rs.Pfxs
-			s.Childs += rs.Childs
-			s.Nodes += rs.Nodes
-			s.Leaves += rs.Leaves
-			s.Fringes += rs.Fringes
-
-		case *FringeNode[V]:
-			s.Fringes++
-
-		case *LeafNode[V]:
-			s.Leaves++
-
-		default:
-			panic("logic error, wrong node type")
-		}
-	}
-
-	return s
-}
+*/

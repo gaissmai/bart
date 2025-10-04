@@ -4,6 +4,7 @@
 package nodes
 
 import (
+	"io"
 	"iter"
 )
 
@@ -33,6 +34,9 @@ type NodeWriter[V any] interface {
 
 type NodeReader[V any] interface {
 	IsEmpty() bool
+	Dump(io.Writer, StridePath, int, bool, bool)
+	DumpRec(io.Writer, StridePath, int, bool, bool)
+	Stats() StatsT
 
 	ChildCount() int
 	PrefixCount() int

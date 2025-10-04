@@ -369,7 +369,7 @@ func BenchmarkFullTableMemory4(b *testing.B) {
 		runtime.GC()
 		runtime.ReadMemStats(&endMem)
 
-		stats := nodes.StatsRec(&rt.root4)
+		stats := rt.root4.StatsRec()
 		if stats.Pfxs == 0 {
 			b.Skip("No prefixes inserted")
 		}
@@ -400,7 +400,7 @@ func BenchmarkFullTableMemory6(b *testing.B) {
 		runtime.GC()
 		runtime.ReadMemStats(&endMem)
 
-		stats := nodes.StatsRec(&rt.root6)
+		stats := rt.root6.StatsRec()
 		if stats.Pfxs == 0 {
 			b.Skip("No prefixes inserted")
 		}
@@ -431,8 +431,8 @@ func BenchmarkFullTableMemory(b *testing.B) {
 		runtime.GC()
 		runtime.ReadMemStats(&endMem)
 
-		s4 := nodes.StatsRec(&rt.root4)
-		s6 := nodes.StatsRec(&rt.root6)
+		s4 := rt.root4.StatsRec()
+		s6 := rt.root6.StatsRec()
 		stats := nodes.StatsT{
 			Pfxs:    s4.Pfxs + s6.Pfxs,
 			Childs:  s4.Childs + s6.Childs,

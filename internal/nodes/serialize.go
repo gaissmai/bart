@@ -5,19 +5,14 @@ package nodes
 
 import (
 	"cmp"
-	"fmt"
-	"io"
 	"net/netip"
-	"slices"
-
-	"github.com/gaissmai/bart/internal/art"
 )
 
 // TrieItem, a node has no path information about its predecessors,
 // we collect this during the recursive descent.
 type TrieItem[V any] struct {
 	// for traversing, path/depth/idx is needed to get the CIDR back from the trie.
-	Node  NodeReader[V]
+	Node  any
 	Is4   bool
 	Path  StridePath
 	Depth int
@@ -44,6 +39,8 @@ func CmpPrefix(a, b netip.Prefix) int {
 
 	return cmp.Compare(a.Bits(), b.Bits())
 }
+
+/*
 
 // FprintRec recursively prints a hierarchical CIDR tree representation
 // starting from this node to the provided writer. The output shows the
@@ -185,3 +182,4 @@ func DirectItemsRec[V any](n NodeReader[V], parentIdx uint8, path StridePath, de
 
 	return directItems
 }
+*/

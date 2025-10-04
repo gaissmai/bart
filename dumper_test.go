@@ -54,7 +54,7 @@ func TestUnifiedDumper_NodeTypes(t *testing.T) {
 
 			// Test nodeStats
 			n := build()
-			stats := nodes.Stats(n)
+			stats := n.Stats()
 			// For empty nodes, stats should have reasonable values
 			if stats.Nodes < 0 || stats.Pfxs < 0 {
 				t.Errorf("Invalid stats for empty %s: %+v", nodeTypeName, stats)
@@ -68,7 +68,7 @@ func TestUnifiedDumper_NodeTypes(t *testing.T) {
 			n.InsertPrefix(128, "test-value")
 
 			// Test that we can get stats after insertion
-			stats := nodes.Stats(n)
+			stats := n.Stats()
 			if stats.Pfxs == 0 {
 				t.Errorf("Expected non-zero prefixes after insertion in %s", nodeTypeName)
 			}
@@ -84,7 +84,7 @@ func TestUnifiedDumper_NodeTypes(t *testing.T) {
 			n.InsertPrefix(64, "dump-test")
 
 			// Use the dump function that takes io.Writer
-			nodes.Dump(n, &buf, path, 0, false, nodes.ShouldPrintValues[any]())
+			n.Dump(&buf, path, 0, false, nodes.ShouldPrintValues[any]())
 
 			output := buf.String()
 			// Just check that it produces some output without panicking
@@ -117,7 +117,7 @@ func TestUnifiedDumper_TypedNilHandling(t *testing.T) {
 			pn := createNilNode()
 			w := new(strings.Builder)
 			path := stridePath{}
-			nodes.DumpRec(pn, w, path, 0, true, nodes.ShouldPrintValues[any]())
+			pn.DumpRec(w, path, 0, true, nodes.ShouldPrintValues[any]())
 		})
 	}
 }

@@ -678,7 +678,7 @@ func (t *liteTable[V]) fprint(w io.Writer, is4 bool) error {
 		Is4:  is4,
 	}
 
-	return nodes.FprintRec(n, w, startParent, "", nodes.ShouldPrintValues[V]())
+	return n.FprintRec(w, startParent, "", nodes.ShouldPrintValues[V]())
 }
 
 // MarshalText implements the [encoding.TextMarshaler] interface,
@@ -721,7 +721,7 @@ func (t *liteTable[V]) DumpList4() []DumpListNode[V] {
 	if t == nil {
 		return nil
 	}
-	return dumpListRec(&t.root4, 0, stridePath{}, 0, true)
+	return t.dumpListRec(&t.root4, 0, stridePath{}, 0, true)
 }
 
 // DumpList6 dumps the ipv6 tree into a list of roots and their subnets.
@@ -730,7 +730,7 @@ func (t *liteTable[V]) DumpList6() []DumpListNode[V] {
 	if t == nil {
 		return nil
 	}
-	return dumpListRec(&t.root6, 0, stridePath{}, 0, false)
+	return t.dumpListRec(&t.root6, 0, stridePath{}, 0, false)
 }
 
 // dumpString is just a wrapper for dump.
@@ -748,20 +748,20 @@ func (t *liteTable[V]) dump(w io.Writer) {
 	}
 
 	if t.size4 > 0 {
-		stats := nodes.StatsRec(&t.root4)
+		stats := t.root4.StatsRec()
 		fmt.Fprintln(w)
 		fmt.Fprintf(w, "### IPv4: size(%d), nodes(%d), pfxs(%d), leaves(%d), fringes(%d)",
 			t.size4, stats.Nodes, stats.Pfxs, stats.Leaves, stats.Fringes)
 
-		nodes.DumpRec(&t.root4, w, stridePath{}, 0, true, nodes.ShouldPrintValues[V]())
+		t.root4.DumpRec(w, stridePath{}, 0, true, nodes.ShouldPrintValues[V]())
 	}
 
 	if t.size6 > 0 {
-		stats := nodes.StatsRec(&t.root6)
+		stats := t.root6.StatsRec()
 		fmt.Fprintln(w)
 		fmt.Fprintf(w, "### IPv6: size(%d), nodes(%d), pfxs(%d), leaves(%d), fringes(%d)",
 			t.size6, stats.Nodes, stats.Pfxs, stats.Leaves, stats.Fringes)
 
-		nodes.DumpRec(&t.root6, w, stridePath{}, 0, false, nodes.ShouldPrintValues[V]())
+		t.root6.DumpRec(w, stridePath{}, 0, false, nodes.ShouldPrintValues[V]())
 	}
 }

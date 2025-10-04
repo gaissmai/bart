@@ -1581,8 +1581,8 @@ func TestDeleteButOne(t *testing.T) {
 			tbl.Delete(p.pfx)
 		}
 
-		stats4 := nodes.StatsRec(&tbl.root4)
-		stats6 := nodes.StatsRec(&tbl.root6)
+		stats4 := tbl.root4.StatsRec()
+		stats6 := tbl.root6.StatsRec()
 
 		if nodes := stats4.Nodes + stats6.Nodes; nodes != 1 {
 			t.Fatalf("delete but one, want nodes: 1, got: %d\n%s", nodes, tbl.dumpString())
@@ -3255,7 +3255,7 @@ func BenchmarkMemIP4(b *testing.B) {
 			runtime.GC()
 			runtime.ReadMemStats(&endMem)
 
-			stats := nodes.StatsRec(&rt.root4)
+			stats := rt.root4.StatsRec()
 
 			bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
 			b.ReportMetric(roundFloat64(bytes/float64(stats.Pfxs)), "bytes/route")
@@ -3288,7 +3288,7 @@ func BenchmarkMemIP6(b *testing.B) {
 			runtime.GC()
 			runtime.ReadMemStats(&endMem)
 
-			stats := nodes.StatsRec(&rt.root6)
+			stats := rt.root6.StatsRec()
 
 			bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
 			b.ReportMetric(roundFloat64(bytes/float64(stats.Pfxs)), "bytes/route")
@@ -3321,8 +3321,8 @@ func BenchmarkMem(b *testing.B) {
 			runtime.GC()
 			runtime.ReadMemStats(&endMem)
 
-			s4 := nodes.StatsRec(&rt.root4)
-			s6 := nodes.StatsRec(&rt.root6)
+			s4 := rt.root4.StatsRec()
+			s6 := rt.root6.StatsRec()
 			stats := nodes.StatsT{
 				Pfxs:    s4.Pfxs + s6.Pfxs,
 				Childs:  s4.Childs + s6.Childs,
@@ -3389,8 +3389,8 @@ func checkRoutes(t *testing.T, tbl *Table[int], tt []tableTest) {
 func checkNumNodes(t *testing.T, tbl *Table[int], want int) {
 	t.Helper()
 
-	s4 := nodes.StatsRec(&tbl.root4)
-	s6 := nodes.StatsRec(&tbl.root6)
+	s4 := tbl.root4.StatsRec()
+	s6 := tbl.root6.StatsRec()
 	nodes := s4.Nodes + s6.Nodes
 
 	if got := nodes; got != want {

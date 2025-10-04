@@ -14,8 +14,12 @@ package nodes
 // useful for gopls during development, deleted during go generate
 
 import (
+	"fmt"
+	"io"
 	"iter"
 	"net/netip"
+	"slices"
+	"strings"
 
 	"github.com/gaissmai/bart/internal/art"
 	"github.com/gaissmai/bart/internal/bitset"
@@ -34,13 +38,18 @@ func (n *_NODE_TYPE[V]) MustGetChild(uint8) (_ any)                { return }
 func (n *_NODE_TYPE[V]) InsertPrefix(uint8, V) (_ bool)            { return }
 func (n *_NODE_TYPE[V]) DeletePrefix(uint8) (_ bool)               { return }
 func (n *_NODE_TYPE[V]) GetChild(uint8) (_ any, _ bool)            { return }
+func (n *_NODE_TYPE[V]) GetChildAddrs(*[256]uint8) (_ []uint8)     { return }
 func (n *_NODE_TYPE[V]) GetPrefix(uint8) (_ V, _ bool)             { return }
+func (n *_NODE_TYPE[V]) GetIndices(*[256]uint8) (_ []uint8)        { return }
 func (n *_NODE_TYPE[V]) InsertChild(uint8, any) (_ bool)           { return }
 func (n *_NODE_TYPE[V]) DeleteChild(uint8) (_ bool)                { return }
 func (n *_NODE_TYPE[V]) CloneRec(CloneFunc[V]) (_ *_NODE_TYPE[V])  { return }
 func (n *_NODE_TYPE[V]) CloneFlat(CloneFunc[V]) (_ *_NODE_TYPE[V]) { return }
 func (n *_NODE_TYPE[V]) AllIndices() (seq2 iter.Seq2[uint8, V])    { return }
 func (n *_NODE_TYPE[V]) AllChildren() (seq2 iter.Seq2[uint8, any]) { return }
+func (n *_NODE_TYPE[V]) Contains(uint8) (_ bool)                   { return }
+func (n *_NODE_TYPE[V]) Lookup(uint8) (_ V, _ bool)                { return }
+func (n *_NODE_TYPE[V]) LookupIdx(uint8) (_ uint8, _ V, _ bool)    { return }
 
 // ### GENERATE DELETE END ###
 
@@ -796,4 +805,397 @@ func (n *_NODE_TYPE[V]) EqualRec(o *_NODE_TYPE[V]) bool {
 	}
 
 	return true
+}
+
+// DumpRec recursively descends the trie rooted at n and writes a human-readable
+// representation of each visited node to w.
+//
+// It returns immediately if n is nil or empty. For each visited internal node
+// it calls dump to write the node's representation, then iterates its child
+// addresses and recurses into children that implement nodeDumper[V] (internal
+// subnodes). The path slice and depth together represent the byte-wise path
+// from the root to the current node; depth is incremented for each recursion.
+// The is4 flag controls IPv4/IPv6 formatting used by dump.
+func (n *_NODE_TYPE[V]) DumpRec(w io.Writer, path StridePath, depth int, is4 bool, printVals bool) {
+	if n == nil || n.IsEmpty() {
+		return
+	}
+
+	// dump this node
+	n.Dump(w, path, depth, is4, printVals)
+
+	// node may have children, rec-descent down
+	for addr, child := range n.AllChildren() {
+		if kid, ok := child.(*_NODE_TYPE[V]); ok {
+			path[depth] = addr
+			kid.DumpRec(w, path, depth+1, is4, printVals)
+		}
+	}
+}
+
+// Dump writes a human-readable representation of the node to `w`.
+// It prints the node type, depth, formatted path (IPv4 vs IPv6 controlled by `is4`),
+// and bit count, followed by any stored prefixes (and their values when applicable),
+// the set of child octets, and any path-compressed leaves or fringe entries.
+func (n *_NODE_TYPE[V]) Dump(w io.Writer, path StridePath, depth int, is4 bool, printVals bool) {
+	bits := depth * strideLen
+	indent := strings.Repeat(".", depth)
+
+	// node type with depth and octet path and bits.
+	fmt.Fprintf(w, "\n%s[%s] depth:  %d path: [%s] / %d\n",
+		indent, n.hasType(), depth, ipStridePath(path, depth, is4), bits)
+
+	if nPfxCount := n.PrefixCount(); nPfxCount != 0 {
+		var buf [256]uint8
+		allIndices := n.GetIndices(&buf)
+
+		// print the baseIndices for this node.
+		fmt.Fprintf(w, "%sindexs(#%d): %v\n", indent, nPfxCount, allIndices)
+
+		// print the prefixes for this node
+		fmt.Fprintf(w, "%sprefxs(#%d):", indent, nPfxCount)
+
+		for _, idx := range allIndices {
+			pfx := CidrFromPath(path, depth, is4, idx)
+			fmt.Fprintf(w, " %s", pfx)
+		}
+
+		fmt.Fprintln(w)
+
+		// skip values, maybe the payload is the empty struct
+		if printVals {
+
+			// print the values for this node
+			fmt.Fprintf(w, "%svalues(#%d):", indent, nPfxCount)
+
+			for _, idx := range allIndices {
+				val := n.MustGetPrefix(idx)
+				fmt.Fprintf(w, " %#v", val)
+			}
+
+			fmt.Fprintln(w)
+		}
+	}
+
+	if n.ChildCount() != 0 {
+		allAddrs := make([]uint8, 0, MaxItems)
+		childAddrs := make([]uint8, 0, MaxItems)
+		leafAddrs := make([]uint8, 0, MaxItems)
+		fringeAddrs := make([]uint8, 0, MaxItems)
+
+		// the node has recursive child nodes or path-compressed leaves
+		for addr, child := range n.AllChildren() {
+			allAddrs = append(allAddrs, addr)
+
+			switch child.(type) {
+			case NodeReader[V]:
+				childAddrs = append(childAddrs, addr)
+				continue
+
+			case *FringeNode[V]:
+				fringeAddrs = append(fringeAddrs, addr)
+
+			case *LeafNode[V]:
+				leafAddrs = append(leafAddrs, addr)
+
+			default:
+				panic("logic error, wrong node type")
+			}
+		}
+
+		// print the children for this node.
+		fmt.Fprintf(w, "%soctets(#%d): %v\n", indent, len(allAddrs), allAddrs)
+
+		if leafCount := len(leafAddrs); leafCount > 0 {
+			// print the pathcomp prefixes for this node
+			fmt.Fprintf(w, "%sleaves(#%d):", indent, leafCount)
+
+			for _, addr := range leafAddrs {
+				kid := n.MustGetChild(addr).(*LeafNode[V])
+				if printVals {
+					fmt.Fprintf(w, " %s:{%s, %v}", addrFmt(addr, is4), kid.Prefix, kid.Value)
+				} else {
+					fmt.Fprintf(w, " %s:{%s}", addrFmt(addr, is4), kid.Prefix)
+				}
+			}
+
+			fmt.Fprintln(w)
+		}
+
+		if fringeCount := len(fringeAddrs); fringeCount > 0 {
+			// print the pathcomp prefixes for this node
+			fmt.Fprintf(w, "%sfringe(#%d):", indent, fringeCount)
+
+			for _, addr := range fringeAddrs {
+				fringePfx := CidrForFringe(path[:], depth, is4, addr)
+
+				kid := n.MustGetChild(addr).(*FringeNode[V])
+				if printVals {
+					fmt.Fprintf(w, " %s:{%s, %v}", addrFmt(addr, is4), fringePfx, kid.Value)
+				} else {
+					fmt.Fprintf(w, " %s:{%s}", addrFmt(addr, is4), fringePfx)
+				}
+			}
+
+			fmt.Fprintln(w)
+		}
+
+		if childCount := len(childAddrs); childCount > 0 {
+			// print the next child
+			fmt.Fprintf(w, "%schilds(#%d):", indent, childCount)
+
+			for _, addr := range childAddrs {
+				fmt.Fprintf(w, " %s", addrFmt(addr, is4))
+			}
+
+			fmt.Fprintln(w)
+		}
+
+	}
+}
+
+// hasType classifies the given node into one of the nodeType values.
+//
+// It inspects immediate statistics (prefix count, child count, node, leaf and
+// fringe counts) for the node and returns:
+//   - nullNode: no prefixes and no children
+//   - stopNode: has children but no subnodes (nodes == 0)
+//   - halfNode: contains at least one leaf or fringe and also has subnodes, but
+//     no prefixes
+//   - fullNode: has prefixes or leaves/fringes and also has subnodes
+//   - pathNode: has subnodes only (no prefixes, leaves, or fringes)
+//
+// The order of these checks is significant to ensure the correct classification.
+func (n *_NODE_TYPE[V]) hasType() nodeType {
+	s := n.Stats()
+
+	// the order is important
+	switch {
+	case s.Pfxs == 0 && s.Childs == 0:
+		return nullNode
+	case s.Nodes == 0:
+		return stopNode
+	case (s.Leaves > 0 || s.Fringes > 0) && s.Nodes > 0 && s.Pfxs == 0:
+		return halfNode
+	case (s.Pfxs > 0 || s.Leaves > 0 || s.Fringes > 0) && s.Nodes > 0:
+		return fullNode
+	case (s.Pfxs == 0 && s.Leaves == 0 && s.Fringes == 0) && s.Nodes > 0:
+		return pathNode
+	default:
+		panic(fmt.Sprintf("UNREACHABLE: pfx: %d, chld: %d, node: %d, leaf: %d, fringe: %d",
+			s.Pfxs, s.Childs, s.Nodes, s.Leaves, s.Fringes))
+	}
+}
+
+// Stats returns immediate statistics for n: counts of prefixes and children,
+// and a classification of each child into nodes, leaves, or fringes.
+// It inspects only the direct children of n (not the whole subtree).
+// Panics if a child has an unexpected concrete type.
+func (n *_NODE_TYPE[V]) Stats() (s StatsT) {
+	s.Pfxs = n.PrefixCount()
+	s.Childs = n.ChildCount()
+
+	for _, child := range n.AllChildren() {
+		switch child.(type) {
+		case *_NODE_TYPE[V]:
+			s.Nodes++
+
+		case *FringeNode[V]:
+			s.Fringes++
+
+		case *LeafNode[V]:
+			s.Leaves++
+
+		default:
+			panic("logic error, wrong node type")
+		}
+	}
+
+	return s
+}
+
+// StatsRec returns aggregated statistics for the subtree rooted at n.
+//
+// It walks the node tree recursively and sums immediate counts (prefixes and
+// child slots) plus the number of nodes, leaves, and fringe nodes in the
+// subtree. If n is nil or empty, a zeroed stats is returned. The returned
+// stats.nodes includes the current node. The function will panic if a child
+// has an unexpected concrete type.
+func (n *_NODE_TYPE[V]) StatsRec() (s StatsT) {
+	if n == nil || n.IsEmpty() {
+		return s
+	}
+
+	s.Pfxs = n.PrefixCount()
+	s.Childs = n.ChildCount()
+	s.Nodes = 1 // this node
+	s.Leaves = 0
+	s.Fringes = 0
+
+	for _, child := range n.AllChildren() {
+		switch kid := child.(type) {
+		case *_NODE_TYPE[V]:
+			// rec-descent
+			rs := kid.StatsRec()
+
+			s.Pfxs += rs.Pfxs
+			s.Childs += rs.Childs
+			s.Nodes += rs.Nodes
+			s.Leaves += rs.Leaves
+			s.Fringes += rs.Fringes
+
+		case *FringeNode[V]:
+			s.Fringes++
+
+		case *LeafNode[V]:
+			s.Leaves++
+
+		default:
+			panic("logic error, wrong node type")
+		}
+	}
+
+	return s
+}
+
+// FprintRec recursively prints a hierarchical CIDR tree representation
+// starting from this node to the provided writer. The output shows the
+// routing table structure in human-readable format for debugging and analysis.
+func (n *_NODE_TYPE[V]) FprintRec(w io.Writer, parent TrieItem[V], pad string, printVals bool) error {
+	// recursion stop condition
+	if n == nil || n.IsEmpty() {
+		return nil
+	}
+
+	// get direct covered childs for this parent ...
+	directItems := n.DirectItemsRec(parent.Idx, parent.Path, parent.Depth, parent.Is4)
+
+	// sort them by netip.Prefix, not by baseIndex
+	slices.SortFunc(directItems, func(a, b TrieItem[V]) int {
+		return CmpPrefix(a.Cidr, b.Cidr)
+	})
+
+	// for all direct item under this node ...
+	for i, item := range directItems {
+		// symbols used in tree
+		glyph := "├─ "
+		space := "│  "
+
+		// ... treat last kid special
+		if i == len(directItems)-1 {
+			glyph = "└─ "
+			space = "   "
+		}
+
+		var err error
+		// val is the empty struct, don't print it
+		switch {
+		case !printVals:
+			_, err = fmt.Fprintf(w, "%s%s\n", pad+glyph, item.Cidr)
+		default:
+			_, err = fmt.Fprintf(w, "%s%s (%v)\n", pad+glyph, item.Cidr, item.Val)
+		}
+
+		if err != nil {
+			return err
+		}
+
+		// rec-descent with this item as parent
+		nextNode, _ := item.Node.(*_NODE_TYPE[V])
+		if err = nextNode.FprintRec(w, item, pad+space, printVals); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// DirectItemsRec, returns the direct covered items by parent.
+// It's a complex recursive function, you have to know the data structure
+// by heart to understand this function!
+//
+// See the  artlookup.pdf paper in the doc folder, the baseIndex function is the key.
+func (n *_NODE_TYPE[V]) DirectItemsRec(parentIdx uint8, path StridePath, depth int, is4 bool) (directItems []TrieItem[V]) {
+	// recursion stop condition
+	if n == nil || n.IsEmpty() {
+		return nil
+	}
+
+	// prefixes:
+	// for all idx's (prefixes mapped by baseIndex) in this node
+	// do a longest-prefix-match
+	for idx, val := range n.AllIndices() {
+		// tricky part, skip self
+		// test with next possible lpm (idx>>1), it's a complete binary tree
+		nextIdx := idx >> 1
+
+		// fast skip, lpm not possible
+		if nextIdx < parentIdx {
+			continue
+		}
+
+		// do a longest-prefix-match
+		lpm, _, _ := n.LookupIdx(nextIdx)
+
+		// be aware, 0 is here a possible value for parentIdx and lpm (if not found)
+		if lpm == parentIdx {
+			// prefix is directly covered by parent
+
+			item := TrieItem[V]{
+				Node:  n,
+				Is4:   is4,
+				Path:  path,
+				Depth: depth,
+				Idx:   idx,
+				// get the prefix back from trie
+				Cidr: CidrFromPath(path, depth, is4, idx),
+				Val:  val,
+			}
+
+			directItems = append(directItems, item)
+		}
+	}
+
+	// children:
+	for addr, child := range n.AllChildren() {
+		hostIdx := art.OctetToIdx(addr)
+
+		// do a longest-prefix-match
+		lpm, _, _ := n.LookupIdx(hostIdx)
+
+		// be aware, 0 is here a possible value for parentIdx and lpm (if not found)
+		if lpm == parentIdx {
+			// child is directly covered by parent
+			switch kid := child.(type) {
+			case *_NODE_TYPE[V]: // traverse rec-descent, call with next child node,
+				// next trie level, set parentIdx to 0, adjust path and depth
+				path[depth] = addr
+				directItems = append(directItems, kid.DirectItemsRec(0, path, depth+1, is4)...)
+
+			case *LeafNode[V]: // path-compressed child, stop's recursion for this child
+				item := TrieItem[V]{
+					Node: nil,
+					Is4:  is4,
+					Cidr: kid.Prefix,
+					Val:  kid.Value,
+				}
+				directItems = append(directItems, item)
+
+			case *FringeNode[V]: // path-compressed fringe, stop's recursion for this child
+				item := TrieItem[V]{
+					Node: nil,
+					Is4:  is4,
+					// get the prefix back from trie
+					Cidr: CidrForFringe(path[:], depth, is4, addr),
+					Val:  kid.Value,
+				}
+				directItems = append(directItems, item)
+
+			default:
+				panic("logic error, wrong node type")
+			}
+		}
+	}
+
+	return directItems
 }
