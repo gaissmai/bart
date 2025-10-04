@@ -12,6 +12,7 @@ import (
 	"io"
 	"iter"
 	"net/netip"
+	"slices"
 	"strings"
 
 	"github.com/gaissmai/bart/internal/nodes"
@@ -731,6 +732,42 @@ func (t *Fast[V]) DumpList6() []DumpListNode[V] {
 		return nil
 	}
 	return t.dumpListRec(&t.root6, 0, stridePath{}, 0, false)
+}
+
+// dumpListRec, build the data structure rec-descent with the help of directItemsRec.
+// anyNode is nodes.BartNode, nodes.FastNode or nodes.LiteNode
+func (t *Fast[V]) dumpListRec(anyNode any, parentIdx uint8, path stridePath, depth int, is4 bool) []DumpListNode[V] {
+	// recursion stop condition
+	if anyNode == nil {
+		return nil
+	}
+
+	// the same method is generated for all table types, therefore
+	// type assert to the smallest needed interface.
+	// The panic on wrong type assertion is by intention, MUST NOT happen
+	n := anyNode.(interface {
+		DirectItemsRec(uint8, stridePath, int, bool) []nodes.TrieItem[V]
+	})
+
+	directItems := n.DirectItemsRec(parentIdx, path, depth, is4)
+
+	// sort the items by prefix
+	slices.SortFunc(directItems, func(a, b nodes.TrieItem[V]) int {
+		return cmpPrefix(a.Cidr, b.Cidr)
+	})
+
+	dumpNodes := make([]DumpListNode[V], 0, len(directItems))
+
+	for _, item := range directItems {
+		dumpNodes = append(dumpNodes, DumpListNode[V]{
+			CIDR:  item.Cidr,
+			Value: item.Val,
+			// build it rec-descent, item.Node is also from type any
+			Subnets: t.dumpListRec(item.Node, item.Idx, item.Path, item.Depth, is4),
+		})
+	}
+
+	return dumpNodes
 }
 
 // dumpString is just a wrapper for dump.

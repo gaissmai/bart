@@ -5,7 +5,6 @@ package bart
 
 import (
 	"net/netip"
-	"slices"
 	"sync"
 
 	"github.com/gaissmai/bart/internal/art"
@@ -334,35 +333,4 @@ LOOP:
 	}
 
 	return lpmPfx, val, ok
-}
-
-// dumpListRec, build the data structure rec-descent with the help of directItemsRec.
-func (t *Table[V]) dumpListRec(n *nodes.BartNode[V], parentIdx uint8, path stridePath, depth int, is4 bool) []DumpListNode[V] {
-	// recursion stop condition
-	if n == nil {
-		return nil
-	}
-
-	directItems := n.DirectItemsRec(parentIdx, path, depth, is4)
-
-	// sort the items by prefix
-	slices.SortFunc(directItems, func(a, b nodes.TrieItem[V]) int {
-		return cmpPrefix(a.Cidr, b.Cidr)
-	})
-
-	dumpNodes := make([]DumpListNode[V], 0, len(directItems))
-
-	for _, item := range directItems {
-		// nextNode == nil is properly handled in dumpListRec
-		nextNode, _ := item.Node.(*nodes.BartNode[V])
-
-		dumpNodes = append(dumpNodes, DumpListNode[V]{
-			CIDR:  item.Cidr,
-			Value: item.Val,
-			// build it rec-descent
-			Subnets: t.dumpListRec(nextNode, item.Idx, item.Path, item.Depth, is4),
-		})
-	}
-
-	return dumpNodes
 }
