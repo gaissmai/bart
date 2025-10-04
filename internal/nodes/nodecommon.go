@@ -29,6 +29,38 @@ const DepthMask = MaxTreeDepth - 1
 // StridePath represents a path through the trie, with a maximum depth of 16 octets for IPv6.
 type StridePath [MaxTreeDepth]uint8
 
+// TrieItem, a node has no path information about its predecessors,
+// we collect this during the recursive descent.
+type TrieItem[V any] struct {
+	// for traversing, path/depth/idx is needed to get the CIDR back from the trie.
+	Node  any
+	Is4   bool
+	Path  StridePath
+	Depth int
+	Idx   uint8
+
+	// for printing
+	Cidr netip.Prefix
+	Val  V
+}
+
+func ShouldPrintValues[V any]() bool {
+	var zero V
+
+	_, isEmptyStruct := any(zero).(struct{})
+	return !isEmptyStruct
+}
+
+// CmpPrefix, helper function, compare func for prefix sort,
+// all cidrs are already normalized
+func CmpPrefix(a, b netip.Prefix) int {
+	if cmpAddr := a.Addr().Compare(b.Addr()); cmpAddr != 0 {
+		return cmpAddr
+	}
+
+	return cmp.Compare(a.Bits(), b.Bits())
+}
+
 // LeafNode represents a path-compressed routing entry that stores both prefix and value.
 // Leaf nodes are used when a prefix doesn't align with trie stride boundaries
 // and needs to be stored as a compressed path to save memory.

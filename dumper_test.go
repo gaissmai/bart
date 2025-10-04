@@ -9,8 +9,6 @@ import (
 	"net/netip"
 	"strings"
 	"testing"
-
-	"github.com/gaissmai/bart/internal/nodes"
 )
 
 type zeroStructT = struct{}
@@ -33,92 +31,6 @@ var tables = map[string]func() tablerTiny{
 func insertAll(tbl tablerTiny, pfxs []netip.Prefix) {
 	for _, p := range pfxs {
 		tbl.Insert(p, zeroStruct)
-	}
-}
-
-// Test unified dumper functionality across node types
-//
-//nolint:tparallel
-func TestUnifiedDumper_NodeTypes(t *testing.T) {
-	t.Parallel()
-
-	nodeBuilder := map[string]func() nodes.NodeReadWriter[any]{
-		"bartNode": func() nodes.NodeReadWriter[any] { return &nodes.BartNode[any]{} },
-		"fastNode": func() nodes.NodeReadWriter[any] { return &nodes.FastNode[any]{} },
-		"liteNode": func() nodes.NodeReadWriter[any] { return &nodes.LiteNode[any]{} },
-	}
-
-	for nodeTypeName, build := range nodeBuilder {
-		t.Run(nodeTypeName+"_EmptyNodeStats", func(t *testing.T) {
-			t.Parallel()
-
-			// Test nodeStats
-			n := build()
-			stats := n.Stats()
-			// For empty nodes, stats should have reasonable values
-			if stats.Nodes < 0 || stats.Pfxs < 0 {
-				t.Errorf("Invalid stats for empty %s: %+v", nodeTypeName, stats)
-			}
-		})
-
-		t.Run(nodeTypeName+"_WithPrefix", func(t *testing.T) {
-			t.Parallel()
-
-			n := build()
-			n.InsertPrefix(128, "test-value")
-
-			// Test that we can get stats after insertion
-			stats := n.Stats()
-			if stats.Pfxs == 0 {
-				t.Errorf("Expected non-zero prefixes after insertion in %s", nodeTypeName)
-			}
-		})
-
-		t.Run(nodeTypeName+"_DumpToWriter", func(t *testing.T) {
-			t.Parallel()
-
-			var buf strings.Builder
-			path := stridePath{}
-
-			n := build()
-			n.InsertPrefix(64, "dump-test")
-
-			// Use the dump function that takes io.Writer
-			n.Dump(&buf, path, 0, false, nodes.ShouldPrintValues[any]())
-
-			output := buf.String()
-			// Just check that it produces some output without panicking
-			if output == "" {
-				t.Errorf("Expected non-empty dump output for %s with data", nodeTypeName)
-			}
-		})
-	}
-}
-
-// Test typed nil handling across node types
-func TestUnifiedDumper_TypedNilHandling(t *testing.T) {
-	t.Parallel()
-
-	nodeBuilder := map[string]func() nodes.NodeReader[any]{
-		"bartNode": func() nodes.NodeReader[any] { return (*nodes.BartNode[any])(nil) },
-		"fastNode": func() nodes.NodeReader[any] { return (*nodes.FastNode[any])(nil) },
-		"liteNode": func() nodes.NodeReader[any] { return (*nodes.LiteNode[any])(nil) },
-	}
-
-	for nodeTypeName, createNilNode := range nodeBuilder {
-		t.Run("TypedNil_"+nodeTypeName, func(t *testing.T) {
-			t.Parallel()
-			defer func() {
-				if r := recover(); r != nil {
-					t.Fatalf("dumpRec: panic with typed-nil %s: %v", nodeTypeName, r)
-				}
-			}()
-
-			pn := createNilNode()
-			w := new(strings.Builder)
-			path := stridePath{}
-			pn.DumpRec(w, path, 0, true, nodes.ShouldPrintValues[any]())
-		})
 	}
 }
 

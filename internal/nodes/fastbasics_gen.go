@@ -850,7 +850,7 @@ func (n *FastNode[V]) Dump(w io.Writer, path StridePath, depth int, is4 bool, pr
 			allAddrs = append(allAddrs, addr)
 
 			switch child.(type) {
-			case NodeReader[V]:
+			case *FastNode[V]:
 				childAddrs = append(childAddrs, addr)
 				continue
 

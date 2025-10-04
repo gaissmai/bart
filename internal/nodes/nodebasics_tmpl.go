@@ -888,7 +888,7 @@ func (n *_NODE_TYPE[V]) Dump(w io.Writer, path StridePath, depth int, is4 bool, 
 			allAddrs = append(allAddrs, addr)
 
 			switch child.(type) {
-			case NodeReader[V]:
+			case *_NODE_TYPE[V]:
 				childAddrs = append(childAddrs, addr)
 				continue
 
