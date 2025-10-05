@@ -784,7 +784,7 @@ func TestBartNode_OverlapsChildrenIn_BitsetPath(t *testing.T) {
 	n.InsertPrefix(1, 100)
 
 	// Insert many children in o (triggers bitset path)
-	for i := uint8(0); i < 20; i++ {
+	for i := range uint8(20) {
 		child := &BartNode[int]{}
 		child.InsertPrefix(1, int(i))
 		o.InsertChild(i, child)
@@ -854,6 +854,7 @@ func TestBartNode_OverlapsTwoChildren_AllCombinations(t *testing.T) {
 	// leaf-node, leaf-leaf, leaf-fringe, fringe-node, fringe-leaf, fringe-fringe
 
 	t.Run("node-node_overlap", func(t *testing.T) {
+		t.Parallel()
 		n1 := &BartNode[int]{}
 		n2 := &BartNode[int]{}
 		n1.InsertPrefix(32, 100)
@@ -866,6 +867,7 @@ func TestBartNode_OverlapsTwoChildren_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("node-node_no_overlap", func(t *testing.T) {
+		t.Parallel()
 		n1 := &BartNode[int]{}
 		n2 := &BartNode[int]{}
 		// Use sibling indices that don't overlap
@@ -879,6 +881,7 @@ func TestBartNode_OverlapsTwoChildren_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("node-leaf", func(t *testing.T) {
+		t.Parallel()
 		node := &BartNode[int]{}
 		leaf := &LeafNode[int]{
 			Prefix: mpp("10.0.0.0/8"),
@@ -895,6 +898,7 @@ func TestBartNode_OverlapsTwoChildren_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("node-fringe_always_overlap", func(t *testing.T) {
+		t.Parallel()
 		node := &BartNode[int]{}
 		fringe := &FringeNode[int]{
 			Value: 100,
@@ -907,6 +911,7 @@ func TestBartNode_OverlapsTwoChildren_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("leaf-leaf_overlap", func(t *testing.T) {
+		t.Parallel()
 		leaf1 := &LeafNode[int]{
 			Prefix: mpp("10.0.0.0/8"),
 			Value:  100,
@@ -923,6 +928,7 @@ func TestBartNode_OverlapsTwoChildren_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("leaf-leaf_no_overlap", func(t *testing.T) {
+		t.Parallel()
 		leaf1 := &LeafNode[int]{
 			Prefix: mpp("10.0.0.0/8"),
 			Value:  100,
@@ -939,6 +945,7 @@ func TestBartNode_OverlapsTwoChildren_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("leaf-fringe_always_overlap", func(t *testing.T) {
+		t.Parallel()
 		leaf := &LeafNode[int]{
 			Prefix: mpp("10.0.0.0/8"),
 			Value:  100,
@@ -954,6 +961,7 @@ func TestBartNode_OverlapsTwoChildren_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("fringe-fringe_always_overlap", func(t *testing.T) {
+		t.Parallel()
 		fringe1 := &FringeNode[int]{
 			Value: 100,
 		}
@@ -972,6 +980,7 @@ func TestBartNode_Overlaps_CompleteFlow(t *testing.T) {
 	t.Parallel()
 
 	t.Run("routes_overlap", func(t *testing.T) {
+		t.Parallel()
 		a := &BartNode[int]{}
 		b := &BartNode[int]{}
 
@@ -984,6 +993,7 @@ func TestBartNode_Overlaps_CompleteFlow(t *testing.T) {
 	})
 
 	t.Run("children_overlap", func(t *testing.T) {
+		t.Parallel()
 		a := &BartNode[int]{}
 		b := &BartNode[int]{}
 
@@ -998,6 +1008,7 @@ func TestBartNode_Overlaps_CompleteFlow(t *testing.T) {
 	})
 
 	t.Run("same_children_overlap", func(t *testing.T) {
+		t.Parallel()
 		a := &BartNode[int]{}
 		b := &BartNode[int]{}
 
@@ -1011,6 +1022,7 @@ func TestBartNode_Overlaps_CompleteFlow(t *testing.T) {
 	})
 
 	t.Run("no_overlap", func(t *testing.T) {
+		t.Parallel()
 		a := &BartNode[int]{}
 		b := &BartNode[int]{}
 
@@ -1023,6 +1035,7 @@ func TestBartNode_Overlaps_CompleteFlow(t *testing.T) {
 	})
 
 	t.Run("empty_nodes", func(t *testing.T) {
+		t.Parallel()
 		a := &BartNode[int]{}
 		b := &BartNode[int]{}
 
@@ -1036,6 +1049,7 @@ func TestBartNode_OverlapsIdx(t *testing.T) {
 	t.Parallel()
 
 	t.Run("prefix_covers_idx", func(t *testing.T) {
+		t.Parallel()
 		n := &BartNode[int]{}
 		n.InsertPrefix(1, 100) // Root covers everything
 
@@ -1045,6 +1059,7 @@ func TestBartNode_OverlapsIdx(t *testing.T) {
 	})
 
 	t.Run("idx_covers_routes", func(t *testing.T) {
+		t.Parallel()
 		n := &BartNode[int]{}
 		n.InsertPrefix(64, 100) // Specific route
 
@@ -1055,6 +1070,7 @@ func TestBartNode_OverlapsIdx(t *testing.T) {
 	})
 
 	t.Run("idx_overlaps_child", func(t *testing.T) {
+		t.Parallel()
 		n := &BartNode[int]{}
 		child := &BartNode[int]{}
 		child.InsertPrefix(1, 100)
@@ -1065,7 +1081,7 @@ func TestBartNode_OverlapsIdx(t *testing.T) {
 		// Check if an idx that covers address 10 returns true
 		// OctetToIdx(10) = 128 + 10>>1 = 133
 		// We need an ancestor of 133
-		idx := uint8(art.OctetToIdx(10))
+		idx := art.OctetToIdx(10)
 		// Find parent
 		for idx > 1 {
 			idx = idx / 2
@@ -1078,6 +1094,7 @@ func TestBartNode_OverlapsIdx(t *testing.T) {
 	})
 
 	t.Run("no_overlap", func(t *testing.T) {
+		t.Parallel()
 		n := &BartNode[int]{}
 		n.InsertPrefix(2, 100) // Left subtree
 
@@ -1088,12 +1105,14 @@ func TestBartNode_OverlapsIdx(t *testing.T) {
 	})
 }
 
+//nolint:gocyclo
 func TestBartNode_UnionRec_AllCombinations(t *testing.T) {
 	t.Parallel()
 
 	cloneFn := cloneFnFactory[int]()
 
 	t.Run("null_plus_node", func(t *testing.T) {
+		t.Parallel()
 		a := &BartNode[int]{}
 		b := &BartNode[int]{}
 
@@ -1118,6 +1137,7 @@ func TestBartNode_UnionRec_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("null_plus_leaf", func(t *testing.T) {
+		t.Parallel()
 		a := &BartNode[int]{}
 		b := &BartNode[int]{}
 
@@ -1144,6 +1164,7 @@ func TestBartNode_UnionRec_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("null_plus_fringe", func(t *testing.T) {
+		t.Parallel()
 		a := &BartNode[int]{}
 		b := &BartNode[int]{}
 
@@ -1167,6 +1188,7 @@ func TestBartNode_UnionRec_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("node_plus_node", func(t *testing.T) {
+		t.Parallel()
 		a := &BartNode[int]{}
 		b := &BartNode[int]{}
 
@@ -1194,6 +1216,7 @@ func TestBartNode_UnionRec_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("node_plus_node_with_duplicate", func(t *testing.T) {
+		t.Parallel()
 		a := &BartNode[int]{}
 		b := &BartNode[int]{}
 
@@ -1218,6 +1241,7 @@ func TestBartNode_UnionRec_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("node_plus_leaf", func(t *testing.T) {
+		t.Parallel()
 		a := &BartNode[int]{}
 		b := &BartNode[int]{}
 
@@ -1244,6 +1268,7 @@ func TestBartNode_UnionRec_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("node_plus_fringe", func(t *testing.T) {
+		t.Parallel()
 		a := &BartNode[int]{}
 		b := &BartNode[int]{}
 
@@ -1264,6 +1289,7 @@ func TestBartNode_UnionRec_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("leaf_plus_node", func(t *testing.T) {
+		t.Parallel()
 		a := &BartNode[int]{}
 		b := &BartNode[int]{}
 
@@ -1296,6 +1322,7 @@ func TestBartNode_UnionRec_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("leaf_plus_leaf_same_prefix", func(t *testing.T) {
+		t.Parallel()
 		a := &BartNode[int]{}
 		b := &BartNode[int]{}
 
@@ -1319,6 +1346,7 @@ func TestBartNode_UnionRec_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("leaf_plus_leaf_different_prefix", func(t *testing.T) {
+		t.Parallel()
 		a := &BartNode[int]{}
 		b := &BartNode[int]{}
 
@@ -1346,6 +1374,7 @@ func TestBartNode_UnionRec_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("leaf_plus_fringe", func(t *testing.T) {
+		t.Parallel()
 		a := &BartNode[int]{}
 		b := &BartNode[int]{}
 
@@ -1367,6 +1396,7 @@ func TestBartNode_UnionRec_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("fringe_plus_node", func(t *testing.T) {
+		t.Parallel()
 		a := &BartNode[int]{}
 		b := &BartNode[int]{}
 
@@ -1390,6 +1420,7 @@ func TestBartNode_UnionRec_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("fringe_plus_leaf", func(t *testing.T) {
+		t.Parallel()
 		a := &BartNode[int]{}
 		b := &BartNode[int]{}
 
@@ -1411,6 +1442,7 @@ func TestBartNode_UnionRec_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("fringe_plus_fringe", func(t *testing.T) {
+		t.Parallel()
 		a := &BartNode[int]{}
 		b := &BartNode[int]{}
 
@@ -1439,6 +1471,7 @@ func TestBartNode_UnionRecPersist_AllCombinations(t *testing.T) {
 	cloneFn := cloneFnFactory[int]()
 
 	t.Run("null_plus_node_persist", func(t *testing.T) {
+		t.Parallel()
 		a := &BartNode[int]{}
 		b := &BartNode[int]{}
 
@@ -1465,6 +1498,7 @@ func TestBartNode_UnionRecPersist_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("null_plus_leaf_persist", func(t *testing.T) {
+		t.Parallel()
 		a := &BartNode[int]{}
 		b := &BartNode[int]{}
 
@@ -1490,6 +1524,7 @@ func TestBartNode_UnionRecPersist_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("null_plus_fringe_persist", func(t *testing.T) {
+		t.Parallel()
 		a := &BartNode[int]{}
 		b := &BartNode[int]{}
 
@@ -1511,6 +1546,7 @@ func TestBartNode_UnionRecPersist_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("node_plus_node_persist", func(t *testing.T) {
+		t.Parallel()
 		a := &BartNode[int]{}
 		b := &BartNode[int]{}
 
@@ -1548,6 +1584,7 @@ func TestBartNode_UnionRecPersist_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("node_plus_leaf_persist", func(t *testing.T) {
+		t.Parallel()
 		a := &BartNode[int]{}
 		b := &BartNode[int]{}
 
@@ -1571,6 +1608,7 @@ func TestBartNode_UnionRecPersist_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("node_plus_fringe_persist", func(t *testing.T) {
+		t.Parallel()
 		a := &BartNode[int]{}
 		b := &BartNode[int]{}
 
@@ -1591,6 +1629,7 @@ func TestBartNode_UnionRecPersist_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("leaf_plus_node_persist", func(t *testing.T) {
+		t.Parallel()
 		a := &BartNode[int]{}
 		b := &BartNode[int]{}
 
@@ -1613,6 +1652,7 @@ func TestBartNode_UnionRecPersist_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("leaf_plus_leaf_same_prefix_persist", func(t *testing.T) {
+		t.Parallel()
 		a := &BartNode[int]{}
 		b := &BartNode[int]{}
 
@@ -1636,6 +1676,7 @@ func TestBartNode_UnionRecPersist_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("leaf_plus_leaf_different_prefix_persist", func(t *testing.T) {
+		t.Parallel()
 		a := &BartNode[int]{}
 		b := &BartNode[int]{}
 
@@ -1660,6 +1701,7 @@ func TestBartNode_UnionRecPersist_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("leaf_plus_fringe_persist", func(t *testing.T) {
+		t.Parallel()
 		a := &BartNode[int]{}
 		b := &BartNode[int]{}
 
@@ -1681,6 +1723,7 @@ func TestBartNode_UnionRecPersist_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("fringe_plus_node_persist", func(t *testing.T) {
+		t.Parallel()
 		a := &BartNode[int]{}
 		b := &BartNode[int]{}
 
@@ -1700,6 +1743,7 @@ func TestBartNode_UnionRecPersist_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("fringe_plus_leaf_persist", func(t *testing.T) {
+		t.Parallel()
 		a := &BartNode[int]{}
 		b := &BartNode[int]{}
 
@@ -1721,6 +1765,7 @@ func TestBartNode_UnionRecPersist_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("fringe_plus_fringe_persist", func(t *testing.T) {
+		t.Parallel()
 		a := &BartNode[int]{}
 		b := &BartNode[int]{}
 
@@ -1743,10 +1788,12 @@ func TestBartNode_UnionRecPersist_AllCombinations(t *testing.T) {
 	})
 }
 
+//nolint:gocyclo
 func TestBartNode_Modify_AllPaths(t *testing.T) {
 	t.Parallel()
 
 	t.Run("modify_at_lastOctet_delete_nonexistent", func(t *testing.T) {
+		t.Parallel()
 		n := &BartNode[int]{}
 
 		// Use /0 for depth=0, lastOctetPlusOne=0, so depth == lastOctetPlusOne
@@ -1763,6 +1810,7 @@ func TestBartNode_Modify_AllPaths(t *testing.T) {
 	})
 
 	t.Run("modify_at_lastOctet_delete_existing", func(t *testing.T) {
+		t.Parallel()
 		n := &BartNode[int]{}
 		pfx := mpp("0.0.0.0/0")
 		n.Insert(pfx, 100, 0)
@@ -1784,6 +1832,7 @@ func TestBartNode_Modify_AllPaths(t *testing.T) {
 	})
 
 	t.Run("modify_at_lastOctet_insert_new", func(t *testing.T) {
+		t.Parallel()
 		n := &BartNode[int]{}
 		pfx := mpp("0.0.0.0/0")
 
@@ -1804,6 +1853,7 @@ func TestBartNode_Modify_AllPaths(t *testing.T) {
 	})
 
 	t.Run("modify_at_lastOctet_update_existing", func(t *testing.T) {
+		t.Parallel()
 		n := &BartNode[int]{}
 		pfx := mpp("0.0.0.0/0")
 		n.Insert(pfx, 100, 0)
@@ -1825,6 +1875,7 @@ func TestBartNode_Modify_AllPaths(t *testing.T) {
 	})
 
 	t.Run("modify_insert_path_compressed_fringe", func(t *testing.T) {
+		t.Parallel()
 		n := &BartNode[int]{}
 
 		// Insert /8 which becomes a FringeNode at depth 0
@@ -1855,6 +1906,7 @@ func TestBartNode_Modify_AllPaths(t *testing.T) {
 	})
 
 	t.Run("modify_insert_path_compressed_leaf", func(t *testing.T) {
+		t.Parallel()
 		n := &BartNode[int]{}
 
 		// Insert /16 which becomes a LeafNode directly (no intermediate BartNode)
@@ -1888,6 +1940,7 @@ func TestBartNode_Modify_AllPaths(t *testing.T) {
 	})
 
 	t.Run("modify_delete_nonexistent_path_compressed", func(t *testing.T) {
+		t.Parallel()
 		n := &BartNode[int]{}
 
 		// Try to delete where path doesn't exist
@@ -1901,6 +1954,7 @@ func TestBartNode_Modify_AllPaths(t *testing.T) {
 	})
 
 	t.Run("modify_update_leaf_same_prefix", func(t *testing.T) {
+		t.Parallel()
 		n := &BartNode[int]{}
 		pfx := mpp("10.1.0.0/16")
 		n.Insert(pfx, 100, 0)
@@ -1923,6 +1977,7 @@ func TestBartNode_Modify_AllPaths(t *testing.T) {
 	})
 
 	t.Run("modify_delete_leaf_same_prefix", func(t *testing.T) {
+		t.Parallel()
 		n := &BartNode[int]{}
 		pfx := mpp("10.1.0.0/16")
 		n.Insert(pfx, 100, 0)
@@ -1942,6 +1997,7 @@ func TestBartNode_Modify_AllPaths(t *testing.T) {
 	})
 
 	t.Run("modify_insert_creates_node_from_leaf", func(t *testing.T) {
+		t.Parallel()
 		n := &BartNode[int]{}
 		pfx1 := mpp("10.1.0.0/16")
 		n.Insert(pfx1, 100, 0)
@@ -1969,6 +2025,7 @@ func TestBartNode_Modify_AllPaths(t *testing.T) {
 	})
 
 	t.Run("modify_delete_noop_from_leaf_mismatch", func(t *testing.T) {
+		t.Parallel()
 		n := &BartNode[int]{}
 		n.Insert(mpp("10.1.0.0/16"), 100, 0)
 
@@ -1983,6 +2040,7 @@ func TestBartNode_Modify_AllPaths(t *testing.T) {
 	})
 
 	t.Run("modify_update_fringe_same_prefix", func(t *testing.T) {
+		t.Parallel()
 		n := &BartNode[int]{}
 		pfx := mpp("10.0.0.0/8")
 		n.Insert(pfx, 100, 0)
@@ -2005,6 +2063,7 @@ func TestBartNode_Modify_AllPaths(t *testing.T) {
 	})
 
 	t.Run("modify_delete_fringe", func(t *testing.T) {
+		t.Parallel()
 		n := &BartNode[int]{}
 		pfx := mpp("10.0.0.0/8")
 		n.Insert(pfx, 100, 0)
@@ -2024,6 +2083,7 @@ func TestBartNode_Modify_AllPaths(t *testing.T) {
 	})
 
 	t.Run("modify_insert_creates_node_from_fringe", func(t *testing.T) {
+		t.Parallel()
 		n := &BartNode[int]{}
 		pfx1 := mpp("10.0.0.0/8")
 		n.Insert(pfx1, 100, 0)
@@ -2048,6 +2108,7 @@ func TestBartNode_Modify_AllPaths(t *testing.T) {
 	})
 
 	t.Run("modify_delete_noop_from_fringe_mismatch", func(t *testing.T) {
+		t.Parallel()
 		n := &BartNode[int]{}
 		n.Insert(mpp("10.0.0.0/8"), 100, 0)
 

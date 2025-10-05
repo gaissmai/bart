@@ -60,6 +60,7 @@ func TestNodeType_String(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.expected, func(t *testing.T) {
+			t.Parallel()
 			got := tt.nt.String()
 			if got != tt.expected {
 				t.Errorf("nodeType(%d).String() = %q, want %q", tt.nt, got, tt.expected)
@@ -99,6 +100,7 @@ func TestNodeIpStridePath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.expected, func(t *testing.T) {
+			t.Parallel()
 			got := ipStridePath(tt.path, tt.depth, tt.is4)
 			if got != tt.expected {
 				t.Errorf("ipStridePath(%v,%d,%v) = %q, want %q", tt.path, tt.depth, tt.is4, got, tt.expected)

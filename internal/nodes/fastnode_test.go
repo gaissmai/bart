@@ -764,7 +764,7 @@ func TestFastNode_OverlapsChildrenIn_BitsetPath(t *testing.T) {
 
 	n.InsertPrefix(1, 100)
 
-	for i := uint8(0); i < 20; i++ {
+	for i := range uint8(20) {
 		child := &FastNode[int]{}
 		child.InsertPrefix(1, int(i))
 		o.InsertChild(i, child)
@@ -825,6 +825,7 @@ func TestFastNode_OverlapsTwoChildren_AllCombinations(t *testing.T) {
 	t.Parallel()
 
 	t.Run("node-node_overlap", func(t *testing.T) {
+		t.Parallel()
 		n1 := &FastNode[int]{}
 		n2 := &FastNode[int]{}
 		n1.InsertPrefix(32, 100)
@@ -837,6 +838,7 @@ func TestFastNode_OverlapsTwoChildren_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("node-node_no_overlap", func(t *testing.T) {
+		t.Parallel()
 		n1 := &FastNode[int]{}
 		n2 := &FastNode[int]{}
 		n1.InsertPrefix(2, 100)
@@ -849,6 +851,7 @@ func TestFastNode_OverlapsTwoChildren_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("node-leaf", func(t *testing.T) {
+		t.Parallel()
 		node := &FastNode[int]{}
 		leaf := &LeafNode[int]{
 			Prefix: mpp("10.0.0.0/8"),
@@ -864,6 +867,7 @@ func TestFastNode_OverlapsTwoChildren_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("node-fringe_always_overlap", func(t *testing.T) {
+		t.Parallel()
 		node := &FastNode[int]{}
 		fringe := &FringeNode[int]{
 			Value: 100,
@@ -876,6 +880,7 @@ func TestFastNode_OverlapsTwoChildren_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("leaf-leaf_overlap", func(t *testing.T) {
+		t.Parallel()
 		leaf1 := &LeafNode[int]{
 			Prefix: mpp("10.0.0.0/8"),
 			Value:  100,
@@ -892,6 +897,7 @@ func TestFastNode_OverlapsTwoChildren_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("leaf-leaf_no_overlap", func(t *testing.T) {
+		t.Parallel()
 		leaf1 := &LeafNode[int]{
 			Prefix: mpp("10.0.0.0/8"),
 			Value:  100,
@@ -908,6 +914,7 @@ func TestFastNode_OverlapsTwoChildren_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("leaf-fringe_always_overlap", func(t *testing.T) {
+		t.Parallel()
 		leaf := &LeafNode[int]{
 			Prefix: mpp("10.0.0.0/8"),
 			Value:  100,
@@ -923,6 +930,7 @@ func TestFastNode_OverlapsTwoChildren_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("fringe-fringe_always_overlap", func(t *testing.T) {
+		t.Parallel()
 		fringe1 := &FringeNode[int]{
 			Value: 100,
 		}
@@ -941,6 +949,7 @@ func TestFastNode_Overlaps_CompleteFlow(t *testing.T) {
 	t.Parallel()
 
 	t.Run("routes_overlap", func(t *testing.T) {
+		t.Parallel()
 		a := &FastNode[int]{}
 		b := &FastNode[int]{}
 
@@ -953,6 +962,7 @@ func TestFastNode_Overlaps_CompleteFlow(t *testing.T) {
 	})
 
 	t.Run("children_overlap", func(t *testing.T) {
+		t.Parallel()
 		a := &FastNode[int]{}
 		b := &FastNode[int]{}
 
@@ -965,6 +975,7 @@ func TestFastNode_Overlaps_CompleteFlow(t *testing.T) {
 	})
 
 	t.Run("same_children_overlap", func(t *testing.T) {
+		t.Parallel()
 		a := &FastNode[int]{}
 		b := &FastNode[int]{}
 
@@ -977,6 +988,7 @@ func TestFastNode_Overlaps_CompleteFlow(t *testing.T) {
 	})
 
 	t.Run("no_overlap", func(t *testing.T) {
+		t.Parallel()
 		a := &FastNode[int]{}
 		b := &FastNode[int]{}
 
@@ -989,6 +1001,7 @@ func TestFastNode_Overlaps_CompleteFlow(t *testing.T) {
 	})
 
 	t.Run("empty_nodes", func(t *testing.T) {
+		t.Parallel()
 		a := &FastNode[int]{}
 		b := &FastNode[int]{}
 
@@ -1002,6 +1015,7 @@ func TestFastNode_OverlapsIdx(t *testing.T) {
 	t.Parallel()
 
 	t.Run("prefix_covers_idx", func(t *testing.T) {
+		t.Parallel()
 		n := &FastNode[int]{}
 		n.InsertPrefix(1, 100)
 
@@ -1011,6 +1025,7 @@ func TestFastNode_OverlapsIdx(t *testing.T) {
 	})
 
 	t.Run("idx_covers_routes", func(t *testing.T) {
+		t.Parallel()
 		n := &FastNode[int]{}
 		n.InsertPrefix(64, 100)
 
@@ -1020,13 +1035,14 @@ func TestFastNode_OverlapsIdx(t *testing.T) {
 	})
 
 	t.Run("idx_overlaps_child", func(t *testing.T) {
+		t.Parallel()
 		n := &FastNode[int]{}
 		child := &FastNode[int]{}
 		child.InsertPrefix(1, 100)
 
 		n.InsertChild(10, child)
 
-		idx := uint8(art.OctetToIdx(10))
+		idx := art.OctetToIdx(10)
 		for idx > 1 {
 			idx = idx / 2
 			if n.OverlapsIdx(idx) {
@@ -1036,6 +1052,7 @@ func TestFastNode_OverlapsIdx(t *testing.T) {
 	})
 
 	t.Run("no_overlap", func(t *testing.T) {
+		t.Parallel()
 		n := &FastNode[int]{}
 		n.InsertPrefix(2, 100)
 
@@ -1045,12 +1062,14 @@ func TestFastNode_OverlapsIdx(t *testing.T) {
 	})
 }
 
+//nolint:gocyclo
 func TestFastNode_UnionRec_AllCombinations(t *testing.T) {
 	t.Parallel()
 
 	cloneFn := cloneFnFactory[int]()
 
 	t.Run("null_plus_node", func(t *testing.T) {
+		t.Parallel()
 		a := &FastNode[int]{}
 		b := &FastNode[int]{}
 
@@ -1075,6 +1094,7 @@ func TestFastNode_UnionRec_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("null_plus_leaf", func(t *testing.T) {
+		t.Parallel()
 		a := &FastNode[int]{}
 		b := &FastNode[int]{}
 
@@ -1101,6 +1121,7 @@ func TestFastNode_UnionRec_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("null_plus_fringe", func(t *testing.T) {
+		t.Parallel()
 		a := &FastNode[int]{}
 		b := &FastNode[int]{}
 
@@ -1124,6 +1145,7 @@ func TestFastNode_UnionRec_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("node_plus_node", func(t *testing.T) {
+		t.Parallel()
 		a := &FastNode[int]{}
 		b := &FastNode[int]{}
 
@@ -1151,6 +1173,7 @@ func TestFastNode_UnionRec_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("node_plus_node_with_duplicate", func(t *testing.T) {
+		t.Parallel()
 		a := &FastNode[int]{}
 		b := &FastNode[int]{}
 
@@ -1175,6 +1198,7 @@ func TestFastNode_UnionRec_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("node_plus_leaf", func(t *testing.T) {
+		t.Parallel()
 		a := &FastNode[int]{}
 		b := &FastNode[int]{}
 
@@ -1201,6 +1225,7 @@ func TestFastNode_UnionRec_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("node_plus_fringe", func(t *testing.T) {
+		t.Parallel()
 		a := &FastNode[int]{}
 		b := &FastNode[int]{}
 
@@ -1221,6 +1246,7 @@ func TestFastNode_UnionRec_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("leaf_plus_node", func(t *testing.T) {
+		t.Parallel()
 		a := &FastNode[int]{}
 		b := &FastNode[int]{}
 
@@ -1253,6 +1279,7 @@ func TestFastNode_UnionRec_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("leaf_plus_leaf_same_prefix", func(t *testing.T) {
+		t.Parallel()
 		a := &FastNode[int]{}
 		b := &FastNode[int]{}
 
@@ -1276,6 +1303,7 @@ func TestFastNode_UnionRec_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("leaf_plus_leaf_different_prefix", func(t *testing.T) {
+		t.Parallel()
 		a := &FastNode[int]{}
 		b := &FastNode[int]{}
 
@@ -1303,6 +1331,7 @@ func TestFastNode_UnionRec_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("leaf_plus_fringe", func(t *testing.T) {
+		t.Parallel()
 		a := &FastNode[int]{}
 		b := &FastNode[int]{}
 
@@ -1324,6 +1353,7 @@ func TestFastNode_UnionRec_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("fringe_plus_node", func(t *testing.T) {
+		t.Parallel()
 		a := &FastNode[int]{}
 		b := &FastNode[int]{}
 
@@ -1347,6 +1377,7 @@ func TestFastNode_UnionRec_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("fringe_plus_leaf", func(t *testing.T) {
+		t.Parallel()
 		a := &FastNode[int]{}
 		b := &FastNode[int]{}
 
@@ -1368,6 +1399,7 @@ func TestFastNode_UnionRec_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("fringe_plus_fringe", func(t *testing.T) {
+		t.Parallel()
 		a := &FastNode[int]{}
 		b := &FastNode[int]{}
 
@@ -1396,6 +1428,7 @@ func TestFastNode_UnionRecPersist_AllCombinations(t *testing.T) {
 	cloneFn := cloneFnFactory[int]()
 
 	t.Run("null_plus_node_persist", func(t *testing.T) {
+		t.Parallel()
 		a := &FastNode[int]{}
 		b := &FastNode[int]{}
 
@@ -1422,6 +1455,7 @@ func TestFastNode_UnionRecPersist_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("null_plus_leaf_persist", func(t *testing.T) {
+		t.Parallel()
 		a := &FastNode[int]{}
 		b := &FastNode[int]{}
 
@@ -1447,6 +1481,7 @@ func TestFastNode_UnionRecPersist_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("null_plus_fringe_persist", func(t *testing.T) {
+		t.Parallel()
 		a := &FastNode[int]{}
 		b := &FastNode[int]{}
 
@@ -1468,6 +1503,7 @@ func TestFastNode_UnionRecPersist_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("node_plus_node_persist", func(t *testing.T) {
+		t.Parallel()
 		a := &FastNode[int]{}
 		b := &FastNode[int]{}
 
@@ -1505,6 +1541,7 @@ func TestFastNode_UnionRecPersist_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("node_plus_leaf_persist", func(t *testing.T) {
+		t.Parallel()
 		a := &FastNode[int]{}
 		b := &FastNode[int]{}
 
@@ -1528,6 +1565,7 @@ func TestFastNode_UnionRecPersist_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("node_plus_fringe_persist", func(t *testing.T) {
+		t.Parallel()
 		a := &FastNode[int]{}
 		b := &FastNode[int]{}
 
@@ -1548,6 +1586,7 @@ func TestFastNode_UnionRecPersist_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("leaf_plus_node_persist", func(t *testing.T) {
+		t.Parallel()
 		a := &FastNode[int]{}
 		b := &FastNode[int]{}
 
@@ -1570,6 +1609,7 @@ func TestFastNode_UnionRecPersist_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("leaf_plus_leaf_same_prefix_persist", func(t *testing.T) {
+		t.Parallel()
 		a := &FastNode[int]{}
 		b := &FastNode[int]{}
 
@@ -1593,6 +1633,7 @@ func TestFastNode_UnionRecPersist_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("leaf_plus_leaf_different_prefix_persist", func(t *testing.T) {
+		t.Parallel()
 		a := &FastNode[int]{}
 		b := &FastNode[int]{}
 
@@ -1617,6 +1658,7 @@ func TestFastNode_UnionRecPersist_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("leaf_plus_fringe_persist", func(t *testing.T) {
+		t.Parallel()
 		a := &FastNode[int]{}
 		b := &FastNode[int]{}
 
@@ -1638,6 +1680,7 @@ func TestFastNode_UnionRecPersist_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("fringe_plus_node_persist", func(t *testing.T) {
+		t.Parallel()
 		a := &FastNode[int]{}
 		b := &FastNode[int]{}
 
@@ -1657,6 +1700,7 @@ func TestFastNode_UnionRecPersist_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("fringe_plus_leaf_persist", func(t *testing.T) {
+		t.Parallel()
 		a := &FastNode[int]{}
 		b := &FastNode[int]{}
 
@@ -1678,6 +1722,7 @@ func TestFastNode_UnionRecPersist_AllCombinations(t *testing.T) {
 	})
 
 	t.Run("fringe_plus_fringe_persist", func(t *testing.T) {
+		t.Parallel()
 		a := &FastNode[int]{}
 		b := &FastNode[int]{}
 
@@ -1700,10 +1745,12 @@ func TestFastNode_UnionRecPersist_AllCombinations(t *testing.T) {
 	})
 }
 
+//nolint:gocyclo
 func TestFastNode_Modify_AllPaths(t *testing.T) {
 	t.Parallel()
 
 	t.Run("modify_at_lastOctet_delete_nonexistent", func(t *testing.T) {
+		t.Parallel()
 		n := &FastNode[int]{}
 
 		delta := n.Modify(mpp("0.0.0.0/0"), func(val int, found bool) (int, bool) {
@@ -1718,6 +1765,7 @@ func TestFastNode_Modify_AllPaths(t *testing.T) {
 	})
 
 	t.Run("modify_at_lastOctet_delete_existing", func(t *testing.T) {
+		t.Parallel()
 		n := &FastNode[int]{}
 		pfx := mpp("0.0.0.0/0")
 		n.Insert(pfx, 100, 0)
@@ -1737,6 +1785,7 @@ func TestFastNode_Modify_AllPaths(t *testing.T) {
 	})
 
 	t.Run("modify_at_lastOctet_insert_new", func(t *testing.T) {
+		t.Parallel()
 		n := &FastNode[int]{}
 		pfx := mpp("0.0.0.0/0")
 
@@ -1755,6 +1804,7 @@ func TestFastNode_Modify_AllPaths(t *testing.T) {
 	})
 
 	t.Run("modify_at_lastOctet_update_existing", func(t *testing.T) {
+		t.Parallel()
 		n := &FastNode[int]{}
 		pfx := mpp("0.0.0.0/0")
 		n.Insert(pfx, 100, 0)
@@ -1774,6 +1824,7 @@ func TestFastNode_Modify_AllPaths(t *testing.T) {
 	})
 
 	t.Run("modify_insert_path_compressed_fringe", func(t *testing.T) {
+		t.Parallel()
 		n := &FastNode[int]{}
 		pfx := mpp("10.0.0.0/8")
 
@@ -1795,6 +1846,7 @@ func TestFastNode_Modify_AllPaths(t *testing.T) {
 	})
 
 	t.Run("modify_insert_path_compressed_leaf", func(t *testing.T) {
+		t.Parallel()
 		n := &FastNode[int]{}
 		pfx := mpp("10.1.0.0/16")
 
@@ -1816,6 +1868,7 @@ func TestFastNode_Modify_AllPaths(t *testing.T) {
 	})
 
 	t.Run("modify_delete_nonexistent_path_compressed", func(t *testing.T) {
+		t.Parallel()
 		n := &FastNode[int]{}
 		delta := n.Modify(mpp("10.1.0.0/16"), func(val int, found bool) (int, bool) {
 			return 0, true
@@ -1826,6 +1879,7 @@ func TestFastNode_Modify_AllPaths(t *testing.T) {
 	})
 
 	t.Run("modify_update_leaf_same_prefix", func(t *testing.T) {
+		t.Parallel()
 		n := &FastNode[int]{}
 		pfx := mpp("10.1.0.0/16")
 		n.Insert(pfx, 100, 0)
@@ -1845,6 +1899,7 @@ func TestFastNode_Modify_AllPaths(t *testing.T) {
 	})
 
 	t.Run("modify_delete_leaf_same_prefix", func(t *testing.T) {
+		t.Parallel()
 		n := &FastNode[int]{}
 		pfx := mpp("10.1.0.0/16")
 		n.Insert(pfx, 100, 0)
@@ -1859,6 +1914,7 @@ func TestFastNode_Modify_AllPaths(t *testing.T) {
 	})
 
 	t.Run("modify_insert_creates_node_from_leaf", func(t *testing.T) {
+		t.Parallel()
 		n := &FastNode[int]{}
 		p1 := mpp("10.1.0.0/16")
 		p2 := mpp("10.1.1.0/24")
@@ -1882,6 +1938,7 @@ func TestFastNode_Modify_AllPaths(t *testing.T) {
 	})
 
 	t.Run("modify_delete_noop_from_leaf_mismatch", func(t *testing.T) {
+		t.Parallel()
 		n := &FastNode[int]{}
 		n.Insert(mpp("10.1.0.0/16"), 100, 0)
 		delta := n.Modify(mpp("10.1.1.0/24"), func(_ int, _ bool) (int, bool) { return 0, true })
@@ -1891,6 +1948,7 @@ func TestFastNode_Modify_AllPaths(t *testing.T) {
 	})
 
 	t.Run("modify_update_fringe_same_prefix", func(t *testing.T) {
+		t.Parallel()
 		n := &FastNode[int]{}
 		pfx := mpp("10.0.0.0/8")
 		n.Insert(pfx, 100, 0)
@@ -1910,6 +1968,7 @@ func TestFastNode_Modify_AllPaths(t *testing.T) {
 	})
 
 	t.Run("modify_delete_fringe", func(t *testing.T) {
+		t.Parallel()
 		n := &FastNode[int]{}
 		pfx := mpp("10.0.0.0/8")
 		n.Insert(pfx, 100, 0)
@@ -1924,6 +1983,7 @@ func TestFastNode_Modify_AllPaths(t *testing.T) {
 	})
 
 	t.Run("modify_insert_creates_node_from_fringe", func(t *testing.T) {
+		t.Parallel()
 		n := &FastNode[int]{}
 		pFr := mpp("10.0.0.0/8")
 		pLeaf := mpp("10.1.0.0/16")
@@ -1942,6 +2002,7 @@ func TestFastNode_Modify_AllPaths(t *testing.T) {
 	})
 
 	t.Run("modify_delete_noop_from_fringe_mismatch", func(t *testing.T) {
+		t.Parallel()
 		n := &FastNode[int]{}
 		n.Insert(mpp("10.0.0.0/8"), 100, 0)
 
@@ -1952,6 +2013,7 @@ func TestFastNode_Modify_AllPaths(t *testing.T) {
 	})
 
 	t.Run("modify_noop_update", func(t *testing.T) {
+		t.Parallel()
 		n := &FastNode[int]{}
 		pfx := mpp("0.0.0.0/0")
 		n.Insert(pfx, 100, 0)
