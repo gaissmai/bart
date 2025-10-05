@@ -198,7 +198,7 @@ func (n *LiteNode[V]) InsertPersist(cloneFn CloneFunc[V], pfx netip.Prefix, val 
 	panic("unreachable")
 }
 
-// purgeAndCompress performs bottom-up compression of the trie by removing
+// PurgeAndCompress performs bottom-up compression of the trie by removing
 // empty nodes and converting sparse branches into compressed leaf/fringe nodes.
 //
 // The function unwinds the provided stack of parent nodes, checking each level
@@ -917,6 +917,19 @@ func (n *LiteNode[V]) Dump(w io.Writer, path StridePath, depth int, is4 bool, pr
 	}
 }
 
+// DumpString traverses the trie to the node at the specified depth along the given
+// octet path and returns its string representation via Dump.
+//
+// If the path is invalid or encounters an unexpected node type during traversal,
+// it returns an error message string instead.
+//
+// Parameters:
+//   - octets: The path of octets to follow from the root
+//   - depth: Target depth to reach before dumping (0-based byte index)
+//   - is4: True for IPv4 formatting, false for IPv6
+//   - printVals: Whether to include values in the dump output
+//
+// Returns a formatted string representation of the target node or an error message.
 func (n *LiteNode[V]) DumpString(octets []uint8, depth int, is4 bool, printVals bool) string {
 	path := StridePath{}
 	copy(path[:], octets)
@@ -1841,6 +1854,23 @@ func (n *LiteNode[V]) EachSubnet(octets []byte, depth int, is4 bool, pfxIdx uint
 	return true
 }
 
+// Supernets yields all supernet prefixes of pfx that exist in the trie,
+// in reverse order (most-specific first, least-specific last).
+//
+// It traverses upward from the given prefix toward the root, collecting
+// matching prefixes along the path. The traversal uses a stack to yield
+// results in reverse order, so that more-specific supernets appear before
+// less-specific ones.
+//
+// The function handles all node types (internal nodes, leaves, and fringes)
+// and stops early if the yield callback returns false.
+//
+// Parameters:
+//   - pfx: The prefix for which to find supernets
+//   - yield: Callback function invoked for each supernet prefix/value pair
+//
+// The yield function receives prefix/value pairs and returns false to stop
+// the iteration early.
 func (n *LiteNode[V]) Supernets(pfx netip.Prefix, yield func(netip.Prefix, V) bool) {
 	ip := pfx.Addr()
 	is4 := ip.Is4()
@@ -1941,6 +1971,22 @@ LOOP:
 	}
 }
 
+// Subnets yields all subnet prefixes covered by pfx that exist in the trie,
+// in CIDR sort order.
+//
+// It first locates the trie node corresponding to pfx, then recursively
+// yields all prefixes and child entries contained within that subtree.
+// The traversal uses sorted iteration to maintain canonical CIDR ordering.
+//
+// The function handles various node types (internal nodes, leaves, and fringes)
+// and uses EachSubnet and AllRecSorted for sorted traversal of covered prefixes.
+//
+// Parameters:
+//   - pfx: The parent prefix whose subnets should be yielded
+//   - yield: Callback function invoked for each subnet prefix/value pair
+//
+// The yield function receives prefix/value pairs and returns false to stop
+// the iteration early. If pfx doesn't exist in the trie, no prefixes are yielded.
 func (n *LiteNode[V]) Subnets(pfx netip.Prefix, yield func(netip.Prefix, V) bool) {
 	// values derived from pfx
 	ip := pfx.Addr()
@@ -1992,7 +2038,7 @@ func (n *LiteNode[V]) Subnets(pfx netip.Prefix, yield func(netip.Prefix, V) bool
 	}
 }
 
-// overlaps recursively compares two trie nodes and returns true
+// Overlaps recursively compares two trie nodes and returns true
 // if any of their prefixes or descendants overlap.
 //
 // The implementation checks for:
@@ -2069,7 +2115,7 @@ func (n *LiteNode[V]) Overlaps(o *LiteNode[V], depth int) bool {
 	return n.OverlapsSameChildren(o, depth)
 }
 
-// overlapsRoutes compares the prefix sets of two nodes (n and o).
+// OverlapsRoutes compares the prefix sets of two nodes (n and o).
 //
 // It first checks for direct bitset intersection (identical indices),
 // then walks both prefix sets using lpmTest to detect if any
@@ -2129,7 +2175,7 @@ func (n *LiteNode[V]) OverlapsRoutes(o *LiteNode[V]) bool {
 	return false
 }
 
-// overlapsChildrenIn checks whether the prefixes in node n
+// OverlapsChildrenIn checks whether the prefixes in node n
 // overlap with any children (by address range) in node o.
 //
 // Uses bitset intersection or manual iteration heuristically,
@@ -2173,7 +2219,7 @@ func (n *LiteNode[V]) OverlapsChildrenIn(o *LiteNode[V]) bool {
 	return false
 }
 
-// overlapsSameChildren compares all matching child addresses (octets)
+// OverlapsSameChildren compares all matching child addresses (octets)
 // between node n and node o recursively.
 //
 // For each shared address, the corresponding child nodes (of any type)
@@ -2200,7 +2246,7 @@ func (n *LiteNode[V]) OverlapsSameChildren(o *LiteNode[V], depth int) bool {
 	return false
 }
 
-// overlapsPrefixAtDepth returns true if any route in the subtree rooted at this node
+// OverlapsPrefixAtDepth returns true if any route in the subtree rooted at this node
 // overlaps with the given pfx, starting the comparison at the specified depth.
 //
 // This function supports structural overlap detection even in compressed or sparse
@@ -2260,7 +2306,7 @@ func (n *LiteNode[V]) OverlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
 	panic("unreachable: " + pfx.String())
 }
 
-// overlapsIdx returns true if the given prefix index overlaps with any entry in this node.
+// OverlapsIdx returns true if the given prefix index overlaps with any entry in this node.
 //
 // The overlap detection considers three categories:
 //
@@ -2287,7 +2333,7 @@ func (n *LiteNode[V]) OverlapsIdx(idx uint8) bool {
 	return n.Children.Intersects(&allot.FringeRoutesLookupTbl[idx])
 }
 
-// overlapsTwoChildren handles all 3x3 combinations of
+// OverlapsTwoChildren handles all 3x3 combinations of
 // node kinds (node, leaf, fringe).
 //
 //	3x3 possible different combinations for n and o
