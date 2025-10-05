@@ -917,7 +917,19 @@ func (n *FastNode[V]) Dump(w io.Writer, path StridePath, depth int, is4 bool, pr
 	}
 }
 
-// DumpString @coderabbitai
+// DumpString traverses the trie to the node at the specified depth along the given
+// octet path and returns its string representation via Dump.
+//
+// If the path is invalid or encounters an unexpected node type during traversal,
+// it returns an error message string instead.
+//
+// Parameters:
+//   - octets: The path of octets to follow from the root
+//   - depth: Target depth to reach before dumping (0-based byte index)
+//   - is4: True for IPv4 formatting, false for IPv6
+//   - printVals: Whether to include values in the dump output
+//
+// Returns a formatted string representation of the target node or an error message.
 func (n *FastNode[V]) DumpString(octets []uint8, depth int, is4 bool, printVals bool) string {
 	path := StridePath{}
 	copy(path[:], octets)
