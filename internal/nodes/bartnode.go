@@ -83,8 +83,6 @@ func (n *BartNode[V]) MustGetPrefix(idx uint8) (val V) {
 
 // AllIndices returns an iterator over all prefix entries.
 // Each iteration yields the prefix index (uint8) and its associated value (V).
-//
-//nolint:unused // used via nodeReader interface
 func (n *BartNode[V]) AllIndices() iter.Seq2[uint8, V] {
 	return func(yield func(uint8, V) bool) {
 		var buf [256]uint8
@@ -125,8 +123,6 @@ func (n *BartNode[V]) MustGetChild(addr uint8) any {
 
 // AllChildren returns an iterator over all child nodes.
 // Each iteration yields the child's address (uint8) and the child node (any).
-//
-//nolint:unused // used via nodeReader interface
 func (n *BartNode[V]) AllChildren() iter.Seq2[uint8, any] {
 	return func(yield func(addr uint8, child any) bool) {
 		var buf [256]uint8

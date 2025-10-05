@@ -101,8 +101,6 @@ func (n *LiteNode[V]) InsertPrefix(idx uint8, _ V) (exists bool) {
 }
 
 // prefix is set at the given index.
-//
-//nolint:unparam
 func (n *LiteNode[V]) GetPrefix(idx uint8) (_ V, exists bool) {
 	exists = n.Prefixes.Test(idx)
 	return
@@ -114,8 +112,6 @@ func (n *LiteNode[V]) MustGetPrefix(idx uint8) (_ V) {
 
 // AllIndices returns an iterator over all prefix entries.
 // Each iteration yields the prefix index (uint8) and its associated value (V).
-//
-//nolint:unused // used via nodeReader interface
 func (n *LiteNode[V]) AllIndices() iter.Seq2[uint8, V] {
 	var zero V
 	return func(yield func(uint8, V) bool) {
@@ -130,8 +126,6 @@ func (n *LiteNode[V]) AllIndices() iter.Seq2[uint8, V] {
 
 // DeletePrefix removes the prefix at the specified index.
 // Returns true if the prefix existed, and false otherwise.
-//
-//nolint:unparam
 func (n *LiteNode[V]) DeletePrefix(idx uint8) (exists bool) {
 	if exists = n.Prefixes.Test(idx); !exists {
 		return false
@@ -162,8 +156,6 @@ func (n *LiteNode[V]) MustGetChild(addr uint8) any {
 
 // AllChildren returns an iterator over all child nodes.
 // Each iteration yields the child's address (uint8) and the child node (any).
-//
-//nolint:unused // used via nodeReader interface
 func (n *LiteNode[V]) AllChildren() iter.Seq2[uint8, any] {
 	return func(yield func(addr uint8, child any) bool) {
 		var buf [256]uint8
@@ -206,16 +198,12 @@ func (n *LiteNode[V]) Contains(idx uint8) bool {
 // via the baseIndex function. Unlike the original ART algorithm, this implementation
 // does not use an allotment-based approach. Instead, it performs CBT backtracking
 // using a bitset-based operation with a precomputed backtracking pattern specific to idx.
-//
-//nolint:unparam,unused // used via nodeReader interface
 func (n *LiteNode[V]) LookupIdx(idx uint8) (top uint8, _ V, ok bool) {
 	top, ok = n.Prefixes.IntersectionTop(&lpm.LookupTbl[idx])
 	return
 }
 
 // Lookup is just a simple wrapper for lookupIdx.
-//
-//nolint:unparam,unused // used via nodeReader interface
 func (n *LiteNode[V]) Lookup(idx uint8) (_ V, ok bool) {
 	_, _, ok = n.LookupIdx(idx)
 	return
