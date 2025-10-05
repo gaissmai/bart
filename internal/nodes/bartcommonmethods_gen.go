@@ -917,6 +917,30 @@ func (n *BartNode[V]) Dump(w io.Writer, path StridePath, depth int, is4 bool, pr
 	}
 }
 
+func (n *BartNode[V]) DumpString(octets []uint8, depth int, is4 bool, printVals bool) string {
+	path := StridePath{}
+	copy(path[:], octets)
+
+	buf := new(strings.Builder)
+	for i := range depth {
+		anyKid, ok := n.GetChild(path[i])
+		if !ok {
+			return fmt.Sprintf("ERROR: kid for %v[%d] is NOT set in node\n", octets, i)
+		}
+
+		kid, ok := anyKid.(*BartNode[V])
+		if !ok {
+			return fmt.Sprintf("ERROR: kid for %v[%d] is NO %s\n", octets, i, "BartNode[V]")
+		}
+
+		// traverse
+		n = kid
+	}
+
+	n.Dump(buf, path, depth, is4, printVals)
+	return buf.String()
+}
+
 // hasType classifies the given node into one of the nodeType values.
 //
 // It inspects immediate statistics (prefix count, child count, node, leaf and
