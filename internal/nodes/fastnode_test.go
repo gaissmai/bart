@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/gaissmai/bart/internal/art"
 )
 
 func TestFastNode_EmptyState(t *testing.T) {
@@ -645,4 +647,1323 @@ func TestFastNode_FprintRec_and_DirectItemsRec_Smoke(t *testing.T) {
 	if len(items) == 0 {
 		t.Fatal("DirectItemsRec returned no items")
 	}
+}
+
+func TestFastNode_OverlapsRoutes_DirectIntersection(t *testing.T) {
+	t.Parallel()
+	a := &FastNode[int]{}
+	b := &FastNode[int]{}
+
+	a.InsertPrefix(32, 100)
+	b.InsertPrefix(32, 200)
+
+	if !a.OverlapsRoutes(b) {
+		t.Error("OverlapsRoutes should return true for identical indices")
+	}
+}
+
+func TestFastNode_OverlapsRoutes_LPM_Containment(t *testing.T) {
+	t.Parallel()
+	a := &FastNode[int]{}
+	b := &FastNode[int]{}
+
+	a.InsertPrefix(64, 100)
+	b.InsertPrefix(32, 200)
+
+	if !a.OverlapsRoutes(b) {
+		t.Error("OverlapsRoutes should detect LPM containment")
+	}
+
+	c := &FastNode[int]{}
+	d := &FastNode[int]{}
+	c.InsertPrefix(32, 100)
+	d.InsertPrefix(64, 200)
+
+	if !c.OverlapsRoutes(d) {
+		t.Error("OverlapsRoutes should detect LPM containment (reverse)")
+	}
+}
+
+func TestFastNode_OverlapsRoutes_NoOverlap(t *testing.T) {
+	t.Parallel()
+	a := &FastNode[int]{}
+	b := &FastNode[int]{}
+
+	a.InsertPrefix(2, 100)
+	b.InsertPrefix(3, 200)
+
+	if a.OverlapsRoutes(b) {
+		t.Error("OverlapsRoutes should return false for non-overlapping prefixes")
+	}
+
+	c := &FastNode[int]{}
+	d := &FastNode[int]{}
+	c.InsertPrefix(4, 100)
+	d.InsertPrefix(6, 200)
+
+	if c.OverlapsRoutes(d) {
+		t.Error("OverlapsRoutes should return false for non-overlapping sibling subtrees")
+	}
+}
+
+func TestFastNode_OverlapsRoutes_EmptyNodes(t *testing.T) {
+	t.Parallel()
+	a := &FastNode[int]{}
+	b := &FastNode[int]{}
+
+	if a.OverlapsRoutes(b) {
+		t.Error("OverlapsRoutes should return false for empty nodes")
+	}
+
+	a.InsertPrefix(32, 100)
+	if a.OverlapsRoutes(b) {
+		t.Error("OverlapsRoutes should return false when one node is empty")
+	}
+}
+
+func TestFastNode_OverlapsRoutes_MultiplePrefix_WithOverlap(t *testing.T) {
+	t.Parallel()
+	a := &FastNode[int]{}
+	b := &FastNode[int]{}
+
+	a.InsertPrefix(16, 100)
+	a.InsertPrefix(64, 101)
+	a.InsertPrefix(128, 102)
+
+	b.InsertPrefix(8, 200)
+	b.InsertPrefix(32, 201)
+	b.InsertPrefix(255, 202)
+
+	if !a.OverlapsRoutes(b) {
+		t.Error("OverlapsRoutes should detect overlap in multi-prefix scenario")
+	}
+}
+
+func TestFastNode_OverlapsRoutes_Uint8_Boundary(t *testing.T) {
+	t.Parallel()
+	a := &FastNode[int]{}
+	b := &FastNode[int]{}
+
+	a.InsertPrefix(255, 100)
+	b.InsertPrefix(254, 200)
+
+	if a.OverlapsRoutes(b) {
+		t.Error("OverlapsRoutes returned unexpected overlap for sibling indices at boundary")
+	}
+
+	b.InsertPrefix(255, 300)
+	if !a.OverlapsRoutes(b) {
+		t.Error("OverlapsRoutes should detect overlap at index 255")
+	}
+}
+
+func TestFastNode_OverlapsChildrenIn_BitsetPath(t *testing.T) {
+	t.Parallel()
+	n := &FastNode[int]{}
+	o := &FastNode[int]{}
+
+	n.InsertPrefix(1, 100)
+
+	for i := uint8(0); i < 20; i++ {
+		child := &FastNode[int]{}
+		child.InsertPrefix(1, int(i))
+		o.InsertChild(i, child)
+	}
+
+	if !n.OverlapsChildrenIn(o) {
+		t.Error("OverlapsChildrenIn should detect overlap using bitset path")
+	}
+}
+
+func TestFastNode_OverlapsChildrenIn_IterationPath(t *testing.T) {
+	t.Parallel()
+	n := &FastNode[int]{}
+	o := &FastNode[int]{}
+
+	n.InsertPrefix(2, 100)
+
+	child := &FastNode[int]{}
+	child.InsertPrefix(1, 1)
+	o.InsertChild(128, child)
+
+	if n.OverlapsChildrenIn(o) {
+		t.Error("OverlapsChildrenIn should not detect overlap for non-overlapping children")
+	}
+
+	child2 := &FastNode[int]{}
+	child2.InsertPrefix(1, 2)
+	o.InsertChild(0, child2)
+
+	if !n.OverlapsChildrenIn(o) {
+		t.Error("OverlapsChildrenIn should detect overlap using iteration path")
+	}
+}
+
+func TestFastNode_OverlapsChildrenIn_EmptyCases(t *testing.T) {
+	t.Parallel()
+	n := &FastNode[int]{}
+	o := &FastNode[int]{}
+
+	if n.OverlapsChildrenIn(o) {
+		t.Error("OverlapsChildrenIn should return false for empty nodes")
+	}
+
+	n.InsertPrefix(32, 100)
+	if n.OverlapsChildrenIn(o) {
+		t.Error("OverlapsChildrenIn should return false when o has no children")
+	}
+
+	n2 := &FastNode[int]{}
+	child := &FastNode[int]{}
+	o.InsertChild(10, child)
+	if n2.OverlapsChildrenIn(o) {
+		t.Error("OverlapsChildrenIn should return false when n has no prefixes")
+	}
+}
+
+func TestFastNode_OverlapsTwoChildren_AllCombinations(t *testing.T) {
+	t.Parallel()
+
+	t.Run("node-node_overlap", func(t *testing.T) {
+		n1 := &FastNode[int]{}
+		n2 := &FastNode[int]{}
+		n1.InsertPrefix(32, 100)
+		n2.InsertPrefix(32, 200)
+
+		parent := &FastNode[int]{}
+		if !parent.OverlapsTwoChildren(n1, n2, 0) {
+			t.Error("node-node should overlap when prefixes overlap")
+		}
+	})
+
+	t.Run("node-node_no_overlap", func(t *testing.T) {
+		n1 := &FastNode[int]{}
+		n2 := &FastNode[int]{}
+		n1.InsertPrefix(2, 100)
+		n2.InsertPrefix(3, 200)
+
+		parent := &FastNode[int]{}
+		if parent.OverlapsTwoChildren(n1, n2, 0) {
+			t.Error("node-node should not overlap when prefixes don't overlap")
+		}
+	})
+
+	t.Run("node-leaf", func(t *testing.T) {
+		node := &FastNode[int]{}
+		leaf := &LeafNode[int]{
+			Prefix: mpp("10.0.0.0/8"),
+			Value:  100,
+		}
+
+		node.Insert(mpp("10.0.0.0/16"), 200, 0)
+
+		parent := &FastNode[int]{}
+		if !parent.OverlapsTwoChildren(node, leaf, 0) {
+			t.Error("node-leaf should overlap when node contains overlapping prefix")
+		}
+	})
+
+	t.Run("node-fringe_always_overlap", func(t *testing.T) {
+		node := &FastNode[int]{}
+		fringe := &FringeNode[int]{
+			Value: 100,
+		}
+
+		parent := &FastNode[int]{}
+		if !parent.OverlapsTwoChildren(node, fringe, 0) {
+			t.Error("node-fringe should always overlap")
+		}
+	})
+
+	t.Run("leaf-leaf_overlap", func(t *testing.T) {
+		leaf1 := &LeafNode[int]{
+			Prefix: mpp("10.0.0.0/8"),
+			Value:  100,
+		}
+		leaf2 := &LeafNode[int]{
+			Prefix: mpp("10.0.0.0/16"),
+			Value:  200,
+		}
+
+		parent := &FastNode[int]{}
+		if !parent.OverlapsTwoChildren(leaf1, leaf2, 0) {
+			t.Error("leaf-leaf should overlap when prefixes overlap")
+		}
+	})
+
+	t.Run("leaf-leaf_no_overlap", func(t *testing.T) {
+		leaf1 := &LeafNode[int]{
+			Prefix: mpp("10.0.0.0/8"),
+			Value:  100,
+		}
+		leaf2 := &LeafNode[int]{
+			Prefix: mpp("192.168.0.0/16"),
+			Value:  200,
+		}
+
+		parent := &FastNode[int]{}
+		if parent.OverlapsTwoChildren(leaf1, leaf2, 0) {
+			t.Error("leaf-leaf should not overlap when prefixes don't overlap")
+		}
+	})
+
+	t.Run("leaf-fringe_always_overlap", func(t *testing.T) {
+		leaf := &LeafNode[int]{
+			Prefix: mpp("10.0.0.0/8"),
+			Value:  100,
+		}
+		fringe := &FringeNode[int]{
+			Value: 200,
+		}
+
+		parent := &FastNode[int]{}
+		if !parent.OverlapsTwoChildren(leaf, fringe, 0) {
+			t.Error("leaf-fringe should always overlap")
+		}
+	})
+
+	t.Run("fringe-fringe_always_overlap", func(t *testing.T) {
+		fringe1 := &FringeNode[int]{
+			Value: 100,
+		}
+		fringe2 := &FringeNode[int]{
+			Value: 200,
+		}
+
+		parent := &FastNode[int]{}
+		if !parent.OverlapsTwoChildren(fringe1, fringe2, 0) {
+			t.Error("fringe-fringe should always overlap")
+		}
+	})
+}
+
+func TestFastNode_Overlaps_CompleteFlow(t *testing.T) {
+	t.Parallel()
+
+	t.Run("routes_overlap", func(t *testing.T) {
+		a := &FastNode[int]{}
+		b := &FastNode[int]{}
+
+		a.Insert(mpp("10.0.0.0/8"), 100, 0)
+		b.Insert(mpp("10.0.0.0/16"), 200, 0)
+
+		if !a.Overlaps(b, 0) {
+			t.Error("Overlaps should detect route overlap")
+		}
+	})
+
+	t.Run("children_overlap", func(t *testing.T) {
+		a := &FastNode[int]{}
+		b := &FastNode[int]{}
+
+		a.Insert(mpp("10.0.0.0/8"), 100, 0)
+		b.Insert(mpp("10.1.0.0/16"), 200, 0)
+
+		if !a.Overlaps(b, 0) {
+			t.Error("Overlaps should detect child overlap")
+		}
+	})
+
+	t.Run("same_children_overlap", func(t *testing.T) {
+		a := &FastNode[int]{}
+		b := &FastNode[int]{}
+
+		a.Insert(mpp("10.1.0.0/16"), 100, 0)
+		b.Insert(mpp("10.1.0.0/24"), 200, 0)
+
+		if !a.Overlaps(b, 0) {
+			t.Error("Overlaps should detect same-children overlap")
+		}
+	})
+
+	t.Run("no_overlap", func(t *testing.T) {
+		a := &FastNode[int]{}
+		b := &FastNode[int]{}
+
+		a.Insert(mpp("10.0.0.0/8"), 100, 0)
+		b.Insert(mpp("192.168.0.0/16"), 200, 0)
+
+		if a.Overlaps(b, 0) {
+			t.Error("Overlaps should return false for non-overlapping trees")
+		}
+	})
+
+	t.Run("empty_nodes", func(t *testing.T) {
+		a := &FastNode[int]{}
+		b := &FastNode[int]{}
+
+		if a.Overlaps(b, 0) {
+			t.Error("Overlaps should return false for empty nodes")
+		}
+	})
+}
+
+func TestFastNode_OverlapsIdx(t *testing.T) {
+	t.Parallel()
+
+	t.Run("prefix_covers_idx", func(t *testing.T) {
+		n := &FastNode[int]{}
+		n.InsertPrefix(1, 100)
+
+		if !n.OverlapsIdx(128) {
+			t.Error("OverlapsIdx should return true when prefix covers idx")
+		}
+	})
+
+	t.Run("idx_covers_routes", func(t *testing.T) {
+		n := &FastNode[int]{}
+		n.InsertPrefix(64, 100)
+
+		if !n.OverlapsIdx(32) {
+			t.Error("OverlapsIdx should return true when idx covers routes")
+		}
+	})
+
+	t.Run("idx_overlaps_child", func(t *testing.T) {
+		n := &FastNode[int]{}
+		child := &FastNode[int]{}
+		child.InsertPrefix(1, 100)
+
+		n.InsertChild(10, child)
+
+		idx := uint8(art.OctetToIdx(10))
+		for idx > 1 {
+			idx = idx / 2
+			if n.OverlapsIdx(idx) {
+				break
+			}
+		}
+	})
+
+	t.Run("no_overlap", func(t *testing.T) {
+		n := &FastNode[int]{}
+		n.InsertPrefix(2, 100)
+
+		if n.OverlapsIdx(3) {
+			t.Error("OverlapsIdx should return false for non-overlapping idx")
+		}
+	})
+}
+
+func TestFastNode_UnionRec_AllCombinations(t *testing.T) {
+	t.Parallel()
+
+	cloneFn := cloneFnFactory[int]()
+
+	t.Run("null_plus_node", func(t *testing.T) {
+		a := &FastNode[int]{}
+		b := &FastNode[int]{}
+
+		childNode := &FastNode[int]{}
+		childNode.InsertPrefix(32, 100)
+		b.InsertChild(10, childNode)
+
+		duplicates := a.UnionRec(cloneFn, b, 0)
+		if duplicates != 0 {
+			t.Errorf("Expected 0 duplicates, got %d", duplicates)
+		}
+
+		child, exists := a.GetChild(10)
+		if !exists {
+			t.Error("Child should exist after union")
+		}
+		if childNode, ok := child.(*FastNode[int]); !ok {
+			t.Error("Child should be a FastNode")
+		} else if val, ok := childNode.GetPrefix(32); !ok || val != 100 {
+			t.Error("Child node should have prefix 32 with value 100")
+		}
+	})
+
+	t.Run("null_plus_leaf", func(t *testing.T) {
+		a := &FastNode[int]{}
+		b := &FastNode[int]{}
+
+		leaf := &LeafNode[int]{
+			Prefix: mpp("10.10.0.0/16"),
+			Value:  100,
+		}
+		b.InsertChild(10, leaf)
+
+		duplicates := a.UnionRec(cloneFn, b, 0)
+		if duplicates != 0 {
+			t.Errorf("Expected 0 duplicates, got %d", duplicates)
+		}
+
+		child, exists := a.GetChild(10)
+		if !exists {
+			t.Error("Leaf should exist after union")
+		}
+		if childLeaf, ok := child.(*LeafNode[int]); !ok {
+			t.Error("Child should be a LeafNode")
+		} else if childLeaf.Value != 100 {
+			t.Errorf("Leaf value should be 100, got %d", childLeaf.Value)
+		}
+	})
+
+	t.Run("null_plus_fringe", func(t *testing.T) {
+		a := &FastNode[int]{}
+		b := &FastNode[int]{}
+
+		fringe := &FringeNode[int]{Value: 100}
+		b.InsertChild(10, fringe)
+
+		duplicates := a.UnionRec(cloneFn, b, 0)
+		if duplicates != 0 {
+			t.Errorf("Expected 0 duplicates, got %d", duplicates)
+		}
+
+		child, exists := a.GetChild(10)
+		if !exists {
+			t.Error("Fringe should exist after union")
+		}
+		if childFringe, ok := child.(*FringeNode[int]); !ok {
+			t.Error("Child should be a FringeNode")
+		} else if childFringe.Value != 100 {
+			t.Errorf("Fringe value should be 100, got %d", childFringe.Value)
+		}
+	})
+
+	t.Run("node_plus_node", func(t *testing.T) {
+		a := &FastNode[int]{}
+		b := &FastNode[int]{}
+
+		childNodeA := &FastNode[int]{}
+		childNodeA.InsertPrefix(32, 100)
+		a.InsertChild(10, childNodeA)
+
+		childNodeB := &FastNode[int]{}
+		childNodeB.InsertPrefix(64, 200)
+		b.InsertChild(10, childNodeB)
+
+		duplicates := a.UnionRec(cloneFn, b, 0)
+		if duplicates != 0 {
+			t.Errorf("Expected 0 duplicates, got %d", duplicates)
+		}
+
+		child, _ := a.GetChild(10)
+		mergedNode := child.(*FastNode[int])
+		if val, ok := mergedNode.GetPrefix(32); !ok || val != 100 {
+			t.Error("Should have prefix 32 with value 100")
+		}
+		if val, ok := mergedNode.GetPrefix(64); !ok || val != 200 {
+			t.Error("Should have prefix 64 with value 200")
+		}
+	})
+
+	t.Run("node_plus_node_with_duplicate", func(t *testing.T) {
+		a := &FastNode[int]{}
+		b := &FastNode[int]{}
+
+		childNodeA := &FastNode[int]{}
+		childNodeA.InsertPrefix(32, 100)
+		a.InsertChild(10, childNodeA)
+
+		childNodeB := &FastNode[int]{}
+		childNodeB.InsertPrefix(32, 999)
+		b.InsertChild(10, childNodeB)
+
+		duplicates := a.UnionRec(cloneFn, b, 0)
+		if duplicates != 1 {
+			t.Errorf("Expected 1 duplicate, got %d", duplicates)
+		}
+
+		child, _ := a.GetChild(10)
+		mergedNode := child.(*FastNode[int])
+		if val, ok := mergedNode.GetPrefix(32); !ok || val != 999 {
+			t.Errorf("Should have prefix 32 with value 999, got %d", val)
+		}
+	})
+
+	t.Run("node_plus_leaf", func(t *testing.T) {
+		a := &FastNode[int]{}
+		b := &FastNode[int]{}
+
+		childNodeA := &FastNode[int]{}
+		childNodeA.InsertPrefix(32, 100)
+		a.InsertChild(10, childNodeA)
+
+		leaf := &LeafNode[int]{
+			Prefix: mpp("10.10.1.0/24"),
+			Value:  200,
+		}
+		b.InsertChild(10, leaf)
+
+		duplicates := a.UnionRec(cloneFn, b, 0)
+		if duplicates != 0 {
+			t.Errorf("Expected 0 duplicates, got %d", duplicates)
+		}
+
+		child, _ := a.GetChild(10)
+		mergedNode := child.(*FastNode[int])
+		if mergedNode.PrefixCount() == 0 && mergedNode.ChildCount() == 0 {
+			t.Error("Node should not be empty after inserting leaf")
+		}
+	})
+
+	t.Run("node_plus_fringe", func(t *testing.T) {
+		a := &FastNode[int]{}
+		b := &FastNode[int]{}
+
+		childNodeA := &FastNode[int]{}
+		childNodeA.InsertPrefix(32, 100)
+		a.InsertChild(10, childNodeA)
+
+		fringe := &FringeNode[int]{Value: 200}
+		b.InsertChild(10, fringe)
+
+		a.UnionRec(cloneFn, b, 0)
+
+		child, _ := a.GetChild(10)
+		mergedNode := child.(*FastNode[int])
+		if val, ok := mergedNode.GetPrefix(1); !ok || val != 200 {
+			t.Error("Node should have fringe prefix (idx=1)")
+		}
+	})
+
+	t.Run("leaf_plus_node", func(t *testing.T) {
+		a := &FastNode[int]{}
+		b := &FastNode[int]{}
+
+		leafA := &LeafNode[int]{
+			Prefix: mpp("10.10.0.0/16"),
+			Value:  100,
+		}
+		a.InsertChild(10, leafA)
+
+		childNodeB := &FastNode[int]{}
+		childNodeB.InsertPrefix(32, 200)
+		b.InsertChild(10, childNodeB)
+
+		duplicates := a.UnionRec(cloneFn, b, 0)
+		if duplicates != 0 {
+			t.Errorf("Expected 0 duplicates, got %d", duplicates)
+		}
+
+		child, exists := a.GetChild(10)
+		if !exists {
+			t.Fatal("Child should exist")
+		}
+		newNode, ok := child.(*FastNode[int])
+		if !ok {
+			t.Fatal("Child should be a FastNode after union")
+		}
+		if newNode.PrefixCount() == 0 && newNode.ChildCount() == 0 {
+			t.Error("New node should not be empty")
+		}
+	})
+
+	t.Run("leaf_plus_leaf_same_prefix", func(t *testing.T) {
+		a := &FastNode[int]{}
+		b := &FastNode[int]{}
+
+		prefix := mpp("10.10.0.0/16")
+		leafA := &LeafNode[int]{Prefix: prefix, Value: 100}
+		leafB := &LeafNode[int]{Prefix: prefix, Value: 999}
+
+		a.InsertChild(10, leafA)
+		b.InsertChild(10, leafB)
+
+		duplicates := a.UnionRec(cloneFn, b, 0)
+		if duplicates != 1 {
+			t.Errorf("Expected 1 duplicate, got %d", duplicates)
+		}
+
+		child, _ := a.GetChild(10)
+		leaf := child.(*LeafNode[int])
+		if leaf.Value != 999 {
+			t.Errorf("Leaf value should be 999, got %d", leaf.Value)
+		}
+	})
+
+	t.Run("leaf_plus_leaf_different_prefix", func(t *testing.T) {
+		a := &FastNode[int]{}
+		b := &FastNode[int]{}
+
+		leafA := &LeafNode[int]{
+			Prefix: mpp("10.10.0.0/16"),
+			Value:  100,
+		}
+		leafB := &LeafNode[int]{
+			Prefix: mpp("10.10.1.0/24"),
+			Value:  200,
+		}
+
+		a.InsertChild(10, leafA)
+		b.InsertChild(10, leafB)
+
+		duplicates := a.UnionRec(cloneFn, b, 0)
+		if duplicates != 0 {
+			t.Errorf("Expected 0 duplicates, got %d", duplicates)
+		}
+
+		child, _ := a.GetChild(10)
+		if _, ok := child.(*FastNode[int]); !ok {
+			t.Error("Should create new FastNode when merging different leaves")
+		}
+	})
+
+	t.Run("leaf_plus_fringe", func(t *testing.T) {
+		a := &FastNode[int]{}
+		b := &FastNode[int]{}
+
+		leafA := &LeafNode[int]{
+			Prefix: mpp("10.10.0.0/16"),
+			Value:  100,
+		}
+		fringeB := &FringeNode[int]{Value: 200}
+
+		a.InsertChild(10, leafA)
+		b.InsertChild(10, fringeB)
+
+		a.UnionRec(cloneFn, b, 0)
+
+		child, _ := a.GetChild(10)
+		if _, ok := child.(*FastNode[int]); !ok {
+			t.Error("Should create new FastNode when merging leaf + fringe")
+		}
+	})
+
+	t.Run("fringe_plus_node", func(t *testing.T) {
+		a := &FastNode[int]{}
+		b := &FastNode[int]{}
+
+		fringeA := &FringeNode[int]{Value: 100}
+		childNodeB := &FastNode[int]{}
+		childNodeB.InsertPrefix(32, 200)
+
+		a.InsertChild(10, fringeA)
+		b.InsertChild(10, childNodeB)
+
+		a.UnionRec(cloneFn, b, 0)
+
+		child, _ := a.GetChild(10)
+		newNode, ok := child.(*FastNode[int])
+		if !ok {
+			t.Fatal("Should create new FastNode when merging fringe + node")
+		}
+		if newNode.PrefixCount() == 0 {
+			t.Error("New node should have prefixes")
+		}
+	})
+
+	t.Run("fringe_plus_leaf", func(t *testing.T) {
+		a := &FastNode[int]{}
+		b := &FastNode[int]{}
+
+		fringeA := &FringeNode[int]{Value: 100}
+		leafB := &LeafNode[int]{
+			Prefix: mpp("10.10.0.0/16"),
+			Value:  200,
+		}
+
+		a.InsertChild(10, fringeA)
+		b.InsertChild(10, leafB)
+
+		a.UnionRec(cloneFn, b, 0)
+
+		child, _ := a.GetChild(10)
+		if _, ok := child.(*FastNode[int]); !ok {
+			t.Error("Should create new FastNode when merging fringe + leaf")
+		}
+	})
+
+	t.Run("fringe_plus_fringe", func(t *testing.T) {
+		a := &FastNode[int]{}
+		b := &FastNode[int]{}
+
+		fringeA := &FringeNode[int]{Value: 100}
+		fringeB := &FringeNode[int]{Value: 999}
+
+		a.InsertChild(10, fringeA)
+		b.InsertChild(10, fringeB)
+
+		duplicates := a.UnionRec(cloneFn, b, 0)
+		if duplicates != 1 {
+			t.Errorf("Expected 1 duplicate, got %d", duplicates)
+		}
+
+		child, _ := a.GetChild(10)
+		fringe := child.(*FringeNode[int])
+		if fringe.Value != 999 {
+			t.Errorf("Fringe value should be 999, got %d", fringe.Value)
+		}
+	})
+}
+
+func TestFastNode_UnionRecPersist_AllCombinations(t *testing.T) {
+	t.Parallel()
+
+	cloneFn := cloneFnFactory[int]()
+
+	t.Run("null_plus_node_persist", func(t *testing.T) {
+		a := &FastNode[int]{}
+		b := &FastNode[int]{}
+
+		childNodeB := &FastNode[int]{}
+		childNodeB.InsertPrefix(32, 100)
+		b.InsertChild(10, childNodeB)
+
+		duplicates := a.UnionRecPersist(cloneFn, b, 0)
+		if duplicates != 0 {
+			t.Errorf("Expected 0 duplicates, got %d", duplicates)
+		}
+
+		child, exists := a.GetChild(10)
+		if !exists {
+			t.Fatal("Child should exist")
+		}
+		childNode := child.(*FastNode[int])
+
+		// Modify original, check clone unchanged
+		childNodeB.InsertPrefix(64, 999)
+		if _, ok := childNode.GetPrefix(64); ok {
+			t.Error("Clone should not reflect changes to original")
+		}
+	})
+
+	t.Run("null_plus_leaf_persist", func(t *testing.T) {
+		a := &FastNode[int]{}
+		b := &FastNode[int]{}
+
+		originalLeaf := &LeafNode[int]{
+			Prefix: mpp("10.10.0.0/16"),
+			Value:  100,
+		}
+		b.InsertChild(10, originalLeaf)
+
+		duplicates := a.UnionRecPersist(cloneFn, b, 0)
+		if duplicates != 0 {
+			t.Errorf("Expected 0 duplicates, got %d", duplicates)
+		}
+
+		child, _ := a.GetChild(10)
+		clonedLeaf := child.(*LeafNode[int])
+
+		// Modify original, check clone unchanged
+		originalLeaf.Value = 999
+		if clonedLeaf.Value == 999 {
+			t.Error("Clone should not reflect changes to original")
+		}
+	})
+
+	t.Run("null_plus_fringe_persist", func(t *testing.T) {
+		a := &FastNode[int]{}
+		b := &FastNode[int]{}
+
+		fringe := &FringeNode[int]{Value: 100}
+		b.InsertChild(10, fringe)
+
+		duplicates := a.UnionRecPersist(cloneFn, b, 0)
+		if duplicates != 0 {
+			t.Errorf("Expected 0 duplicates, got %d", duplicates)
+		}
+
+		child, exists := a.GetChild(10)
+		if !exists {
+			t.Fatal("Fringe should exist")
+		}
+		if _, ok := child.(*FringeNode[int]); !ok {
+			t.Error("Child should be a FringeNode")
+		}
+	})
+
+	t.Run("node_plus_node_persist", func(t *testing.T) {
+		a := &FastNode[int]{}
+		b := &FastNode[int]{}
+
+		childNodeA := &FastNode[int]{}
+		childNodeA.InsertPrefix(32, 100)
+		originalChildA := childNodeA
+		a.InsertChild(10, childNodeA)
+
+		childNodeB := &FastNode[int]{}
+		childNodeB.InsertPrefix(64, 200)
+		b.InsertChild(10, childNodeB)
+
+		duplicates := a.UnionRecPersist(cloneFn, b, 0)
+		if duplicates != 0 {
+			t.Errorf("Expected 0 duplicates, got %d", duplicates)
+		}
+
+		child, _ := a.GetChild(10)
+		mergedNode := child.(*FastNode[int])
+
+		if mergedNode == originalChildA {
+			t.Error("Child node should be cloned, not reused")
+		}
+
+		if _, ok := mergedNode.GetPrefix(32); !ok {
+			t.Error("Should have prefix 32")
+		}
+		if _, ok := mergedNode.GetPrefix(64); !ok {
+			t.Error("Should have prefix 64")
+		}
+
+		if originalChildA.PrefixCount() != 1 {
+			t.Error("Original should remain unchanged")
+		}
+	})
+
+	t.Run("node_plus_leaf_persist", func(t *testing.T) {
+		a := &FastNode[int]{}
+		b := &FastNode[int]{}
+
+		childNodeA := &FastNode[int]{}
+		childNodeA.InsertPrefix(32, 100)
+		originalChildA := childNodeA
+		a.InsertChild(10, childNodeA)
+
+		leaf := &LeafNode[int]{
+			Prefix: mpp("10.10.1.0/24"),
+			Value:  200,
+		}
+		b.InsertChild(10, leaf)
+
+		a.UnionRecPersist(cloneFn, b, 0)
+
+		child, _ := a.GetChild(10)
+		if child == originalChildA {
+			t.Error("Child should be cloned")
+		}
+	})
+
+	t.Run("node_plus_fringe_persist", func(t *testing.T) {
+		a := &FastNode[int]{}
+		b := &FastNode[int]{}
+
+		childNodeA := &FastNode[int]{}
+		childNodeA.InsertPrefix(32, 100)
+		originalChildA := childNodeA
+		a.InsertChild(10, childNodeA)
+
+		fringe := &FringeNode[int]{Value: 200}
+		b.InsertChild(10, fringe)
+
+		a.UnionRecPersist(cloneFn, b, 0)
+
+		child, _ := a.GetChild(10)
+		if child == originalChildA {
+			t.Error("Child should be cloned")
+		}
+	})
+
+	t.Run("leaf_plus_node_persist", func(t *testing.T) {
+		a := &FastNode[int]{}
+		b := &FastNode[int]{}
+
+		originalLeaf := &LeafNode[int]{
+			Prefix: mpp("10.10.0.0/16"),
+			Value:  100,
+		}
+		a.InsertChild(10, originalLeaf)
+
+		childNodeB := &FastNode[int]{}
+		childNodeB.InsertPrefix(32, 200)
+		b.InsertChild(10, childNodeB)
+
+		a.UnionRecPersist(cloneFn, b, 0)
+
+		child, _ := a.GetChild(10)
+		if _, ok := child.(*FastNode[int]); !ok {
+			t.Error("Should create new FastNode")
+		}
+	})
+
+	t.Run("leaf_plus_leaf_same_prefix_persist", func(t *testing.T) {
+		a := &FastNode[int]{}
+		b := &FastNode[int]{}
+
+		prefix := mpp("10.10.0.0/16")
+		originalLeaf := &LeafNode[int]{Prefix: prefix, Value: 100}
+		leafB := &LeafNode[int]{Prefix: prefix, Value: 999}
+
+		a.InsertChild(10, originalLeaf)
+		b.InsertChild(10, leafB)
+
+		duplicates := a.UnionRecPersist(cloneFn, b, 0)
+		if duplicates != 1 {
+			t.Errorf("Expected 1 duplicate, got %d", duplicates)
+		}
+
+		child, _ := a.GetChild(10)
+		leaf := child.(*LeafNode[int])
+		if leaf.Value != 999 {
+			t.Errorf("Value should be 999, got %d", leaf.Value)
+		}
+	})
+
+	t.Run("leaf_plus_leaf_different_prefix_persist", func(t *testing.T) {
+		a := &FastNode[int]{}
+		b := &FastNode[int]{}
+
+		leafA := &LeafNode[int]{
+			Prefix: mpp("10.10.0.0/16"),
+			Value:  100,
+		}
+		leafB := &LeafNode[int]{
+			Prefix: mpp("10.10.1.0/24"),
+			Value:  200,
+		}
+
+		a.InsertChild(10, leafA)
+		b.InsertChild(10, leafB)
+
+		a.UnionRecPersist(cloneFn, b, 0)
+
+		child, _ := a.GetChild(10)
+		if _, ok := child.(*FastNode[int]); !ok {
+			t.Error("Should create new FastNode")
+		}
+	})
+
+	t.Run("leaf_plus_fringe_persist", func(t *testing.T) {
+		a := &FastNode[int]{}
+		b := &FastNode[int]{}
+
+		leafA := &LeafNode[int]{
+			Prefix: mpp("10.10.0.0/16"),
+			Value:  100,
+		}
+		fringeB := &FringeNode[int]{Value: 200}
+
+		a.InsertChild(10, leafA)
+		b.InsertChild(10, fringeB)
+
+		a.UnionRecPersist(cloneFn, b, 0)
+
+		child, _ := a.GetChild(10)
+		if _, ok := child.(*FastNode[int]); !ok {
+			t.Error("Should create new FastNode")
+		}
+	})
+
+	t.Run("fringe_plus_node_persist", func(t *testing.T) {
+		a := &FastNode[int]{}
+		b := &FastNode[int]{}
+
+		fringeA := &FringeNode[int]{Value: 100}
+		a.InsertChild(10, fringeA)
+
+		childNodeB := &FastNode[int]{}
+		childNodeB.InsertPrefix(32, 200)
+		b.InsertChild(10, childNodeB)
+
+		a.UnionRecPersist(cloneFn, b, 0)
+
+		child, _ := a.GetChild(10)
+		if _, ok := child.(*FastNode[int]); !ok {
+			t.Error("Should create new FastNode")
+		}
+	})
+
+	t.Run("fringe_plus_leaf_persist", func(t *testing.T) {
+		a := &FastNode[int]{}
+		b := &FastNode[int]{}
+
+		fringeA := &FringeNode[int]{Value: 100}
+		a.InsertChild(10, fringeA)
+
+		leafB := &LeafNode[int]{
+			Prefix: mpp("10.10.0.0/16"),
+			Value:  200,
+		}
+		b.InsertChild(10, leafB)
+
+		a.UnionRecPersist(cloneFn, b, 0)
+
+		child, _ := a.GetChild(10)
+		if _, ok := child.(*FastNode[int]); !ok {
+			t.Error("Should create new FastNode")
+		}
+	})
+
+	t.Run("fringe_plus_fringe_persist", func(t *testing.T) {
+		a := &FastNode[int]{}
+		b := &FastNode[int]{}
+
+		fringeA := &FringeNode[int]{Value: 100}
+		fringeB := &FringeNode[int]{Value: 999}
+
+		a.InsertChild(10, fringeA)
+		b.InsertChild(10, fringeB)
+
+		duplicates := a.UnionRecPersist(cloneFn, b, 0)
+		if duplicates != 1 {
+			t.Errorf("Expected 1 duplicate, got %d", duplicates)
+		}
+
+		child, _ := a.GetChild(10)
+		fringe := child.(*FringeNode[int])
+		if fringe.Value != 999 {
+			t.Errorf("Value should be 999, got %d", fringe.Value)
+		}
+	})
+}
+
+func TestFastNode_Modify_AllPaths(t *testing.T) {
+	t.Parallel()
+
+	t.Run("modify_at_lastOctet_delete_nonexistent", func(t *testing.T) {
+		n := &FastNode[int]{}
+
+		delta := n.Modify(mpp("0.0.0.0/0"), func(val int, found bool) (int, bool) {
+			if found {
+				t.Error("Should not find non-existent prefix")
+			}
+			return 0, true
+		})
+		if delta != 0 {
+			t.Errorf("Expected delta 0 for no-op delete, got %d", delta)
+		}
+	})
+
+	t.Run("modify_at_lastOctet_delete_existing", func(t *testing.T) {
+		n := &FastNode[int]{}
+		pfx := mpp("0.0.0.0/0")
+		n.Insert(pfx, 100, 0)
+
+		delta := n.Modify(pfx, func(val int, found bool) (int, bool) {
+			if !found || val != 100 {
+				t.Errorf("Expected found=true with val=100, got found=%v val=%d", found, val)
+			}
+			return 0, true
+		})
+		if delta != -1 {
+			t.Errorf("Expected delta -1 for delete, got %d", delta)
+		}
+		if _, ok := n.Get(pfx); ok {
+			t.Error("Prefix should be deleted")
+		}
+	})
+
+	t.Run("modify_at_lastOctet_insert_new", func(t *testing.T) {
+		n := &FastNode[int]{}
+		pfx := mpp("0.0.0.0/0")
+
+		delta := n.Modify(pfx, func(val int, found bool) (int, bool) {
+			if found {
+				t.Error("Should not find new prefix")
+			}
+			return 999, false
+		})
+		if delta != 1 {
+			t.Errorf("Expected delta 1 for insert, got %d", delta)
+		}
+		if val, ok := n.Get(pfx); !ok || val != 999 {
+			t.Errorf("Expected val=999, got val=%d ok=%v", val, ok)
+		}
+	})
+
+	t.Run("modify_at_lastOctet_update_existing", func(t *testing.T) {
+		n := &FastNode[int]{}
+		pfx := mpp("0.0.0.0/0")
+		n.Insert(pfx, 100, 0)
+
+		delta := n.Modify(pfx, func(val int, found bool) (int, bool) {
+			if !found || val != 100 {
+				t.Errorf("Expected found=true with val=100")
+			}
+			return 999, false
+		})
+		if delta != 0 {
+			t.Errorf("Expected delta 0 for update, got %d", delta)
+		}
+		if val, ok := n.Get(pfx); !ok || val != 999 {
+			t.Errorf("Expected val=999, got val=%d ok=%v", val, ok)
+		}
+	})
+
+	t.Run("modify_insert_path_compressed_fringe", func(t *testing.T) {
+		n := &FastNode[int]{}
+		pfx := mpp("10.0.0.0/8")
+
+		delta := n.Modify(pfx, func(val int, found bool) (int, bool) {
+			return 100, false
+		})
+		if delta != 1 {
+			t.Errorf("Expected delta 1, got %d", delta)
+		}
+		// Verify via Get and by child type
+		if val, ok := n.Get(pfx); !ok || val != 100 {
+			t.Errorf("Expected val=100 via Get, got val=%d ok=%v", val, ok)
+		}
+		if ch, ok := n.GetChild(10); !ok {
+			t.Fatal("Child should exist")
+		} else if _, isFr := ch.(*FringeNode[int]); !isFr {
+			t.Errorf("Child should be FringeNode, got %T", ch)
+		}
+	})
+
+	t.Run("modify_insert_path_compressed_leaf", func(t *testing.T) {
+		n := &FastNode[int]{}
+		pfx := mpp("10.1.0.0/16")
+
+		delta := n.Modify(pfx, func(val int, found bool) (int, bool) {
+			return 200, false
+		})
+		if delta != 1 {
+			t.Errorf("Expected delta 1, got %d", delta)
+		}
+		// Verify via Get and by child type
+		if val, ok := n.Get(pfx); !ok || val != 200 {
+			t.Errorf("Expected val=200 via Get, got val=%d ok=%v", val, ok)
+		}
+		if ch, ok := n.GetChild(10); !ok {
+			t.Fatal("Child should exist at octet 10")
+		} else if _, isLeaf := ch.(*LeafNode[int]); !isLeaf {
+			t.Errorf("Child should be LeafNode, got %T", ch)
+		}
+	})
+
+	t.Run("modify_delete_nonexistent_path_compressed", func(t *testing.T) {
+		n := &FastNode[int]{}
+		delta := n.Modify(mpp("10.1.0.0/16"), func(val int, found bool) (int, bool) {
+			return 0, true
+		})
+		if delta != 0 {
+			t.Errorf("Expected delta 0 for no-op, got %d", delta)
+		}
+	})
+
+	t.Run("modify_update_leaf_same_prefix", func(t *testing.T) {
+		n := &FastNode[int]{}
+		pfx := mpp("10.1.0.0/16")
+		n.Insert(pfx, 100, 0)
+
+		delta := n.Modify(pfx, func(val int, found bool) (int, bool) {
+			if !found || val != 100 {
+				t.Errorf("Expected found=true with val=100")
+			}
+			return 999, false
+		})
+		if delta != 0 {
+			t.Errorf("Expected delta 0 for update, got %d", delta)
+		}
+		if v, ok := n.Get(pfx); !ok || v != 999 {
+			t.Errorf("Expected val=999, got %d ok=%v", v, ok)
+		}
+	})
+
+	t.Run("modify_delete_leaf_same_prefix", func(t *testing.T) {
+		n := &FastNode[int]{}
+		pfx := mpp("10.1.0.0/16")
+		n.Insert(pfx, 100, 0)
+
+		delta := n.Modify(pfx, func(val int, found bool) (int, bool) { return 0, true })
+		if delta != -1 {
+			t.Errorf("Expected delta -1, got %d", delta)
+		}
+		if !n.IsEmpty() {
+			t.Error("Node should be empty after delete and purge")
+		}
+	})
+
+	t.Run("modify_insert_creates_node_from_leaf", func(t *testing.T) {
+		n := &FastNode[int]{}
+		p1 := mpp("10.1.0.0/16")
+		p2 := mpp("10.1.1.0/24")
+		n.Insert(p1, 100, 0)
+
+		delta := n.Modify(p2, func(_ int, found bool) (int, bool) {
+			if found {
+				t.Error("Should not find")
+			}
+			return 200, false
+		})
+		if delta != 1 {
+			t.Errorf("Expected delta 1, got %d", delta)
+		}
+		if v, ok := n.Get(p1); !ok || v != 100 {
+			t.Errorf("Expected p1=100, got %d ok=%v", v, ok)
+		}
+		if v, ok := n.Get(p2); !ok || v != 200 {
+			t.Errorf("Expected p2=200, got %d ok=%v", v, ok)
+		}
+	})
+
+	t.Run("modify_delete_noop_from_leaf_mismatch", func(t *testing.T) {
+		n := &FastNode[int]{}
+		n.Insert(mpp("10.1.0.0/16"), 100, 0)
+		delta := n.Modify(mpp("10.1.1.0/24"), func(_ int, _ bool) (int, bool) { return 0, true })
+		if delta != 0 {
+			t.Errorf("Expected delta 0, got %d", delta)
+		}
+	})
+
+	t.Run("modify_update_fringe_same_prefix", func(t *testing.T) {
+		n := &FastNode[int]{}
+		pfx := mpp("10.0.0.0/8")
+		n.Insert(pfx, 100, 0)
+
+		delta := n.Modify(pfx, func(val int, found bool) (int, bool) {
+			if !found || val != 100 {
+				t.Errorf("Expected found=true with val=100")
+			}
+			return 999, false
+		})
+		if delta != 0 {
+			t.Errorf("Expected delta 0, got %d", delta)
+		}
+		if v, ok := n.Get(pfx); !ok || v != 999 {
+			t.Errorf("Expected val=999, got %d ok=%v", v, ok)
+		}
+	})
+
+	t.Run("modify_delete_fringe", func(t *testing.T) {
+		n := &FastNode[int]{}
+		pfx := mpp("10.0.0.0/8")
+		n.Insert(pfx, 100, 0)
+
+		delta := n.Modify(pfx, func(_ int, _ bool) (int, bool) { return 0, true })
+		if delta != -1 {
+			t.Errorf("Expected delta -1, got %d", delta)
+		}
+		if !n.IsEmpty() {
+			t.Error("Node should be empty")
+		}
+	})
+
+	t.Run("modify_insert_creates_node_from_fringe", func(t *testing.T) {
+		n := &FastNode[int]{}
+		pFr := mpp("10.0.0.0/8")
+		pLeaf := mpp("10.1.0.0/16")
+		n.Insert(pFr, 100, 0)
+
+		delta := n.Modify(pLeaf, func(_ int, _ bool) (int, bool) { return 200, false })
+		if delta != 1 {
+			t.Errorf("Expected delta 1, got %d", delta)
+		}
+		if v, ok := n.Get(pFr); !ok || v != 100 {
+			t.Errorf("Fringe should remain (val=100), got %d ok=%v", v, ok)
+		}
+		if v, ok := n.Get(pLeaf); !ok || v != 200 {
+			t.Errorf("Leaf should exist (val=200), got %d ok=%v", v, ok)
+		}
+	})
+
+	t.Run("modify_delete_noop_from_fringe_mismatch", func(t *testing.T) {
+		n := &FastNode[int]{}
+		n.Insert(mpp("10.0.0.0/8"), 100, 0)
+
+		delta := n.Modify(mpp("10.1.0.0/16"), func(_ int, _ bool) (int, bool) { return 0, true })
+		if delta != 0 {
+			t.Errorf("Expected delta 0, got %d", delta)
+		}
+	})
+
+	t.Run("modify_noop_update", func(t *testing.T) {
+		n := &FastNode[int]{}
+		pfx := mpp("0.0.0.0/0")
+		n.Insert(pfx, 100, 0)
+
+		delta := n.Modify(pfx, func(val int, found bool) (int, bool) {
+			if !found || val != 100 {
+				t.Fatalf("Expected found with val=100")
+			}
+			return 100, false // same value (no delta)
+		})
+		if delta != 0 {
+			t.Errorf("Expected delta 0, got %d", delta)
+		}
+	})
 }

@@ -11,12 +11,100 @@ import (
 	"github.com/gaissmai/bart/internal/art"
 )
 
+// cloneFnFactory returns a CloneFunc.
+// If V implements Cloner[V], the returned function should perform
+// a deep copy using Clone(), otherwise it returns nil.
+func cloneFnFactory[V any]() CloneFunc[V] {
+	var zero V
+	// you can't assert directly on a type parameter
+	if _, ok := any(zero).(Cloner[V]); ok {
+		return cloneVal[V]
+	}
+	return nil
+}
+
+// cloneVal returns a deep clone of val by calling its Clone method when
+// val implements Cloner[V]. If val does not implement Cloner[V] or the
+// asserted Cloner is nil, val is returned unchanged.
+func cloneVal[V any](val V) V {
+	// you can't assert directly on a type parameter
+	c, ok := any(val).(Cloner[V])
+	if !ok || c == nil {
+		return val
+	}
+	return c.Clone()
+}
+
 var mpp = func(s string) netip.Prefix {
 	pfx := netip.MustParsePrefix(s)
 	if pfx == pfx.Masked() {
 		return pfx
 	}
 	panic(fmt.Sprintf("%s is not canonicalized as %s", s, pfx.Masked()))
+}
+
+func TestNodeType_String(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		nt       nodeType
+		expected string
+	}{
+		{nullNode, "NULL"},
+		{fullNode, "FULL"},
+		{halfNode, "HALF"},
+		{pathNode, "PATH"},
+		{stopNode, "STOP"},
+		{nodeType(99), "unreachable"}, // Invalid type
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.expected, func(t *testing.T) {
+			got := tt.nt.String()
+			if got != tt.expected {
+				t.Errorf("nodeType(%d).String() = %q, want %q", tt.nt, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestNodeIpStridePath(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		path     StridePath
+		depth    int
+		is4      bool
+		expected string
+	}{
+		// IPv4
+		{StridePath{10, 1, 2, 3}, 4, true, "10.1.2.3"},
+		{StridePath{10, 1, 2, 3}, 3, true, "10.1.2"},
+		{StridePath{10, 1, 2, 3}, 1, true, "10"},
+		// IPv6
+		{StridePath{0x20}, 1, false, "20"},
+		{
+			StridePath{0x20, 0x01, 0x0d, 0xb8},
+			4,
+			false,
+			"2001:0db8",
+		},
+		{
+			StridePath{0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},
+			16,
+			false,
+			"2001:0db8:0000:0000:0000:0000:0000:0001",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.expected, func(t *testing.T) {
+			got := ipStridePath(tt.path, tt.depth, tt.is4)
+			if got != tt.expected {
+				t.Errorf("ipStridePath(%v,%d,%v) = %q, want %q", tt.path, tt.depth, tt.is4, got, tt.expected)
+			}
+		})
+	}
 }
 
 // Test cases for cidrFromPath function

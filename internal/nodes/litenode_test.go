@@ -6,6 +6,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/gaissmai/bart/internal/art"
 )
 
 func TestLiteNode_EmptyState(t *testing.T) {
@@ -605,4 +607,1310 @@ func TestLiteNode_FprintRec_and_DirectItemsRec_Smoke(t *testing.T) {
 	if len(items) == 0 {
 		t.Fatal("DirectItemsRec should return items")
 	}
+}
+
+func TestLiteNode_OverlapsRoutes_DirectIntersection(t *testing.T) {
+	t.Parallel()
+	a := &LiteNode[int]{}
+	b := &LiteNode[int]{}
+
+	a.InsertPrefix(32, 0)
+	b.InsertPrefix(32, 0)
+
+	if !a.OverlapsRoutes(b) {
+		t.Error("OverlapsRoutes should return true for identical indices")
+	}
+}
+
+func TestLiteNode_OverlapsRoutes_LPM_Containment(t *testing.T) {
+	t.Parallel()
+	a := &LiteNode[int]{}
+	b := &LiteNode[int]{}
+
+	a.InsertPrefix(64, 0)
+	b.InsertPrefix(32, 0)
+
+	if !a.OverlapsRoutes(b) {
+		t.Error("OverlapsRoutes should detect LPM containment")
+	}
+
+	c := &LiteNode[int]{}
+	d := &LiteNode[int]{}
+	c.InsertPrefix(32, 0)
+	d.InsertPrefix(64, 0)
+
+	if !c.OverlapsRoutes(d) {
+		t.Error("OverlapsRoutes should detect LPM containment (reverse)")
+	}
+}
+
+func TestLiteNode_OverlapsRoutes_NoOverlap(t *testing.T) {
+	t.Parallel()
+	a := &LiteNode[int]{}
+	b := &LiteNode[int]{}
+
+	a.InsertPrefix(2, 0)
+	b.InsertPrefix(3, 0)
+
+	if a.OverlapsRoutes(b) {
+		t.Error("OverlapsRoutes should return false for non-overlapping prefixes")
+	}
+
+	c := &LiteNode[int]{}
+	d := &LiteNode[int]{}
+	c.InsertPrefix(4, 0)
+	d.InsertPrefix(6, 0)
+
+	if c.OverlapsRoutes(d) {
+		t.Error("OverlapsRoutes should return false for non-overlapping sibling subtrees")
+	}
+}
+
+func TestLiteNode_OverlapsRoutes_EmptyNodes(t *testing.T) {
+	t.Parallel()
+	a := &LiteNode[int]{}
+	b := &LiteNode[int]{}
+
+	if a.OverlapsRoutes(b) {
+		t.Error("OverlapsRoutes should return false for empty nodes")
+	}
+
+	a.InsertPrefix(32, 0)
+	if a.OverlapsRoutes(b) {
+		t.Error("OverlapsRoutes should return false when one node is empty")
+	}
+}
+
+func TestLiteNode_OverlapsRoutes_MultiplePrefix_WithOverlap(t *testing.T) {
+	t.Parallel()
+	a := &LiteNode[int]{}
+	b := &LiteNode[int]{}
+
+	a.InsertPrefix(16, 0)
+	a.InsertPrefix(64, 0)
+	a.InsertPrefix(128, 0)
+
+	b.InsertPrefix(8, 0)
+	b.InsertPrefix(32, 0)
+	b.InsertPrefix(255, 0)
+
+	if !a.OverlapsRoutes(b) {
+		t.Error("OverlapsRoutes should detect overlap in multi-prefix scenario")
+	}
+}
+
+func TestLiteNode_OverlapsRoutes_Uint8_Boundary(t *testing.T) {
+	t.Parallel()
+	a := &LiteNode[int]{}
+	b := &LiteNode[int]{}
+
+	a.InsertPrefix(255, 0)
+	b.InsertPrefix(254, 0)
+
+	if a.OverlapsRoutes(b) {
+		t.Error("OverlapsRoutes returned unexpected overlap for sibling indices at boundary")
+	}
+
+	b.InsertPrefix(255, 0)
+	if !a.OverlapsRoutes(b) {
+		t.Error("OverlapsRoutes should detect overlap at index 255")
+	}
+}
+
+func TestLiteNode_OverlapsChildrenIn_BitsetPath(t *testing.T) {
+	t.Parallel()
+	n := &LiteNode[int]{}
+	o := &LiteNode[int]{}
+
+	n.InsertPrefix(1, 0)
+
+	for i := uint8(0); i < 20; i++ {
+		child := &LiteNode[int]{}
+		child.InsertPrefix(1, 0)
+		o.InsertChild(i, child)
+	}
+
+	if !n.OverlapsChildrenIn(o) {
+		t.Error("OverlapsChildrenIn should detect overlap using bitset path")
+	}
+}
+
+func TestLiteNode_OverlapsChildrenIn_IterationPath(t *testing.T) {
+	t.Parallel()
+	n := &LiteNode[int]{}
+	o := &LiteNode[int]{}
+
+	n.InsertPrefix(2, 0)
+
+	child := &LiteNode[int]{}
+	child.InsertPrefix(1, 0)
+	o.InsertChild(128, child)
+
+	if n.OverlapsChildrenIn(o) {
+		t.Error("OverlapsChildrenIn should not detect overlap for non-overlapping children")
+	}
+
+	child2 := &LiteNode[int]{}
+	child2.InsertPrefix(1, 0)
+	o.InsertChild(0, child2)
+
+	if !n.OverlapsChildrenIn(o) {
+		t.Error("OverlapsChildrenIn should detect overlap using iteration path")
+	}
+}
+
+func TestLiteNode_OverlapsChildrenIn_EmptyCases(t *testing.T) {
+	t.Parallel()
+	n := &LiteNode[int]{}
+	o := &LiteNode[int]{}
+
+	if n.OverlapsChildrenIn(o) {
+		t.Error("OverlapsChildrenIn should return false for empty nodes")
+	}
+
+	n.InsertPrefix(32, 0)
+	if n.OverlapsChildrenIn(o) {
+		t.Error("OverlapsChildrenIn should return false when o has no children")
+	}
+
+	n2 := &LiteNode[int]{}
+	child := &LiteNode[int]{}
+	o.InsertChild(10, child)
+	if n2.OverlapsChildrenIn(o) {
+		t.Error("OverlapsChildrenIn should return false when n has no prefixes")
+	}
+}
+
+func TestLiteNode_OverlapsTwoChildren_AllCombinations(t *testing.T) {
+	t.Parallel()
+
+	t.Run("node-node_overlap", func(t *testing.T) {
+		n1 := &LiteNode[int]{}
+		n2 := &LiteNode[int]{}
+		n1.InsertPrefix(32, 0)
+		n2.InsertPrefix(32, 0)
+
+		parent := &LiteNode[int]{}
+		if !parent.OverlapsTwoChildren(n1, n2, 0) {
+			t.Error("node-node should overlap when prefixes overlap")
+		}
+	})
+
+	t.Run("node-node_no_overlap", func(t *testing.T) {
+		n1 := &LiteNode[int]{}
+		n2 := &LiteNode[int]{}
+		n1.InsertPrefix(2, 0)
+		n2.InsertPrefix(3, 0)
+
+		parent := &LiteNode[int]{}
+		if parent.OverlapsTwoChildren(n1, n2, 0) {
+			t.Error("node-node should not overlap when prefixes don't overlap")
+		}
+	})
+
+	t.Run("node-leaf", func(t *testing.T) {
+		node := &LiteNode[int]{}
+		leaf := &LeafNode[int]{
+			Prefix: mpp("10.0.0.0/8"),
+			Value:  0,
+		}
+
+		node.Insert(mpp("10.0.0.0/16"), 0, 0)
+
+		parent := &LiteNode[int]{}
+		if !parent.OverlapsTwoChildren(node, leaf, 0) {
+			t.Error("node-leaf should overlap when node contains overlapping prefix")
+		}
+	})
+
+	t.Run("node-fringe_always_overlap", func(t *testing.T) {
+		node := &LiteNode[int]{}
+		fringe := &FringeNode[int]{
+			Value: 0,
+		}
+
+		parent := &LiteNode[int]{}
+		if !parent.OverlapsTwoChildren(node, fringe, 0) {
+			t.Error("node-fringe should always overlap")
+		}
+	})
+
+	t.Run("leaf-leaf_overlap", func(t *testing.T) {
+		leaf1 := &LeafNode[int]{
+			Prefix: mpp("10.0.0.0/8"),
+			Value:  0,
+		}
+		leaf2 := &LeafNode[int]{
+			Prefix: mpp("10.0.0.0/16"),
+			Value:  0,
+		}
+
+		parent := &LiteNode[int]{}
+		if !parent.OverlapsTwoChildren(leaf1, leaf2, 0) {
+			t.Error("leaf-leaf should overlap when prefixes overlap")
+		}
+	})
+
+	t.Run("leaf-leaf_no_overlap", func(t *testing.T) {
+		leaf1 := &LeafNode[int]{
+			Prefix: mpp("10.0.0.0/8"),
+			Value:  0,
+		}
+		leaf2 := &LeafNode[int]{
+			Prefix: mpp("192.168.0.0/16"),
+			Value:  0,
+		}
+
+		parent := &LiteNode[int]{}
+		if parent.OverlapsTwoChildren(leaf1, leaf2, 0) {
+			t.Error("leaf-leaf should not overlap when prefixes don't overlap")
+		}
+	})
+
+	t.Run("leaf-fringe_always_overlap", func(t *testing.T) {
+		leaf := &LeafNode[int]{
+			Prefix: mpp("10.0.0.0/8"),
+			Value:  0,
+		}
+		fringe := &FringeNode[int]{
+			Value: 0,
+		}
+
+		parent := &LiteNode[int]{}
+		if !parent.OverlapsTwoChildren(leaf, fringe, 0) {
+			t.Error("leaf-fringe should always overlap")
+		}
+	})
+
+	t.Run("fringe-fringe_always_overlap", func(t *testing.T) {
+		fringe1 := &FringeNode[int]{
+			Value: 0,
+		}
+		fringe2 := &FringeNode[int]{
+			Value: 0,
+		}
+
+		parent := &LiteNode[int]{}
+		if !parent.OverlapsTwoChildren(fringe1, fringe2, 0) {
+			t.Error("fringe-fringe should always overlap")
+		}
+	})
+}
+
+func TestLiteNode_Overlaps_CompleteFlow(t *testing.T) {
+	t.Parallel()
+
+	t.Run("routes_overlap", func(t *testing.T) {
+		a := &LiteNode[int]{}
+		b := &LiteNode[int]{}
+
+		a.Insert(mpp("10.0.0.0/8"), 0, 0)
+		b.Insert(mpp("10.0.0.0/16"), 0, 0)
+
+		if !a.Overlaps(b, 0) {
+			t.Error("Overlaps should detect route overlap")
+		}
+	})
+
+	t.Run("children_overlap", func(t *testing.T) {
+		a := &LiteNode[int]{}
+		b := &LiteNode[int]{}
+
+		a.Insert(mpp("10.0.0.0/8"), 0, 0)
+		b.Insert(mpp("10.1.0.0/16"), 0, 0)
+
+		if !a.Overlaps(b, 0) {
+			t.Error("Overlaps should detect child overlap")
+		}
+	})
+
+	t.Run("same_children_overlap", func(t *testing.T) {
+		a := &LiteNode[int]{}
+		b := &LiteNode[int]{}
+
+		a.Insert(mpp("10.1.0.0/16"), 0, 0)
+		b.Insert(mpp("10.1.0.0/24"), 0, 0)
+
+		if !a.Overlaps(b, 0) {
+			t.Error("Overlaps should detect same-children overlap")
+		}
+	})
+
+	t.Run("no_overlap", func(t *testing.T) {
+		a := &LiteNode[int]{}
+		b := &LiteNode[int]{}
+
+		a.Insert(mpp("10.0.0.0/8"), 0, 0)
+		b.Insert(mpp("192.168.0.0/16"), 0, 0)
+
+		if a.Overlaps(b, 0) {
+			t.Error("Overlaps should return false for non-overlapping trees")
+		}
+	})
+
+	t.Run("empty_nodes", func(t *testing.T) {
+		a := &LiteNode[int]{}
+		b := &LiteNode[int]{}
+
+		if a.Overlaps(b, 0) {
+			t.Error("Overlaps should return false for empty nodes")
+		}
+	})
+}
+
+func TestLiteNode_OverlapsIdx(t *testing.T) {
+	t.Parallel()
+
+	t.Run("prefix_covers_idx", func(t *testing.T) {
+		n := &LiteNode[int]{}
+		n.InsertPrefix(1, 0)
+
+		if !n.OverlapsIdx(128) {
+			t.Error("OverlapsIdx should return true when prefix covers idx")
+		}
+	})
+
+	t.Run("idx_covers_routes", func(t *testing.T) {
+		n := &LiteNode[int]{}
+		n.InsertPrefix(64, 0)
+
+		if !n.OverlapsIdx(32) {
+			t.Error("OverlapsIdx should return true when idx covers routes")
+		}
+	})
+
+	t.Run("idx_overlaps_child", func(t *testing.T) {
+		n := &LiteNode[int]{}
+		child := &LiteNode[int]{}
+		child.InsertPrefix(1, 0)
+
+		n.InsertChild(10, child)
+
+		idx := uint8(art.OctetToIdx(10))
+		for idx > 1 {
+			idx = idx / 2
+			if n.OverlapsIdx(idx) {
+				break
+			}
+		}
+	})
+
+	t.Run("no_overlap", func(t *testing.T) {
+		n := &LiteNode[int]{}
+		n.InsertPrefix(2, 0)
+
+		if n.OverlapsIdx(3) {
+			t.Error("OverlapsIdx should return false for non-overlapping idx")
+		}
+	})
+}
+
+func TestLiteNode_UnionRec_AllCombinations(t *testing.T) {
+	t.Parallel()
+
+	cloneFn := cloneFnFactory[int]()
+
+	t.Run("null_plus_node", func(t *testing.T) {
+		a := &LiteNode[int]{}
+		b := &LiteNode[int]{}
+
+		childNode := &LiteNode[int]{}
+		childNode.InsertPrefix(32, 0)
+		b.InsertChild(10, childNode)
+
+		duplicates := a.UnionRec(cloneFn, b, 0)
+		if duplicates != 0 {
+			t.Errorf("Expected 0 duplicates, got %d", duplicates)
+		}
+
+		child, exists := a.GetChild(10)
+		if !exists {
+			t.Error("Child should exist after union")
+		}
+		if childNode, ok := child.(*LiteNode[int]); !ok {
+			t.Error("Child should be a LiteNode")
+		} else if _, ok := childNode.GetPrefix(32); !ok {
+			t.Error("Child node should have prefix 32")
+		}
+	})
+
+	t.Run("null_plus_leaf", func(t *testing.T) {
+		a := &LiteNode[int]{}
+		b := &LiteNode[int]{}
+
+		leaf := &LeafNode[int]{
+			Prefix: mpp("10.10.0.0/16"),
+			Value:  0,
+		}
+		b.InsertChild(10, leaf)
+
+		duplicates := a.UnionRec(cloneFn, b, 0)
+		if duplicates != 0 {
+			t.Errorf("Expected 0 duplicates, got %d", duplicates)
+		}
+
+		child, exists := a.GetChild(10)
+		if !exists {
+			t.Error("Leaf should exist after union")
+		}
+		if _, ok := child.(*LeafNode[int]); !ok {
+			t.Error("Child should be a LeafNode")
+		}
+	})
+
+	t.Run("null_plus_fringe", func(t *testing.T) {
+		a := &LiteNode[int]{}
+		b := &LiteNode[int]{}
+
+		fringe := &FringeNode[int]{Value: 0}
+		b.InsertChild(10, fringe)
+
+		duplicates := a.UnionRec(cloneFn, b, 0)
+		if duplicates != 0 {
+			t.Errorf("Expected 0 duplicates, got %d", duplicates)
+		}
+
+		child, exists := a.GetChild(10)
+		if !exists {
+			t.Error("Fringe should exist after union")
+		}
+		if _, ok := child.(*FringeNode[int]); !ok {
+			t.Error("Child should be a FringeNode")
+		}
+	})
+
+	t.Run("node_plus_node", func(t *testing.T) {
+		a := &LiteNode[int]{}
+		b := &LiteNode[int]{}
+
+		childNodeA := &LiteNode[int]{}
+		childNodeA.InsertPrefix(32, 0)
+		a.InsertChild(10, childNodeA)
+
+		childNodeB := &LiteNode[int]{}
+		childNodeB.InsertPrefix(64, 0)
+		b.InsertChild(10, childNodeB)
+
+		duplicates := a.UnionRec(cloneFn, b, 0)
+		if duplicates != 0 {
+			t.Errorf("Expected 0 duplicates, got %d", duplicates)
+		}
+
+		child, _ := a.GetChild(10)
+		mergedNode := child.(*LiteNode[int])
+		if _, ok := mergedNode.GetPrefix(32); !ok {
+			t.Error("Should have prefix 32")
+		}
+		if _, ok := mergedNode.GetPrefix(64); !ok {
+			t.Error("Should have prefix 64")
+		}
+	})
+
+	t.Run("node_plus_node_with_duplicate", func(t *testing.T) {
+		a := &LiteNode[int]{}
+		b := &LiteNode[int]{}
+
+		childNodeA := &LiteNode[int]{}
+		childNodeA.InsertPrefix(32, 0)
+		a.InsertChild(10, childNodeA)
+
+		childNodeB := &LiteNode[int]{}
+		childNodeB.InsertPrefix(32, 0)
+		b.InsertChild(10, childNodeB)
+
+		duplicates := a.UnionRec(cloneFn, b, 0)
+		if duplicates != 1 {
+			t.Errorf("Expected 1 duplicate, got %d", duplicates)
+		}
+
+		child, _ := a.GetChild(10)
+		mergedNode := child.(*LiteNode[int])
+		if _, ok := mergedNode.GetPrefix(32); !ok {
+			t.Error("Should have prefix 32")
+		}
+	})
+
+	t.Run("node_plus_leaf", func(t *testing.T) {
+		a := &LiteNode[int]{}
+		b := &LiteNode[int]{}
+
+		childNodeA := &LiteNode[int]{}
+		childNodeA.InsertPrefix(32, 0)
+		a.InsertChild(10, childNodeA)
+
+		leaf := &LeafNode[int]{
+			Prefix: mpp("10.10.1.0/24"),
+			Value:  0,
+		}
+		b.InsertChild(10, leaf)
+
+		duplicates := a.UnionRec(cloneFn, b, 0)
+		if duplicates != 0 {
+			t.Errorf("Expected 0 duplicates, got %d", duplicates)
+		}
+
+		child, _ := a.GetChild(10)
+		mergedNode := child.(*LiteNode[int])
+		if mergedNode.PrefixCount() == 0 && mergedNode.ChildCount() == 0 {
+			t.Error("Node should not be empty after inserting leaf")
+		}
+	})
+
+	t.Run("node_plus_fringe", func(t *testing.T) {
+		a := &LiteNode[int]{}
+		b := &LiteNode[int]{}
+
+		childNodeA := &LiteNode[int]{}
+		childNodeA.InsertPrefix(32, 0)
+		a.InsertChild(10, childNodeA)
+
+		fringe := &FringeNode[int]{Value: 0}
+		b.InsertChild(10, fringe)
+
+		a.UnionRec(cloneFn, b, 0)
+
+		child, _ := a.GetChild(10)
+		mergedNode := child.(*LiteNode[int])
+		if _, ok := mergedNode.GetPrefix(1); !ok {
+			t.Error("Node should have fringe prefix (idx=1)")
+		}
+	})
+
+	t.Run("leaf_plus_node", func(t *testing.T) {
+		a := &LiteNode[int]{}
+		b := &LiteNode[int]{}
+
+		leafA := &LeafNode[int]{
+			Prefix: mpp("10.10.0.0/16"),
+			Value:  0,
+		}
+		a.InsertChild(10, leafA)
+
+		childNodeB := &LiteNode[int]{}
+		childNodeB.InsertPrefix(32, 0)
+		b.InsertChild(10, childNodeB)
+
+		duplicates := a.UnionRec(cloneFn, b, 0)
+		if duplicates != 0 {
+			t.Errorf("Expected 0 duplicates, got %d", duplicates)
+		}
+
+		child, exists := a.GetChild(10)
+		if !exists {
+			t.Fatal("Child should exist")
+		}
+		newNode, ok := child.(*LiteNode[int])
+		if !ok {
+			t.Fatal("Child should be a LiteNode after union")
+		}
+		if newNode.PrefixCount() == 0 && newNode.ChildCount() == 0 {
+			t.Error("New node should not be empty")
+		}
+	})
+
+	t.Run("leaf_plus_leaf_same_prefix", func(t *testing.T) {
+		a := &LiteNode[int]{}
+		b := &LiteNode[int]{}
+
+		prefix := mpp("10.10.0.0/16")
+		leafA := &LeafNode[int]{Prefix: prefix, Value: 0}
+		leafB := &LeafNode[int]{Prefix: prefix, Value: 0}
+
+		a.InsertChild(10, leafA)
+		b.InsertChild(10, leafB)
+
+		duplicates := a.UnionRec(cloneFn, b, 0)
+		if duplicates != 1 {
+			t.Errorf("Expected 1 duplicate, got %d", duplicates)
+		}
+
+		child, _ := a.GetChild(10)
+		if _, ok := child.(*LeafNode[int]); !ok {
+			t.Error("Child should remain a LeafNode")
+		}
+	})
+
+	t.Run("leaf_plus_leaf_different_prefix", func(t *testing.T) {
+		a := &LiteNode[int]{}
+		b := &LiteNode[int]{}
+
+		leafA := &LeafNode[int]{
+			Prefix: mpp("10.10.0.0/16"),
+			Value:  0,
+		}
+		leafB := &LeafNode[int]{
+			Prefix: mpp("10.10.1.0/24"),
+			Value:  0,
+		}
+
+		a.InsertChild(10, leafA)
+		b.InsertChild(10, leafB)
+
+		duplicates := a.UnionRec(cloneFn, b, 0)
+		if duplicates != 0 {
+			t.Errorf("Expected 0 duplicates, got %d", duplicates)
+		}
+
+		child, _ := a.GetChild(10)
+		if _, ok := child.(*LiteNode[int]); !ok {
+			t.Error("Should create new LiteNode when merging different leaves")
+		}
+	})
+
+	t.Run("leaf_plus_fringe", func(t *testing.T) {
+		a := &LiteNode[int]{}
+		b := &LiteNode[int]{}
+
+		leafA := &LeafNode[int]{
+			Prefix: mpp("10.10.0.0/16"),
+			Value:  0,
+		}
+		fringeB := &FringeNode[int]{Value: 0}
+
+		a.InsertChild(10, leafA)
+		b.InsertChild(10, fringeB)
+
+		a.UnionRec(cloneFn, b, 0)
+
+		child, _ := a.GetChild(10)
+		if _, ok := child.(*LiteNode[int]); !ok {
+			t.Error("Should create new LiteNode when merging leaf + fringe")
+		}
+	})
+
+	t.Run("fringe_plus_node", func(t *testing.T) {
+		a := &LiteNode[int]{}
+		b := &LiteNode[int]{}
+
+		fringeA := &FringeNode[int]{Value: 0}
+		childNodeB := &LiteNode[int]{}
+		childNodeB.InsertPrefix(32, 0)
+
+		a.InsertChild(10, fringeA)
+		b.InsertChild(10, childNodeB)
+
+		a.UnionRec(cloneFn, b, 0)
+
+		child, _ := a.GetChild(10)
+		newNode, ok := child.(*LiteNode[int])
+		if !ok {
+			t.Fatal("Should create new LiteNode when merging fringe + node")
+		}
+		if newNode.PrefixCount() == 0 {
+			t.Error("New node should have prefixes")
+		}
+	})
+
+	t.Run("fringe_plus_leaf", func(t *testing.T) {
+		a := &LiteNode[int]{}
+		b := &LiteNode[int]{}
+
+		fringeA := &FringeNode[int]{Value: 0}
+		leafB := &LeafNode[int]{
+			Prefix: mpp("10.10.0.0/16"),
+			Value:  0,
+		}
+
+		a.InsertChild(10, fringeA)
+		b.InsertChild(10, leafB)
+
+		a.UnionRec(cloneFn, b, 0)
+
+		child, _ := a.GetChild(10)
+		if _, ok := child.(*LiteNode[int]); !ok {
+			t.Error("Should create new LiteNode when merging fringe + leaf")
+		}
+	})
+
+	t.Run("fringe_plus_fringe", func(t *testing.T) {
+		a := &LiteNode[int]{}
+		b := &LiteNode[int]{}
+
+		fringeA := &FringeNode[int]{Value: 0}
+		fringeB := &FringeNode[int]{Value: 0}
+
+		a.InsertChild(10, fringeA)
+		b.InsertChild(10, fringeB)
+
+		duplicates := a.UnionRec(cloneFn, b, 0)
+		if duplicates != 1 {
+			t.Errorf("Expected 1 duplicate, got %d", duplicates)
+		}
+
+		child, _ := a.GetChild(10)
+		if _, ok := child.(*FringeNode[int]); !ok {
+			t.Error("Child should remain a FringeNode")
+		}
+	})
+}
+
+func TestLiteNode_UnionRecPersist_AllCombinations(t *testing.T) {
+	t.Parallel()
+
+	cloneFn := cloneFnFactory[int]()
+
+	t.Run("null_plus_node_persist", func(t *testing.T) {
+		a := &LiteNode[int]{}
+		b := &LiteNode[int]{}
+
+		childNodeB := &LiteNode[int]{}
+		childNodeB.InsertPrefix(32, 0)
+		b.InsertChild(10, childNodeB)
+
+		duplicates := a.UnionRecPersist(cloneFn, b, 0)
+		if duplicates != 0 {
+			t.Errorf("Expected 0 duplicates, got %d", duplicates)
+		}
+
+		child, exists := a.GetChild(10)
+		if !exists {
+			t.Fatal("Child should exist")
+		}
+		childNode := child.(*LiteNode[int])
+
+		// Modify original, check clone unchanged
+		childNodeB.InsertPrefix(64, 0)
+		if _, ok := childNode.GetPrefix(64); ok {
+			t.Error("Clone should not reflect changes to original")
+		}
+	})
+
+	t.Run("null_plus_leaf_persist", func(t *testing.T) {
+		a := &LiteNode[int]{}
+		b := &LiteNode[int]{}
+
+		originalLeaf := &LeafNode[int]{
+			Prefix: mpp("10.10.0.0/16"),
+			Value:  0,
+		}
+		b.InsertChild(10, originalLeaf)
+
+		duplicates := a.UnionRecPersist(cloneFn, b, 0)
+		if duplicates != 0 {
+			t.Errorf("Expected 0 duplicates, got %d", duplicates)
+		}
+
+		child, _ := a.GetChild(10)
+		clonedLeaf := child.(*LeafNode[int])
+
+		// Modify original prefix (create new one)
+		originalLeaf.Prefix = mpp("10.10.1.0/24")
+		if clonedLeaf.Prefix.String() == "10.10.1.0/24" {
+			t.Error("Clone should not reflect changes to original")
+		}
+	})
+
+	t.Run("null_plus_fringe_persist", func(t *testing.T) {
+		a := &LiteNode[int]{}
+		b := &LiteNode[int]{}
+
+		fringe := &FringeNode[int]{Value: 0}
+		b.InsertChild(10, fringe)
+
+		duplicates := a.UnionRecPersist(cloneFn, b, 0)
+		if duplicates != 0 {
+			t.Errorf("Expected 0 duplicates, got %d", duplicates)
+		}
+
+		child, exists := a.GetChild(10)
+		if !exists {
+			t.Fatal("Fringe should exist")
+		}
+		if _, ok := child.(*FringeNode[int]); !ok {
+			t.Error("Child should be a FringeNode")
+		}
+	})
+
+	t.Run("node_plus_node_persist", func(t *testing.T) {
+		a := &LiteNode[int]{}
+		b := &LiteNode[int]{}
+
+		childNodeA := &LiteNode[int]{}
+		childNodeA.InsertPrefix(32, 0)
+		originalChildA := childNodeA
+		a.InsertChild(10, childNodeA)
+
+		childNodeB := &LiteNode[int]{}
+		childNodeB.InsertPrefix(64, 0)
+		b.InsertChild(10, childNodeB)
+
+		duplicates := a.UnionRecPersist(cloneFn, b, 0)
+		if duplicates != 0 {
+			t.Errorf("Expected 0 duplicates, got %d", duplicates)
+		}
+
+		child, _ := a.GetChild(10)
+		mergedNode := child.(*LiteNode[int])
+
+		if mergedNode == originalChildA {
+			t.Error("Child node should be cloned, not reused")
+		}
+
+		if _, ok := mergedNode.GetPrefix(32); !ok {
+			t.Error("Should have prefix 32")
+		}
+		if _, ok := mergedNode.GetPrefix(64); !ok {
+			t.Error("Should have prefix 64")
+		}
+
+		if originalChildA.PrefixCount() != 1 {
+			t.Error("Original should remain unchanged")
+		}
+	})
+
+	t.Run("node_plus_leaf_persist", func(t *testing.T) {
+		a := &LiteNode[int]{}
+		b := &LiteNode[int]{}
+
+		childNodeA := &LiteNode[int]{}
+		childNodeA.InsertPrefix(32, 0)
+		originalChildA := childNodeA
+		a.InsertChild(10, childNodeA)
+
+		leaf := &LeafNode[int]{
+			Prefix: mpp("10.10.1.0/24"),
+			Value:  0,
+		}
+		b.InsertChild(10, leaf)
+
+		a.UnionRecPersist(cloneFn, b, 0)
+
+		child, _ := a.GetChild(10)
+		if child == originalChildA {
+			t.Error("Child should be cloned")
+		}
+	})
+
+	t.Run("node_plus_fringe_persist", func(t *testing.T) {
+		a := &LiteNode[int]{}
+		b := &LiteNode[int]{}
+
+		childNodeA := &LiteNode[int]{}
+		childNodeA.InsertPrefix(32, 0)
+		originalChildA := childNodeA
+		a.InsertChild(10, childNodeA)
+
+		fringe := &FringeNode[int]{Value: 0}
+		b.InsertChild(10, fringe)
+
+		a.UnionRecPersist(cloneFn, b, 0)
+
+		child, _ := a.GetChild(10)
+		if child == originalChildA {
+			t.Error("Child should be cloned")
+		}
+	})
+
+	t.Run("leaf_plus_node_persist", func(t *testing.T) {
+		a := &LiteNode[int]{}
+		b := &LiteNode[int]{}
+
+		originalLeaf := &LeafNode[int]{
+			Prefix: mpp("10.10.0.0/16"),
+			Value:  0,
+		}
+		a.InsertChild(10, originalLeaf)
+
+		childNodeB := &LiteNode[int]{}
+		childNodeB.InsertPrefix(32, 0)
+		b.InsertChild(10, childNodeB)
+
+		a.UnionRecPersist(cloneFn, b, 0)
+
+		child, _ := a.GetChild(10)
+		if _, ok := child.(*LiteNode[int]); !ok {
+			t.Error("Should create new LiteNode")
+		}
+	})
+
+	t.Run("leaf_plus_leaf_same_prefix_persist", func(t *testing.T) {
+		a := &LiteNode[int]{}
+		b := &LiteNode[int]{}
+
+		prefix := mpp("10.10.0.0/16")
+		leafA := &LeafNode[int]{Prefix: prefix, Value: 0}
+		leafB := &LeafNode[int]{Prefix: prefix, Value: 0}
+
+		a.InsertChild(10, leafA)
+		b.InsertChild(10, leafB)
+
+		duplicates := a.UnionRecPersist(cloneFn, b, 0)
+		if duplicates != 1 {
+			t.Errorf("Expected 1 duplicate, got %d", duplicates)
+		}
+
+		child, _ := a.GetChild(10)
+		if _, ok := child.(*LeafNode[int]); !ok {
+			t.Error("Child should remain a LeafNode")
+		}
+	})
+
+	t.Run("leaf_plus_leaf_different_prefix_persist", func(t *testing.T) {
+		a := &LiteNode[int]{}
+		b := &LiteNode[int]{}
+
+		leafA := &LeafNode[int]{
+			Prefix: mpp("10.10.0.0/16"),
+			Value:  0,
+		}
+		leafB := &LeafNode[int]{
+			Prefix: mpp("10.10.1.0/24"),
+			Value:  0,
+		}
+
+		a.InsertChild(10, leafA)
+		b.InsertChild(10, leafB)
+
+		a.UnionRecPersist(cloneFn, b, 0)
+
+		child, _ := a.GetChild(10)
+		if _, ok := child.(*LiteNode[int]); !ok {
+			t.Error("Should create new LiteNode")
+		}
+	})
+
+	t.Run("leaf_plus_fringe_persist", func(t *testing.T) {
+		a := &LiteNode[int]{}
+		b := &LiteNode[int]{}
+
+		leafA := &LeafNode[int]{
+			Prefix: mpp("10.10.0.0/16"),
+			Value:  0,
+		}
+		fringeB := &FringeNode[int]{Value: 0}
+
+		a.InsertChild(10, leafA)
+		b.InsertChild(10, fringeB)
+
+		a.UnionRecPersist(cloneFn, b, 0)
+
+		child, _ := a.GetChild(10)
+		if _, ok := child.(*LiteNode[int]); !ok {
+			t.Error("Should create new LiteNode")
+		}
+	})
+
+	t.Run("fringe_plus_node_persist", func(t *testing.T) {
+		a := &LiteNode[int]{}
+		b := &LiteNode[int]{}
+
+		fringeA := &FringeNode[int]{Value: 0}
+		a.InsertChild(10, fringeA)
+
+		childNodeB := &LiteNode[int]{}
+		childNodeB.InsertPrefix(32, 0)
+		b.InsertChild(10, childNodeB)
+
+		a.UnionRecPersist(cloneFn, b, 0)
+
+		child, _ := a.GetChild(10)
+		if _, ok := child.(*LiteNode[int]); !ok {
+			t.Error("Should create new LiteNode")
+		}
+	})
+
+	t.Run("fringe_plus_leaf_persist", func(t *testing.T) {
+		a := &LiteNode[int]{}
+		b := &LiteNode[int]{}
+
+		fringeA := &FringeNode[int]{Value: 0}
+		a.InsertChild(10, fringeA)
+
+		leafB := &LeafNode[int]{
+			Prefix: mpp("10.10.0.0/16"),
+			Value:  0,
+		}
+		b.InsertChild(10, leafB)
+
+		a.UnionRecPersist(cloneFn, b, 0)
+
+		child, _ := a.GetChild(10)
+		if _, ok := child.(*LiteNode[int]); !ok {
+			t.Error("Should create new LiteNode")
+		}
+	})
+
+	t.Run("fringe_plus_fringe_persist", func(t *testing.T) {
+		a := &LiteNode[int]{}
+		b := &LiteNode[int]{}
+
+		fringeA := &FringeNode[int]{Value: 0}
+		fringeB := &FringeNode[int]{Value: 0}
+
+		a.InsertChild(10, fringeA)
+		b.InsertChild(10, fringeB)
+
+		duplicates := a.UnionRecPersist(cloneFn, b, 0)
+		if duplicates != 1 {
+			t.Errorf("Expected 1 duplicate, got %d", duplicates)
+		}
+
+		child, _ := a.GetChild(10)
+		if _, ok := child.(*FringeNode[int]); !ok {
+			t.Error("Child should remain a FringeNode")
+		}
+	})
+}
+
+func TestLiteNode_Modify_AllPaths(t *testing.T) {
+	t.Parallel()
+
+	t.Run("modify_at_lastOctet_delete_nonexistent", func(t *testing.T) {
+		n := &LiteNode[int]{}
+
+		delta := n.Modify(mpp("0.0.0.0/0"), func(_ int, found bool) (int, bool) {
+			if found {
+				t.Error("Should not find non-existent prefix")
+			}
+			return 0, true
+		})
+		if delta != 0 {
+			t.Errorf("Expected delta 0 for no-op delete, got %d", delta)
+		}
+	})
+
+	t.Run("modify_at_lastOctet_delete_existing", func(t *testing.T) {
+		n := &LiteNode[int]{}
+		pfx := mpp("0.0.0.0/0")
+		n.Insert(pfx, 0, 0)
+
+		delta := n.Modify(pfx, func(_ int, found bool) (int, bool) {
+			if !found {
+				t.Errorf("Expected found=true")
+			}
+			return 0, true
+		})
+		if delta != -1 {
+			t.Errorf("Expected delta -1 for delete, got %d", delta)
+		}
+		if _, ok := n.Get(pfx); ok {
+			t.Error("Prefix should be deleted")
+		}
+	})
+
+	t.Run("modify_at_lastOctet_insert_new", func(t *testing.T) {
+		n := &LiteNode[int]{}
+		pfx := mpp("0.0.0.0/0")
+
+		delta := n.Modify(pfx, func(_ int, found bool) (int, bool) {
+			if found {
+				t.Error("Should not find new prefix")
+			}
+			return 0, false
+		})
+		if delta != 1 {
+			t.Errorf("Expected delta 1 for insert, got %d", delta)
+		}
+		if _, ok := n.Get(pfx); !ok {
+			t.Errorf("Expected prefix to exist")
+		}
+	})
+
+	t.Run("modify_at_lastOctet_update_existing", func(t *testing.T) {
+		n := &LiteNode[int]{}
+		pfx := mpp("0.0.0.0/0")
+		n.Insert(pfx, 0, 0)
+
+		delta := n.Modify(pfx, func(_ int, found bool) (int, bool) {
+			if !found {
+				t.Errorf("Expected found=true")
+			}
+			return 0, false
+		})
+		if delta != 0 {
+			t.Errorf("Expected delta 0 for update, got %d", delta)
+		}
+		if _, ok := n.Get(pfx); !ok {
+			t.Errorf("Expected prefix to still exist")
+		}
+	})
+
+	t.Run("modify_insert_path_compressed_fringe", func(t *testing.T) {
+		n := &LiteNode[int]{}
+		pfx := mpp("10.0.0.0/8")
+
+		delta := n.Modify(pfx, func(_ int, _ bool) (int, bool) { return 0, false })
+		if delta != 1 {
+			t.Errorf("Expected delta 1, got %d", delta)
+		}
+		// Verify via Get and by child type
+		if _, ok := n.Get(pfx); !ok {
+			t.Errorf("Expected fringe prefix to exist via Get")
+		}
+		if ch, ok := n.GetChild(10); !ok {
+			t.Fatal("Child should exist")
+		} else if _, isFr := ch.(*FringeNode[int]); !isFr {
+			t.Errorf("Child should be FringeNode, got %T", ch)
+		}
+	})
+
+	t.Run("modify_insert_path_compressed_leaf", func(t *testing.T) {
+		n := &LiteNode[int]{}
+		pfx := mpp("10.1.0.0/16")
+
+		delta := n.Modify(pfx, func(_ int, _ bool) (int, bool) { return 0, false })
+		if delta != 1 {
+			t.Errorf("Expected delta 1, got %d", delta)
+		}
+		// Verify via Get and by child type
+		if _, ok := n.Get(pfx); !ok {
+			t.Errorf("Expected leaf prefix to exist via Get")
+		}
+		if ch, ok := n.GetChild(10); !ok {
+			t.Fatal("Child should exist at octet 10")
+		} else if _, isLeaf := ch.(*LeafNode[int]); !isLeaf {
+			t.Errorf("Child should be LeafNode, got %T", ch)
+		}
+	})
+
+	t.Run("modify_delete_nonexistent_path_compressed", func(t *testing.T) {
+		n := &LiteNode[int]{}
+		delta := n.Modify(mpp("10.1.0.0/16"), func(_ int, _ bool) (int, bool) { return 0, true })
+		if delta != 0 {
+			t.Errorf("Expected delta 0 for no-op, got %d", delta)
+		}
+	})
+
+	t.Run("modify_update_leaf_same_prefix", func(t *testing.T) {
+		n := &LiteNode[int]{}
+		pfx := mpp("10.1.0.0/16")
+		n.Insert(pfx, 0, 0)
+
+		delta := n.Modify(pfx, func(_ int, found bool) (int, bool) {
+			if !found {
+				t.Errorf("Expected found=true")
+			}
+			return 0, false
+		})
+		if delta != 0 {
+			t.Errorf("Expected delta 0 for update, got %d", delta)
+		}
+		if _, ok := n.Get(pfx); !ok {
+			t.Errorf("Expected prefix to still exist")
+		}
+	})
+
+	t.Run("modify_delete_leaf_same_prefix", func(t *testing.T) {
+		n := &LiteNode[int]{}
+		pfx := mpp("10.1.0.0/16")
+		n.Insert(pfx, 0, 0)
+
+		delta := n.Modify(pfx, func(_ int, _ bool) (int, bool) { return 0, true })
+		if delta != -1 {
+			t.Errorf("Expected delta -1, got %d", delta)
+		}
+		if !n.IsEmpty() {
+			t.Error("Node should be empty after delete and purge")
+		}
+	})
+
+	t.Run("modify_insert_creates_node_from_leaf", func(t *testing.T) {
+		n := &LiteNode[int]{}
+		p1 := mpp("10.1.0.0/16")
+		p2 := mpp("10.1.1.0/24")
+		n.Insert(p1, 0, 0)
+
+		delta := n.Modify(p2, func(_ int, found bool) (int, bool) {
+			if found {
+				t.Error("Should not find")
+			}
+			return 0, false
+		})
+		if delta != 1 {
+			t.Errorf("Expected delta 1, got %d", delta)
+		}
+		if _, ok := n.Get(p1); !ok {
+			t.Errorf("Expected p1 to exist")
+		}
+		if _, ok := n.Get(p2); !ok {
+			t.Errorf("Expected p2 to exist")
+		}
+	})
+
+	t.Run("modify_delete_noop_from_leaf_mismatch", func(t *testing.T) {
+		n := &LiteNode[int]{}
+		n.Insert(mpp("10.1.0.0/16"), 0, 0)
+
+		delta := n.Modify(mpp("10.1.1.0/24"), func(_ int, _ bool) (int, bool) { return 0, true })
+		if delta != 0 {
+			t.Errorf("Expected delta 0, got %d", delta)
+		}
+	})
+
+	t.Run("modify_update_fringe_same_prefix", func(t *testing.T) {
+		n := &LiteNode[int]{}
+		pfx := mpp("10.0.0.0/8")
+		n.Insert(pfx, 0, 0)
+
+		delta := n.Modify(pfx, func(_ int, found bool) (int, bool) {
+			if !found {
+				t.Errorf("Expected found=true")
+			}
+			return 0, false
+		})
+		if delta != 0 {
+			t.Errorf("Expected delta 0, got %d", delta)
+		}
+		if _, ok := n.Get(pfx); !ok {
+			t.Errorf("Expected fringe prefix to still exist")
+		}
+	})
+
+	t.Run("modify_delete_fringe", func(t *testing.T) {
+		n := &LiteNode[int]{}
+		pfx := mpp("10.0.0.0/8")
+		n.Insert(pfx, 0, 0)
+
+		delta := n.Modify(pfx, func(_ int, _ bool) (int, bool) { return 0, true })
+		if delta != -1 {
+			t.Errorf("Expected delta -1, got %d", delta)
+		}
+		if !n.IsEmpty() {
+			t.Error("Node should be empty")
+		}
+	})
+
+	t.Run("modify_insert_creates_node_from_fringe", func(t *testing.T) {
+		n := &LiteNode[int]{}
+		pFr := mpp("10.0.0.0/8")
+		pLeaf := mpp("10.1.0.0/16")
+		n.Insert(pFr, 0, 0)
+
+		delta := n.Modify(pLeaf, func(_ int, _ bool) (int, bool) { return 0, false })
+		if delta != 1 {
+			t.Errorf("Expected delta 1, got %d", delta)
+		}
+		if _, ok := n.Get(pFr); !ok {
+			t.Errorf("Fringe should still exist")
+		}
+		if _, ok := n.Get(pLeaf); !ok {
+			t.Errorf("Leaf should exist")
+		}
+	})
+
+	t.Run("modify_delete_noop_from_fringe_mismatch", func(t *testing.T) {
+		n := &LiteNode[int]{}
+		n.Insert(mpp("10.0.0.0/8"), 0, 0)
+
+		delta := n.Modify(mpp("10.1.0.0/16"), func(_ int, _ bool) (int, bool) { return 0, true })
+		if delta != 0 {
+			t.Errorf("Expected delta 0, got %d", delta)
+		}
+	})
+
+	t.Run("modify_noop_update", func(t *testing.T) {
+		n := &LiteNode[int]{}
+		pfx := mpp("0.0.0.0/0")
+		n.Insert(pfx, 0, 0)
+
+		delta := n.Modify(pfx, func(_ int, found bool) (int, bool) {
+			if !found {
+				t.Fatalf("Expected found")
+			}
+			return 0, false // same presence
+		})
+		if delta != 0 {
+			t.Errorf("Expected delta 0, got %d", delta)
+		}
+	})
 }
