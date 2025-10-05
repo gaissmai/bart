@@ -239,12 +239,12 @@ func (n *BartNode[V]) CloneFlat(cloneFn CloneFunc[V]) *BartNode[V] {
 // If cloneFn is nil, the stored values are copied directly without modification.
 // Otherwise cloneFn is applied to each stored value for deep cloning.
 //
-// This method first creates a shallow clone of the current node using cloneFlat,
+// This method first creates a shallow clone of the current node using CloneFlat,
 // applying cloneFn to values as described there. Then it recursively clones all
 // child nodes of type *bartNode[V], performing a full deep clone down the subtree.
 //
 // Child nodes of type *leafNode[V] and *fringeNode[V] are already cloned
-// by cloneFlat.
+// by CloneFlat.
 //
 // Returns a new instance of bartNode[V] which is a complete deep clone of the
 // receiver node with all descendants.

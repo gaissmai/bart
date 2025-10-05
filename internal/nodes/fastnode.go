@@ -295,7 +295,7 @@ func (n *FastNode[V]) allot(idx uint8, oldValPtr, valPtr *V) {
 }
 
 // CloneFlat returns a shallow copy of the current fastNode[V],
-// Its semantics are identical to [bartNode.cloneFlat] but the
+// Its semantics are identical to [bartNode.CloneFlat] but the
 // implementation is more complex.
 func (n *FastNode[V]) CloneFlat(cloneFn CloneFunc[V]) *FastNode[V] {
 	if n == nil {
