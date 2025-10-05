@@ -236,12 +236,12 @@ func (n *LiteNode[V]) CloneFlat(_ CloneFunc[V]) *LiteNode[V] {
 //
 // cloneFn is only used for interface satisfaction.
 //
-// It first creates a shallow clone of the current node using cloneFlat.
+// It first creates a shallow clone of the current node using CloneFlat.
 // Then it recursively clones all child nodes of type *liteNode[V],
 // performing a full deep clone down the subtree.
 //
 // Child nodes of type *leafNode and *fringeNode are already copied
-// by cloneFlat.
+// by CloneFlat.
 //
 // Returns a new instance of liteNode[V] which is a complete deep clone of the
 // receiver node with all descendants.
