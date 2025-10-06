@@ -316,13 +316,16 @@ func TestNodeCloneFlat_PanicOnWrongType(t *testing.T) {
 	t.Parallel()
 	n := &nodes.BartNode[*routeEntry]{}
 	n.Children = *n.Children.Copy()
-	// insert a wrong type into children.Items to trigger panic branch
-	n.Children.Items = append(n.Children.Items, struct{}{}) // not a recognized node type
+
+	// insert a wrong type into children to trigger panic branch
+	n.InsertChild(0, &struct{}{}) // not a recognized node type
+
 	defer func() {
 		if r := recover(); r == nil {
 			t.Fatalf("expected panic on wrong node type")
 		}
 	}()
+
 	_ = n.CloneFlat(nil)
 }
 
