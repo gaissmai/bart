@@ -17,7 +17,6 @@ var zeroStruct zeroStructT
 
 type tablerTiny interface {
 	Insert(netip.Prefix, zeroStructT)
-	String() string
 	dump(io.Writer)
 	dumpString() string
 }
@@ -46,28 +45,6 @@ func TestUnifiedDumper_TableTypes(t *testing.T) {
 	}
 
 	for name, builder := range tables {
-		t.Run(name+"_EmptyTableString", func(t *testing.T) {
-			t.Parallel()
-
-			tbl := builder()
-			output := tbl.String()
-			if output != "" {
-				t.Errorf("Expected empty string for empty %s table, got: %s", name, output)
-			}
-		})
-
-		t.Run(name+"_WithDataString", func(t *testing.T) {
-			t.Parallel()
-
-			tbl := builder()
-			insertAll(tbl, pfxs)
-
-			output := tbl.String()
-			if !strings.Contains(output, pfxs[0].String()) || !strings.Contains(output, pfxs[1].String()) {
-				t.Errorf("Expected %s table output to contain inserted routes, got: %s", name, output)
-			}
-		})
-
 		t.Run(name+"_EmptyTableDump", func(t *testing.T) {
 			t.Parallel()
 
