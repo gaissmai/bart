@@ -32,11 +32,11 @@ type BartNode[V any] struct {
 	// at this trie level (8-bit stride).
 	//
 	// Entries in Children may be:
-	//   - *bartNode[V]   -> internal child node for further traversal
-	//   - *leafNode[V]   -> path-comp. node (depth < maxDepth - 1)
-	//   - *fringeNode[V] -> path-comp. node (depth == maxDepth - 1, stride-aligned: /8, /16, ... /128)
+	//   - *BartNode[V]   -> internal child node for further traversal
+	//   - *LeafNode[V]   -> path-comp. node (depth < maxDepth - 1)
+	//   - *FringeNode[V] -> path-comp. node (depth == maxDepth - 1, stride-aligned: /8, /16, ... /128)
 	//
-	// Note: Both *leafNode and *fringeNode entries are only created by path compression.
+	// Note: Both *LeafNode and *FringeNode entries are only created by path compression.
 	// Prefixes that match exactly at the maximum trie depth (depth == maxDepth) are
 	// never stored as Children, but always directly in the prefixes array at that level.
 	Children sparse.Array256[any]
@@ -103,7 +103,7 @@ func (n *BartNode[V]) DeletePrefix(idx uint8) (exists bool) {
 }
 
 // InsertChild adds a child node at the specified address (0-255).
-// The child can be a *bartNode[V], *leafNode[V], or *fringeNode[V].
+// The child can be a *BartNode[V], *LeafNode[V], or *FringeNode[V].
 // Returns true if a child already existed at that address.
 func (n *BartNode[V]) InsertChild(addr uint8, child any) (exists bool) {
 	return n.Children.InsertAt(addr, child)
@@ -185,12 +185,12 @@ func (n *BartNode[V]) Lookup(idx uint8) (val V, ok bool) {
 //
 // If cloneFn is nil, the stored values in prefixes are copied directly without modification.
 // Otherwise, cloneFn is applied to each stored value for deep cloning.
-// Child nodes are cloned shallowly: leafNode and fringeNode children are cloned via their clone methods,
-// but child nodes of type *bartNode[V] (subnodes) are assigned as-is without recursive cloning.
+// Child nodes are cloned shallowly: LeafNode and FringeNode children are cloned via their clone methods,
+// but child nodes of type *BartNode[V] (subnodes) are assigned as-is without recursive cloning.
 // This method does not recursively clone descendants beyond the immediate children.
 //
 // Note: The returned node is a new instance with copied slices but only shallow copies of nested nodes,
-// except for leafNode and fringeNode children which are cloned according to cloneFn.
+// except for LeafNode and FringeNode children which are cloned according to cloneFn.
 func (n *BartNode[V]) CloneFlat(cloneFn CloneFunc[V]) *BartNode[V] {
 	if n == nil {
 		return nil
@@ -215,7 +215,7 @@ func (n *BartNode[V]) CloneFlat(cloneFn CloneFunc[V]) *BartNode[V] {
 	c.Children = *(n.Children.Copy())
 
 	// Iterate over children to flat clone leaf/fringe nodes;
-	// for *bartNode[V] children, keep shallow references (no recursive clone)
+	// for *BartNode[V] children, keep shallow references (no recursive clone)
 	for i, anyKid := range c.Children.Items {
 		switch kid := anyKid.(type) {
 		case *BartNode[V]:
@@ -241,12 +241,12 @@ func (n *BartNode[V]) CloneFlat(cloneFn CloneFunc[V]) *BartNode[V] {
 //
 // This method first creates a shallow clone of the current node using CloneFlat,
 // applying cloneFn to values as described there. Then it recursively clones all
-// child nodes of type *bartNode[V], performing a full deep clone down the subtree.
+// child nodes of type *BartNode[V], performing a full deep clone down the subtree.
 //
-// Child nodes of type *leafNode[V] and *fringeNode[V] are already cloned
+// Child nodes of type *LeafNode[V] and *FringeNode[V] are already cloned
 // by CloneFlat.
 //
-// Returns a new instance of bartNode[V] which is a complete deep clone of the
+// Returns a new instance of BartNode[V] which is a complete deep clone of the
 // receiver node with all descendants.
 func (n *BartNode[V]) CloneRec(cloneFn CloneFunc[V]) *BartNode[V] {
 	if n == nil {
@@ -256,7 +256,7 @@ func (n *BartNode[V]) CloneRec(cloneFn CloneFunc[V]) *BartNode[V] {
 	// Perform a flat clone of the current node.
 	c := n.CloneFlat(cloneFn)
 
-	// Recursively clone all child nodes of type *bartNode[V]
+	// Recursively clone all child nodes of type *BartNode[V]
 	for i, kidAny := range c.Children.Items {
 		if kid, ok := kidAny.(*BartNode[V]); ok {
 			c.Children.Items[i] = kid.CloneRec(cloneFn)
