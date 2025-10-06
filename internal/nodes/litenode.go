@@ -24,8 +24,8 @@ import (
 //     via backtracking along the complete binary tree (CBT) encoded in this bitset.
 //   - **Child management**: Child pointers are held in a sparse-array of at most
 //     256 entries. A child can be another *LiteNode[V] for further traversal, or
-//     a path-compressed terminal node: *leafNode (explicit prefix storage)
-//     or *fringeNode (implicit prefix at stride boundary).
+//     a path-compressed terminal node: *LeafNode (explicit prefix storage)
+//     or *FringeNode (implicit prefix at stride boundary).
 //
 // Fields:
 //   - prefixes: BitSet256 indicating which prefix indices are occupied.
@@ -136,7 +136,7 @@ func (n *LiteNode[V]) DeletePrefix(idx uint8) (exists bool) {
 }
 
 // InsertChild adds a child node at the specified address (0-255).
-// The child can be a *liteNode[V], *leafNode, or *fringeNode.
+// The child can be a *LiteNode[V], *LeafNode, or *FringeNode.
 // Returns true if a child already existed at that address.
 func (n *LiteNode[V]) InsertChild(addr uint8, child any) (exists bool) {
 	return n.Children.InsertAt(addr, child)
@@ -237,13 +237,13 @@ func (n *LiteNode[V]) CloneFlat(_ CloneFunc[V]) *LiteNode[V] {
 // cloneFn is only used for interface satisfaction.
 //
 // It first creates a shallow clone of the current node using CloneFlat.
-// Then it recursively clones all child nodes of type *liteNode[V],
+// Then it recursively clones all child nodes of type *LiteNode[V],
 // performing a full deep clone down the subtree.
 //
-// Child nodes of type *leafNode and *fringeNode are already copied
+// Child nodes of type *LeafNode and *FringeNode are already copied
 // by CloneFlat.
 //
-// Returns a new instance of liteNode[V] which is a complete deep clone of the
+// Returns a new instance of LiteNode[V] which is a complete deep clone of the
 // receiver node with all descendants.
 func (n *LiteNode[V]) CloneRec(_ CloneFunc[V]) *LiteNode[V] {
 	if n == nil {
@@ -253,7 +253,7 @@ func (n *LiteNode[V]) CloneRec(_ CloneFunc[V]) *LiteNode[V] {
 	// Perform a flat clone of the current node.
 	c := n.CloneFlat(nil)
 
-	// Recursively clone all child nodes of type *liteNode[V]
+	// Recursively clone all child nodes of type *LiteNode[V]
 	for i, kidAny := range c.Children.Items {
 		if kid, ok := kidAny.(*LiteNode[V]); ok {
 			c.Children.Items[i] = kid.CloneRec(nil)
