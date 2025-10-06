@@ -24,7 +24,7 @@ type FastNode[V any] struct {
 		Items [256]*V
 	}
 
-	// Children.items: **fastNode or path-compressed **leaf- or **fringeNode
+	// Children.items: **FastNode or path-compressed **leaf- or **fringeNode
 	// an array of "pointers to" the empty interface,
 	// and not an array of empty interfaces.
 	//
@@ -145,7 +145,7 @@ func (n *FastNode[V]) InsertPrefix(idx uint8, val V) (exists bool) {
 	// insert or update
 
 	// To ensure allot works as intended, every unique prefix in the
-	// fastNode must point to a distinct value pointer, even for identical values.
+	// FastNode must point to a distinct value pointer, even for identical values.
 	// Using new() and assignment guarantees each inserted prefix gets its own address,
 	valPtr := new(V)
 	*valPtr = val
@@ -294,7 +294,7 @@ func (n *FastNode[V]) allot(idx uint8, oldValPtr, valPtr *V) {
 	}
 }
 
-// CloneFlat returns a shallow copy of the current fastNode[V],
+// CloneFlat returns a shallow copy of the current FastNode[V],
 // Its semantics are identical to [bartNode.CloneFlat] but the
 // implementation is more complex.
 func (n *FastNode[V]) CloneFlat(cloneFn CloneFunc[V]) *FastNode[V] {
@@ -352,7 +352,7 @@ func (n *FastNode[V]) CloneFlat(cloneFn CloneFunc[V]) *FastNode[V] {
 	return c
 }
 
-// CloneRec performs a recursive deep copy of the fastNode[V] and all its descendants.
+// CloneRec performs a recursive deep copy of the FastNode[V] and all its descendants.
 // Its semantics are identical to [bartNode.cloneRec].
 func (n *FastNode[V]) CloneRec(cloneFn CloneFunc[V]) *FastNode[V] {
 	if n == nil {
@@ -362,7 +362,7 @@ func (n *FastNode[V]) CloneRec(cloneFn CloneFunc[V]) *FastNode[V] {
 	// Perform a flat clone of the current node.
 	c := n.CloneFlat(cloneFn)
 
-	// Recursively clone all child nodes of type *fastNode[V]
+	// Recursively clone all child nodes of type *FastNode[V]
 	for addr, kidAny := range c.AllChildren() {
 		switch kid := kidAny.(type) {
 		case *FastNode[V]:
