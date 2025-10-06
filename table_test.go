@@ -1376,10 +1376,6 @@ func TestInsertPersistShuffled(t *testing.T) {
 			rt2 = rt2.InsertPersist(pfx.pfx, pfx.val)
 		}
 
-		if rt1.String() != rt2.String() {
-			t.Fatal("mutable and immutable table have different string representation")
-		}
-
 		if rt1.dumpString() != rt2.dumpString() {
 			t.Fatal("mutable and immutable table have different dumpString representation")
 		}
@@ -1508,10 +1504,6 @@ func TestDeleteShuffled(t *testing.T) {
 		// delete
 		for _, pfx := range toDelete2 {
 			rt2.Delete(pfx.pfx)
-		}
-
-		if rt1.String() != rt2.String() {
-			t.Fatal("shuffled table has different string representation")
 		}
 
 		if rt1.dumpString() != rt2.dumpString() {
@@ -2165,10 +2157,6 @@ func TestModifyShuffled(t *testing.T) {
 			rt2.Modify(pfx.pfx, cb)
 		}
 
-		if rt1.String() != rt2.String() {
-			t.Fatal("shuffled table has different string representation")
-		}
-
 		if rt1.dumpString() != rt2.dumpString() {
 			t.Fatal("shuffled table has different dumpString representation")
 		}
@@ -2239,244 +2227,10 @@ func TestModifyPersistShuffled(t *testing.T) {
 			rt2 = rt2.ModifyPersist(pfx.pfx, cb)
 		}
 
-		if rt1.String() != rt2.String() {
-			t.Fatal("shuffled table has different string representation")
-		}
-
 		if rt1.dumpString() != rt2.dumpString() {
 			t.Fatal("shuffled table has different dumpString representation")
 		}
 	}
-}
-
-func TestUnionEdgeCases(t *testing.T) {
-	t.Parallel()
-
-	t.Run("empty", func(t *testing.T) {
-		t.Parallel()
-		aTbl := new(Table[int])
-		bTbl := new(Table[int])
-
-		// union empty tables
-		aTbl.Union(bTbl)
-
-		want := ""
-		got := aTbl.String()
-		if got != want {
-			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
-		}
-	})
-
-	t.Run("other empty", func(t *testing.T) {
-		t.Parallel()
-		aTbl := new(Table[int])
-		bTbl := new(Table[int])
-
-		// one empty table, b
-		aTbl.Insert(mpp("0.0.0.0/0"), 0)
-
-		aTbl.Union(bTbl)
-		want := `▼
-└─ 0.0.0.0/0 (0)
-`
-		got := aTbl.String()
-		if got != want {
-			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
-		}
-	})
-
-	t.Run("this empty", func(t *testing.T) {
-		t.Parallel()
-		aTbl := new(Table[int])
-		bTbl := new(Table[int])
-
-		// one empty table, a
-		bTbl.Insert(mpp("0.0.0.0/0"), 0)
-
-		aTbl.Union(bTbl)
-		want := `▼
-└─ 0.0.0.0/0 (0)
-`
-		got := aTbl.String()
-		if got != want {
-			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
-		}
-	})
-
-	t.Run("duplicate prefix", func(t *testing.T) {
-		t.Parallel()
-		aTbl := new(Table[string])
-		bTbl := new(Table[string])
-
-		aTbl.Insert(mpp("::/0"), "orig value")
-		bTbl.Insert(mpp("::/0"), "overwrite")
-
-		aTbl.Union(bTbl)
-		want := `▼
-└─ ::/0 (overwrite)
-`
-		got := aTbl.String()
-		if got != want {
-			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
-		}
-	})
-
-	t.Run("different IP versions", func(t *testing.T) {
-		t.Parallel()
-		aTbl := new(Table[int])
-		bTbl := new(Table[int])
-
-		// one empty table
-		aTbl.Insert(mpp("0.0.0.0/0"), 1)
-		bTbl.Insert(mpp("::/0"), 2)
-
-		aTbl.Union(bTbl)
-		want := `▼
-└─ 0.0.0.0/0 (1)
-▼
-└─ ::/0 (2)
-`
-		got := aTbl.String()
-		if got != want {
-			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
-		}
-	})
-
-	t.Run("same children", func(t *testing.T) {
-		t.Parallel()
-		aTbl := new(Table[int])
-		bTbl := new(Table[int])
-
-		aTbl.Insert(mpp("127.0.0.1/32"), 1)
-		aTbl.Insert(mpp("::1/128"), 1)
-
-		bTbl.Insert(mpp("127.0.0.2/32"), 2)
-		bTbl.Insert(mpp("::2/128"), 2)
-
-		aTbl.Union(bTbl)
-		want := `▼
-├─ 127.0.0.1/32 (1)
-└─ 127.0.0.2/32 (2)
-▼
-├─ ::1/128 (1)
-└─ ::2/128 (2)
-`
-		got := aTbl.String()
-		if got != want {
-			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
-		}
-	})
-}
-
-func TestUnionPersistEdgeCases(t *testing.T) {
-	t.Parallel()
-
-	t.Run("empty", func(t *testing.T) {
-		t.Parallel()
-		aTbl := new(Table[int])
-		bTbl := new(Table[int])
-
-		// union empty tables
-		cTbl := aTbl.UnionPersist(bTbl)
-
-		want := ""
-		got := cTbl.String()
-		if got != want {
-			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
-		}
-	})
-
-	t.Run("other empty", func(t *testing.T) {
-		t.Parallel()
-		aTbl := new(Table[int])
-		bTbl := new(Table[int])
-
-		// one empty table, b
-		aTbl.Insert(mpp("10.0.0.0/8"), 0)
-		aTbl.Insert(mpp("10.1.0.0/24"), 0)
-		aTbl.Insert(mpp("2001:db8::/64"), 0)
-		aTbl.Insert(mpp("2001:db8::1/128"), 0)
-
-		cTbl := aTbl.UnionPersist(bTbl)
-		want := `▼
-└─ 10.0.0.0/8 (0)
-   └─ 10.1.0.0/24 (0)
-▼
-└─ 2001:db8::/64 (0)
-   └─ 2001:db8::1/128 (0)
-`
-		got := cTbl.String()
-		if got != want {
-			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
-		}
-	})
-
-	t.Run("this empty", func(t *testing.T) {
-		t.Parallel()
-		aTbl := new(Table[int])
-		bTbl := new(Table[int])
-
-		bTbl.Insert(mpp("10.0.0.0/8"), 0)
-		bTbl.Insert(mpp("10.1.0.0/24"), 0)
-		bTbl.Insert(mpp("2001:db8::/64"), 0)
-		bTbl.Insert(mpp("2001:db8::1/128"), 0)
-
-		cTbl := aTbl.UnionPersist(bTbl)
-		want := `▼
-└─ 10.0.0.0/8 (0)
-   └─ 10.1.0.0/24 (0)
-▼
-└─ 2001:db8::/64 (0)
-   └─ 2001:db8::1/128 (0)
-`
-		got := cTbl.String()
-		if got != want {
-			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
-		}
-	})
-
-	t.Run("duplicate prefix", func(t *testing.T) {
-		t.Parallel()
-		aTbl := new(Table[string])
-		bTbl := new(Table[string])
-
-		aTbl.Insert(mpp("::/0"), "orig value")
-		bTbl.Insert(mpp("::/0"), "overwrite")
-
-		cTbl := aTbl.UnionPersist(bTbl)
-		want := `▼
-└─ ::/0 (overwrite)
-`
-		got := cTbl.String()
-		if got != want {
-			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
-		}
-	})
-
-	t.Run("same children", func(t *testing.T) {
-		t.Parallel()
-		aTbl := new(Table[int])
-		bTbl := new(Table[int])
-
-		aTbl.Insert(mpp("127.0.0.1/32"), 1)
-		aTbl.Insert(mpp("::1/128"), 1)
-
-		bTbl.Insert(mpp("127.0.0.2/32"), 2)
-		bTbl.Insert(mpp("::2/128"), 2)
-
-		cTbl := aTbl.UnionPersist(bTbl)
-		want := `▼
-├─ 127.0.0.1/32 (1)
-└─ 127.0.0.2/32 (2)
-▼
-├─ ::1/128 (1)
-└─ ::2/128 (2)
-`
-		got := cTbl.String()
-		if got != want {
-			t.Fatalf("got:\n%v\nwant:\n%v", got, want)
-		}
-	})
 }
 
 // TestUnionMemoryAliasing tests that the Union method does not alias memory
@@ -2657,34 +2411,6 @@ func TestUnionPersistCompare(t *testing.T) {
 	}
 }
 
-func TestCloneEdgeCases(t *testing.T) {
-	t.Parallel()
-
-	tbl := new(Table[int])
-	clone := tbl.Clone()
-	if tbl.String() != clone.String() {
-		t.Errorf("empty Clone: got:\n%swant:\n%s", clone.String(), tbl.String())
-	}
-
-	tbl.Insert(mpp("10.0.0.1/32"), 1)
-	tbl.Insert(mpp("::1/128"), 1)
-	clone = tbl.Clone()
-	if tbl.String() != clone.String() {
-		t.Errorf("Clone: got:\n%swant:\n%s", clone.String(), tbl.String())
-	}
-
-	// overwrite value
-	tbl.Insert(mpp("::1/128"), 2)
-	if tbl.String() == clone.String() {
-		t.Errorf("overwrite, clone must be different: clone:\n%sorig:\n%s", clone.String(), tbl.String())
-	}
-
-	tbl.Delete(mpp("10.0.0.1/32"))
-	if tbl.String() == clone.String() {
-		t.Errorf("delete, clone must be different: clone:\n%sorig:\n%s", clone.String(), tbl.String())
-	}
-}
-
 func TestClone(t *testing.T) {
 	t.Parallel()
 	prng := rand.New(rand.NewPCG(42, 42))
@@ -2714,7 +2440,7 @@ func TestCloneShallow(t *testing.T) {
 	tbl := new(Table[*int])
 	clone := tbl.Clone()
 	if tbl.dumpString() != clone.dumpString() {
-		t.Errorf("empty Clone: got:\n%swant:\n%s", clone.String(), tbl.String())
+		t.Errorf("empty Clone: got:\n%swant:\n%s", clone.dumpString(), tbl.dumpString())
 	}
 
 	val := 1
@@ -2744,8 +2470,8 @@ func TestCloneDeep(t *testing.T) {
 
 	tbl := new(Table[*MyInt])
 	clone := tbl.Clone()
-	if tbl.String() != clone.String() {
-		t.Errorf("empty Clone: got:\n%swant:\n%s", clone.String(), tbl.String())
+	if tbl.dumpString() != clone.dumpString() {
+		t.Errorf("empty Clone: got:\n%swant:\n%s", clone.dumpString(), tbl.dumpString())
 	}
 
 	val := MyInt(1)
@@ -3356,7 +3082,6 @@ func checkOverlapsPrefix(t *testing.T, tbl *Table[int], tests []tableOverlapsTes
 	for _, tt := range tests {
 		got := tbl.OverlapsPrefix(mpp(tt.prefix))
 		if got != tt.want {
-			t.Log(tbl.String())
 			t.Errorf("OverlapsPrefix(%v) = %v, want %v", mpp(tt.prefix), got, tt.want)
 		}
 	}

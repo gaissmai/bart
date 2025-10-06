@@ -67,20 +67,6 @@ func TestTest(t *testing.T) {
 	}
 }
 
-func TestString(t *testing.T) {
-	t.Parallel()
-	bs := BitSet256{}
-	bs.Set(0)
-	bs.Set(42)
-	bs.Set(255)
-
-	want := "[0 42 255]"
-	got := bs.String()
-	if got != want {
-		t.Errorf("String(), expected: %s, got: %s", want, got)
-	}
-}
-
 func TestFirstSet(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {

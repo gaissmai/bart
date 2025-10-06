@@ -10,73 +10,6 @@ import (
 	"testing"
 )
 
-func TestTableStringSerialization(t *testing.T) {
-	tests := []struct {
-		name           string
-		expectedData   map[netip.Prefix]string
-		expectedValues []string
-	}{
-		{
-			name:           "empty",
-			expectedData:   map[netip.Prefix]string{},
-			expectedValues: []string{},
-		},
-		{
-			name: "single_ipv4",
-			expectedData: map[netip.Prefix]string{
-				netip.MustParsePrefix("192.168.1.0/24"): "test",
-			},
-			expectedValues: []string{"test"},
-		},
-		{
-			name: "default_routes",
-			expectedData: map[netip.Prefix]string{
-				netip.MustParsePrefix("0.0.0.0/0"): "ipv4-default",
-				netip.MustParsePrefix("::/0"):      "ipv6-default",
-			},
-			expectedValues: []string{"ipv4-default", "ipv6-default"},
-		},
-		{
-			name: "mixed_prefixes",
-			expectedData: map[netip.Prefix]string{
-				netip.MustParsePrefix("192.168.1.0/24"): "lan",
-				netip.MustParsePrefix("2001:db8::/32"):  "doc",
-				netip.MustParsePrefix("10.0.0.0/8"):     "private",
-			},
-			expectedValues: []string{"lan", "doc", "private"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			table := &Table[string]{}
-
-			// Insert test data
-			for prefix, value := range tt.expectedData {
-				table.Insert(prefix, value)
-			}
-
-			str := table.String()
-
-			// Validation
-			if len(tt.expectedData) == 0 {
-				return // Empty table case
-			}
-
-			if str == "" {
-				t.Error("Expected non-empty string representation")
-			}
-
-			// Check that all expected values appear in the string
-			for _, value := range tt.expectedValues {
-				if !strings.Contains(str, value) {
-					t.Errorf("String representation doesn't contain expected value: %s", value)
-				}
-			}
-		})
-	}
-}
-
 func TestTableMarshalText(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -278,57 +211,6 @@ func TestTableDumpList6(t *testing.T) {
 	}
 }
 
-func TestFastStringSerialization(t *testing.T) {
-	tests := []struct {
-		name           string
-		expectedData   map[netip.Prefix]string
-		expectedValues []string
-	}{
-		{
-			name:           "empty",
-			expectedData:   map[netip.Prefix]string{},
-			expectedValues: []string{},
-		},
-		{
-			name: "ipv4_and_ipv6",
-			expectedData: map[netip.Prefix]string{
-				netip.MustParsePrefix("192.168.1.0/24"): "ipv4",
-				netip.MustParsePrefix("2001:db8::/32"):  "ipv6",
-			},
-			expectedValues: []string{"ipv4", "ipv6"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			fast := &Fast[string]{}
-
-			// Insert test data
-			for prefix, value := range tt.expectedData {
-				fast.Insert(prefix, value)
-			}
-
-			str := fast.String()
-
-			// Validation
-			if len(tt.expectedData) == 0 {
-				return // Empty case
-			}
-
-			if str == "" {
-				t.Error("Expected non-empty string representation")
-			}
-
-			// Check that all expected values appear in the string
-			for _, value := range tt.expectedValues {
-				if !strings.Contains(str, value) {
-					t.Errorf("String representation doesn't contain expected value: %s", value)
-				}
-			}
-		})
-	}
-}
-
 func TestFastMarshalText(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -473,60 +355,6 @@ func TestFastDumpList6(t *testing.T) {
 	verifyAllIPv6Nodes(t, dumpList)
 }
 
-func TestLiteStringSerialization(t *testing.T) {
-	tests := []struct {
-		name             string
-		expectedPrefixes []netip.Prefix
-	}{
-		{
-			name:             "empty",
-			expectedPrefixes: []netip.Prefix{},
-		},
-		{
-			name: "single_ipv4",
-			expectedPrefixes: []netip.Prefix{
-				netip.MustParsePrefix("192.168.1.0/24"),
-			},
-		},
-		{
-			name: "multiple_prefixes",
-			expectedPrefixes: []netip.Prefix{
-				netip.MustParsePrefix("192.168.1.0/24"),
-				netip.MustParsePrefix("10.0.0.0/8"),
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			lite := &Lite{}
-
-			// Insert test data
-			for _, prefix := range tt.expectedPrefixes {
-				lite.Insert(prefix)
-			}
-
-			str := lite.String()
-
-			// Basic validation
-			if len(tt.expectedPrefixes) == 0 && str == "" {
-				return // Empty case is OK
-			}
-
-			if len(tt.expectedPrefixes) > 0 && str == "" {
-				t.Error("Expected non-empty string representation")
-			}
-
-			// Check that all expected prefixes appear in the string
-			for _, prefix := range tt.expectedPrefixes {
-				if !strings.Contains(str, prefix.String()) {
-					t.Errorf("String representation doesn't contain expected prefix: %s", prefix)
-				}
-			}
-		})
-	}
-}
-
 func TestLiteMarshalText(t *testing.T) {
 	expectedPrefix := netip.MustParsePrefix("192.168.1.0/24")
 	lite := &Lite{}
@@ -554,12 +382,6 @@ func TestLiteMarshalText(t *testing.T) {
 func TestNilTableSerialization(t *testing.T) {
 	var table *Table[string] = nil
 
-	// String() should not panic
-	str := table.String()
-	if str != "" {
-		t.Errorf("Nil Table String() should be empty, got: %q", str)
-	}
-
 	// MarshalText() should not panic
 	data, err := table.MarshalText()
 	if err != nil {
@@ -584,12 +406,6 @@ func TestNilTableSerialization(t *testing.T) {
 
 func TestNilFastSerialization(t *testing.T) {
 	var fast *Fast[string] = nil
-
-	// String() should not panic
-	str := fast.String()
-	if str != "" {
-		t.Errorf("Nil Fast String() should be empty, got: %q", str)
-	}
 
 	// MarshalText() should not panic
 	data, err := fast.MarshalText()

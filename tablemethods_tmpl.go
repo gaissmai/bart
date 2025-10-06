@@ -660,18 +660,6 @@ func (t *_TABLE_TYPE[V]) AllSorted6() iter.Seq2[netip.Prefix, V] {
 	}
 }
 
-// String returns a hierarchical tree diagram of the ordered CIDRs
-// as string, just a wrapper for [_TABLE_TYPE.Fprint].
-// If Fprint returns an error, String panics.
-func (t *_TABLE_TYPE[V]) String() string {
-	w := new(strings.Builder)
-	if err := t.Fprint(w); err != nil {
-		panic(err)
-	}
-
-	return w.String()
-}
-
 // Fprint writes a hierarchical tree diagram of the ordered CIDRs
 // with default formatted payload V to w.
 //

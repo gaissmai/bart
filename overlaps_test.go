@@ -392,8 +392,7 @@ func TestOverlapsGoldenCompare(t *testing.T) {
 		gotBart := bart.Overlaps(bartInter)
 
 		if gotGold != gotBart {
-			t.Fatalf("Overlaps(...) = %v, want %v\nbart1:\n%s\nbart2:\n%s",
-				gotBart, gotGold, bart.String(), bartInter.String())
+			t.Fatalf("Overlaps(...) = %v, want %v", gotBart, gotGold)
 		}
 
 		// Fast
@@ -411,8 +410,7 @@ func TestOverlapsGoldenCompare(t *testing.T) {
 		gotFast := fast.Overlaps(fastInter)
 
 		if gotGold != gotFast {
-			t.Fatalf("Overlaps(...) = %v, want %v\nfast1:\n%s\nfast2:\n%s",
-				gotFast, gotGold, fast.String(), fastInter.String())
+			t.Fatalf("Overlaps(...) = %v, want %v", gotFast, gotGold)
 		}
 
 		// Lite
@@ -430,8 +428,7 @@ func TestOverlapsGoldenCompare(t *testing.T) {
 		gotLite := lite.Overlaps(liteInter)
 
 		if gotGold != gotLite {
-			t.Fatalf("Overlaps(...) = %v, want %v\nlite1:\n%s\nlite2:\n%s",
-				gotLite, gotGold, lite.String(), liteInter.String())
+			t.Fatalf("Overlaps(...) = %v, want %v", gotLite, gotGold)
 		}
 	}
 }
