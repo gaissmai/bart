@@ -247,7 +247,6 @@ func (t *Table[V]) Size() int
 func (t *Table[V]) Size4() int
 func (t *Table[V]) Size6() int
 
-func (t *Table[V]) String() string
 func (t *Table[V]) Fprint(w io.Writer) error
 func (t *Table[V]) MarshalText() ([]byte, error)
 func (t *Table[V]) MarshalJSON() ([]byte, error)

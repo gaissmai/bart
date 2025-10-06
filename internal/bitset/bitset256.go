@@ -35,7 +35,6 @@ package bitset
 // can inline (*BitSet256).Union with cost 36
 
 import (
-	"fmt"
 	"math/bits"
 )
 
@@ -58,11 +57,6 @@ import (
 
 // BitSet256 represents a fixed size bitset from [0..255]
 type BitSet256 [4]uint64
-
-// String implements fmt.Stringer.
-func (b *BitSet256) String() string {
-	return fmt.Sprintf("%v", b.Bits())
-}
 
 // Set sets the bit.
 func (b *BitSet256) Set(bit uint8) {
