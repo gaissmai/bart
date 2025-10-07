@@ -1,4 +1,4 @@
-// Code generated from file "tablemethods_tmpl.go"; DO NOT EDIT.
+// Code generated from file "commonmethods_tmpl.go"; DO NOT EDIT.
 
 // Copyright (c) 2025 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
@@ -302,6 +302,9 @@ func (t *Table[V]) ModifyPersist(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, d
 // Returns an empty iterator if the prefix is invalid.
 func (t *Table[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
+		if t == nil {
+			return
+		}
 		if !pfx.IsValid() {
 			return
 		}
@@ -331,6 +334,9 @@ func (t *Table[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 // Returns an empty iterator if the prefix is invalid.
 func (t *Table[V]) Subnets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
+		if t == nil {
+			return
+		}
 		if !pfx.IsValid() {
 			return
 		}
@@ -543,6 +549,9 @@ func (t *Table[V]) Size6() int {
 //	}
 func (t *Table[V]) All() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
+		if t == nil {
+			return
+		}
 		_ = t.root4.AllRec(stridePath{}, 0, true, yield) && t.root6.AllRec(stridePath{}, 0, false, yield)
 	}
 }
@@ -550,6 +559,9 @@ func (t *Table[V]) All() iter.Seq2[netip.Prefix, V] {
 // All4 is like [Table.All] but only for the v4 routing table.
 func (t *Table[V]) All4() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
+		if t == nil {
+			return
+		}
 		_ = t.root4.AllRec(stridePath{}, 0, true, yield)
 	}
 }
@@ -557,6 +569,9 @@ func (t *Table[V]) All4() iter.Seq2[netip.Prefix, V] {
 // All6 is like [Table.All] but only for the v6 routing table.
 func (t *Table[V]) All6() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
+		if t == nil {
+			return
+		}
 		_ = t.root6.AllRec(stridePath{}, 0, false, yield)
 	}
 }
@@ -580,6 +595,9 @@ func (t *Table[V]) All6() iter.Seq2[netip.Prefix, V] {
 // traversal is required use persistent table methods.
 func (t *Table[V]) AllSorted() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
+		if t == nil {
+			return
+		}
 		_ = t.root4.AllRecSorted(stridePath{}, 0, true, yield) &&
 			t.root6.AllRecSorted(stridePath{}, 0, false, yield)
 	}
@@ -588,6 +606,9 @@ func (t *Table[V]) AllSorted() iter.Seq2[netip.Prefix, V] {
 // AllSorted4 is like [Table.AllSorted] but only for the v4 routing table.
 func (t *Table[V]) AllSorted4() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
+		if t == nil {
+			return
+		}
 		_ = t.root4.AllRecSorted(stridePath{}, 0, true, yield)
 	}
 }
@@ -595,6 +616,9 @@ func (t *Table[V]) AllSorted4() iter.Seq2[netip.Prefix, V] {
 // AllSorted6 is like [Table.AllSorted] but only for the v6 routing table.
 func (t *Table[V]) AllSorted6() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
+		if t == nil {
+			return
+		}
 		_ = t.root6.AllRecSorted(stridePath{}, 0, false, yield)
 	}
 }

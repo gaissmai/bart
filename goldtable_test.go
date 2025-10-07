@@ -26,13 +26,27 @@ func (g goldTableItem[V]) String() string {
 //nolint:unused
 func (t *goldTable[V]) insert(pfx netip.Prefix, val V) {
 	pfx = pfx.Masked()
-	for i, ent := range *t {
-		if ent.pfx == pfx {
-			(*t)[i].val = val
+	for i, item := range *t {
+		if item.pfx == pfx {
+			(*t)[i].val = val // de-dupe
 			return
 		}
 	}
 	*t = append(*t, goldTableItem[V]{pfx, val})
+}
+
+func (t *goldTable[V]) delete(pfx netip.Prefix) (exists bool) {
+	pfx = pfx.Masked()
+	c := slices.Clone(*t)
+
+	for i, item := range *t {
+		if item.pfx == pfx {
+			exists = true
+			c = slices.Delete(c, i, i)
+		}
+	}
+	*t = c
+	return
 }
 
 func (t *goldTable[V]) insertMany(pfxs []goldTableItem[V]) {
@@ -43,9 +57,9 @@ func (t *goldTable[V]) insertMany(pfxs []goldTableItem[V]) {
 
 func (t goldTable[V]) get(pfx netip.Prefix) (val V, ok bool) {
 	pfx = pfx.Masked()
-	for _, ent := range t {
-		if ent.pfx == pfx {
-			return ent.val, true
+	for _, item := range t {
+		if item.pfx == pfx {
+			return item.val, true
 		}
 	}
 	return val, false
@@ -53,10 +67,10 @@ func (t goldTable[V]) get(pfx netip.Prefix) (val V, ok bool) {
 
 func (t *goldTable[V]) update(pfx netip.Prefix, cb func(V, bool) V) (val V) {
 	pfx = pfx.Masked()
-	for i, ent := range *t {
-		if ent.pfx == pfx {
+	for i, item := range *t {
+		if item.pfx == pfx {
 			// update val
-			val = cb(ent.val, true)
+			val = cb(item.val, true)
 			(*t)[i].val = val
 			return val
 		}
@@ -126,6 +140,16 @@ func (t goldTable[V]) lookupPfxLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, o
 	return lpm, val, ok
 }
 
+func (t goldTable[V]) allSorted() []netip.Prefix {
+	var result []netip.Prefix
+
+	for _, item := range t {
+		result = append(result, item.pfx)
+	}
+	slices.SortFunc(result, cmpPrefix)
+	return result
+}
+
 func (t goldTable[V]) subnets(pfx netip.Prefix) []netip.Prefix {
 	pfx = pfx.Masked()
 	var result []netip.Prefix
@@ -153,6 +177,7 @@ func (t goldTable[V]) supernets(pfx netip.Prefix) []netip.Prefix {
 	return result
 }
 
+//nolint:unused
 func (t goldTable[V]) overlapsPrefix(pfx netip.Prefix) bool {
 	pfx = pfx.Masked()
 	for _, p := range t {
@@ -163,6 +188,7 @@ func (t goldTable[V]) overlapsPrefix(pfx netip.Prefix) bool {
 	return false
 }
 
+//nolint:unused
 func (ta *goldTable[V]) overlaps(tb *goldTable[V]) bool {
 	for _, aItem := range *ta {
 		for _, bItem := range *tb {

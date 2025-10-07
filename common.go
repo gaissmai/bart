@@ -10,7 +10,15 @@ import (
 )
 
 // These types, constants, and functions are required in the bart package
-// and in internal/nodes. To prevent drift in implementation or values, they are either aliased, copied or wrapped.
+// and in internal/nodes. To prevent drift in implementation or values,
+// they are either aliased, copied or wrapped.
+
+// Equaler is a generic interface for types that can decide their own
+// equality logic. It can be used to override the potentially expensive
+// default comparison with [reflect.DeepEqual].
+type Equaler[V any] interface {
+	Equal(other V) bool
+}
 
 // Cloner is an interface that enables deep cloning of values of type V.
 // If a value implements Cloner[V], Table methods such as InsertPersist,
@@ -72,9 +80,4 @@ func cloneVal[V any](val V) V {
 		return val
 	}
 	return c.Clone()
-}
-
-// copyVal just copies the value.
-func copyVal[V any](val V) V {
-	return val
 }

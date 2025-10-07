@@ -32,6 +32,7 @@ for tableType in "${TABLE_TYPES[@]}"; do
     # build output filename e.g. bartiterators_gen.go
     output_file="${tableType,,}"                            # lowercase e.g. Fast -> fast
     output_file="${output_file}${template_file/_tmpl/_gen}" # concat with mangled template filename
+    output_file="${output_file/common/}"                    # common       -> 
     output_file="${output_file/#table/bart}"                # tablefoo     -> bartfoo
     output_file="${output_file/#litetable/lite}"            # litetablefoo -> litefoo
 
