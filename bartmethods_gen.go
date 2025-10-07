@@ -1,17 +1,9 @@
-// REPLACE with generate hint
+// Code generated from file "commonmethods_tmpl.go"; DO NOT EDIT.
 
 // Copyright (c) 2025 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
-//go:generate ./scripts/generate-table-methods.sh
-//go:build generate
-
 package bart
-
-// ### GENERATE DELETE START ###
-
-// stub code for generator types and methods
-// useful for gopls during development, deleted during go generate
 
 import (
 	"bytes"
@@ -26,60 +18,7 @@ import (
 	"github.com/gaissmai/bart/internal/nodes"
 )
 
-type _NODE_TYPE[V any] struct{}
-
-type _TABLE_TYPE[V any] struct {
-	root4 _NODE_TYPE[V]
-	root6 _NODE_TYPE[V]
-	size4 int
-	size6 int
-}
-
-func (n *_NODE_TYPE[V]) IsEmpty() (_ bool)                                               { return }
-func (n *_NODE_TYPE[V]) StatsRec() (_ nodes.StatsT)                                      { return }
-func (n *_NODE_TYPE[V]) PrefixCount() (_ int)                                            { return }
-func (n *_NODE_TYPE[V]) ChildCount() (_ int)                                             { return }
-func (n *_NODE_TYPE[V]) GetPrefix(uint8) (_ V, _ bool)                                   { return }
-func (n *_NODE_TYPE[V]) GetChild(uint8) (_ any, _ bool)                                  { return }
-func (n *_NODE_TYPE[V]) MustGetPrefix(uint8) (_ V)                                       { return }
-func (n *_NODE_TYPE[V]) MustGetChild(uint8) (_ any)                                      { return }
-func (n *_NODE_TYPE[V]) Insert(netip.Prefix, V, int) (_ bool)                            { return }
-func (n *_NODE_TYPE[V]) Modify(netip.Prefix, func(V, bool) (V, bool)) (_ int)            { return }
-func (n *_NODE_TYPE[V]) Delete(netip.Prefix) (_ bool)                                    { return }
-func (n *_NODE_TYPE[V]) InsertPersist(nodes.CloneFunc[V], netip.Prefix, V, int) (_ bool) { return }
-func (n *_NODE_TYPE[V]) DeletePersist(nodes.CloneFunc[V], netip.Prefix) (_ bool)         { return }
-func (n *_NODE_TYPE[V]) Get(netip.Prefix) (_ V, _ bool)                                  { return }
-func (n *_NODE_TYPE[V]) OverlapsPrefixAtDepth(netip.Prefix, int) (_ bool)                { return }
-func (n *_NODE_TYPE[V]) Overlaps(*_NODE_TYPE[V], int) (_ bool)                           { return }
-func (n *_NODE_TYPE[V]) UnionRec(nodes.CloneFunc[V], *_NODE_TYPE[V], int) (_ int)        { return }
-func (n *_NODE_TYPE[V]) UnionRecPersist(nodes.CloneFunc[V], *_NODE_TYPE[V], int) (_ int) { return }
-func (n *_NODE_TYPE[V]) EqualRec(*_NODE_TYPE[V]) (_ bool)                                { return }
-func (n *_NODE_TYPE[V]) CloneRec(nodes.CloneFunc[V]) (_ *_NODE_TYPE[V])                  { return }
-func (n *_NODE_TYPE[V]) CloneFlat(nodes.CloneFunc[V]) (_ *_NODE_TYPE[V])                 { return }
-func (n *_NODE_TYPE[V]) GetChildAddrs(*[256]uint8) (_ []uint8)                           { return }
-func (n *_NODE_TYPE[V]) GetIndices(*[256]uint8) (_ []uint8)                              { return }
-func (n *_NODE_TYPE[V]) AllChildren() (_ iter.Seq2[uint8, any])                          { return }
-func (n *_NODE_TYPE[V]) AllIndices() (_ iter.Seq2[uint8, V])                             { return }
-func (n *_NODE_TYPE[V]) Contains(uint8) (_ bool)                                         { return }
-func (n *_NODE_TYPE[V]) Lookup(uint8) (_ V, _ bool)                                      { return }
-func (n *_NODE_TYPE[V]) LookupIdx(uint8) (_ uint8, _ V, _ bool)                          { return }
-func (n *_NODE_TYPE[V]) Supernets(netip.Prefix, func(netip.Prefix, V) bool)              { return }
-func (n *_NODE_TYPE[V]) Subnets(netip.Prefix, func(netip.Prefix, V) bool)                { return }
-func (n *_NODE_TYPE[V]) FprintRec(io.Writer, nodes.TrieItem[V], string, bool) (_ error)  { return }
-func (n *_NODE_TYPE[V]) DumpRec(io.Writer, stridePath, int, bool, bool)                  { return }
-func (n *_NODE_TYPE[V]) AllRec(stridePath, int, bool, func(netip.Prefix, V) bool) (_ bool) {
-	return
-}
-
-func (n *_NODE_TYPE[V]) AllRecSorted(stridePath, int, bool, func(netip.Prefix, V) bool) (_ bool) {
-	return
-}
-
-func (t *_TABLE_TYPE[V]) rootNodeByVersion(is4 bool) (n *_NODE_TYPE[V]) { return }
-
-// ### GENERATE DELETE END ###
-
-func (t *_TABLE_TYPE[V]) sizeUpdate(is4 bool, delta int) {
+func (t *Table[V]) sizeUpdate(is4 bool, delta int) {
 	if is4 {
 		t.size4 += delta
 		return
@@ -93,7 +32,7 @@ func (t *_TABLE_TYPE[V]) sizeUpdate(is4 bool, delta int) {
 //
 // The prefix is automatically canonicalized using pfx.Masked() to ensure
 // consistent behavior regardless of host bits in the input.
-func (t *_TABLE_TYPE[V]) Insert(pfx netip.Prefix, val V) {
+func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	if !pfx.IsValid() {
 		return
 	}
@@ -114,8 +53,8 @@ func (t *_TABLE_TYPE[V]) Insert(pfx netip.Prefix, val V) {
 
 // InsertPersist is similar to Insert but the receiver isn't modified.
 //
-// All nodes touched during insert are cloned and a new _TABLE_TYPE is returned.
-// This is not a full [_TABLE_TYPE.Clone], all untouched nodes are still referenced
+// All nodes touched during insert are cloned and a new Table is returned.
+// This is not a full [Table.Clone], all untouched nodes are still referenced
 // from both Tables.
 //
 // If the payload type V contains pointers or needs deep copying,
@@ -123,7 +62,7 @@ func (t *_TABLE_TYPE[V]) Insert(pfx netip.Prefix, val V) {
 //
 // Due to cloning overhead this is significantly slower than Insert,
 // typically taking μsec instead of nsec.
-func (t *_TABLE_TYPE[V]) InsertPersist(pfx netip.Prefix, val V) *_TABLE_TYPE[V] {
+func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V] {
 	if !pfx.IsValid() {
 		return t
 	}
@@ -133,7 +72,7 @@ func (t *_TABLE_TYPE[V]) InsertPersist(pfx netip.Prefix, val V) *_TABLE_TYPE[V] 
 	is4 := pfx.Addr().Is4()
 
 	// share size counters; root nodes cloned selectively.
-	pt := &_TABLE_TYPE[V]{
+	pt := &Table[V]{
 		size4: t.size4,
 		size6: t.size6,
 	}
@@ -168,7 +107,7 @@ func (t *_TABLE_TYPE[V]) InsertPersist(pfx netip.Prefix, val V) *_TABLE_TYPE[V] 
 // removed. If pfx does not exist or pfx is invalid, the table is left unchanged.
 //
 // The prefix is canonicalized (Masked) before lookup.
-func (t *_TABLE_TYPE[V]) Delete(pfx netip.Prefix) {
+func (t *Table[V]) Delete(pfx netip.Prefix) {
 	if !pfx.IsValid() {
 		return
 	}
@@ -190,11 +129,11 @@ func (t *_TABLE_TYPE[V]) Delete(pfx netip.Prefix) {
 // in both address and prefix length to be found. If pfx exists, the
 // associated value (zero value for Lite) and found=true is returned.
 // If pfx does not exist or pfx is invalid, the zero value for V and
-// found=false is returned.
+// exists=false is returned.
 //
 // For longest-prefix-match (LPM) lookups, use Contains(ip), Lookup(ip),
 // LookupPrefix(pfx) or LookupPrefixLPM(pfx) instead.
-func (t *_TABLE_TYPE[V]) Get(pfx netip.Prefix) (val V, exists bool) {
+func (t *Table[V]) Get(pfx netip.Prefix) (val V, exists bool) {
 	if !pfx.IsValid() {
 		return val, exists
 	}
@@ -210,7 +149,7 @@ func (t *_TABLE_TYPE[V]) Get(pfx netip.Prefix) (val V, exists bool) {
 // DeletePersist is similar to Delete but does not modify the receiver.
 //
 // It performs a copy-on-write delete operation, cloning all nodes touched during
-// deletion and returning a new _TABLE_TYPE reflecting the change.
+// deletion and returning a new Table reflecting the change.
 //
 // If the prefix is invalid or doesn't exist, the original table is
 // returned unchanged.
@@ -220,7 +159,7 @@ func (t *_TABLE_TYPE[V]) Get(pfx netip.Prefix) (val V, exists bool) {
 //
 // Due to cloning overhead this is significantly slower than Delete,
 // typically taking μsec instead of nsec.
-func (t *_TABLE_TYPE[V]) DeletePersist(pfx netip.Prefix) *_TABLE_TYPE[V] {
+func (t *Table[V]) DeletePersist(pfx netip.Prefix) *Table[V] {
 	if !pfx.IsValid() {
 		return t
 	}
@@ -236,7 +175,7 @@ func (t *_TABLE_TYPE[V]) DeletePersist(pfx netip.Prefix) *_TABLE_TYPE[V] {
 	}
 
 	// share size counters; root nodes cloned selectively.
-	pt := &_TABLE_TYPE[V]{
+	pt := &Table[V]{
 		size4: t.size4,
 		size6: t.size6,
 	}
@@ -289,7 +228,7 @@ func (t *_TABLE_TYPE[V]) DeletePersist(pfx netip.Prefix) *_TABLE_TYPE[V] {
 //	| (oldVal, true)  | (newVal, false) | update |
 //	| (oldVal, true)  | (_,      true)  | delete |
 //	------------------------------------- --------
-func (t *_TABLE_TYPE[V]) Modify(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, del bool)) {
+func (t *Table[V]) Modify(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, del bool)) {
 	if !pfx.IsValid() {
 		return
 	}
@@ -306,8 +245,8 @@ func (t *_TABLE_TYPE[V]) Modify(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, de
 }
 
 // ModifyPersist is similar to Modify but the receiver isn't modified and
-// a new *_TABLE_TYPE is returned.
-func (t *_TABLE_TYPE[V]) ModifyPersist(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, del bool)) *_TABLE_TYPE[V] {
+// a new *Table is returned.
+func (t *Table[V]) ModifyPersist(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, del bool)) *Table[V] {
 	if !pfx.IsValid() {
 		return t
 	}
@@ -361,8 +300,11 @@ func (t *_TABLE_TYPE[V]) ModifyPersist(pfx netip.Prefix, cb func(_ V, ok bool) (
 //
 // The iteration can be stopped early by breaking from the range loop.
 // Returns an empty iterator if the prefix is invalid.
-func (t *_TABLE_TYPE[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
+func (t *Table[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
+		if t == nil {
+			return
+		}
 		if !pfx.IsValid() {
 			return
 		}
@@ -390,8 +332,11 @@ func (t *_TABLE_TYPE[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] 
 //
 // The iteration can be stopped early by breaking from the range loop.
 // Returns an empty iterator if the prefix is invalid.
-func (t *_TABLE_TYPE[V]) Subnets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
+func (t *Table[V]) Subnets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
+		if t == nil {
+			return
+		}
 		if !pfx.IsValid() {
 			return
 		}
@@ -415,7 +360,7 @@ func (t *_TABLE_TYPE[V]) Subnets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 //
 // This is useful for containment tests, route validation, or policy checks using prefix
 // semantics without retrieving exact matches.
-func (t *_TABLE_TYPE[V]) OverlapsPrefix(pfx netip.Prefix) bool {
+func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 	if !pfx.IsValid() {
 		return false
 	}
@@ -441,23 +386,23 @@ func (t *_TABLE_TYPE[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 //
 // This is useful for conflict detection, policy enforcement,
 // or validating mutually exclusive routing domains.
-func (t *_TABLE_TYPE[V]) Overlaps(o *_TABLE_TYPE[V]) bool {
+func (t *Table[V]) Overlaps(o *Table[V]) bool {
 	if o == nil {
 		return false
 	}
 	return t.Overlaps4(o) || t.Overlaps6(o)
 }
 
-// Overlaps4 is like [_TABLE_TYPE.Overlaps] but for the v4 routing table only.
-func (t *_TABLE_TYPE[V]) Overlaps4(o *_TABLE_TYPE[V]) bool {
+// Overlaps4 is like [Table.Overlaps] but for the v4 routing table only.
+func (t *Table[V]) Overlaps4(o *Table[V]) bool {
 	if o == nil || t.size4 == 0 || o.size4 == 0 {
 		return false
 	}
 	return t.root4.Overlaps(&o.root4, 0)
 }
 
-// Overlaps6 is like [_TABLE_TYPE.Overlaps] but for the v6 routing table only.
-func (t *_TABLE_TYPE[V]) Overlaps6(o *_TABLE_TYPE[V]) bool {
+// Overlaps6 is like [Table.Overlaps] but for the v6 routing table only.
+func (t *Table[V]) Overlaps6(o *Table[V]) bool {
 	if o == nil || t.size6 == 0 || o.size6 == 0 {
 		return false
 	}
@@ -469,8 +414,8 @@ func (t *_TABLE_TYPE[V]) Overlaps6(o *_TABLE_TYPE[V]) bool {
 // All prefixes and values from the other table (o) are inserted into the receiver.
 // If a duplicate prefix exists in both tables, the value from o replaces the existing entry.
 // This duplicate is shallow-copied by default, but if the value type V implements the
-// Cloner interface, the value is deeply cloned before insertion. See also _TABLE_TYPE.Clone.
-func (t *_TABLE_TYPE[V]) Union(o *_TABLE_TYPE[V]) {
+// Cloner interface, the value is deeply cloned before insertion. See also Table.Clone.
+func (t *Table[V]) Union(o *Table[V]) {
 	if o == nil || o == t || (o.size4 == 0 && o.size6 == 0) {
 		return
 	}
@@ -488,10 +433,10 @@ func (t *_TABLE_TYPE[V]) Union(o *_TABLE_TYPE[V]) {
 
 // UnionPersist is similar to [Union] but the receiver isn't modified.
 //
-// All nodes touched during union are cloned and a new *_TABLE_TYPE is returned.
+// All nodes touched during union are cloned and a new *Table is returned.
 // If o is nil or empty, no nodes are touched and the receiver may be
 // returned unchanged.
-func (t *_TABLE_TYPE[V]) UnionPersist(o *_TABLE_TYPE[V]) *_TABLE_TYPE[V] {
+func (t *Table[V]) UnionPersist(o *Table[V]) *Table[V] {
 	if o == nil || o == t || (o.size4 == 0 && o.size6 == 0) {
 		return t
 	}
@@ -500,8 +445,8 @@ func (t *_TABLE_TYPE[V]) UnionPersist(o *_TABLE_TYPE[V]) *_TABLE_TYPE[V] {
 	// returns nil if V does not implement the Cloner interface.
 	cloneFn := cloneFnFactory[V]()
 
-	// new _TABLE_TYPE with root nodes just copied.
-	pt := &_TABLE_TYPE[V]{
+	// new Table with root nodes just copied.
+	pt := &Table[V]{
 		root4: t.root4,
 		root6: t.root6,
 		//
@@ -529,7 +474,7 @@ func (t *_TABLE_TYPE[V]) UnionPersist(o *_TABLE_TYPE[V]) *_TABLE_TYPE[V] {
 // Equal checks whether two tables are structurally and semantically equal.
 // It ensures both trees (IPv4-based and IPv6-based) have the same sizes and
 // recursively compares their root nodes.
-func (t *_TABLE_TYPE[V]) Equal(o *_TABLE_TYPE[V]) bool {
+func (t *Table[V]) Equal(o *Table[V]) bool {
 	if o == nil || t.size4 != o.size4 || t.size6 != o.size6 {
 		return false
 	}
@@ -543,12 +488,12 @@ func (t *_TABLE_TYPE[V]) Equal(o *_TABLE_TYPE[V]) bool {
 // Clone returns a copy of the routing table.
 // The payload of type V is shallow copied, but if type V implements the [Cloner] interface,
 // the values are cloned.
-func (t *_TABLE_TYPE[V]) Clone() *_TABLE_TYPE[V] {
+func (t *Table[V]) Clone() *Table[V] {
 	if t == nil {
 		return nil
 	}
 
-	c := new(_TABLE_TYPE[V])
+	c := new(Table[V])
 
 	cloneFn := cloneFnFactory[V]()
 
@@ -562,17 +507,17 @@ func (t *_TABLE_TYPE[V]) Clone() *_TABLE_TYPE[V] {
 }
 
 // Size returns the prefix count.
-func (t *_TABLE_TYPE[V]) Size() int {
+func (t *Table[V]) Size() int {
 	return t.size4 + t.size6
 }
 
 // Size4 returns the IPv4 prefix count.
-func (t *_TABLE_TYPE[V]) Size4() int {
+func (t *Table[V]) Size4() int {
 	return t.size4
 }
 
 // Size6 returns the IPv6 prefix count.
-func (t *_TABLE_TYPE[V]) Size6() int {
+func (t *Table[V]) Size6() int {
 	return t.size6
 }
 
@@ -602,22 +547,31 @@ func (t *_TABLE_TYPE[V]) Size6() int {
 //		  pt = pt.DeletePersist(pfx)
 //	  }
 //	}
-func (t *_TABLE_TYPE[V]) All() iter.Seq2[netip.Prefix, V] {
+func (t *Table[V]) All() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
+		if t == nil {
+			return
+		}
 		_ = t.root4.AllRec(stridePath{}, 0, true, yield) && t.root6.AllRec(stridePath{}, 0, false, yield)
 	}
 }
 
-// All4 is like [_TABLE_TYPE.All] but only for the v4 routing table.
-func (t *_TABLE_TYPE[V]) All4() iter.Seq2[netip.Prefix, V] {
+// All4 is like [Table.All] but only for the v4 routing table.
+func (t *Table[V]) All4() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
+		if t == nil {
+			return
+		}
 		_ = t.root4.AllRec(stridePath{}, 0, true, yield)
 	}
 }
 
-// All6 is like [_TABLE_TYPE.All] but only for the v6 routing table.
-func (t *_TABLE_TYPE[V]) All6() iter.Seq2[netip.Prefix, V] {
+// All6 is like [Table.All] but only for the v6 routing table.
+func (t *Table[V]) All6() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
+		if t == nil {
+			return
+		}
 		_ = t.root6.AllRec(stridePath{}, 0, false, yield)
 	}
 }
@@ -639,23 +593,32 @@ func (t *_TABLE_TYPE[V]) All6() iter.Seq2[netip.Prefix, V] {
 // as this would interfere with the internal traversal and may corrupt or
 // prematurely terminate the iteration. If mutation of the table during
 // traversal is required use persistent table methods.
-func (t *_TABLE_TYPE[V]) AllSorted() iter.Seq2[netip.Prefix, V] {
+func (t *Table[V]) AllSorted() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
+		if t == nil {
+			return
+		}
 		_ = t.root4.AllRecSorted(stridePath{}, 0, true, yield) &&
 			t.root6.AllRecSorted(stridePath{}, 0, false, yield)
 	}
 }
 
-// AllSorted4 is like [_TABLE_TYPE.AllSorted] but only for the v4 routing table.
-func (t *_TABLE_TYPE[V]) AllSorted4() iter.Seq2[netip.Prefix, V] {
+// AllSorted4 is like [Table.AllSorted] but only for the v4 routing table.
+func (t *Table[V]) AllSorted4() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
+		if t == nil {
+			return
+		}
 		_ = t.root4.AllRecSorted(stridePath{}, 0, true, yield)
 	}
 }
 
-// AllSorted6 is like [_TABLE_TYPE.AllSorted] but only for the v6 routing table.
-func (t *_TABLE_TYPE[V]) AllSorted6() iter.Seq2[netip.Prefix, V] {
+// AllSorted6 is like [Table.AllSorted] but only for the v6 routing table.
+func (t *Table[V]) AllSorted6() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
+		if t == nil {
+			return
+		}
 		_ = t.root6.AllRecSorted(stridePath{}, 0, false, yield)
 	}
 }
@@ -682,7 +645,7 @@ func (t *_TABLE_TYPE[V]) AllSorted6() iter.Seq2[netip.Prefix, V] {
 //	   ├─ 2000::/3 (V)
 //	   │  └─ 2001:db8::/32 (V)
 //	   └─ fe80::/10 (V)
-func (t *_TABLE_TYPE[V]) Fprint(w io.Writer) error {
+func (t *Table[V]) Fprint(w io.Writer) error {
 	if w == nil {
 		return fmt.Errorf("nil writer")
 	}
@@ -704,7 +667,7 @@ func (t *_TABLE_TYPE[V]) Fprint(w io.Writer) error {
 }
 
 // fprint is the version dependent adapter to fprintRec.
-func (t *_TABLE_TYPE[V]) fprint(w io.Writer, is4 bool) error {
+func (t *Table[V]) fprint(w io.Writer, is4 bool) error {
 	n := t.rootNodeByVersion(is4)
 	if n.IsEmpty() {
 		return nil
@@ -725,8 +688,8 @@ func (t *_TABLE_TYPE[V]) fprint(w io.Writer, is4 bool) error {
 }
 
 // MarshalText implements the [encoding.TextMarshaler] interface,
-// just a wrapper for [_TABLE_TYPE.Fprint].
-func (t *_TABLE_TYPE[V]) MarshalText() ([]byte, error) {
+// just a wrapper for [Table.Fprint].
+func (t *Table[V]) MarshalText() ([]byte, error) {
 	w := new(bytes.Buffer)
 	if err := t.Fprint(w); err != nil {
 		return nil, err
@@ -737,7 +700,7 @@ func (t *_TABLE_TYPE[V]) MarshalText() ([]byte, error) {
 
 // MarshalJSON dumps the table into two sorted lists: for ipv4 and ipv6.
 // Every root and subnet is an array, not a map, because the order matters.
-func (t *_TABLE_TYPE[V]) MarshalJSON() ([]byte, error) {
+func (t *Table[V]) MarshalJSON() ([]byte, error) {
 	if t == nil {
 		return []byte("null"), nil
 	}
@@ -760,7 +723,7 @@ func (t *_TABLE_TYPE[V]) MarshalJSON() ([]byte, error) {
 
 // DumpList4 dumps the ipv4 tree into a list of roots and their subnets.
 // It can be used to analyze the tree or build the text or json serialization.
-func (t *_TABLE_TYPE[V]) DumpList4() []DumpListNode[V] {
+func (t *Table[V]) DumpList4() []DumpListNode[V] {
 	if t == nil {
 		return nil
 	}
@@ -769,7 +732,7 @@ func (t *_TABLE_TYPE[V]) DumpList4() []DumpListNode[V] {
 
 // DumpList6 dumps the ipv6 tree into a list of roots and their subnets.
 // It can be used to analyze the tree or build custom json representation.
-func (t *_TABLE_TYPE[V]) DumpList6() []DumpListNode[V] {
+func (t *Table[V]) DumpList6() []DumpListNode[V] {
 	if t == nil {
 		return nil
 	}
@@ -778,7 +741,7 @@ func (t *_TABLE_TYPE[V]) DumpList6() []DumpListNode[V] {
 
 // dumpListRec, build the data structure rec-descent with the help of directItemsRec.
 // anyNode is nodes.BartNode, nodes.FastNode or nodes.LiteNode
-func (t *_TABLE_TYPE[V]) dumpListRec(anyNode any, parentIdx uint8, path stridePath, depth int, is4 bool) []DumpListNode[V] {
+func (t *Table[V]) dumpListRec(anyNode any, parentIdx uint8, path stridePath, depth int, is4 bool) []DumpListNode[V] {
 	// recursion stop condition
 	if anyNode == nil {
 		return nil
@@ -813,7 +776,7 @@ func (t *_TABLE_TYPE[V]) dumpListRec(anyNode any, parentIdx uint8, path stridePa
 }
 
 // dumpString is just a wrapper for dump.
-func (t *_TABLE_TYPE[V]) dumpString() string {
+func (t *Table[V]) dumpString() string {
 	w := new(strings.Builder)
 	t.dump(w)
 
@@ -821,7 +784,7 @@ func (t *_TABLE_TYPE[V]) dumpString() string {
 }
 
 // dump the table structure and all the nodes to w.
-func (t *_TABLE_TYPE[V]) dump(w io.Writer) {
+func (t *Table[V]) dump(w io.Writer) {
 	if t == nil {
 		return
 	}
