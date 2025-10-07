@@ -184,6 +184,9 @@ func dropSeq2[V any](seq2 iter.Seq2[netip.Prefix, V]) iter.Seq[netip.Prefix] {
 
 // Clone returns a copy of the routing table.
 func (l *Lite) Clone() *Lite {
+	if l == nil {
+		return nil
+	}
 	return &Lite{*l.liteTable.Clone()}
 }
 
@@ -238,16 +241,25 @@ func (l *Lite) UnionPersist(o *Lite) *Lite {
 // 	}
 
 func (l *Lite) All() iter.Seq[netip.Prefix] {
+	if l == nil {
+		return func(func(netip.Prefix) bool) {}
+	}
 	return dropSeq2(l.liteTable.All())
 }
 
 // All4 is like [Lite.All] but only for the v4 routing table.
 func (l *Lite) All4() iter.Seq[netip.Prefix] {
+	if l == nil {
+		return func(func(netip.Prefix) bool) {}
+	}
 	return dropSeq2(l.liteTable.All4())
 }
 
 // All6 is like [Lite.All] but only for the v6 routing table.
 func (l *Lite) All6() iter.Seq[netip.Prefix] {
+	if l == nil {
+		return func(func(netip.Prefix) bool) {}
+	}
 	return dropSeq2(l.liteTable.All6())
 }
 
@@ -269,16 +281,25 @@ func (l *Lite) All6() iter.Seq[netip.Prefix] {
 // prematurely terminate the iteration. If mutation of the table during
 // traversal is required use persistent table methods.
 func (l *Lite) AllSorted() iter.Seq[netip.Prefix] {
+	if l == nil {
+		return func(func(netip.Prefix) bool) {}
+	}
 	return dropSeq2(l.liteTable.AllSorted())
 }
 
 // AllSorted4 is like [Lite.AllSorted] but only for the v4 routing table.
 func (l *Lite) AllSorted4() iter.Seq[netip.Prefix] {
+	if l == nil {
+		return func(func(netip.Prefix) bool) {}
+	}
 	return dropSeq2(l.liteTable.AllSorted4())
 }
 
 // AllSorted6 is like [Lite.AllSorted] but only for the v6 routing table.
 func (l *Lite) AllSorted6() iter.Seq[netip.Prefix] {
+	if l == nil {
+		return func(func(netip.Prefix) bool) {}
+	}
 	return dropSeq2(l.liteTable.AllSorted6())
 }
 
@@ -296,6 +317,9 @@ func (l *Lite) AllSorted6() iter.Seq[netip.Prefix] {
 // The iteration can be stopped early by breaking from the range loop.
 // Returns an empty iterator if the prefix is invalid.
 func (l *Lite) Subnets(pfx netip.Prefix) iter.Seq[netip.Prefix] {
+	if l == nil {
+		return func(func(netip.Prefix) bool) {}
+	}
 	return dropSeq2(l.liteTable.Subnets(pfx))
 }
 
@@ -320,6 +344,9 @@ func (l *Lite) Subnets(pfx netip.Prefix) iter.Seq[netip.Prefix] {
 //	    fmt.Println("Matched covering route:", supernet)
 //	}
 func (l *Lite) Supernets(pfx netip.Prefix) iter.Seq[netip.Prefix] {
+	if l == nil {
+		return func(func(netip.Prefix) bool) {}
+	}
 	return dropSeq2(l.liteTable.Supernets(pfx))
 }
 
@@ -343,6 +370,22 @@ func (l *Lite) Overlaps(o *Lite) bool {
 		return false
 	}
 	return l.liteTable.Overlaps(&o.liteTable)
+}
+
+// Overlaps4 is like [Lite.Overlaps] but for the v4 routing table only.
+func (l *Lite) Overlaps4(o *Lite) bool {
+	if o == nil {
+		return false
+	}
+	return l.liteTable.Overlaps4(&o.liteTable)
+}
+
+// Overlaps6 is like [Lite.Overlaps] but for the v6 routing table only.
+func (l *Lite) Overlaps6(o *Lite) bool {
+	if o == nil {
+		return false
+	}
+	return l.liteTable.Overlaps6(&o.liteTable)
 }
 
 // Equal checks whether two tables are structurally and semantically equal.

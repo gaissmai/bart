@@ -14,18 +14,18 @@
 - `childRef`: 8 bytes (pointer) or 16 bytes (interface value storage)
 - The actual size depends on implementation: 8B for `*node` pointers, 16B for `interface{}` values
 
-### bartNode[V] - Dynamic Sparse Node
+### BartNode[V] - Dynamic Sparse Node
  ```go
-type bartNode[V any] struct {
+type BartNode[V any] struct {
     prefixes sparse.Array256[V]        // 56 + n×sizeof(V)  
     children sparse.Array256[childRef] // 56 + m×sizeof(childRef)
  }
  ```
 **Memory Usage:** **112 bytes + n×sizeof(V) + m×sizeof(childRef)**
  
-### liteNode - Dynamic Sparse, prefixes Bitset-Only Node
+### LiteNode - Dynamic Sparse, prefixes Bitset-Only Node
  ```go
-type liteNode struct {
+type LiteNode struct {
     prefixes bitset.BitSet256           // 32 bytes (presence only)
     children sparse.Array256[childRef]  // 56 + m×sizeof(childRef)
     pfxCount uint16                     // 2 bytes + padding
@@ -33,9 +33,9 @@ type liteNode struct {
  ```
 **Memory Usage:** **96 bytes + m×sizeof(childRef)** (no value storage)
 
-### fastNode[V] - Fixed Array Node
+### FastNode[V] - Fixed Array Node
  ```go
-type fastNode[V any] struct {
+type FastNode[V any] struct {
     prefixes struct {
         bitset.BitSet256
         items [256]*V
@@ -55,9 +55,9 @@ type fastNode[V any] struct {
  
  | Node Type | Base | *Payload | +Children | Total | **Bytes/Prefix** ¹ |
  |-----------|------|----------|----------|-----------|------------------|
- | liteNode | 96 | 0 | 5×16=80 | 176 bytes | **17** |
- | bartNode[int] | 112 | 10×8=80 | 5×16=80 | 272 bytes | **27** |
- | fastNode[int] | 4,168 | 0 | 0 | 4,168 bytes | **417** |
+ | LiteNode | 96 | 0 | 5×16=80 | 176 bytes | **17** |
+ | BartNode[int] | 112 | 10×8=80 | 5×16=80 | 272 bytes | **27** |
+ | FastNode[int] | 4,168 | 0 | 0 | 4,168 bytes | **417** |
  
 ¹ Values assume childRef = 16 bytes and pointer to payload = 8 bytes
 
@@ -126,14 +126,14 @@ The actual payload struct referenced by the pointer is **not included** in these
 - **Performance characteristic**: O(trie_depth) not O(number_of_routes)
 - **IPv6 vs IPv4**: IPv6 inherently ~2× slower due to deeper tree structure
  
-### bartNode[V] & liteNode - Optimized Level Operations
+### BartNode[V] & LiteNode - Optimized Level Operations
 - **Precomputed lookup tables** (`lmp.LookupTbl[idx]`) eliminate search within each level
 - **BitSet256 intersections** via `IntersectionTop()` for instant prefix matching
 - **Rank-based indirection**: Bitset-to-slice mapping uses precomputed Rank masks
 - **Pipeline-friendly**: Only 4 bitset operations (4×uint64) per level, optimized for CPU pipelining
 - **No backtracking**: Traditional longest-prefix-match backtracking replaced with direct table lookups
  
-### fastNode[V] - Direct Array Access per Level
+### FastNode[V] - Direct Array Access per Level
 - **Zero indirection per level**: Direct array indexing `prefixes[idx]` and `children[idx]`
 - **Cache-optimal**: Contiguous memory layout within each level
 - **Performance advantage**: Still ~40% faster per level despite sparse optimizations
