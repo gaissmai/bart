@@ -27,6 +27,8 @@ func TestSparseArrayLen(t *testing.T) {
 		a.InsertAt(i, i)
 	}
 	a.InsertAt(255, 255)
+	a.InsertAt(255, 255)
+	a.InsertAt(255, 255)
 	if c := a.Len(); c != 256 {
 		t.Errorf("Len, expected 256, got %d", c)
 	}
@@ -66,6 +68,8 @@ func TestSparseArrayGet(t *testing.T) {
 		}
 	}
 
+	a.DeleteAt(0)
+	a.DeleteAt(0)
 	a.DeleteAt(0)
 	_, ok := a.Get(0)
 	if ok {
