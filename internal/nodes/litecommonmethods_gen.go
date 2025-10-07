@@ -198,15 +198,13 @@ func (n *LiteNode[V]) InsertPersist(cloneFn CloneFunc[V], pfx netip.Prefix, val 
 	panic("unreachable")
 }
 
-// PurgeAndCompress performs bottom-up compression of the trie by removing
-// empty nodes and converting sparse branches into compressed leaf/fringe nodes.
+// PurgeAndCompress performs bottom-up compression of the trie.
 //
 // The function unwinds the provided stack of parent nodes, checking each level
-// for compression opportunities based on child count and prefix distribution.
+// for compression opportunities based on child and prefix count.
 // It may convert:
-//   - Nodes with a single prefix into leafNode (path compression)
-//   - Nodes at lastOctet with a single prefix into fringeNode
-//   - Empty intermediate nodes are removed entirely
+//   - Nodes with a single prefix into leaf one level above.
+//   - Nodes with a single leaf or fringe into leaf one level above.
 //
 // Parameters:
 //   - stack: Array of parent nodes to process during unwinding
@@ -221,12 +219,12 @@ func (n *LiteNode[V]) PurgeAndCompress(stack []*LiteNode[V], octets []uint8, is4
 		pfxCount := n.PrefixCount()
 		childCount := n.ChildCount()
 
-		switch {
-		case n.IsEmpty():
-			// just delete this empty node from parent
-			parent.DeleteChild(octet)
+		if pfxCount+childCount > 1 {
+			return
+		}
 
-		case pfxCount == 0 && childCount == 1:
+		switch {
+		case childCount == 1:
 			singleAddr, _ := n.Children.FirstSet() // single addr must be first bit set
 			anyKid := n.MustGetChild(singleAddr)
 
@@ -254,7 +252,7 @@ func (n *LiteNode[V]) PurgeAndCompress(stack []*LiteNode[V], octets []uint8, is4
 				parent.Insert(fringePfx, kid.Value, depth)
 			}
 
-		case pfxCount == 1 && childCount == 0:
+		case pfxCount == 1:
 			// just one prefix, delete this node and reinsert the idx as leaf above
 			parent.DeleteChild(octet)
 
