@@ -60,6 +60,60 @@ type fastNode[V any] struct {
  | fastNode[int] | 4,168 | 0 | 0 | 4,168 bytes | **417** |
  
 ¹ Values assume childRef = 16 bytes and pointer to payload = 8 bytes
+
+## Extended Memory Example with Path Compression
+
+### Path-Compressed Child Types
+
+**Note:** In realistic scenarios, the value type `V` is typically a **pointer to a
+payload struct** (e.g., `*RouteInfo`, `*Metadata`).
+The calculations below assume `V = 8 bytes` (pointer size on 64-bit systems).
+The actual payload struct referenced by the pointer is **not included** in these per-node calculations.
+
+**LiteNode:**
+- **LeafNode**: `netip.Prefix` only = **32 bytes** (Value field unused)
+- **FringeNode**: **0 bytes** payload (prefix implicit from position, Value field unused)
+
+**BartNode[V] / FastNode[V]:** (assuming V is a pointer = 8 bytes)
+- **LeafNode[V]**: `Value (8B) + Prefix (32B)` = **40 bytes**
+- **FringeNode[V]**: `Value (8B)` = **8 bytes** (prefix implicit from position)
+
+### Realistic Scenario: Mixed Child Types
+
+**Setup:** Node with 10 prefixes + 5 child nodes + 5 LeafNodes + 5 FringeNodes
+
+**Total prefix items:** 10 (in-node) + 5 (leaves) + 5 (fringes) = **20 prefix items**
+
+| Node Type | Base | Prefixes¹ | Children² | Subtotal | + Leaves³ | + Fringes⁴ | **Bytes/Prefix**⁵ |
+|-----------|------|-----------|-----------|----------|-----------|------------|-------------------|
+| **LiteNode** | 96 B | 0 | 15×16=240 B | 336 B | +160 B | +0 B | **16.8** |
+| **BartNode[V]** | 112 B | 10×8=80 B | 15×16=240 B | 432 B | +200 B | +40 B | **21.6** |
+| **FastNode[V]** | 4,168 B | 0 | 0 | 4,168 B | +200 B | +40 B | **208.4** |
+
+**Notes:**
+1. Prefixes: LiteNode stores no values (0B); BartNode/FastNode store 10×8B pointers to payload structs
+2. Children: 15 total (5 nodes + 5 leaves + 5 fringes), each as `interface{}` = 16 bytes
+3. Leaves: LiteNode stores 5×32B LeafNode (unused Value field), BartNode/FastNode store
+   5×40B LeafNode[V] (with 8B pointer each)
+4. Fringes: LiteNode stores 0B (prefix implicit, unused Value field), BartNode/FastNode store
+   5×8B FringeNode[V] (8B pointer)
+5. Calculated as: `Subtotal / 20` (node itself only, excluding referenced child nodes and external
+   payload structs)
+
+### Memory Efficiency Insights
+
+**LiteNode advantages:**
+- **No value storage** in LeafNode: saves 8 bytes per leaf (32B vs 40B)
+- **No value storage** in FringeNode: saves 8 bytes per fringe (0B vs 8B)
+- **No in-node prefix values**: saves 80 bytes for 10 prefixes vs BartNode
+- **Total savings:** ~22% smaller than BartNode for typical routing tables
+
+**Path compression benefits:**
+- **LeafNode**: Eliminates intermediate nodes for isolated prefixes
+- **FringeNode**: Compresses /8, /16, /24 boundaries without node overhead
+- **Reduced trie depth**: Fewer levels = fewer lookups per route
+
+**Important:** The actual payload structs (e.g., routing information, metadata) are stored externally and referenced by the 8-byte pointers. Their sizes are not included in the per-node calculations above, as they are shared or application-specific.
  
 ## Lookup Performance Deep Dive
  
