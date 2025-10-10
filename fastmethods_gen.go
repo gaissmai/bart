@@ -129,7 +129,7 @@ func (t *Fast[V]) Delete(pfx netip.Prefix) {
 // in both address and prefix length to be found. If pfx exists, the
 // associated value (zero value for Lite) and found=true is returned.
 // If pfx does not exist or pfx is invalid, the zero value for V and
-// found=false is returned.
+// exists=false is returned.
 //
 // For longest-prefix-match (LPM) lookups, use Contains(ip), Lookup(ip),
 // LookupPrefix(pfx) or LookupPrefixLPM(pfx) instead.

@@ -46,7 +46,7 @@ func (t *goldTable[V]) delete(pfx netip.Prefix) (exists bool) {
 		}
 	}
 	*t = c
-	return
+	return exists
 }
 
 func (t *goldTable[V]) insertMany(pfxs []goldTableItem[V]) {

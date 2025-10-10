@@ -147,6 +147,138 @@ func TestLiteInvalid(t *testing.T) {
 	noPanic(t, "UnionPersist", func() { lite1.UnionPersist(lite2) })
 }
 
+func TestLiteTableNil(t *testing.T) {
+	t.Parallel()
+
+	ip4 := mpa("127.0.0.1")
+	ip6 := mpa("::1")
+
+	pfx4 := mpp("127.0.0.0/8")
+	pfx6 := mpp("::1/128")
+
+	bart2 := new(liteTable[any])
+	bart2.Insert(pfx4, nil)
+	bart2.Insert(pfx6, nil)
+
+	var bart1 *liteTable[any] = nil
+
+	t.Run("mustPanic", func(t *testing.T) {
+		t.Parallel()
+
+		mustPanic(t, "sizeUpdate", func() { bart1.sizeUpdate(true, 1) })
+		mustPanic(t, "sizeUpdate", func() { bart1.sizeUpdate(false, 1) })
+		mustPanic(t, "rootNodeByVersion", func() { bart1.rootNodeByVersion(true) })
+		mustPanic(t, "rootNodeByVersion", func() { bart1.rootNodeByVersion(false) })
+		mustPanic(t, "fprint", func() { bart1.fprint(nil, true) })
+		mustPanic(t, "fprint", func() { bart1.fprint(nil, false) })
+
+		mustPanic(t, "Size", func() { bart1.Size() })
+		mustPanic(t, "Size4", func() { bart1.Size4() })
+		mustPanic(t, "Size6", func() { bart1.Size6() })
+
+		mustPanic(t, "Get", func() { bart1.Get(pfx4) })
+		mustPanic(t, "Insert", func() { bart1.Insert(pfx4, nil) })
+		mustPanic(t, "InsertPersist", func() { bart1.InsertPersist(pfx4, nil) })
+		mustPanic(t, "Delete", func() { bart1.Delete(pfx4) })
+		mustPanic(t, "DeletePersist", func() { bart1.DeletePersist(pfx4) })
+		mustPanic(t, "Modify", func() { bart1.Modify(pfx4, nil) })
+		mustPanic(t, "ModifyPersist", func() { bart1.Modify(pfx4, nil) })
+		mustPanic(t, "Contains", func() { bart1.Contains(ip4) })
+		mustPanic(t, "Contains", func() { bart1.Contains(ip6) })
+		mustPanic(t, "lookupPrefixLPM", func() { bart1.lookupPrefixLPM(pfx4, true) })
+		mustPanic(t, "lookupPrefixLPM", func() { bart1.lookupPrefixLPM(pfx6, false) })
+		mustPanic(t, "Union", func() { bart1.Union(bart2) })
+		mustPanic(t, "UnionPersist", func() { bart1.UnionPersist(bart2) })
+	})
+
+	t.Run("noPanic", func(t *testing.T) {
+		t.Parallel()
+
+		noPanic(t, "Overlaps", func() { bart1.Overlaps(nil) })
+		noPanic(t, "Overlaps4", func() { bart1.Overlaps4(nil) })
+		noPanic(t, "Overlaps6", func() { bart1.Overlaps6(nil) })
+
+		noPanic(t, "Overlaps", func() { bart2.Overlaps(bart2) })
+		noPanic(t, "Overlaps4", func() { bart2.Overlaps4(bart2) })
+		noPanic(t, "Overlaps6", func() { bart2.Overlaps6(bart2) })
+
+		mustPanic(t, "Overlaps", func() { bart1.Overlaps(bart2) })
+		mustPanic(t, "Overlaps4", func() { bart1.Overlaps4(bart2) })
+		mustPanic(t, "Overlaps6", func() { bart1.Overlaps6(bart2) })
+
+		mustPanic(t, "Equal", func() { bart1.Equal(bart2) })
+		noPanic(t, "Equal", func() { bart1.Equal(bart1) })
+		noPanic(t, "Equal", func() { bart2.Equal(bart2) })
+
+		noPanic(t, "dump", func() { bart1.dump(nil) })
+		noPanic(t, "dumpString", func() { bart1.dumpString() })
+		noPanic(t, "Clone", func() { bart1.Clone() })
+		noPanic(t, "DumpList4", func() { bart1.DumpList4() })
+		noPanic(t, "DumpList6", func() { bart1.DumpList6() })
+		noPanic(t, "Fprint", func() { bart1.Fprint(nil) })
+		noPanic(t, "MarshalJSON", func() { _, _ = bart1.MarshalJSON() })
+		noPanic(t, "MarshalText", func() { _, _ = bart1.MarshalText() })
+	})
+
+	t.Run("noPanicRangeOverFunc", func(t *testing.T) {
+		t.Parallel()
+
+		noPanicRangeOverFunc[any](t, "All", bart1.All)
+		noPanicRangeOverFunc[any](t, "All4", bart1.All4)
+		noPanicRangeOverFunc[any](t, "All6", bart1.All6)
+		noPanicRangeOverFunc[any](t, "AllSorted", bart1.AllSorted)
+		noPanicRangeOverFunc[any](t, "AllSorted4", bart1.AllSorted4)
+		noPanicRangeOverFunc[any](t, "AllSorted6", bart1.AllSorted6)
+		noPanicRangeOverFunc[any](t, "Subnets", bart1.Subnets)
+		noPanicRangeOverFunc[any](t, "Supernets", bart1.Supernets)
+	})
+}
+
+func TestLiteTableInvalid(t *testing.T) {
+	t.Parallel()
+
+	bart1 := new(liteTable[any])
+	bart2 := new(liteTable[any])
+
+	var zeroIP netip.Addr
+	var zeroPfx netip.Prefix
+
+	noPanic(t, "All", func() { bart1.All() })
+	noPanic(t, "All4", func() { bart1.All4() })
+	noPanic(t, "All6", func() { bart1.All6() })
+	noPanic(t, "AllSorted", func() { bart1.AllSorted() })
+	noPanic(t, "AllSorted4", func() { bart1.AllSorted4() })
+	noPanic(t, "AllSorted6", func() { bart1.AllSorted6() })
+	noPanic(t, "Clone", func() { bart1.Clone() })
+	noPanic(t, "Contains", func() { bart1.Contains(zeroIP) })
+	noPanic(t, "Delete", func() { bart1.Delete(zeroPfx) })
+	noPanic(t, "DeletePersist", func() { bart1.DeletePersist(zeroPfx) })
+	noPanic(t, "DumpList4", func() { bart1.DumpList4() })
+	noPanic(t, "DumpList6", func() { bart1.DumpList6() })
+	noPanic(t, "Equal", func() { bart1.Equal(bart2) })
+	noPanic(t, "Fprint", func() { bart1.Fprint(nil) })
+	noPanic(t, "Get", func() { bart1.Get(zeroPfx) })
+	noPanic(t, "Insert", func() { bart1.Insert(zeroPfx, nil) })
+	noPanic(t, "InsertPersist", func() { bart1.InsertPersist(zeroPfx, nil) })
+	noPanic(t, "LookupPrefixLPM", func() { bart1.lookupPrefixLPM(zeroPfx, true) })
+	noPanic(t, "LookupPrefixLPM", func() { bart1.lookupPrefixLPM(zeroPfx, false) })
+	noPanic(t, "MarshalJSON", func() { _, _ = bart1.MarshalJSON() })
+	noPanic(t, "MarshalText", func() { _, _ = bart1.MarshalText() })
+	noPanic(t, "Modify", func() { bart1.Modify(zeroPfx, nil) })
+	noPanic(t, "ModifyPersist", func() { bart1.ModifyPersist(zeroPfx, nil) })
+	noPanic(t, "Overlaps", func() { bart1.Overlaps(bart2) })
+	noPanic(t, "Overlaps4", func() { bart1.Overlaps4(bart2) })
+	noPanic(t, "Overlaps6", func() { bart1.Overlaps6(bart2) })
+	noPanic(t, "OverlapsPrefix", func() { bart1.OverlapsPrefix(zeroPfx) })
+	noPanic(t, "Size", func() { bart1.Size() })
+	noPanic(t, "Size4", func() { bart1.Size4() })
+	noPanic(t, "Size6", func() { bart1.Size6() })
+	noPanic(t, "Subnets", func() { bart1.Subnets(zeroPfx) })
+	noPanic(t, "Supernets", func() { bart1.Supernets(zeroPfx) })
+	noPanic(t, "Union", func() { bart1.Union(bart2) })
+	noPanic(t, "UnionPersist", func() { bart1.UnionPersist(bart2) })
+}
+
 func TestLiteContainsCompare(t *testing.T) {
 	// Create large route tables repeatedly, and compare Lite's
 	// behavior to a naive and slow but correct implementation.
@@ -712,7 +844,7 @@ func TestLiteModifySemantics(t *testing.T) {
 		}
 
 		if !slices.Equal(collect, tt.finalData) {
-			t.Fatalf("[%s] final table not equal expectes", tt.name)
+			t.Fatalf("[%s] final table not equal expected", tt.name)
 		}
 	}
 }
@@ -766,7 +898,7 @@ func TestLiteModifyPersistSemantics(t *testing.T) {
 		}
 
 		if !slices.Equal(collect, tt.finalData) {
-			t.Fatalf("[%s] final table not equal expectes", tt.name)
+			t.Fatalf("[%s] final table not equal expected", tt.name)
 		}
 	}
 }
