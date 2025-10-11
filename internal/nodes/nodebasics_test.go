@@ -11,6 +11,8 @@ import (
 	"github.com/gaissmai/bart/internal/art"
 )
 
+// helpers
+
 // cloneFnFactory returns a CloneFunc.
 // If V implements Cloner[V], the returned function should perform
 // a deep copy using Clone(), otherwise it returns nil.
@@ -41,6 +43,75 @@ var mpp = func(s string) netip.Prefix {
 		return pfx
 	}
 	panic(fmt.Sprintf("%s is not canonicalized as %s", s, pfx.Masked()))
+}
+
+func TestLastOctetPlusOneAndLastBits(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		pfx       netip.Prefix
+		wantDepth int
+		wantBits  uint8
+	}{
+		{
+			pfx:       mpp("0.0.0.0/0"),
+			wantDepth: 0,
+			wantBits:  0,
+		},
+		{
+			pfx:       mpp("0.0.0.0/32"),
+			wantDepth: 4,
+			wantBits:  0,
+		},
+		{
+			pfx:       mpp("10.0.0.0/7"),
+			wantDepth: 0,
+			wantBits:  7,
+		},
+		{
+			pfx:       mpp("10.20.0.0/14"),
+			wantDepth: 1,
+			wantBits:  6,
+		},
+		{
+			pfx:       mpp("10.20.30.0/24"),
+			wantDepth: 3,
+			wantBits:  0,
+		},
+		{
+			pfx:       mpp("10.20.30.40/31"),
+			wantDepth: 3,
+			wantBits:  7,
+		},
+		//
+		{
+			pfx:       mpp("::/0"),
+			wantDepth: 0,
+			wantBits:  0,
+		},
+		{
+			pfx:       mpp("::/128"),
+			wantDepth: 16,
+			wantBits:  0,
+		},
+		{
+			pfx:       mpp("2001:db8::/31"),
+			wantDepth: 3,
+			wantBits:  7,
+		},
+	}
+
+	for _, tc := range tests {
+		lastOctetPlusOne, gotBits := LastOctetPlusOneAndLastBits(tc.pfx)
+		if lastOctetPlusOne != tc.wantDepth {
+			t.Errorf("LastOctetPlusOneAndLastBits(%d), lastOctetPlusOne got: %d, want: %d",
+				tc.pfx.Bits(), lastOctetPlusOne, tc.wantDepth)
+		}
+		if gotBits != tc.wantBits {
+			t.Errorf("LastOctetPlusOneAndLastBits(%d), lastBits got: %d, want: %d",
+				tc.pfx.Bits(), gotBits, tc.wantBits)
+		}
+	}
 }
 
 func TestNodeType_String(t *testing.T) {

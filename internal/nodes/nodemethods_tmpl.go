@@ -1,20 +1,55 @@
-// Code generated from file "commonmethods_tmpl.go"; DO NOT EDIT.
+// REPLACE with generate hint
 
 // Copyright (c) 2025 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
+//go:generate ../../scripts/generate-node-methods.sh
+//go:build generate
+
 package nodes
+
+// ### GENERATE DELETE START ###
+
+// stub code for generator types and methods
+// useful for gopls during development, deleted during go generate
 
 import (
 	"fmt"
 	"io"
+	"iter"
 	"net/netip"
 	"slices"
 	"strings"
 
 	"github.com/gaissmai/bart/internal/allot"
 	"github.com/gaissmai/bart/internal/art"
+	"github.com/gaissmai/bart/internal/bitset"
 )
+
+type _NODE_TYPE[V any] struct {
+	Prefixes struct{ bitset.BitSet256 }
+	Children struct{ bitset.BitSet256 }
+}
+
+func (n *_NODE_TYPE[V]) IsEmpty() (_ bool)                         { return }
+func (n *_NODE_TYPE[V]) PrefixCount() (_ int)                      { return }
+func (n *_NODE_TYPE[V]) ChildCount() (_ int)                       { return }
+func (n *_NODE_TYPE[V]) MustGetPrefix(uint8) (_ V)                 { return }
+func (n *_NODE_TYPE[V]) MustGetChild(uint8) (_ any)                { return }
+func (n *_NODE_TYPE[V]) InsertPrefix(uint8, V) (_ bool)            { return }
+func (n *_NODE_TYPE[V]) DeletePrefix(uint8) (_ bool)               { return }
+func (n *_NODE_TYPE[V]) GetChild(uint8) (_ any, _ bool)            { return }
+func (n *_NODE_TYPE[V]) GetPrefix(uint8) (_ V, _ bool)             { return }
+func (n *_NODE_TYPE[V]) InsertChild(uint8, any) (_ bool)           { return }
+func (n *_NODE_TYPE[V]) DeleteChild(uint8) (_ bool)                { return }
+func (n *_NODE_TYPE[V]) CloneRec(CloneFunc[V]) (_ *_NODE_TYPE[V])  { return }
+func (n *_NODE_TYPE[V]) CloneFlat(CloneFunc[V]) (_ *_NODE_TYPE[V]) { return }
+func (n *_NODE_TYPE[V]) AllIndices() (seq2 iter.Seq2[uint8, V])    { return }
+func (n *_NODE_TYPE[V]) AllChildren() (seq2 iter.Seq2[uint8, any]) { return }
+func (n *_NODE_TYPE[V]) Contains(uint8) (_ bool)                   { return }
+func (n *_NODE_TYPE[V]) LookupIdx(uint8) (_ uint8, _ V, _ bool)    { return }
+
+// ### GENERATE DELETE END ###
 
 // Insert inserts a network prefix and its associated value into the
 // trie starting at the specified byte depth.
@@ -30,7 +65,7 @@ import (
 //   - depth: The current depth in the trie (0-based byte index)
 //
 // Returns true if a prefix already existed and was updated, false for new insertions.
-func (n *FastNode[V]) Insert(pfx netip.Prefix, val V, depth int) (exists bool) {
+func (n *_NODE_TYPE[V]) Insert(pfx netip.Prefix, val V, depth int) (exists bool) {
 	ip := pfx.Addr() // the pfx must be in canonical form
 	octets := ip.AsSlice()
 	lastOctetPlusOne, lastBits := LastOctetPlusOneAndLastBits(pfx)
@@ -59,7 +94,7 @@ func (n *FastNode[V]) Insert(pfx netip.Prefix, val V, depth int) (exists bool) {
 
 		// kid is node or leaf at addr
 		switch kid := kid.(type) {
-		case *FastNode[V]:
+		case *_NODE_TYPE[V]:
 			n = kid // descend down to next trie level
 
 		case *LeafNode[V]:
@@ -75,7 +110,7 @@ func (n *FastNode[V]) Insert(pfx netip.Prefix, val V, depth int) (exists bool) {
 			// push the leaf down
 			// insert new child at current leaf position (addr)
 			// descend down, replace n with new child
-			newNode := new(FastNode[V])
+			newNode := new(_NODE_TYPE[V])
 			newNode.Insert(kid.Prefix, kid.Value, depth+1)
 
 			n.InsertChild(octet, newNode)
@@ -94,7 +129,7 @@ func (n *FastNode[V]) Insert(pfx netip.Prefix, val V, depth int) (exists bool) {
 			// push the fringe down, it becomes a default route (idx=1)
 			// insert new child at current leaf position (addr)
 			// descend down, replace n with new child
-			newNode := new(FastNode[V])
+			newNode := new(_NODE_TYPE[V])
 			newNode.InsertPrefix(1, kid.Value)
 
 			n.InsertChild(octet, newNode)
@@ -110,7 +145,7 @@ func (n *FastNode[V]) Insert(pfx netip.Prefix, val V, depth int) (exists bool) {
 // InsertPersist is similar to insert but the receiver isn't modified.
 // Assumes the caller has pre-cloned the root (COW). It clones the
 // internal nodes along the descent path before mutating them.
-func (n *FastNode[V]) InsertPersist(cloneFn CloneFunc[V], pfx netip.Prefix, val V, depth int) (exists bool) {
+func (n *_NODE_TYPE[V]) InsertPersist(cloneFn CloneFunc[V], pfx netip.Prefix, val V, depth int) (exists bool) {
 	ip := pfx.Addr() // the pfx must be in canonical form
 	octets := ip.AsSlice()
 	lastOctetPlusOne, lastBits := LastOctetPlusOneAndLastBits(pfx)
@@ -139,7 +174,7 @@ func (n *FastNode[V]) InsertPersist(cloneFn CloneFunc[V], pfx netip.Prefix, val 
 
 		// kid is node or leaf at addr
 		switch kid := kid.(type) {
-		case *FastNode[V]:
+		case *_NODE_TYPE[V]:
 			// clone the traversed path
 
 			// kid points now to cloned kid
@@ -164,7 +199,7 @@ func (n *FastNode[V]) InsertPersist(cloneFn CloneFunc[V], pfx netip.Prefix, val 
 			// push the leaf down
 			// insert new child at current leaf position (addr)
 			// descend down, replace n with new child
-			newNode := new(FastNode[V])
+			newNode := new(_NODE_TYPE[V])
 			newNode.Insert(kid.Prefix, kid.Value, depth+1)
 
 			n.InsertChild(octet, newNode)
@@ -183,7 +218,7 @@ func (n *FastNode[V]) InsertPersist(cloneFn CloneFunc[V], pfx netip.Prefix, val 
 			// push the fringe down, it becomes a default route (idx=1)
 			// insert new child at current leaf position (addr)
 			// descend down, replace n with new child
-			newNode := new(FastNode[V])
+			newNode := new(_NODE_TYPE[V])
 			newNode.InsertPrefix(1, kid.Value)
 
 			n.InsertChild(octet, newNode)
@@ -210,7 +245,7 @@ func (n *FastNode[V]) InsertPersist(cloneFn CloneFunc[V], pfx netip.Prefix, val 
 //   - stack: Array of parent nodes to process during unwinding
 //   - octets: The path of octets taken to reach the current position
 //   - is4: True for IPv4 processing, false for IPv6
-func (n *FastNode[V]) PurgeAndCompress(stack []*FastNode[V], octets []uint8, is4 bool) {
+func (n *_NODE_TYPE[V]) PurgeAndCompress(stack []*_NODE_TYPE[V], octets []uint8, is4 bool) {
 	// unwind the stack
 	for depth := len(stack) - 1; depth >= 0; depth-- {
 		parent := stack[depth]
@@ -229,7 +264,7 @@ func (n *FastNode[V]) PurgeAndCompress(stack []*FastNode[V], octets []uint8, is4
 			anyKid := n.MustGetChild(singleAddr)
 
 			switch kid := anyKid.(type) {
-			case *FastNode[V]:
+			case *_NODE_TYPE[V]:
 				// fast exit, we are at an intermediate path node
 				// no further delete/compress upwards the stack is possible
 				return
@@ -278,7 +313,7 @@ func (n *FastNode[V]) PurgeAndCompress(stack []*FastNode[V], octets []uint8, is4
 
 // Delete deletes the prefix and returns true if the prefix existed,
 // or false otherwise. The prefix must be in canonical form.
-func (n *FastNode[V]) Delete(pfx netip.Prefix) (exists bool) {
+func (n *_NODE_TYPE[V]) Delete(pfx netip.Prefix) (exists bool) {
 	// invariant, prefix must be masked
 
 	// values derived from pfx
@@ -289,7 +324,7 @@ func (n *FastNode[V]) Delete(pfx netip.Prefix) (exists bool) {
 
 	// record the nodes on the path to the deleted node, needed to purge
 	// and/or path compress nodes after the deletion of a prefix
-	stack := [MaxTreeDepth]*FastNode[V]{}
+	stack := [MaxTreeDepth]*_NODE_TYPE[V]{}
 
 	// find the trie node
 	for depth, octet := range octets {
@@ -319,7 +354,7 @@ func (n *FastNode[V]) Delete(pfx netip.Prefix) (exists bool) {
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
-		case *FastNode[V]:
+		case *_NODE_TYPE[V]:
 			n = kid // descend down to next trie level
 
 		case *FringeNode[V]:
@@ -361,7 +396,7 @@ func (n *FastNode[V]) Delete(pfx netip.Prefix) (exists bool) {
 // DeletePersist is similar to delete but does not mutate the original trie.
 // Assumes the caller has pre-cloned the root (COW). It clones the
 // internal nodes along the descent path before mutating them.
-func (n *FastNode[V]) DeletePersist(cloneFn CloneFunc[V], pfx netip.Prefix) (exists bool) {
+func (n *_NODE_TYPE[V]) DeletePersist(cloneFn CloneFunc[V], pfx netip.Prefix) (exists bool) {
 	ip := pfx.Addr() // the pfx must be in canonical form
 	is4 := ip.Is4()
 	octets := ip.AsSlice()
@@ -369,7 +404,7 @@ func (n *FastNode[V]) DeletePersist(cloneFn CloneFunc[V], pfx netip.Prefix) (exi
 
 	// Stack to keep track of cloned nodes along the path,
 	// needed for purge and path compression after delete.
-	stack := [MaxTreeDepth]*FastNode[V]{}
+	stack := [MaxTreeDepth]*_NODE_TYPE[V]{}
 
 	// Traverse the trie to locate the prefix to delete.
 	for depth, octet := range octets {
@@ -400,7 +435,7 @@ func (n *FastNode[V]) DeletePersist(cloneFn CloneFunc[V], pfx netip.Prefix) (exi
 		kid := n.MustGetChild(addr)
 
 		switch kid := kid.(type) {
-		case *FastNode[V]:
+		case *_NODE_TYPE[V]:
 			// Clone the internal node for copy-on-write.
 			kid = kid.CloneFlat(cloneFn)
 
@@ -461,7 +496,7 @@ func (n *FastNode[V]) DeletePersist(cloneFn CloneFunc[V], pfx netip.Prefix) (exi
 // Returns:
 //   - val: The value associated with the prefix (zero value if not found)
 //   - exists: True if the prefix was found, false otherwise
-func (n *FastNode[V]) Get(pfx netip.Prefix) (val V, exists bool) {
+func (n *_NODE_TYPE[V]) Get(pfx netip.Prefix) (val V, exists bool) {
 	// invariant, prefix must be masked
 
 	// values derived from pfx
@@ -482,7 +517,7 @@ func (n *FastNode[V]) Get(pfx netip.Prefix) (val V, exists bool) {
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kidAny.(type) {
-		case *FastNode[V]:
+		case *_NODE_TYPE[V]:
 			n = kid // descend down to next trie level
 
 		case *FringeNode[V]:
@@ -521,7 +556,7 @@ func (n *FastNode[V]) Get(pfx netip.Prefix) (val V, exists bool) {
 //
 // Returns:
 //   - delta: Size change (-1 for delete, 0 for update/noop, +1 for insert)
-func (n *FastNode[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del bool)) (delta int) {
+func (n *_NODE_TYPE[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, del bool)) (delta int) {
 	var zero V
 
 	ip := pfx.Addr()
@@ -531,7 +566,7 @@ func (n *FastNode[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, 
 
 	// record the nodes on the path to the deleted node, needed to purge
 	// and/or path compress nodes after the deletion of a prefix
-	stack := [MaxTreeDepth]*FastNode[V]{}
+	stack := [MaxTreeDepth]*_NODE_TYPE[V]{}
 
 	// find the proper trie node to update prefix
 	for depth, octet := range octets {
@@ -598,7 +633,7 @@ func (n *FastNode[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, 
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
-		case *FastNode[V]:
+		case *_NODE_TYPE[V]:
 			n = kid // descend down to next trie level
 			continue
 
@@ -631,7 +666,7 @@ func (n *FastNode[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, 
 
 			// create new node
 			// insert new child at current leaf position (octet)
-			newNode := new(FastNode[V])
+			newNode := new(_NODE_TYPE[V])
 			n.InsertChild(octet, newNode)
 
 			// push the leaf down
@@ -667,7 +702,7 @@ func (n *FastNode[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, 
 
 			// create new node
 			// insert new child at current leaf position (octet)
-			newNode := new(FastNode[V])
+			newNode := new(_NODE_TYPE[V])
 			n.InsertChild(octet, newNode)
 
 			// push the fringe down, it becomes a default route (idx=1)
@@ -692,7 +727,7 @@ func (n *FastNode[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, 
 //
 // The comparison handles different node types (internal nodes, leafNodes, fringeNodes)
 // and uses the equal function for value comparisons to support custom equality logic.
-func (n *FastNode[V]) EqualRec(o *FastNode[V]) bool {
+func (n *_NODE_TYPE[V]) EqualRec(o *_NODE_TYPE[V]) bool {
 	if n == nil || o == nil {
 		return n == o
 	}
@@ -719,9 +754,9 @@ func (n *FastNode[V]) EqualRec(o *FastNode[V]) bool {
 		oKid := o.MustGetChild(addr) // mustGet is ok, bitsets are equal
 
 		switch nKid := nKid.(type) {
-		case *FastNode[V]:
+		case *_NODE_TYPE[V]:
 			// oKid must also be a node
-			oKid, ok := oKid.(*FastNode[V])
+			oKid, ok := oKid.(*_NODE_TYPE[V])
 			if !ok {
 				return false
 			}
@@ -777,7 +812,7 @@ func (n *FastNode[V]) EqualRec(o *FastNode[V]) bool {
 // subnodes). The path slice and depth together represent the byte-wise path
 // from the root to the current node; depth is incremented for each recursion.
 // The is4 flag controls IPv4/IPv6 formatting used by dump.
-func (n *FastNode[V]) DumpRec(w io.Writer, path StridePath, depth int, is4 bool, printVals bool) {
+func (n *_NODE_TYPE[V]) DumpRec(w io.Writer, path StridePath, depth int, is4 bool, printVals bool) {
 	if n == nil || n.IsEmpty() {
 		return
 	}
@@ -787,7 +822,7 @@ func (n *FastNode[V]) DumpRec(w io.Writer, path StridePath, depth int, is4 bool,
 
 	// node may have children, rec-descent down
 	for addr, child := range n.AllChildren() {
-		if kid, ok := child.(*FastNode[V]); ok {
+		if kid, ok := child.(*_NODE_TYPE[V]); ok {
 			path[depth] = addr
 			kid.DumpRec(w, path, depth+1, is4, printVals)
 		}
@@ -798,7 +833,7 @@ func (n *FastNode[V]) DumpRec(w io.Writer, path StridePath, depth int, is4 bool,
 // It prints the node type, depth, formatted path (IPv4 vs IPv6 controlled by `is4`),
 // and bit count, followed by any stored prefixes (and their values when applicable),
 // the set of child octets, and any path-compressed leaves or fringe entries.
-func (n *FastNode[V]) Dump(w io.Writer, path StridePath, depth int, is4 bool, printVals bool) {
+func (n *_NODE_TYPE[V]) Dump(w io.Writer, path StridePath, depth int, is4 bool, printVals bool) {
 	bits := depth * strideLen
 	indent := strings.Repeat(".", depth)
 
@@ -849,7 +884,7 @@ func (n *FastNode[V]) Dump(w io.Writer, path StridePath, depth int, is4 bool, pr
 			allAddrs = append(allAddrs, addr)
 
 			switch child.(type) {
-			case *FastNode[V]:
+			case *_NODE_TYPE[V]:
 				childAddrs = append(childAddrs, addr)
 				continue
 
@@ -928,7 +963,7 @@ func (n *FastNode[V]) Dump(w io.Writer, path StridePath, depth int, is4 bool, pr
 //   - printVals: Whether to include values in the dump output
 //
 // Returns a formatted string representation of the target node or an error message.
-func (n *FastNode[V]) DumpString(octets []uint8, depth int, is4 bool, printVals bool) string {
+func (n *_NODE_TYPE[V]) DumpString(octets []uint8, depth int, is4 bool, printVals bool) string {
 	path := StridePath{}
 	copy(path[:], octets)
 
@@ -939,9 +974,9 @@ func (n *FastNode[V]) DumpString(octets []uint8, depth int, is4 bool, printVals 
 			return fmt.Sprintf("ERROR: kid for %v[%d] is NOT set in node\n", octets, i)
 		}
 
-		kid, ok := anyKid.(*FastNode[V])
+		kid, ok := anyKid.(*_NODE_TYPE[V])
 		if !ok {
-			return fmt.Sprintf("ERROR: kid for %v[%d] is NO %s\n", octets, i, "FastNode[V]")
+			return fmt.Sprintf("ERROR: kid for %v[%d] is NO %s\n", octets, i, "_NODE_TYPE[V]")
 		}
 
 		// traverse
@@ -964,7 +999,7 @@ func (n *FastNode[V]) DumpString(octets []uint8, depth int, is4 bool, printVals 
 //   - pathNode: has subnodes only (no prefixes, leaves, or fringes)
 //
 // The order of these checks is significant to ensure the correct classification.
-func (n *FastNode[V]) hasType() nodeType {
+func (n *_NODE_TYPE[V]) hasType() nodeType {
 	s := n.Stats()
 
 	// the order is important
@@ -989,13 +1024,13 @@ func (n *FastNode[V]) hasType() nodeType {
 // and a classification of each child into nodes, leaves, or fringes.
 // It inspects only the direct children of n (not the whole subtree).
 // Panics if a child has an unexpected concrete type.
-func (n *FastNode[V]) Stats() (s StatsT) {
+func (n *_NODE_TYPE[V]) Stats() (s StatsT) {
 	s.Pfxs = n.PrefixCount()
 	s.Childs = n.ChildCount()
 
 	for _, child := range n.AllChildren() {
 		switch child.(type) {
-		case *FastNode[V]:
+		case *_NODE_TYPE[V]:
 			s.Nodes++
 
 		case *FringeNode[V]:
@@ -1019,7 +1054,7 @@ func (n *FastNode[V]) Stats() (s StatsT) {
 // subtree. If n is nil or empty, a zeroed stats is returned. The returned
 // stats.nodes includes the current node. The function will panic if a child
 // has an unexpected concrete type.
-func (n *FastNode[V]) StatsRec() (s StatsT) {
+func (n *_NODE_TYPE[V]) StatsRec() (s StatsT) {
 	if n == nil || n.IsEmpty() {
 		return s
 	}
@@ -1032,7 +1067,7 @@ func (n *FastNode[V]) StatsRec() (s StatsT) {
 
 	for _, child := range n.AllChildren() {
 		switch kid := child.(type) {
-		case *FastNode[V]:
+		case *_NODE_TYPE[V]:
 			// rec-descent
 			rs := kid.StatsRec()
 
@@ -1059,7 +1094,7 @@ func (n *FastNode[V]) StatsRec() (s StatsT) {
 // FprintRec recursively prints a hierarchical CIDR tree representation
 // starting from this node to the provided writer. The output shows the
 // routing table structure in human-readable format for debugging and analysis.
-func (n *FastNode[V]) FprintRec(w io.Writer, parent TrieItem[V], pad string, printVals bool) error {
+func (n *_NODE_TYPE[V]) FprintRec(w io.Writer, parent TrieItem[V], pad string, printVals bool) error {
 	// recursion stop condition
 	if n == nil || n.IsEmpty() {
 		return nil
@@ -1099,7 +1134,7 @@ func (n *FastNode[V]) FprintRec(w io.Writer, parent TrieItem[V], pad string, pri
 		}
 
 		// rec-descent with this item as parent
-		nextNode, _ := item.Node.(*FastNode[V])
+		nextNode, _ := item.Node.(*_NODE_TYPE[V])
 		if err = nextNode.FprintRec(w, item, pad+space, printVals); err != nil {
 			return err
 		}
@@ -1113,7 +1148,7 @@ func (n *FastNode[V]) FprintRec(w io.Writer, parent TrieItem[V], pad string, pri
 // by heart to understand this function!
 //
 // See the  artlookup.pdf paper in the doc folder, the baseIndex function is the key.
-func (n *FastNode[V]) DirectItemsRec(parentIdx uint8, path StridePath, depth int, is4 bool) (directItems []TrieItem[V]) {
+func (n *_NODE_TYPE[V]) DirectItemsRec(parentIdx uint8, path StridePath, depth int, is4 bool) (directItems []TrieItem[V]) {
 	// recursion stop condition
 	if n == nil || n.IsEmpty() {
 		return nil
@@ -1165,7 +1200,7 @@ func (n *FastNode[V]) DirectItemsRec(parentIdx uint8, path StridePath, depth int
 		if lpm == parentIdx {
 			// child is directly covered by parent
 			switch kid := child.(type) {
-			case *FastNode[V]: // traverse rec-descent, call with next child node,
+			case *_NODE_TYPE[V]: // traverse rec-descent, call with next child node,
 				// next trie level, set parentIdx to 0, adjust path and depth
 				path[depth] = addr
 				directItems = append(directItems, kid.DirectItemsRec(0, path, depth+1, is4)...)
@@ -1207,13 +1242,13 @@ func (n *FastNode[V]) DirectItemsRec(parentIdx uint8, path StridePath, depth int
 //
 // The union handles all possible combinations of child node types (node, leaf, fringe)
 // between the two nodes. Structural conflicts are resolved by creating new intermediate
-// *FastNode[V] objects and pushing both children further down the trie. Leaves and fringes
+// *_NODE_TYPE[V] objects and pushing both children further down the trie. Leaves and fringes
 // are also recursively relocated as needed to preserve prefix semantics.
 //
 // The merge operation is destructive on the receiver n, but leaves the source node o unchanged.
 //
 // Returns the number of duplicate prefixes that were overwritten during merging.
-func (n *FastNode[V]) UnionRec(cloneFn CloneFunc[V], o *FastNode[V], depth int) (duplicates int) {
+func (n *_NODE_TYPE[V]) UnionRec(cloneFn CloneFunc[V], o *_NODE_TYPE[V], depth int) (duplicates int) {
 	if cloneFn == nil {
 		cloneFn = copyVal
 	}
@@ -1246,7 +1281,7 @@ func (n *FastNode[V]) UnionRec(cloneFn CloneFunc[V], o *FastNode[V], depth int) 
 }
 
 // UnionRecPersist is similar to unionRec but performs an immutable union of nodes.
-func (n *FastNode[V]) UnionRecPersist(cloneFn CloneFunc[V], o *FastNode[V], depth int) (duplicates int) {
+func (n *_NODE_TYPE[V]) UnionRecPersist(cloneFn CloneFunc[V], o *_NODE_TYPE[V], depth int) (duplicates int) {
 	if cloneFn == nil {
 		cloneFn = copyVal
 	}
@@ -1297,14 +1332,14 @@ func (n *FastNode[V]) UnionRecPersist(cloneFn CloneFunc[V], o *FastNode[V], dept
 //	fringe, node    <-- insert new node, push this fringe down, union rec-descent
 //	fringe, leaf    <-- insert new node, push this fringe down, insert other leaf at depth+1
 //	fringe, fringe  <-- just overwrite value
-func (n *FastNode[V]) handleMatrix(cloneFn CloneFunc[V], thisExists bool, thisChild, otherChild any, addr uint8, depth int) int {
+func (n *_NODE_TYPE[V]) handleMatrix(cloneFn CloneFunc[V], thisExists bool, thisChild, otherChild any, addr uint8, depth int) int {
 	// Do ALL type assertions upfront - reduces line noise
 	var (
-		thisNode, thisIsNode     = thisChild.(*FastNode[V])
+		thisNode, thisIsNode     = thisChild.(*_NODE_TYPE[V])
 		thisLeaf, thisIsLeaf     = thisChild.(*LeafNode[V])
 		thisFringe, thisIsFringe = thisChild.(*FringeNode[V])
 
-		otherNode, otherIsNode     = otherChild.(*FastNode[V])
+		otherNode, otherIsNode     = otherChild.(*_NODE_TYPE[V])
 		otherLeaf, otherIsLeaf     = otherChild.(*LeafNode[V])
 		otherFringe, otherIsFringe = otherChild.(*FringeNode[V])
 	)
@@ -1361,7 +1396,7 @@ func (n *FastNode[V]) handleMatrix(cloneFn CloneFunc[V], thisExists bool, thisCh
 	// Case 3: All remaining cases need a new node
 	// (thisChild is leaf or fringe, and we didn't hit the special cases above)
 
-	nc := new(FastNode[V])
+	nc := new(_NODE_TYPE[V])
 
 	// Push existing child down into new node
 	switch {
@@ -1414,14 +1449,14 @@ func (n *FastNode[V]) handleMatrix(cloneFn CloneFunc[V], thisExists bool, thisCh
 //	fringe, node    <-- insert new node, push this fringe down, union rec-descent
 //	fringe, leaf    <-- insert new node, push this fringe down, insert other leaf at depth+1
 //	fringe, fringe  <-- just overwrite value
-func (n *FastNode[V]) handleMatrixPersist(cloneFn CloneFunc[V], thisExists bool, thisChild, otherChild any, addr uint8, depth int) int {
+func (n *_NODE_TYPE[V]) handleMatrixPersist(cloneFn CloneFunc[V], thisExists bool, thisChild, otherChild any, addr uint8, depth int) int {
 	// Do ALL type assertions upfront - reduces line noise
 	var (
-		thisNode, thisIsNode     = thisChild.(*FastNode[V])
+		thisNode, thisIsNode     = thisChild.(*_NODE_TYPE[V])
 		thisLeaf, thisIsLeaf     = thisChild.(*LeafNode[V])
 		thisFringe, thisIsFringe = thisChild.(*FringeNode[V])
 
-		otherNode, otherIsNode     = otherChild.(*FastNode[V])
+		otherNode, otherIsNode     = otherChild.(*_NODE_TYPE[V])
 		otherLeaf, otherIsLeaf     = otherChild.(*LeafNode[V])
 		otherFringe, otherIsFringe = otherChild.(*FringeNode[V])
 	)
@@ -1486,7 +1521,7 @@ func (n *FastNode[V]) handleMatrixPersist(cloneFn CloneFunc[V], thisExists bool,
 	// Case 3: All remaining cases need a new node
 	// (thisChild is leaf or fringe, and we didn't hit the special cases above)
 
-	nc := new(FastNode[V])
+	nc := new(_NODE_TYPE[V])
 
 	// Push existing child down into new node
 	switch {
@@ -1534,7 +1569,7 @@ func (n *FastNode[V]) handleMatrixPersist(cloneFn CloneFunc[V], thisExists bool,
 //
 // The traversal order is not defined. This implementation favors simplicity
 // and runtime efficiency over consistency of iteration sequence.
-func (n *FastNode[V]) AllRec(path StridePath, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
+func (n *_NODE_TYPE[V]) AllRec(path StridePath, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
 	var buf [256]uint8
 	for _, idx := range n.Prefixes.AsSlice(&buf) {
 		cidr := CidrFromPath(path, depth, is4, idx)
@@ -1551,7 +1586,7 @@ func (n *FastNode[V]) AllRec(path StridePath, depth int, is4 bool, yield func(ne
 	for _, addr := range n.Children.AsSlice(&buf) {
 		anyKid := n.MustGetChild(addr)
 		switch kid := anyKid.(type) {
-		case *FastNode[V]:
+		case *_NODE_TYPE[V]:
 			// rec-descent with this node
 			path[depth] = addr
 			if !kid.AllRec(path, depth+1, is4, yield) {
@@ -1606,7 +1641,7 @@ func (n *FastNode[V]) AllRec(path StridePath, depth int, is4 bool, yield func(ne
 //   - yield: callback function invoked for each prefix/value pair
 //
 // Returns false if yield function requests early termination.
-func (n *FastNode[V]) AllRecSorted(path StridePath, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
+func (n *_NODE_TYPE[V]) AllRecSorted(path StridePath, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
 	// get slice of all child octets, sorted by addr
 	var childBuf [256]uint8
 	allChildAddrs := n.Children.AsSlice(&childBuf)
@@ -1635,7 +1670,7 @@ func (n *FastNode[V]) AllRecSorted(path StridePath, depth int, is4 bool, yield f
 			// yield the node (rec-descent) or leaf
 			anyKid := n.MustGetChild(childAddr)
 			switch kid := anyKid.(type) {
-			case *FastNode[V]:
+			case *_NODE_TYPE[V]:
 				path[depth] = childAddr
 				if !kid.AllRecSorted(path, depth+1, is4, yield) {
 					return false
@@ -1672,7 +1707,7 @@ func (n *FastNode[V]) AllRecSorted(path StridePath, depth int, is4 bool, yield f
 		addr := allChildAddrs[j]
 		anyKid := n.MustGetChild(addr)
 		switch kid := anyKid.(type) {
-		case *FastNode[V]:
+		case *_NODE_TYPE[V]:
 			path[depth] = addr
 			if !kid.AllRecSorted(path, depth+1, is4, yield) {
 				return false
@@ -1711,7 +1746,7 @@ func (n *FastNode[V]) AllRecSorted(path StridePath, depth int, is4 bool, yield f
 //
 // This function is intended for internal use during supernet traversal and
 // does not descend the trie further.
-func (n *FastNode[V]) EachLookupPrefix(ip netip.Addr, depth int, pfxIdx uint8, yield func(netip.Prefix, V) bool) (ok bool) {
+func (n *_NODE_TYPE[V]) EachLookupPrefix(ip netip.Addr, depth int, pfxIdx uint8, yield func(netip.Prefix, V) bool) (ok bool) {
 	for ; pfxIdx > 0; pfxIdx >>= 1 {
 		if n.Prefixes.Test(pfxIdx) {
 			val := n.MustGetPrefix(pfxIdx)
@@ -1741,7 +1776,7 @@ func (n *FastNode[V]) EachLookupPrefix(ip netip.Addr, depth int, pfxIdx uint8, y
 //
 // This function is intended for internal use by Subnets(), and it assumes the
 // current node is positioned at the point in the trie corresponding to the parent prefix.
-func (n *FastNode[V]) EachSubnet(octets []byte, depth int, is4 bool, pfxIdx uint8, yield func(netip.Prefix, V) bool) bool {
+func (n *_NODE_TYPE[V]) EachSubnet(octets []byte, depth int, is4 bool, pfxIdx uint8, yield func(netip.Prefix, V) bool) bool {
 	// octets as array, needed below more than once
 	var path StridePath
 	copy(path[:], octets)
@@ -1789,7 +1824,7 @@ func (n *FastNode[V]) EachSubnet(octets []byte, depth int, is4 bool, pfxIdx uint
 
 			// yield the node or leaf?
 			switch kid := n.MustGetChild(addr).(type) {
-			case *FastNode[V]:
+			case *_NODE_TYPE[V]:
 				path[depth] = addr
 				if !kid.AllRecSorted(path, depth+1, is4, yield) {
 					return false
@@ -1827,7 +1862,7 @@ func (n *FastNode[V]) EachSubnet(octets []byte, depth int, is4 bool, pfxIdx uint
 	for _, addr := range allCoveredChildAddrs[addrCursor:] {
 		// yield the node or leaf?
 		switch kid := n.MustGetChild(addr).(type) {
-		case *FastNode[V]:
+		case *_NODE_TYPE[V]:
 			path[depth] = addr
 			if !kid.AllRecSorted(path, depth+1, is4, yield) {
 				return false
@@ -1869,14 +1904,14 @@ func (n *FastNode[V]) EachSubnet(octets []byte, depth int, is4 bool, pfxIdx uint
 //
 // The yield function receives prefix/value pairs and returns false to stop
 // the iteration early.
-func (n *FastNode[V]) Supernets(pfx netip.Prefix, yield func(netip.Prefix, V) bool) {
+func (n *_NODE_TYPE[V]) Supernets(pfx netip.Prefix, yield func(netip.Prefix, V) bool) {
 	ip := pfx.Addr()
 	is4 := ip.Is4()
 	octets := ip.AsSlice()
 	lastOctetPlusOne, lastBits := LastOctetPlusOneAndLastBits(pfx)
 
 	// stack of the traversed nodes for reverse ordering of supernets
-	stack := [MaxTreeDepth]*FastNode[V]{}
+	stack := [MaxTreeDepth]*_NODE_TYPE[V]{}
 
 	// run variable, used after for loop
 	var depth int
@@ -1901,7 +1936,7 @@ LOOP:
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
-		case *FastNode[V]:
+		case *_NODE_TYPE[V]:
 			n = kid
 			continue LOOP // descend down to next trie level
 
@@ -1985,7 +2020,7 @@ LOOP:
 //
 // The yield function receives prefix/value pairs and returns false to stop
 // the iteration early. If pfx doesn't exist in the trie, no prefixes are yielded.
-func (n *FastNode[V]) Subnets(pfx netip.Prefix, yield func(netip.Prefix, V) bool) {
+func (n *_NODE_TYPE[V]) Subnets(pfx netip.Prefix, yield func(netip.Prefix, V) bool) {
 	// values derived from pfx
 	ip := pfx.Addr()
 	is4 := ip.Is4()
@@ -2010,7 +2045,7 @@ func (n *FastNode[V]) Subnets(pfx netip.Prefix, yield func(netip.Prefix, V) bool
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
-		case *FastNode[V]:
+		case *_NODE_TYPE[V]:
 			n = kid
 			continue // descend down to next trie level
 
@@ -2048,7 +2083,7 @@ func (n *FastNode[V]) Subnets(pfx netip.Prefix, yield func(netip.Prefix, V) bool
 //
 // The function is optimized for early exit on first match and uses heuristics to
 // choose between set-based and loop-based matching for performance.
-func (n *FastNode[V]) Overlaps(o *FastNode[V], depth int) bool {
+func (n *_NODE_TYPE[V]) Overlaps(o *_NODE_TYPE[V], depth int) bool {
 	nPfxCount := n.PrefixCount()
 	oPfxCount := o.PrefixCount()
 
@@ -2118,7 +2153,7 @@ func (n *FastNode[V]) Overlaps(o *FastNode[V], depth int) bool {
 // It first checks for direct bitset intersection (identical indices),
 // then walks both prefix sets using lpmTest to detect if any
 // of the n-prefixes is contained in o, or vice versa.
-func (n *FastNode[V]) OverlapsRoutes(o *FastNode[V]) bool {
+func (n *_NODE_TYPE[V]) OverlapsRoutes(o *_NODE_TYPE[V]) bool {
 	// some prefixes are identical, trivial overlap
 	if n.Prefixes.Intersects(&o.Prefixes.BitSet256) {
 		return true
@@ -2181,7 +2216,7 @@ func (n *FastNode[V]) OverlapsRoutes(o *FastNode[V]) bool {
 //
 // Bitset-based matching uses precomputed coverage tables
 // to avoid per-address looping. This is critical for high fan-out nodes.
-func (n *FastNode[V]) OverlapsChildrenIn(o *FastNode[V]) bool {
+func (n *_NODE_TYPE[V]) OverlapsChildrenIn(o *_NODE_TYPE[V]) bool {
 	pfxCount := n.PrefixCount()
 	childCount := o.ChildCount()
 
@@ -2221,9 +2256,9 @@ func (n *FastNode[V]) OverlapsChildrenIn(o *FastNode[V]) bool {
 // between node n and node o recursively.
 //
 // For each shared address, the corresponding child nodes (of any type)
-// are compared using FastNodeOverlapsTwoChildren, which handles all
+// are compared using _NODE_TYPEOverlapsTwoChildren, which handles all
 // node/leaf/fringe combinations.
-func (n *FastNode[V]) OverlapsSameChildren(o *FastNode[V], depth int) bool {
+func (n *_NODE_TYPE[V]) OverlapsSameChildren(o *_NODE_TYPE[V], depth int) bool {
 	// intersect the child bitsets from n with o
 	commonChildren := n.Children.Intersection(&o.Children.BitSet256)
 
@@ -2257,7 +2292,7 @@ func (n *FastNode[V]) OverlapsSameChildren(o *FastNode[V], depth int) bool {
 //
 // This function underlies the top-level OverlapsPrefix behavior and handles details of
 // trie traversal across varying prefix lengths and compression levels.
-func (n *FastNode[V]) OverlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
+func (n *_NODE_TYPE[V]) OverlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
 	ip := pfx.Addr()
 	octets := ip.AsSlice()
 	lastOctetPlusOne, lastBits := LastOctetPlusOneAndLastBits(pfx)
@@ -2286,7 +2321,7 @@ func (n *FastNode[V]) OverlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
 
 		// next child, node or leaf
 		switch kid := n.MustGetChild(octet).(type) {
-		case *FastNode[V]:
+		case *_NODE_TYPE[V]:
 			n = kid
 			continue
 
@@ -2316,7 +2351,7 @@ func (n *FastNode[V]) OverlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
 // using fast bitwise set intersections instead of explicit range comparisons.
 // This enables high-performance overlap checks on a single stride level
 // without descending further into the trie.
-func (n *FastNode[V]) OverlapsIdx(idx uint8) bool {
+func (n *_NODE_TYPE[V]) OverlapsIdx(idx uint8) bool {
 	// 1. Test if any route in this node overlaps prefix?
 	if n.Contains(idx) {
 		return true
@@ -2347,13 +2382,13 @@ func (n *FastNode[V]) OverlapsIdx(idx uint8) bool {
 //	fringe, node    --> true
 //	fringe, leaf    --> true
 //	fringe, fringe  --> true
-func (n *FastNode[V]) OverlapsTwoChildren(nChild, oChild any, depth int) bool {
+func (n *_NODE_TYPE[V]) OverlapsTwoChildren(nChild, oChild any, depth int) bool {
 	// child type detection
-	nNode, nIsNode := nChild.(*FastNode[V])
+	nNode, nIsNode := nChild.(*_NODE_TYPE[V])
 	nLeaf, nIsLeaf := nChild.(*LeafNode[V])
 	_, nIsFringe := nChild.(*FringeNode[V])
 
-	oNode, oIsNode := oChild.(*FastNode[V])
+	oNode, oIsNode := oChild.(*_NODE_TYPE[V])
 	oLeaf, oIsLeaf := oChild.(*LeafNode[V])
 	_, oIsFringe := oChild.(*FringeNode[V])
 
