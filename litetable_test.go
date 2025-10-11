@@ -452,7 +452,7 @@ func TestLiteLookupPrefixLPMCompare(t *testing.T) {
 			t.Fatalf("LookupPrefixLPM(%q) = %v, want %v", pfx, liteOK, goldOK)
 		}
 
-		if goldOK != liteOK {
+		if goldLPM != liteLPM {
 			t.Fatalf("LookupPrefixLPM(%q) = (%v, %v), want (%v, %v)", pfx, liteLPM, liteOK, goldLPM, goldOK)
 		}
 	}
@@ -1175,7 +1175,7 @@ func TestLiteUnionCompare(t *testing.T) {
 		lite2 := new(Lite)
 
 		for _, pfx := range pfxs2 {
-			gold.insert(pfx, nil)
+			gold2.insert(pfx, nil)
 			lite2.Insert(pfx)
 		}
 

@@ -1160,7 +1160,7 @@ func TestTableUnionCompare(t *testing.T) {
 		bart2 := new(Table[string])
 
 		for _, pfx := range pfxs2 {
-			gold.insert(pfx, pfx.String())
+			gold2.insert(pfx, pfx.String())
 			bart2.Insert(pfx, pfx.String())
 		}
 

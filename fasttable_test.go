@@ -1160,7 +1160,7 @@ func TestFastUnionCompare(t *testing.T) {
 		fast2 := new(Fast[string])
 
 		for _, pfx := range pfxs2 {
-			gold.insert(pfx, pfx.String())
+			gold2.insert(pfx, pfx.String())
 			fast2.Insert(pfx, pfx.String())
 		}
 

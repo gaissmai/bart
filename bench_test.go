@@ -38,7 +38,7 @@ func BenchmarkTableModifyRandom(b *testing.B) {
 
 		b.Run(fmt.Sprintf("persist into %d", n), func(b *testing.B) {
 			for b.Loop() {
-				prt.ModifyPersist(probe, func(int, bool) (int, bool) { return 42, false })
+				prt = prt.ModifyPersist(probe, func(int, bool) (int, bool) { return 42, false })
 			}
 		})
 
@@ -241,9 +241,6 @@ func BenchmarkFullMatch4(b *testing.B) {
 		rt.Insert(route.CIDR, struct{}{})
 	}
 
-	b.Log(matchIP4)
-	b.Log(matchPfx4)
-
 	b.Run("Contains", func(b *testing.B) {
 		for b.Loop() {
 			rt.Contains(matchIP4)
@@ -275,9 +272,6 @@ func BenchmarkFullMatch6(b *testing.B) {
 	for _, route := range routes {
 		rt.Insert(route.CIDR, struct{}{})
 	}
-
-	b.Log(matchIP6)
-	b.Log(matchPfx6)
 
 	b.Run("Contains", func(b *testing.B) {
 		for b.Loop() {
@@ -311,9 +305,6 @@ func BenchmarkFullMiss4(b *testing.B) {
 		rt.Insert(route.CIDR, i)
 	}
 
-	b.Log(missIP4)
-	b.Log(missPfx4)
-
 	b.Run("Contains", func(b *testing.B) {
 		for b.Loop() {
 			rt.Contains(missIP4)
@@ -345,9 +336,6 @@ func BenchmarkFullMiss6(b *testing.B) {
 	for i, route := range routes {
 		rt.Insert(route.CIDR, i)
 	}
-
-	b.Log(missIP6)
-	b.Log(missPfx6)
 
 	b.Run("Contains", func(b *testing.B) {
 		for b.Loop() {
@@ -390,7 +378,7 @@ func BenchmarkFullTableOverlaps4(b *testing.B) {
 
 		b.Run(fmt.Sprintf("With_%4d", i), func(b *testing.B) {
 			for b.Loop() {
-				lt.Overlaps(lt2)
+				lt.Overlaps4(lt2)
 			}
 		})
 	}
@@ -412,7 +400,7 @@ func BenchmarkFullTableOverlaps6(b *testing.B) {
 
 		b.Run(fmt.Sprintf("With_%4d", i), func(b *testing.B) {
 			for b.Loop() {
-				lt.Overlaps(lt2)
+				lt.Overlaps6(lt2)
 			}
 		})
 	}

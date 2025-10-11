@@ -37,16 +37,14 @@ func (t *goldTable[V]) insert(pfx netip.Prefix, val V) {
 
 func (t *goldTable[V]) delete(pfx netip.Prefix) (exists bool) {
 	pfx = pfx.Masked()
-	c := slices.Clone(*t)
 
 	for i, item := range *t {
 		if item.pfx == pfx {
-			exists = true
-			c = slices.Delete(c, i, i)
+			*t = slices.Delete(*t, i, i+1)
+			return true
 		}
 	}
-	*t = c
-	return exists
+	return false
 }
 
 func (t *goldTable[V]) insertMany(pfxs []goldTableItem[V]) {
