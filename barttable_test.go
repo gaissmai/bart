@@ -49,7 +49,7 @@ func TestTableNil(t *testing.T) {
 		mustPanic(t, "Delete", func() { bart1.Delete(pfx4) })
 		mustPanic(t, "DeletePersist", func() { bart1.DeletePersist(pfx4) })
 		mustPanic(t, "Modify", func() { bart1.Modify(pfx4, nil) })
-		mustPanic(t, "ModifyPersist", func() { bart1.Modify(pfx4, nil) })
+		mustPanic(t, "ModifyPersist", func() { bart1.ModifyPersist(pfx4, nil) })
 		mustPanic(t, "Contains", func() { bart1.Contains(ip4) })
 		mustPanic(t, "Lookup", func() { bart1.Lookup(ip6) })
 		mustPanic(t, "LookupPrefix", func() { bart1.LookupPrefix(pfx4) })
