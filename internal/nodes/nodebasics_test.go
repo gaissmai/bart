@@ -13,6 +13,14 @@ import (
 
 // helpers
 
+// workLoadN to adjust loops for tests with -short
+func workLoadN() int {
+	if testing.Short() {
+		return 100
+	}
+	return 1_000
+}
+
 // cloneFnFactory returns a CloneFunc.
 // If V implements Cloner[V], the returned function should perform
 // a deep copy using Clone(), otherwise it returns nil.
