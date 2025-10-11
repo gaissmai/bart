@@ -2,6 +2,8 @@ package nodes
 
 import (
 	"bytes"
+	"iter"
+	"math/rand/v2"
 	"net/netip"
 	"slices"
 	"strings"
@@ -9,6 +11,24 @@ import (
 
 	"github.com/gaissmai/bart/internal/art"
 )
+
+func (l *LiteNode[V]) allSorted4() iter.Seq2[netip.Prefix, V] {
+	return func(yield func(netip.Prefix, V) bool) {
+		if l == nil {
+			return
+		}
+		_ = l.AllRecSorted(StridePath{}, 0, true, yield)
+	}
+}
+
+func (l *LiteNode[V]) allSorted6() iter.Seq2[netip.Prefix, V] {
+	return func(yield func(netip.Prefix, V) bool) {
+		if l == nil {
+			return
+		}
+		_ = l.AllRecSorted(StridePath{}, 0, false, yield)
+	}
+}
 
 func TestLiteNode_EmptyState(t *testing.T) {
 	t.Parallel()
@@ -2069,5 +2089,384 @@ func TestLiteNode_DumpString_Error_KidWrongType_FringeAtDeeperStep(t *testing.T)
 	}
 	if strings.Contains(out, "depth:") {
 		t.Fatalf("unexpected normal dump on error, got: %q", out)
+	}
+}
+
+func TestLiteInsertShuffled(t *testing.T) {
+	// The order in which you insert prefixes into a route table
+	// should not matter, as long as you're inserting the same set of
+	// routes.
+	t.Parallel()
+
+	n := workLoadN()
+
+	prng := rand.New(rand.NewPCG(42, 42))
+	pfxs := randomRealWorldPrefixes(prng, n)
+
+	for range 10 {
+		pfxs2 := slices.Clone(pfxs)
+		prng.Shuffle(len(pfxs2), func(i, j int) { pfxs2[i], pfxs2[j] = pfxs2[j], pfxs2[i] })
+
+		lite1 := new(LiteNode[struct{}])
+		lite2 := new(LiteNode[struct{}])
+
+		for _, pfx := range pfxs {
+			lite1.Insert(pfx, struct{}{}, 0)
+			lite1.Insert(pfx, struct{}{}, 0) // idempotent
+		}
+		for _, pfx := range pfxs2 {
+			lite2.Insert(pfx, struct{}{}, 0)
+			lite2.Insert(pfx, struct{}{}, 0) // idempotent
+		}
+
+		if !lite1.EqualRec(lite2) {
+			t.Fatal("expected Equal")
+		}
+	}
+}
+
+func TestLiteInsertPersistShuffled(t *testing.T) {
+	// The order in which you insert prefixes into a route table
+	// should not matter, as long as you're inserting the same set of
+	// routes.
+	t.Parallel()
+
+	n := workLoadN()
+
+	prng := rand.New(rand.NewPCG(42, 42))
+	pfxs := randomRealWorldPrefixes(prng, n)
+
+	for range 10 {
+		pfxs2 := slices.Clone(pfxs)
+		prng.Shuffle(len(pfxs2), func(i, j int) { pfxs2[i], pfxs2[j] = pfxs2[j], pfxs2[i] })
+
+		lite1 := new(LiteNode[struct{}])
+		lite2 := new(LiteNode[struct{}])
+
+		// lite1 is mutable
+		for _, pfx := range pfxs {
+			lite1.Insert(pfx, struct{}{}, 0)
+			lite1.Insert(pfx, struct{}{}, 0) // idempotent
+		}
+
+		// lite2 is persistent
+		for _, pfx := range pfxs2 {
+			lite2.InsertPersist(nil, pfx, struct{}{}, 0)
+			lite2.InsertPersist(nil, pfx, struct{}{}, 0) // idempotent
+		}
+
+		if !lite1.EqualRec(lite2) {
+			t.Fatal("expected Equal")
+		}
+	}
+}
+
+func TestLiteDeleteCompare4(t *testing.T) {
+	t.Parallel()
+
+	var (
+		n         = workLoadN()
+		prng      = rand.New(rand.NewPCG(42, 42))
+		deleteCut = n / 2
+		probes    = 3
+	)
+
+	for range probes {
+		all4 := randomRealWorldPrefixes4(prng, n)
+
+		// pfxs and toDelete should be non-overlapping sets
+		pfxs := all4[:deleteCut]
+		toDelete := all4[deleteCut:]
+
+		gold := new(goldTable[struct{}])
+		lite := new(LiteNode[struct{}])
+
+		for _, pfx := range pfxs {
+			gold.insert(pfx, struct{}{})
+			lite.Insert(pfx, struct{}{}, 0)
+		}
+
+		for _, pfx := range toDelete {
+			gold.delete(pfx)
+			lite.Delete(pfx)
+		}
+
+		collect := []netip.Prefix{}
+		for pfx := range lite.allSorted4() {
+			collect = append(collect, pfx)
+		}
+
+		if !slices.Equal(gold.allSorted(), collect) {
+			t.Fatal("expected Equal")
+		}
+	}
+}
+
+func TestLiteDeleteCompare6(t *testing.T) {
+	t.Parallel()
+
+	var (
+		n         = workLoadN()
+		prng      = rand.New(rand.NewPCG(42, 42))
+		deleteCut = n / 2
+		probes    = 3
+	)
+
+	for range probes {
+		all6 := randomRealWorldPrefixes6(prng, n)
+
+		// pfxs and toDelete should be non-overlapping sets
+		pfxs := all6[:deleteCut]
+		toDelete := all6[deleteCut:]
+
+		gold := new(goldTable[struct{}])
+		lite := new(LiteNode[struct{}])
+
+		for _, pfx := range pfxs {
+			gold.insert(pfx, struct{}{})
+			lite.Insert(pfx, struct{}{}, 0)
+		}
+
+		for _, pfx := range toDelete {
+			gold.delete(pfx)
+			lite.Delete(pfx)
+		}
+
+		collect := []netip.Prefix{}
+		for pfx := range lite.allSorted6() {
+			collect = append(collect, pfx)
+		}
+
+		if !slices.Equal(gold.allSorted(), collect) {
+			t.Fatal("expected Equal")
+		}
+	}
+}
+
+func TestLiteDeleteShuffled4(t *testing.T) {
+	// The order in which you delete prefixes from a route table
+	// should not matter, as long as you're deleting the same set of
+	// routes.
+	t.Parallel()
+
+	n := workLoadN()
+
+	prng := rand.New(rand.NewPCG(42, 42))
+
+	deleteCut := n / 2
+
+	for range 10 {
+		all4 := randomRealWorldPrefixes4(prng, n)
+
+		// pfxs and toDelete should be non-overlapping sets
+		toDelete := all4[deleteCut:]
+
+		lite := new(LiteNode[struct{}])
+
+		// insert
+		for _, pfx := range all4 {
+			lite.Insert(pfx, struct{}{}, 0)
+		}
+
+		// delete
+		for _, pfx := range toDelete {
+			lite.Delete(pfx)
+		}
+
+		toDelete2 := slices.Clone(toDelete)
+		prng.Shuffle(len(toDelete2), func(i, j int) { toDelete2[i], toDelete2[j] = toDelete2[j], toDelete2[i] })
+
+		lite2 := new(LiteNode[struct{}])
+
+		// insert
+		for _, pfx := range all4 {
+			lite2.Insert(pfx, struct{}{}, 0)
+		}
+
+		// delete
+		for _, pfx := range toDelete2 {
+			lite2.Delete(pfx)
+		}
+
+		if !lite.EqualRec(lite2) {
+			t.Fatal("expect equal")
+		}
+	}
+}
+
+func TestLiteDeleteShuffled6(t *testing.T) {
+	// The order in which you delete prefixes from a route table
+	// should not matter, as long as you're deleting the same set of
+	// routes.
+	t.Parallel()
+
+	n := workLoadN()
+
+	prng := rand.New(rand.NewPCG(42, 42))
+
+	deleteCut := n / 2
+
+	for range 10 {
+		all6 := randomRealWorldPrefixes6(prng, n)
+
+		// pfxs and toDelete should be non-overlapping sets
+		toDelete := all6[deleteCut:]
+
+		lite := new(LiteNode[struct{}])
+
+		// insert
+		for _, pfx := range all6 {
+			lite.Insert(pfx, struct{}{}, 0)
+		}
+
+		// delete
+		for _, pfx := range toDelete {
+			lite.Delete(pfx)
+		}
+
+		toDelete2 := slices.Clone(toDelete)
+		prng.Shuffle(len(toDelete2), func(i, j int) { toDelete2[i], toDelete2[j] = toDelete2[j], toDelete2[i] })
+
+		lite2 := new(LiteNode[struct{}])
+
+		// insert
+		for _, pfx := range all6 {
+			lite2.Insert(pfx, struct{}{}, 0)
+		}
+
+		// delete
+		for _, pfx := range toDelete2 {
+			lite2.Delete(pfx)
+		}
+
+		if !lite.EqualRec(lite2) {
+			t.Fatal("expect equal")
+		}
+	}
+}
+
+func TestLiteDeleteIsReverseOfInsert4(t *testing.T) {
+	t.Parallel()
+
+	n := workLoadN()
+
+	prng := rand.New(rand.NewPCG(42, 42))
+	// Insert n prefixes, then delete those same prefixes in reverse
+	// order. Each deletion should exactly undo the internal structure
+	// changes that each insert did.
+
+	pfxs := randomRealWorldPrefixes4(prng, n)
+
+	lite := new(LiteNode[struct{}])
+	for _, pfx := range pfxs {
+		lite.Insert(pfx, struct{}{}, 0)
+	}
+
+	for i := len(pfxs) - 1; i >= 0; i-- {
+		lite.Delete(pfxs[i])
+	}
+
+	if !lite.IsEmpty() {
+		t.Errorf("after delete, expected empty LiteNode")
+	}
+	if nt := lite.hasType(); nt != nullNode {
+		t.Fatalf("after delete, expected NULL node, but got %s", nt)
+	}
+}
+
+func TestLiteDeleteIsReverseOfInsert6(t *testing.T) {
+	t.Parallel()
+
+	n := workLoadN()
+
+	prng := rand.New(rand.NewPCG(42, 42))
+	// Insert n prefixes, then delete those same prefixes in reverse
+	// order. Each deletion should exactly undo the internal structure
+	// changes that each insert did.
+
+	pfxs := randomRealWorldPrefixes6(prng, n)
+
+	lite := new(LiteNode[struct{}])
+	for _, pfx := range pfxs {
+		lite.Insert(pfx, struct{}{}, 0)
+	}
+
+	for i := len(pfxs) - 1; i >= 0; i-- {
+		lite.Delete(pfxs[i])
+	}
+
+	if !lite.IsEmpty() {
+		t.Errorf("after delete, expected empty LiteNode")
+	}
+	if nt := lite.hasType(); nt != nullNode {
+		t.Fatalf("after delete, expected NULL node, but got %s", nt)
+	}
+}
+
+func TestLiteDeleteButOne4(t *testing.T) {
+	t.Parallel()
+	prng := rand.New(rand.NewPCG(42, 42))
+	// Insert n prefixes, then delete all but one
+	n := workLoadN()
+
+	for range 10 {
+
+		lite := new(LiteNode[struct{}])
+		prefixes := randomRealWorldPrefixes4(prng, n)
+
+		for _, pfx := range prefixes {
+			lite.Insert(pfx, struct{}{}, 0)
+		}
+
+		// shuffle the prefixes
+		prng.Shuffle(n, func(i, j int) {
+			prefixes[i], prefixes[j] = prefixes[j], prefixes[i]
+		})
+
+		// skip the first
+		for i := 1; i < len(prefixes); i++ {
+			lite.Delete(prefixes[i])
+		}
+
+		if nt := lite.hasType(); nt != stopNode {
+			t.Fatalf("after delete but one, expected STOP node, but got %s", nt)
+		}
+		if sum := lite.PrefixCount() + lite.ChildCount(); sum != 1 {
+			t.Fatalf("after delete but one, sum of prefixes and children must be 1, got %d", sum)
+		}
+	}
+}
+
+func TestLiteDeleteButOne6(t *testing.T) {
+	t.Parallel()
+	prng := rand.New(rand.NewPCG(42, 42))
+	// Insert n prefixes, then delete all but one
+	n := workLoadN()
+
+	for range 10 {
+
+		lite := new(LiteNode[struct{}])
+		prefixes := randomRealWorldPrefixes6(prng, n)
+
+		for _, pfx := range prefixes {
+			lite.Insert(pfx, struct{}{}, 0)
+		}
+
+		// shuffle the prefixes
+		prng.Shuffle(n, func(i, j int) {
+			prefixes[i], prefixes[j] = prefixes[j], prefixes[i]
+		})
+
+		// skip the first
+		for i := 1; i < len(prefixes); i++ {
+			lite.Delete(prefixes[i])
+		}
+
+		if nt := lite.hasType(); nt != stopNode {
+			t.Fatalf("after delete but one, expected STOP node, but got %s", nt)
+		}
+		if sum := lite.PrefixCount() + lite.ChildCount(); sum != 1 {
+			t.Fatalf("after delete but one, sum of prefixes and children must be 1, got %d", sum)
+		}
 	}
 }
