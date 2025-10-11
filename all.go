@@ -1,6 +1,27 @@
 // Copyright (c) 2025 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
+// Package bart provides high-performance Balanced Routing Tables (BART)
+// for fastest IP-to-CIDR lookups on IPv4 and IPv6 addresses.
+//
+// BART offers three table variants optimized for different use cases:
+//
+//   - Lite:  Memory-optimized with popcount-compressed sparse arrays
+//   - Table: Full-featured with popcount-compressed sparse arrays
+//   - Fast:  Speed-optimized with fixed-size 256-element arrays
+//
+// The implementation is based on Knuth's ART algorithm with novel
+// optimizations for memory efficiency and lookup speed.
+//
+// `Table` and `Lite` use popcount compression for memory efficiency, while
+// `Fast` trades memory for maximum lookup speed with uncompressed arrays.
+//
+// BART excels at efficient set operations on routing tables including Union,
+// Overlaps, Equal, Subnets, and Supernets with optimal complexity, making it
+// ideal for large-scale IP prefix matching in ACLs, RIBs, FIBs, firewalls,
+// and routers.
+//
+// All variants also support copy-on-write persistence.
 package bart
 
 import (
@@ -12,19 +33,6 @@ import (
 // These types, constants, and functions are required in the bart package
 // and in internal/nodes. To prevent drift in implementation or values,
 // they are either aliased, copied or wrapped.
-
-// Equaler is a generic interface for types that can decide their own
-// equality logic. It can be used to override the potentially expensive
-// default comparison with [reflect.DeepEqual].
-type Equaler[V any] interface {
-	Equal(other V) bool
-}
-
-// Cloner is an interface that enables deep cloning of values of type V.
-// If a value implements Cloner[V], Table methods such as InsertPersist,
-// ModifyPersist, DeletePersist, UnionPersist, Union and Clone will use
-// its Clone method to perform deep copies.
-type Cloner[V any] = nodes.Cloner[V]
 
 type stridePath = nodes.StridePath
 
@@ -48,6 +56,21 @@ func shouldPrintValues[V any]() bool {
 
 	_, isEmptyStruct := any(zero).(struct{})
 	return !isEmptyStruct
+}
+
+// Equaler is a generic interface for types that can decide their own
+// equality logic. It can be used to override the potentially expensive
+// default comparison with [reflect.DeepEqual].
+type Equaler[V any] interface {
+	Equal(other V) bool
+}
+
+// Cloner is an interface that enables deep cloning of values of type V.
+// If a value implements Cloner[V], Table methods such as InsertPersist,
+// ModifyPersist, DeletePersist, UnionPersist, Union and Clone will use
+// its Clone method to perform deep copies.
+type Cloner[V any] interface {
+	Clone() V
 }
 
 // DumpListNode contains CIDR, Value and Subnets, representing the trie
