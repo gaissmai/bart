@@ -300,14 +300,14 @@ func TestTableLookupPrefixLPMCompare(t *testing.T) {
 	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
-	pfxs := randomPrefixes(prng, n)
+	pfxs := randomRealWorldPrefixes(prng, n)
 
 	gold := new(goldTable[int])
-	gold.insertMany(pfxs)
 
 	bart := new(Table[int])
-	for _, pfx := range pfxs {
-		bart.Insert(pfx.pfx, pfx.val)
+	for i, pfx := range pfxs {
+		gold.insert(pfx, i)
+		bart.Insert(pfx, i)
 	}
 
 	for range n {

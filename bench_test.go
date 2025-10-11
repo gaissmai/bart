@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand/v2"
+	"net/netip"
 	"runtime"
 	"strconv"
 	"testing"
@@ -48,21 +49,21 @@ func BenchmarkTableModifyRandom(b *testing.B) {
 func BenchmarkTableDelete(b *testing.B) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, n := range []int{1_000, 10_000, 100_000, 1_000_000} {
-		pfxs := randomPrefixes(prng, n)
+		pfxs := randomRealWorldPrefixes(prng, n)
 
 		b.Run(fmt.Sprintf("mutable from_%d", n), func(b *testing.B) {
 			for b.Loop() {
 				b.StopTimer()
 				bart := new(Table[*MyInt])
 
-				for i, route := range pfxs {
+				for i, pfx := range pfxs {
 					myInt := MyInt(i)
-					bart.Insert(route.pfx, &myInt)
+					bart.Insert(pfx, &myInt)
 				}
 				b.StartTimer()
 
-				for _, route := range pfxs {
-					bart.Delete(route.pfx)
+				for _, pfx := range pfxs {
+					bart.Delete(pfx)
 				}
 			}
 			b.ReportMetric(float64(b.Elapsed())/float64(b.N)/float64(len(pfxs)), "ns/route")
@@ -74,14 +75,14 @@ func BenchmarkTableDelete(b *testing.B) {
 				b.StopTimer()
 				bart := new(Table[*MyInt])
 
-				for i, route := range pfxs {
+				for i, pfx := range pfxs {
 					myInt := MyInt(i)
-					bart.Insert(route.pfx, &myInt)
+					bart.Insert(pfx, &myInt)
 				}
 				b.StartTimer()
 
-				for _, route := range pfxs {
-					bart = bart.DeletePersist(route.pfx)
+				for _, pfx := range pfxs {
+					bart = bart.DeletePersist(pfx)
 				}
 			}
 			b.ReportMetric(float64(b.Elapsed())/float64(b.N)/float64(len(pfxs)), "ns/route")
@@ -93,22 +94,22 @@ func BenchmarkTableDelete(b *testing.B) {
 func BenchmarkTableGet(b *testing.B) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, fam := range []string{"ipv4", "ipv6"} {
-		rng := randomPrefixes4
+		rng := randomRealWorldPrefixes4
 		if fam == "ipv6" {
-			rng = randomPrefixes6
+			rng = randomRealWorldPrefixes6
 		}
 
 		for _, nroutes := range benchRouteCount {
 			bart := new(Table[int])
-			for _, route := range rng(prng, nroutes) {
-				bart.Insert(route.pfx, route.val)
+			for i, pfx := range rng(prng, nroutes) {
+				bart.Insert(pfx, i)
 			}
 
 			probe := rng(prng, 1)[0]
 
 			b.Run(fmt.Sprintf("%s/From_%d", fam, nroutes), func(b *testing.B) {
 				for b.Loop() {
-					bart.Get(probe.pfx)
+					bart.Get(probe)
 				}
 			})
 		}
@@ -118,40 +119,40 @@ func BenchmarkTableGet(b *testing.B) {
 func BenchmarkTableLPM(b *testing.B) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, fam := range []string{"ipv4", "ipv6"} {
-		rng := randomPrefixes4
+		rng := randomRealWorldPrefixes4
 		if fam == "ipv6" {
-			rng = randomPrefixes6
+			rng = randomRealWorldPrefixes6
 		}
 
 		for _, nroutes := range benchRouteCount {
 			bart := new(Table[int])
-			for _, route := range rng(prng, nroutes) {
-				bart.Insert(route.pfx, route.val)
+			for i, pfx := range rng(prng, nroutes) {
+				bart.Insert(pfx, i)
 			}
 
 			probe := rng(prng, 1)[0]
 
 			b.Run(fmt.Sprintf("%s/In_%6d/%s", fam, nroutes, "Contains"), func(b *testing.B) {
 				for b.Loop() {
-					bart.Contains(probe.pfx.Addr())
+					bart.Contains(probe.Addr())
 				}
 			})
 
 			b.Run(fmt.Sprintf("%s/In_%6d/%s", fam, nroutes, "Lookup"), func(b *testing.B) {
 				for b.Loop() {
-					bart.Lookup(probe.pfx.Addr())
+					bart.Lookup(probe.Addr())
 				}
 			})
 
 			b.Run(fmt.Sprintf("%s/In_%6d/%s", fam, nroutes, "Prefix"), func(b *testing.B) {
 				for b.Loop() {
-					bart.LookupPrefix(probe.pfx)
+					bart.LookupPrefix(probe)
 				}
 			})
 
 			b.Run(fmt.Sprintf("%s/In_%6d/%s", fam, nroutes, "PrefixLPM"), func(b *testing.B) {
 				for b.Loop() {
-					bart.LookupPrefixLPM(probe.pfx)
+					bart.LookupPrefixLPM(probe)
 				}
 			})
 		}
@@ -161,22 +162,22 @@ func BenchmarkTableLPM(b *testing.B) {
 func BenchmarkTableOverlapsPrefix(b *testing.B) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, fam := range []string{"ipv4", "ipv6"} {
-		rng := randomPrefixes4
+		rng := randomRealWorldPrefixes4
 		if fam == "ipv6" {
-			rng = randomPrefixes6
+			rng = randomRealWorldPrefixes6
 		}
 
 		for _, nroutes := range benchRouteCount {
 			bart := new(Table[int])
-			for _, route := range rng(prng, nroutes) {
-				bart.Insert(route.pfx, route.val)
+			for i, pfx := range rng(prng, nroutes) {
+				bart.Insert(pfx, i)
 			}
 
 			probe := rng(prng, 1)[0]
 
 			b.Run(fmt.Sprintf("%s/With_%d", fam, nroutes), func(b *testing.B) {
 				for b.Loop() {
-					bart.OverlapsPrefix(probe.pfx)
+					bart.OverlapsPrefix(probe)
 				}
 			})
 		}
@@ -186,20 +187,20 @@ func BenchmarkTableOverlapsPrefix(b *testing.B) {
 func BenchmarkTableOverlaps(b *testing.B) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, fam := range []string{"ipv4", "ipv6"} {
-		rng := randomPrefixes4
+		rng := randomRealWorldPrefixes4
 		if fam == "ipv6" {
-			rng = randomPrefixes6
+			rng = randomRealWorldPrefixes6
 		}
 
 		for _, nroutes := range benchRouteCount {
 			bart := new(Table[int])
-			for _, route := range rng(prng, nroutes) {
-				bart.Insert(route.pfx, route.val)
+			for i, pfx := range rng(prng, nroutes) {
+				bart.Insert(pfx, i)
 			}
 
 			inter := new(Table[int])
-			for _, route := range rng(prng, nroutes) {
-				inter.Insert(route.pfx, route.val)
+			for i, pfx := range rng(prng, nroutes) {
+				inter.Insert(pfx, i)
 			}
 
 			b.Run(fmt.Sprintf("%s/%d_with_%d", fam, nroutes, nroutes), func(b *testing.B) {
@@ -214,15 +215,15 @@ func BenchmarkTableOverlaps(b *testing.B) {
 func BenchmarkTableClone(b *testing.B) {
 	prng := rand.New(rand.NewPCG(42, 42))
 	for _, fam := range []string{"ipv4", "ipv6"} {
-		rng := randomPrefixes4
+		rng := randomRealWorldPrefixes4
 		if fam == "ipv6" {
-			rng = randomPrefixes6
+			rng = randomRealWorldPrefixes6
 		}
 
 		for _, nroutes := range benchRouteCount {
 			bart := new(Table[int])
-			for _, route := range rng(prng, nroutes) {
-				bart.Insert(route.pfx, route.val)
+			for i, pfx := range rng(prng, nroutes) {
+				bart.Insert(pfx, i)
 			}
 
 			b.Run(fmt.Sprintf("%s/%d", fam, nroutes), func(b *testing.B) {
@@ -666,4 +667,487 @@ func BenchmarkMem(b *testing.B) {
 			b.ReportMetric(0, "ns/op")
 		})
 	}
+}
+
+// worstcase benchmarks
+
+var (
+	worstCaseProbeIP4  = mpa("255.255.255.255")
+	worstCaseProbePfx4 = mpp("255.255.255.255/32")
+
+	ipv4DefaultRoute = mpp("0.0.0.0/0")
+	worstCasePfxsIP4 = []netip.Prefix{
+		mpp("0.0.0.0/1"),
+		mpp("254.0.0.0/8"),
+		mpp("255.0.0.0/9"),
+		mpp("255.254.0.0/16"),
+		mpp("255.255.0.0/17"),
+		mpp("255.255.254.0/24"),
+		mpp("255.255.255.0/25"),
+		mpp("255.255.255.255/32"), // matching prefix
+	}
+
+	worstCaseProbeIP6  = mpa("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")
+	worstCaseProbePfx6 = mpp("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff/128")
+
+	ipv6DefaultRoute = mpp("::/0")
+	worstCasePfxsIP6 = []netip.Prefix{
+		mpp("::/1"),
+		mpp("fe00::/8"),
+		mpp("ff00::/9"),
+		mpp("fffe::/16"),
+		mpp("ffff::/17"),
+		mpp("ffff:fe00::/24"),
+		mpp("ffff:ff00::/25"),
+		mpp("ffff:fffe::/32"),
+		mpp("ffff:ffff::/33"),
+		mpp("ffff:ffff:fe00::/40"),
+		mpp("ffff:ffff:ff00::/41"),
+		mpp("ffff:ffff:fffe::/48"),
+		mpp("ffff:ffff:ffff::/49"),
+		mpp("ffff:ffff:ffff:fe00::/56"),
+		mpp("ffff:ffff:ffff:ff00::/57"),
+		mpp("ffff:ffff:ffff:fffe::/64"),
+		mpp("ffff:ffff:ffff:ffff::/65"),
+		mpp("ffff:ffff:ffff:ffff:fe00::/72"),
+		mpp("ffff:ffff:ffff:ffff:ff00::/73"),
+		mpp("ffff:ffff:ffff:ffff:fffe::/80"),
+		mpp("ffff:ffff:ffff:ffff:ffff::/81"),
+		mpp("ffff:ffff:ffff:ffff:ffff:fe00::/88"),
+		mpp("ffff:ffff:ffff:ffff:ffff:ff00::/89"),
+		mpp("ffff:ffff:ffff:ffff:ffff:fffe::/96"),
+		mpp("ffff:ffff:ffff:ffff:ffff:ffff::/97"),
+		mpp("ffff:ffff:ffff:ffff:ffff:ffff:fe00::/104"),
+		mpp("ffff:ffff:ffff:ffff:ffff:ffff:ff00::/105"),
+		mpp("ffff:ffff:ffff:ffff:ffff:ffff:fffe::/112"),
+		mpp("ffff:ffff:ffff:ffff:ffff:ffff:ffff::/113"),
+		mpp("ffff:ffff:ffff:ffff:ffff:ffff:ffff:fe00/120"),
+		mpp("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ff00/121"),
+		mpp("ffff:ffff:ffff:ffff:ffff:ffff:ffff:fffe/128"),
+		mpp("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff/128"),
+	}
+)
+
+func BenchmarkTableWorstCaseMatch4(b *testing.B) {
+	b.Run("Contains", func(b *testing.B) {
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
+
+		for b.Loop() {
+			tbl.Contains(worstCaseProbeIP4)
+		}
+	})
+
+	b.Run("Lookup", func(b *testing.B) {
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
+		tbl.Insert(ipv4DefaultRoute, ipv4DefaultRoute.String())
+		tbl.Delete(worstCaseProbePfx4)
+
+		for b.Loop() {
+			tbl.Lookup(worstCaseProbeIP4)
+		}
+	})
+
+	b.Run("LookupPrefix", func(b *testing.B) {
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
+		tbl.Insert(ipv4DefaultRoute, ipv4DefaultRoute.String())
+		tbl.Delete(worstCaseProbePfx4)
+
+		for b.Loop() {
+			tbl.LookupPrefix(worstCaseProbePfx4)
+		}
+	})
+
+	b.Run("LookupPrefixLPM", func(b *testing.B) {
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
+		tbl.Insert(ipv4DefaultRoute, ipv4DefaultRoute.String())
+		tbl.Delete(worstCaseProbePfx4)
+
+		for b.Loop() {
+			tbl.LookupPrefixLPM(worstCaseProbePfx4)
+		}
+	})
+}
+
+func BenchmarkFastWorstCaseMatch4(b *testing.B) {
+	b.Run("Contains", func(b *testing.B) {
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
+
+		for b.Loop() {
+			tbl.Contains(worstCaseProbeIP4)
+		}
+	})
+
+	b.Run("Lookup", func(b *testing.B) {
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
+		tbl.Insert(ipv4DefaultRoute, ipv4DefaultRoute.String())
+		tbl.Delete(worstCaseProbePfx4)
+
+		for b.Loop() {
+			tbl.Lookup(worstCaseProbeIP4)
+		}
+	})
+
+	b.Run("LookupPrefix", func(b *testing.B) {
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
+		tbl.Insert(ipv4DefaultRoute, ipv4DefaultRoute.String())
+		tbl.Delete(worstCaseProbePfx4)
+
+		for b.Loop() {
+			tbl.LookupPrefix(worstCaseProbePfx4)
+		}
+	})
+
+	b.Run("LookupPrefixLPM", func(b *testing.B) {
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
+		tbl.Insert(ipv4DefaultRoute, ipv4DefaultRoute.String())
+		tbl.Delete(worstCaseProbePfx4)
+
+		for b.Loop() {
+			tbl.LookupPrefixLPM(worstCaseProbePfx4)
+		}
+	})
+}
+
+func BenchmarkTableWorstCaseMiss4(b *testing.B) {
+	b.Run("Contains", func(b *testing.B) {
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
+
+		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
+
+		for b.Loop() {
+			tbl.Contains(worstCaseProbeIP4)
+		}
+	})
+
+	b.Run("Lookup", func(b *testing.B) {
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
+
+		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
+
+		for b.Loop() {
+			tbl.Lookup(worstCaseProbeIP4)
+		}
+	})
+
+	b.Run("LookupPrefix", func(b *testing.B) {
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
+
+		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
+
+		for b.Loop() {
+			tbl.LookupPrefix(worstCaseProbePfx4)
+		}
+	})
+
+	b.Run("LookupPrefixLPM", func(b *testing.B) {
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
+
+		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
+
+		for b.Loop() {
+			tbl.LookupPrefixLPM(worstCaseProbePfx4)
+		}
+	})
+}
+
+func BenchmarkFastWorstCaseMiss4(b *testing.B) {
+	b.Run("Contains", func(b *testing.B) {
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
+
+		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
+
+		for b.Loop() {
+			tbl.Contains(worstCaseProbeIP4)
+		}
+	})
+
+	b.Run("Lookup", func(b *testing.B) {
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
+
+		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
+
+		for b.Loop() {
+			tbl.Lookup(worstCaseProbeIP4)
+		}
+	})
+
+	b.Run("LookupPrefix", func(b *testing.B) {
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
+
+		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
+
+		for b.Loop() {
+			tbl.LookupPrefix(worstCaseProbePfx4)
+		}
+	})
+
+	b.Run("LookupPrefixLPM", func(b *testing.B) {
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP4 {
+			tbl.Insert(p, p.String())
+		}
+
+		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
+
+		for b.Loop() {
+			tbl.LookupPrefixLPM(worstCaseProbePfx4)
+		}
+	})
+}
+
+func BenchmarkTableWorstCaseMatch6(b *testing.B) {
+	b.Run("Contains", func(b *testing.B) {
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
+
+		for b.Loop() {
+			tbl.Contains(worstCaseProbeIP6)
+		}
+	})
+
+	b.Run("Lookup", func(b *testing.B) {
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
+		tbl.Insert(ipv6DefaultRoute, ipv6DefaultRoute.String())
+		tbl.Delete(worstCaseProbePfx6)
+
+		for b.Loop() {
+			tbl.Lookup(worstCaseProbeIP6)
+		}
+	})
+
+	b.Run("LookupPrefix", func(b *testing.B) {
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
+		tbl.Insert(ipv6DefaultRoute, ipv6DefaultRoute.String())
+		tbl.Delete(worstCaseProbePfx6)
+
+		for b.Loop() {
+			tbl.LookupPrefix(worstCaseProbePfx6)
+		}
+	})
+
+	b.Run("LookupPrefixLPM", func(b *testing.B) {
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
+		tbl.Insert(ipv6DefaultRoute, ipv6DefaultRoute.String())
+		tbl.Delete(worstCaseProbePfx6)
+
+		for b.Loop() {
+			tbl.LookupPrefixLPM(worstCaseProbePfx6)
+		}
+	})
+}
+
+func BenchmarkFastWorstCaseMatch6(b *testing.B) {
+	b.Run("Contains", func(b *testing.B) {
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
+
+		for b.Loop() {
+			tbl.Contains(worstCaseProbeIP6)
+		}
+	})
+
+	b.Run("Lookup", func(b *testing.B) {
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
+		tbl.Insert(ipv6DefaultRoute, ipv6DefaultRoute.String())
+		tbl.Delete(worstCaseProbePfx6)
+
+		for b.Loop() {
+			tbl.Lookup(worstCaseProbeIP6)
+		}
+	})
+
+	b.Run("LookupPrefix", func(b *testing.B) {
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
+		tbl.Insert(ipv6DefaultRoute, ipv6DefaultRoute.String())
+		tbl.Delete(worstCaseProbePfx6)
+
+		for b.Loop() {
+			tbl.LookupPrefix(worstCaseProbePfx6)
+		}
+	})
+
+	b.Run("LookupPrefixLPM", func(b *testing.B) {
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
+		tbl.Insert(ipv6DefaultRoute, ipv6DefaultRoute.String())
+		tbl.Delete(worstCaseProbePfx6)
+
+		for b.Loop() {
+			tbl.LookupPrefixLPM(worstCaseProbePfx6)
+		}
+	})
+}
+
+func BenchmarkTableWorstCaseMiss6(b *testing.B) {
+	b.Run("Contains", func(b *testing.B) {
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
+
+		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
+
+		for b.Loop() {
+			tbl.Contains(worstCaseProbeIP6)
+		}
+	})
+
+	b.Run("Lookup", func(b *testing.B) {
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
+
+		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
+
+		for b.Loop() {
+			tbl.Lookup(worstCaseProbeIP6)
+		}
+	})
+
+	b.Run("LookupPrefix", func(b *testing.B) {
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
+
+		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
+
+		for b.Loop() {
+			tbl.LookupPrefix(worstCaseProbePfx6)
+		}
+	})
+
+	b.Run("LookupPrefixLPM", func(b *testing.B) {
+		tbl := new(Table[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
+
+		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
+
+		for b.Loop() {
+			tbl.LookupPrefixLPM(worstCaseProbePfx6)
+		}
+	})
+}
+
+func BenchmarkFastWorstCaseMiss6(b *testing.B) {
+	b.Run("Contains", func(b *testing.B) {
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
+
+		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
+
+		for b.Loop() {
+			tbl.Contains(worstCaseProbeIP6)
+		}
+	})
+
+	b.Run("Lookup", func(b *testing.B) {
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
+
+		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
+
+		for b.Loop() {
+			tbl.Lookup(worstCaseProbeIP6)
+		}
+	})
+
+	b.Run("LookupPrefix", func(b *testing.B) {
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
+
+		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
+
+		for b.Loop() {
+			tbl.LookupPrefix(worstCaseProbePfx6)
+		}
+	})
+
+	b.Run("LookupPrefixLPM", func(b *testing.B) {
+		tbl := new(Fast[string])
+		for _, p := range worstCasePfxsIP6 {
+			tbl.Insert(p, p.String())
+		}
+
+		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
+
+		for b.Loop() {
+			tbl.LookupPrefixLPM(worstCaseProbePfx6)
+		}
+	})
 }

@@ -300,14 +300,14 @@ func TestFastLookupPrefixLPMCompare(t *testing.T) {
 	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
-	pfxs := randomPrefixes(prng, n)
+	pfxs := randomRealWorldPrefixes(prng, n)
 
 	gold := new(goldTable[int])
-	gold.insertMany(pfxs)
 
 	fast := new(Fast[int])
-	for _, pfx := range pfxs {
-		fast.Insert(pfx.pfx, pfx.val)
+	for i, pfx := range pfxs {
+		gold.insert(pfx, i)
+		fast.Insert(pfx, i)
 	}
 
 	for range n {

@@ -42,7 +42,7 @@ func cmpPrefix(a, b netip.Prefix) int {
 	return nodes.CmpPrefix(a, b)
 }
 
-// TODO
+// shouldPrintValues returns true if the payload V is not the empty struct.
 func shouldPrintValues[V any]() bool {
 	var zero V
 
