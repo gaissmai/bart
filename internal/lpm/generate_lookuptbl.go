@@ -48,7 +48,7 @@ import (
 
 var (
 	thisFname = os.Getenv("GOFILE")
-	outFname  = "lookuptbl_gen.go"
+	outFname  = "lookuptblgenerated.go"
 )
 
 // data holds the template variables for code generation.
