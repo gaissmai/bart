@@ -1,10 +1,9 @@
-// REPLACE with generate hint
+//go:build generate
 
 // Copyright (c) 2025 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
 //go:generate ../../scripts/generate-node-methods.sh
-//go:build generate
 
 package nodes
 

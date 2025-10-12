@@ -29,13 +29,16 @@ readonly NODE_TYPES=("BartNode" "FastNode" "LiteNode")
 generated_files=()
 
 for nodeType in "${NODE_TYPES[@]}"; do
-    # build output filename e.g. bartcommon_gen_test.go
-    output_file="${nodeType,,}"                                       # lowercase e.g. bartNode -> bartnode
-    output_file="${output_file}${template_file/_tmpl/generated_test}" # concat with mangled template filename
-    output_file="${output_file//node/}"                               # remove node in filename
+    # Build output filename, e.g. litetestsgenerated_test.go
+    template_base="${template_file##*/}"                                # basename: tests_tmpl.go
+    type_prefix="${nodeType,,}"                                         # litenode
+    type_prefix="${type_prefix/node/}"                                  # lite
+    base_mangled="${template_base/_tmpl/generated_test}"                # testsgenerated_test.go
+    output_file="${type_prefix}${base_mangled}"                         # litetestsgenerated_test.go
     
     # Remove go:generate directives and build constraint, add generated header, substitute node type
-    sed -e "s|.*REPLACE with generate hint.*|// Code generated from file \"${template_file}\"; DO NOT EDIT.|" \
+    sed -e "1i\\
+// Code generated from file \"${template_file}\"; DO NOT EDIT." \
         -e '/^\/\/go:build generate\b/d' \
         -e '/^\/\/go:generate\b/d' \
         -e '/GENERATE DELETE START/,/GENERATE DELETE END/d' \

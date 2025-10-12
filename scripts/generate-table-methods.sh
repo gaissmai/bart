@@ -29,15 +29,17 @@ readonly TABLE_TYPES=("Table" "Fast" "liteTable")
 generated_files=()
 
 for tableType in "${TABLE_TYPES[@]}"; do
-    # build output filename e.g. bartiterators_gen.go
-    output_file="${tableType,,}"                            # lowercase e.g. Fast -> fast
-    output_file="${output_file}${template_file/_tmpl/_gen}" # concat with mangled template filename
-    output_file="${output_file/common/}"                    # common       -> 
-    output_file="${output_file/#table/bart}"                # tablefoo     -> bartfoo
-    output_file="${output_file/#litetable/lite}"            # litetablefoo -> litefoo
+    template_base="${template_file##*/}"            # basename: tablemethods_tmpl.go
+    type_prefix="${tableType,,}"                    # lowercase
+    type_prefix="${type_prefix/#table/bart}"        # table     -> bart
+    type_prefix="${type_prefix/#litetable/lite}"    # litetable -> lite
+    base_mangled="${template_base/_tmpl/generated}" # tablemethodsgenerated.go
+    base_mangled="${base_mangled//all/}"            # methodsgenerated.go (global)
+    output_file="${type_prefix}${base_mangled}"     # fastmethodsgenerated.go
 
     # Remove go:generate directives and build constraint, add generated header, substitute node type
-    sed -e "s|.*REPLACE with generate hint.*|// Code generated from file \"${template_file}\"; DO NOT EDIT.|" \
+    sed -e "1i\\
+// Code generated from file \"${template_file}\"; DO NOT EDIT." \
         -e '/^\/\/go:build generate\b/d' \
         -e '/^\/\/go:generate\b/d' \
         -e '/GENERATE DELETE START/,/GENERATE DELETE END/d' \

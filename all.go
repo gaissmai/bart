@@ -95,9 +95,10 @@ func cloneFnFactory[V any]() nodes.CloneFunc[V] {
 	return nil
 }
 
-// cloneVal returns a deep clone of val by calling its Clone method when
-// val implements Cloner[V]. If val does not implement Cloner[V] or its
-// Clone method is nil, cloneVal returns val unchanged.
+// cloneVal returns a deep clone of val by calling Clone when
+// val implements Cloner[V]. If val does not implement
+// Cloner[V] or the Cloner receiver is nil (val is a nil pointer),
+// cloneVal returns val unchanged.
 func cloneVal[V any](val V) V {
 	// you can't assert directly on a type parameter
 	c, ok := any(val).(Cloner[V])
