@@ -16,7 +16,7 @@ if [[ ! -f "${template_file}" ]]; then
     DIE  "GOFILE=${GOFILE:-<not set>}" >&2
 fi
 
-INFO "START: Generating monomorphized node methods from template '${GOFILE}' ..."
+INFO "START: Generating monomorphized node tests from template '${GOFILE}' ..."
 
 if grep -q "TODO" "${template_file}"; then
 	DIE "✗ Aborting, found pattern 'TODO' in ${template_file}" >&2
@@ -29,10 +29,10 @@ readonly NODE_TYPES=("BartNode" "FastNode" "LiteNode")
 generated_files=()
 
 for nodeType in "${NODE_TYPES[@]}"; do
-    # build output filename e.g. bartiterators_gen.go
-    output_file="${nodeType,,}"                                  # lowercase e.g. bartNode -> bartnode
-    output_file="${output_file}${template_file/_tmpl/generated}" # concat with mangled template filename
-    output_file="${output_file//node/}"                          # remove node in filename
+    # build output filename e.g. bartcommon_gen_test.go
+    output_file="${nodeType,,}"                                       # lowercase e.g. bartNode -> bartnode
+    output_file="${output_file}${template_file/_tmpl/generated_test}" # concat with mangled template filename
+    output_file="${output_file//node/}"                               # remove node in filename
     
     # Remove go:generate directives and build constraint, add generated header, substitute node type
     sed -e "s|.*REPLACE with generate hint.*|// Code generated from file \"${template_file}\"; DO NOT EDIT.|" \

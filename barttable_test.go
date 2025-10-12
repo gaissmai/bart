@@ -678,16 +678,10 @@ func TestTableModifySemantics(t *testing.T) {
 		cb  func(val int, found bool) (_ int, del bool)
 	}
 
-	type want struct {
-		val     int
-		deleted bool
-	}
-
 	tests := []struct {
 		name      string
 		prepare   map[netip.Prefix]int // entries to pre-populate the table
 		args      args
-		want      want
 		finalData map[netip.Prefix]int // expected table contents after the operation
 	}{
 		{
@@ -697,7 +691,6 @@ func TestTableModifySemantics(t *testing.T) {
 				pfx: mpp("10.0.0.0/8"),
 				cb:  func(val int, found bool) (_ int, del bool) { return 0, true },
 			},
-			want:      want{val: 42, deleted: true},
 			finalData: map[netip.Prefix]int{mpp("2001:db8::/32"): 4242},
 		},
 
@@ -708,7 +701,6 @@ func TestTableModifySemantics(t *testing.T) {
 				pfx: mpp("2001:db8::/32"),
 				cb:  func(val int, found bool) (_ int, del bool) { return 4242, false },
 			},
-			want:      want{val: 4242, deleted: false},
 			finalData: map[netip.Prefix]int{mpp("10.0.0.0/8"): 42, mpp("2001:db8::/32"): 4242},
 		},
 
@@ -720,7 +712,6 @@ func TestTableModifySemantics(t *testing.T) {
 				pfx: mpp("10.0.0.0/8"),
 				cb:  func(val int, found bool) (_ int, del bool) { return -1, false },
 			},
-			want:      want{val: 42, deleted: false},
 			finalData: map[netip.Prefix]int{mpp("10.0.0.0/8"): -1, mpp("2001:db8::/32"): 4242},
 		},
 
@@ -731,7 +722,6 @@ func TestTableModifySemantics(t *testing.T) {
 				pfx: mpp("2001:db8::/32"),
 				cb:  func(val int, found bool) (_ int, del bool) { return 0, true },
 			},
-			want:      want{val: 0, deleted: false},
 			finalData: map[netip.Prefix]int{mpp("10.0.0.0/8"): 42},
 		},
 	}
@@ -771,16 +761,10 @@ func TestTableModifyPersistSemantics(t *testing.T) {
 		cb  func(val int, found bool) (_ int, del bool)
 	}
 
-	type want struct {
-		val     int
-		deleted bool
-	}
-
 	tests := []struct {
 		name      string
 		prepare   map[netip.Prefix]int // entries to pre-populate the table
 		args      args
-		want      want
 		finalData map[netip.Prefix]int // expected table contents after the operation
 	}{
 		{
@@ -790,7 +774,6 @@ func TestTableModifyPersistSemantics(t *testing.T) {
 				pfx: mpp("10.0.0.0/8"),
 				cb:  func(val int, found bool) (_ int, del bool) { return 0, true },
 			},
-			want:      want{val: 42, deleted: true},
 			finalData: map[netip.Prefix]int{mpp("2001:db8::/32"): 4242},
 		},
 
@@ -801,7 +784,6 @@ func TestTableModifyPersistSemantics(t *testing.T) {
 				pfx: mpp("2001:db8::/32"),
 				cb:  func(val int, found bool) (_ int, del bool) { return 4242, false },
 			},
-			want:      want{val: 4242, deleted: false},
 			finalData: map[netip.Prefix]int{mpp("10.0.0.0/8"): 42, mpp("2001:db8::/32"): 4242},
 		},
 
@@ -813,7 +795,6 @@ func TestTableModifyPersistSemantics(t *testing.T) {
 				pfx: mpp("10.0.0.0/8"),
 				cb:  func(val int, found bool) (_ int, del bool) { return -1, false },
 			},
-			want:      want{val: 42, deleted: false},
 			finalData: map[netip.Prefix]int{mpp("10.0.0.0/8"): -1, mpp("2001:db8::/32"): 4242},
 		},
 
@@ -824,7 +805,6 @@ func TestTableModifyPersistSemantics(t *testing.T) {
 				pfx: mpp("2001:db8::/32"),
 				cb:  func(val int, found bool) (_ int, del bool) { return 0, true },
 			},
-			want:      want{val: 0, deleted: false},
 			finalData: map[netip.Prefix]int{mpp("10.0.0.0/8"): 42},
 		},
 	}
