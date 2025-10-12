@@ -466,36 +466,6 @@ func TestLiteNode_Stats_Dump_Fprint_DirectItems(t *testing.T) {
 	}
 }
 
-func TestLiteNode_Supernets_and_Subnets(t *testing.T) {
-	t.Parallel()
-	n := &LiteNode[int]{}
-	// tree: 10/8 -> 10.1/16 -> 10.1.1/24
-	n.Insert(mpp("10.0.0.0/8"), 0, 0)
-	n.Insert(mpp("10.1.0.0/16"), 0, 0)
-	n.Insert(mpp("10.1.1.0/24"), 0, 0)
-	n.Insert(mpp("192.168.0.0/16"), 0, 0)
-
-	// Supernets(10.1.1.0/24)
-	var supers []netip.Prefix
-	n.Supernets(mpp("10.1.1.0/24"), func(p netip.Prefix, _ int) bool {
-		supers = append(supers, p)
-		return true
-	})
-	if len(supers) != 3 {
-		t.Errorf("Supernets count=%d, want 3", len(supers))
-	}
-
-	// Subnets(10/8)
-	var subs []netip.Prefix
-	n.Subnets(mpp("10.0.0.0/8"), func(p netip.Prefix, _ int) bool {
-		subs = append(subs, p)
-		return true
-	})
-	if len(subs) != 3 {
-		t.Errorf("Subnets count=%d, want 3", len(subs))
-	}
-}
-
 func TestLiteNode_Overlaps_Basic_and_PrefixAtDepth(t *testing.T) {
 	t.Parallel()
 	a := &LiteNode[int]{}

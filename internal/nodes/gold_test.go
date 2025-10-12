@@ -170,8 +170,6 @@ func (t goldTable[V]) allSorted() []netip.Prefix {
 	return result
 }
 
-/*
-
 func (t goldTable[V]) get(pfx netip.Prefix) (val V, ok bool) {
 	pfx = pfx.Masked()
 	for _, item := range t {
@@ -313,5 +311,3 @@ func (t *goldTable[V]) sort() {
 		return CmpPrefix(a.pfx, b.pfx)
 	})
 }
-
-*/
