@@ -29,7 +29,7 @@ import (
 
 var (
 	thisFname = os.Getenv("GOFILE")
-	outFname  = "allotRoutes_gen.go"
+	outFname  = "allotroutesgenerated.go"
 )
 
 var (
