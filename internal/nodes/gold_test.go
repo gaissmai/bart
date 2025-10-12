@@ -170,6 +170,7 @@ func (t goldTable[V]) allSorted() []netip.Prefix {
 	return result
 }
 
+// nolint:unused
 func (t goldTable[V]) get(pfx netip.Prefix) (val V, ok bool) {
 	pfx = pfx.Masked()
 	for _, item := range t {
@@ -180,6 +181,7 @@ func (t goldTable[V]) get(pfx netip.Prefix) (val V, ok bool) {
 	return val, false
 }
 
+// nolint:unused
 func (t *goldTable[V]) update(pfx netip.Prefix, cb func(V, bool) V) (val V) {
 	pfx = pfx.Masked()
 	for i, item := range *t {
@@ -197,6 +199,7 @@ func (t *goldTable[V]) update(pfx netip.Prefix, cb func(V, bool) V) (val V) {
 	return val
 }
 
+// nolint:unused
 func (ta *goldTable[V]) union(tb *goldTable[V]) {
 	for _, bItem := range *tb {
 		var match bool
@@ -213,6 +216,7 @@ func (ta *goldTable[V]) union(tb *goldTable[V]) {
 	}
 }
 
+// nolint:unused
 func (t goldTable[V]) lookup(addr netip.Addr) (val V, ok bool) {
 	bestLen := -1
 
@@ -226,6 +230,7 @@ func (t goldTable[V]) lookup(addr netip.Addr) (val V, ok bool) {
 	return val, ok
 }
 
+// nolint:unused
 func (t goldTable[V]) lookupPrefix(pfx netip.Prefix) (val V, ok bool) {
 	pfx = pfx.Masked()
 	bestLen := -1
@@ -240,6 +245,7 @@ func (t goldTable[V]) lookupPrefix(pfx netip.Prefix) (val V, ok bool) {
 	return val, ok
 }
 
+// nolint:unused
 func (t goldTable[V]) lookupPrefixLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) {
 	pfx = pfx.Masked()
 	bestLen := -1
@@ -306,6 +312,7 @@ func (ta *goldTable[V]) overlaps(tb *goldTable[V]) bool {
 }
 
 // sort, inplace by netip.Prefix, all prefixes are in normalized form
+// nolint:unused
 func (t *goldTable[V]) sort() {
 	slices.SortFunc(*t, func(a, b goldTableItem[V]) int {
 		return CmpPrefix(a.pfx, b.pfx)
