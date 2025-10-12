@@ -19,7 +19,6 @@ func TestInsertDeleteLiteNode(t *testing.T) {
 		name        string
 		pfxs        []string
 		is4         bool
-		wantSize    int
 		wantPfxs    int
 		wantLeaves  int
 		wantFringes int
