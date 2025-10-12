@@ -387,3 +387,54 @@ func TestAllIteratorsBartNode(t *testing.T) {
 		}
 	}
 }
+
+func TestSupernetsAndSubnetsBartNode(t *testing.T) {
+	t.Parallel()
+	n := workLoadN()
+
+	prng := rand.New(rand.NewPCG(42, 42))
+	for range 100 {
+		pfxs := randomRealWorldPrefixes6(prng, n)
+
+		node := new(BartNode[int])
+		gold := new(goldTable[int])
+
+		for i, pfx := range pfxs {
+			node.Insert(pfx, i, 0)
+			gold.insert(pfx, i)
+		}
+
+		k := prng.IntN(len(pfxs))
+		probe := pfxs[k]
+
+		goldSupernets := gold.supernets(probe)
+		nodeSupernets := []netip.Prefix{}
+
+		node.Supernets(probe, func(p netip.Prefix, _ int) bool {
+			nodeSupernets = append(nodeSupernets, p)
+			return true
+		})
+
+		if len(goldSupernets) != len(nodeSupernets) {
+			t.Errorf("Supernets count=%d, want %d", len(nodeSupernets), len(goldSupernets))
+		}
+		if !slices.Equal(goldSupernets, nodeSupernets) {
+			t.Errorf("Supernets expected equal")
+		}
+
+		goldSubnets := gold.subnets(probe)
+		nodeSubnets := []netip.Prefix{}
+
+		node.Subnets(probe, func(p netip.Prefix, _ int) bool {
+			nodeSubnets = append(nodeSubnets, p)
+			return true
+		})
+
+		if len(goldSubnets) != len(nodeSubnets) {
+			t.Errorf("Subnets count=%d, want %d", len(nodeSubnets), len(goldSubnets))
+		}
+		if !slices.Equal(goldSubnets, nodeSubnets) {
+			t.Errorf("Subnets expected equal")
+		}
+	}
+}
