@@ -1,47 +1,19 @@
-// REPLACE with generate hint
+// Code generated from file "tests_tmpl.go"; DO NOT EDIT.
 
 // Copyright (c) 2025 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
-//go:generate ../../scripts/generate-node-methods.sh
-//go:build generate
-
 package nodes
 
-// ### GENERATE DELETE START ###
-
-// stub code for generator types and methods
-// useful for gopls during development, deleted during go generate
-
 import (
-	"io"
-	"net/netip"
 	"strings"
 	"testing"
-
-	"github.com/gaissmai/bart/internal/bitset"
 )
 
-type _NODE_TYPE[V any] struct {
-	Prefixes struct{ bitset.BitSet256 }
-	Children struct{ bitset.BitSet256 }
-}
+func TestInsertDeleteFastNode(t *testing.T) {
+	t.Parallel()
 
-func (n *_NODE_TYPE[V]) IsEmpty() (_ bool)                                         { return }
-func (n *_NODE_TYPE[V]) StatsRec() (_ StatsT)                                      { return }
-func (n *_NODE_TYPE[V]) DumpRec(io.Writer, StridePath, int, bool, bool)            { return }
-func (n *_NODE_TYPE[V]) Insert(netip.Prefix, V, int) (_ bool)                      { return }
-func (n *_NODE_TYPE[V]) Delete(netip.Prefix) (_ bool)                              { return }
-func (n *_NODE_TYPE[V]) InsertPersist(CloneFunc[V], netip.Prefix, V, int) (_ bool) { return }
-func (n *_NODE_TYPE[V]) DeletePersist(CloneFunc[V], netip.Prefix) (_ bool)         { return }
-
-// ### GENERATE DELETE END ###
-
-func TestInsertDelete_NODE_TYPE(t *testing.T) {
-	type instanceT struct{}
-	zero := instanceT{}
-
-	n := new(_NODE_TYPE[instanceT])
+	zero := 0
 
 	testsInsertDelete := []struct {
 		name        string
@@ -143,6 +115,9 @@ func TestInsertDelete_NODE_TYPE(t *testing.T) {
 
 	for _, tt := range testsInsertDelete {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			n := new(FastNode[int])
 			for _, s := range tt.pfxs {
 				n.Insert(mpp(s), zero, 0)
 				n.Insert(mpp(s), zero, 0) // idempotent
@@ -192,6 +167,8 @@ func TestInsertDelete_NODE_TYPE(t *testing.T) {
 
 		t.Run("Persist_"+tt.name, func(t *testing.T) {
 			t.Parallel()
+
+			n := new(FastNode[int])
 
 			for _, s := range tt.pfxs {
 				n.InsertPersist(nil, mpp(s), zero, 0)
