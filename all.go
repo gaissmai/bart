@@ -46,11 +46,13 @@ func lastOctetPlusOneAndLastBits(pfx netip.Prefix) (lastOctetPlusOne int, lastBi
 	return nodes.LastOctetPlusOneAndLastBits(pfx)
 }
 
+// cmpPrefix compares two netip.Prefix values and reports their ordering.
 func cmpPrefix(a, b netip.Prefix) int {
 	return nodes.CmpPrefix(a, b)
 }
 
-// shouldPrintValues returns true if the payload V is not the empty struct.
+// shouldPrintValues reports whether values of type V should be printed.
+// It returns true if V is not the empty struct, false otherwise.
 func shouldPrintValues[V any]() bool {
 	var zero V
 
@@ -94,8 +96,8 @@ func cloneFnFactory[V any]() nodes.CloneFunc[V] {
 }
 
 // cloneVal returns a deep clone of val by calling its Clone method when
-// val implements Cloner[V]. If val does not implement Cloner[V] or the
-// asserted Cloner is nil, val is returned unchanged.
+// val implements Cloner[V]. If val does not implement Cloner[V] or its
+// Clone method is nil, cloneVal returns val unchanged.
 func cloneVal[V any](val V) V {
 	// you can't assert directly on a type parameter
 	c, ok := any(val).(Cloner[V])
