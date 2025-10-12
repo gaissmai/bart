@@ -6,9 +6,50 @@
 package nodes
 
 import (
+	"iter"
+	"math/rand/v2"
+	"net/netip"
+	"slices"
 	"strings"
 	"testing"
 )
+
+// common helpers
+func (n *BartNode[V]) all4() iter.Seq2[netip.Prefix, V] {
+	return func(yield func(netip.Prefix, V) bool) {
+		if n == nil {
+			return
+		}
+		_ = n.AllRec(StridePath{}, 0, true, yield)
+	}
+}
+
+func (n *BartNode[V]) all6() iter.Seq2[netip.Prefix, V] {
+	return func(yield func(netip.Prefix, V) bool) {
+		if n == nil {
+			return
+		}
+		_ = n.AllRec(StridePath{}, 0, false, yield)
+	}
+}
+
+func (n *BartNode[V]) allSorted4() iter.Seq2[netip.Prefix, V] {
+	return func(yield func(netip.Prefix, V) bool) {
+		if n == nil {
+			return
+		}
+		_ = n.AllRecSorted(StridePath{}, 0, true, yield)
+	}
+}
+
+func (n *BartNode[V]) allSorted6() iter.Seq2[netip.Prefix, V] {
+	return func(yield func(netip.Prefix, V) bool) {
+		if n == nil {
+			return
+		}
+		_ = n.AllRecSorted(StridePath{}, 0, false, yield)
+	}
+}
 
 func TestInsertDeleteBartNode(t *testing.T) {
 	t.Parallel()
@@ -294,5 +335,55 @@ func TestInsertDeleteBartNode(t *testing.T) {
 				t.Logf("%s:\n%s", tt.name, buf.String())
 			}
 		})
+	}
+}
+
+func TestAllIteratorsBartNode(t *testing.T) {
+	t.Parallel()
+	n := workLoadN()
+
+	prng := rand.New(rand.NewPCG(42, 42))
+
+	for range 100 {
+		pfxs := randomRealWorldPrefixes4(prng, n)
+
+		node := new(BartNode[int])
+		for _, p := range pfxs {
+			node.Insert(p, 0, 0)
+		}
+
+		// AllRec: collect without order guarantee
+		var got []netip.Prefix
+		i := 0
+		for p := range node.all4() {
+			i++
+			got = append(got, p)
+			if i >= n/2 {
+				break
+			}
+		}
+
+		if len(got) != n/2 {
+			t.Fatalf("AllRec len=%d, want %d", len(got), n/2)
+		}
+
+		got = nil
+		i = 0
+		for p := range node.allSorted4() {
+			i++
+			got = append(got, p)
+			if i >= n/2 {
+				break
+			}
+		}
+
+		if len(got) != n/2 {
+			t.Fatalf("AllRecSorted len=%d, want %d", len(got), n/2)
+		}
+
+		slices.SortFunc(pfxs, CmpPrefix)
+		if !slices.Equal(pfxs[:n/2], got) {
+			t.Fatal("AllRecSorted is not as expected")
+		}
 	}
 }

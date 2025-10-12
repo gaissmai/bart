@@ -2,7 +2,6 @@ package nodes
 
 import (
 	"bytes"
-	"iter"
 	"math/rand/v2"
 	"net/netip"
 	"slices"
@@ -11,24 +10,6 @@ import (
 
 	"github.com/gaissmai/bart/internal/art"
 )
-
-func (l *LiteNode[V]) allSorted4() iter.Seq2[netip.Prefix, V] {
-	return func(yield func(netip.Prefix, V) bool) {
-		if l == nil {
-			return
-		}
-		_ = l.AllRecSorted(StridePath{}, 0, true, yield)
-	}
-}
-
-func (l *LiteNode[V]) allSorted6() iter.Seq2[netip.Prefix, V] {
-	return func(yield func(netip.Prefix, V) bool) {
-		if l == nil {
-			return
-		}
-		_ = l.AllRecSorted(StridePath{}, 0, false, yield)
-	}
-}
 
 func TestLiteNode_EmptyState(t *testing.T) {
 	t.Parallel()
@@ -482,39 +463,6 @@ func TestLiteNode_Stats_Dump_Fprint_DirectItems(t *testing.T) {
 	items := n.DirectItemsRec(0, StridePath{}, 0, true)
 	if len(items) == 0 {
 		t.Errorf("DirectItemsRec returned no items")
-	}
-}
-
-func TestLiteNode_AllRec_and_AllRecSorted(t *testing.T) {
-	t.Parallel()
-	n := &LiteNode[int]{}
-	pfxs := []netip.Prefix{
-		mpp("10.1.0.0/16"),
-		mpp("10.0.0.0/8"),
-		mpp("192.168.0.0/16"),
-	}
-	for _, p := range pfxs {
-		n.Insert(p, 0, 0)
-	}
-
-	// AllRec: collect without order guarantee
-	var got []netip.Prefix
-	n.AllRec(StridePath{}, 0, true, func(p netip.Prefix, _ int) bool {
-		got = append(got, p)
-		return true
-	})
-	if len(got) != len(pfxs) {
-		t.Fatalf("AllRec len=%d, want %d", len(got), len(pfxs))
-	}
-
-	// AllRecSorted: verify order is sorted by CmpPrefix
-	var sorted []netip.Prefix
-	n.AllRecSorted(StridePath{}, 0, true, func(p netip.Prefix, _ int) bool {
-		sorted = append(sorted, p)
-		return true
-	})
-	if !slices.IsSortedFunc(sorted, CmpPrefix) {
-		t.Fatalf("AllRecSorted not sorted: %v", sorted)
 	}
 }
 
