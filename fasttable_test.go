@@ -705,7 +705,6 @@ func TestFastModifySemantics(t *testing.T) {
 		},
 
 		{
-			// For update, the callback gets oldVal, returns newVal, but Modify returns oldVal
 			name:    "Update existing entry",
 			prepare: map[netip.Prefix]int{mpp("10.0.0.0/8"): 42, mpp("2001:db8::/32"): 4242},
 			args: args{
@@ -788,7 +787,6 @@ func TestFastModifyPersistSemantics(t *testing.T) {
 		},
 
 		{
-			// For update, the callback gets oldVal, returns newVal, but Modify returns oldVal
 			name:    "Update existing entry",
 			prepare: map[netip.Prefix]int{mpp("10.0.0.0/8"): 42, mpp("2001:db8::/32"): 4242},
 			args: args{
