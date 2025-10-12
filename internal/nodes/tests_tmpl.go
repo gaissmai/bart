@@ -62,9 +62,25 @@ func TestInsertDelete_NODE_TYPE(t *testing.T) {
 			wantFringes: 0,
 		},
 		{
-			name:        "one leave in root node",
+			name:        "one prefix in root node IPv6",
+			pfxs:        []string{"::/0"},
+			is4:         false,
+			wantPfxs:    1,
+			wantLeaves:  0,
+			wantFringes: 0,
+		},
+		{
+			name:        "one leaf in root node",
 			pfxs:        []string{"0.0.0.0/32"},
 			is4:         true,
+			wantPfxs:    0,
+			wantLeaves:  1,
+			wantFringes: 0,
+		},
+		{
+			name:        "one leaf in root node IPv6",
+			pfxs:        []string{"::/32"},
+			is4:         false,
 			wantPfxs:    0,
 			wantLeaves:  1,
 			wantFringes: 0,
@@ -78,9 +94,25 @@ func TestInsertDelete_NODE_TYPE(t *testing.T) {
 			wantFringes: 1,
 		},
 		{
+			name:        "one fringe in root node IPv6",
+			pfxs:        []string{"0::/8"},
+			is4:         false,
+			wantPfxs:    0,
+			wantLeaves:  0,
+			wantFringes: 1,
+		},
+		{
 			name:        "many pfxs in root node",
 			pfxs:        []string{"0.0.0.0/0", "0.0.0.0/1", "0.0.0.0/2", "0.0.0.0/3"},
 			is4:         true,
+			wantPfxs:    4,
+			wantLeaves:  0,
+			wantFringes: 0,
+		},
+		{
+			name:        "many pfxs in root node IPv6",
+			pfxs:        []string{"::/0", "::/1", "::/2", "::/3"},
+			is4:         false,
 			wantPfxs:    4,
 			wantLeaves:  0,
 			wantFringes: 0,
@@ -92,6 +124,17 @@ func TestInsertDelete_NODE_TYPE(t *testing.T) {
 				"0.0.0.0/9", "1.0.0.0/9", "2.0.0.0/9", "3.0.0.0/9", // leaves
 			},
 			is4:         true,
+			wantPfxs:    4,
+			wantLeaves:  4,
+			wantFringes: 0,
+		},
+		{
+			name: "many pfxs and leaves in root node IPv6",
+			pfxs: []string{
+				"::/0", "::/1", "::/2", "::/3", // pfxs
+				"::/9", "0100::/9", "0200::/9", "0300::/9", // leaves
+			},
+			is4:         false,
 			wantPfxs:    4,
 			wantLeaves:  4,
 			wantFringes: 0,
@@ -109,13 +152,37 @@ func TestInsertDelete_NODE_TYPE(t *testing.T) {
 			wantFringes: 4,
 		},
 		{
+			name: "many pfxs, leaves and fringes in root node IPv6",
+			pfxs: []string{
+				"::/0", "::/1", // pfxs
+				"::/9", "0100::/19", "0200::/29", // leaves
+				"0400::/8", "0500::/8", "0600::/8", "0700::/8", // fringes
+			},
+			is4:         false,
+			wantPfxs:    2,
+			wantLeaves:  3,
+			wantFringes: 4,
+		},
+		{
 			name: "many pfxs, leaves and fringes in deeper level",
 			pfxs: []string{
 				"0.0.0.0/9", "0.0.0.0/10", // pfxs in level 1
-				"0.1.0.0/19", // leave in level 1
+				"0.1.0.0/19", // leaf in level 1
 				"0.2.0.0/16", // fringe in level 1
 			},
 			is4:         true,
+			wantPfxs:    2,
+			wantLeaves:  1,
+			wantFringes: 1,
+		},
+		{
+			name: "many pfxs, leaves and fringes in deeper level IPv6",
+			pfxs: []string{
+				"::/9", "::/10", // pfxs in level 1
+				"0010::/19", // leaf in level 1
+				"0020::/16", // fringe in level 1
+			},
+			is4:         false,
 			wantPfxs:    2,
 			wantLeaves:  1,
 			wantFringes: 1,
@@ -128,6 +195,18 @@ func TestInsertDelete_NODE_TYPE(t *testing.T) {
 				"0.0.0.0/24", // fringe in level 2
 			},
 			is4:         true,
+			wantPfxs:    2,
+			wantLeaves:  0,
+			wantFringes: 1,
+		},
+		{
+			name: "leaves and fringes in deeper level IPv6",
+			pfxs: []string{
+				"::/12", // pfx in level 1
+				"::/16", // fringe in level 1 -> default pfx in level 2
+				"::/24", // fringe in level 2
+			},
+			is4:         false,
 			wantPfxs:    2,
 			wantLeaves:  0,
 			wantFringes: 1,

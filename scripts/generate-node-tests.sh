@@ -1,5 +1,5 @@
 #!/bin/bash
-# Generate monomorphized methods for all node types from template files.
+# Generate tests for all node types from template files.
 
 set -euo pipefail
 
@@ -16,7 +16,7 @@ if [[ ! -f "${template_file}" ]]; then
     DIE  "GOFILE=${GOFILE:-<not set>}" >&2
 fi
 
-INFO "START: Generating monomorphized node tests from template '${GOFILE}' ..."
+INFO "START: Generating node tests from template '${GOFILE}' ..."
 
 if grep -q "TODO" "${template_file}"; then
 	DIE "✗ Aborting, found pattern 'TODO' in ${template_file}" >&2
