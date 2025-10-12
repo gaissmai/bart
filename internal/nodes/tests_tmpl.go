@@ -14,7 +14,10 @@ package nodes
 
 import (
 	"io"
+	"iter"
+	"math/rand/v2"
 	"net/netip"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -23,14 +26,55 @@ var mpp = netip.MustParsePrefix
 
 type _NODE_TYPE[V any] struct{}
 
-func (n *_NODE_TYPE[V]) StatsRec() (_ StatsT)                                      { return }
-func (n *_NODE_TYPE[V]) DumpRec(io.Writer, StridePath, int, bool, bool)            { return }
-func (n *_NODE_TYPE[V]) Insert(netip.Prefix, V, int) (_ bool)                      { return }
-func (n *_NODE_TYPE[V]) Delete(netip.Prefix) (_ bool)                              { return }
-func (n *_NODE_TYPE[V]) InsertPersist(CloneFunc[V], netip.Prefix, V, int) (_ bool) { return }
-func (n *_NODE_TYPE[V]) DeletePersist(CloneFunc[V], netip.Prefix) (_ bool)         { return }
+func (n *_NODE_TYPE[V]) StatsRec() (_ StatsT)                                              { return }
+func (n *_NODE_TYPE[V]) DumpRec(io.Writer, StridePath, int, bool, bool)                    { return }
+func (n *_NODE_TYPE[V]) Insert(netip.Prefix, V, int) (_ bool)                              { return }
+func (n *_NODE_TYPE[V]) Delete(netip.Prefix) (_ bool)                                      { return }
+func (n *_NODE_TYPE[V]) InsertPersist(CloneFunc[V], netip.Prefix, V, int) (_ bool)         { return }
+func (n *_NODE_TYPE[V]) DeletePersist(CloneFunc[V], netip.Prefix) (_ bool)                 { return }
+func (n *_NODE_TYPE[V]) AllRec(StridePath, int, bool, func(netip.Prefix, V) bool) (_ bool) { return }
+func (n *_NODE_TYPE[V]) AllRecSorted(StridePath, int, bool, func(netip.Prefix, V) bool) (_ bool) {
+	return
+}
 
 // ### GENERATE DELETE END ###
+
+// common helpers
+func (n *_NODE_TYPE[V]) all4() iter.Seq2[netip.Prefix, V] {
+	return func(yield func(netip.Prefix, V) bool) {
+		if n == nil {
+			return
+		}
+		_ = n.AllRec(StridePath{}, 0, true, yield)
+	}
+}
+
+func (n *_NODE_TYPE[V]) all6() iter.Seq2[netip.Prefix, V] {
+	return func(yield func(netip.Prefix, V) bool) {
+		if n == nil {
+			return
+		}
+		_ = n.AllRec(StridePath{}, 0, false, yield)
+	}
+}
+
+func (n *_NODE_TYPE[V]) allSorted4() iter.Seq2[netip.Prefix, V] {
+	return func(yield func(netip.Prefix, V) bool) {
+		if n == nil {
+			return
+		}
+		_ = n.AllRecSorted(StridePath{}, 0, true, yield)
+	}
+}
+
+func (n *_NODE_TYPE[V]) allSorted6() iter.Seq2[netip.Prefix, V] {
+	return func(yield func(netip.Prefix, V) bool) {
+		if n == nil {
+			return
+		}
+		_ = n.AllRecSorted(StridePath{}, 0, false, yield)
+	}
+}
 
 func TestInsertDelete_NODE_TYPE(t *testing.T) {
 	t.Parallel()
@@ -316,5 +360,55 @@ func TestInsertDelete_NODE_TYPE(t *testing.T) {
 				t.Logf("%s:\n%s", tt.name, buf.String())
 			}
 		})
+	}
+}
+
+func TestAllIterators_NODE_TYPE(t *testing.T) {
+	t.Parallel()
+	n := workLoadN()
+
+	prng := rand.New(rand.NewPCG(42, 42))
+
+	for range 100 {
+		pfxs := randomRealWorldPrefixes4(prng, n)
+
+		node := new(_NODE_TYPE[int])
+		for _, p := range pfxs {
+			node.Insert(p, 0, 0)
+		}
+
+		// AllRec: collect without order guarantee
+		var got []netip.Prefix
+		i := 0
+		for p := range node.all4() {
+			i++
+			got = append(got, p)
+			if i >= n/2 {
+				break
+			}
+		}
+
+		if len(got) != n/2 {
+			t.Fatalf("AllRec len=%d, want %d", len(got), n/2)
+		}
+
+		got = nil
+		i = 0
+		for p := range node.allSorted4() {
+			i++
+			got = append(got, p)
+			if i >= n/2 {
+				break
+			}
+		}
+
+		if len(got) != n/2 {
+			t.Fatalf("AllRecSorted len=%d, want %d", len(got), n/2)
+		}
+
+		slices.SortFunc(pfxs, CmpPrefix)
+		if !slices.Equal(pfxs[:n/2], got) {
+			t.Fatal("AllRecSorted is not as expected")
+		}
 	}
 }
