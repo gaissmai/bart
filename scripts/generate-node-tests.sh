@@ -3,8 +3,11 @@
 
 set -euo pipefail
 
+# INFO prints MESSAGE prefixed with "INFO:" in blue to stdout.
 function INFO  {                    echo -e "\e[34mINFO:\e[0m $1" ;         }
+# WARN prints a red-prefixed "WARN:" prefix followed by the provided message to stdout.
 function WARN  {                    echo -e "\e[31mWARN:\e[0m $1" ;         }
+# DIE prints an error message prefixed with `ERROR:` in red and exits with status 1.
 function DIE   {                    echo -e "\e[31mERROR:\e[0m $1"; exit 1; }
 
 # Use GOFILE environment variable set by go generate
