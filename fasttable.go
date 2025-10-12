@@ -18,8 +18,17 @@ import (
 // speed.
 //
 // The zero value is ready to use.
-//
 // A Fast table must not be copied by value; always pass by pointer.
+//
+// The payload type MUST NOT be a zero-sized value (for example: struct{}
+// or [0]byte). According to the Go specification:
+//
+//	"Pointers to distinct zero-size variables may or may not be equal."
+//
+// However, the ART algorithm requires that different prefixes, even with
+// identical payload V, result in distinct value pointers. This is not
+// guaranteed for zero-sized values; thus, zero-sized types as payload V
+// results in undefined behavior.
 //
 // Performance note: Do not pass IPv4-in-IPv6 addresses (e.g., ::ffff:192.0.2.1)
 // as input. The methods do not perform automatic unmapping to avoid unnecessary
