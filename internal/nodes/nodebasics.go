@@ -49,11 +49,11 @@ type TrieItem[V any] struct {
 
 // StatsT, only used for dump, tests and benchmarks
 type StatsT struct {
-	Pfxs    int
-	Childs  int
-	Nodes   int
-	Leaves  int
-	Fringes int
+	Prefixes int
+	Children int
+	SubNodes int
+	Leaves   int
+	Fringes  int
 }
 
 type nodeType byte
