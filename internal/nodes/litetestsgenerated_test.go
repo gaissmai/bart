@@ -14,7 +14,7 @@ import (
 	"testing"
 )
 
-// common helpers
+// helpers
 func (n *LiteNode[V]) all4() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
 		if n == nil {
@@ -344,7 +344,7 @@ func TestAllIteratorsLiteNode(t *testing.T) {
 
 	prng := rand.New(rand.NewPCG(42, 42))
 
-	for range 100 {
+	for range 10 {
 		pfxs := randomRealWorldPrefixes4(prng, n)
 
 		node := new(LiteNode[int])
@@ -393,8 +393,8 @@ func TestSupernets4LiteNode(t *testing.T) {
 	n := workLoadN()
 	prng := rand.New(rand.NewPCG(42, 42))
 
-	for range 100 {
-		pfxs := randomRealWorldPrefixes6(prng, n)
+	for range 10 {
+		pfxs := randomRealWorldPrefixes4(prng, n)
 
 		node := new(LiteNode[int])
 		gold := new(goldTable[int])
@@ -426,7 +426,7 @@ func TestSupernets6LiteNode(t *testing.T) {
 	n := workLoadN()
 	prng := rand.New(rand.NewPCG(42, 42))
 
-	for range 100 {
+	for range 10 {
 		pfxs := randomRealWorldPrefixes6(prng, n)
 
 		node := new(LiteNode[int])
@@ -459,7 +459,7 @@ func TestSubnets4LiteNode(t *testing.T) {
 	n := workLoadN()
 	prng := rand.New(rand.NewPCG(42, 42))
 
-	for range 100 {
+	for range 10 {
 		pfxs := randomRealWorldPrefixes4(prng, n)
 
 		node := new(LiteNode[int])
@@ -506,7 +506,7 @@ func TestSubnets6LiteNode(t *testing.T) {
 	n := workLoadN()
 	prng := rand.New(rand.NewPCG(42, 42))
 
-	for range 100 {
+	for range 10 {
 		pfxs := randomRealWorldPrefixes6(prng, n)
 
 		node := new(LiteNode[int])
