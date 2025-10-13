@@ -471,17 +471,44 @@ func TestSubnets4FastNode(t *testing.T) {
 		}
 
 		// the default route must have all pfxs as subnet
+		defaultRoute := mpp("0.0.0.0/0")
 		allPfxsSorted := slices.Clone(pfxs)
 		slices.SortFunc(allPfxsSorted, CmpPrefix)
 
 		nodeSubnets := []netip.Prefix{}
-		node.Subnets(mpp("0.0.0.0/0"), func(p netip.Prefix, _ int) bool {
+		node.Subnets(defaultRoute, func(p netip.Prefix, _ int) bool {
 			nodeSubnets = append(nodeSubnets, p)
 			return true
 		})
 
 		if !slices.Equal(allPfxsSorted, nodeSubnets) {
-			t.Errorf("Subnets(0.0.0.0/0) not equal to all sorted prefixes")
+			t.Errorf("Subnets(%s) not equal to all sorted prefixes", defaultRoute)
+		}
+
+		kMax := max(1, n/10)
+		somePfxs := make([]netip.Prefix, 0, kMax) // allocate mem 1x
+
+		for k := range kMax {
+			somePfxs = somePfxs[:0] // reset slice
+
+			i := 0
+			node.Subnets(defaultRoute, func(p netip.Prefix, _ int) bool {
+				if i >= k {
+					// early-termination: stop after k
+					return false
+				}
+				i++
+				somePfxs = append(somePfxs, p)
+				return true
+			})
+
+			if len(somePfxs) != k {
+				t.Errorf("Subnets early-termination: got %d items, want %d", len(somePfxs), k)
+			}
+
+			if !slices.Equal(somePfxs, allPfxsSorted[:k]) {
+				t.Errorf("Subnets expected equal")
+			}
 		}
 
 		// test with random probes
@@ -518,17 +545,44 @@ func TestSubnets6FastNode(t *testing.T) {
 		}
 
 		// the default route must have all pfxs as subnet
+		defaultRoute := mpp("::/0")
 		allPfxsSorted := slices.Clone(pfxs)
 		slices.SortFunc(allPfxsSorted, CmpPrefix)
 
 		nodeSubnets := []netip.Prefix{}
-		node.Subnets(mpp("::/0"), func(p netip.Prefix, _ int) bool {
+		node.Subnets(defaultRoute, func(p netip.Prefix, _ int) bool {
 			nodeSubnets = append(nodeSubnets, p)
 			return true
 		})
 
 		if !slices.Equal(allPfxsSorted, nodeSubnets) {
-			t.Errorf("Subnets(::/0) not equal to all sorted prefixes")
+			t.Errorf("Subnets(%s) not equal to all sorted prefixes", defaultRoute)
+		}
+
+		kMax := max(1, n/10)
+		somePfxs := make([]netip.Prefix, 0, kMax) // allocate mem 1x
+
+		for k := range kMax {
+			somePfxs = somePfxs[:0] // reset slice
+
+			i := 0
+			node.Subnets(defaultRoute, func(p netip.Prefix, _ int) bool {
+				if i >= k {
+					// early-termination: stop after k
+					return false
+				}
+				i++
+				somePfxs = append(somePfxs, p)
+				return true
+			})
+
+			if len(somePfxs) != k {
+				t.Errorf("Subnets early-termination: got %d items, want %d", len(somePfxs), k)
+			}
+
+			if !slices.Equal(somePfxs, allPfxsSorted[:k]) {
+				t.Errorf("Subnets expected equal")
+			}
 		}
 
 		// test with random probes

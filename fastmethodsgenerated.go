@@ -792,7 +792,7 @@ func (t *Fast[V]) dump(w io.Writer) {
 	if t.size4 > 0 {
 		stats := t.root4.StatsRec()
 		fmt.Fprintln(w)
-		fmt.Fprintf(w, "### IPv4: size(%d), nodes(%d), pfxs(%d), leaves(%d), fringes(%d)",
+		fmt.Fprintf(w, "### IPv4: size(%d), subnodes(%d), prefixes(%d), leaves(%d), fringes(%d)",
 			t.size4, stats.SubNodes, stats.Prefixes, stats.Leaves, stats.Fringes)
 
 		t.root4.DumpRec(w, stridePath{}, 0, true, shouldPrintValues[V]())
@@ -801,7 +801,7 @@ func (t *Fast[V]) dump(w io.Writer) {
 	if t.size6 > 0 {
 		stats := t.root6.StatsRec()
 		fmt.Fprintln(w)
-		fmt.Fprintf(w, "### IPv6: size(%d), nodes(%d), pfxs(%d), leaves(%d), fringes(%d)",
+		fmt.Fprintf(w, "### IPv6: size(%d), subnodes(%d), prefixes(%d), leaves(%d), fringes(%d)",
 			t.size6, stats.SubNodes, stats.Prefixes, stats.Leaves, stats.Fringes)
 
 		t.root6.DumpRec(w, stridePath{}, 0, false, shouldPrintValues[V]())
