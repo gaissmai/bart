@@ -475,7 +475,7 @@ func TestBartNode_Stats_Dump_Fprint_DirectItems(t *testing.T) {
 
 	// Stats
 	s := n.StatsRec()
-	if sum := s.Pfxs + s.Leaves + s.Fringes; sum != len(pfx4)+len(pfx6) {
+	if sum := s.Prefixes + s.Leaves + s.Fringes; sum != len(pfx4)+len(pfx6) {
 		t.Fatalf("StatsRec.Pfxs+Leaves+Fringes=%d, want %d", sum, len(pfx4)+len(pfx6))
 	}
 

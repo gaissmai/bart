@@ -969,19 +969,19 @@ func (n *FastNode[V]) hasType() nodeType {
 
 	// the order is important
 	switch {
-	case s.Pfxs == 0 && s.Childs == 0:
+	case s.Prefixes == 0 && s.Children == 0:
 		return nullNode
-	case s.Nodes == 0:
+	case s.SubNodes == 0:
 		return stopNode
-	case (s.Leaves > 0 || s.Fringes > 0) && s.Nodes > 0 && s.Pfxs == 0:
+	case (s.Leaves > 0 || s.Fringes > 0) && s.SubNodes > 0 && s.Prefixes == 0:
 		return halfNode
-	case (s.Pfxs > 0 || s.Leaves > 0 || s.Fringes > 0) && s.Nodes > 0:
+	case (s.Prefixes > 0 || s.Leaves > 0 || s.Fringes > 0) && s.SubNodes > 0:
 		return fullNode
-	case (s.Pfxs == 0 && s.Leaves == 0 && s.Fringes == 0) && s.Nodes > 0:
+	case (s.Prefixes == 0 && s.Leaves == 0 && s.Fringes == 0) && s.SubNodes > 0:
 		return pathNode
 	default:
 		panic(fmt.Sprintf("UNREACHABLE: pfx: %d, chld: %d, node: %d, leaf: %d, fringe: %d",
-			s.Pfxs, s.Childs, s.Nodes, s.Leaves, s.Fringes))
+			s.Prefixes, s.Children, s.SubNodes, s.Leaves, s.Fringes))
 	}
 }
 
@@ -990,13 +990,13 @@ func (n *FastNode[V]) hasType() nodeType {
 // It inspects only the direct children of n (not the whole subtree).
 // Panics if a child has an unexpected concrete type.
 func (n *FastNode[V]) Stats() (s StatsT) {
-	s.Pfxs = n.PrefixCount()
-	s.Childs = n.ChildCount()
+	s.Prefixes = n.PrefixCount()
+	s.Children = n.ChildCount()
 
 	for _, child := range n.AllChildren() {
 		switch child.(type) {
 		case *FastNode[V]:
-			s.Nodes++
+			s.SubNodes++
 
 		case *FringeNode[V]:
 			s.Fringes++
@@ -1024,9 +1024,9 @@ func (n *FastNode[V]) StatsRec() (s StatsT) {
 		return s
 	}
 
-	s.Pfxs = n.PrefixCount()
-	s.Childs = n.ChildCount()
-	s.Nodes = 1 // this node
+	s.Prefixes = n.PrefixCount()
+	s.Children = n.ChildCount()
+	s.SubNodes = 1 // this node
 	s.Leaves = 0
 	s.Fringes = 0
 
@@ -1036,9 +1036,9 @@ func (n *FastNode[V]) StatsRec() (s StatsT) {
 			// rec-descent
 			rs := kid.StatsRec()
 
-			s.Pfxs += rs.Pfxs
-			s.Childs += rs.Childs
-			s.Nodes += rs.Nodes
+			s.Prefixes += rs.Prefixes
+			s.Children += rs.Children
+			s.SubNodes += rs.SubNodes
 			s.Leaves += rs.Leaves
 			s.Fringes += rs.Fringes
 

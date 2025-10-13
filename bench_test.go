@@ -657,15 +657,15 @@ func BenchmarkFullTableMemory4(b *testing.B) {
 		runtime.ReadMemStats(&endMem)
 
 		stats := bart.root4.StatsRec()
-		if stats.Pfxs == 0 {
+		if stats.Prefixes == 0 {
 			b.Skip("No prefixes inserted")
 		}
 
 		bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
 		b.ReportMetric(roundFloat64(bytes/float64(bart.Size())), "bytes/route")
 
-		b.ReportMetric(float64(stats.Pfxs), "pfxs")
-		b.ReportMetric(float64(stats.Nodes), "nodes")
+		b.ReportMetric(float64(stats.Prefixes), "pfxs")
+		b.ReportMetric(float64(stats.SubNodes), "nodes")
 		b.ReportMetric(float64(stats.Leaves), "leaves")
 		b.ReportMetric(float64(stats.Fringes), "fringes")
 		b.ReportMetric(0, "ns/op")
@@ -688,15 +688,15 @@ func BenchmarkFullTableMemory6(b *testing.B) {
 		runtime.ReadMemStats(&endMem)
 
 		stats := bart.root6.StatsRec()
-		if stats.Pfxs == 0 {
+		if stats.Prefixes == 0 {
 			b.Skip("No prefixes inserted")
 		}
 
 		bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
 		b.ReportMetric(roundFloat64(bytes/float64(bart.Size())), "bytes/route")
 
-		b.ReportMetric(float64(stats.Pfxs), "pfxs")
-		b.ReportMetric(float64(stats.Nodes), "nodes")
+		b.ReportMetric(float64(stats.Prefixes), "pfxs")
+		b.ReportMetric(float64(stats.SubNodes), "nodes")
 		b.ReportMetric(float64(stats.Leaves), "leaves")
 		b.ReportMetric(float64(stats.Fringes), "fringes")
 		b.ReportMetric(0, "ns/op")
@@ -721,22 +721,22 @@ func BenchmarkFullTableMemory(b *testing.B) {
 		s4 := bart.root4.StatsRec()
 		s6 := bart.root6.StatsRec()
 		stats := nodes.StatsT{
-			Pfxs:    s4.Pfxs + s6.Pfxs,
-			Childs:  s4.Childs + s6.Childs,
-			Nodes:   s4.Nodes + s6.Nodes,
-			Leaves:  s4.Leaves + s6.Leaves,
-			Fringes: s4.Fringes + s6.Fringes,
+			Prefixes: s4.Prefixes + s6.Prefixes,
+			Children: s4.Children + s6.Children,
+			SubNodes: s4.SubNodes + s6.SubNodes,
+			Leaves:   s4.Leaves + s6.Leaves,
+			Fringes:  s4.Fringes + s6.Fringes,
 		}
 
-		if stats.Pfxs == 0 {
+		if stats.Prefixes == 0 {
 			b.Skip("No prefixes inserted")
 		}
 
 		bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
 		b.ReportMetric(roundFloat64(bytes/float64(bart.Size())), "bytes/route")
 
-		b.ReportMetric(float64(stats.Pfxs), "pfxs")
-		b.ReportMetric(float64(stats.Nodes), "nodes")
+		b.ReportMetric(float64(stats.Prefixes), "pfxs")
+		b.ReportMetric(float64(stats.SubNodes), "nodes")
 		b.ReportMetric(float64(stats.Leaves), "leaves")
 		b.ReportMetric(float64(stats.Fringes), "fringes")
 		b.ReportMetric(0, "ns/op")
@@ -767,9 +767,9 @@ func BenchmarkTableMemIP4(b *testing.B) {
 			stats := bart.root4.StatsRec()
 
 			bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
-			b.ReportMetric(roundFloat64(bytes/float64(stats.Pfxs)), "bytes/route")
-			b.ReportMetric(float64(stats.Pfxs), "pfxs")
-			b.ReportMetric(float64(stats.Nodes), "nodes")
+			b.ReportMetric(roundFloat64(bytes/float64(stats.Prefixes)), "bytes/route")
+			b.ReportMetric(float64(stats.Prefixes), "pfxs")
+			b.ReportMetric(float64(stats.SubNodes), "nodes")
 			b.ReportMetric(float64(stats.Leaves), "leaves")
 			b.ReportMetric(float64(stats.Fringes), "fringes")
 			b.ReportMetric(0, "ns/op")
@@ -801,9 +801,9 @@ func BenchmarkTableMemIP6(b *testing.B) {
 			stats := bart.root6.StatsRec()
 
 			bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
-			b.ReportMetric(roundFloat64(bytes/float64(stats.Pfxs)), "bytes/route")
-			b.ReportMetric(float64(stats.Pfxs), "pfxs")
-			b.ReportMetric(float64(stats.Nodes), "nodes")
+			b.ReportMetric(roundFloat64(bytes/float64(stats.Prefixes)), "bytes/route")
+			b.ReportMetric(float64(stats.Prefixes), "pfxs")
+			b.ReportMetric(float64(stats.SubNodes), "nodes")
 			b.ReportMetric(float64(stats.Leaves), "leaves")
 			b.ReportMetric(float64(stats.Fringes), "fringes")
 			b.ReportMetric(0, "ns/op")
@@ -835,17 +835,17 @@ func BenchmarkTableMem(b *testing.B) {
 			s4 := bart.root4.StatsRec()
 			s6 := bart.root6.StatsRec()
 			stats := nodes.StatsT{
-				Pfxs:    s4.Pfxs + s6.Pfxs,
-				Childs:  s4.Childs + s6.Childs,
-				Nodes:   s4.Nodes + s6.Nodes,
-				Leaves:  s4.Leaves + s6.Leaves,
-				Fringes: s4.Fringes + s6.Fringes,
+				Prefixes: s4.Prefixes + s6.Prefixes,
+				Children: s4.Children + s6.Children,
+				SubNodes: s4.SubNodes + s6.SubNodes,
+				Leaves:   s4.Leaves + s6.Leaves,
+				Fringes:  s4.Fringes + s6.Fringes,
 			}
 
 			bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
-			b.ReportMetric(roundFloat64(bytes/float64(stats.Pfxs)), "bytes/route")
-			b.ReportMetric(float64(stats.Pfxs), "pfxs")
-			b.ReportMetric(float64(stats.Nodes), "nodes")
+			b.ReportMetric(roundFloat64(bytes/float64(stats.Prefixes)), "bytes/route")
+			b.ReportMetric(float64(stats.Prefixes), "pfxs")
+			b.ReportMetric(float64(stats.SubNodes), "nodes")
 			b.ReportMetric(float64(stats.Leaves), "leaves")
 			b.ReportMetric(float64(stats.Fringes), "fringes")
 			b.ReportMetric(0, "ns/op")
@@ -877,9 +877,9 @@ func BenchmarkLiteMemIP4(b *testing.B) {
 			stats := lite.root4.StatsRec()
 
 			bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
-			b.ReportMetric(roundFloat64(bytes/float64(stats.Pfxs)), "bytes/route")
-			b.ReportMetric(float64(stats.Pfxs), "pfxs")
-			b.ReportMetric(float64(stats.Nodes), "nodes")
+			b.ReportMetric(roundFloat64(bytes/float64(stats.Prefixes)), "bytes/route")
+			b.ReportMetric(float64(stats.Prefixes), "pfxs")
+			b.ReportMetric(float64(stats.SubNodes), "nodes")
 			b.ReportMetric(float64(stats.Leaves), "leaves")
 			b.ReportMetric(float64(stats.Fringes), "fringes")
 			b.ReportMetric(0, "ns/op")
@@ -911,9 +911,9 @@ func BenchmarkLiteMemIP6(b *testing.B) {
 			stats := lite.root6.StatsRec()
 
 			bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
-			b.ReportMetric(roundFloat64(bytes/float64(stats.Pfxs)), "bytes/route")
-			b.ReportMetric(float64(stats.Pfxs), "pfxs")
-			b.ReportMetric(float64(stats.Nodes), "nodes")
+			b.ReportMetric(roundFloat64(bytes/float64(stats.Prefixes)), "bytes/route")
+			b.ReportMetric(float64(stats.Prefixes), "pfxs")
+			b.ReportMetric(float64(stats.SubNodes), "nodes")
 			b.ReportMetric(float64(stats.Leaves), "leaves")
 			b.ReportMetric(float64(stats.Fringes), "fringes")
 			b.ReportMetric(0, "ns/op")
@@ -945,17 +945,17 @@ func BenchmarkLiteMem(b *testing.B) {
 			s4 := lite.root4.StatsRec()
 			s6 := lite.root6.StatsRec()
 			stats := nodes.StatsT{
-				Pfxs:    s4.Pfxs + s6.Pfxs,
-				Childs:  s4.Childs + s6.Childs,
-				Nodes:   s4.Nodes + s6.Nodes,
-				Leaves:  s4.Leaves + s6.Leaves,
-				Fringes: s4.Fringes + s6.Fringes,
+				Prefixes: s4.Prefixes + s6.Prefixes,
+				Children: s4.Children + s6.Children,
+				SubNodes: s4.SubNodes + s6.SubNodes,
+				Leaves:   s4.Leaves + s6.Leaves,
+				Fringes:  s4.Fringes + s6.Fringes,
 			}
 
 			bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
-			b.ReportMetric(roundFloat64(bytes/float64(stats.Pfxs)), "bytes/route")
-			b.ReportMetric(float64(stats.Pfxs), "pfxs")
-			b.ReportMetric(float64(stats.Nodes), "nodes")
+			b.ReportMetric(roundFloat64(bytes/float64(stats.Prefixes)), "bytes/route")
+			b.ReportMetric(float64(stats.Prefixes), "pfxs")
+			b.ReportMetric(float64(stats.SubNodes), "nodes")
 			b.ReportMetric(float64(stats.Leaves), "leaves")
 			b.ReportMetric(float64(stats.Fringes), "fringes")
 			b.ReportMetric(0, "ns/op")

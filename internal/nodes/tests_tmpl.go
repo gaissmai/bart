@@ -22,8 +22,6 @@ import (
 	"testing"
 )
 
-var mpp = netip.MustParsePrefix
-
 type _NODE_TYPE[V any] struct{}
 
 func (n *_NODE_TYPE[V]) StatsRec() (_ StatsT)                                              { return }
@@ -33,7 +31,16 @@ func (n *_NODE_TYPE[V]) Delete(netip.Prefix) (_ bool)                           
 func (n *_NODE_TYPE[V]) InsertPersist(CloneFunc[V], netip.Prefix, V, int) (_ bool)         { return }
 func (n *_NODE_TYPE[V]) DeletePersist(CloneFunc[V], netip.Prefix) (_ bool)                 { return }
 func (n *_NODE_TYPE[V]) AllRec(StridePath, int, bool, func(netip.Prefix, V) bool) (_ bool) { return }
+
 func (n *_NODE_TYPE[V]) AllRecSorted(StridePath, int, bool, func(netip.Prefix, V) bool) (_ bool) {
+	return
+}
+
+func (n *_NODE_TYPE[V]) Subnets(netip.Prefix, func(netip.Prefix, V) bool) (_ iter.Seq2[netip.Prefix, V]) {
+	return
+}
+
+func (n *_NODE_TYPE[V]) Supernets(netip.Prefix, func(netip.Prefix, V) bool) (_ iter.Seq2[netip.Prefix, V]) {
 	return
 }
 
@@ -268,7 +275,7 @@ func TestInsertDelete_NODE_TYPE(t *testing.T) {
 			}
 
 			stats := n.StatsRec()
-			if pfxs := stats.Pfxs; pfxs != tt.wantPfxs {
+			if pfxs := stats.Prefixes; pfxs != tt.wantPfxs {
 				t.Errorf("after insert: got num pfxs %d, want %d", pfxs, tt.wantPfxs)
 			}
 			if leaves := stats.Leaves; leaves != tt.wantLeaves {
@@ -292,7 +299,7 @@ func TestInsertDelete_NODE_TYPE(t *testing.T) {
 			}
 
 			stats = n.StatsRec()
-			if num := stats.Pfxs; num != 0 {
+			if num := stats.Prefixes; num != 0 {
 				t.Errorf("after delete: got num pfxs %d, want 0", num)
 			}
 			if num := stats.Leaves; num != 0 {
@@ -320,7 +327,7 @@ func TestInsertDelete_NODE_TYPE(t *testing.T) {
 			}
 
 			stats := n.StatsRec()
-			if pfxs := stats.Pfxs; pfxs != tt.wantPfxs {
+			if pfxs := stats.Prefixes; pfxs != tt.wantPfxs {
 				t.Errorf("after insert: got num pfxs %d, want %d", pfxs, tt.wantPfxs)
 			}
 			if leaves := stats.Leaves; leaves != tt.wantLeaves {
@@ -344,7 +351,7 @@ func TestInsertDelete_NODE_TYPE(t *testing.T) {
 			}
 
 			stats = n.StatsRec()
-			if num := stats.Pfxs; num != 0 {
+			if num := stats.Prefixes; num != 0 {
 				t.Errorf("after delete: got num pfxs %d, want 0", num)
 			}
 			if num := stats.Leaves; num != 0 {
@@ -413,11 +420,11 @@ func TestAllIterators_NODE_TYPE(t *testing.T) {
 	}
 }
 
-func TestSupernetsAndSubnets_NODE_TYPE(t *testing.T) {
+func TestSupernets4_NODE_TYPE(t *testing.T) {
 	t.Parallel()
 	n := workLoadN()
-
 	prng := rand.New(rand.NewPCG(42, 42))
+
 	for range 100 {
 		pfxs := randomRealWorldPrefixes6(prng, n)
 
@@ -429,37 +436,146 @@ func TestSupernetsAndSubnets_NODE_TYPE(t *testing.T) {
 			gold.insert(pfx, i)
 		}
 
-		k := prng.IntN(len(pfxs))
-		probe := pfxs[k]
+		// test with random probes
+		for _, probe := range pfxs {
+			goldSupernets := gold.supernets(probe)
+			nodeSupernets := []netip.Prefix{}
 
-		goldSupernets := gold.supernets(probe)
-		nodeSupernets := []netip.Prefix{}
+			node.Supernets(probe, func(p netip.Prefix, _ int) bool {
+				nodeSupernets = append(nodeSupernets, p)
+				return true
+			})
 
-		node.Supernets(probe, func(p netip.Prefix, _ int) bool {
-			nodeSupernets = append(nodeSupernets, p)
-			return true
-		})
-
-		if len(goldSupernets) != len(nodeSupernets) {
-			t.Errorf("Supernets count=%d, want %d", len(nodeSupernets), len(goldSupernets))
+			if !slices.Equal(goldSupernets, nodeSupernets) {
+				t.Errorf("Supernets expected equal to golden implementation")
+			}
 		}
-		if !slices.Equal(goldSupernets, nodeSupernets) {
-			t.Errorf("Supernets expected equal")
+	}
+}
+
+func TestSupernets6_NODE_TYPE(t *testing.T) {
+	t.Parallel()
+	n := workLoadN()
+	prng := rand.New(rand.NewPCG(42, 42))
+
+	for range 100 {
+		pfxs := randomRealWorldPrefixes6(prng, n)
+
+		node := new(_NODE_TYPE[int])
+		gold := new(goldTable[int])
+
+		for i, pfx := range pfxs {
+			node.Insert(pfx, i, 0)
+			gold.insert(pfx, i)
 		}
 
-		goldSubnets := gold.subnets(probe)
+		// test with random probes
+		for _, probe := range pfxs {
+			goldSupernets := gold.supernets(probe)
+			nodeSupernets := []netip.Prefix{}
+
+			node.Supernets(probe, func(p netip.Prefix, _ int) bool {
+				nodeSupernets = append(nodeSupernets, p)
+				return true
+			})
+
+			if !slices.Equal(goldSupernets, nodeSupernets) {
+				t.Errorf("Supernets expected equal to golden implementation")
+			}
+		}
+	}
+}
+
+func TestSubnets4_NODE_TYPE(t *testing.T) {
+	t.Parallel()
+	n := workLoadN()
+	prng := rand.New(rand.NewPCG(42, 42))
+
+	for range 100 {
+		pfxs := randomRealWorldPrefixes4(prng, n)
+
+		node := new(_NODE_TYPE[int])
+		gold := new(goldTable[int])
+
+		for i, pfx := range pfxs {
+			node.Insert(pfx, i, 0)
+			gold.insert(pfx, i)
+		}
+
+		// the default route must have all pfxs as subnet
+		allPfxsSorted := slices.Clone(pfxs)
+		slices.SortFunc(allPfxsSorted, CmpPrefix)
+
 		nodeSubnets := []netip.Prefix{}
-
-		node.Subnets(probe, func(p netip.Prefix, _ int) bool {
+		node.Subnets(mpp("0.0.0.0/0"), func(p netip.Prefix, _ int) bool {
 			nodeSubnets = append(nodeSubnets, p)
 			return true
 		})
 
-		if len(goldSubnets) != len(nodeSubnets) {
-			t.Errorf("Subnets count=%d, want %d", len(nodeSubnets), len(goldSubnets))
+		if !slices.Equal(allPfxsSorted, nodeSubnets) {
+			t.Errorf("Subnets(0.0.0.0/0) not equal to all sorted prefixes")
 		}
-		if !slices.Equal(goldSubnets, nodeSubnets) {
-			t.Errorf("Subnets expected equal")
+
+		// test with random probes
+		for _, probe := range pfxs {
+			goldSubnets := gold.subnets(probe)
+			nodeSubnets := []netip.Prefix{}
+
+			node.Subnets(probe, func(p netip.Prefix, _ int) bool {
+				nodeSubnets = append(nodeSubnets, p)
+				return true
+			})
+
+			if !slices.Equal(goldSubnets, nodeSubnets) {
+				t.Errorf("Subnets expected equal to golden implementation")
+			}
+		}
+	}
+}
+
+func TestSubnets6_NODE_TYPE(t *testing.T) {
+	t.Parallel()
+	n := workLoadN()
+	prng := rand.New(rand.NewPCG(42, 42))
+
+	for range 100 {
+		pfxs := randomRealWorldPrefixes6(prng, n)
+
+		node := new(_NODE_TYPE[int])
+		gold := new(goldTable[int])
+
+		for i, pfx := range pfxs {
+			node.Insert(pfx, i, 0)
+			gold.insert(pfx, i)
+		}
+
+		// the default route must have all pfxs as subnet
+		allPfxsSorted := slices.Clone(pfxs)
+		slices.SortFunc(allPfxsSorted, CmpPrefix)
+
+		nodeSubnets := []netip.Prefix{}
+		node.Subnets(mpp("::/0"), func(p netip.Prefix, _ int) bool {
+			nodeSubnets = append(nodeSubnets, p)
+			return true
+		})
+
+		if !slices.Equal(allPfxsSorted, nodeSubnets) {
+			t.Errorf("Subnets(::/0) not equal to all sorted prefixes")
+		}
+
+		// test with random probes
+		for _, probe := range pfxs {
+			goldSubnets := gold.subnets(probe)
+			nodeSubnets := []netip.Prefix{}
+
+			node.Subnets(probe, func(p netip.Prefix, _ int) bool {
+				nodeSubnets = append(nodeSubnets, p)
+				return true
+			})
+
+			if !slices.Equal(goldSubnets, nodeSubnets) {
+				t.Errorf("Subnets expected equal to golden implementation")
+			}
 		}
 	}
 }
