@@ -1922,7 +1922,7 @@ func TestTableMarshalJSON(t *testing.T) {
 				bart.Insert(prefix, value)
 			}
 
-			jsonData, err := json.Marshal(bart)
+			jsonData, err := bart.MarshalJSON()
 			if err != nil {
 				t.Errorf("JSON marshaling failed: %v", err)
 			}

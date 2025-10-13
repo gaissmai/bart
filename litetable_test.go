@@ -1794,7 +1794,7 @@ func TestLiteMarshalJSON(t *testing.T) {
 				lite.Insert(mpp(prefix))
 			}
 
-			jsonData, err := json.Marshal(lite)
+			jsonData, err := lite.MarshalJSON()
 			if err != nil {
 				t.Errorf("JSON marshaling failed: %v", err)
 			}
