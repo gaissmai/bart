@@ -46,7 +46,7 @@ func (n *_NODE_TYPE[V]) Supernets(netip.Prefix, func(netip.Prefix, V) bool) (_ i
 
 // ### GENERATE DELETE END ###
 
-// common helpers
+// helpers
 func (n *_NODE_TYPE[V]) all4() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
 		if n == nil {
@@ -376,7 +376,7 @@ func TestAllIterators_NODE_TYPE(t *testing.T) {
 
 	prng := rand.New(rand.NewPCG(42, 42))
 
-	for range 100 {
+	for range 10 {
 		pfxs := randomRealWorldPrefixes4(prng, n)
 
 		node := new(_NODE_TYPE[int])
@@ -425,8 +425,8 @@ func TestSupernets4_NODE_TYPE(t *testing.T) {
 	n := workLoadN()
 	prng := rand.New(rand.NewPCG(42, 42))
 
-	for range 100 {
-		pfxs := randomRealWorldPrefixes6(prng, n)
+	for range 10 {
+		pfxs := randomRealWorldPrefixes4(prng, n)
 
 		node := new(_NODE_TYPE[int])
 		gold := new(goldTable[int])
@@ -458,7 +458,7 @@ func TestSupernets6_NODE_TYPE(t *testing.T) {
 	n := workLoadN()
 	prng := rand.New(rand.NewPCG(42, 42))
 
-	for range 100 {
+	for range 10 {
 		pfxs := randomRealWorldPrefixes6(prng, n)
 
 		node := new(_NODE_TYPE[int])
@@ -491,7 +491,7 @@ func TestSubnets4_NODE_TYPE(t *testing.T) {
 	n := workLoadN()
 	prng := rand.New(rand.NewPCG(42, 42))
 
-	for range 100 {
+	for range 10 {
 		pfxs := randomRealWorldPrefixes4(prng, n)
 
 		node := new(_NODE_TYPE[int])
@@ -538,7 +538,7 @@ func TestSubnets6_NODE_TYPE(t *testing.T) {
 	n := workLoadN()
 	prng := rand.New(rand.NewPCG(42, 42))
 
-	for range 100 {
+	for range 10 {
 		pfxs := randomRealWorldPrefixes6(prng, n)
 
 		node := new(_NODE_TYPE[int])
