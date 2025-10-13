@@ -304,8 +304,8 @@ Credits for many inspirations go to
 
 - the clever folks at Tailscale,
 - to Daniel Lemire for his inspiring blog,
-- to Donald E. Knuth for the Allotment Routing Table (ART) algorithm and
-- to Yoichi Hariguchi who deciphered it for us mere mortals
+- to Donald E. Knuth for the Allotment Routing Table [ART](https://github.com/hariguchi/art/tree/master/orig) algorithm and
+- to Yoichi Hariguchi who [deciphered it](https://github.com/hariguchi/art/blob/master/docs/art.pdf) for us mere mortals
 
 And last but not least to the Go team who do a wonderful job!
 
