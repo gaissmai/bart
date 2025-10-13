@@ -436,7 +436,7 @@ func TestLiteNode_Stats_Dump_Fprint_DirectItems(t *testing.T) {
 
 	// Stats/StatsRec
 	sr := n.StatsRec()
-	if sum := sr.Pfxs + sr.Leaves + sr.Fringes; sum != len(pfx) {
+	if sum := sr.Prefixes + sr.Leaves + sr.Fringes; sum != len(pfx) {
 		t.Fatalf("StatsRec Pfxs*Leaves+Fringes=%d, want %d", sum, len(pfx))
 	}
 

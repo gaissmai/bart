@@ -568,12 +568,12 @@ func TestTableDeleteButOne(t *testing.T) {
 		stats4 := bart.root4.StatsRec()
 		stats6 := bart.root6.StatsRec()
 
-		if nodes := stats4.Nodes + stats6.Nodes; nodes != 1 {
+		if nodes := stats4.SubNodes + stats6.SubNodes; nodes != 1 {
 			t.Fatalf("delete but one, want nodes: 1, got: %d\n%s", nodes, bart.dumpString())
 		}
 
-		sum := stats4.Pfxs + stats4.Leaves + stats4.Fringes +
-			stats6.Pfxs + stats6.Leaves + stats6.Fringes
+		sum := stats4.Prefixes + stats4.Leaves + stats4.Fringes +
+			stats6.Prefixes + stats6.Leaves + stats6.Fringes
 
 		if sum != 1 {
 			t.Fatalf("delete but one, only one item must be left, but: %d\n%s", sum, bart.dumpString())
