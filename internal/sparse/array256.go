@@ -77,7 +77,7 @@ func (a *Array256[T]) Get(i uint8) (value T, ok bool) {
 	if a.Test(i) {
 		return a.Items[a.Rank(i)-1], true
 	}
-	return value, ok
+	return
 }
 
 // MustGet returns the value at index i without checking if it exists.

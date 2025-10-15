@@ -117,7 +117,7 @@ func (b *BitSet256) FirstSet() (first uint8, ok bool) {
 		return uint8(x3 + 192), true
 	}
 
-	return first, ok
+	return
 }
 
 // NextSet returns the index of the next set bit that is greater than or equal to bit.
@@ -153,7 +153,7 @@ func (b *BitSet256) NextSet(bit uint8) (next uint8, ok bool) {
 			return uint8(wIdx<<6 + bits.TrailingZeros64(next)), true
 		}
 	}
-	return next, ok
+	return
 }
 
 // LastSet returns the index of the highest (last) bit that is set in the BitSet256.
@@ -198,7 +198,7 @@ func (b *BitSet256) LastSet() (last uint8, ok bool) {
 			return uint8(wIdx<<6 + bits.Len64(word) - 1), true
 		}
 	}
-	return last, ok
+	return
 }
 
 // AsSlice returns a slice containing all set bits in the BitSet256.
@@ -243,7 +243,7 @@ func (b *BitSet256) IntersectionTop(c *BitSet256) (top uint8, ok bool) {
 			return uint8(wIdx<<6 + bits.Len64(word) - 1), true
 		}
 	}
-	return top, ok
+	return
 }
 
 // Rank returns the number of bits set (i.e., value 1) in the BitSet256
@@ -273,7 +273,7 @@ func (b *BitSet256) Rank(idx uint8) (rnk int) {
 	rnk += bits.OnesCount64(b[1] & rankMask[idx][1])
 	rnk += bits.OnesCount64(b[2] & rankMask[idx][2])
 	rnk += bits.OnesCount64(b[3] & rankMask[idx][3])
-	return rnk
+	return
 }
 
 // IsEmpty returns true if no bit is set.
@@ -297,7 +297,7 @@ func (b *BitSet256) Intersection(c *BitSet256) (bs BitSet256) {
 	bs[1] = b[1] & c[1]
 	bs[2] = b[2] & c[2]
 	bs[3] = b[3] & c[3]
-	return bs
+	return
 }
 
 // Union performs an in-place union of the receiver with c.
@@ -315,7 +315,7 @@ func (b *BitSet256) Size() (cnt int) {
 	cnt += bits.OnesCount64(b[1])
 	cnt += bits.OnesCount64(b[2])
 	cnt += bits.OnesCount64(b[3])
-	return cnt
+	return
 }
 
 // rankMask is a table of bitmasks with all bits set to 1 up to and including a given bit position.
