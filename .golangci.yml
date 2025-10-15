@@ -48,7 +48,7 @@ linters:
 
 formatters:
   enable:
-    - gofumpt
+    - gofmt
     - goimports
   exclusions:
     generated: lax
