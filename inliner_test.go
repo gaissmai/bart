@@ -14,10 +14,8 @@ var (
 	a = netip.MustParseAddr
 	p = netip.MustParsePrefix
 
-	worstCaseProbeIP4  = a("255.255.255.255")
-	worstCaseProbePfx4 = p("255.255.255.255/32")
+	worstCaseProbeIP4 = a("255.255.255.255")
 
-	ipv4DefaultRoute = p("0.0.0.0/0")
 	worstCasePfxsIP4 = []netip.Prefix{
 		p("0.0.0.0/1"),
 		p("254.0.0.0/8"),
