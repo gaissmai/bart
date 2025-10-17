@@ -95,9 +95,6 @@ func (f *Fast[V]) Contains(ip netip.Addr) bool {
 			// due to path compression, the octet path between
 			// leaf and prefix may diverge
 			return kid.Prefix.Contains(ip)
-
-		default:
-			panic("logic error, wrong node type")
 		}
 	}
 
@@ -150,9 +147,6 @@ func (f *Fast[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 			}
 			// maybe there is a current best value from upper levels
 			return val, ok
-
-		default:
-			panic("logic error, wrong node type")
 		}
 	}
 
@@ -260,9 +254,6 @@ LOOP:
 			// it's a fringe, bits are always /8, /16, /24, ...
 			fringePfx, _ := ip.Prefix((depth + 1) << 3)
 			return fringePfx, kid.Value, true
-
-		default:
-			panic("logic error, wrong node type")
 		}
 	}
 

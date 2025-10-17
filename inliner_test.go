@@ -28,7 +28,8 @@ var (
 	}
 )
 
-func BenchmarkMyLite(b *testing.B) {
+// If the bitset methods get inlined?
+func BenchmarkInlinedLite(b *testing.B) {
 	tbl := new(bart.Lite)
 	for _, p := range worstCasePfxsIP4 {
 		tbl.Insert(p)
@@ -39,7 +40,8 @@ func BenchmarkMyLite(b *testing.B) {
 	}
 }
 
-func BenchmarkMyBart(b *testing.B) {
+// If the bitset methods get inlined?
+func BenchmarkInlinedTable(b *testing.B) {
 	tbl := new(bart.Table[string])
 	for _, p := range worstCasePfxsIP4 {
 		tbl.Insert(p, p.String())
@@ -50,7 +52,8 @@ func BenchmarkMyBart(b *testing.B) {
 	}
 }
 
-func BenchmarkMyFast(b *testing.B) {
+// If the bitset methods get inlined?
+func BenchmarkInlinedFast(b *testing.B) {
 	tbl := new(bart.Fast[string])
 	for _, p := range worstCasePfxsIP4 {
 		tbl.Insert(p, p.String())
