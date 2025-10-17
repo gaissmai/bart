@@ -467,9 +467,6 @@ func (l *liteTable[V]) Contains(ip netip.Addr) bool {
 
 		case *nodes.LeafNode[V]:
 			return kid.Prefix.Contains(ip)
-
-		default:
-			panic("logic error, wrong node type")
 		}
 	}
 
@@ -551,9 +548,6 @@ LOOP:
 			// it's a fringe, bits are always /8, /16, /24, ...
 			fringePfx, _ := ip.Prefix((depth + 1) << 3)
 			return fringePfx, true
-
-		default:
-			panic("logic error, wrong node type")
 		}
 	}
 

@@ -27,15 +27,10 @@ package bart
 import (
 	"net/netip"
 
-	"github.com/gaissmai/bart/internal/bitset"
 	"github.com/gaissmai/bart/internal/nodes"
-	"github.com/gaissmai/bart/internal/sparse"
-)
 
-// hint for the go inliner
-var (
-	_ bitset.BitSet256
-	_ sparse.Array256[any]
+	// inlining hint
+	_ "github.com/gaissmai/bart/internal/bitset"
 )
 
 // These types, constants, and functions are required in the bart package
