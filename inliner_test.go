@@ -4,62 +4,71 @@
 package bart_test
 
 import (
-	"net/netip"
+	"bytes"
+	"context"
+	"os/exec"
+	"regexp"
 	"testing"
-
-	"github.com/gaissmai/bart"
+	"time"
 )
 
-var (
-	a = netip.MustParseAddr
-	p = netip.MustParsePrefix
-
-	worstCaseProbeIP4 = a("255.255.255.255")
-
-	worstCasePfxsIP4 = []netip.Prefix{
-		p("0.0.0.0/1"),
-		p("254.0.0.0/8"),
-		p("255.0.0.0/9"),
-		p("255.254.0.0/16"),
-		p("255.255.0.0/17"),
-		p("255.255.254.0/24"),
-		p("255.255.255.0/25"),
-		p("255.255.255.255/32"), // matching prefix
-	}
-)
-
-// If the bitset methods get inlined?
-func BenchmarkInlinedLite(b *testing.B) {
-	tbl := new(bart.Lite)
-	for _, p := range worstCasePfxsIP4 {
-		tbl.Insert(p)
-	}
-
-	for b.Loop() {
-		_ = tbl.Contains(worstCaseProbeIP4)
-	}
-}
-
-// If the bitset methods get inlined?
-func BenchmarkInlinedTable(b *testing.B) {
-	tbl := new(bart.Table[string])
-	for _, p := range worstCasePfxsIP4 {
-		tbl.Insert(p, p.String())
+// TestInlineBitSet256Functions checks if specified functions in hot path
+// are inlined by the Go compiler. It compiles the package with the
+// -gcflags=-m flag to get inlining debug output, then searches the output
+// for evidence that the functions were inlined.
+//
+// The functions to check are listed in the funcs slice. If any function is
+// missing the inlining message, the test fails.
+func TestInlineBitSet256Functions(t *testing.T) {
+	// List of functions expected to be inlined
+	funcs := []string{
+		"bitset.(*BitSet256).Set",
+		"bitset.(*BitSet256).Clear",
+		"bitset.(*BitSet256).Test",
+		"bitset.(*BitSet256).IsEmpty",
+		//
+		"bitset.(*BitSet256).FirstSet",
+		"bitset.(*BitSet256).NextSet",
+		"bitset.(*BitSet256).LastSet",
+		//
+		"bitset.(*BitSet256).Intersects",
+		"bitset.(*BitSet256).Intersection",
+		"bitset.(*BitSet256).IntersectionTop",
+		//
+		"bitset.(*BitSet256).Rank",
+		"bitset.(*BitSet256).Size",
+		"bitset.(*BitSet256).Union",
 	}
 
-	for b.Loop() {
-		_ = tbl.Contains(worstCaseProbeIP4)
-	}
-}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
-// If the bitset methods get inlined?
-func BenchmarkInlinedFast(b *testing.B) {
-	tbl := new(bart.Fast[string])
-	for _, p := range worstCasePfxsIP4 {
-		tbl.Insert(p, p.String())
+	buf := new(bytes.Buffer)
+
+	// Run 'go build' with inlining debug output enabled and capture stdout/stderr
+	cmd := exec.CommandContext(ctx, "go", "build", "-gcflags=-m")
+	cmd.Stdout = buf
+	cmd.Stderr = buf
+
+	err := cmd.Run()
+	if err != nil {
+		t.Fatalf("Build failed: %v\nCompiler output:\n%s", err, buf.String())
 	}
 
-	for b.Loop() {
-		_ = tbl.Contains(worstCaseProbeIP4)
+	output := buf.String()
+
+	// Check compiler output for each function's inlining indication
+	for _, fn := range funcs {
+		inlineMsgRx := regexp.MustCompile("inlining call to .*" + regexp.QuoteMeta(fn))
+		if inlineMsgRx.MatchString(output) {
+			continue
+		}
+
+		canInlineMsgRx := regexp.MustCompile("can inline .*" + regexp.QuoteMeta(fn))
+		if canInlineMsgRx.MatchString(output) {
+			continue
+		}
+
+		t.Errorf("Function %s is NOT inlined.", fn)
 	}
 }
