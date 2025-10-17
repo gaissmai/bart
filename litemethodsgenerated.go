@@ -722,7 +722,7 @@ func (t *liteTable[V]) MarshalJSON() ([]byte, error) {
 }
 
 // DumpList4 dumps the ipv4 tree into a list of roots and their subnets.
-// It can be used to analyze the tree or build the text or json serialization.
+// It can be used to analyze the tree or build the text or JSON serialization.
 func (t *liteTable[V]) DumpList4() []DumpListNode[V] {
 	if t == nil {
 		return nil
@@ -731,7 +731,7 @@ func (t *liteTable[V]) DumpList4() []DumpListNode[V] {
 }
 
 // DumpList6 dumps the ipv6 tree into a list of roots and their subnets.
-// It can be used to analyze the tree or build custom json representation.
+// It can be used to analyze the tree or build custom JSON representation.
 func (t *liteTable[V]) DumpList6() []DumpListNode[V] {
 	if t == nil {
 		return nil

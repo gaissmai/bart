@@ -4,6 +4,7 @@
 package bart
 
 import (
+	"io"
 	"iter"
 	"net/netip"
 	"sync"
@@ -94,7 +95,7 @@ func (l *Lite) Insert(pfx netip.Prefix) {
 
 // InsertPersist is similar to Insert but the receiver isn't modified.
 //
-// All nodes touched during insert are cloned and a new Table is returned.
+// All nodes touched during insert are cloned and a new *Lite is returned.
 // This is not a full [Lite.Clone], all untouched nodes are still referenced
 // from both Tables.
 //
@@ -123,7 +124,7 @@ func (l *Lite) InsertPersist(pfx netip.Prefix) *Lite {
 func (l *Lite) DeletePersist(pfx netip.Prefix) *Lite {
 	lp := l.liteTable.DeletePersist(pfx)
 	if lp == &l.liteTable {
-		// pfx s invalid or didn't exist
+		// pfx is invalid or didn't exist
 		return l
 	}
 
@@ -398,6 +399,71 @@ func (l *Lite) Equal(o *Lite) bool {
 	return l.liteTable.Equal(&o.liteTable)
 }
 
+// DumpList4 dumps the ipv4 tree into a list of roots and their subnets.
+// It can be used to analyze the tree or build the text or JSON serialization.
+func (l *Lite) DumpList4() []DumpListNode[struct{}] {
+	if l == nil {
+		return nil
+	}
+	return l.liteTable.DumpList4()
+}
+
+// DumpList6 dumps the ipv6 tree into a list of roots and their subnets.
+// It can be used to analyze the tree or build custom JSON representation.
+func (l *Lite) DumpList6() []DumpListNode[struct{}] {
+	if l == nil {
+		return nil
+	}
+	return l.liteTable.DumpList6()
+}
+
+// Fprint writes a hierarchical tree diagram of the ordered CIDRs
+// with default formatted payload V to w.
+//
+// The order from top to bottom is in ascending order of the prefix address
+// and the subtree structure is determined by the CIDRs coverage.
+//
+//	▼
+//	├─ 10.0.0.0/8 (V)
+//	│  ├─ 10.0.0.0/24 (V)
+//	│  └─ 10.0.1.0/24 (V)
+//	├─ 127.0.0.0/8 (V)
+//	│  └─ 127.0.0.1/32 (V)
+//	├─ 169.254.0.0/16 (V)
+//	├─ 172.16.0.0/12 (V)
+//	└─ 192.168.0.0/16 (V)
+//	   └─ 192.168.1.0/24 (V)
+//	▼
+//	└─ ::/0 (V)
+//	   ├─ ::1/128 (V)
+//	   ├─ 2000::/3 (V)
+//	   │  └─ 2001:db8::/32 (V)
+//	   └─ fe80::/10 (V)
+func (l *Lite) Fprint(w io.Writer) error {
+	if l == nil {
+		return nil
+	}
+	return l.liteTable.Fprint(w)
+}
+
+// MarshalJSON dumps the table into two sorted lists: for ipv4 and ipv6.
+// Every root and subnet is an array, not a map, because the order matters.
+func (l *Lite) MarshalJSON() ([]byte, error) {
+	if l == nil {
+		return []byte("null"), nil
+	}
+	return l.liteTable.MarshalJSON()
+}
+
+// MarshalText implements the [encoding.TextMarshaler] interface,
+// just a wrapper for [liteTable.Fprint].
+func (l *Lite) MarshalText() ([]byte, error) {
+	if l == nil {
+		return nil, nil
+	}
+	return l.liteTable.MarshalText()
+}
+
 // END OF liteTable WRAPPER
 
 // liteTable follows the BART design but with no payload.
@@ -473,9 +539,45 @@ func (l *liteTable[V]) Contains(ip netip.Addr) bool {
 	return false
 }
 
+// Lookup is just a wrapper for Contains.
+func (l *liteTable[V]) Lookup(ip netip.Addr) (val V, exists bool) {
+	return val, l.Contains(ip)
+}
+
+// LookupPrefix performs a longest prefix match lookup for any address within
+// the given prefix. It finds the most specific routing table entry that would
+// match any address in the provided prefix range.
+//
+// This is functionally identical to LookupPrefixLPM but returns only the
+// associated value, not the matching prefix itself.
+//
+// Returns the zero value and true if a matching prefix is found.
+// Returns zero value and false if no match exists.
+func (l *liteTable[V]) LookupPrefix(pfx netip.Prefix) (val V, exists bool) {
+	_, exists = l.lookupPrefixLPM(pfx, false)
+	return
+}
+
+// LookupPrefixLPM performs a longest prefix match lookup for any address within
+// the given prefix. It finds the most specific routing table entry that would
+// match any address in the provided prefix range.
+//
+// This is functionally identical to LookupPrefix but additionally returns the
+// matching prefix (lpmPfx) itself along with the value.
+//
+// This method is slower than LookupPrefix and should only be used if the
+// matching lpm entry is also required for other reasons.
+//
+// Returns the matching prefix, the zero value, and true if found.
+// Returns zero values and false if no match exists.
+func (l *liteTable[V]) LookupPrefixLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, exists bool) {
+	lpm, exists = l.lookupPrefixLPM(pfx, true)
+	return
+}
+
 // lookupPrefixLPM performs a longest prefix match lookup for any address within
 // the given prefix. It finds the most specific routing table entry that would
-// match any address in the provided prefix range. Is withLPM is true, it also
+// match any address in the provided prefix range. If withLPM is true, it also
 // returns the matching longest prefix.
 func (l *liteTable[V]) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpmPfx netip.Prefix, ok bool) {
 	if !pfx.IsValid() {
