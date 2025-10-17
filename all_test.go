@@ -16,6 +16,16 @@ import (
 
 // this file contains init functions and helpers for test functions
 
+var mpa = netip.MustParseAddr
+
+var mpp = func(s string) netip.Prefix {
+	pfx := netip.MustParsePrefix(s)
+	if pfx == pfx.Masked() {
+		return pfx
+	}
+	panic(fmt.Sprintf("%s is not canonicalized as %s", s, pfx.Masked()))
+}
+
 // workLoadN to adjust loops for tests with -short
 func workLoadN() int {
 	if testing.Short() {
@@ -204,26 +214,6 @@ func verifyAllIPv6Nodes[V any](t *testing.T, nodes []DumpListNode[V]) {
 	}
 }
 
-func getsEqual[V comparable](a V, aOK bool, b V, bOK bool) bool {
-	if !aOK && !bOK {
-		return true
-	}
-	if aOK != bOK {
-		return false
-	}
-	return a == b
-}
-
-var mpa = netip.MustParseAddr
-
-var mpp = func(s string) netip.Prefix {
-	pfx := netip.MustParsePrefix(s)
-	if pfx == pfx.Masked() {
-		return pfx
-	}
-	panic(fmt.Sprintf("%s is not canonicalized as %s", s, pfx.Masked()))
-}
-
 func mustPanic(t *testing.T, name string, fn func()) {
 	t.Helper()
 	defer func() {
@@ -273,58 +263,6 @@ func noPanicRangeOverFunc[V any](t *testing.T, name string, fn any) {
 }
 
 // ##################### helpers ############################
-
-type tableOverlapsTest struct {
-	prefix string
-	want   bool
-}
-
-// checkOverlapsPrefix verifies that the overlaps lookups in tt return the
-// expected results on tbl.
-func checkOverlapsPrefix(t *testing.T, tblInterface any, tests []tableOverlapsTest) {
-	t.Helper()
-	tbl := tblInterface.(interface{ OverlapsPrefix(netip.Prefix) bool })
-	for _, tt := range tests {
-		got := tbl.OverlapsPrefix(mpp(tt.prefix))
-		if got != tt.want {
-			t.Errorf("OverlapsPrefix(%v) = %v, want %v", mpp(tt.prefix), got, tt.want)
-		}
-	}
-}
-
-// dumpAsGoldTable, just a helper to compare with golden table.
-func (t *Table[V]) dumpAsGoldTable() goldTable[V] {
-	var gold goldTable[V]
-
-	for p, v := range t.AllSorted() {
-		gold = append(gold, goldTableItem[V]{pfx: p, val: v})
-	}
-
-	return gold
-}
-
-// dumpAsGoldTable, just a helper to compare with golden table.
-func (f *Fast[V]) dumpAsGoldTable() goldTable[V] {
-	var gold goldTable[V]
-
-	for p, v := range f.AllSorted() {
-		gold = append(gold, goldTableItem[V]{pfx: p, val: v})
-	}
-
-	return gold
-}
-
-// dumpAsGoldTable, just a helper to compare with golden table.
-func dumpAsGoldTable[V any](l *Lite) goldTable[V] {
-	var zero V
-	var gold goldTable[V]
-
-	for p := range l.AllSorted() {
-		gold = append(gold, goldTableItem[V]{pfx: p, val: zero})
-	}
-
-	return gold
-}
 
 // goldTable is a simple and slow route table, implemented as a slice of prefixes
 // and values as a golden reference for bart.Table.
@@ -526,20 +464,12 @@ func randomPrefix(prng *rand.Rand) netip.Prefix {
 
 func randomPrefix4(prng *rand.Rand) netip.Prefix {
 	bits := prng.IntN(33)
-	pfx, err := randomIP4(prng).Prefix(bits)
-	if err != nil {
-		panic(err)
-	}
-	return pfx
+	return netip.PrefixFrom(randomIP4(prng), bits).Masked()
 }
 
 func randomPrefix6(prng *rand.Rand) netip.Prefix {
 	bits := prng.IntN(129)
-	pfx, err := randomIP6(prng).Prefix(bits)
-	if err != nil {
-		panic(err)
-	}
-	return pfx
+	return netip.PrefixFrom(randomIP6(prng), bits).Masked()
 }
 
 func randomIP4(prng *rand.Rand) netip.Addr {

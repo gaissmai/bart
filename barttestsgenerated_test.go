@@ -1,3 +1,5 @@
+// Code generated from file "tests_tmpl.go"; DO NOT EDIT.
+
 // Copyright (c) 2025 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
@@ -14,7 +16,18 @@ import (
 
 // ############ tests ################################
 
-func TestTableNil(t *testing.T) {
+// flatSorted, just a helper to compare with golden table.
+func (t *Table[V]) flatSorted() goldTable[V] {
+	var flat goldTable[V]
+
+	for p, v := range t.AllSorted() {
+		flat = append(flat, goldTableItem[V]{pfx: p, val: v})
+	}
+
+	return flat
+}
+
+func TestTableNil_Table(t *testing.T) {
 	t.Parallel()
 
 	ip4 := mpa("127.0.0.1")
@@ -23,131 +36,133 @@ func TestTableNil(t *testing.T) {
 	pfx4 := mpp("127.0.0.0/8")
 	pfx6 := mpp("::1/128")
 
-	bart2 := new(Table[any])
-	bart2.Insert(pfx4, nil)
-	bart2.Insert(pfx6, nil)
+	tbl2 := new(Table[any])
+	tbl2.Insert(pfx4, nil)
+	tbl2.Insert(pfx6, nil)
 
-	var bart1 *Table[any] = nil
+	var tbl1 *Table[any] = nil
 
 	t.Run("mustPanic", func(t *testing.T) {
 		t.Parallel()
 
-		mustPanic(t, "sizeUpdate", func() { bart1.sizeUpdate(true, 1) })
-		mustPanic(t, "sizeUpdate", func() { bart1.sizeUpdate(false, 1) })
-		mustPanic(t, "rootNodeByVersion", func() { bart1.rootNodeByVersion(true) })
-		mustPanic(t, "rootNodeByVersion", func() { bart1.rootNodeByVersion(false) })
-		mustPanic(t, "fprint", func() { bart1.fprint(nil, true) })
-		mustPanic(t, "fprint", func() { bart1.fprint(nil, false) })
+		mustPanic(t, "sizeUpdate", func() { tbl1.sizeUpdate(true, 1) })
+		mustPanic(t, "sizeUpdate", func() { tbl1.sizeUpdate(false, 1) })
+		mustPanic(t, "rootNodeByVersion", func() { tbl1.rootNodeByVersion(true) })
+		mustPanic(t, "rootNodeByVersion", func() { tbl1.rootNodeByVersion(false) })
+		mustPanic(t, "fprint", func() { tbl1.fprint(nil, true) })
+		mustPanic(t, "fprint", func() { tbl1.fprint(nil, false) })
 
-		mustPanic(t, "Size", func() { bart1.Size() })
-		mustPanic(t, "Size4", func() { bart1.Size4() })
-		mustPanic(t, "Size6", func() { bart1.Size6() })
+		mustPanic(t, "Size", func() { tbl1.Size() })
+		mustPanic(t, "Size4", func() { tbl1.Size4() })
+		mustPanic(t, "Size6", func() { tbl1.Size6() })
 
-		mustPanic(t, "Get", func() { bart1.Get(pfx4) })
-		mustPanic(t, "Insert", func() { bart1.Insert(pfx4, nil) })
-		mustPanic(t, "InsertPersist", func() { bart1.InsertPersist(pfx4, nil) })
-		mustPanic(t, "Delete", func() { bart1.Delete(pfx4) })
-		mustPanic(t, "DeletePersist", func() { bart1.DeletePersist(pfx4) })
-		mustPanic(t, "Modify", func() { bart1.Modify(pfx4, nil) })
-		mustPanic(t, "ModifyPersist", func() { bart1.ModifyPersist(pfx4, nil) })
-		mustPanic(t, "Contains", func() { bart1.Contains(ip4) })
-		mustPanic(t, "Lookup", func() { bart1.Lookup(ip6) })
-		mustPanic(t, "LookupPrefix", func() { bart1.LookupPrefix(pfx4) })
-		mustPanic(t, "LookupPrefixLPM", func() { bart1.LookupPrefixLPM(pfx4) })
-		mustPanic(t, "Union", func() { bart1.Union(bart2) })
-		mustPanic(t, "UnionPersist", func() { bart1.UnionPersist(bart2) })
+		mustPanic(t, "Get", func() { tbl1.Get(pfx4) })
+		mustPanic(t, "Insert", func() { tbl1.Insert(pfx4, nil) })
+		mustPanic(t, "InsertPersist", func() { tbl1.InsertPersist(pfx4, nil) })
+		mustPanic(t, "Delete", func() { tbl1.Delete(pfx4) })
+		mustPanic(t, "DeletePersist", func() { tbl1.DeletePersist(pfx4) })
+		mustPanic(t, "Modify", func() { tbl1.Modify(pfx4, nil) })
+		mustPanic(t, "ModifyPersist", func() { tbl1.ModifyPersist(pfx4, nil) })
+		mustPanic(t, "Contains", func() { tbl1.Contains(ip4) })
+		mustPanic(t, "Lookup", func() { tbl1.Lookup(ip6) })
+		mustPanic(t, "LookupPrefix", func() { tbl1.LookupPrefix(pfx4) })
+		mustPanic(t, "LookupPrefixLPM", func() { tbl1.LookupPrefixLPM(pfx4) })
+		mustPanic(t, "Union", func() { tbl1.Union(tbl2) })
+		mustPanic(t, "UnionPersist", func() { tbl1.UnionPersist(tbl2) })
 	})
 
 	t.Run("noPanic", func(t *testing.T) {
 		t.Parallel()
 
-		noPanic(t, "Overlaps", func() { bart1.Overlaps(nil) })
-		noPanic(t, "Overlaps4", func() { bart1.Overlaps4(nil) })
-		noPanic(t, "Overlaps6", func() { bart1.Overlaps6(nil) })
+		noPanic(t, "Overlaps", func() { tbl1.Overlaps(nil) })
+		noPanic(t, "Overlaps4", func() { tbl1.Overlaps4(nil) })
+		noPanic(t, "Overlaps6", func() { tbl1.Overlaps6(nil) })
 
-		noPanic(t, "Overlaps", func() { bart2.Overlaps(bart2) })
-		noPanic(t, "Overlaps4", func() { bart2.Overlaps4(bart2) })
-		noPanic(t, "Overlaps6", func() { bart2.Overlaps6(bart2) })
+		noPanic(t, "Overlaps", func() { tbl2.Overlaps(tbl2) })
+		noPanic(t, "Overlaps4", func() { tbl2.Overlaps4(tbl2) })
+		noPanic(t, "Overlaps6", func() { tbl2.Overlaps6(tbl2) })
 
-		mustPanic(t, "Overlaps", func() { bart1.Overlaps(bart2) })
-		mustPanic(t, "Overlaps4", func() { bart1.Overlaps4(bart2) })
-		mustPanic(t, "Overlaps6", func() { bart1.Overlaps6(bart2) })
+		mustPanic(t, "Overlaps", func() { tbl1.Overlaps(tbl2) })
+		mustPanic(t, "Overlaps4", func() { tbl1.Overlaps4(tbl2) })
+		mustPanic(t, "Overlaps6", func() { tbl1.Overlaps6(tbl2) })
+		mustPanic(t, "OverlapsPrefix", func() { tbl1.OverlapsPrefix(pfx4) })
+		mustPanic(t, "OverlapsPrefix", func() { tbl1.OverlapsPrefix(pfx6) })
 
-		mustPanic(t, "Equal", func() { bart1.Equal(bart2) })
-		noPanic(t, "Equal", func() { bart1.Equal(bart1) })
-		noPanic(t, "Equal", func() { bart2.Equal(bart2) })
+		mustPanic(t, "Equal", func() { tbl1.Equal(tbl2) })
+		noPanic(t, "Equal", func() { tbl1.Equal(tbl1) })
+		noPanic(t, "Equal", func() { tbl2.Equal(tbl2) })
 
-		noPanic(t, "dump", func() { bart1.dump(nil) })
-		noPanic(t, "dumpString", func() { bart1.dumpString() })
-		noPanic(t, "Clone", func() { bart1.Clone() })
-		noPanic(t, "DumpList4", func() { bart1.DumpList4() })
-		noPanic(t, "DumpList6", func() { bart1.DumpList6() })
-		noPanic(t, "Fprint", func() { bart1.Fprint(nil) })
-		noPanic(t, "MarshalJSON", func() { _, _ = bart1.MarshalJSON() })
-		noPanic(t, "MarshalText", func() { _, _ = bart1.MarshalText() })
+		noPanic(t, "dump", func() { tbl1.dump(nil) })
+		noPanic(t, "dumpString", func() { tbl1.dumpString() })
+		noPanic(t, "Clone", func() { tbl1.Clone() })
+		noPanic(t, "DumpList4", func() { tbl1.DumpList4() })
+		noPanic(t, "DumpList6", func() { tbl1.DumpList6() })
+		noPanic(t, "Fprint", func() { tbl1.Fprint(nil) })
+		noPanic(t, "MarshalJSON", func() { _, _ = tbl1.MarshalJSON() })
+		noPanic(t, "MarshalText", func() { _, _ = tbl1.MarshalText() })
 	})
 
 	t.Run("noPanicRangeOverFunc", func(t *testing.T) {
 		t.Parallel()
 
-		noPanicRangeOverFunc[any](t, "All", bart1.All)
-		noPanicRangeOverFunc[any](t, "All4", bart1.All4)
-		noPanicRangeOverFunc[any](t, "All6", bart1.All6)
-		noPanicRangeOverFunc[any](t, "AllSorted", bart1.AllSorted)
-		noPanicRangeOverFunc[any](t, "AllSorted4", bart1.AllSorted4)
-		noPanicRangeOverFunc[any](t, "AllSorted6", bart1.AllSorted6)
-		noPanicRangeOverFunc[any](t, "Subnets", bart1.Subnets)
-		noPanicRangeOverFunc[any](t, "Supernets", bart1.Supernets)
+		noPanicRangeOverFunc[any](t, "All", tbl1.All)
+		noPanicRangeOverFunc[any](t, "All4", tbl1.All4)
+		noPanicRangeOverFunc[any](t, "All6", tbl1.All6)
+		noPanicRangeOverFunc[any](t, "AllSorted", tbl1.AllSorted)
+		noPanicRangeOverFunc[any](t, "AllSorted4", tbl1.AllSorted4)
+		noPanicRangeOverFunc[any](t, "AllSorted6", tbl1.AllSorted6)
+		noPanicRangeOverFunc[any](t, "Subnets", tbl1.Subnets)
+		noPanicRangeOverFunc[any](t, "Supernets", tbl1.Supernets)
 	})
 }
 
-func TestTableInvalid(t *testing.T) {
+func TestTableInvalid_Table(t *testing.T) {
 	t.Parallel()
 
-	bart1 := new(Table[any])
-	bart2 := new(Table[any])
+	tbl1 := new(Table[any])
+	tbl2 := new(Table[any])
 
 	var zeroIP netip.Addr
 	var zeroPfx netip.Prefix
 
-	noPanic(t, "All", func() { bart1.All() })
-	noPanic(t, "All4", func() { bart1.All4() })
-	noPanic(t, "All6", func() { bart1.All6() })
-	noPanic(t, "AllSorted", func() { bart1.AllSorted() })
-	noPanic(t, "AllSorted4", func() { bart1.AllSorted4() })
-	noPanic(t, "AllSorted6", func() { bart1.AllSorted6() })
-	noPanic(t, "Clone", func() { bart1.Clone() })
-	noPanic(t, "Contains", func() { bart1.Contains(zeroIP) })
-	noPanic(t, "Delete", func() { bart1.Delete(zeroPfx) })
-	noPanic(t, "DeletePersist", func() { bart1.DeletePersist(zeroPfx) })
-	noPanic(t, "DumpList4", func() { bart1.DumpList4() })
-	noPanic(t, "DumpList6", func() { bart1.DumpList6() })
-	noPanic(t, "Equal", func() { bart1.Equal(bart2) })
-	noPanic(t, "Fprint", func() { bart1.Fprint(nil) })
-	noPanic(t, "Get", func() { bart1.Get(zeroPfx) })
-	noPanic(t, "Insert", func() { bart1.Insert(zeroPfx, nil) })
-	noPanic(t, "InsertPersist", func() { bart1.InsertPersist(zeroPfx, nil) })
-	noPanic(t, "Lookup", func() { bart1.Lookup(zeroIP) })
-	noPanic(t, "LookupPrefix", func() { bart1.LookupPrefix(zeroPfx) })
-	noPanic(t, "LookupPrefixLPM", func() { bart1.LookupPrefixLPM(zeroPfx) })
-	noPanic(t, "MarshalJSON", func() { _, _ = bart1.MarshalJSON() })
-	noPanic(t, "MarshalText", func() { _, _ = bart1.MarshalText() })
-	noPanic(t, "Modify", func() { bart1.Modify(zeroPfx, nil) })
-	noPanic(t, "ModifyPersist", func() { bart1.ModifyPersist(zeroPfx, nil) })
-	noPanic(t, "Overlaps", func() { bart1.Overlaps(bart2) })
-	noPanic(t, "Overlaps4", func() { bart1.Overlaps4(bart2) })
-	noPanic(t, "Overlaps6", func() { bart1.Overlaps6(bart2) })
-	noPanic(t, "OverlapsPrefix", func() { bart1.OverlapsPrefix(zeroPfx) })
-	noPanic(t, "Size", func() { bart1.Size() })
-	noPanic(t, "Size4", func() { bart1.Size4() })
-	noPanic(t, "Size6", func() { bart1.Size6() })
-	noPanic(t, "Subnets", func() { bart1.Subnets(zeroPfx) })
-	noPanic(t, "Supernets", func() { bart1.Supernets(zeroPfx) })
-	noPanic(t, "Union", func() { bart1.Union(bart2) })
-	noPanic(t, "UnionPersist", func() { bart1.UnionPersist(bart2) })
+	noPanic(t, "All", func() { tbl1.All() })
+	noPanic(t, "All4", func() { tbl1.All4() })
+	noPanic(t, "All6", func() { tbl1.All6() })
+	noPanic(t, "AllSorted", func() { tbl1.AllSorted() })
+	noPanic(t, "AllSorted4", func() { tbl1.AllSorted4() })
+	noPanic(t, "AllSorted6", func() { tbl1.AllSorted6() })
+	noPanic(t, "Clone", func() { tbl1.Clone() })
+	noPanic(t, "Contains", func() { tbl1.Contains(zeroIP) })
+	noPanic(t, "Delete", func() { tbl1.Delete(zeroPfx) })
+	noPanic(t, "DeletePersist", func() { tbl1.DeletePersist(zeroPfx) })
+	noPanic(t, "DumpList4", func() { tbl1.DumpList4() })
+	noPanic(t, "DumpList6", func() { tbl1.DumpList6() })
+	noPanic(t, "Equal", func() { tbl1.Equal(tbl2) })
+	noPanic(t, "Fprint", func() { tbl1.Fprint(nil) })
+	noPanic(t, "Get", func() { tbl1.Get(zeroPfx) })
+	noPanic(t, "Insert", func() { tbl1.Insert(zeroPfx, nil) })
+	noPanic(t, "InsertPersist", func() { tbl1.InsertPersist(zeroPfx, nil) })
+	noPanic(t, "Lookup", func() { tbl1.Lookup(zeroIP) })
+	noPanic(t, "LookupPrefix", func() { tbl1.LookupPrefix(zeroPfx) })
+	noPanic(t, "LookupPrefixLPM", func() { tbl1.LookupPrefixLPM(zeroPfx) })
+	noPanic(t, "MarshalJSON", func() { _, _ = tbl1.MarshalJSON() })
+	noPanic(t, "MarshalText", func() { _, _ = tbl1.MarshalText() })
+	noPanic(t, "Modify", func() { tbl1.Modify(zeroPfx, nil) })
+	noPanic(t, "ModifyPersist", func() { tbl1.ModifyPersist(zeroPfx, nil) })
+	noPanic(t, "Overlaps", func() { tbl1.Overlaps(tbl2) })
+	noPanic(t, "Overlaps4", func() { tbl1.Overlaps4(tbl2) })
+	noPanic(t, "Overlaps6", func() { tbl1.Overlaps6(tbl2) })
+	noPanic(t, "OverlapsPrefix", func() { tbl1.OverlapsPrefix(zeroPfx) })
+	noPanic(t, "Size", func() { tbl1.Size() })
+	noPanic(t, "Size4", func() { tbl1.Size4() })
+	noPanic(t, "Size6", func() { tbl1.Size6() })
+	noPanic(t, "Subnets", func() { tbl1.Subnets(zeroPfx) })
+	noPanic(t, "Supernets", func() { tbl1.Supernets(zeroPfx) })
+	noPanic(t, "Union", func() { tbl1.Union(tbl2) })
+	noPanic(t, "UnionPersist", func() { tbl1.UnionPersist(tbl2) })
 }
 
-func TestTableContainsCompare(t *testing.T) {
+func TestTableContainsCompare_Table(t *testing.T) {
 	// Create large route tables repeatedly, and compare Table's
 	// behavior to a naive and slow but correct implementation.
 	t.Parallel()
@@ -158,26 +173,26 @@ func TestTableContainsCompare(t *testing.T) {
 	pfxs := randomRealWorldPrefixes(prng, n)
 
 	gold := new(goldTable[int])
-	bart := new(Table[int])
+	tbl := new(Table[int])
 
 	for i, p := range pfxs {
-		gold.insert(p, i) // ensures Masked + de-dupe
-		bart.Insert(p, i)
+		gold.insert(p, i)
+		tbl.Insert(p, i)
 	}
 
 	for range n {
 		a := randomAddr(prng)
 
 		_, goldOK := gold.lookup(a)
-		bartOK := bart.Contains(a)
+		tblOK := tbl.Contains(a)
 
-		if goldOK != bartOK {
-			t.Fatalf("Contains(%q) = %v, want %v", a, bartOK, goldOK)
+		if goldOK != tblOK {
+			t.Fatalf("Contains(%q) = %v, want %v", a, tblOK, goldOK)
 		}
 	}
 }
 
-func TestTableLookupCompare(t *testing.T) {
+func TestTableLookupCompare_Table(t *testing.T) {
 	// Create large route tables repeatedly, and compare Table's
 	// behavior to a naive and slow but correct implementation.
 	t.Parallel()
@@ -188,31 +203,39 @@ func TestTableLookupCompare(t *testing.T) {
 	pfxs := randomRealWorldPrefixes(prng, n)
 
 	gold := new(goldTable[int])
-	bart := new(Table[int])
+	tbl := new(Table[int])
 
 	for i, pfx := range pfxs {
 		gold.insert(pfx, i)
-		bart.Insert(pfx, i)
+		tbl.Insert(pfx, i)
 	}
 
 	for range n {
 		a := randomAddr(prng)
 
 		goldVal, goldOK := gold.lookup(a)
-		bartVal, bartOK := bart.Lookup(a)
+		tblVal, tblOK := tbl.Lookup(a)
 
-		if !getsEqual(goldVal, goldOK, bartVal, bartOK) {
-			t.Fatalf("Lookup(%q) = (%v, %v), want (%v, %v)", a, bartVal, bartOK, goldVal, goldOK)
+		if goldOK != tblOK {
+			t.Fatalf("Lookup(%q) = (_, %v), want %v", a, tblOK, goldOK)
+		}
+
+		// Skip value comparison for liteTable (no real payload)
+		if _, isLite := any(tbl).(*liteTable[int]); !isLite {
+			if goldVal != tblVal {
+				t.Fatalf("Lookup(%q) = (%v, %v), want (%v, %v)", a, tblVal, tblOK, goldVal, goldOK)
+			}
 		}
 	}
 }
 
-func TestTableLookupPrefixUnmasked(t *testing.T) {
+func TestTableLookupPrefixUnmasked_Table(t *testing.T) {
 	// test that the pfx must not be masked on input for LookupPrefix
 	t.Parallel()
 
-	bart := new(Table[any])
-	bart.Insert(mpp("10.20.30.0/24"), nil)
+	tbl := new(Table[any])
+	tbl.Insert(mpp("10.20.30.0/24"), nil)
+	tbl.Insert(mpp("2001:db8::/32"), nil)
 
 	// not normalized pfxs
 	tests := []struct {
@@ -245,15 +268,36 @@ func TestTableLookupPrefixUnmasked(t *testing.T) {
 			wantLPM: mpp("10.20.30.0/24"),
 			wantOk:  true,
 		},
+		// IPv6 counterparts
+		{
+			probe:   netip.MustParsePrefix("2001:db8::1/0"),
+			wantLPM: netip.Prefix{},
+			wantOk:  false,
+		},
+		{
+			probe:   netip.MustParsePrefix("2001:db8::1/31"),
+			wantLPM: netip.Prefix{},
+			wantOk:  false,
+		},
+		{
+			probe:   netip.MustParsePrefix("2001:db8::1/32"),
+			wantLPM: mpp("2001:db8::/32"),
+			wantOk:  true,
+		},
+		{
+			probe:   netip.MustParsePrefix("2001:db8::1/64"),
+			wantLPM: mpp("2001:db8::/32"),
+			wantOk:  true,
+		},
 	}
 
 	for _, tc := range tests {
-		_, got := bart.LookupPrefix(tc.probe)
+		_, got := tbl.LookupPrefix(tc.probe)
 		if got != tc.wantOk {
 			t.Errorf("LookupPrefix non canonical prefix (%s), got: %v, want: %v", tc.probe, got, tc.wantOk)
 		}
 
-		lpm, _, got := bart.LookupPrefixLPM(tc.probe)
+		lpm, _, got := tbl.LookupPrefixLPM(tc.probe)
 		if got != tc.wantOk {
 			t.Errorf("LookupPrefixLPM non canonical prefix (%s), got: %v, want: %v", tc.probe, got, tc.wantOk)
 		}
@@ -263,7 +307,7 @@ func TestTableLookupPrefixUnmasked(t *testing.T) {
 	}
 }
 
-func TestTableLookupPrefixCompare(t *testing.T) {
+func TestTableLookupPrefixCompare_Table(t *testing.T) {
 	// Create large route tables repeatedly, and compare Table's
 	// behavior to a naive and slow but correct implementation.
 	t.Parallel()
@@ -274,25 +318,32 @@ func TestTableLookupPrefixCompare(t *testing.T) {
 	pfxs := randomRealWorldPrefixes(prng, n)
 
 	gold := new(goldTable[int])
-	bart := new(Table[int])
+	tbl := new(Table[int])
 	for i, pfx := range pfxs {
 		gold.insert(pfx, i)
-		bart.Insert(pfx, i)
+		tbl.Insert(pfx, i)
 	}
 
 	for range n {
 		pfx := randomPrefix(prng)
 
 		goldVal, goldOK := gold.lookupPfx(pfx)
-		bartVal, bartOK := bart.LookupPrefix(pfx)
+		tblVal, tblOK := tbl.LookupPrefix(pfx)
 
-		if !getsEqual(goldVal, goldOK, bartVal, bartOK) {
-			t.Fatalf("LookupPrefix(%q) = (%v, %v), want (%v, %v)", pfx, bartVal, bartOK, goldVal, goldOK)
+		if goldOK != tblOK {
+			t.Fatalf("LookupPrefix(%q) = (_, %v), want (_, %v)", pfx, tblOK, goldOK)
+		}
+
+		// Skip value comparison for liteTable (no real payload)
+		if _, isLite := any(tbl).(*liteTable[int]); !isLite {
+			if goldVal != tblVal {
+				t.Fatalf("LookupPrefix(%q) = (%v, %v), want (%v, %v)", pfx, tblVal, tblOK, goldVal, goldOK)
+			}
 		}
 	}
 }
 
-func TestTableLookupPrefixLPMCompare(t *testing.T) {
+func TestTableLookupPrefixLPMCompare_Table(t *testing.T) {
 	// Create large route tables repeatedly, and compare Table's
 	// behavior to a naive and slow but correct implementation.
 	t.Parallel()
@@ -303,30 +354,36 @@ func TestTableLookupPrefixLPMCompare(t *testing.T) {
 	pfxs := randomRealWorldPrefixes(prng, n)
 
 	gold := new(goldTable[int])
-
-	bart := new(Table[int])
+	tbl := new(Table[int])
 	for i, pfx := range pfxs {
 		gold.insert(pfx, i)
-		bart.Insert(pfx, i)
+		tbl.Insert(pfx, i)
 	}
 
 	for range n {
 		pfx := randomPrefix(prng)
 
 		goldLPM, goldVal, goldOK := gold.lookupPfxLPM(pfx)
-		bartLPM, bartVal, bartOK := bart.LookupPrefixLPM(pfx)
+		tblLPM, tblVal, tblOK := tbl.LookupPrefixLPM(pfx)
 
-		if !getsEqual(goldVal, goldOK, bartVal, bartOK) {
-			t.Fatalf("LookupPrefixLPM(%q) = (%v, %v), want (%v, %v)", pfx, bartVal, bartOK, goldVal, goldOK)
+		if goldOK != tblOK {
+			t.Fatalf("LookupPrefixLPM(%q) = (_, _, %v), want (_, _, %v)", pfx, tblOK, goldOK)
 		}
 
-		if !getsEqual(goldLPM, goldOK, bartLPM, bartOK) {
-			t.Fatalf("LookupPrefixLPM(%q) = (%v, %v), want (%v, %v)", pfx, bartLPM, bartOK, goldLPM, goldOK)
+		if goldLPM != tblLPM {
+			t.Fatalf("LookupPrefixLPM(%q) = ( %v, _, _), want ( %v, _, _)", pfx, tblLPM, goldLPM)
+		}
+
+		// Skip value comparison for liteTable (no real payload)
+		if _, isLite := any(tbl).(*liteTable[int]); !isLite {
+			if goldVal != tblVal {
+				t.Fatalf("LookupPrefixLPM(%q) = (_, %v, _), want (_, %v, _)", pfx, tblVal, goldVal)
+			}
 		}
 	}
 }
 
-func TestTableInsertShuffled(t *testing.T) {
+func TestTableInsertShuffled_Table(t *testing.T) {
 	// The order in which you insert prefixes into a route table
 	// should not matter, as long as you're inserting the same set of
 	// routes.
@@ -341,24 +398,27 @@ func TestTableInsertShuffled(t *testing.T) {
 		pfxs2 := slices.Clone(pfxs)
 		prng.Shuffle(len(pfxs2), func(i, j int) { pfxs2[i], pfxs2[j] = pfxs2[j], pfxs2[i] })
 
-		bart1 := new(Table[string])
-		bart2 := new(Table[string])
+		tbl1 := new(Table[string])
+		tbl2 := new(Table[string])
 
 		for _, pfx := range pfxs {
-			bart1.Insert(pfx, pfx.String())
-			bart1.Insert(pfx, pfx.String()) // idempotent
+			tbl1.Insert(pfx, pfx.String())
+			tbl1.Insert(pfx, pfx.String()) // idempotent
 		}
 		for _, pfx := range pfxs2 {
-			bart2.Insert(pfx, pfx.String()) // idempotent
+			tbl2.Insert(pfx, pfx.String()) // idempotent
 		}
 
-		if !bart1.Equal(bart2) {
+		if tbl1.dumpString() != tbl2.dumpString() {
+			t.Fatal("tbl1 and tbl2 have different dumpString representation")
+		}
+		if !tbl1.Equal(tbl2) {
 			t.Fatal("expected Equal")
 		}
 	}
 }
 
-func TestTableInsertPersistShuffled(t *testing.T) {
+func TestTableInsertPersistShuffled_Table(t *testing.T) {
 	// The order in which you insert prefixes into a route table
 	// should not matter, as long as you're inserting the same set of
 	// routes.
@@ -373,30 +433,30 @@ func TestTableInsertPersistShuffled(t *testing.T) {
 		pfxs2 := slices.Clone(pfxs)
 		prng.Shuffle(len(pfxs2), func(i, j int) { pfxs2[i], pfxs2[j] = pfxs2[j], pfxs2[i] })
 
-		bart1 := new(Table[string])
-		bart2 := new(Table[string])
+		tbl1 := new(Table[string])
+		tbl2 := new(Table[string])
 
 		// bart1 is mutable
 		for _, pfx := range pfxs {
-			bart1.Insert(pfx, pfx.String())
+			tbl1.Insert(pfx, pfx.String())
 		}
 
 		// bart2 is persistent
 		for _, pfx := range pfxs2 {
-			bart2 = bart2.InsertPersist(pfx, pfx.String())
+			tbl2 = tbl2.InsertPersist(pfx, pfx.String())
 		}
 
-		if bart1.dumpString() != bart2.dumpString() {
+		if tbl1.dumpString() != tbl2.dumpString() {
 			t.Fatal("mutable and immutable table have different dumpString representation")
 		}
 
-		if !bart1.Equal(bart2) {
+		if !tbl1.Equal(tbl2) {
 			t.Fatal("expected Equal")
 		}
 	}
 }
 
-func TestTableDeleteCompare(t *testing.T) {
+func TestTableDeleteCompare_Table(t *testing.T) {
 	// Create large route tables repeatedly, delete half of their
 	// prefixes, and compare Table's behavior to a naive and slow but
 	// correct implementation.
@@ -415,35 +475,40 @@ func TestTableDeleteCompare(t *testing.T) {
 		all4 := randomRealWorldPrefixes4(prng, numPerFamily)
 		all6 := randomRealWorldPrefixes6(prng, numPerFamily)
 
-		// pfxs toDelete should be non-overlapping sets
-		pfxs := slices.Concat(all4[:deleteCut], all6[:deleteCut])
+		pfxs := slices.Concat(all4, all6)
 		toDelete := slices.Concat(all4[deleteCut:], all6[deleteCut:])
 
 		gold := new(goldTable[string])
-		bart := new(Table[string])
+		tbl := new(Table[string])
 
 		for _, pfx := range pfxs {
 			gold.insert(pfx, pfx.String())
-			bart.Insert(pfx, pfx.String())
+			tbl.Insert(pfx, pfx.String())
 		}
 
 		for _, pfx := range toDelete {
 			gold.delete(pfx)
-			bart.Delete(pfx)
+			tbl.Delete(pfx)
 		}
 
 		gold.sort()
 
-		bartGolden := bart.dumpAsGoldTable()
-		bartGolden.sort()
+		tblFlat := tbl.flatSorted()
 
-		if !slices.Equal(*gold, bartGolden) {
-			t.Fatal("expected Equal")
+		// Skip value comparison for liteTable (no real payload)
+		if _, isLite := any(tbl).(*liteTable[string]); isLite {
+			if !slices.Equal(gold.allSorted(), tblFlat.allSorted()) {
+				t.Fatal("expected Equal")
+			}
+		} else {
+			if !slices.Equal(*gold, tblFlat) {
+				t.Fatal("expected Equal")
+			}
 		}
 	}
 }
 
-func TestTableDeleteShuffled(t *testing.T) {
+func TestTableDeleteShuffled_Table(t *testing.T) {
 	// The order in which you delete prefixes from a route table
 	// should not matter, as long as you're deleting the same set of
 	// routes.
@@ -463,51 +528,44 @@ func TestTableDeleteShuffled(t *testing.T) {
 		all4 := randomRealWorldPrefixes4(prng, numPerFamily)
 		all6 := randomRealWorldPrefixes6(prng, numPerFamily)
 
-		// pfxs toDelete should be non-overlapping sets
-		pfxs := slices.Concat(all4[:deleteCut], all6[:deleteCut])
+		pfxs := slices.Concat(all4, all6)
 		toDelete := slices.Concat(all4[deleteCut:], all6[deleteCut:])
 
-		bart := new(Table[string])
+		tbl := new(Table[string])
 
 		// insert
 		for _, pfx := range pfxs {
-			bart.Insert(pfx, pfx.String())
-		}
-		for _, pfx := range toDelete {
-			bart.Insert(pfx, pfx.String())
+			tbl.Insert(pfx, pfx.String())
 		}
 
 		// delete
 		for _, pfx := range toDelete {
-			bart.Delete(pfx)
+			tbl.Delete(pfx)
 		}
 
 		pfxs2 := slices.Clone(pfxs)
 		toDelete2 := slices.Clone(toDelete)
 		prng.Shuffle(len(toDelete2), func(i, j int) { toDelete2[i], toDelete2[j] = toDelete2[j], toDelete2[i] })
 
-		bart2 := new(Table[string])
+		tbl2 := new(Table[string])
 
 		// insert
 		for _, pfx := range pfxs2 {
-			bart2.Insert(pfx, pfx.String())
-		}
-		for _, pfx := range toDelete2 {
-			bart2.Insert(pfx, pfx.String())
+			tbl2.Insert(pfx, pfx.String())
 		}
 
 		// delete
 		for _, pfx := range toDelete2 {
-			bart2.Delete(pfx)
+			tbl2.Delete(pfx)
 		}
 
-		if !bart.Equal(bart2) {
+		if !tbl.Equal(tbl2) {
 			t.Fatal("expect equal")
 		}
 	}
 }
 
-func TestTableDeleteIsReverseOfInsert(t *testing.T) {
+func TestTableDeleteIsReverseOfInsert_Table(t *testing.T) {
 	t.Parallel()
 
 	n := workLoadN()
@@ -517,8 +575,8 @@ func TestTableDeleteIsReverseOfInsert(t *testing.T) {
 	// order. Each deletion should exactly undo the internal structure
 	// changes that each insert did.
 
-	bart := new(Table[string])
-	want := bart.dumpString()
+	tbl := new(Table[string])
+	want := tbl.dumpString()
 
 	prefixes := randomRealWorldPrefixes(prng, n)
 
@@ -529,18 +587,18 @@ func TestTableDeleteIsReverseOfInsert(t *testing.T) {
 	}()
 
 	for _, p := range prefixes {
-		bart.Insert(p, p.String())
+		tbl.Insert(p, p.String())
 	}
 
 	for i := len(prefixes) - 1; i >= 0; i-- {
-		bart.Delete(prefixes[i])
+		tbl.Delete(prefixes[i])
 	}
-	if got := bart.dumpString(); got != want {
+	if got := tbl.dumpString(); got != want {
 		t.Fatalf("after delete, mismatch:\n\n got: %s\n\nwant: %s", got, want)
 	}
 }
 
-func TestTableDeleteButOne(t *testing.T) {
+func TestTableDeleteButOne_Table(t *testing.T) {
 	t.Parallel()
 	prng := rand.New(rand.NewPCG(42, 42))
 	// Insert n prefixes, then delete all but one
@@ -548,11 +606,11 @@ func TestTableDeleteButOne(t *testing.T) {
 
 	for range 10 {
 
-		bart := new(Table[any])
+		tbl := new(Table[any])
 		prefixes := randomRealWorldPrefixes(prng, n)
 
 		for _, p := range prefixes {
-			bart.Insert(p, nil)
+			tbl.Insert(p, nil)
 		}
 
 		// shuffle the prefixes
@@ -562,40 +620,33 @@ func TestTableDeleteButOne(t *testing.T) {
 
 		// skip the first
 		for i := 1; i < len(prefixes); i++ {
-			bart.Delete(prefixes[i])
+			tbl.Delete(prefixes[i])
 		}
 
-		stats4 := bart.root4.StatsRec()
-		stats6 := bart.root6.StatsRec()
+		if size := tbl.Size(); size != 1 {
+			t.Fatalf("Size(), got %d, want 1", size)
+		}
+
+		stats4 := tbl.root4.StatsRec()
+		stats6 := tbl.root6.StatsRec()
 
 		if nodes := stats4.SubNodes + stats6.SubNodes; nodes != 1 {
-			t.Fatalf("delete but one, want nodes: 1, got: %d\n%s", nodes, bart.dumpString())
+			t.Fatalf("delete but one, want nodes: 1, got: %d\n%s", nodes, tbl.dumpString())
 		}
 
 		sum := stats4.Prefixes + stats4.Leaves + stats4.Fringes +
 			stats6.Prefixes + stats6.Leaves + stats6.Fringes
 
 		if sum != 1 {
-			t.Fatalf("delete but one, only one item must be left, but: %d\n%s", sum, bart.dumpString())
+			t.Fatalf("delete but one, only one item must be left, but: %d\n%s", sum, tbl.dumpString())
 		}
 	}
 }
 
-func TestTableGet(t *testing.T) {
+func TestTableGet_Table(t *testing.T) {
 	t.Parallel()
-
-	t.Run("empty table", func(t *testing.T) {
-		t.Parallel()
-		prng := rand.New(rand.NewPCG(42, 42))
-
-		bart := new(Table[int])
-		pfx := randomPrefix(prng)
-		_, ok := bart.Get(pfx)
-
-		if ok {
-			t.Errorf("empty table: Get(%v), ok=%v, expected: %v", pfx, ok, false)
-		}
-	})
+	prng := rand.New(rand.NewPCG(42, 42))
+	pfx := randomPrefix(prng)
 
 	tests := []struct {
 		name string
@@ -624,15 +675,19 @@ func TestTableGet(t *testing.T) {
 		},
 	}
 
-	bart := new(Table[int])
+	tbl := new(Table[int])
+	if _, ok := tbl.Get(pfx); ok {
+		t.Errorf("empty table: Get(%v), ok=%v, expected: %v", pfx, ok, false)
+	}
+
 	for _, tt := range tests {
-		bart.Insert(tt.pfx, tt.val)
+		tbl.Insert(tt.pfx, tt.val)
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, ok := bart.Get(tt.pfx)
+			got, ok := tbl.Get(tt.pfx)
 
 			if !ok {
 				t.Errorf("%s: ok=%v, expected: %v", tt.name, ok, true)
@@ -645,7 +700,7 @@ func TestTableGet(t *testing.T) {
 	}
 }
 
-func TestTableGetCompare(t *testing.T) {
+func TestTableGetCompare_Table(t *testing.T) {
 	t.Parallel()
 
 	n := workLoadN()
@@ -654,23 +709,30 @@ func TestTableGetCompare(t *testing.T) {
 	pfxs := randomRealWorldPrefixes(prng, n)
 
 	gold := new(goldTable[string])
-	bart := new(Table[string])
+	tbl := new(Table[string])
 	for _, pfx := range pfxs {
 		gold.insert(pfx, pfx.String())
-		bart.Insert(pfx, pfx.String())
+		tbl.Insert(pfx, pfx.String())
 	}
 
 	for _, pfx := range pfxs {
 		goldVal, goldOK := gold.get(pfx)
-		bartVal, bartOK := bart.Get(pfx)
+		tblVal, tblOK := tbl.Get(pfx)
 
-		if !getsEqual(goldVal, goldOK, bartVal, bartOK) {
-			t.Fatalf("Get(%q) = (%v, %v), want (%v, %v)", pfx, bartVal, bartOK, goldVal, goldOK)
+		if goldOK != tblOK {
+			t.Fatalf("Get(%q) = (_, %v), want (_, %v)", pfx, tblOK, goldOK)
+		}
+
+		// Skip value comparison for liteTable (no real payload)
+		if _, isLite := any(tbl).(*liteTable[string]); !isLite {
+			if goldVal != tblVal {
+				t.Fatalf("Get(%q) = (%v, %v), want (%v, %v)", pfx, tblVal, tblOK, goldVal, goldOK)
+			}
 		}
 	}
 }
 
-func TestTableModifySemantics(t *testing.T) {
+func TestTableModifySemantics_Table(t *testing.T) {
 	t.Parallel()
 
 	type args struct {
@@ -726,18 +788,18 @@ func TestTableModifySemantics(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		bart := new(Table[int])
+		tbl := new(Table[int])
 
 		// Insert initial entries using Modify
 		for pfx, v := range tt.prepare {
-			bart.Modify(pfx, func(_ int, _ bool) (_ int, del bool) { return v, false })
+			tbl.Modify(pfx, func(_ int, _ bool) (_ int, del bool) { return v, false })
 		}
 
-		bart.Modify(tt.args.pfx, tt.args.cb)
+		tbl.Modify(tt.args.pfx, tt.args.cb)
 
 		// Check the final state of the table using Get, compares expected and actual table
 		got := make(map[netip.Prefix]int, len(tt.finalData))
-		for pfx, val := range bart.All() {
+		for pfx, val := range tbl.All() {
 			got[pfx] = val
 		}
 		if len(got) != len(tt.finalData) {
@@ -752,8 +814,12 @@ func TestTableModifySemantics(t *testing.T) {
 	}
 }
 
-func TestTableModifyPersistSemantics(t *testing.T) {
+func TestTableModifyPersistSemantics_Table(t *testing.T) {
 	t.Parallel()
+
+	if _, isLite := any(new(Table[any])).(*liteTable[any]); isLite {
+		t.Skip("liteNode has no real payload")
+	}
 
 	type args struct {
 		pfx netip.Prefix
@@ -808,14 +874,14 @@ func TestTableModifyPersistSemantics(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		bart := new(Table[int])
+		tbl := new(Table[int])
 
 		// Insert initial entries using Modify
 		for pfx, v := range tt.prepare {
-			bart.Modify(pfx, func(_ int, _ bool) (_ int, del bool) { return v, false })
+			tbl.Modify(pfx, func(_ int, _ bool) (_ int, del bool) { return v, false })
 		}
 
-		prt := bart.ModifyPersist(tt.args.pfx, tt.args.cb)
+		prt := tbl.ModifyPersist(tt.args.pfx, tt.args.cb)
 
 		// Check the final state of the table using Get, compares expected and actual table
 		for pfx, wantVal := range tt.finalData {
@@ -824,6 +890,7 @@ func TestTableModifyPersistSemantics(t *testing.T) {
 				t.Errorf("[%s] final table: key %v = %v (ok=%v), want %v (ok=true)", tt.name, pfx, gotVal, ok, wantVal)
 			}
 		}
+
 		// Ensure there are no unexpected entries
 		for pfx := range tt.prepare {
 			if _, expect := tt.finalData[pfx]; !expect {
@@ -832,10 +899,22 @@ func TestTableModifyPersistSemantics(t *testing.T) {
 				}
 			}
 		}
+
+		// Ensure the original table isn't modified
+		for pfx, wantVal := range tt.prepare {
+			val, ok := tbl.Get(pfx)
+			if !ok {
+				t.Errorf("[%s] original table: key %v should must be present", tt.name, pfx)
+			}
+
+			if val != wantVal {
+				t.Errorf("[%s] original table: val %v is not as expected %v", tt.name, val, wantVal)
+			}
+		}
 	}
 }
 
-func TestTableModifyCompare(t *testing.T) {
+func TestTableModifyCompare_Table(t *testing.T) {
 	t.Parallel()
 
 	n := workLoadN()
@@ -844,20 +923,26 @@ func TestTableModifyCompare(t *testing.T) {
 	pfxs := randomRealWorldPrefixes(prng, n)
 
 	gold := new(goldTable[int])
-	bart := new(Table[int])
+	tbl := new(Table[int])
 
 	// Update as insert
 	for i, pfx := range pfxs {
 		gold.insert(pfx, i)
-		bart.Modify(pfx, func(int, bool) (int, bool) { return i, false })
+		tbl.Modify(pfx, func(int, bool) (int, bool) { return i, false })
 	}
 
 	gold.sort()
-	bartGolden := bart.dumpAsGoldTable()
-	bartGolden.sort()
+	tblFlat := tbl.flatSorted()
 
-	if !slices.Equal(*gold, bartGolden) {
-		t.Fatal("expected Equal")
+	// Skip value comparison for liteTable (no real payload)
+	if _, isLite := any(tbl).(*liteTable[int]); isLite {
+		if !slices.Equal(gold.allSorted(), tblFlat.allSorted()) {
+			t.Fatal("expected Equal")
+		}
+	} else {
+		if !slices.Equal(*gold, tblFlat) {
+			t.Fatal("expected Equal")
+		}
 	}
 
 	cb1 := func(val int, _ bool) int { return val + 1 }
@@ -866,19 +951,25 @@ func TestTableModifyCompare(t *testing.T) {
 	// Update as update
 	for _, pfx := range pfxs[:len(pfxs)/2] {
 		gold.update(pfx, cb1)
-		bart.Modify(pfx, cb2)
+		tbl.Modify(pfx, cb2)
 	}
 
 	gold.sort()
-	bartGolden = bart.dumpAsGoldTable()
-	bartGolden.sort()
+	tblFlat = tbl.flatSorted()
 
-	if !slices.Equal(*gold, bartGolden) {
-		t.Fatal("expected Equal")
+	// Skip value comparison for liteTable (no real payload)
+	if _, isLite := any(tbl).(*liteTable[int]); isLite {
+		if !slices.Equal(gold.allSorted(), tblFlat.allSorted()) {
+			t.Fatal("expected Equal")
+		}
+	} else {
+		if !slices.Equal(*gold, tblFlat) {
+			t.Fatal("expected Equal")
+		}
 	}
 }
 
-func TestTableModifyPersistCompare(t *testing.T) {
+func TestTableModifyPersistCompare_Table(t *testing.T) {
 	t.Parallel()
 
 	n := workLoadN()
@@ -912,7 +1003,7 @@ func TestTableModifyPersistCompare(t *testing.T) {
 	}
 }
 
-func TestTableModifyShuffled(t *testing.T) {
+func TestTableModifyShuffled_Table(t *testing.T) {
 	t.Parallel()
 
 	n := workLoadN()
@@ -930,17 +1021,14 @@ func TestTableModifyShuffled(t *testing.T) {
 		all6 := randomRealWorldPrefixes6(prng, numPerFamily)
 
 		// pfxs toDelete should be non-overlapping sets
-		pfxs := slices.Concat(all4[:deleteCut], all6[:deleteCut])
+		pfxs := slices.Concat(all4, all6)
 		toDelete := slices.Concat(all4[deleteCut:], all6[deleteCut:])
 
-		bart1 := new(Table[string])
+		tbl1 := new(Table[string])
 
 		// insert
 		for _, pfx := range pfxs {
-			bart1.Insert(pfx, pfx.String())
-		}
-		for _, pfx := range toDelete {
-			bart1.Insert(pfx, pfx.String())
+			tbl1.Insert(pfx, pfx.String())
 		}
 
 		// this callback deletes unconditionally
@@ -948,35 +1036,32 @@ func TestTableModifyShuffled(t *testing.T) {
 
 		// delete
 		for _, pfx := range toDelete {
-			bart1.Modify(pfx, cb)
+			tbl1.Modify(pfx, cb)
 		}
 
 		pfxs2 := slices.Clone(pfxs)
 		toDelete2 := slices.Clone(toDelete)
 		prng.Shuffle(len(toDelete2), func(i, j int) { toDelete2[i], toDelete2[j] = toDelete2[j], toDelete2[i] })
 
-		bart2 := new(Table[string])
+		tbl2 := new(Table[string])
 
 		// insert
 		for _, pfx := range pfxs2 {
-			bart2.Insert(pfx, pfx.String())
-		}
-		for _, pfx := range toDelete2 {
-			bart2.Insert(pfx, pfx.String())
+			tbl2.Insert(pfx, pfx.String())
 		}
 
 		// delete
 		for _, pfx := range toDelete2 {
-			bart2.Modify(pfx, cb)
+			tbl2.Modify(pfx, cb)
 		}
 
-		if !bart1.Equal(bart2) {
+		if !tbl1.Equal(tbl2) {
 			t.Fatal("expected equal")
 		}
 	}
 }
 
-func TestTableModifyPersistShuffled(t *testing.T) {
+func TestTableModifyPersistShuffled_Table(t *testing.T) {
 	t.Parallel()
 
 	n := workLoadN()
@@ -994,17 +1079,14 @@ func TestTableModifyPersistShuffled(t *testing.T) {
 		all6 := randomRealWorldPrefixes6(prng, numPerFamily)
 
 		// pfxs toDelete should be non-overlapping sets
-		pfxs := slices.Concat(all4[:deleteCut], all6[:deleteCut])
+		pfxs := slices.Concat(all4, all6)
 		toDelete := slices.Concat(all4[deleteCut:], all6[deleteCut:])
 
-		bart1 := new(Table[string])
+		tbl1 := new(Table[string])
 
 		// insert
 		for _, pfx := range pfxs {
-			bart1.Insert(pfx, pfx.String())
-		}
-		for _, pfx := range toDelete {
-			bart1.Insert(pfx, pfx.String())
+			tbl1.Insert(pfx, pfx.String())
 		}
 
 		// this callback deletes unconditionally
@@ -1012,29 +1094,26 @@ func TestTableModifyPersistShuffled(t *testing.T) {
 
 		// delete
 		for _, pfx := range toDelete {
-			bart1 = bart1.ModifyPersist(pfx, cb)
+			tbl1 = tbl1.ModifyPersist(pfx, cb)
 		}
 
 		pfxs2 := slices.Clone(pfxs)
 		toDelete2 := slices.Clone(toDelete)
 		prng.Shuffle(len(toDelete2), func(i, j int) { toDelete2[i], toDelete2[j] = toDelete2[j], toDelete2[i] })
 
-		bart2 := new(Table[string])
+		tbl2 := new(Table[string])
 
 		// insert
 		for _, pfx := range pfxs2 {
-			bart2.Insert(pfx, pfx.String())
-		}
-		for _, pfx := range toDelete2 {
-			bart2.Insert(pfx, pfx.String())
+			tbl2.Insert(pfx, pfx.String())
 		}
 
 		// delete
 		for _, pfx := range toDelete2 {
-			bart2 = bart2.ModifyPersist(pfx, cb)
+			tbl2 = tbl2.ModifyPersist(pfx, cb)
 		}
 
-		if !bart1.Equal(bart2) {
+		if !tbl1.Equal(tbl2) {
 			t.Fatal("expected equal")
 		}
 	}
@@ -1042,15 +1121,15 @@ func TestTableModifyPersistShuffled(t *testing.T) {
 
 // TestUnionMemoryAliasing tests that the Union method does not alias memory
 // between the two tables.
-func TestTableUnionMemoryAliasing(t *testing.T) {
+func TestTableUnionMemoryAliasing_Table(t *testing.T) {
 	t.Parallel()
 
 	newTable := func(pfx ...string) *Table[struct{}] {
-		rt := new(Table[struct{}])
+		tbl := new(Table[struct{}])
 		for _, s := range pfx {
-			rt.Insert(mpp(s), struct{}{})
+			tbl.Insert(mpp(s), struct{}{})
 		}
-		return rt
+		return tbl
 	}
 
 	// First create two tables with disjoint prefixes.
@@ -1080,15 +1159,15 @@ func TestTableUnionMemoryAliasing(t *testing.T) {
 
 // TestUnionPersistMemoryAliasing tests that the Union method does not alias memory
 // between the tables.
-func TestTableUnionPersistMemoryAliasing(t *testing.T) {
+func TestTableUnionPersistMemoryAliasing_Table(t *testing.T) {
 	t.Parallel()
 
 	newTable := func(pfx ...string) *Table[struct{}] {
-		rt := new(Table[struct{}])
+		tbl := new(Table[struct{}])
 		for _, s := range pfx {
-			rt.Insert(mpp(s), struct{}{})
+			tbl.Insert(mpp(s), struct{}{})
 		}
-		return rt
+		return tbl
 	}
 	// First create two tables with disjoint prefixes.
 	a := newTable("100.69.1.0/24")
@@ -1115,7 +1194,7 @@ func TestTableUnionPersistMemoryAliasing(t *testing.T) {
 	}
 }
 
-func TestTableUnionCompare(t *testing.T) {
+func TestTableUnionCompare_Table(t *testing.T) {
 	t.Parallel()
 
 	n := workLoadN()
@@ -1125,40 +1204,46 @@ func TestTableUnionCompare(t *testing.T) {
 		pfxs := randomRealWorldPrefixes(prng, n)
 
 		gold := new(goldTable[string])
-		bart := new(Table[string])
+		tbl := new(Table[string])
 
 		for _, pfx := range pfxs {
 			gold.insert(pfx, pfx.String())
-			bart.Insert(pfx, pfx.String())
+			tbl.Insert(pfx, pfx.String())
 		}
 
 		pfxs2 := randomRealWorldPrefixes(prng, n)
 
 		gold2 := new(goldTable[string])
-		bart2 := new(Table[string])
+		tbl2 := new(Table[string])
 
 		for _, pfx := range pfxs2 {
 			gold2.insert(pfx, pfx.String())
-			bart2.Insert(pfx, pfx.String())
+			tbl2.Insert(pfx, pfx.String())
 		}
 
 		gold.union(gold2)
-		bart.Union(bart2)
+		tbl.Union(tbl2)
 
 		// dump as slow table for comparison
-		bartAsGoldenTbl := bart.dumpAsGoldTable()
+		tblFlat := tbl.flatSorted()
 
 		// sort for comparison
 		gold.sort()
-		bartAsGoldenTbl.sort()
 
-		if !slices.Equal(*gold, bartAsGoldenTbl) {
-			t.Fatal("expected equal")
+		// Skip value comparison for liteTable (no real payload)
+		if _, isLite := any(tbl).(*liteTable[string]); isLite {
+			if !slices.Equal(gold.allSorted(), tblFlat.allSorted()) {
+				t.Fatal("expected Equal")
+			}
+		} else {
+			if !slices.Equal(*gold, tblFlat) {
+				t.Fatal("expected Equal")
+			}
 		}
 	}
 }
 
-func TestTableUnionPersistCompare(t *testing.T) {
+func TestTableUnionPersistCompare_Table(t *testing.T) {
 	t.Parallel()
 	prng := rand.New(rand.NewPCG(42, 42))
 
@@ -1168,75 +1253,88 @@ func TestTableUnionPersistCompare(t *testing.T) {
 		pfxs := randomRealWorldPrefixes(prng, n)
 
 		gold := new(goldTable[int])
-		bart := new(Table[int])
+		tbl := new(Table[int])
 
 		for i, pfx := range pfxs {
 			gold.insert(pfx, i)
-			bart.Insert(pfx, i)
+			tbl.Insert(pfx, i)
 		}
 
 		pfxs2 := randomRealWorldPrefixes(prng, n)
 
 		gold2 := new(goldTable[int])
-		bart2 := new(Table[int])
+		tbl2 := new(Table[int])
 
 		for i, pfx := range pfxs2 {
 			gold2.insert(pfx, i)
-			bart2.Insert(pfx, i)
+			tbl2.Insert(pfx, i)
 		}
 
 		gold.union(gold2)
-		bartP := bart.UnionPersist(bart2)
+		tblP := tbl.UnionPersist(tbl2)
 
 		// dump as slow table for comparison
-		bartAsGoldenTbl := bartP.dumpAsGoldTable()
+		flatP := tblP.flatSorted()
 
 		// sort for comparison
 		gold.sort()
-		bartAsGoldenTbl.sort()
 
-		if !slices.Equal(*gold, bartAsGoldenTbl) {
-			t.Fatal("expected equal")
+		// Skip value comparison for liteTable (no real payload)
+		if _, isLite := any(tbl).(*liteTable[int]); isLite {
+			if !slices.Equal(gold.allSorted(), flatP.allSorted()) {
+				t.Fatal("expected Equal")
+			}
+		} else {
+			if !slices.Equal(*gold, flatP) {
+				t.Fatal("expected Equal")
+			}
 		}
 	}
 }
 
-func TestTableClone(t *testing.T) {
+func TestTableClone_Table(t *testing.T) {
 	t.Parallel()
-	prng := rand.New(rand.NewPCG(42, 42))
-	pfxs := randomRealWorldPrefixes(prng, 100_000)
+	n := workLoadN()
 
-	var bart *Table[int]
-	if bart.Clone() != nil {
+	prng := rand.New(rand.NewPCG(42, 42))
+	pfxs := randomRealWorldPrefixes(prng, n)
+
+	var tbl *Table[int]
+	if tbl.Clone() != nil {
 		t.Fatal("expected nil")
 	}
 
-	bart = new(Table[int])
+	tbl = new(Table[int])
 	for i, pfx := range pfxs {
-		bart.Insert(pfx, i)
+		tbl.Insert(pfx, i)
 	}
-	clone := bart.Clone()
+	clone := tbl.Clone()
 
-	if !bart.Equal(clone) {
+	if !tbl.Equal(clone) {
 		t.Fatal("expected equal")
 	}
 }
 
-func TestTableCloneShallow(t *testing.T) {
+func TestTableCloneShallow_Table(t *testing.T) {
 	t.Parallel()
 
-	bart := new(Table[*int])
-	clone := bart.Clone()
-	if bart.dumpString() != clone.dumpString() {
-		t.Errorf("empty Clone: got:\n%swant:\n%s", clone.dumpString(), bart.dumpString())
+	tbl := new(Table[*int])
+
+	if _, isLite := any(tbl).(*liteTable[*int]); isLite {
+		t.Skip("liteNode has no real payload")
+	}
+
+	clone := tbl.Clone()
+	if tbl.dumpString() != clone.dumpString() {
+		t.Errorf("empty Clone: got:\n%swant:\n%s", clone.dumpString(), tbl.dumpString())
 	}
 
 	val := 1
 	pfx := mpp("10.0.0.1/32")
-	bart.Insert(pfx, &val)
+	tbl.Insert(pfx, &val)
 
-	clone = bart.Clone()
-	want, _ := bart.Get(pfx)
+	clone = tbl.Clone()
+	want, _ := tbl.Get(pfx)
 	got, _ := clone.Get(pfx)
 
 	if *got != *want || got != want {
@@ -1245,7 +1343,7 @@ func TestTableCloneShallow(t *testing.T) {
 
 	// update value, shallow copy of values, clone must be equal
 	val = 2
-	want, _ = bart.Get(pfx)
+	want, _ = tbl.Get(pfx)
 	got, _ = clone.Get(pfx)
 
 	if *got != *want {
@@ -1253,21 +1351,26 @@ func TestTableCloneShallow(t *testing.T) {
 	}
 }
 
-func TestTableCloneDeep(t *testing.T) {
+func TestTableCloneDeep_Table(t *testing.T) {
 	t.Parallel()
 
-	bart := new(Table[*MyInt])
-	clone := bart.Clone()
-	if bart.dumpString() != clone.dumpString() {
-		t.Errorf("empty Clone: got:\n%swant:\n%s", clone.dumpString(), bart.dumpString())
+	tbl := new(Table[*MyInt])
+
+	if _, isLite := any(tbl).(*liteTable[*MyInt]); isLite {
+		t.Skip("liteNode has no real payload")
+	}
+
+	clone := tbl.Clone()
+	if tbl.dumpString() != clone.dumpString() {
+		t.Errorf("empty Clone: got:\n%swant:\n%s", clone.dumpString(), tbl.dumpString())
 	}
 
 	val := MyInt(1)
 	pfx := mpp("10.0.0.1/32")
-	bart.Insert(pfx, &val)
+	tbl.Insert(pfx, &val)
 
-	clone = bart.Clone()
-	want, _ := bart.Get(pfx)
+	clone = tbl.Clone()
+	want, _ := tbl.Get(pfx)
 	got, _ := clone.Get(pfx)
 
 	if *got != *want || got == want {
@@ -1276,7 +1379,7 @@ func TestTableCloneDeep(t *testing.T) {
 
 	// update value, deep copy of values, cloned value must now be different
 	val = 2
-	want, _ = bart.Get(pfx)
+	want, _ = tbl.Get(pfx)
 	got, _ = clone.Get(pfx)
 
 	if *got == *want {
@@ -1284,19 +1387,23 @@ func TestTableCloneDeep(t *testing.T) {
 	}
 }
 
-func TestTableUnionShallow(t *testing.T) {
+func TestTableUnionShallow_Table(t *testing.T) {
 	t.Parallel()
 
-	bart1 := new(Table[*int])
-	bart2 := new(Table[*int])
+	tbl1 := new(Table[*int])
+	tbl2 := new(Table[*int])
+
+	if _, isLite := any(tbl1).(*liteTable[*int]); isLite {
+		t.Skip("liteNode has no real payload")
+	}
 
 	val := 1
 	pfx := mpp("10.0.0.1/32")
-	bart2.Insert(pfx, &val)
+	tbl2.Insert(pfx, &val)
 
-	bart1.Union(bart2)
-	got, _ := bart1.Get(pfx)
-	want, _ := bart2.Get(pfx)
+	tbl1.Union(tbl2)
+	got, _ := tbl1.Get(pfx)
+	want, _ := tbl2.Get(pfx)
 
 	if *got != *want || got != want {
 		t.Errorf("shallow copy, values and pointers must be equal:\nvalues(%d, %d)\n(ptr(%v, %v)", *got, *want, got, want)
@@ -1304,27 +1411,31 @@ func TestTableUnionShallow(t *testing.T) {
 
 	// update value, shallow copy of values, union must be equal
 	val = 2
-	got, _ = bart1.Get(pfx)
-	want, _ = bart2.Get(pfx)
+	got, _ = tbl1.Get(pfx)
+	want, _ = tbl2.Get(pfx)
 
 	if *got != *want {
 		t.Errorf("memory aliasing after shallow copy, values must be equal:\nvalues(%d, %d)", *got, *want)
 	}
 }
 
-func TestTableUnionDeep(t *testing.T) {
+func TestTableUnionDeep_Table(t *testing.T) {
 	t.Parallel()
 
-	bart1 := new(Table[*MyInt])
-	bart2 := new(Table[*MyInt])
+	tbl1 := new(Table[*MyInt])
+	tbl2 := new(Table[*MyInt])
+
+	if _, isLite := any(tbl1).(*liteTable[*MyInt]); isLite {
+		t.Skip("liteNode has no real payload")
+	}
 
 	val := MyInt(1)
 	pfx := mpp("10.0.0.1/32")
-	bart2.Insert(pfx, &val)
+	tbl2.Insert(pfx, &val)
 
-	bart1.Union(bart2)
-	got, _ := bart1.Get(pfx)
-	want, _ := bart2.Get(pfx)
+	tbl1.Union(tbl2)
+	got, _ := tbl1.Get(pfx)
+	want, _ := tbl2.Get(pfx)
 
 	if *got != *want || got == want {
 		t.Errorf("value with Cloner interface, pointers must be different:\nvalues(%d, %d)\n(ptr(%v, %v)", *got, *want, got, want)
@@ -1332,8 +1443,8 @@ func TestTableUnionDeep(t *testing.T) {
 
 	// update value, shallow copy of values, union must be equal
 	val = 2
-	got, _ = bart1.Get(pfx)
-	want, _ = bart2.Get(pfx)
+	got, _ = tbl1.Get(pfx)
+	want, _ = tbl2.Get(pfx)
 
 	if *got == *want {
 		t.Errorf("memory aliasing after deep copy, values must be different:\nvalues(%d, %d)", *got, *want)
@@ -1341,142 +1452,151 @@ func TestTableUnionDeep(t *testing.T) {
 }
 
 // test some edge cases
-func TestTableOverlapsPrefixEdgeCases(t *testing.T) {
+func TestTableOverlapsPrefixEdgeCases_Table(t *testing.T) {
 	t.Parallel()
 
-	bart := new(Table[int])
+	type probe struct {
+		pfx  netip.Prefix
+		want bool
+	}
 
-	// empty table
-	checkOverlapsPrefix(t, bart, []tableOverlapsTest{
-		{"0.0.0.0/0", false},
-		{"::/0", false},
-	})
+	type probes []probe
+	type pfxs []netip.Prefix
 
-	// default route
-	bart.Insert(mpp("10.0.0.0/9"), 0)
-	bart.Insert(mpp("2001:db8::/32"), 0)
-	checkOverlapsPrefix(t, bart, []tableOverlapsTest{
-		{"0.0.0.0/0", true},
-		{"::/0", true},
-	})
+	type test struct {
+		name   string
+		insert pfxs
+		probes probes
+	}
 
-	// default route
-	bart = new(Table[int])
-	bart.Insert(mpp("0.0.0.0/0"), 0)
-	bart.Insert(mpp("::/0"), 0)
-	checkOverlapsPrefix(t, bart, []tableOverlapsTest{
-		{"10.0.0.0/9", true},
-		{"2001:db8::/32", true},
-	})
+	tests := []test{
+		{
+			name:   "empty table",
+			insert: nil,
+			probes: probes{{mpp("0.0.0.0/0"), false}, {mpp("::/0"), false}},
+		},
+		{
+			name:   "default route I",
+			insert: pfxs{mpp("10.0.0.0/9"), mpp("2001:db8::/32")},
+			probes: probes{{mpp("0.0.0.0/0"), true}, {mpp("::/0"), true}},
+		},
+		{
+			name:   "default route II",
+			insert: pfxs{mpp("0.0.0.0/0"), mpp("::/0")},
+			probes: probes{{mpp("10.0.0.0/9"), true}, {mpp("2001:db8::/32"), true}},
+		},
+		{
+			name:   "single IP I",
+			insert: pfxs{mpp("10.0.0.0/7"), mpp("2001::/16")},
+			probes: probes{{mpp("10.1.2.3/32"), true}, {mpp("2001:db8:affe::cafe/128"), true}},
+		},
+		{
+			name:   "single IP II",
+			insert: pfxs{mpp("10.1.2.3/32"), mpp("2001:db8:affe::cafe/128")},
+			probes: probes{{mpp("10.0.0.0/7"), true}, {mpp("2001::/16"), true}},
+		},
+		{
+			name:   "same IP",
+			insert: pfxs{mpp("10.1.2.3/32"), mpp("2001:db8:affe::cafe/128")},
+			probes: probes{{mpp("10.1.2.3/32"), true}, {mpp("2001:db8:affe::cafe/128"), true}},
+		},
+	}
 
-	// single IP
-	bart = new(Table[int])
-	bart.Insert(mpp("10.0.0.0/7"), 0)
-	bart.Insert(mpp("2001::/16"), 0)
-	checkOverlapsPrefix(t, bart, []tableOverlapsTest{
-		{"10.1.2.3/32", true},
-		{"2001:db8:affe::cafe/128", true},
-	})
+	for _, tt := range tests {
+		tbl := new(Table[int])
+		for _, pfx := range tt.insert {
+			tbl.Insert(pfx, 0)
+		}
 
-	// single IP
-	bart = new(Table[int])
-	bart.Insert(mpp("10.1.2.3/32"), 0)
-	bart.Insert(mpp("2001:db8:affe::cafe/128"), 0)
-	checkOverlapsPrefix(t, bart, []tableOverlapsTest{
-		{"10.0.0.0/7", true},
-		{"2001::/16", true},
-	})
-
-	// same IPv
-	bart = new(Table[int])
-	bart.Insert(mpp("10.1.2.3/32"), 0)
-	bart.Insert(mpp("2001:db8:affe::cafe/128"), 0)
-	checkOverlapsPrefix(t, bart, []tableOverlapsTest{
-		{"10.1.2.3/32", true},
-		{"2001:db8:affe::cafe/128", true},
-	})
+		for _, probe := range tt.probes {
+			got := tbl.OverlapsPrefix(probe.pfx)
+			if got != probe.want {
+				t.Errorf("[%s] OverlapsPrefix(%v) = %v, want %v", tt.name, probe.pfx, got, probe.want)
+			}
+		}
+	}
 }
 
-func TestTableSize(t *testing.T) {
+func TestTableSize_Table(t *testing.T) {
 	t.Parallel()
 
 	n := workLoadN()
 	prng := rand.New(rand.NewPCG(42, 42))
 
-	bart := new(Table[any])
-	if bart.Size() != 0 {
-		t.Errorf("empty Table: want: 0, got: %d", bart.Size())
+	tbl := new(Table[any])
+	if tbl.Size() != 0 {
+		t.Errorf("empty Table: want: 0, got: %d", tbl.Size())
 	}
 
-	if bart.Size4() != 0 {
-		t.Errorf("empty Table: want: 0, got: %d", bart.Size4())
+	if tbl.Size4() != 0 {
+		t.Errorf("empty Table: want: 0, got: %d", tbl.Size4())
 	}
 
-	if bart.Size6() != 0 {
-		t.Errorf("empty Table: want: 0, got: %d", bart.Size6())
+	if tbl.Size6() != 0 {
+		t.Errorf("empty Table: want: 0, got: %d", tbl.Size6())
 	}
 
 	pfxs1 := randomRealWorldPrefixes(prng, n)
 	pfxs2 := randomRealWorldPrefixes(prng, n)
 
 	for _, pfx := range pfxs1 {
-		bart.Insert(pfx, nil)
+		tbl.Insert(pfx, nil)
 	}
 
 	for _, pfx := range pfxs2 {
-		bart.Modify(pfx, func(any, bool) (any, bool) { return nil, false })
+		tbl.Modify(pfx, func(any, bool) (any, bool) { return nil, false })
 	}
 
 	pfxs1 = append(pfxs1, pfxs2...)
 
 	for _, pfx := range pfxs1[:n] {
-		bart.Modify(pfx, func(any, bool) (any, bool) { return nil, false })
+		tbl.Modify(pfx, func(any, bool) (any, bool) { return nil, false })
 	}
 
 	for _, pfx := range randomRealWorldPrefixes(prng, n) {
-		bart.Delete(pfx)
+		tbl.Delete(pfx)
 	}
 
-	var allInc4 int
-	var allInc6 int
+	var allCount4 int
+	var allCount6 int
 
-	for range bart.AllSorted4() {
-		allInc4++
+	for range tbl.AllSorted4() {
+		allCount4++
 	}
 
-	for range bart.AllSorted6() {
-		allInc6++
+	for range tbl.AllSorted6() {
+		allCount6++
 	}
 
-	if allInc4 != bart.Size4() {
-		t.Errorf("Size4: want: %d, got: %d", allInc4, bart.Size4())
+	if allCount4 != tbl.Size4() {
+		t.Errorf("Size4: want: %d, got: %d", allCount4, tbl.Size4())
 	}
 
-	if allInc6 != bart.Size6() {
-		t.Errorf("Size6: want: %d, got: %d", allInc6, bart.Size6())
+	if allCount6 != tbl.Size6() {
+		t.Errorf("Size6: want: %d, got: %d", allCount6, tbl.Size6())
 	}
 }
 
 // TestAll tests All with random samples
-func TestTableAll(t *testing.T) {
+func TestTableAll_Table(t *testing.T) {
 	t.Parallel()
 	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
 	pfxs := randomRealWorldPrefixes(prng, n)
 
-	bart := new(Table[string])
+	tbl := new(Table[string])
 
 	// Insert all prefixes with their values
 	for _, pfx := range pfxs {
-		bart.Insert(pfx, pfx.String())
+		tbl.Insert(pfx, pfx.String())
 	}
 
 	// Collect all prefixes from All
 	gotPrefixes := make([]netip.Prefix, 0, n)
 	gotValues := make([]string, 0, n)
 
-	for pfx, val := range bart.All() {
+	for pfx, val := range tbl.All() {
 		gotPrefixes = append(gotPrefixes, pfx)
 		gotValues = append(gotValues, val)
 	}
@@ -1485,14 +1605,14 @@ func TestTableAll(t *testing.T) {
 	got4Prefixes := make([]netip.Prefix, 0, n)
 	got4Values := make([]string, 0, n)
 
-	for pfx, val := range bart.All4() {
+	for pfx, val := range tbl.All4() {
 		got4Prefixes = append(got4Prefixes, pfx)
 		got4Values = append(got4Values, val)
 	}
 
 	got6Prefixes := make([]netip.Prefix, 0, n)
 	got6Values := make([]string, 0, n)
-	for pfx, val := range bart.All6() {
+	for pfx, val := range tbl.All6() {
 		got6Prefixes = append(got6Prefixes, pfx)
 		got6Values = append(got6Values, val)
 	}
@@ -1526,9 +1646,12 @@ func TestTableAll(t *testing.T) {
 			t.Fatalf("Original prefix %v not found in All results", pfx)
 		}
 
-		if val != pfx.String() {
-			t.Fatalf("Original prefix %v has wrong value: expected %s, got %s",
-				pfx, pfx.String(), val)
+		// Skip value comparison for liteTable (no real payload)
+		if _, isLite := any(tbl).(*liteTable[string]); !isLite {
+			if val != pfx.String() {
+				t.Fatalf("Original prefix %v has wrong value: expected %s, got %s",
+					pfx, pfx.String(), val)
+			}
 		}
 	}
 
@@ -1542,7 +1665,7 @@ func TestTableAll(t *testing.T) {
 	}
 }
 
-func TestTableAllSorted(t *testing.T) {
+func TestTableAllSorted_Table(t *testing.T) {
 	t.Parallel()
 
 	// Test cases with known CIDR sort order
@@ -1604,17 +1727,17 @@ func TestTableAllSorted(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			bart := new(Table[int])
+			tbl := new(Table[int])
 
 			// Insert prefixes with index as value
 			for i, prefixStr := range tc.prefixes {
 				pfx := netip.MustParsePrefix(prefixStr)
-				bart.Insert(pfx, i)
+				tbl.Insert(pfx, i)
 			}
 
 			// Collect sorted results
 			var actualOrder []string
-			for pfx := range bart.AllSorted() {
+			for pfx := range tbl.AllSorted() {
 				actualOrder = append(actualOrder, pfx.String())
 			}
 
@@ -1625,13 +1748,13 @@ func TestTableAllSorted(t *testing.T) {
 
 			// Collect sorted 4 results
 			var actual4Order []string
-			for pfx := range bart.AllSorted4() {
+			for pfx := range tbl.AllSorted4() {
 				actual4Order = append(actual4Order, pfx.String())
 			}
 
 			// Collect sorted 6 results
 			var actual6Order []string
-			for pfx := range bart.AllSorted6() {
+			for pfx := range tbl.AllSorted6() {
 				actual6Order = append(actual6Order, pfx.String())
 			}
 
@@ -1651,44 +1774,47 @@ func TestTableAllSorted(t *testing.T) {
 	}
 }
 
-func TestTableSubnets(t *testing.T) {
+func TestTableSubnets_Table(t *testing.T) {
 	t.Parallel()
 
 	var zeroPfx netip.Prefix
 
 	t.Run("empty table", func(t *testing.T) {
 		t.Parallel()
-		bart := new(Table[string])
+		tbl := new(Table[string])
 		pfx := mpp("::1/128")
 
-		for range bart.Subnets(pfx) {
+		for range tbl.Subnets(pfx) {
 			t.Errorf("empty table, must not range over")
 		}
 	})
 
 	t.Run("invalid prefix", func(t *testing.T) {
-		bart := new(Table[string])
+		tbl := new(Table[string])
 		pfx := mpp("::1/128")
 		val := "foo"
-		bart.Insert(pfx, val)
-		for range bart.Subnets(zeroPfx) {
+		tbl.Insert(pfx, val)
+		for range tbl.Subnets(zeroPfx) {
 			t.Errorf("invalid prefix, must not range over")
 		}
 	})
 
 	t.Run("identity", func(t *testing.T) {
-		bart := new(Table[string])
+		tbl := new(Table[string])
 		pfx := mpp("::1/128")
 		val := "foo"
-		bart.Insert(pfx, val)
+		tbl.Insert(pfx, val)
 
-		for p, v := range bart.Subnets(pfx) {
+		for p, v := range tbl.Subnets(pfx) {
 			if p != pfx {
 				t.Errorf("Subnet(%v), got: %v, want: %v", pfx, p, pfx)
 			}
 
-			if v != val {
-				t.Errorf("Subnet(%v), got: %v, want: %v", pfx, v, val)
+			// Skip value comparison for liteTable (no real payload)
+			if _, isLite := any(tbl).(*liteTable[string]); !isLite {
+				if v != val {
+					t.Errorf("Subnet(%v), got: %v, want: %v", pfx, v, val)
+				}
 			}
 		}
 	})
@@ -1700,25 +1826,25 @@ func TestTableSubnets(t *testing.T) {
 		want4 := n - n/2
 		want6 := n + n/2
 
-		bart := new(Table[int])
+		tbl := new(Table[int])
 		for i, pfx := range randomRealWorldPrefixes4(prng, want4) {
-			bart.Insert(pfx, i)
+			tbl.Insert(pfx, i)
 		}
 		for i, pfx := range randomRealWorldPrefixes6(prng, want6) {
-			bart.Insert(pfx, i)
+			tbl.Insert(pfx, i)
 		}
 
 		// default gateway v4 covers all v4 prefixes in table
 		dg4 := mpp("0.0.0.0/0")
 		got4 := 0
-		for range bart.Subnets(dg4) {
+		for range tbl.Subnets(dg4) {
 			got4++
 		}
 
 		// default gateway v6 covers all v6 prefixes in table
 		dg6 := mpp("::/0")
 		got6 := 0
-		for range bart.Subnets(dg6) {
+		for range tbl.Subnets(dg6) {
 			got6++
 		}
 
@@ -1731,7 +1857,7 @@ func TestTableSubnets(t *testing.T) {
 	})
 }
 
-func TestTableSubnetsCompare(t *testing.T) {
+func TestTableSubnetsCompare_Table(t *testing.T) {
 	t.Parallel()
 	n := workLoadN()
 	prng := rand.New(rand.NewPCG(42, 42))
@@ -1739,11 +1865,11 @@ func TestTableSubnetsCompare(t *testing.T) {
 	pfxs := randomRealWorldPrefixes(prng, n)
 
 	gold := new(goldTable[int])
-	bart := new(Table[int])
+	tbl := new(Table[int])
 
 	for i, pfx := range pfxs {
 		gold.insert(pfx, i)
-		bart.Insert(pfx, i)
+		tbl.Insert(pfx, i)
 	}
 
 	for _, pfx := range randomRealWorldPrefixes(prng, n) {
@@ -1751,64 +1877,67 @@ func TestTableSubnetsCompare(t *testing.T) {
 			t.Parallel()
 
 			gotGold := gold.subnets(pfx)
-			gotBart := []netip.Prefix{}
-			for pfx := range bart.Subnets(pfx) {
-				gotBart = append(gotBart, pfx)
+			gotTbl := []netip.Prefix{}
+			for pfx := range tbl.Subnets(pfx) {
+				gotTbl = append(gotTbl, pfx)
 			}
-			if !slices.Equal(gotGold, gotBart) {
-				t.Fatalf("Subnets(%q) = %v, want %v", pfx, gotBart, gotGold)
+			if !slices.Equal(gotGold, gotTbl) {
+				t.Fatalf("Subnets(%q) = %v, want %v", pfx, gotTbl, gotGold)
 			}
 		})
 	}
 }
 
-func TestTableSupernetsEdgeCase(t *testing.T) {
+func TestTableSupernetsEdgeCase_Table(t *testing.T) {
 	t.Parallel()
 
 	var zeroPfx netip.Prefix
 
 	t.Run("empty table", func(t *testing.T) {
 		t.Parallel()
-		bart := new(Table[any])
+		tbl := new(Table[any])
 		pfx := mpp("::1/128")
 
-		bart.Supernets(pfx)(func(_ netip.Prefix, _ any) bool {
+		tbl.Supernets(pfx)(func(_ netip.Prefix, _ any) bool {
 			t.Errorf("empty table, must not range over")
 			return false
 		})
 	})
 
 	t.Run("invalid prefix", func(t *testing.T) {
-		bart := new(Table[any])
+		tbl := new(Table[any])
 		pfx := mpp("::1/128")
 		val := "foo"
-		bart.Insert(pfx, val)
+		tbl.Insert(pfx, val)
 
-		bart.Supernets(zeroPfx)(func(_ netip.Prefix, _ any) bool {
+		tbl.Supernets(zeroPfx)(func(_ netip.Prefix, _ any) bool {
 			t.Errorf("invalid prefix, must not range over")
 			return false
 		})
 	})
 
 	t.Run("identity", func(t *testing.T) {
-		bart := new(Table[string])
+		tbl := new(Table[string])
 		pfx := mpp("::1/128")
 		val := "foo"
-		bart.Insert(pfx, val)
+		tbl.Insert(pfx, val)
 
-		for p, v := range bart.Supernets(pfx) {
+		for p, v := range tbl.Supernets(pfx) {
 			if p != pfx {
 				t.Errorf("Supernets(%v), got: %v, want: %v", pfx, p, pfx)
 			}
 
-			if v != val {
-				t.Errorf("Supernets(%v), got: %v, want: %v", pfx, v, val)
+			// Skip value comparison for liteTable (no real payload)
+			if _, isLite := any(tbl).(*liteTable[string]); !isLite {
+				if v != val {
+					t.Errorf("Supernets(%v), got: %v, want: %v", pfx, v, val)
+				}
 			}
 		}
 	})
 }
 
-func TestTableSupernetsCompare(t *testing.T) {
+func TestTableSupernetsCompare_Table(t *testing.T) {
 	t.Parallel()
 	n := workLoadN()
 
@@ -1817,31 +1946,31 @@ func TestTableSupernetsCompare(t *testing.T) {
 	pfxs := randomRealWorldPrefixes(prng, n)
 
 	gold := new(goldTable[int])
-	bart := new(Table[int])
+	tbl := new(Table[int])
 
 	for i, pfx := range pfxs {
 		gold.insert(pfx, i)
-		bart.Insert(pfx, i)
+		tbl.Insert(pfx, i)
 	}
 
 	for _, pfx := range randomRealWorldPrefixes(prng, n) {
 		t.Run("subtest", func(t *testing.T) {
 			t.Parallel()
 			gotGold := gold.supernets(pfx)
-			gotBart := []netip.Prefix{}
+			gotTbl := []netip.Prefix{}
 
-			for p := range bart.Supernets(pfx) {
-				gotBart = append(gotBart, p)
+			for p := range tbl.Supernets(pfx) {
+				gotTbl = append(gotTbl, p)
 			}
 
-			if !slices.Equal(gotGold, gotBart) {
-				t.Fatalf("Supernets(%q) = %v, want %v", pfx, gotBart, gotGold)
+			if !slices.Equal(gotGold, gotTbl) {
+				t.Fatalf("Supernets(%q) = %v, want %v", pfx, gotTbl, gotGold)
 			}
 		})
 	}
 }
 
-func TestTableMarshalText(t *testing.T) {
+func TestTableMarshalText_Table(t *testing.T) {
 	tests := []struct {
 		name         string
 		expectedData map[netip.Prefix]string
@@ -1853,22 +1982,22 @@ func TestTableMarshalText(t *testing.T) {
 		{
 			name: "with_data",
 			expectedData: map[netip.Prefix]string{
-				netip.MustParsePrefix("192.168.1.0/24"): "test1",
-				netip.MustParsePrefix("10.0.0.0/8"):     "test2",
+				mpp("192.168.1.0/24"): "test1",
+				mpp("10.0.0.0/8"):     "test2",
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			bart := new(Table[string])
+			tbl := new(Table[string])
 
 			// Insert test data
 			for prefix, value := range tt.expectedData {
-				bart.Insert(prefix, value)
+				tbl.Insert(prefix, value)
 			}
 
-			data, err := bart.MarshalText()
+			data, err := tbl.MarshalText()
 			if err != nil {
 				t.Errorf("MarshalText failed: %v", err)
 			}
@@ -1888,7 +2017,7 @@ func TestTableMarshalText(t *testing.T) {
 	}
 }
 
-func TestTableMarshalJSON(t *testing.T) {
+func TestTableMarshalJSON_Table(t *testing.T) {
 	tests := []struct {
 		name         string
 		expectedData map[netip.Prefix]any
@@ -1900,29 +2029,29 @@ func TestTableMarshalJSON(t *testing.T) {
 		{
 			name: "string_values",
 			expectedData: map[netip.Prefix]any{
-				netip.MustParsePrefix("192.168.1.0/24"): "net1",
-				netip.MustParsePrefix("10.0.0.0/8"):     "net2",
+				mpp("192.168.1.0/24"): "net1",
+				mpp("10.0.0.0/8"):     "net2",
 			},
 		},
 		{
 			name: "mixed_values",
 			expectedData: map[netip.Prefix]any{
-				netip.MustParsePrefix("192.168.1.0/24"): "string",
-				netip.MustParsePrefix("10.0.0.0/8"):     42,
+				mpp("192.168.1.0/24"): "string",
+				mpp("10.0.0.0/8"):     42,
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			bart := new(Table[any])
+			tbl := new(Table[any])
 
 			// Insert test data
 			for prefix, value := range tt.expectedData {
-				bart.Insert(prefix, value)
+				tbl.Insert(prefix, value)
 			}
 
-			jsonData, err := bart.MarshalJSON()
+			jsonData, err := tbl.MarshalJSON()
 			if err != nil {
 				t.Errorf("JSON marshaling failed: %v", err)
 			}
@@ -1940,7 +2069,7 @@ func TestTableMarshalJSON(t *testing.T) {
 	}
 }
 
-func TestTableDumpList4(t *testing.T) {
+func TestTableDumpList4_Table(t *testing.T) {
 	tests := []struct {
 		name         string
 		expectedData map[netip.Prefix]string
@@ -1954,15 +2083,15 @@ func TestTableDumpList4(t *testing.T) {
 		{
 			name: "single_ipv4",
 			expectedData: map[netip.Prefix]string{
-				netip.MustParsePrefix("192.168.1.0/24"): "lan",
+				mpp("192.168.1.0/24"): "lan",
 			},
 			expectItems: 1,
 		},
 		{
 			name: "multiple_ipv4",
 			expectedData: map[netip.Prefix]string{
-				netip.MustParsePrefix("192.168.1.0/24"): "lan",
-				netip.MustParsePrefix("10.0.0.0/8"):     "private",
+				mpp("192.168.1.0/24"): "lan",
+				mpp("10.0.0.0/8"):     "private",
 			},
 			expectItems: 2,
 		},
@@ -1970,14 +2099,14 @@ func TestTableDumpList4(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			bart := new(Table[string])
+			tbl := new(Table[string])
 
 			// Insert test data
 			for prefix, value := range tt.expectedData {
-				bart.Insert(prefix, value)
+				tbl.Insert(prefix, value)
 			}
 
-			dumpList := bart.DumpList4()
+			dumpList := tbl.DumpList4()
 
 			// Count total nodes in the tree (including nested)
 			totalNodes := countDumpListNodes(dumpList)
@@ -1991,7 +2120,7 @@ func TestTableDumpList4(t *testing.T) {
 	}
 }
 
-func TestTableDumpList6(t *testing.T) {
+func TestTableDumpList6_Table(t *testing.T) {
 	tests := []struct {
 		name         string
 		expectedData map[netip.Prefix]string
@@ -2005,15 +2134,15 @@ func TestTableDumpList6(t *testing.T) {
 		{
 			name: "single_ipv6",
 			expectedData: map[netip.Prefix]string{
-				netip.MustParsePrefix("2001:db8::/32"): "doc",
+				mpp("2001:db8::/32"): "doc",
 			},
 			expectItems: 1,
 		},
 		{
 			name: "multiple_ipv6",
 			expectedData: map[netip.Prefix]string{
-				netip.MustParsePrefix("2001:db8::/32"): "doc",
-				netip.MustParsePrefix("fe80::/10"):     "link-local",
+				mpp("2001:db8::/32"): "doc",
+				mpp("fe80::/10"):     "link-local",
 			},
 			expectItems: 2,
 		},
@@ -2021,14 +2150,14 @@ func TestTableDumpList6(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			bart := new(Table[string])
+			tbl := new(Table[string])
 
 			// Insert test data
 			for prefix, value := range tt.expectedData {
-				bart.Insert(prefix, value)
+				tbl.Insert(prefix, value)
 			}
 
-			dumpList := bart.DumpList6()
+			dumpList := tbl.DumpList6()
 
 			// Count total nodes in the tree (including nested)
 			totalNodes := countDumpListNodes(dumpList)
@@ -2042,7 +2171,7 @@ func TestTableDumpList6(t *testing.T) {
 	}
 }
 
-func TestTableEqual(t *testing.T) {
+func TestTableEqual_Table(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -2132,7 +2261,7 @@ func TestTableEqual(t *testing.T) {
 	}
 }
 
-func TestTableFullEqual(t *testing.T) {
+func TestTableFullEqual_Table(t *testing.T) {
 	t.Parallel()
 	at := new(Table[int])
 	for i, r := range routes {
@@ -2149,6 +2278,11 @@ func TestTableFullEqual(t *testing.T) {
 
 	t.Run("modify", func(t *testing.T) {
 		t.Parallel()
+
+		if _, isLite := any(at).(*liteTable[int]); isLite {
+			t.Skip("liteNode has no real payload")
+		}
+
 		ct := at.Clone()
 
 		for i, r := range routes {
