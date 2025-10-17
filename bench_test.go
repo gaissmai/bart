@@ -6,289 +6,15 @@ import (
 	"math/rand/v2"
 	"net/netip"
 	"runtime"
-	"strconv"
 	"testing"
 
 	"github.com/gaissmai/bart/internal/nodes"
 )
 
-var benchRouteCount = []int{10, 100, 1000, 10_000, 100_000, 200_000}
-
 // roundFloat64 to 2 decimal places
 func roundFloat64(f float64) float64 { return math.Round(f*100) / 100 }
 
-func BenchmarkTableModifyRandom(b *testing.B) {
-	prng := rand.New(rand.NewPCG(42, 42))
-	for _, n := range benchRouteCount {
-		randomPfxs := randomRealWorldPrefixes(prng, n)
-
-		bart := new(Table[int])
-		for i, pfx := range randomPfxs {
-			bart.Insert(pfx, i)
-		}
-
-		prt := bart
-
-		probe := randomPfxs[prng.IntN(len(randomPfxs))]
-
-		b.Run(fmt.Sprintf("mutable into %d", n), func(b *testing.B) {
-			for b.Loop() {
-				bart.Modify(probe, func(int, bool) (int, bool) { return 42, false })
-			}
-		})
-
-		b.Run(fmt.Sprintf("persist into %d", n), func(b *testing.B) {
-			for b.Loop() {
-				prt = prt.ModifyPersist(probe, func(int, bool) (int, bool) { return 42, false })
-			}
-		})
-
-	}
-}
-
-func BenchmarkTableDelete(b *testing.B) {
-	prng := rand.New(rand.NewPCG(42, 42))
-	for _, n := range []int{1_000, 10_000, 100_000, 1_000_000} {
-		pfxs := randomRealWorldPrefixes(prng, n)
-
-		b.Run(fmt.Sprintf("mutable from_%d", n), func(b *testing.B) {
-			for b.Loop() {
-				b.StopTimer()
-				bart := new(Table[*MyInt])
-
-				for i, pfx := range pfxs {
-					myInt := MyInt(i)
-					bart.Insert(pfx, &myInt)
-				}
-				b.StartTimer()
-
-				for _, pfx := range pfxs {
-					bart.Delete(pfx)
-				}
-			}
-			b.ReportMetric(float64(b.Elapsed())/float64(b.N)/float64(len(pfxs)), "ns/route")
-			b.ReportMetric(0, "ns/op")
-		})
-
-		b.Run(fmt.Sprintf("persist from_%d", n), func(b *testing.B) {
-			for b.Loop() {
-				b.StopTimer()
-				bart := new(Table[*MyInt])
-
-				for i, pfx := range pfxs {
-					myInt := MyInt(i)
-					bart.Insert(pfx, &myInt)
-				}
-				b.StartTimer()
-
-				for _, pfx := range pfxs {
-					bart = bart.DeletePersist(pfx)
-				}
-			}
-			b.ReportMetric(float64(b.Elapsed())/float64(b.N)/float64(len(pfxs)), "ns/route")
-			b.ReportMetric(0, "ns/op")
-		})
-	}
-}
-
-func BenchmarkTableGet(b *testing.B) {
-	prng := rand.New(rand.NewPCG(42, 42))
-	for _, fam := range []string{"ipv4", "ipv6"} {
-		rng := randomRealWorldPrefixes4
-		if fam == "ipv6" {
-			rng = randomRealWorldPrefixes6
-		}
-
-		for _, nroutes := range benchRouteCount {
-			bart := new(Table[int])
-			for i, pfx := range rng(prng, nroutes) {
-				bart.Insert(pfx, i)
-			}
-
-			probe := rng(prng, 1)[0]
-
-			b.Run(fmt.Sprintf("%s/From_%d", fam, nroutes), func(b *testing.B) {
-				for b.Loop() {
-					bart.Get(probe)
-				}
-			})
-		}
-	}
-}
-
-func BenchmarkTableLPM(b *testing.B) {
-	prng := rand.New(rand.NewPCG(42, 42))
-	for _, fam := range []string{"ipv4", "ipv6"} {
-		rng := randomRealWorldPrefixes4
-		if fam == "ipv6" {
-			rng = randomRealWorldPrefixes6
-		}
-
-		for _, nroutes := range benchRouteCount {
-			bart := new(Table[int])
-			for i, pfx := range rng(prng, nroutes) {
-				bart.Insert(pfx, i)
-			}
-
-			probe := rng(prng, 1)[0]
-
-			b.Run(fmt.Sprintf("%s/In_%6d/%s", fam, nroutes, "Contains"), func(b *testing.B) {
-				for b.Loop() {
-					bart.Contains(probe.Addr())
-				}
-			})
-
-			b.Run(fmt.Sprintf("%s/In_%6d/%s", fam, nroutes, "Lookup"), func(b *testing.B) {
-				for b.Loop() {
-					bart.Lookup(probe.Addr())
-				}
-			})
-
-			b.Run(fmt.Sprintf("%s/In_%6d/%s", fam, nroutes, "Prefix"), func(b *testing.B) {
-				for b.Loop() {
-					bart.LookupPrefix(probe)
-				}
-			})
-
-			b.Run(fmt.Sprintf("%s/In_%6d/%s", fam, nroutes, "PrefixLPM"), func(b *testing.B) {
-				for b.Loop() {
-					bart.LookupPrefixLPM(probe)
-				}
-			})
-		}
-	}
-}
-
-func BenchmarkFastLPM(b *testing.B) {
-	prng := rand.New(rand.NewPCG(42, 42))
-	for _, fam := range []string{"ipv4", "ipv6"} {
-		rng := randomRealWorldPrefixes4
-		if fam == "ipv6" {
-			rng = randomRealWorldPrefixes6
-		}
-
-		for _, nroutes := range benchRouteCount {
-			fast := new(Fast[int])
-			for i, pfx := range rng(prng, nroutes) {
-				fast.Insert(pfx, i)
-			}
-
-			probe := rng(prng, 1)[0]
-
-			b.Run(fmt.Sprintf("%s/In_%6d/%s", fam, nroutes, "Contains"), func(b *testing.B) {
-				for b.Loop() {
-					fast.Contains(probe.Addr())
-				}
-			})
-
-			b.Run(fmt.Sprintf("%s/In_%6d/%s", fam, nroutes, "Lookup"), func(b *testing.B) {
-				for b.Loop() {
-					fast.Lookup(probe.Addr())
-				}
-			})
-
-			b.Run(fmt.Sprintf("%s/In_%6d/%s", fam, nroutes, "Prefix"), func(b *testing.B) {
-				for b.Loop() {
-					fast.LookupPrefix(probe)
-				}
-			})
-
-			b.Run(fmt.Sprintf("%s/In_%6d/%s", fam, nroutes, "PrefixLPM"), func(b *testing.B) {
-				for b.Loop() {
-					fast.LookupPrefixLPM(probe)
-				}
-			})
-		}
-	}
-}
-
-func BenchmarkTableOverlapsPrefix(b *testing.B) {
-	prng := rand.New(rand.NewPCG(42, 42))
-	for _, fam := range []string{"ipv4", "ipv6"} {
-		rng := randomRealWorldPrefixes4
-		if fam == "ipv6" {
-			rng = randomRealWorldPrefixes6
-		}
-
-		for _, nroutes := range benchRouteCount {
-			bart := new(Table[int])
-			for i, pfx := range rng(prng, nroutes) {
-				bart.Insert(pfx, i)
-			}
-
-			probe := rng(prng, 1)[0]
-
-			b.Run(fmt.Sprintf("%s/With_%d", fam, nroutes), func(b *testing.B) {
-				for b.Loop() {
-					bart.OverlapsPrefix(probe)
-				}
-			})
-		}
-	}
-}
-
-func BenchmarkTableOverlaps(b *testing.B) {
-	prng := rand.New(rand.NewPCG(42, 42))
-	for _, fam := range []string{"ipv4", "ipv6"} {
-		rng := randomRealWorldPrefixes4
-		if fam == "ipv6" {
-			rng = randomRealWorldPrefixes6
-		}
-
-		for _, nroutes := range benchRouteCount {
-			bart := new(Table[int])
-			fast := new(Fast[int])
-			for i, pfx := range rng(prng, nroutes) {
-				bart.Insert(pfx, i)
-				fast.Insert(pfx, i)
-			}
-
-			interBart := new(Table[int])
-			interFast := new(Fast[int])
-			for i, pfx := range rng(prng, nroutes) {
-				interBart.Insert(pfx, i)
-				interFast.Insert(pfx, i)
-			}
-
-			b.Run(fmt.Sprintf("Bart: %s/%d_with_%d", fam, nroutes, nroutes), func(b *testing.B) {
-				for b.Loop() {
-					bart.Overlaps(interBart)
-				}
-			})
-
-			b.Run(fmt.Sprintf("Fast: %s/%d_with_%d", fam, nroutes, nroutes), func(b *testing.B) {
-				for b.Loop() {
-					fast.Overlaps(interFast)
-				}
-			})
-		}
-	}
-}
-
-func BenchmarkTableClone(b *testing.B) {
-	prng := rand.New(rand.NewPCG(42, 42))
-	for _, fam := range []string{"ipv4", "ipv6"} {
-		rng := randomRealWorldPrefixes4
-		if fam == "ipv6" {
-			rng = randomRealWorldPrefixes6
-		}
-
-		for _, nroutes := range benchRouteCount {
-			bart := new(Table[int])
-			for i, pfx := range rng(prng, nroutes) {
-				bart.Insert(pfx, i)
-			}
-
-			b.Run(fmt.Sprintf("%s/%d", fam, nroutes), func(b *testing.B) {
-				for b.Loop() {
-					bart.Clone()
-				}
-			})
-		}
-	}
-}
-
-func BenchmarkTableFullMatch4(b *testing.B) {
+func BenchmarkBartMatch4(b *testing.B) {
 	bart := new(Table[struct{}])
 
 	for _, route := range routes {
@@ -320,7 +46,7 @@ func BenchmarkTableFullMatch4(b *testing.B) {
 	})
 }
 
-func BenchmarkTableFullMatch6(b *testing.B) {
+func BenchmarkBartMatch6(b *testing.B) {
 	bart := new(Table[struct{}])
 
 	for _, route := range routes {
@@ -352,7 +78,7 @@ func BenchmarkTableFullMatch6(b *testing.B) {
 	})
 }
 
-func BenchmarkTableFullMiss4(b *testing.B) {
+func BenchmarkBartMiss4(b *testing.B) {
 	bart := new(Table[int])
 
 	for i, route := range routes {
@@ -384,7 +110,7 @@ func BenchmarkTableFullMiss4(b *testing.B) {
 	})
 }
 
-func BenchmarkTableFullMiss6(b *testing.B) {
+func BenchmarkBartMiss6(b *testing.B) {
 	bart := new(Table[int])
 
 	for i, route := range routes {
@@ -416,7 +142,7 @@ func BenchmarkTableFullMiss6(b *testing.B) {
 	})
 }
 
-func BenchmarkFastFullMatch4(b *testing.B) {
+func BenchmarkFastMatch4(b *testing.B) {
 	fast := new(Fast[struct{}])
 
 	for _, route := range routes {
@@ -448,7 +174,7 @@ func BenchmarkFastFullMatch4(b *testing.B) {
 	})
 }
 
-func BenchmarkFastFullMatch6(b *testing.B) {
+func BenchmarkFastMatch6(b *testing.B) {
 	fast := new(Fast[struct{}])
 
 	for _, route := range routes {
@@ -480,7 +206,7 @@ func BenchmarkFastFullMatch6(b *testing.B) {
 	})
 }
 
-func BenchmarkFastFullMiss4(b *testing.B) {
+func BenchmarkFastMiss4(b *testing.B) {
 	fast := new(Fast[int])
 
 	for i, route := range routes {
@@ -512,7 +238,7 @@ func BenchmarkFastFullMiss4(b *testing.B) {
 	})
 }
 
-func BenchmarkFastFullMiss6(b *testing.B) {
+func BenchmarkFastMiss6(b *testing.B) {
 	fast := new(Fast[int])
 
 	for i, route := range routes {
@@ -544,7 +270,7 @@ func BenchmarkFastFullMiss6(b *testing.B) {
 	})
 }
 
-func BenchmarkFullTableOverlaps4(b *testing.B) {
+func BenchmarkBartOverlaps4(b *testing.B) {
 	lt := new(Lite)
 
 	for _, route := range routes4 {
@@ -566,7 +292,7 @@ func BenchmarkFullTableOverlaps4(b *testing.B) {
 	}
 }
 
-func BenchmarkFullTableOverlaps6(b *testing.B) {
+func BenchmarkBartOverlaps6(b *testing.B) {
 	lt := new(Lite)
 
 	for _, route := range routes6 {
@@ -588,60 +314,7 @@ func BenchmarkFullTableOverlaps6(b *testing.B) {
 	}
 }
 
-func BenchmarkFullTableOverlapsPrefix(b *testing.B) {
-	lt := new(Lite)
-
-	for _, route := range routes {
-		lt.Insert(route.CIDR)
-	}
-
-	prng := rand.New(rand.NewPCG(42, 42))
-	pfx := randomRealWorldPrefixes(prng, 1)[0]
-
-	for b.Loop() {
-		lt.OverlapsPrefix(pfx)
-	}
-}
-
-func BenchmarkFullTableClone(b *testing.B) {
-	rt4 := new(Table[int])
-
-	for i, route := range routes4 {
-		rt4.Insert(route.CIDR, i)
-	}
-
-	b.Run("CloneIP4", func(b *testing.B) {
-		for b.Loop() {
-			_ = rt4.Clone()
-		}
-	})
-
-	rt6 := new(Table[int])
-
-	for i, route := range routes6 {
-		rt6.Insert(route.CIDR, i)
-	}
-
-	b.Run("CloneIP6", func(b *testing.B) {
-		for b.Loop() {
-			_ = rt6.Clone()
-		}
-	})
-
-	rt := new(Table[int])
-
-	for i, route := range routes {
-		rt.Insert(route.CIDR, i)
-	}
-
-	b.Run("Clone", func(b *testing.B) {
-		for b.Loop() {
-			_ = rt.Clone()
-		}
-	})
-}
-
-func BenchmarkFullTableMemory4(b *testing.B) {
+func BenchmarkBartMemory4(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 
 	bart := new(Table[struct{}])
@@ -672,7 +345,7 @@ func BenchmarkFullTableMemory4(b *testing.B) {
 	})
 }
 
-func BenchmarkFullTableMemory6(b *testing.B) {
+func BenchmarkBartMemory6(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 
 	bart := new(Table[struct{}])
@@ -703,7 +376,7 @@ func BenchmarkFullTableMemory6(b *testing.B) {
 	})
 }
 
-func BenchmarkFullTableMemory(b *testing.B) {
+func BenchmarkBartMemory(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 
 	bart := new(Table[struct{}])
@@ -741,226 +414,6 @@ func BenchmarkFullTableMemory(b *testing.B) {
 		b.ReportMetric(float64(stats.Fringes), "fringes")
 		b.ReportMetric(0, "ns/op")
 	})
-}
-
-func BenchmarkTableMemIP4(b *testing.B) {
-	prng := rand.New(rand.NewPCG(42, 42))
-	for _, k := range []int{1_000, 10_000, 100_000, 1_000_000} {
-		var startMem, endMem runtime.MemStats
-		pfxs := randomRealWorldPrefixes4(prng, k)
-
-		runtime.GC()
-		runtime.ReadMemStats(&startMem)
-
-		b.Run(strconv.Itoa(k), func(b *testing.B) {
-			bart := new(Table[struct{}])
-			for b.Loop() {
-				bart = new(Table[struct{}])
-				for _, pfx := range pfxs {
-					bart.Insert(pfx, struct{}{})
-				}
-			}
-
-			runtime.GC()
-			runtime.ReadMemStats(&endMem)
-
-			stats := bart.root4.StatsRec()
-
-			bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
-			b.ReportMetric(roundFloat64(bytes/float64(stats.Prefixes)), "bytes/route")
-			b.ReportMetric(float64(stats.Prefixes), "pfxs")
-			b.ReportMetric(float64(stats.SubNodes), "nodes")
-			b.ReportMetric(float64(stats.Leaves), "leaves")
-			b.ReportMetric(float64(stats.Fringes), "fringes")
-			b.ReportMetric(0, "ns/op")
-		})
-	}
-}
-
-func BenchmarkTableMemIP6(b *testing.B) {
-	prng := rand.New(rand.NewPCG(42, 42))
-	for _, k := range []int{1_000, 10_000, 100_000, 1_000_000} {
-		var startMem, endMem runtime.MemStats
-		pfxs := randomRealWorldPrefixes6(prng, k)
-
-		runtime.GC()
-		runtime.ReadMemStats(&startMem)
-
-		b.Run(strconv.Itoa(k), func(b *testing.B) {
-			bart := new(Table[struct{}])
-			for b.Loop() {
-				bart = new(Table[struct{}])
-				for _, pfx := range pfxs {
-					bart.Insert(pfx, struct{}{})
-				}
-			}
-
-			runtime.GC()
-			runtime.ReadMemStats(&endMem)
-
-			stats := bart.root6.StatsRec()
-
-			bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
-			b.ReportMetric(roundFloat64(bytes/float64(stats.Prefixes)), "bytes/route")
-			b.ReportMetric(float64(stats.Prefixes), "pfxs")
-			b.ReportMetric(float64(stats.SubNodes), "nodes")
-			b.ReportMetric(float64(stats.Leaves), "leaves")
-			b.ReportMetric(float64(stats.Fringes), "fringes")
-			b.ReportMetric(0, "ns/op")
-		})
-	}
-}
-
-func BenchmarkTableMem(b *testing.B) {
-	prng := rand.New(rand.NewPCG(42, 42))
-	for _, k := range []int{1_000, 10_000, 100_000, 1_000_000} {
-		var startMem, endMem runtime.MemStats
-		pfxs := randomRealWorldPrefixes(prng, k)
-
-		runtime.GC()
-		runtime.ReadMemStats(&startMem)
-
-		b.Run(strconv.Itoa(k), func(b *testing.B) {
-			bart := new(Table[struct{}])
-			for b.Loop() {
-				bart = new(Table[struct{}])
-				for _, pfx := range pfxs {
-					bart.Insert(pfx, struct{}{})
-				}
-			}
-
-			runtime.GC()
-			runtime.ReadMemStats(&endMem)
-
-			s4 := bart.root4.StatsRec()
-			s6 := bart.root6.StatsRec()
-			stats := nodes.StatsT{
-				Prefixes: s4.Prefixes + s6.Prefixes,
-				Children: s4.Children + s6.Children,
-				SubNodes: s4.SubNodes + s6.SubNodes,
-				Leaves:   s4.Leaves + s6.Leaves,
-				Fringes:  s4.Fringes + s6.Fringes,
-			}
-
-			bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
-			b.ReportMetric(roundFloat64(bytes/float64(stats.Prefixes)), "bytes/route")
-			b.ReportMetric(float64(stats.Prefixes), "pfxs")
-			b.ReportMetric(float64(stats.SubNodes), "nodes")
-			b.ReportMetric(float64(stats.Leaves), "leaves")
-			b.ReportMetric(float64(stats.Fringes), "fringes")
-			b.ReportMetric(0, "ns/op")
-		})
-	}
-}
-
-func BenchmarkLiteMemIP4(b *testing.B) {
-	prng := rand.New(rand.NewPCG(42, 42))
-	for _, k := range []int{1_000, 10_000, 100_000, 1_000_000} {
-		var startMem, endMem runtime.MemStats
-		pfxs := randomRealWorldPrefixes4(prng, k)
-
-		runtime.GC()
-		runtime.ReadMemStats(&startMem)
-
-		b.Run(strconv.Itoa(k), func(b *testing.B) {
-			lite := new(Lite)
-			for b.Loop() {
-				lite = new(Lite)
-				for _, pfx := range pfxs {
-					lite.Insert(pfx)
-				}
-			}
-
-			runtime.GC()
-			runtime.ReadMemStats(&endMem)
-
-			stats := lite.root4.StatsRec()
-
-			bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
-			b.ReportMetric(roundFloat64(bytes/float64(stats.Prefixes)), "bytes/route")
-			b.ReportMetric(float64(stats.Prefixes), "pfxs")
-			b.ReportMetric(float64(stats.SubNodes), "nodes")
-			b.ReportMetric(float64(stats.Leaves), "leaves")
-			b.ReportMetric(float64(stats.Fringes), "fringes")
-			b.ReportMetric(0, "ns/op")
-		})
-	}
-}
-
-func BenchmarkLiteMemIP6(b *testing.B) {
-	prng := rand.New(rand.NewPCG(42, 42))
-	for _, k := range []int{1_000, 10_000, 100_000, 1_000_000} {
-		var startMem, endMem runtime.MemStats
-		pfxs := randomRealWorldPrefixes6(prng, k)
-
-		runtime.GC()
-		runtime.ReadMemStats(&startMem)
-
-		b.Run(strconv.Itoa(k), func(b *testing.B) {
-			lite := new(Lite)
-			for b.Loop() {
-				lite = new(Lite)
-				for _, pfx := range pfxs {
-					lite.Insert(pfx)
-				}
-			}
-
-			runtime.GC()
-			runtime.ReadMemStats(&endMem)
-
-			stats := lite.root6.StatsRec()
-
-			bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
-			b.ReportMetric(roundFloat64(bytes/float64(stats.Prefixes)), "bytes/route")
-			b.ReportMetric(float64(stats.Prefixes), "pfxs")
-			b.ReportMetric(float64(stats.SubNodes), "nodes")
-			b.ReportMetric(float64(stats.Leaves), "leaves")
-			b.ReportMetric(float64(stats.Fringes), "fringes")
-			b.ReportMetric(0, "ns/op")
-		})
-	}
-}
-
-func BenchmarkLiteMem(b *testing.B) {
-	prng := rand.New(rand.NewPCG(42, 42))
-	for _, k := range []int{1_000, 10_000, 100_000, 1_000_000} {
-		var startMem, endMem runtime.MemStats
-		pfxs := randomRealWorldPrefixes(prng, k)
-
-		runtime.GC()
-		runtime.ReadMemStats(&startMem)
-
-		b.Run(strconv.Itoa(k), func(b *testing.B) {
-			lite := new(Lite)
-			for b.Loop() {
-				lite = new(Lite)
-				for _, pfx := range pfxs {
-					lite.Insert(pfx)
-				}
-			}
-
-			runtime.GC()
-			runtime.ReadMemStats(&endMem)
-
-			s4 := lite.root4.StatsRec()
-			s6 := lite.root6.StatsRec()
-			stats := nodes.StatsT{
-				Prefixes: s4.Prefixes + s6.Prefixes,
-				Children: s4.Children + s6.Children,
-				SubNodes: s4.SubNodes + s6.SubNodes,
-				Leaves:   s4.Leaves + s6.Leaves,
-				Fringes:  s4.Fringes + s6.Fringes,
-			}
-
-			bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
-			b.ReportMetric(roundFloat64(bytes/float64(stats.Prefixes)), "bytes/route")
-			b.ReportMetric(float64(stats.Prefixes), "pfxs")
-			b.ReportMetric(float64(stats.SubNodes), "nodes")
-			b.ReportMetric(float64(stats.Leaves), "leaves")
-			b.ReportMetric(float64(stats.Fringes), "fringes")
-			b.ReportMetric(0, "ns/op")
-		})
-	}
 }
 
 // worstcase benchmarks
@@ -1022,7 +475,7 @@ var (
 	}
 )
 
-func BenchmarkTableWorstCaseMatch4(b *testing.B) {
+func BenchmarkBartWorstCaseMatch4(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
 		tbl := new(Table[string])
 		for _, p := range worstCasePfxsIP4 {
@@ -1126,7 +579,7 @@ func BenchmarkFastWorstCaseMatch4(b *testing.B) {
 	})
 }
 
-func BenchmarkTableWorstCaseMiss4(b *testing.B) {
+func BenchmarkBartWorstCaseMiss4(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
 		tbl := new(Table[string])
 		for _, p := range worstCasePfxsIP4 {
@@ -1234,7 +687,7 @@ func BenchmarkFastWorstCaseMiss4(b *testing.B) {
 	})
 }
 
-func BenchmarkTableWorstCaseMatch6(b *testing.B) {
+func BenchmarkBartWorstCaseMatch6(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
 		tbl := new(Table[string])
 		for _, p := range worstCasePfxsIP6 {
@@ -1338,7 +791,7 @@ func BenchmarkFastWorstCaseMatch6(b *testing.B) {
 	})
 }
 
-func BenchmarkTableWorstCaseMiss6(b *testing.B) {
+func BenchmarkBartWorstCaseMiss6(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
 		tbl := new(Table[string])
 		for _, p := range worstCasePfxsIP6 {

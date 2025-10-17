@@ -29,7 +29,8 @@ import (
 
 	"github.com/gaissmai/bart/internal/nodes"
 
-	// inlining hint
+	// inlining hint, see also the TestInlineBitSet256Functions.
+	// without this silent import the BitSet256 functions are not inlined
 	_ "github.com/gaissmai/bart/internal/bitset"
 )
 
