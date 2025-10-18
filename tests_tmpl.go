@@ -1152,3 +1152,176 @@ func TestTableModifyPersistShuffled__TABLE_TYPE(t *testing.T) {
 		}
 	}
 }
+
+// TestUnionMemoryAliasing tests that the Union method does not alias memory
+// between the two tables.
+func TestTableUnionMemoryAliasing__TABLE_TYPE(t *testing.T) {
+	t.Parallel()
+
+	newTable := func(pfx ...string) *_TABLE_TYPE[struct{}] {
+		tbl := new(_TABLE_TYPE[struct{}])
+		for _, s := range pfx {
+			tbl.Insert(mpp(s), struct{}{})
+		}
+		return tbl
+	}
+
+	// First create two tables with disjoint prefixes.
+	stable := newTable("0.0.0.0/24")
+	temp := newTable("100.69.1.0/24")
+
+	// Verify that the tables are disjoint.
+	if stable.Overlaps(temp) {
+		t.Error("stable should not overlap temp")
+	}
+
+	// Now union them.
+	temp.Union(stable)
+
+	// Add a new prefix to temp.
+	temp.Insert(mpp("0.0.1.0/24"), struct{}{})
+
+	// Ensure that stable is unchanged.
+	_, ok := stable.Lookup(mpa("0.0.1.1"))
+	if ok {
+		t.Error("stable should not contain 0.0.1.1")
+	}
+	if stable.OverlapsPrefix(mpp("0.0.1.1/32")) {
+		t.Error("stable should not overlap 0.0.1.1/32")
+	}
+}
+
+// TestUnionPersistMemoryAliasing tests that the Union method does not alias memory
+// between the tables.
+func TestTableUnionPersistMemoryAliasing__TABLE_TYPE(t *testing.T) {
+	t.Parallel()
+
+	newTable := func(pfx ...string) *_TABLE_TYPE[struct{}] {
+		tbl := new(_TABLE_TYPE[struct{}])
+		for _, s := range pfx {
+			tbl.Insert(mpp(s), struct{}{})
+		}
+		return tbl
+	}
+	// First create two tables with disjoint prefixes.
+	a := newTable("100.69.1.0/24")
+	b := newTable("0.0.0.0/24")
+
+	// Verify that the tables are disjoint.
+	if a.Overlaps(b) {
+		t.Error("this should not overlap other")
+	}
+
+	// Now union them with copy-on-write.
+	pTbl := a.UnionPersist(b)
+
+	// Add a new prefix to new union
+	pTbl.Insert(mpp("0.0.1.0/24"), struct{}{})
+
+	// Ensure that a is unchanged.
+	_, ok := a.Lookup(mpa("0.0.1.1"))
+	if ok {
+		t.Error("a should not contain 0.0.1.1")
+	}
+	if a.OverlapsPrefix(mpp("0.0.1.1/32")) {
+		t.Error("a should not overlap 0.0.1.1/32")
+	}
+}
+
+func TestTableUnionCompare__TABLE_TYPE(t *testing.T) {
+	t.Parallel()
+
+	n := workLoadN()
+	prng := rand.New(rand.NewPCG(42, 42))
+
+	for range 3 {
+		pfxs := randomRealWorldPrefixes(prng, n)
+
+		gold := new(goldTable[string])
+		tbl := new(_TABLE_TYPE[string])
+
+		for _, pfx := range pfxs {
+			gold.insert(pfx, pfx.String())
+			tbl.Insert(pfx, pfx.String())
+		}
+
+		pfxs2 := randomRealWorldPrefixes(prng, n)
+
+		gold2 := new(goldTable[string])
+		tbl2 := new(_TABLE_TYPE[string])
+
+		for _, pfx := range pfxs2 {
+			gold2.insert(pfx, pfx.String())
+			tbl2.Insert(pfx, pfx.String())
+		}
+
+		gold.union(gold2)
+		tbl.Union(tbl2)
+
+		// dump as slow table for comparison
+		tblFlat := tbl.flatSorted()
+
+		// sort for comparison
+		gold.sort()
+
+		// Skip value comparison for liteTable (no real payload)
+		if _, isLite := any(tbl).(*liteTable[string]); isLite {
+			if !slices.Equal(gold.allSorted(), tblFlat.allSorted()) {
+				t.Fatal("expected Equal")
+			}
+		} else {
+			if !slices.Equal(*gold, tblFlat) {
+				t.Fatal("expected Equal")
+			}
+		}
+	}
+}
+
+func TestTableUnionPersistCompare__TABLE_TYPE(t *testing.T) {
+	t.Parallel()
+	prng := rand.New(rand.NewPCG(42, 42))
+
+	n := workLoadN()
+
+	for range 3 {
+		pfxs := randomRealWorldPrefixes(prng, n)
+
+		gold := new(goldTable[int])
+		tbl := new(_TABLE_TYPE[int])
+
+		for i, pfx := range pfxs {
+			gold.insert(pfx, i)
+			tbl.Insert(pfx, i)
+		}
+
+		pfxs2 := randomRealWorldPrefixes(prng, n)
+
+		gold2 := new(goldTable[int])
+		tbl2 := new(_TABLE_TYPE[int])
+
+		for i, pfx := range pfxs2 {
+			gold2.insert(pfx, i)
+			tbl2.Insert(pfx, i)
+		}
+
+		gold.union(gold2)
+		tblP := tbl.UnionPersist(tbl2)
+
+		// dump as slow table for comparison
+		flatP := tblP.flatSorted()
+
+		// sort for comparison
+		gold.sort()
+
+		// Skip value comparison for liteTable (no real payload)
+		if _, isLite := any(tbl).(*liteTable[int]); isLite {
+			if !slices.Equal(gold.allSorted(), flatP.allSorted()) {
+				t.Fatal("expected Equal")
+			}
+		} else {
+			if !slices.Equal(*gold, flatP) {
+				t.Fatal("expected Equal")
+			}
+		}
+	}
+}
