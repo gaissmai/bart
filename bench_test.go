@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/gaissmai/bart/internal/golden"
 	"github.com/gaissmai/bart/internal/nodes"
 )
 
@@ -280,7 +281,7 @@ func BenchmarkBartOverlaps4(b *testing.B) {
 	for i := 1; i <= 1<<20; i *= 2 {
 		prng := rand.New(rand.NewPCG(42, 42))
 		lt2 := new(Lite)
-		for _, pfx := range randomRealWorldPrefixes4(prng, i) {
+		for _, pfx := range golden.RandomRealWorldPrefixes4(prng, i) {
 			lt2.Insert(pfx)
 		}
 
@@ -302,7 +303,7 @@ func BenchmarkBartOverlaps6(b *testing.B) {
 	for i := 1; i <= 1<<20; i *= 2 {
 		prng := rand.New(rand.NewPCG(42, 42))
 		lt2 := new(Lite)
-		for _, pfx := range randomRealWorldPrefixes6(prng, i) {
+		for _, pfx := range golden.RandomRealWorldPrefixes6(prng, i) {
 			lt2.Insert(pfx)
 		}
 

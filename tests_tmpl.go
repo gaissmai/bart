@@ -22,6 +22,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gaissmai/bart/internal/golden"
 	"github.com/gaissmai/bart/internal/nodes"
 )
 
@@ -88,11 +89,11 @@ func (*_TABLE_TYPE[V]) Supernets(netip.Prefix) (_ iter.Seq2[netip.Prefix, V]) { 
 // ############ tests ################################
 
 // flatSorted, just a helper to compare with golden table.
-func (t *_TABLE_TYPE[V]) flatSorted() goldTable[V] {
-	var flat goldTable[V]
+func (t *_TABLE_TYPE[V]) flatSorted() golden.GoldTable[V] {
+	var flat golden.GoldTable[V]
 
 	for p, v := range t.AllSorted() {
-		flat = append(flat, goldTableItem[V]{pfx: p, val: v})
+		flat = append(flat, golden.GoldTableItem[V]{Pfx: p, Val: v})
 	}
 
 	return flat
@@ -241,20 +242,20 @@ func TestTableContainsCompare__TABLE_TYPE(t *testing.T) {
 	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
-	pfxs := randomRealWorldPrefixes(prng, n)
+	pfxs := golden.RandomRealWorldPrefixes(prng, n)
 
-	gold := new(goldTable[int])
+	gold := new(golden.GoldTable[int])
 	tbl := new(_TABLE_TYPE[int])
 
 	for i, p := range pfxs {
-		gold.insert(p, i)
+		gold.Insert(p, i)
 		tbl.Insert(p, i)
 	}
 
 	for range n {
-		a := randomAddr(prng)
+		a := golden.RandomAddr(prng)
 
-		_, goldOK := gold.lookup(a)
+		_, goldOK := gold.Lookup(a)
 		tblOK := tbl.Contains(a)
 
 		if goldOK != tblOK {
@@ -271,20 +272,20 @@ func TestTableLookupCompare__TABLE_TYPE(t *testing.T) {
 	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
-	pfxs := randomRealWorldPrefixes(prng, n)
+	pfxs := golden.RandomRealWorldPrefixes(prng, n)
 
-	gold := new(goldTable[int])
+	gold := new(golden.GoldTable[int])
 	tbl := new(_TABLE_TYPE[int])
 
 	for i, pfx := range pfxs {
-		gold.insert(pfx, i)
+		gold.Insert(pfx, i)
 		tbl.Insert(pfx, i)
 	}
 
 	for range n {
-		a := randomAddr(prng)
+		a := golden.RandomAddr(prng)
 
-		goldVal, goldOK := gold.lookup(a)
+		goldVal, goldOK := gold.Lookup(a)
 		tblVal, tblOK := tbl.Lookup(a)
 
 		if goldOK != tblOK {
@@ -386,19 +387,19 @@ func TestTableLookupPrefixCompare__TABLE_TYPE(t *testing.T) {
 	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
-	pfxs := randomRealWorldPrefixes(prng, n)
+	pfxs := golden.RandomRealWorldPrefixes(prng, n)
 
-	gold := new(goldTable[int])
+	gold := new(golden.GoldTable[int])
 	tbl := new(_TABLE_TYPE[int])
 	for i, pfx := range pfxs {
-		gold.insert(pfx, i)
+		gold.Insert(pfx, i)
 		tbl.Insert(pfx, i)
 	}
 
 	for range n {
-		pfx := randomPrefix(prng)
+		pfx := golden.RandomPrefix(prng)
 
-		goldVal, goldOK := gold.lookupPfx(pfx)
+		goldVal, goldOK := gold.LookupPrefix(pfx)
 		tblVal, tblOK := tbl.LookupPrefix(pfx)
 
 		if goldOK != tblOK {
@@ -422,19 +423,19 @@ func TestTableLookupPrefixLPMCompare__TABLE_TYPE(t *testing.T) {
 	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
-	pfxs := randomRealWorldPrefixes(prng, n)
+	pfxs := golden.RandomRealWorldPrefixes(prng, n)
 
-	gold := new(goldTable[int])
+	gold := new(golden.GoldTable[int])
 	tbl := new(_TABLE_TYPE[int])
 	for i, pfx := range pfxs {
-		gold.insert(pfx, i)
+		gold.Insert(pfx, i)
 		tbl.Insert(pfx, i)
 	}
 
 	for range n {
-		pfx := randomPrefix(prng)
+		pfx := golden.RandomPrefix(prng)
 
-		goldLPM, goldVal, goldOK := gold.lookupPfxLPM(pfx)
+		goldLPM, goldVal, goldOK := gold.LookupPrefixLPM(pfx)
 		tblLPM, tblVal, tblOK := tbl.LookupPrefixLPM(pfx)
 
 		if goldOK != tblOK {
@@ -463,7 +464,7 @@ func TestTableInsertShuffled__TABLE_TYPE(t *testing.T) {
 	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
-	pfxs := randomRealWorldPrefixes(prng, n)
+	pfxs := golden.RandomRealWorldPrefixes(prng, n)
 
 	for range 10 {
 		pfxs2 := slices.Clone(pfxs)
@@ -498,7 +499,7 @@ func TestTableInsertPersistShuffled__TABLE_TYPE(t *testing.T) {
 	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
-	pfxs := randomRealWorldPrefixes(prng, n)
+	pfxs := golden.RandomRealWorldPrefixes(prng, n)
 
 	for range 10 {
 		pfxs2 := slices.Clone(pfxs)
@@ -543,32 +544,32 @@ func TestTableDeleteCompare__TABLE_TYPE(t *testing.T) {
 	)
 
 	for range probes {
-		all4 := randomRealWorldPrefixes4(prng, numPerFamily)
-		all6 := randomRealWorldPrefixes6(prng, numPerFamily)
+		all4 := golden.RandomRealWorldPrefixes4(prng, numPerFamily)
+		all6 := golden.RandomRealWorldPrefixes6(prng, numPerFamily)
 
 		pfxs := slices.Concat(all4, all6)
 		toDelete := slices.Concat(all4[deleteCut:], all6[deleteCut:])
 
-		gold := new(goldTable[string])
+		gold := new(golden.GoldTable[string])
 		tbl := new(_TABLE_TYPE[string])
 
 		for _, pfx := range pfxs {
-			gold.insert(pfx, pfx.String())
+			gold.Insert(pfx, pfx.String())
 			tbl.Insert(pfx, pfx.String())
 		}
 
 		for _, pfx := range toDelete {
-			gold.delete(pfx)
+			gold.Delete(pfx)
 			tbl.Delete(pfx)
 		}
 
-		gold.sort()
+		gold.Sort()
 
 		tblFlat := tbl.flatSorted()
 
 		// Skip value comparison for liteTable (no real payload)
 		if _, isLite := any(tbl).(*liteTable[string]); isLite {
-			if !slices.Equal(gold.allSorted(), tblFlat.allSorted()) {
+			if !slices.Equal(gold.AllSorted(), tblFlat.AllSorted()) {
 				t.Fatal("expected Equal")
 			}
 		} else {
@@ -596,8 +597,8 @@ func TestTableDeleteShuffled__TABLE_TYPE(t *testing.T) {
 	)
 
 	for range 10 {
-		all4 := randomRealWorldPrefixes4(prng, numPerFamily)
-		all6 := randomRealWorldPrefixes6(prng, numPerFamily)
+		all4 := golden.RandomRealWorldPrefixes4(prng, numPerFamily)
+		all6 := golden.RandomRealWorldPrefixes6(prng, numPerFamily)
 
 		pfxs := slices.Concat(all4, all6)
 		toDelete := slices.Concat(all4[deleteCut:], all6[deleteCut:])
@@ -649,7 +650,7 @@ func TestTableDeleteIsReverseOfInsert__TABLE_TYPE(t *testing.T) {
 	tbl := new(_TABLE_TYPE[string])
 	want := tbl.dumpString()
 
-	prefixes := randomRealWorldPrefixes(prng, n)
+	prefixes := golden.RandomRealWorldPrefixes(prng, n)
 
 	defer func() {
 		if t.Failed() {
@@ -678,7 +679,7 @@ func TestTableDeleteButOne__TABLE_TYPE(t *testing.T) {
 	for range 10 {
 
 		tbl := new(_TABLE_TYPE[any])
-		prefixes := randomRealWorldPrefixes(prng, n)
+		prefixes := golden.RandomRealWorldPrefixes(prng, n)
 
 		for _, p := range prefixes {
 			tbl.Insert(p, nil)
@@ -717,7 +718,7 @@ func TestTableDeleteButOne__TABLE_TYPE(t *testing.T) {
 func TestTableGet__TABLE_TYPE(t *testing.T) {
 	t.Parallel()
 	prng := rand.New(rand.NewPCG(42, 42))
-	pfx := randomPrefix(prng)
+	pfx := golden.RandomPrefix(prng)
 
 	tests := []struct {
 		name string
@@ -777,17 +778,17 @@ func TestTableGetCompare__TABLE_TYPE(t *testing.T) {
 	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
-	pfxs := randomRealWorldPrefixes(prng, n)
+	pfxs := golden.RandomRealWorldPrefixes(prng, n)
 
-	gold := new(goldTable[string])
+	gold := new(golden.GoldTable[string])
 	tbl := new(_TABLE_TYPE[string])
 	for _, pfx := range pfxs {
-		gold.insert(pfx, pfx.String())
+		gold.Insert(pfx, pfx.String())
 		tbl.Insert(pfx, pfx.String())
 	}
 
 	for _, pfx := range pfxs {
-		goldVal, goldOK := gold.get(pfx)
+		goldVal, goldOK := gold.Get(pfx)
 		tblVal, tblOK := tbl.Get(pfx)
 
 		if goldOK != tblOK {
@@ -991,23 +992,23 @@ func TestTableModifyCompare__TABLE_TYPE(t *testing.T) {
 	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
-	pfxs := randomRealWorldPrefixes(prng, n)
+	pfxs := golden.RandomRealWorldPrefixes(prng, n)
 
-	gold := new(goldTable[int])
+	gold := new(golden.GoldTable[int])
 	tbl := new(_TABLE_TYPE[int])
 
 	// Update as insert
 	for i, pfx := range pfxs {
-		gold.insert(pfx, i)
+		gold.Insert(pfx, i)
 		tbl.Modify(pfx, func(int, bool) (int, bool) { return i, false })
 	}
 
-	gold.sort()
+	gold.Sort()
 	tblFlat := tbl.flatSorted()
 
 	// Skip value comparison for liteTable (no real payload)
 	if _, isLite := any(tbl).(*liteTable[int]); isLite {
-		if !slices.Equal(gold.allSorted(), tblFlat.allSorted()) {
+		if !slices.Equal(gold.AllSorted(), tblFlat.AllSorted()) {
 			t.Fatal("expected Equal")
 		}
 	} else {
@@ -1021,16 +1022,16 @@ func TestTableModifyCompare__TABLE_TYPE(t *testing.T) {
 
 	// Update as update
 	for _, pfx := range pfxs[:len(pfxs)/2] {
-		gold.update(pfx, cb1)
+		gold.Update(pfx, cb1)
 		tbl.Modify(pfx, cb2)
 	}
 
-	gold.sort()
+	gold.Sort()
 	tblFlat = tbl.flatSorted()
 
 	// Skip value comparison for liteTable (no real payload)
 	if _, isLite := any(tbl).(*liteTable[int]); isLite {
-		if !slices.Equal(gold.allSorted(), tblFlat.allSorted()) {
+		if !slices.Equal(gold.AllSorted(), tblFlat.AllSorted()) {
 			t.Fatal("expected Equal")
 		}
 	} else {
@@ -1046,7 +1047,7 @@ func TestTableModifyPersistCompare__TABLE_TYPE(t *testing.T) {
 	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
-	pfxs := randomRealWorldPrefixes(prng, n)
+	pfxs := golden.RandomRealWorldPrefixes(prng, n)
 
 	mut := new(_TABLE_TYPE[int])
 	imu := new(_TABLE_TYPE[int])
@@ -1088,8 +1089,8 @@ func TestTableModifyShuffled__TABLE_TYPE(t *testing.T) {
 	)
 
 	for range 10 {
-		all4 := randomRealWorldPrefixes4(prng, numPerFamily)
-		all6 := randomRealWorldPrefixes6(prng, numPerFamily)
+		all4 := golden.RandomRealWorldPrefixes4(prng, numPerFamily)
+		all6 := golden.RandomRealWorldPrefixes6(prng, numPerFamily)
 
 		// pfxs toDelete should be non-overlapping sets
 		pfxs := slices.Concat(all4, all6)
@@ -1146,8 +1147,8 @@ func TestTableModifyPersistShuffled__TABLE_TYPE(t *testing.T) {
 	)
 
 	for range 10 {
-		all4 := randomRealWorldPrefixes4(prng, numPerFamily)
-		all6 := randomRealWorldPrefixes6(prng, numPerFamily)
+		all4 := golden.RandomRealWorldPrefixes4(prng, numPerFamily)
+		all6 := golden.RandomRealWorldPrefixes6(prng, numPerFamily)
 
 		// pfxs toDelete should be non-overlapping sets
 		pfxs := slices.Concat(all4, all6)
@@ -1272,38 +1273,38 @@ func TestTableUnionCompare__TABLE_TYPE(t *testing.T) {
 	prng := rand.New(rand.NewPCG(42, 42))
 
 	for range 3 {
-		pfxs := randomRealWorldPrefixes(prng, n)
+		pfxs := golden.RandomRealWorldPrefixes(prng, n)
 
-		gold := new(goldTable[string])
+		gold := new(golden.GoldTable[string])
 		tbl := new(_TABLE_TYPE[string])
 
 		for _, pfx := range pfxs {
-			gold.insert(pfx, pfx.String())
+			gold.Insert(pfx, pfx.String())
 			tbl.Insert(pfx, pfx.String())
 		}
 
-		pfxs2 := randomRealWorldPrefixes(prng, n)
+		pfxs2 := golden.RandomRealWorldPrefixes(prng, n)
 
-		gold2 := new(goldTable[string])
+		gold2 := new(golden.GoldTable[string])
 		tbl2 := new(_TABLE_TYPE[string])
 
 		for _, pfx := range pfxs2 {
-			gold2.insert(pfx, pfx.String())
+			gold2.Insert(pfx, pfx.String())
 			tbl2.Insert(pfx, pfx.String())
 		}
 
-		gold.union(gold2)
+		gold.Union(gold2)
 		tbl.Union(tbl2)
 
 		// dump as slow table for comparison
 		tblFlat := tbl.flatSorted()
 
 		// sort for comparison
-		gold.sort()
+		gold.Sort()
 
 		// Skip value comparison for liteTable (no real payload)
 		if _, isLite := any(tbl).(*liteTable[string]); isLite {
-			if !slices.Equal(gold.allSorted(), tblFlat.allSorted()) {
+			if !slices.Equal(gold.AllSorted(), tblFlat.AllSorted()) {
 				t.Fatal("expected Equal")
 			}
 		} else {
@@ -1321,38 +1322,38 @@ func TestTableUnionPersistCompare__TABLE_TYPE(t *testing.T) {
 	n := workLoadN()
 
 	for range 3 {
-		pfxs := randomRealWorldPrefixes(prng, n)
+		pfxs := golden.RandomRealWorldPrefixes(prng, n)
 
-		gold := new(goldTable[int])
+		gold := new(golden.GoldTable[int])
 		tbl := new(_TABLE_TYPE[int])
 
 		for i, pfx := range pfxs {
-			gold.insert(pfx, i)
+			gold.Insert(pfx, i)
 			tbl.Insert(pfx, i)
 		}
 
-		pfxs2 := randomRealWorldPrefixes(prng, n)
+		pfxs2 := golden.RandomRealWorldPrefixes(prng, n)
 
-		gold2 := new(goldTable[int])
+		gold2 := new(golden.GoldTable[int])
 		tbl2 := new(_TABLE_TYPE[int])
 
 		for i, pfx := range pfxs2 {
-			gold2.insert(pfx, i)
+			gold2.Insert(pfx, i)
 			tbl2.Insert(pfx, i)
 		}
 
-		gold.union(gold2)
+		gold.Union(gold2)
 		tblP := tbl.UnionPersist(tbl2)
 
 		// dump as slow table for comparison
 		flatP := tblP.flatSorted()
 
 		// sort for comparison
-		gold.sort()
+		gold.Sort()
 
 		// Skip value comparison for liteTable (no real payload)
 		if _, isLite := any(tbl).(*liteTable[int]); isLite {
-			if !slices.Equal(gold.allSorted(), flatP.allSorted()) {
+			if !slices.Equal(gold.AllSorted(), flatP.AllSorted()) {
 				t.Fatal("expected Equal")
 			}
 		} else {
@@ -1368,7 +1369,7 @@ func TestTableClone__TABLE_TYPE(t *testing.T) {
 	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
-	pfxs := randomRealWorldPrefixes(prng, n)
+	pfxs := golden.RandomRealWorldPrefixes(prng, n)
 
 	var tbl *_TABLE_TYPE[int]
 	if tbl.Clone() != nil {
@@ -1607,8 +1608,8 @@ func TestTableSize__TABLE_TYPE(t *testing.T) {
 		t.Errorf("empty Table: want: 0, got: %d", tbl.Size6())
 	}
 
-	pfxs1 := randomRealWorldPrefixes(prng, n)
-	pfxs2 := randomRealWorldPrefixes(prng, n)
+	pfxs1 := golden.RandomRealWorldPrefixes(prng, n)
+	pfxs2 := golden.RandomRealWorldPrefixes(prng, n)
 
 	for _, pfx := range pfxs1 {
 		tbl.Insert(pfx, nil)
@@ -1624,7 +1625,7 @@ func TestTableSize__TABLE_TYPE(t *testing.T) {
 		tbl.Modify(pfx, func(any, bool) (any, bool) { return nil, false })
 	}
 
-	for _, pfx := range randomRealWorldPrefixes(prng, n) {
+	for _, pfx := range golden.RandomRealWorldPrefixes(prng, n) {
 		tbl.Delete(pfx)
 	}
 
@@ -1654,7 +1655,7 @@ func TestTableAll__TABLE_TYPE(t *testing.T) {
 	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
-	pfxs := randomRealWorldPrefixes(prng, n)
+	pfxs := golden.RandomRealWorldPrefixes(prng, n)
 
 	tbl := new(_TABLE_TYPE[string])
 
@@ -1898,10 +1899,10 @@ func TestTableSubnets__TABLE_TYPE(t *testing.T) {
 		want6 := n + n/2
 
 		tbl := new(_TABLE_TYPE[int])
-		for i, pfx := range randomRealWorldPrefixes4(prng, want4) {
+		for i, pfx := range golden.RandomRealWorldPrefixes4(prng, want4) {
 			tbl.Insert(pfx, i)
 		}
-		for i, pfx := range randomRealWorldPrefixes6(prng, want6) {
+		for i, pfx := range golden.RandomRealWorldPrefixes6(prng, want6) {
 			tbl.Insert(pfx, i)
 		}
 
@@ -1933,21 +1934,21 @@ func TestTableSubnetsCompare__TABLE_TYPE(t *testing.T) {
 	n := workLoadN()
 	prng := rand.New(rand.NewPCG(42, 42))
 
-	pfxs := randomRealWorldPrefixes(prng, n)
+	pfxs := golden.RandomRealWorldPrefixes(prng, n)
 
-	gold := new(goldTable[int])
+	gold := new(golden.GoldTable[int])
 	tbl := new(_TABLE_TYPE[int])
 
 	for i, pfx := range pfxs {
-		gold.insert(pfx, i)
+		gold.Insert(pfx, i)
 		tbl.Insert(pfx, i)
 	}
 
-	for _, pfx := range randomRealWorldPrefixes(prng, n) {
+	for _, pfx := range golden.RandomRealWorldPrefixes(prng, n) {
 		t.Run("subtest", func(t *testing.T) {
 			t.Parallel()
 
-			gotGold := gold.subnets(pfx)
+			gotGold := gold.Subnets(pfx)
 			gotTbl := []netip.Prefix{}
 			for pfx := range tbl.Subnets(pfx) {
 				gotTbl = append(gotTbl, pfx)
@@ -2014,20 +2015,20 @@ func TestTableSupernetsCompare__TABLE_TYPE(t *testing.T) {
 
 	prng := rand.New(rand.NewPCG(42, 42))
 
-	pfxs := randomRealWorldPrefixes(prng, n)
+	pfxs := golden.RandomRealWorldPrefixes(prng, n)
 
-	gold := new(goldTable[int])
+	gold := new(golden.GoldTable[int])
 	tbl := new(_TABLE_TYPE[int])
 
 	for i, pfx := range pfxs {
-		gold.insert(pfx, i)
+		gold.Insert(pfx, i)
 		tbl.Insert(pfx, i)
 	}
 
-	for _, pfx := range randomRealWorldPrefixes(prng, n) {
+	for _, pfx := range golden.RandomRealWorldPrefixes(prng, n) {
 		t.Run("subtest", func(t *testing.T) {
 			t.Parallel()
-			gotGold := gold.supernets(pfx)
+			gotGold := gold.Supernets(pfx)
 			gotTbl := []netip.Prefix{}
 
 			for p := range tbl.Supernets(pfx) {

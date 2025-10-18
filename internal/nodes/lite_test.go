@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/gaissmai/bart/internal/art"
+	"github.com/gaissmai/bart/internal/golden"
 )
 
 func TestLiteNode_EmptyState(t *testing.T) {
@@ -2019,7 +2020,7 @@ func TestLiteInsertShuffled(t *testing.T) {
 	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
-	pfxs := randomRealWorldPrefixes(prng, n)
+	pfxs := golden.RandomRealWorldPrefixes(prng, n)
 
 	for range 10 {
 		pfxs2 := slices.Clone(pfxs)
@@ -2052,7 +2053,7 @@ func TestLiteInsertPersistShuffled(t *testing.T) {
 	n := workLoadN()
 
 	prng := rand.New(rand.NewPCG(42, 42))
-	pfxs := randomRealWorldPrefixes(prng, n)
+	pfxs := golden.RandomRealWorldPrefixes(prng, n)
 
 	for range 10 {
 		pfxs2 := slices.Clone(pfxs)
@@ -2090,22 +2091,22 @@ func TestLiteDeleteCompare4(t *testing.T) {
 	)
 
 	for range probes {
-		all4 := randomRealWorldPrefixes4(prng, n)
+		all4 := golden.RandomRealWorldPrefixes4(prng, n)
 
 		// pfxs and toDelete should be non-overlapping sets
 		pfxs := all4[:deleteCut]
 		toDelete := all4[deleteCut:]
 
-		gold := new(goldTable[struct{}])
+		gold := new(golden.GoldTable[struct{}])
 		lite := new(LiteNode[struct{}])
 
 		for _, pfx := range pfxs {
-			gold.insert(pfx, struct{}{})
+			gold.Insert(pfx, struct{}{})
 			lite.Insert(pfx, struct{}{}, 0)
 		}
 
 		for _, pfx := range toDelete {
-			gold.delete(pfx)
+			gold.Delete(pfx)
 			lite.Delete(pfx)
 		}
 
@@ -2114,7 +2115,7 @@ func TestLiteDeleteCompare4(t *testing.T) {
 			collect = append(collect, pfx)
 		}
 
-		if !slices.Equal(gold.allSorted(), collect) {
+		if !slices.Equal(gold.AllSorted(), collect) {
 			t.Fatal("expected Equal")
 		}
 	}
@@ -2131,22 +2132,22 @@ func TestLiteDeleteCompare6(t *testing.T) {
 	)
 
 	for range probes {
-		all6 := randomRealWorldPrefixes6(prng, n)
+		all6 := golden.RandomRealWorldPrefixes6(prng, n)
 
 		// pfxs and toDelete should be non-overlapping sets
 		pfxs := all6[:deleteCut]
 		toDelete := all6[deleteCut:]
 
-		gold := new(goldTable[struct{}])
+		gold := new(golden.GoldTable[struct{}])
 		lite := new(LiteNode[struct{}])
 
 		for _, pfx := range pfxs {
-			gold.insert(pfx, struct{}{})
+			gold.Insert(pfx, struct{}{})
 			lite.Insert(pfx, struct{}{}, 0)
 		}
 
 		for _, pfx := range toDelete {
-			gold.delete(pfx)
+			gold.Delete(pfx)
 			lite.Delete(pfx)
 		}
 
@@ -2155,7 +2156,7 @@ func TestLiteDeleteCompare6(t *testing.T) {
 			collect = append(collect, pfx)
 		}
 
-		if !slices.Equal(gold.allSorted(), collect) {
+		if !slices.Equal(gold.AllSorted(), collect) {
 			t.Fatal("expected Equal")
 		}
 	}
@@ -2174,7 +2175,7 @@ func TestLiteDeleteShuffled4(t *testing.T) {
 	deleteCut := n / 2
 
 	for range 10 {
-		all4 := randomRealWorldPrefixes4(prng, n)
+		all4 := golden.RandomRealWorldPrefixes4(prng, n)
 
 		// pfxs and toDelete should be non-overlapping sets
 		toDelete := all4[deleteCut:]
@@ -2225,7 +2226,7 @@ func TestLiteDeleteShuffled6(t *testing.T) {
 	deleteCut := n / 2
 
 	for range 10 {
-		all6 := randomRealWorldPrefixes6(prng, n)
+		all6 := golden.RandomRealWorldPrefixes6(prng, n)
 
 		// pfxs and toDelete should be non-overlapping sets
 		toDelete := all6[deleteCut:]
@@ -2273,7 +2274,7 @@ func TestLiteDeleteIsReverseOfInsert4(t *testing.T) {
 	// order. Each deletion should exactly undo the internal structure
 	// changes that each insert did.
 
-	pfxs := randomRealWorldPrefixes4(prng, n)
+	pfxs := golden.RandomRealWorldPrefixes4(prng, n)
 
 	lite := new(LiteNode[struct{}])
 	for _, pfx := range pfxs {
@@ -2302,7 +2303,7 @@ func TestLiteDeleteIsReverseOfInsert6(t *testing.T) {
 	// order. Each deletion should exactly undo the internal structure
 	// changes that each insert did.
 
-	pfxs := randomRealWorldPrefixes6(prng, n)
+	pfxs := golden.RandomRealWorldPrefixes6(prng, n)
 
 	lite := new(LiteNode[struct{}])
 	for _, pfx := range pfxs {
@@ -2330,7 +2331,7 @@ func TestLiteDeleteButOne4(t *testing.T) {
 	for range 10 {
 
 		lite := new(LiteNode[struct{}])
-		prefixes := randomRealWorldPrefixes4(prng, n)
+		prefixes := golden.RandomRealWorldPrefixes4(prng, n)
 
 		for _, pfx := range prefixes {
 			lite.Insert(pfx, struct{}{}, 0)
@@ -2364,7 +2365,7 @@ func TestLiteDeleteButOne6(t *testing.T) {
 	for range 10 {
 
 		lite := new(LiteNode[struct{}])
-		prefixes := randomRealWorldPrefixes6(prng, n)
+		prefixes := golden.RandomRealWorldPrefixes6(prng, n)
 
 		for _, pfx := range prefixes {
 			lite.Insert(pfx, struct{}{}, 0)
