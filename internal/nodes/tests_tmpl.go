@@ -20,6 +20,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/gaissmai/bart/internal/golden"
 )
 
 type _NODE_TYPE[V any] struct{}
@@ -371,7 +373,7 @@ func TestAllIterators_NODE_TYPE(t *testing.T) {
 	prng := rand.New(rand.NewPCG(42, 42))
 
 	for range 10 {
-		pfxs := randomRealWorldPrefixes4(prng, n)
+		pfxs := golden.RandomRealWorldPrefixes4(prng, n)
 
 		node := new(_NODE_TYPE[int])
 		for _, p := range pfxs {
@@ -420,19 +422,19 @@ func TestSupernets4_NODE_TYPE(t *testing.T) {
 	prng := rand.New(rand.NewPCG(42, 42))
 
 	for range 10 {
-		pfxs := randomRealWorldPrefixes4(prng, n)
+		pfxs := golden.RandomRealWorldPrefixes4(prng, n)
 
 		node := new(_NODE_TYPE[int])
-		gold := new(goldTable[int])
+		gold := new(golden.GoldTable[int])
 
 		for i, pfx := range pfxs {
 			node.Insert(pfx, i, 0)
-			gold.insert(pfx, i)
+			gold.Insert(pfx, i)
 		}
 
 		// test with random probes
 		for _, probe := range pfxs {
-			goldSupernets := gold.supernets(probe)
+			goldSupernets := gold.Supernets(probe)
 			nodeSupernets := []netip.Prefix{}
 
 			node.Supernets(probe, func(p netip.Prefix, _ int) bool {
@@ -453,19 +455,19 @@ func TestSupernets6_NODE_TYPE(t *testing.T) {
 	prng := rand.New(rand.NewPCG(42, 42))
 
 	for range 10 {
-		pfxs := randomRealWorldPrefixes6(prng, n)
+		pfxs := golden.RandomRealWorldPrefixes6(prng, n)
 
 		node := new(_NODE_TYPE[int])
-		gold := new(goldTable[int])
+		gold := new(golden.GoldTable[int])
 
 		for i, pfx := range pfxs {
 			node.Insert(pfx, i, 0)
-			gold.insert(pfx, i)
+			gold.Insert(pfx, i)
 		}
 
 		// test with random probes
 		for _, probe := range pfxs {
-			goldSupernets := gold.supernets(probe)
+			goldSupernets := gold.Supernets(probe)
 			nodeSupernets := []netip.Prefix{}
 
 			node.Supernets(probe, func(p netip.Prefix, _ int) bool {
@@ -486,14 +488,14 @@ func TestSubnets4_NODE_TYPE(t *testing.T) {
 	prng := rand.New(rand.NewPCG(42, 42))
 
 	for range 10 {
-		pfxs := randomRealWorldPrefixes4(prng, n)
+		pfxs := golden.RandomRealWorldPrefixes4(prng, n)
 
 		node := new(_NODE_TYPE[int])
-		gold := new(goldTable[int])
+		gold := new(golden.GoldTable[int])
 
 		for i, pfx := range pfxs {
 			node.Insert(pfx, i, 0)
-			gold.insert(pfx, i)
+			gold.Insert(pfx, i)
 		}
 
 		// the default route must have all pfxs as subnet
@@ -539,7 +541,7 @@ func TestSubnets4_NODE_TYPE(t *testing.T) {
 
 		// test with random probes
 		for _, probe := range pfxs {
-			goldSubnets := gold.subnets(probe)
+			goldSubnets := gold.Subnets(probe)
 			nodeSubnets := []netip.Prefix{}
 
 			node.Subnets(probe, func(p netip.Prefix, _ int) bool {
@@ -560,14 +562,14 @@ func TestSubnets6_NODE_TYPE(t *testing.T) {
 	prng := rand.New(rand.NewPCG(42, 42))
 
 	for range 10 {
-		pfxs := randomRealWorldPrefixes6(prng, n)
+		pfxs := golden.RandomRealWorldPrefixes6(prng, n)
 
 		node := new(_NODE_TYPE[int])
-		gold := new(goldTable[int])
+		gold := new(golden.GoldTable[int])
 
 		for i, pfx := range pfxs {
 			node.Insert(pfx, i, 0)
-			gold.insert(pfx, i)
+			gold.Insert(pfx, i)
 		}
 
 		// the default route must have all pfxs as subnet
@@ -613,7 +615,7 @@ func TestSubnets6_NODE_TYPE(t *testing.T) {
 
 		// test with random probes
 		for _, probe := range pfxs {
-			goldSubnets := gold.subnets(probe)
+			goldSubnets := gold.Subnets(probe)
 			nodeSubnets := []netip.Prefix{}
 
 			node.Subnets(probe, func(p netip.Prefix, _ int) bool {
