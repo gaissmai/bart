@@ -304,6 +304,7 @@ func TestTableLookupPrefixUnmasked__TABLE_TYPE(t *testing.T) {
 
 	tbl := new(_TABLE_TYPE[any])
 	tbl.Insert(mpp("10.20.30.0/24"), nil)
+	tbl.Insert(mpp("2001:db8::/32"), nil)
 
 	// not normalized pfxs
 	tests := []struct {
@@ -334,6 +335,27 @@ func TestTableLookupPrefixUnmasked__TABLE_TYPE(t *testing.T) {
 		{
 			probe:   netip.MustParsePrefix("10.20.30.40/32"),
 			wantLPM: mpp("10.20.30.0/24"),
+			wantOk:  true,
+		},
+		// IPv6 counterparts
+		{
+			probe:   netip.MustParsePrefix("2001:db8::1/0"),
+			wantLPM: netip.Prefix{},
+			wantOk:  false,
+		},
+		{
+			probe:   netip.MustParsePrefix("2001:db8::1/31"),
+			wantLPM: netip.Prefix{},
+			wantOk:  false,
+		},
+		{
+			probe:   netip.MustParsePrefix("2001:db8::1/32"),
+			wantLPM: mpp("2001:db8::/32"),
+			wantOk:  true,
+		},
+		{
+			probe:   netip.MustParsePrefix("2001:db8::1/64"),
+			wantLPM: mpp("2001:db8::/32"),
 			wantOk:  true,
 		},
 	}
@@ -522,7 +544,6 @@ func TestTableDeleteCompare__TABLE_TYPE(t *testing.T) {
 		all4 := randomRealWorldPrefixes4(prng, numPerFamily)
 		all6 := randomRealWorldPrefixes6(prng, numPerFamily)
 
-		// pfxs toDelete should be non-overlapping sets
 		pfxs := slices.Concat(all4, all6)
 		toDelete := slices.Concat(all4[deleteCut:], all6[deleteCut:])
 
@@ -576,7 +597,6 @@ func TestTableDeleteShuffled__TABLE_TYPE(t *testing.T) {
 		all4 := randomRealWorldPrefixes4(prng, numPerFamily)
 		all6 := randomRealWorldPrefixes6(prng, numPerFamily)
 
-		// pfxs toDelete should be non-overlapping sets
 		pfxs := slices.Concat(all4, all6)
 		toDelete := slices.Concat(all4[deleteCut:], all6[deleteCut:])
 
@@ -584,9 +604,6 @@ func TestTableDeleteShuffled__TABLE_TYPE(t *testing.T) {
 
 		// insert
 		for _, pfx := range pfxs {
-			tbl.Insert(pfx, pfx.String())
-		}
-		for _, pfx := range toDelete {
 			tbl.Insert(pfx, pfx.String())
 		}
 
@@ -603,9 +620,6 @@ func TestTableDeleteShuffled__TABLE_TYPE(t *testing.T) {
 
 		// insert
 		for _, pfx := range pfxs2 {
-			tbl2.Insert(pfx, pfx.String())
-		}
-		for _, pfx := range toDelete2 {
 			tbl2.Insert(pfx, pfx.String())
 		}
 
@@ -676,6 +690,10 @@ func TestTableDeleteButOne__TABLE_TYPE(t *testing.T) {
 		// skip the first
 		for i := 1; i < len(prefixes); i++ {
 			tbl.Delete(prefixes[i])
+		}
+
+		if size := tbl.Size(); size != 1 {
+			t.Fatalf("Size(), got %d, want 1", size)
 		}
 
 		stats4 := tbl.root4.StatsRec()
