@@ -292,40 +292,6 @@ func checkOverlapsPrefix(t *testing.T, tblInterface any, tests []tableOverlapsTe
 	}
 }
 
-// dumpAsGoldTable, just a helper to compare with golden table.
-func (t *Table[V]) dumpAsGoldTable() goldTable[V] {
-	var gold goldTable[V]
-
-	for p, v := range t.AllSorted() {
-		gold = append(gold, goldTableItem[V]{pfx: p, val: v})
-	}
-
-	return gold
-}
-
-// dumpAsGoldTable, just a helper to compare with golden table.
-func (f *Fast[V]) dumpAsGoldTable() goldTable[V] {
-	var gold goldTable[V]
-
-	for p, v := range f.AllSorted() {
-		gold = append(gold, goldTableItem[V]{pfx: p, val: v})
-	}
-
-	return gold
-}
-
-// dumpAsGoldTable, just a helper to compare with golden table.
-func dumpAsGoldTable[V any](l *Lite) goldTable[V] {
-	var zero V
-	var gold goldTable[V]
-
-	for p := range l.AllSorted() {
-		gold = append(gold, goldTableItem[V]{pfx: p, val: zero})
-	}
-
-	return gold
-}
-
 // goldTable is a simple and slow route table, implemented as a slice of prefixes
 // and values as a golden reference for bart.Table.
 type goldTable[V any] []goldTableItem[V]

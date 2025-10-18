@@ -434,10 +434,9 @@ func TestFastDeleteCompare(t *testing.T) {
 
 		gold.sort()
 
-		fastGolden := fast.dumpAsGoldTable()
-		fastGolden.sort()
+		fastFlatSorted := fast.flatSorted()
 
-		if !slices.Equal(*gold, fastGolden) {
+		if !slices.Equal(*gold, fastFlatSorted) {
 			t.Fatal("expected Equal")
 		}
 	}
@@ -853,10 +852,9 @@ func TestFastModifyCompare(t *testing.T) {
 	}
 
 	gold.sort()
-	fastGolden := fast.dumpAsGoldTable()
-	fastGolden.sort()
+	fastFlat := fast.flatSorted()
 
-	if !slices.Equal(*gold, fastGolden) {
+	if !slices.Equal(*gold, fastFlat) {
 		t.Fatal("expected Equal")
 	}
 
@@ -870,10 +868,9 @@ func TestFastModifyCompare(t *testing.T) {
 	}
 
 	gold.sort()
-	fastGolden = fast.dumpAsGoldTable()
-	fastGolden.sort()
+	fastFlat = fast.flatSorted()
 
-	if !slices.Equal(*gold, fastGolden) {
+	if !slices.Equal(*gold, fastFlat) {
 		t.Fatal("expected Equal")
 	}
 }
@@ -1146,13 +1143,12 @@ func TestFastUnionCompare(t *testing.T) {
 		fast.Union(fast2)
 
 		// dump as slow table for comparison
-		fastAsGoldenTbl := fast.dumpAsGoldTable()
+		fastFlat := fast.flatSorted()
 
 		// sort for comparison
 		gold.sort()
-		fastAsGoldenTbl.sort()
 
-		if !slices.Equal(*gold, fastAsGoldenTbl) {
+		if !slices.Equal(*gold, fastFlat) {
 			t.Fatal("expected equal")
 		}
 	}
@@ -1189,13 +1185,13 @@ func TestFastUnionPersistCompare(t *testing.T) {
 		fastP := fast.UnionPersist(fast2)
 
 		// dump as slow table for comparison
-		fastAsGoldenTbl := fastP.dumpAsGoldTable()
+		fastFlat := fastP.flatSorted()
 
 		// sort for comparison
 		gold.sort()
-		fastAsGoldenTbl.sort()
+		fastFlat.sort()
 
-		if !slices.Equal(*gold, fastAsGoldenTbl) {
+		if !slices.Equal(*gold, fastFlat) {
 			t.Fatal("expected equal")
 		}
 	}

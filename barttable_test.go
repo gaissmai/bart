@@ -434,8 +434,7 @@ func TestTableDeleteCompare(t *testing.T) {
 
 		gold.sort()
 
-		bartGolden := bart.dumpAsGoldTable()
-		bartGolden.sort()
+		bartGolden := bart.flatSorted()
 
 		if !slices.Equal(*gold, bartGolden) {
 			t.Fatal("expected Equal")
@@ -853,8 +852,7 @@ func TestTableModifyCompare(t *testing.T) {
 	}
 
 	gold.sort()
-	bartGolden := bart.dumpAsGoldTable()
-	bartGolden.sort()
+	bartGolden := bart.flatSorted()
 
 	if !slices.Equal(*gold, bartGolden) {
 		t.Fatal("expected Equal")
@@ -870,8 +868,7 @@ func TestTableModifyCompare(t *testing.T) {
 	}
 
 	gold.sort()
-	bartGolden = bart.dumpAsGoldTable()
-	bartGolden.sort()
+	bartGolden = bart.flatSorted()
 
 	if !slices.Equal(*gold, bartGolden) {
 		t.Fatal("expected Equal")
@@ -1146,11 +1143,10 @@ func TestTableUnionCompare(t *testing.T) {
 		bart.Union(bart2)
 
 		// dump as slow table for comparison
-		bartAsGoldenTbl := bart.dumpAsGoldTable()
+		bartAsGoldenTbl := bart.flatSorted()
 
 		// sort for comparison
 		gold.sort()
-		bartAsGoldenTbl.sort()
 
 		if !slices.Equal(*gold, bartAsGoldenTbl) {
 			t.Fatal("expected equal")
@@ -1189,13 +1185,12 @@ func TestTableUnionPersistCompare(t *testing.T) {
 		bartP := bart.UnionPersist(bart2)
 
 		// dump as slow table for comparison
-		bartAsGoldenTbl := bartP.dumpAsGoldTable()
+		bartFlatSorted := bartP.flatSorted()
 
 		// sort for comparison
 		gold.sort()
-		bartAsGoldenTbl.sort()
 
-		if !slices.Equal(*gold, bartAsGoldenTbl) {
+		if !slices.Equal(*gold, bartFlatSorted) {
 			t.Fatal("expected equal")
 		}
 	}

@@ -521,7 +521,7 @@ func TestTableDeleteCompare__TABLE_TYPE(t *testing.T) {
 		all6 := randomRealWorldPrefixes6(prng, numPerFamily)
 
 		// pfxs toDelete should be non-overlapping sets
-		pfxs := slices.Concat(all4[:deleteCut], all6[:deleteCut])
+		pfxs := slices.Concat(all4, all6)
 		toDelete := slices.Concat(all4[deleteCut:], all6[deleteCut:])
 
 		gold := new(goldTable[string])
@@ -575,7 +575,7 @@ func TestTableDeleteShuffled__TABLE_TYPE(t *testing.T) {
 		all6 := randomRealWorldPrefixes6(prng, numPerFamily)
 
 		// pfxs toDelete should be non-overlapping sets
-		pfxs := slices.Concat(all4[:deleteCut], all6[:deleteCut])
+		pfxs := slices.Concat(all4, all6)
 		toDelete := slices.Concat(all4[deleteCut:], all6[deleteCut:])
 
 		tbl := new(_TABLE_TYPE[string])

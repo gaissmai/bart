@@ -12,6 +12,18 @@ import (
 	"testing"
 )
 
+// flatSorted, just a helper to compare with golden table.
+func flatSorted[V any](l *Lite) goldTable[V] {
+	var zero V
+	var flat goldTable[V]
+
+	for p := range l.AllSorted() {
+		flat = append(flat, goldTableItem[V]{pfx: p, val: zero})
+	}
+
+	return flat
+}
+
 // ############ tests ################################
 
 func TestLiteNil(t *testing.T) {
@@ -564,7 +576,7 @@ func TestLiteDeleteCompare(t *testing.T) {
 			lite.Delete(pfx)
 		}
 
-		liteGolden := dumpAsGoldTable[string](lite)
+		liteGolden := flatSorted[string](lite)
 
 		if !slices.Equal(gold.allSorted(), liteGolden.allSorted()) {
 			t.Fatal("expected Equal")
@@ -920,7 +932,7 @@ func TestLiteModifyCompare(t *testing.T) {
 		lite.Modify(pfx, func(bool) bool { return false })
 	}
 
-	liteGolden := dumpAsGoldTable[int](lite)
+	liteGolden := flatSorted[int](lite)
 
 	if !slices.Equal(gold.allSorted(), liteGolden.allSorted()) {
 		t.Fatal("expected Equal")
@@ -1183,7 +1195,7 @@ func TestLiteUnionCompare(t *testing.T) {
 		lite.Union(lite2)
 
 		// dump as slow table for comparison
-		liteAsGoldenTbl := dumpAsGoldTable[any](lite)
+		liteAsGoldenTbl := flatSorted[any](lite)
 
 		if !slices.Equal(gold.allSorted(), liteAsGoldenTbl.allSorted()) {
 			t.Fatal("expected equal")
@@ -1222,7 +1234,7 @@ func TestLiteUnionPersistCompare(t *testing.T) {
 		liteP := lite.UnionPersist(lite2)
 
 		// dump as slow table for comparison
-		liteAsGoldenTbl := dumpAsGoldTable[int](liteP)
+		liteAsGoldenTbl := flatSorted[int](liteP)
 
 		// sort for comparison
 		if !slices.Equal(gold.allSorted(), liteAsGoldenTbl.allSorted()) {
