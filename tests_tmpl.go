@@ -780,3 +780,385 @@ func TestTableGetCompare__TABLE_TYPE(t *testing.T) {
 		}
 	}
 }
+
+func TestTableModifySemantics__TABLE_TYPE(t *testing.T) {
+	t.Parallel()
+
+	type args struct {
+		pfx netip.Prefix
+		cb  func(val int, found bool) (_ int, del bool)
+	}
+
+	tests := []struct {
+		name      string
+		prepare   map[netip.Prefix]int // entries to pre-populate the table
+		args      args
+		finalData map[netip.Prefix]int // expected table contents after the operation
+	}{
+		{
+			name:    "Delete existing entry",
+			prepare: map[netip.Prefix]int{mpp("10.0.0.0/8"): 42, mpp("2001:db8::/32"): 4242},
+			args: args{
+				pfx: mpp("10.0.0.0/8"),
+				cb:  func(val int, found bool) (_ int, del bool) { return 0, true },
+			},
+			finalData: map[netip.Prefix]int{mpp("2001:db8::/32"): 4242},
+		},
+
+		{
+			name:    "Insert new entry",
+			prepare: map[netip.Prefix]int{mpp("10.0.0.0/8"): 42},
+			args: args{
+				pfx: mpp("2001:db8::/32"),
+				cb:  func(val int, found bool) (_ int, del bool) { return 4242, false },
+			},
+			finalData: map[netip.Prefix]int{mpp("10.0.0.0/8"): 42, mpp("2001:db8::/32"): 4242},
+		},
+
+		{
+			name:    "Update existing entry",
+			prepare: map[netip.Prefix]int{mpp("10.0.0.0/8"): 42, mpp("2001:db8::/32"): 4242},
+			args: args{
+				pfx: mpp("10.0.0.0/8"),
+				cb:  func(val int, found bool) (_ int, del bool) { return -1, false },
+			},
+			finalData: map[netip.Prefix]int{mpp("10.0.0.0/8"): -1, mpp("2001:db8::/32"): 4242},
+		},
+
+		{
+			name:    "No-op on missing entry",
+			prepare: map[netip.Prefix]int{mpp("10.0.0.0/8"): 42},
+			args: args{
+				pfx: mpp("2001:db8::/32"),
+				cb:  func(val int, found bool) (_ int, del bool) { return 0, true },
+			},
+			finalData: map[netip.Prefix]int{mpp("10.0.0.0/8"): 42},
+		},
+	}
+
+	for _, tt := range tests {
+		tbl := new(_TABLE_TYPE[int])
+
+		// Insert initial entries using Modify
+		for pfx, v := range tt.prepare {
+			tbl.Modify(pfx, func(_ int, _ bool) (_ int, del bool) { return v, false })
+		}
+
+		tbl.Modify(tt.args.pfx, tt.args.cb)
+
+		// Check the final state of the table using Get, compares expected and actual table
+		got := make(map[netip.Prefix]int, len(tt.finalData))
+		for pfx, val := range tbl.All() {
+			got[pfx] = val
+		}
+		if len(got) != len(tt.finalData) {
+			t.Fatalf("[%s] final table size mismatch: got %d, want %d", tt.name, len(got), len(tt.finalData))
+		}
+		for pfx, wantVal := range tt.finalData {
+			gotVal, ok := got[pfx]
+			if !ok || gotVal != wantVal {
+				t.Fatalf("[%s] final table: key %v = %v (present=%v), want %v", tt.name, pfx, gotVal, ok, wantVal)
+			}
+		}
+	}
+}
+
+func TestTableModifyPersistSemantics__TABLE_TYPE(t *testing.T) {
+	t.Parallel()
+
+	type args struct {
+		pfx netip.Prefix
+		cb  func(val int, found bool) (_ int, del bool)
+	}
+
+	tests := []struct {
+		name      string
+		prepare   map[netip.Prefix]int // entries to pre-populate the table
+		args      args
+		finalData map[netip.Prefix]int // expected table contents after the operation
+	}{
+		{
+			name:    "Delete existing entry",
+			prepare: map[netip.Prefix]int{mpp("10.0.0.0/8"): 42, mpp("2001:db8::/32"): 4242},
+			args: args{
+				pfx: mpp("10.0.0.0/8"),
+				cb:  func(val int, found bool) (_ int, del bool) { return 0, true },
+			},
+			finalData: map[netip.Prefix]int{mpp("2001:db8::/32"): 4242},
+		},
+
+		{
+			name:    "Insert new entry",
+			prepare: map[netip.Prefix]int{mpp("10.0.0.0/8"): 42},
+			args: args{
+				pfx: mpp("2001:db8::/32"),
+				cb:  func(val int, found bool) (_ int, del bool) { return 4242, false },
+			},
+			finalData: map[netip.Prefix]int{mpp("10.0.0.0/8"): 42, mpp("2001:db8::/32"): 4242},
+		},
+
+		{
+			name:    "Update existing entry",
+			prepare: map[netip.Prefix]int{mpp("10.0.0.0/8"): 42, mpp("2001:db8::/32"): 4242},
+			args: args{
+				pfx: mpp("10.0.0.0/8"),
+				cb:  func(val int, found bool) (_ int, del bool) { return -1, false },
+			},
+			finalData: map[netip.Prefix]int{mpp("10.0.0.0/8"): -1, mpp("2001:db8::/32"): 4242},
+		},
+
+		{
+			name:    "No-op on missing entry",
+			prepare: map[netip.Prefix]int{mpp("10.0.0.0/8"): 42},
+			args: args{
+				pfx: mpp("2001:db8::/32"),
+				cb:  func(val int, found bool) (_ int, del bool) { return 0, true },
+			},
+			finalData: map[netip.Prefix]int{mpp("10.0.0.0/8"): 42},
+		},
+	}
+
+	for _, tt := range tests {
+		tbl := new(_TABLE_TYPE[int])
+
+		// Insert initial entries using Modify
+		for pfx, v := range tt.prepare {
+			tbl.Modify(pfx, func(_ int, _ bool) (_ int, del bool) { return v, false })
+		}
+
+		prt := tbl.ModifyPersist(tt.args.pfx, tt.args.cb)
+
+		// Check the final state of the table using Get, compares expected and actual table
+		for pfx, wantVal := range tt.finalData {
+			gotVal, ok := prt.Get(pfx)
+			if !ok || gotVal != wantVal {
+				t.Errorf("[%s] final table: key %v = %v (ok=%v), want %v (ok=true)", tt.name, pfx, gotVal, ok, wantVal)
+			}
+		}
+		// Ensure there are no unexpected entries
+		for pfx := range tt.prepare {
+			if _, expect := tt.finalData[pfx]; !expect {
+				if _, ok := prt.Get(pfx); ok {
+					t.Errorf("[%s] final table: key %v should not be present", tt.name, pfx)
+				}
+			}
+		}
+	}
+}
+
+func TestTableModifyCompare__TABLE_TYPE(t *testing.T) {
+	t.Parallel()
+
+	n := workLoadN()
+
+	prng := rand.New(rand.NewPCG(42, 42))
+	pfxs := randomRealWorldPrefixes(prng, n)
+
+	gold := new(goldTable[int])
+	tbl := new(_TABLE_TYPE[int])
+
+	// Update as insert
+	for i, pfx := range pfxs {
+		gold.insert(pfx, i)
+		tbl.Modify(pfx, func(int, bool) (int, bool) { return i, false })
+	}
+
+	gold.sort()
+	tblFlat := tbl.flatSorted()
+
+	// Skip value comparison for liteTable (no real payload)
+	if _, isLite := any(tbl).(*liteTable[int]); isLite {
+		if !slices.Equal(gold.allSorted(), tblFlat.allSorted()) {
+			t.Fatal("expected Equal")
+		}
+	} else {
+		if !slices.Equal(*gold, tblFlat) {
+			t.Fatal("expected Equal")
+		}
+	}
+
+	cb1 := func(val int, _ bool) int { return val + 1 }
+	cb2 := func(val int, _ bool) (int, bool) { return val + 1, false }
+
+	// Update as update
+	for _, pfx := range pfxs[:len(pfxs)/2] {
+		gold.update(pfx, cb1)
+		tbl.Modify(pfx, cb2)
+	}
+
+	gold.sort()
+	tblFlat = tbl.flatSorted()
+
+	// Skip value comparison for liteTable (no real payload)
+	if _, isLite := any(tbl).(*liteTable[int]); isLite {
+		if !slices.Equal(gold.allSorted(), tblFlat.allSorted()) {
+			t.Fatal("expected Equal")
+		}
+	} else {
+		if !slices.Equal(*gold, tblFlat) {
+			t.Fatal("expected Equal")
+		}
+	}
+}
+
+func TestTableModifyPersistCompare__TABLE_TYPE(t *testing.T) {
+	t.Parallel()
+
+	n := workLoadN()
+
+	prng := rand.New(rand.NewPCG(42, 42))
+	pfxs := randomRealWorldPrefixes(prng, n)
+
+	mut := new(_TABLE_TYPE[int])
+	imu := new(_TABLE_TYPE[int])
+
+	// Update as insert
+	for i, pfx := range pfxs {
+		mut.Modify(pfx, func(int, bool) (int, bool) { return i, false })
+		imu = imu.ModifyPersist(pfx, func(int, bool) (int, bool) { return i, false })
+	}
+
+	if !mut.Equal(imu) {
+		t.Fatal("expected Equal")
+	}
+
+	cb := func(val int, _ bool) (int, bool) { return val + 1, false }
+
+	// Update as update
+	for _, pfx := range pfxs[:len(pfxs)/2] {
+		mut.Modify(pfx, cb)
+		imu = imu.ModifyPersist(pfx, cb)
+	}
+
+	if !mut.Equal(imu) {
+		t.Fatal("expected Equal")
+	}
+}
+
+func TestTableModifyShuffled__TABLE_TYPE(t *testing.T) {
+	t.Parallel()
+
+	n := workLoadN()
+
+	prng := rand.New(rand.NewPCG(42, 42))
+
+	var (
+		numPrefixes  = n // prefixes to insert (test deletes 50% of them)
+		numPerFamily = numPrefixes / 2
+		deleteCut    = numPerFamily / 2
+	)
+
+	for range 10 {
+		all4 := randomRealWorldPrefixes4(prng, numPerFamily)
+		all6 := randomRealWorldPrefixes6(prng, numPerFamily)
+
+		// pfxs toDelete should be non-overlapping sets
+		pfxs := slices.Concat(all4[:deleteCut], all6[:deleteCut])
+		toDelete := slices.Concat(all4[deleteCut:], all6[deleteCut:])
+
+		tbl1 := new(_TABLE_TYPE[string])
+
+		// insert
+		for _, pfx := range pfxs {
+			tbl1.Insert(pfx, pfx.String())
+		}
+		for _, pfx := range toDelete {
+			tbl1.Insert(pfx, pfx.String())
+		}
+
+		// this callback deletes unconditionally
+		cb := func(string, bool) (string, bool) { return "", true }
+
+		// delete
+		for _, pfx := range toDelete {
+			tbl1.Modify(pfx, cb)
+		}
+
+		pfxs2 := slices.Clone(pfxs)
+		toDelete2 := slices.Clone(toDelete)
+		prng.Shuffle(len(toDelete2), func(i, j int) { toDelete2[i], toDelete2[j] = toDelete2[j], toDelete2[i] })
+
+		tbl2 := new(_TABLE_TYPE[string])
+
+		// insert
+		for _, pfx := range pfxs2 {
+			tbl2.Insert(pfx, pfx.String())
+		}
+		for _, pfx := range toDelete2 {
+			tbl2.Insert(pfx, pfx.String())
+		}
+
+		// delete
+		for _, pfx := range toDelete2 {
+			tbl2.Modify(pfx, cb)
+		}
+
+		if !tbl1.Equal(tbl2) {
+			t.Fatal("expected equal")
+		}
+	}
+}
+
+func TestTableModifyPersistShuffled__TABLE_TYPE(t *testing.T) {
+	t.Parallel()
+
+	n := workLoadN()
+
+	prng := rand.New(rand.NewPCG(42, 42))
+
+	var (
+		numPrefixes  = n // prefixes to insert (test deletes 50% of them)
+		numPerFamily = numPrefixes / 2
+		deleteCut    = numPerFamily / 2
+	)
+
+	for range 10 {
+		all4 := randomRealWorldPrefixes4(prng, numPerFamily)
+		all6 := randomRealWorldPrefixes6(prng, numPerFamily)
+
+		// pfxs toDelete should be non-overlapping sets
+		pfxs := slices.Concat(all4[:deleteCut], all6[:deleteCut])
+		toDelete := slices.Concat(all4[deleteCut:], all6[deleteCut:])
+
+		tbl1 := new(_TABLE_TYPE[string])
+
+		// insert
+		for _, pfx := range pfxs {
+			tbl1.Insert(pfx, pfx.String())
+		}
+		for _, pfx := range toDelete {
+			tbl1.Insert(pfx, pfx.String())
+		}
+
+		// this callback deletes unconditionally
+		cb := func(string, bool) (string, bool) { return "", true }
+
+		// delete
+		for _, pfx := range toDelete {
+			tbl1 = tbl1.ModifyPersist(pfx, cb)
+		}
+
+		pfxs2 := slices.Clone(pfxs)
+		toDelete2 := slices.Clone(toDelete)
+		prng.Shuffle(len(toDelete2), func(i, j int) { toDelete2[i], toDelete2[j] = toDelete2[j], toDelete2[i] })
+
+		tbl2 := new(_TABLE_TYPE[string])
+
+		// insert
+		for _, pfx := range pfxs2 {
+			tbl2.Insert(pfx, pfx.String())
+		}
+		for _, pfx := range toDelete2 {
+			tbl2.Insert(pfx, pfx.String())
+		}
+
+		// delete
+		for _, pfx := range toDelete2 {
+			tbl2 = tbl2.ModifyPersist(pfx, cb)
+		}
+
+		if !tbl1.Equal(tbl2) {
+			t.Fatal("expected equal")
+		}
+	}
+}
