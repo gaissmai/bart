@@ -505,7 +505,7 @@ func (l *liteTable[V]) LookupPrefix(pfx netip.Prefix) (val V, exists bool) {
 // Returns the matching prefix, the zero value, and true if found.
 // Returns zero values and false if no match exists.
 func (l *liteTable[V]) LookupPrefixLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, exists bool) {
-	lpm, exists = l.lookupPrefixLPM(pfx, false)
+	lpm, exists = l.lookupPrefixLPM(pfx, true)
 	return
 }
 

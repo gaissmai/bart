@@ -213,3 +213,135 @@ func TestTableLookupCompare_Table(t *testing.T) {
 		}
 	}
 }
+
+func TestTableLookupPrefixUnmasked_Table(t *testing.T) {
+	// test that the pfx must not be masked on input for LookupPrefix
+	t.Parallel()
+
+	tbl := new(Table[any])
+	tbl.Insert(mpp("10.20.30.0/24"), nil)
+
+	// not normalized pfxs
+	tests := []struct {
+		probe   netip.Prefix
+		wantLPM netip.Prefix
+		wantOk  bool
+	}{
+		{
+			probe:   netip.MustParsePrefix("10.20.30.40/0"),
+			wantLPM: netip.Prefix{},
+			wantOk:  false,
+		},
+		{
+			probe:   netip.MustParsePrefix("10.20.30.40/23"),
+			wantLPM: netip.Prefix{},
+			wantOk:  false,
+		},
+		{
+			probe:   netip.MustParsePrefix("10.20.30.40/24"),
+			wantLPM: mpp("10.20.30.0/24"),
+			wantOk:  true,
+		},
+		{
+			probe:   netip.MustParsePrefix("10.20.30.40/25"),
+			wantLPM: mpp("10.20.30.0/24"),
+			wantOk:  true,
+		},
+		{
+			probe:   netip.MustParsePrefix("10.20.30.40/32"),
+			wantLPM: mpp("10.20.30.0/24"),
+			wantOk:  true,
+		},
+	}
+
+	for _, tc := range tests {
+		_, got := tbl.LookupPrefix(tc.probe)
+		if got != tc.wantOk {
+			t.Errorf("LookupPrefix non canonical prefix (%s), got: %v, want: %v", tc.probe, got, tc.wantOk)
+		}
+
+		lpm, _, got := tbl.LookupPrefixLPM(tc.probe)
+		if got != tc.wantOk {
+			t.Errorf("LookupPrefixLPM non canonical prefix (%s), got: %v, want: %v", tc.probe, got, tc.wantOk)
+		}
+		if lpm != tc.wantLPM {
+			t.Errorf("LookupPrefixLPM non canonical prefix (%s), got: %v, want: %v", tc.probe, lpm, tc.wantLPM)
+		}
+	}
+}
+
+func TestTableLookupPrefixCompare_Table(t *testing.T) {
+	// Create large route tables repeatedly, and compare Table's
+	// behavior to a naive and slow but correct implementation.
+	t.Parallel()
+
+	n := workLoadN()
+
+	prng := rand.New(rand.NewPCG(42, 42))
+	pfxs := randomRealWorldPrefixes(prng, n)
+
+	gold := new(goldTable[int])
+	tbl := new(Table[int])
+	for i, pfx := range pfxs {
+		gold.insert(pfx, i)
+		tbl.Insert(pfx, i)
+	}
+
+	for range n {
+		pfx := randomPrefix(prng)
+
+		goldVal, goldOK := gold.lookupPfx(pfx)
+		tblVal, tblOK := tbl.LookupPrefix(pfx)
+
+		if goldOK != tblOK {
+			t.Fatalf("LookupPrefix(%q) = (_, %v), want (_, %v)", pfx, tblOK, goldOK)
+		}
+
+		// liteTable has no real payload
+		if _, ok := any(tbl).(*liteTable[int]); !ok {
+			if goldVal != tblVal {
+				t.Fatalf("LookupPrefix(%q) = (%v, %v), want (%v, %v)", pfx, tblVal, tblOK, goldVal, goldOK)
+			}
+		}
+	}
+}
+
+func TestTableLookupPrefixLPMCompare_Table(t *testing.T) {
+	// Create large route tables repeatedly, and compare Table's
+	// behavior to a naive and slow but correct implementation.
+	t.Parallel()
+
+	n := workLoadN()
+
+	prng := rand.New(rand.NewPCG(42, 42))
+	pfxs := randomRealWorldPrefixes(prng, n)
+
+	gold := new(goldTable[int])
+	tbl := new(Table[int])
+	for i, pfx := range pfxs {
+		gold.insert(pfx, i)
+		tbl.Insert(pfx, i)
+	}
+
+	for range n {
+		pfx := randomPrefix(prng)
+
+		goldLPM, goldVal, goldOK := gold.lookupPfxLPM(pfx)
+		tblLPM, tblVal, tblOK := tbl.LookupPrefixLPM(pfx)
+
+		if goldOK != tblOK {
+			t.Fatalf("LookupPrefixLPM(%q) = (_, _, %v), want (_, _, %v)", pfx, tblOK, goldOK)
+		}
+
+		if goldLPM != tblLPM {
+			t.Fatalf("LookupPrefixLPM(%q) = ( %v, _, _), want ( %v, _, _)", pfx, tblLPM, goldLPM)
+		}
+
+		// liteTable has no real payload
+		if _, ok := any(tbl).(*liteTable[int]); !ok {
+			if goldVal != tblVal {
+				t.Fatalf("LookupPrefixLPM(%q) = (_, %v, _), want (_, %v, _)", pfx, tblVal, goldVal)
+			}
+		}
+	}
+}
