@@ -1272,3 +1272,226 @@ func TestTableUnionPersistCompare_Fast(t *testing.T) {
 		}
 	}
 }
+
+func TestTableClone_Fast(t *testing.T) {
+	t.Parallel()
+	prng := rand.New(rand.NewPCG(42, 42))
+	pfxs := randomRealWorldPrefixes(prng, 100_000)
+
+	var tbl *Fast[int]
+	if tbl.Clone() != nil {
+		t.Fatal("expected nil")
+	}
+
+	tbl = new(Fast[int])
+	for i, pfx := range pfxs {
+		tbl.Insert(pfx, i)
+	}
+	clone := tbl.Clone()
+
+	if !tbl.Equal(clone) {
+		t.Fatal("expected equal")
+	}
+}
+
+func TestTableCloneShallow_Fast(t *testing.T) {
+	t.Parallel()
+
+	tbl := new(Fast[*int])
+
+	if _, isLite := any(tbl).(*liteTable[*int]); isLite {
+		t.Skip("liteNode has no real payload")
+	}
+
+	clone := tbl.Clone()
+	if tbl.dumpString() != clone.dumpString() {
+		t.Errorf("empty Clone: got:\n%swant:\n%s", clone.dumpString(), tbl.dumpString())
+	}
+
+	val := 1
+	pfx := mpp("10.0.0.1/32")
+	tbl.Insert(pfx, &val)
+
+	clone = tbl.Clone()
+	want, _ := tbl.Get(pfx)
+	got, _ := clone.Get(pfx)
+
+	if *got != *want || got != want {
+		t.Errorf("shallow copy, values and pointers must be equal:\nvalues(%d, %d)\n(ptr(%v, %v)", *got, *want, got, want)
+	}
+
+	// update value, shallow copy of values, clone must be equal
+	val = 2
+	want, _ = tbl.Get(pfx)
+	got, _ = clone.Get(pfx)
+
+	if *got != *want {
+		t.Errorf("memory aliasing after shallow copy, values must be equal:\nvalues(%d, %d)", *got, *want)
+	}
+}
+
+func TestTableCloneDeep_Fast(t *testing.T) {
+	t.Parallel()
+
+	tbl := new(Fast[*MyInt])
+
+	if _, isLite := any(tbl).(*liteTable[*MyInt]); isLite {
+		t.Skip("liteNode has no real payload")
+	}
+
+	clone := tbl.Clone()
+	if tbl.dumpString() != clone.dumpString() {
+		t.Errorf("empty Clone: got:\n%swant:\n%s", clone.dumpString(), tbl.dumpString())
+	}
+
+	val := MyInt(1)
+	pfx := mpp("10.0.0.1/32")
+	tbl.Insert(pfx, &val)
+
+	clone = tbl.Clone()
+	want, _ := tbl.Get(pfx)
+	got, _ := clone.Get(pfx)
+
+	if *got != *want || got == want {
+		t.Errorf("value with Cloner interface, pointers must be different:\nvalues(%d, %d)\n(ptr(%v, %v)", *got, *want, got, want)
+	}
+
+	// update value, deep copy of values, cloned value must now be different
+	val = 2
+	want, _ = tbl.Get(pfx)
+	got, _ = clone.Get(pfx)
+
+	if *got == *want {
+		t.Errorf("memory aliasing after deep copy, values must be different:\nvalues(%d, %d)", *got, *want)
+	}
+}
+
+func TestTableUnionShallow_Fast(t *testing.T) {
+	t.Parallel()
+
+	tbl1 := new(Fast[*int])
+	tbl2 := new(Fast[*int])
+
+	if _, isLite := any(tbl1).(*liteTable[*int]); isLite {
+		t.Skip("liteNode has no real payload")
+	}
+
+	val := 1
+	pfx := mpp("10.0.0.1/32")
+	tbl2.Insert(pfx, &val)
+
+	tbl1.Union(tbl2)
+	got, _ := tbl1.Get(pfx)
+	want, _ := tbl2.Get(pfx)
+
+	if *got != *want || got != want {
+		t.Errorf("shallow copy, values and pointers must be equal:\nvalues(%d, %d)\n(ptr(%v, %v)", *got, *want, got, want)
+	}
+
+	// update value, shallow copy of values, union must be equal
+	val = 2
+	got, _ = tbl1.Get(pfx)
+	want, _ = tbl2.Get(pfx)
+
+	if *got != *want {
+		t.Errorf("memory aliasing after shallow copy, values must be equal:\nvalues(%d, %d)", *got, *want)
+	}
+}
+
+func TestTableUnionDeep_Fast(t *testing.T) {
+	t.Parallel()
+
+	tbl1 := new(Fast[*MyInt])
+	tbl2 := new(Fast[*MyInt])
+
+	if _, isLite := any(tbl1).(*liteTable[*MyInt]); isLite {
+		t.Skip("liteNode has no real payload")
+	}
+
+	val := MyInt(1)
+	pfx := mpp("10.0.0.1/32")
+	tbl2.Insert(pfx, &val)
+
+	tbl1.Union(tbl2)
+	got, _ := tbl1.Get(pfx)
+	want, _ := tbl2.Get(pfx)
+
+	if *got != *want || got == want {
+		t.Errorf("value with Cloner interface, pointers must be different:\nvalues(%d, %d)\n(ptr(%v, %v)", *got, *want, got, want)
+	}
+
+	// update value, shallow copy of values, union must be equal
+	val = 2
+	got, _ = tbl1.Get(pfx)
+	want, _ = tbl2.Get(pfx)
+
+	if *got == *want {
+		t.Errorf("memory aliasing after deep copy, values must be different:\nvalues(%d, %d)", *got, *want)
+	}
+}
+
+// test some edge cases
+func TestTableOverlapsPrefixEdgeCases_Fast(t *testing.T) {
+	t.Parallel()
+
+	type probe struct {
+		pfx  netip.Prefix
+		want bool
+	}
+
+	type probes []probe
+	type pfxs []netip.Prefix
+
+	type test struct {
+		name   string
+		insert pfxs
+		probes probes
+	}
+
+	tests := []test{
+		{
+			name:   "empty table",
+			insert: nil,
+			probes: probes{{mpp("0.0.0.0/0"), false}, {mpp("::/0"), false}},
+		},
+		{
+			name:   "default route I",
+			insert: pfxs{mpp("10.0.0.0/9"), mpp("2001:db8::/32")},
+			probes: probes{{mpp("0.0.0.0/0"), true}, {mpp("::/0"), true}},
+		},
+		{
+			name:   "default route II",
+			insert: pfxs{mpp("0.0.0.0/0"), mpp("::/0")},
+			probes: probes{{mpp("10.0.0.0/9"), true}, {mpp("2001:db8::/32"), true}},
+		},
+		{
+			name:   "single IP I",
+			insert: pfxs{mpp("10.0.0.0/7"), mpp("2001::/16")},
+			probes: probes{{mpp("10.1.2.3/32"), true}, {mpp("2001:db8:affe::cafe/128"), true}},
+		},
+		{
+			name:   "single IP II",
+			insert: pfxs{mpp("10.1.2.3/32"), mpp("2001:db8:affe::cafe/128")},
+			probes: probes{{mpp("10.0.0.0/7"), true}, {mpp("2001::/16"), true}},
+		},
+		{
+			name:   "same IP",
+			insert: pfxs{mpp("10.1.2.3/32"), mpp("2001:db8:affe::cafe/128")},
+			probes: probes{{mpp("10.1.2.3/32"), true}, {mpp("2001:db8:affe::cafe/128"), true}},
+		},
+	}
+
+	for _, tt := range tests {
+		tbl := new(Fast[int])
+		for _, pfx := range tt.insert {
+			tbl.Insert(pfx, 0)
+		}
+
+		for _, probe := range tt.probes {
+			got := tbl.OverlapsPrefix(probe.pfx)
+			if got != probe.want {
+				t.Errorf("[%s] OverlapsPrefix(%v) = %v, want %v", tt.name, probe.pfx, got, probe.want)
+			}
+		}
+	}
+}
