@@ -691,3 +691,92 @@ func TestTableDeleteButOne__TABLE_TYPE(t *testing.T) {
 		}
 	}
 }
+
+func TestTableGet__TABLE_TYPE(t *testing.T) {
+	t.Parallel()
+	prng := rand.New(rand.NewPCG(42, 42))
+	pfx := randomPrefix(prng)
+
+	tests := []struct {
+		name string
+		pfx  netip.Prefix
+		val  int
+	}{
+		{
+			name: "default route v4",
+			pfx:  mpp("0.0.0.0/0"),
+			val:  0,
+		},
+		{
+			name: "default route v6",
+			pfx:  mpp("::/0"),
+			val:  0,
+		},
+		{
+			name: "set v4",
+			pfx:  mpp("1.2.3.4/32"),
+			val:  1234,
+		},
+		{
+			name: "set v6",
+			pfx:  mpp("2001:db8::/32"),
+			val:  2001,
+		},
+	}
+
+	tbl := new(_TABLE_TYPE[int])
+	if _, ok := tbl.Get(pfx); ok {
+		t.Errorf("empty table: Get(%v), ok=%v, expected: %v", pfx, ok, false)
+	}
+
+	for _, tt := range tests {
+		tbl.Insert(tt.pfx, tt.val)
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, ok := tbl.Get(tt.pfx)
+
+			if !ok {
+				t.Errorf("%s: ok=%v, expected: %v", tt.name, ok, true)
+			}
+
+			if got != tt.val {
+				t.Errorf("%s: val=%v, expected: %v", tt.name, got, tt.val)
+			}
+		})
+	}
+}
+
+func TestTableGetCompare__TABLE_TYPE(t *testing.T) {
+	t.Parallel()
+
+	n := workLoadN()
+
+	prng := rand.New(rand.NewPCG(42, 42))
+	pfxs := randomRealWorldPrefixes(prng, n)
+
+	gold := new(goldTable[string])
+	tbl := new(_TABLE_TYPE[string])
+	for _, pfx := range pfxs {
+		gold.insert(pfx, pfx.String())
+		tbl.Insert(pfx, pfx.String())
+	}
+
+	for _, pfx := range pfxs {
+		goldVal, goldOK := gold.get(pfx)
+		tblVal, tblOK := tbl.Get(pfx)
+
+		if goldOK != tblOK {
+			t.Fatalf("Get(%q) = (_, %v), want (_, %v)", pfx, tblOK, goldOK)
+		}
+
+		// Skip value comparison for liteTable (no real payload)
+		if _, isLite := any(tbl).(*liteTable[string]); !isLite {
+			if goldVal != tblVal {
+				t.Fatalf("Get(%q) = (%v, %v), want (%v, %v)", pfx, tblVal, tblOK, goldVal, goldOK)
+			}
+		}
+	}
+}
