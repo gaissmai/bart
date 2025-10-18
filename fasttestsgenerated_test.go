@@ -83,6 +83,8 @@ func TestTableNil_Fast(t *testing.T) {
 		mustPanic(t, "Overlaps", func() { tbl1.Overlaps(tbl2) })
 		mustPanic(t, "Overlaps4", func() { tbl1.Overlaps4(tbl2) })
 		mustPanic(t, "Overlaps6", func() { tbl1.Overlaps6(tbl2) })
+		mustPanic(t, "OverlapsPrefix", func() { tbl1.OverlapsPrefix(pfx4) })
+		mustPanic(t, "OverlapsPrefix", func() { tbl1.OverlapsPrefix(pfx6) })
 
 		mustPanic(t, "Equal", func() { tbl1.Equal(tbl2) })
 		noPanic(t, "Equal", func() { tbl1.Equal(tbl1) })
@@ -991,9 +993,6 @@ func TestTableModifyShuffled_Fast(t *testing.T) {
 		for _, pfx := range pfxs {
 			tbl1.Insert(pfx, pfx.String())
 		}
-		for _, pfx := range toDelete {
-			tbl1.Insert(pfx, pfx.String())
-		}
 
 		// this callback deletes unconditionally
 		cb := func(string, bool) (string, bool) { return "", true }
@@ -1011,9 +1010,6 @@ func TestTableModifyShuffled_Fast(t *testing.T) {
 
 		// insert
 		for _, pfx := range pfxs2 {
-			tbl2.Insert(pfx, pfx.String())
-		}
-		for _, pfx := range toDelete2 {
 			tbl2.Insert(pfx, pfx.String())
 		}
 
@@ -1046,16 +1042,13 @@ func TestTableModifyPersistShuffled_Fast(t *testing.T) {
 		all6 := randomRealWorldPrefixes6(prng, numPerFamily)
 
 		// pfxs toDelete should be non-overlapping sets
-		pfxs := slices.Concat(all4[:deleteCut], all6[:deleteCut])
+		pfxs := slices.Concat(all4, all6)
 		toDelete := slices.Concat(all4[deleteCut:], all6[deleteCut:])
 
 		tbl1 := new(Fast[string])
 
 		// insert
 		for _, pfx := range pfxs {
-			tbl1.Insert(pfx, pfx.String())
-		}
-		for _, pfx := range toDelete {
 			tbl1.Insert(pfx, pfx.String())
 		}
 
@@ -1075,9 +1068,6 @@ func TestTableModifyPersistShuffled_Fast(t *testing.T) {
 
 		// insert
 		for _, pfx := range pfxs2 {
-			tbl2.Insert(pfx, pfx.String())
-		}
-		for _, pfx := range toDelete2 {
 			tbl2.Insert(pfx, pfx.String())
 		}
 
