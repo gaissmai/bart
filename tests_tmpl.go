@@ -17,13 +17,22 @@ import (
 	"iter"
 	"math/rand/v2"
 	"net/netip"
+	"slices"
 	"testing"
+
+	"github.com/gaissmai/bart/internal/nodes"
 )
 
 type (
-	_NODE_TYPE[V any]  struct{}
-	_TABLE_TYPE[V any] struct{}
+	_NODE_TYPE[V any] struct{}
+
+	_TABLE_TYPE[V any] struct {
+		root4 _NODE_TYPE[V]
+		root6 _NODE_TYPE[V]
+	}
 )
+
+func (*_NODE_TYPE[V]) StatsRec() (_ nodes.StatsT) { return }
 
 func (*_TABLE_TYPE[V]) rootNodeByVersion(bool) (_ *_NODE_TYPE[V])                  { return }
 func (*_TABLE_TYPE[V]) sizeUpdate(bool, int)                                       { return }
@@ -75,6 +84,17 @@ func (*_TABLE_TYPE[V]) Supernets(netip.Prefix) (_ iter.Seq2[netip.Prefix, V]) { 
 // ### GENERATE DELETE END ###
 
 // ############ tests ################################
+
+// flatSorted, just a helper to compare with golden table.
+func (t *_TABLE_TYPE[V]) flatSorted() goldTable[V] {
+	var flat goldTable[V]
+
+	for p, v := range t.AllSorted() {
+		flat = append(flat, goldTableItem[V]{pfx: p, val: v})
+	}
+
+	return flat
+}
 
 func TestTableNil__TABLE_TYPE(t *testing.T) {
 	t.Parallel()
@@ -139,7 +159,6 @@ func TestTableNil__TABLE_TYPE(t *testing.T) {
 		noPanic(t, "Equal", func() { tbl1.Equal(tbl1) })
 		noPanic(t, "Equal", func() { tbl2.Equal(tbl2) })
 
-		noPanic(t, "dump", func() { tbl1.dump(nil) })
 		noPanic(t, "dump", func() { tbl1.dump(nil) })
 		noPanic(t, "dumpString", func() { tbl1.dumpString() })
 		noPanic(t, "Clone", func() { tbl1.Clone() })
@@ -268,8 +287,8 @@ func TestTableLookupCompare__TABLE_TYPE(t *testing.T) {
 			t.Fatalf("Lookup(%q) = (_, %v), want %v", a, tblOK, goldOK)
 		}
 
-		// liteTable has no real payload
-		if _, ok := any(tbl).(*liteTable[int]); !ok {
+		// Skip value comparison for liteTable (no real payload)
+		if _, isLite := any(tbl).(*liteTable[int]); !isLite {
 			if goldVal != tblVal {
 				t.Fatalf("Lookup(%q) = (%v, %v), want (%v, %v)", a, tblVal, tblOK, goldVal, goldOK)
 			}
@@ -360,8 +379,8 @@ func TestTableLookupPrefixCompare__TABLE_TYPE(t *testing.T) {
 			t.Fatalf("LookupPrefix(%q) = (_, %v), want (_, %v)", pfx, tblOK, goldOK)
 		}
 
-		// liteTable has no real payload
-		if _, ok := any(tbl).(*liteTable[int]); !ok {
+		// Skip value comparison for liteTable (no real payload)
+		if _, isLite := any(tbl).(*liteTable[int]); !isLite {
 			if goldVal != tblVal {
 				t.Fatalf("LookupPrefix(%q) = (%v, %v), want (%v, %v)", pfx, tblVal, tblOK, goldVal, goldOK)
 			}
@@ -400,11 +419,275 @@ func TestTableLookupPrefixLPMCompare__TABLE_TYPE(t *testing.T) {
 			t.Fatalf("LookupPrefixLPM(%q) = ( %v, _, _), want ( %v, _, _)", pfx, tblLPM, goldLPM)
 		}
 
-		// liteTable has no real payload
-		if _, ok := any(tbl).(*liteTable[int]); !ok {
+		// Skip value comparison for liteTable (no real payload)
+		if _, isLite := any(tbl).(*liteTable[int]); !isLite {
 			if goldVal != tblVal {
 				t.Fatalf("LookupPrefixLPM(%q) = (_, %v, _), want (_, %v, _)", pfx, tblVal, goldVal)
 			}
+		}
+	}
+}
+
+func TestTableInsertShuffled__TABLE_TYPE(t *testing.T) {
+	// The order in which you insert prefixes into a route table
+	// should not matter, as long as you're inserting the same set of
+	// routes.
+	t.Parallel()
+
+	n := workLoadN()
+
+	prng := rand.New(rand.NewPCG(42, 42))
+	pfxs := randomRealWorldPrefixes(prng, n)
+
+	for range 10 {
+		pfxs2 := slices.Clone(pfxs)
+		prng.Shuffle(len(pfxs2), func(i, j int) { pfxs2[i], pfxs2[j] = pfxs2[j], pfxs2[i] })
+
+		tbl1 := new(_TABLE_TYPE[string])
+		tbl2 := new(_TABLE_TYPE[string])
+
+		for _, pfx := range pfxs {
+			tbl1.Insert(pfx, pfx.String())
+			tbl1.Insert(pfx, pfx.String()) // idempotent
+		}
+		for _, pfx := range pfxs2 {
+			tbl2.Insert(pfx, pfx.String()) // idempotent
+		}
+
+		if tbl1.dumpString() != tbl2.dumpString() {
+			t.Fatal("tbl1 and tbl2 have different dumpString representation")
+		}
+		if !tbl1.Equal(tbl2) {
+			t.Fatal("expected Equal")
+		}
+	}
+}
+
+func TestTableInsertPersistShuffled__TABLE_TYPE(t *testing.T) {
+	// The order in which you insert prefixes into a route table
+	// should not matter, as long as you're inserting the same set of
+	// routes.
+	t.Parallel()
+
+	n := workLoadN()
+
+	prng := rand.New(rand.NewPCG(42, 42))
+	pfxs := randomRealWorldPrefixes(prng, n)
+
+	for range 10 {
+		pfxs2 := slices.Clone(pfxs)
+		prng.Shuffle(len(pfxs2), func(i, j int) { pfxs2[i], pfxs2[j] = pfxs2[j], pfxs2[i] })
+
+		tbl1 := new(_TABLE_TYPE[string])
+		tbl2 := new(_TABLE_TYPE[string])
+
+		// bart1 is mutable
+		for _, pfx := range pfxs {
+			tbl1.Insert(pfx, pfx.String())
+		}
+
+		// bart2 is persistent
+		for _, pfx := range pfxs2 {
+			tbl2 = tbl2.InsertPersist(pfx, pfx.String())
+		}
+
+		if tbl1.dumpString() != tbl2.dumpString() {
+			t.Fatal("mutable and immutable table have different dumpString representation")
+		}
+
+		if !tbl1.Equal(tbl2) {
+			t.Fatal("expected Equal")
+		}
+	}
+}
+
+func TestTableDeleteCompare__TABLE_TYPE(t *testing.T) {
+	// Create large route tables repeatedly, delete half of their
+	// prefixes, and compare Table's behavior to a naive and slow but
+	// correct implementation.
+	t.Parallel()
+
+	var (
+		n            = workLoadN()
+		prng         = rand.New(rand.NewPCG(42, 42))
+		numPrefixes  = n // total prefixes to insert (test deletes 50% of them)
+		numPerFamily = numPrefixes / 2
+		deleteCut    = numPerFamily / 2
+		probes       = 3
+	)
+
+	for range probes {
+		all4 := randomRealWorldPrefixes4(prng, numPerFamily)
+		all6 := randomRealWorldPrefixes6(prng, numPerFamily)
+
+		// pfxs toDelete should be non-overlapping sets
+		pfxs := slices.Concat(all4[:deleteCut], all6[:deleteCut])
+		toDelete := slices.Concat(all4[deleteCut:], all6[deleteCut:])
+
+		gold := new(goldTable[string])
+		tbl := new(_TABLE_TYPE[string])
+
+		for _, pfx := range pfxs {
+			gold.insert(pfx, pfx.String())
+			tbl.Insert(pfx, pfx.String())
+		}
+
+		for _, pfx := range toDelete {
+			gold.delete(pfx)
+			tbl.Delete(pfx)
+		}
+
+		gold.sort()
+
+		tblFlat := tbl.flatSorted()
+
+		// Skip value comparison for liteTable (no real payload)
+		if _, isLite := any(tbl).(*liteTable[string]); isLite {
+			if !slices.Equal(gold.allSorted(), tblFlat.allSorted()) {
+				t.Fatal("expected Equal")
+			}
+		} else {
+			if !slices.Equal(*gold, tblFlat) {
+				t.Fatal("expected Equal")
+			}
+		}
+	}
+}
+
+func TestTableDeleteShuffled__TABLE_TYPE(t *testing.T) {
+	// The order in which you delete prefixes from a route table
+	// should not matter, as long as you're deleting the same set of
+	// routes.
+	t.Parallel()
+
+	n := workLoadN()
+
+	prng := rand.New(rand.NewPCG(42, 42))
+
+	var (
+		numPrefixes  = n // prefixes to insert (test deletes 50% of them)
+		numPerFamily = numPrefixes / 2
+		deleteCut    = numPerFamily / 2
+	)
+
+	for range 10 {
+		all4 := randomRealWorldPrefixes4(prng, numPerFamily)
+		all6 := randomRealWorldPrefixes6(prng, numPerFamily)
+
+		// pfxs toDelete should be non-overlapping sets
+		pfxs := slices.Concat(all4[:deleteCut], all6[:deleteCut])
+		toDelete := slices.Concat(all4[deleteCut:], all6[deleteCut:])
+
+		tbl := new(_TABLE_TYPE[string])
+
+		// insert
+		for _, pfx := range pfxs {
+			tbl.Insert(pfx, pfx.String())
+		}
+		for _, pfx := range toDelete {
+			tbl.Insert(pfx, pfx.String())
+		}
+
+		// delete
+		for _, pfx := range toDelete {
+			tbl.Delete(pfx)
+		}
+
+		pfxs2 := slices.Clone(pfxs)
+		toDelete2 := slices.Clone(toDelete)
+		prng.Shuffle(len(toDelete2), func(i, j int) { toDelete2[i], toDelete2[j] = toDelete2[j], toDelete2[i] })
+
+		tbl2 := new(_TABLE_TYPE[string])
+
+		// insert
+		for _, pfx := range pfxs2 {
+			tbl2.Insert(pfx, pfx.String())
+		}
+		for _, pfx := range toDelete2 {
+			tbl2.Insert(pfx, pfx.String())
+		}
+
+		// delete
+		for _, pfx := range toDelete2 {
+			tbl2.Delete(pfx)
+		}
+
+		if !tbl.Equal(tbl2) {
+			t.Fatal("expect equal")
+		}
+	}
+}
+
+func TestTableDeleteIsReverseOfInsert__TABLE_TYPE(t *testing.T) {
+	t.Parallel()
+
+	n := workLoadN()
+
+	prng := rand.New(rand.NewPCG(42, 42))
+	// Insert n prefixes, then delete those same prefixes in reverse
+	// order. Each deletion should exactly undo the internal structure
+	// changes that each insert did.
+
+	tbl := new(_TABLE_TYPE[string])
+	want := tbl.dumpString()
+
+	prefixes := randomRealWorldPrefixes(prng, n)
+
+	defer func() {
+		if t.Failed() {
+			t.Logf("the prefixes that fail the test: %v\n", prefixes)
+		}
+	}()
+
+	for _, p := range prefixes {
+		tbl.Insert(p, p.String())
+	}
+
+	for i := len(prefixes) - 1; i >= 0; i-- {
+		tbl.Delete(prefixes[i])
+	}
+	if got := tbl.dumpString(); got != want {
+		t.Fatalf("after delete, mismatch:\n\n got: %s\n\nwant: %s", got, want)
+	}
+}
+
+func TestTableDeleteButOne__TABLE_TYPE(t *testing.T) {
+	t.Parallel()
+	prng := rand.New(rand.NewPCG(42, 42))
+	// Insert n prefixes, then delete all but one
+	n := workLoadN()
+
+	for range 10 {
+
+		tbl := new(_TABLE_TYPE[any])
+		prefixes := randomRealWorldPrefixes(prng, n)
+
+		for _, p := range prefixes {
+			tbl.Insert(p, nil)
+		}
+
+		// shuffle the prefixes
+		prng.Shuffle(n, func(i, j int) {
+			prefixes[i], prefixes[j] = prefixes[j], prefixes[i]
+		})
+
+		// skip the first
+		for i := 1; i < len(prefixes); i++ {
+			tbl.Delete(prefixes[i])
+		}
+
+		stats4 := tbl.root4.StatsRec()
+		stats6 := tbl.root6.StatsRec()
+
+		if nodes := stats4.SubNodes + stats6.SubNodes; nodes != 1 {
+			t.Fatalf("delete but one, want nodes: 1, got: %d\n%s", nodes, tbl.dumpString())
+		}
+
+		sum := stats4.Prefixes + stats4.Leaves + stats4.Fringes +
+			stats6.Prefixes + stats6.Leaves + stats6.Fringes
+
+		if sum != 1 {
+			t.Fatalf("delete but one, only one item must be left, but: %d\n%s", sum, tbl.dumpString())
 		}
 	}
 }
