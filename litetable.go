@@ -473,6 +473,42 @@ func (l *liteTable[V]) Contains(ip netip.Addr) bool {
 	return false
 }
 
+// Lookup is just a wrapper for Contains.
+func (l *liteTable[V]) Lookup(ip netip.Addr) (val V, exists bool) {
+	return val, l.Contains(ip)
+}
+
+// LookupPrefix performs a longest prefix match lookup for any address within
+// the given prefix. It finds the most specific routing table entry that would
+// match any address in the provided prefix range.
+//
+// This is functionally identical to LookupPrefixLPM but returns only the
+// associated value, not the matching prefix itself.
+//
+// Returns the zero value and true if a matching prefix is found.
+// Returns zero value and false if no match exists.
+func (l *liteTable[V]) LookupPrefix(pfx netip.Prefix) (val V, exists bool) {
+	_, exists = l.lookupPrefixLPM(pfx, false)
+	return
+}
+
+// LookupPrefixLPM performs a longest prefix match lookup for any address within
+// the given prefix. It finds the most specific routing table entry that would
+// match any address in the provided prefix range.
+//
+// This is functionally identical to LookupPrefix but additionally returns the
+// matching prefix (lpmPfx) itself along with the value.
+//
+// This method is slower than LookupPrefix and should only be used if the
+// matching lpm entry is also required for other reasons.
+//
+// Returns the matching prefix, the zero value, and true if found.
+// Returns zero values and false if no match exists.
+func (l *liteTable[V]) LookupPrefixLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, exists bool) {
+	lpm, exists = l.lookupPrefixLPM(pfx, true)
+	return
+}
+
 // lookupPrefixLPM performs a longest prefix match lookup for any address within
 // the given prefix. It finds the most specific routing table entry that would
 // match any address in the provided prefix range. Is withLPM is true, it also
