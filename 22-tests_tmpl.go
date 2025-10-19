@@ -977,7 +977,7 @@ func TestTableModifyPersistSemantics__TABLE_TYPE(t *testing.T) {
 		for pfx, wantVal := range tt.prepare {
 			val, ok := tbl.Get(pfx)
 			if !ok {
-				t.Errorf("[%s] original table: key %v should must be present", tt.name, pfx)
+				t.Errorf("[%s] original table: key %v should be present", tt.name, pfx)
 			}
 
 			if val != wantVal {

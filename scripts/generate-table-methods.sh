@@ -29,7 +29,7 @@ readonly TABLE_TYPES=("Table" "Fast" "liteTable")
 generated_files=()
 
 for tableType in "${TABLE_TYPES[@]}"; do
-    template_base="${template_file##*/}"            # basename: tablemethods_tmpl.go
+    template_base="${template_file##*-}"            # basename: tablemethods_tmpl.go
     type_prefix="${tableType,,}"                    # lowercase
     type_prefix="${type_prefix/#table/bart}"        # table     -> bart
     type_prefix="${type_prefix/#litetable/lite}"    # litetable -> lite

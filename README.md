@@ -117,7 +117,7 @@ func main() {
  | **IPv6 vs IPv4** | ~2× slower | ~2× slower | ~2× slower |
  | **Memory** | efficient | very efficient | inefficient |
 
-A more detailed description can be found in [NODETYPES.md](NODETYPES.md).
+A more detailed description can be found in [NODETYPES.md](docs/NODETYPES.md).
 
 ## When to Use Each Type
 
@@ -177,9 +177,9 @@ provides clear advantages for any routing daemon.
 But as always, it depends on the specific use case.
 
 See the concurrent tests for concrete examples of this pattern:
-- [ExampleLite](example_lite_concurrent_test.go)
-- [ExampleTable](example_table_concurrent_test.go)
-- [ExampleFast](example_fast_concurrent_test.go)
+- [ExampleFast](zz-example_fast_concurrent_test.go)
+- [ExampleLite](zz-example_lite_concurrent_test.go)
+- [ExampleTable](zz-example_table_concurrent_test.go)
 
 
 ## Additional Use Cases
@@ -264,7 +264,7 @@ Just a teaser, `Fast.Lookup` against the Tier1 full
 Internet routing table with random IP address probes:
 
 ```text
-$ GOAMD64=v3 go test -run=xxx -bench=FastFullM/Lookup$ -cpu=1
+$ GOAMD64=v3 go test -run=xxx -bench=FullFastM/Lookup$ -cpu=1
 goos: linux
 goarch: amd64
 pkg: github.com/gaissmai/bart

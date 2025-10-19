@@ -30,7 +30,7 @@ generated_files=()
 
 for nodeType in "${NODE_TYPES[@]}"; do
     # Build output filename, e.g. bartmethodsgenerated.go
-    template_base="${template_file##*/}"                          # basename: nodemethods_tmpl.go
+    template_base="${template_file##*-}"                          # basename: nodemethods_tmpl.go
     type_prefix="${nodeType,,}"                                   # bartnode
     type_prefix="${type_prefix/node/}"                            # bart
     base_mangled="${template_base/_tmpl/generated}"               # nodemethodsgenerated.go
