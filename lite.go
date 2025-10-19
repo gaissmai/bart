@@ -459,7 +459,7 @@ func (l *Lite) MarshalJSON() ([]byte, error) {
 // just a wrapper for [liteTable.Fprint].
 func (l *Lite) MarshalText() ([]byte, error) {
 	if l == nil {
-		return nil, nil
+		return []byte{}, nil
 	}
 	return l.liteTable.MarshalText()
 }
@@ -540,6 +540,8 @@ func (l *liteTable[V]) Contains(ip netip.Addr) bool {
 }
 
 // Lookup is just a wrapper for Contains.
+// Returns the zero value V and true if a prefix matches ip, otherwise zero value and false.
+// This method exists to provide a consistent interface for code generation.
 func (l *liteTable[V]) Lookup(ip netip.Addr) (val V, exists bool) {
 	return val, l.Contains(ip)
 }
