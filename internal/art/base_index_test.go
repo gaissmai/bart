@@ -110,6 +110,28 @@ func TestPfxToIdx(t *testing.T) {
 	}
 }
 
+func TestPfxToIdx_PanicOnInvalidInput(t *testing.T) {
+	t.Parallel()
+	defer func() {
+		if recover() == nil {
+			t.Fatal("must panic")
+			t.Errorf("PfxToIdx(0, 8) should have panicked")
+		}
+	}()
+	PfxToIdx(0, 8)
+}
+
+func TestIdxToPfx_PanicOnInvalidInput(t *testing.T) {
+	t.Parallel()
+	defer func() {
+		if recover() == nil {
+			t.Fatal("must panic")
+			t.Errorf("IdxToPfx(0) should have panicked")
+		}
+	}()
+	IdxToPfx(0)
+}
+
 func TestIdxToPfx(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
