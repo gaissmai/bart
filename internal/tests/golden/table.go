@@ -10,20 +10,20 @@ import (
 	"slices"
 )
 
-// GoldTable is a simple and slow route table, implemented as a slice of prefixes
+// Table is a simple and slow route table, implemented as a slice of prefixes
 // and values as a golden reference for bart.
-type GoldTable[V any] []GoldTableItem[V]
+type Table[V any] []TableItem[V]
 
-type GoldTableItem[V any] struct {
+type TableItem[V any] struct {
 	Pfx netip.Prefix
 	Val V
 }
 
-func (g GoldTableItem[V]) String() string {
+func (g TableItem[V]) String() string {
 	return fmt.Sprintf("(%s, %v)", g.Pfx, g.Val)
 }
 
-func (t *GoldTable[V]) Insert(pfx netip.Prefix, val V) {
+func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	pfx = pfx.Masked()
 	for i, item := range *t {
 		if item.Pfx == pfx {
@@ -31,10 +31,10 @@ func (t *GoldTable[V]) Insert(pfx netip.Prefix, val V) {
 			return
 		}
 	}
-	*t = append(*t, GoldTableItem[V]{pfx, val})
+	*t = append(*t, TableItem[V]{pfx, val})
 }
 
-func (t *GoldTable[V]) Delete(pfx netip.Prefix) (exists bool) {
+func (t *Table[V]) Delete(pfx netip.Prefix) (exists bool) {
 	pfx = pfx.Masked()
 
 	for i, item := range *t {
@@ -46,17 +46,17 @@ func (t *GoldTable[V]) Delete(pfx netip.Prefix) (exists bool) {
 	return false
 }
 
-func (t GoldTable[V]) AllSorted() []netip.Prefix {
+func (t Table[V]) AllSorted() []netip.Prefix {
 	var result []netip.Prefix
 
 	for _, item := range t {
 		result = append(result, item.Pfx)
 	}
-	slices.SortFunc(result, CmpPrefix)
+	slices.SortFunc(result, cmpPrefix)
 	return result
 }
 
-func (t GoldTable[V]) Get(pfx netip.Prefix) (val V, ok bool) {
+func (t Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 	pfx = pfx.Masked()
 	for _, item := range t {
 		if item.Pfx == pfx {
@@ -66,7 +66,7 @@ func (t GoldTable[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 	return val, false
 }
 
-func (t *GoldTable[V]) Update(pfx netip.Prefix, cb func(V, bool) V) (val V) {
+func (t *Table[V]) Update(pfx netip.Prefix, cb func(V, bool) V) (val V) {
 	pfx = pfx.Masked()
 	for i, item := range *t {
 		if item.Pfx == pfx {
@@ -79,11 +79,11 @@ func (t *GoldTable[V]) Update(pfx netip.Prefix, cb func(V, bool) V) (val V) {
 	// new val
 	val = cb(val, false)
 
-	*t = append(*t, GoldTableItem[V]{pfx, val})
+	*t = append(*t, TableItem[V]{pfx, val})
 	return val
 }
 
-func (ta *GoldTable[V]) Union(tb *GoldTable[V]) {
+func (ta *Table[V]) Union(tb *Table[V]) {
 	for _, bItem := range *tb {
 		var match bool
 		for i, aItem := range *ta {
@@ -99,7 +99,7 @@ func (ta *GoldTable[V]) Union(tb *GoldTable[V]) {
 	}
 }
 
-func (t GoldTable[V]) Lookup(addr netip.Addr) (val V, ok bool) {
+func (t Table[V]) Lookup(addr netip.Addr) (val V, ok bool) {
 	bestLen := -1
 
 	for _, item := range t {
@@ -112,7 +112,7 @@ func (t GoldTable[V]) Lookup(addr netip.Addr) (val V, ok bool) {
 	return val, ok
 }
 
-func (t GoldTable[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
+func (t Table[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
 	pfx = pfx.Masked()
 	bestLen := -1
 
@@ -126,7 +126,7 @@ func (t GoldTable[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
 	return val, ok
 }
 
-func (t GoldTable[V]) LookupPrefixLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) {
+func (t Table[V]) LookupPrefixLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) {
 	pfx = pfx.Masked()
 	bestLen := -1
 
@@ -141,7 +141,7 @@ func (t GoldTable[V]) LookupPrefixLPM(pfx netip.Prefix) (lpm netip.Prefix, val V
 	return lpm, val, ok
 }
 
-func (t GoldTable[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
+func (t Table[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 	pfx = pfx.Masked()
 	var result []netip.Prefix
 
@@ -150,11 +150,11 @@ func (t GoldTable[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 			result = append(result, item.Pfx)
 		}
 	}
-	slices.SortFunc(result, CmpPrefix)
+	slices.SortFunc(result, cmpPrefix)
 	return result
 }
 
-func (t GoldTable[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
+func (t Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 	pfx = pfx.Masked()
 	var result []netip.Prefix
 
@@ -163,12 +163,12 @@ func (t GoldTable[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 			result = append(result, item.Pfx)
 		}
 	}
-	slices.SortFunc(result, CmpPrefix)
+	slices.SortFunc(result, cmpPrefix)
 	slices.Reverse(result)
 	return result
 }
 
-func (t GoldTable[V]) OverlapsPrefix(pfx netip.Prefix) bool {
+func (t Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 	pfx = pfx.Masked()
 	for _, p := range t {
 		if p.Pfx.Overlaps(pfx) {
@@ -178,7 +178,7 @@ func (t GoldTable[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 	return false
 }
 
-func (ta *GoldTable[V]) Overlaps(tb *GoldTable[V]) bool {
+func (ta *Table[V]) Overlaps(tb *Table[V]) bool {
 	for _, aItem := range *ta {
 		for _, bItem := range *tb {
 			if aItem.Pfx.Overlaps(bItem.Pfx) {
@@ -190,15 +190,15 @@ func (ta *GoldTable[V]) Overlaps(tb *GoldTable[V]) bool {
 }
 
 // Sort, inplace by netip.Prefix, all prefixes are in normalized form
-func (t *GoldTable[V]) Sort() {
-	slices.SortFunc(*t, func(a, b GoldTableItem[V]) int {
-		return CmpPrefix(a.Pfx, b.Pfx)
+func (t *Table[V]) Sort() {
+	slices.SortFunc(*t, func(a, b TableItem[V]) int {
+		return cmpPrefix(a.Pfx, b.Pfx)
 	})
 }
 
-// CmpPrefix, helper function, compare func for prefix sort,
+// cmpPrefix, helper function, compare func for prefix sort,
 // all cidrs are already normalized
-func CmpPrefix(a, b netip.Prefix) int {
+func cmpPrefix(a, b netip.Prefix) int {
 	if cmpAddr := a.Addr().Compare(b.Addr()); cmpAddr != 0 {
 		return cmpAddr
 	}
