@@ -8,147 +8,21 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/gaissmai/bart/internal/golden"
 	"github.com/gaissmai/bart/internal/nodes"
+	"github.com/gaissmai/bart/internal/tests/random"
 )
 
 // roundFloat64 to 2 decimal places
 func roundFloat64(f float64) float64 { return math.Round(f*100) / 100 }
 
-func BenchmarkBartMatch4(b *testing.B) {
-	bart := new(Table[struct{}])
-
-	for _, route := range routes {
-		bart.Insert(route.CIDR, struct{}{})
-	}
-
-	b.Run("Contains", func(b *testing.B) {
-		for b.Loop() {
-			bart.Contains(matchIP4)
-		}
-	})
-
-	b.Run("Lookup", func(b *testing.B) {
-		for b.Loop() {
-			bart.Lookup(matchIP4)
-		}
-	})
-
-	b.Run("LookupPrefix", func(b *testing.B) {
-		for b.Loop() {
-			bart.LookupPrefix(matchPfx4)
-		}
-	})
-
-	b.Run("LookupPfxLPM", func(b *testing.B) {
-		for b.Loop() {
-			bart.LookupPrefixLPM(matchPfx4)
-		}
-	})
-}
-
-func BenchmarkBartMatch6(b *testing.B) {
-	bart := new(Table[struct{}])
-
-	for _, route := range routes {
-		bart.Insert(route.CIDR, struct{}{})
-	}
-
-	b.Run("Contains", func(b *testing.B) {
-		for b.Loop() {
-			bart.Contains(matchIP6)
-		}
-	})
-
-	b.Run("Lookup", func(b *testing.B) {
-		for b.Loop() {
-			bart.Lookup(matchIP6)
-		}
-	})
-
-	b.Run("LookupPrefix", func(b *testing.B) {
-		for b.Loop() {
-			bart.LookupPrefix(matchPfx6)
-		}
-	})
-
-	b.Run("LookupPfxLPM", func(b *testing.B) {
-		for b.Loop() {
-			bart.LookupPrefixLPM(matchPfx6)
-		}
-	})
-}
-
-func BenchmarkBartMiss4(b *testing.B) {
-	bart := new(Table[int])
-
-	for i, route := range routes {
-		bart.Insert(route.CIDR, i)
-	}
-
-	b.Run("Contains", func(b *testing.B) {
-		for b.Loop() {
-			bart.Contains(missIP4)
-		}
-	})
-
-	b.Run("Lookup", func(b *testing.B) {
-		for b.Loop() {
-			bart.Lookup(missIP4)
-		}
-	})
-
-	b.Run("LookupPrefix", func(b *testing.B) {
-		for b.Loop() {
-			bart.LookupPrefix(missPfx4)
-		}
-	})
-
-	b.Run("LookupPfxLPM", func(b *testing.B) {
-		for b.Loop() {
-			bart.LookupPrefixLPM(missPfx4)
-		}
-	})
-}
-
-func BenchmarkBartMiss6(b *testing.B) {
-	bart := new(Table[int])
-
-	for i, route := range routes {
-		bart.Insert(route.CIDR, i)
-	}
-
-	b.Run("Contains", func(b *testing.B) {
-		for b.Loop() {
-			bart.Contains(missIP6)
-		}
-	})
-
-	b.Run("Lookup", func(b *testing.B) {
-		for b.Loop() {
-			bart.Lookup(missIP6)
-		}
-	})
-
-	b.Run("LookupPrefix", func(b *testing.B) {
-		for b.Loop() {
-			bart.LookupPrefix(missPfx6)
-		}
-	})
-
-	b.Run("LookupPfxLPM", func(b *testing.B) {
-		for b.Loop() {
-			bart.LookupPrefixLPM(missPfx6)
-		}
-	})
-}
-
-func BenchmarkFastMatch4(b *testing.B) {
+func BenchmarkFullFastMatch4(b *testing.B) {
 	fast := new(Fast[struct{}])
-
-	for _, route := range routes {
-		fast.Insert(route.CIDR, struct{}{})
+	for _, pfx := range tier1.routes4() {
+		fast.Insert(pfx, struct{}{})
 	}
+
+	matchIP4 := tier1.matchIP4()
+	matchPfx4 := tier1.matchPfx4()
 
 	b.Run("Contains", func(b *testing.B) {
 		for b.Loop() {
@@ -175,12 +49,14 @@ func BenchmarkFastMatch4(b *testing.B) {
 	})
 }
 
-func BenchmarkFastMatch6(b *testing.B) {
+func BenchmarkFullFastMatch6(b *testing.B) {
 	fast := new(Fast[struct{}])
-
-	for _, route := range routes {
-		fast.Insert(route.CIDR, struct{}{})
+	for _, pfx := range tier1.routes6() {
+		fast.Insert(pfx, struct{}{})
 	}
+
+	matchIP6 := tier1.matchIP6()
+	matchPfx6 := tier1.matchPfx6()
 
 	b.Run("Contains", func(b *testing.B) {
 		for b.Loop() {
@@ -207,12 +83,14 @@ func BenchmarkFastMatch6(b *testing.B) {
 	})
 }
 
-func BenchmarkFastMiss4(b *testing.B) {
-	fast := new(Fast[int])
-
-	for i, route := range routes {
-		fast.Insert(route.CIDR, i)
+func BenchmarkFullFastMiss4(b *testing.B) {
+	fast := new(Fast[struct{}])
+	for _, pfx := range tier1.routes4() {
+		fast.Insert(pfx, struct{}{})
 	}
+
+	missIP4 := tier1.missIP4()
+	missPfx4 := tier1.missPfx4()
 
 	b.Run("Contains", func(b *testing.B) {
 		for b.Loop() {
@@ -239,12 +117,14 @@ func BenchmarkFastMiss4(b *testing.B) {
 	})
 }
 
-func BenchmarkFastMiss6(b *testing.B) {
-	fast := new(Fast[int])
-
-	for i, route := range routes {
-		fast.Insert(route.CIDR, i)
+func BenchmarkFullFastMiss6(b *testing.B) {
+	fast := new(Fast[struct{}])
+	for _, pfx := range tier1.routes6() {
+		fast.Insert(pfx, struct{}{})
 	}
+
+	missIP6 := tier1.missIP6()
+	missPfx6 := tier1.missPfx6()
 
 	b.Run("Contains", func(b *testing.B) {
 		for b.Loop() {
@@ -271,17 +151,153 @@ func BenchmarkFastMiss6(b *testing.B) {
 	})
 }
 
+func BenchmarkFullBartMatch4(b *testing.B) {
+	bart := new(Table[struct{}])
+	for _, pfx := range tier1.routes4() {
+		bart.Insert(pfx, struct{}{})
+	}
+
+	matchIP4 := tier1.matchIP4()
+	matchPfx4 := tier1.matchPfx4()
+
+	b.Run("Contains", func(b *testing.B) {
+		for b.Loop() {
+			bart.Contains(matchIP4)
+		}
+	})
+
+	b.Run("Lookup", func(b *testing.B) {
+		for b.Loop() {
+			bart.Lookup(matchIP4)
+		}
+	})
+
+	b.Run("LookupPrefix", func(b *testing.B) {
+		for b.Loop() {
+			bart.LookupPrefix(matchPfx4)
+		}
+	})
+
+	b.Run("LookupPfxLPM", func(b *testing.B) {
+		for b.Loop() {
+			bart.LookupPrefixLPM(matchPfx4)
+		}
+	})
+}
+
+func BenchmarkFullBartMatch6(b *testing.B) {
+	bart := new(Table[struct{}])
+	for _, pfx := range tier1.routes6() {
+		bart.Insert(pfx, struct{}{})
+	}
+
+	matchIP6 := tier1.matchIP6()
+	matchPfx6 := tier1.matchPfx6()
+
+	b.Run("Contains", func(b *testing.B) {
+		for b.Loop() {
+			bart.Contains(matchIP6)
+		}
+	})
+
+	b.Run("Lookup", func(b *testing.B) {
+		for b.Loop() {
+			bart.Lookup(matchIP6)
+		}
+	})
+
+	b.Run("LookupPrefix", func(b *testing.B) {
+		for b.Loop() {
+			bart.LookupPrefix(matchPfx6)
+		}
+	})
+
+	b.Run("LookupPfxLPM", func(b *testing.B) {
+		for b.Loop() {
+			bart.LookupPrefixLPM(matchPfx6)
+		}
+	})
+}
+
+func BenchmarkFullBartMiss4(b *testing.B) {
+	bart := new(Table[struct{}])
+	for _, pfx := range tier1.routes4() {
+		bart.Insert(pfx, struct{}{})
+	}
+
+	missIP4 := tier1.missIP4()
+	missPfx4 := tier1.missPfx4()
+
+	b.Run("Contains", func(b *testing.B) {
+		for b.Loop() {
+			bart.Contains(missIP4)
+		}
+	})
+
+	b.Run("Lookup", func(b *testing.B) {
+		for b.Loop() {
+			bart.Lookup(missIP4)
+		}
+	})
+
+	b.Run("LookupPrefix", func(b *testing.B) {
+		for b.Loop() {
+			bart.LookupPrefix(missPfx4)
+		}
+	})
+
+	b.Run("LookupPfxLPM", func(b *testing.B) {
+		for b.Loop() {
+			bart.LookupPrefixLPM(missPfx4)
+		}
+	})
+}
+
+func BenchmarkFullBartMiss6(b *testing.B) {
+	bart := new(Table[struct{}])
+	for _, pfx := range tier1.routes6() {
+		bart.Insert(pfx, struct{}{})
+	}
+
+	missIP6 := tier1.missIP6()
+	missPfx6 := tier1.missPfx6()
+
+	b.Run("Contains", func(b *testing.B) {
+		for b.Loop() {
+			bart.Contains(missIP6)
+		}
+	})
+
+	b.Run("Lookup", func(b *testing.B) {
+		for b.Loop() {
+			bart.Lookup(missIP6)
+		}
+	})
+
+	b.Run("LookupPrefix", func(b *testing.B) {
+		for b.Loop() {
+			bart.LookupPrefix(missPfx6)
+		}
+	})
+
+	b.Run("LookupPfxLPM", func(b *testing.B) {
+		for b.Loop() {
+			bart.LookupPrefixLPM(missPfx6)
+		}
+	})
+}
+
 func BenchmarkBartOverlaps4(b *testing.B) {
 	lt := new(Lite)
 
-	for _, route := range routes4 {
-		lt.Insert(route.CIDR)
+	for _, route := range tier1.routes4() {
+		lt.Insert(route)
 	}
 
 	for i := 1; i <= 1<<20; i *= 2 {
 		prng := rand.New(rand.NewPCG(42, 42))
 		lt2 := new(Lite)
-		for _, pfx := range golden.RandomRealWorldPrefixes4(prng, i) {
+		for _, pfx := range random.RealWorldPrefixes4(prng, i) {
 			lt2.Insert(pfx)
 		}
 
@@ -296,14 +312,14 @@ func BenchmarkBartOverlaps4(b *testing.B) {
 func BenchmarkBartOverlaps6(b *testing.B) {
 	lt := new(Lite)
 
-	for _, route := range routes6 {
-		lt.Insert(route.CIDR)
+	for _, route := range tier1.routes6() {
+		lt.Insert(route)
 	}
 
 	for i := 1; i <= 1<<20; i *= 2 {
 		prng := rand.New(rand.NewPCG(42, 42))
 		lt2 := new(Lite)
-		for _, pfx := range golden.RandomRealWorldPrefixes6(prng, i) {
+		for _, pfx := range random.RealWorldPrefixes6(prng, i) {
 			lt2.Insert(pfx)
 		}
 
@@ -322,9 +338,9 @@ func BenchmarkBartMemory4(b *testing.B) {
 	runtime.GC()
 	runtime.ReadMemStats(&startMem)
 
-	b.Run(fmt.Sprintf("Table[]: %d", len(routes4)), func(b *testing.B) {
-		for _, route := range routes4 {
-			bart.Insert(route.CIDR, struct{}{})
+	b.Run(fmt.Sprintf("Table[]: %d", len(tier1.routes4())), func(b *testing.B) {
+		for _, route := range tier1.routes4() {
+			bart.Insert(route, struct{}{})
 		}
 
 		runtime.GC()
@@ -353,9 +369,9 @@ func BenchmarkBartMemory6(b *testing.B) {
 	runtime.GC()
 	runtime.ReadMemStats(&startMem)
 
-	b.Run(fmt.Sprintf("Table[]: %d", len(routes6)), func(b *testing.B) {
-		for _, route := range routes6 {
-			bart.Insert(route.CIDR, struct{}{})
+	b.Run(fmt.Sprintf("Table[]: %d", len(tier1.routes6())), func(b *testing.B) {
+		for _, route := range tier1.routes6() {
+			bart.Insert(route, struct{}{})
 		}
 
 		runtime.GC()
@@ -384,9 +400,9 @@ func BenchmarkBartMemory(b *testing.B) {
 	runtime.GC()
 	runtime.ReadMemStats(&startMem)
 
-	b.Run(fmt.Sprintf("Table[]: %d", len(routes)), func(b *testing.B) {
-		for _, route := range routes {
-			bart.Insert(route.CIDR, struct{}{})
+	b.Run(fmt.Sprintf("Table[]: %d", len(tier1.routes())), func(b *testing.B) {
+		for _, route := range tier1.routes() {
+			bart.Insert(route, struct{}{})
 		}
 
 		runtime.GC()

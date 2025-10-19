@@ -257,31 +257,22 @@ func (t *Table[V]) DumpList6() []DumpListNode[V]
 
 ## Benchmarks
 
-Please see the extensive [benchmarks](https://github.com/gaissmai/iprbench) comparing `bart` with other IP routing table implementations.
+Please see the extensive [benchmarks](https://github.com/gaissmai/iprbench)
+comparing `bart` with other IP routing table implementations.
 
-Just a teaser, `Fast.Contains` and `Fast.Lookup` against the Tier1 full
+Just a teaser, `Fast.Lookup` against the Tier1 full
 Internet routing table with random IP address probes:
 
 ```text
-$ GOAMD64=v3 go test -run=xxx -bench=FastFullM/Contains$ -cpu=1
-goos: linux
-goarch: amd64
-pkg: github.com/gaissmai/bart
-cpu: Intel(R) Core(TM) i5-8250U CPU @ 1.60GHz
-BenchmarkFastFullMatch4/Contains         197461012         6.10 ns/op
-BenchmarkFastFullMatch6/Contains         147105548         8.15 ns/op
-BenchmarkFastFullMiss4/Contains          145924266         8.20 ns/op
-BenchmarkFastFullMiss6/Contains          180898081         6.61 ns/op
-
 $ GOAMD64=v3 go test -run=xxx -bench=FastFullM/Lookup$ -cpu=1
 goos: linux
 goarch: amd64
 pkg: github.com/gaissmai/bart
 cpu: Intel(R) Core(TM) i5-8250U CPU @ 1.60GHz
-BenchmarkFastFullMatch4/Lookup           100000000        10.48 ns/op
-BenchmarkFastFullMatch6/Lookup           93258969         12.91 ns/op
-BenchmarkFastFullMiss4/Lookup            121576359         9.87 ns/op
-BenchmarkFastFullMiss6/Lookup            152891322         7.86 ns/op
+BenchmarkFullFastMatch4/Lookup           124476082          9.63 ns/op
+BenchmarkFullFastMatch6/Lookup           91032597          13.20 ns/op
+BenchmarkFullFastMiss4/Lookup            134171480          8.93 ns/op
+BenchmarkFullFastMiss6/Lookup            75634396          15.79 ns/op
 ```
 
 ## Compatibility Guarantees

@@ -1,7 +1,7 @@
 // Copyright (c) 2025 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
-package golden
+package random
 
 import (
 	"fmt"
@@ -9,6 +9,8 @@ import (
 	"net/netip"
 )
 
+// mpp is a abbreviation and panics on non masked prefixes.
+//
 //nolint:gochecknoglobals
 var mpp = func(s string) netip.Prefix {
 	pfx := netip.MustParsePrefix(s)
@@ -18,25 +20,25 @@ var mpp = func(s string) netip.Prefix {
 	panic(fmt.Sprintf("%s is not canonicalized as %s", s, pfx.Masked()))
 }
 
-// RandomPrefix returns a randomly generated prefix
-func RandomPrefix(prng *rand.Rand) netip.Prefix {
+// Prefix returns a randomly generated prefix
+func Prefix(prng *rand.Rand) netip.Prefix {
 	if prng.IntN(2) == 1 {
-		return RandomPrefix4(prng)
+		return Prefix4(prng)
 	}
-	return RandomPrefix6(prng)
+	return Prefix6(prng)
 }
 
-func RandomPrefix4(prng *rand.Rand) netip.Prefix {
+func Prefix4(prng *rand.Rand) netip.Prefix {
 	bits := prng.IntN(33)
-	return netip.PrefixFrom(RandomIP4(prng), bits).Masked()
+	return netip.PrefixFrom(IP4(prng), bits).Masked()
 }
 
-func RandomPrefix6(prng *rand.Rand) netip.Prefix {
+func Prefix6(prng *rand.Rand) netip.Prefix {
 	bits := prng.IntN(129)
-	return netip.PrefixFrom(RandomIP6(prng), bits).Masked()
+	return netip.PrefixFrom(IP6(prng), bits).Masked()
 }
 
-func RandomIP4(prng *rand.Rand) netip.Addr {
+func IP4(prng *rand.Rand) netip.Addr {
 	var b [4]byte
 	for i := range b {
 		b[i] = byte(prng.UintN(256))
@@ -44,7 +46,7 @@ func RandomIP4(prng *rand.Rand) netip.Addr {
 	return netip.AddrFrom4(b)
 }
 
-func RandomIP6(prng *rand.Rand) netip.Addr {
+func IP6(prng *rand.Rand) netip.Addr {
 	var b [16]byte
 	for i := range b {
 		b[i] = byte(prng.UintN(256))
@@ -52,19 +54,19 @@ func RandomIP6(prng *rand.Rand) netip.Addr {
 	return netip.AddrFrom16(b)
 }
 
-func RandomAddr(prng *rand.Rand) netip.Addr {
+func IP(prng *rand.Rand) netip.Addr {
 	if prng.IntN(2) == 1 {
-		return RandomIP4(prng)
+		return IP4(prng)
 	}
-	return RandomIP6(prng)
+	return IP6(prng)
 }
 
-func RandomRealWorldPrefixes4(prng *rand.Rand, n int) []netip.Prefix {
+func RealWorldPrefixes4(prng *rand.Rand, n int) []netip.Prefix {
 	set := make(map[netip.Prefix]struct{})
 	pfxs := make([]netip.Prefix, 0, n)
 
 	for len(set) < n {
-		pfx := RandomPrefix4(prng)
+		pfx := Prefix4(prng)
 
 		// skip too small or too big masks
 		if pfx.Bits() < 8 || pfx.Bits() > 28 {
@@ -84,12 +86,12 @@ func RandomRealWorldPrefixes4(prng *rand.Rand, n int) []netip.Prefix {
 	return pfxs
 }
 
-func RandomRealWorldPrefixes6(prng *rand.Rand, n int) []netip.Prefix {
+func RealWorldPrefixes6(prng *rand.Rand, n int) []netip.Prefix {
 	set := make(map[netip.Prefix]struct{})
 	pfxs := make([]netip.Prefix, 0, n)
 
 	for len(set) < n {
-		pfx := RandomPrefix6(prng)
+		pfx := Prefix6(prng)
 
 		// skip too small or too big masks
 		if pfx.Bits() < 16 || pfx.Bits() > 56 {
@@ -112,10 +114,10 @@ func RandomRealWorldPrefixes6(prng *rand.Rand, n int) []netip.Prefix {
 	return pfxs
 }
 
-func RandomRealWorldPrefixes(prng *rand.Rand, n int) []netip.Prefix {
+func RealWorldPrefixes(prng *rand.Rand, n int) []netip.Prefix {
 	pfxs := make([]netip.Prefix, 0, n)
-	pfxs = append(pfxs, RandomRealWorldPrefixes4(prng, n/2)...)
-	pfxs = append(pfxs, RandomRealWorldPrefixes6(prng, n-len(pfxs))...)
+	pfxs = append(pfxs, RealWorldPrefixes4(prng, n/2)...)
+	pfxs = append(pfxs, RealWorldPrefixes6(prng, n-len(pfxs))...)
 
 	prng.Shuffle(len(pfxs), func(i, j int) {
 		pfxs[i], pfxs[j] = pfxs[j], pfxs[i]

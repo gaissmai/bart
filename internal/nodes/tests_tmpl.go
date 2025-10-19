@@ -21,7 +21,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gaissmai/bart/internal/golden"
+	"github.com/gaissmai/bart/internal/tests/golden"
+	"github.com/gaissmai/bart/internal/tests/random"
 )
 
 type _NODE_TYPE[V any] struct{}
@@ -373,7 +374,7 @@ func TestAllIterators_NODE_TYPE(t *testing.T) {
 	prng := rand.New(rand.NewPCG(42, 42))
 
 	for range 10 {
-		pfxs := golden.RandomRealWorldPrefixes4(prng, n)
+		pfxs := random.RealWorldPrefixes4(prng, n)
 
 		node := new(_NODE_TYPE[int])
 		for _, p := range pfxs {
@@ -422,10 +423,10 @@ func TestSupernets4_NODE_TYPE(t *testing.T) {
 	prng := rand.New(rand.NewPCG(42, 42))
 
 	for range 10 {
-		pfxs := golden.RandomRealWorldPrefixes4(prng, n)
+		pfxs := random.RealWorldPrefixes4(prng, n)
 
 		node := new(_NODE_TYPE[int])
-		gold := new(golden.GoldTable[int])
+		gold := new(golden.Table[int])
 
 		for i, pfx := range pfxs {
 			node.Insert(pfx, i, 0)
@@ -455,10 +456,10 @@ func TestSupernets6_NODE_TYPE(t *testing.T) {
 	prng := rand.New(rand.NewPCG(42, 42))
 
 	for range 10 {
-		pfxs := golden.RandomRealWorldPrefixes6(prng, n)
+		pfxs := random.RealWorldPrefixes6(prng, n)
 
 		node := new(_NODE_TYPE[int])
-		gold := new(golden.GoldTable[int])
+		gold := new(golden.Table[int])
 
 		for i, pfx := range pfxs {
 			node.Insert(pfx, i, 0)
@@ -488,10 +489,10 @@ func TestSubnets4_NODE_TYPE(t *testing.T) {
 	prng := rand.New(rand.NewPCG(42, 42))
 
 	for range 10 {
-		pfxs := golden.RandomRealWorldPrefixes4(prng, n)
+		pfxs := random.RealWorldPrefixes4(prng, n)
 
 		node := new(_NODE_TYPE[int])
-		gold := new(golden.GoldTable[int])
+		gold := new(golden.Table[int])
 
 		for i, pfx := range pfxs {
 			node.Insert(pfx, i, 0)
@@ -562,10 +563,10 @@ func TestSubnets6_NODE_TYPE(t *testing.T) {
 	prng := rand.New(rand.NewPCG(42, 42))
 
 	for range 10 {
-		pfxs := golden.RandomRealWorldPrefixes6(prng, n)
+		pfxs := random.RealWorldPrefixes6(prng, n)
 
 		node := new(_NODE_TYPE[int])
-		gold := new(golden.GoldTable[int])
+		gold := new(golden.Table[int])
 
 		for i, pfx := range pfxs {
 			node.Insert(pfx, i, 0)

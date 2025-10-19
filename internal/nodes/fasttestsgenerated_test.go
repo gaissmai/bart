@@ -13,7 +13,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gaissmai/bart/internal/golden"
+	"github.com/gaissmai/bart/internal/tests/golden"
+	"github.com/gaissmai/bart/internal/tests/random"
 )
 
 // helpers
@@ -347,7 +348,7 @@ func TestAllIteratorsFastNode(t *testing.T) {
 	prng := rand.New(rand.NewPCG(42, 42))
 
 	for range 10 {
-		pfxs := golden.RandomRealWorldPrefixes4(prng, n)
+		pfxs := random.RealWorldPrefixes4(prng, n)
 
 		node := new(FastNode[int])
 		for _, p := range pfxs {
@@ -396,10 +397,10 @@ func TestSupernets4FastNode(t *testing.T) {
 	prng := rand.New(rand.NewPCG(42, 42))
 
 	for range 10 {
-		pfxs := golden.RandomRealWorldPrefixes4(prng, n)
+		pfxs := random.RealWorldPrefixes4(prng, n)
 
 		node := new(FastNode[int])
-		gold := new(golden.GoldTable[int])
+		gold := new(golden.Table[int])
 
 		for i, pfx := range pfxs {
 			node.Insert(pfx, i, 0)
@@ -429,10 +430,10 @@ func TestSupernets6FastNode(t *testing.T) {
 	prng := rand.New(rand.NewPCG(42, 42))
 
 	for range 10 {
-		pfxs := golden.RandomRealWorldPrefixes6(prng, n)
+		pfxs := random.RealWorldPrefixes6(prng, n)
 
 		node := new(FastNode[int])
-		gold := new(golden.GoldTable[int])
+		gold := new(golden.Table[int])
 
 		for i, pfx := range pfxs {
 			node.Insert(pfx, i, 0)
@@ -462,10 +463,10 @@ func TestSubnets4FastNode(t *testing.T) {
 	prng := rand.New(rand.NewPCG(42, 42))
 
 	for range 10 {
-		pfxs := golden.RandomRealWorldPrefixes4(prng, n)
+		pfxs := random.RealWorldPrefixes4(prng, n)
 
 		node := new(FastNode[int])
-		gold := new(golden.GoldTable[int])
+		gold := new(golden.Table[int])
 
 		for i, pfx := range pfxs {
 			node.Insert(pfx, i, 0)
@@ -536,10 +537,10 @@ func TestSubnets6FastNode(t *testing.T) {
 	prng := rand.New(rand.NewPCG(42, 42))
 
 	for range 10 {
-		pfxs := golden.RandomRealWorldPrefixes6(prng, n)
+		pfxs := random.RealWorldPrefixes6(prng, n)
 
 		node := new(FastNode[int])
-		gold := new(golden.GoldTable[int])
+		gold := new(golden.Table[int])
 
 		for i, pfx := range pfxs {
 			node.Insert(pfx, i, 0)
