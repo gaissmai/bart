@@ -117,7 +117,7 @@ func main() {
  | **IPv6 vs IPv4** | ~2× slower | ~2× slower | ~2× slower |
  | **Memory** | efficient | very efficient | inefficient |
 
-A more detailed description can be found in [NODETYPES.md](docs/NODETYPES.md).
+A more detailed description can be found in [NODETYPES.md](NODETYPES.md).
 
 ## When to Use Each Type
 
