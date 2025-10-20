@@ -127,7 +127,7 @@ The actual payload struct referenced by the pointer is **not included** in these
 - **IPv6 vs IPv4**: IPv6 inherently ~2× slower due to deeper tree structure
  
 ### BartNode[V] & LiteNode - Optimized Level Operations
-- **Precomputed lookup tables** (`lmp.LookupTbl[idx]`) eliminate search within each level
+- **Precomputed lookup tables** (`lpm.LookupTbl[idx]`) eliminate search within each level
 - **BitSet256 intersections** via `IntersectionTop()` for instant prefix matching
 - **Rank-based indirection**: Bitset-to-slice mapping uses precomputed Rank masks
 - **Pipeline-friendly**: Only 4 bitset operations (4×uint64) per level, optimized for CPU pipelining
