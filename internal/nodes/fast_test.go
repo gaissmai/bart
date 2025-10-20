@@ -5,6 +5,7 @@ package nodes
 
 import (
 	"bytes"
+	"maps"
 	"net/netip"
 	"slices"
 	"strings"
@@ -195,10 +196,7 @@ func TestFastNode_Iterators(t *testing.T) {
 	}
 
 	// AllIndices: verify yielded values
-	m := map[uint8]int{}
-	for idx, val := range n.AllIndices() {
-		m[idx] = val
-	}
+	m := maps.Collect(n.AllIndices())
 	for _, idx := range indices {
 		want := int(idx) * 10
 		if m[idx] != want {
