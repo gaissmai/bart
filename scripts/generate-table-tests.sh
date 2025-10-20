@@ -29,12 +29,13 @@ readonly TABLE_TYPES=("Table" "Fast" "liteTable")
 generated_files=()
 
 for tableType in "${TABLE_TYPES[@]}"; do
-    template_base="${template_file##*-}"                 # basename: tests_tmpl.go
     type_prefix="${tableType,,}"                         # lowercase
     type_prefix="${type_prefix/#table/bart}"             # table     -> bart
     type_prefix="${type_prefix/#litetable/lite}"         # litetable -> lite
-    base_mangled="${template_base/_tmpl/generated_test}" # testsgenerated_test.go
-    base_mangled="${base_mangled//all/}"                 # testsgenerated.go (global)
+
+    template_base="${template_file##*-}"                 # basename: alltests_tmpl.go
+    base_mangled="${template_base/_tmpl/generated_test}" # alltestsgenerated_test.go
+    base_mangled="${base_mangled//all/}"                 # testsgenerated_test.go (global)
     output_file="${type_prefix}${base_mangled}"          # litetestsgenerated_test.go
 
     # Remove go:generate directives and build constraint, add generated header, substitute node type
