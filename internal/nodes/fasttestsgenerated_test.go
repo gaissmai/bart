@@ -1,4 +1,4 @@
-// Code generated from file "22-tests_tmpl.go"; DO NOT EDIT.
+// Code generated from file "aa-tests_tmpl.go"; DO NOT EDIT.
 
 // Copyright (c) 2025 Karl Gaissmaier
 // SPDX-License-Identifier: MIT

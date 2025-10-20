@@ -23,6 +23,5 @@
 # ...even if they are in subdirectories
 !*/
 
-!docs/**
 !scripts/**
 !**/testdata/**
