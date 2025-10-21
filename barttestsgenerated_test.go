@@ -1127,10 +1127,10 @@ func TestTableModifyPersistShuffled_Table(t *testing.T) {
 func TestTableUnionMemoryAliasing_Table(t *testing.T) {
 	t.Parallel()
 
-	newTable := func(pfx ...string) *Table[struct{}] {
-		tbl := new(Table[struct{}])
+	newTable := func(pfx ...string) *Table[any] {
+		tbl := new(Table[any])
 		for _, s := range pfx {
-			tbl.Insert(mpp(s), struct{}{})
+			tbl.Insert(mpp(s), nil)
 		}
 		return tbl
 	}
@@ -1165,10 +1165,10 @@ func TestTableUnionMemoryAliasing_Table(t *testing.T) {
 func TestTableUnionPersistMemoryAliasing_Table(t *testing.T) {
 	t.Parallel()
 
-	newTable := func(pfx ...string) *Table[struct{}] {
-		tbl := new(Table[struct{}])
+	newTable := func(pfx ...string) *Table[any] {
+		tbl := new(Table[any])
 		for _, s := range pfx {
-			tbl.Insert(mpp(s), struct{}{})
+			tbl.Insert(mpp(s), nil)
 		}
 		return tbl
 	}

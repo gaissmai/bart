@@ -86,13 +86,13 @@ func (t *_TABLE_TYPE[V]) sizeUpdate(is4 bool, delta int) {
 	t.size6 += delta
 }
 
-// Insert adds or updates a prefix-value pair in the routing table.
+// insert adds or updates a prefix-value pair in the routing table.
 // If the prefix already exists, its value is updated; otherwise a new entry is created.
 // Invalid prefixes are silently ignored.
 //
 // The prefix is automatically canonicalized using pfx.Masked() to ensure
 // consistent behavior regardless of host bits in the input.
-func (t *_TABLE_TYPE[V]) Insert(pfx netip.Prefix, val V) {
+func (t *_TABLE_TYPE[V]) insert(pfx netip.Prefix, val V) {
 	if !pfx.IsValid() {
 		return
 	}
@@ -111,7 +111,7 @@ func (t *_TABLE_TYPE[V]) Insert(pfx netip.Prefix, val V) {
 	t.sizeUpdate(is4, 1)
 }
 
-// InsertPersist is similar to Insert but the receiver isn't modified.
+// insertPersist is similar to insert but the receiver isn't modified.
 //
 // All nodes touched during insert are cloned and a new _TABLE_TYPE is returned.
 // This is not a full [_TABLE_TYPE.Clone], all untouched nodes are still referenced
@@ -120,9 +120,9 @@ func (t *_TABLE_TYPE[V]) Insert(pfx netip.Prefix, val V) {
 // If the payload type V contains pointers or needs deep copying,
 // it must implement the [bart.Cloner] interface to support correct cloning.
 //
-// Due to cloning overhead this is significantly slower than Insert,
+// Due to cloning overhead this is significantly slower than insert,
 // typically taking μsec instead of nsec.
-func (t *_TABLE_TYPE[V]) InsertPersist(pfx netip.Prefix, val V) *_TABLE_TYPE[V] {
+func (t *_TABLE_TYPE[V]) insertPersist(pfx netip.Prefix, val V) *_TABLE_TYPE[V] {
 	if !pfx.IsValid() {
 		return t
 	}

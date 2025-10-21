@@ -495,6 +495,31 @@ func (l *liteTable[V]) rootNodeByVersion(is4 bool) *nodes.LiteNode[V] {
 	return &l.root6
 }
 
+// Insert adds or updates a prefix-value pair in the routing table.
+// If the prefix already exists, its value is updated; otherwise a new entry is created.
+// Invalid prefixes are silently ignored.
+//
+// The prefix is automatically canonicalized using pfx.Masked() to ensure
+// consistent behavior regardless of host bits in the input.
+func (l *liteTable[V]) Insert(pfx netip.Prefix, val V) {
+	l.insert(pfx, val)
+}
+
+// InsertPersist is similar to Insert but the receiver isn't modified.
+//
+// All nodes touched during insert are cloned and a new liteTable is returned.
+// This is not a full [liteTable.Clone], all untouched nodes are still referenced
+// from both Tables.
+//
+// If the payload type V contains pointers or needs deep copying,
+// it must implement the [bart.Cloner] interface to support correct cloning.
+//
+// Due to cloning overhead this is significantly slower than Insert,
+// typically taking μsec instead of nsec.
+func (l *liteTable[V]) InsertPersist(pfx netip.Prefix, val V) *liteTable[V] {
+	return l.insertPersist(pfx, val)
+}
+
 // Contains reports whether any stored prefix covers the given IP address.
 // Returns false for invalid IP addresses.
 //
