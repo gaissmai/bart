@@ -123,7 +123,10 @@ func panicOnZST[V any]() {
 	}
 }
 
-// escapeToHeap, use noinline that it really escapes to heap.
+// escapeToHeap forces two allocations to escape to the heap.
+// The noinline directive prevents compiler optimizations that could
+// prove address equality or elide allocations, ensuring reliable
+// ZST detection.
 //
 //go:noinline
 func escapeToHeap[V any]() (*V, *V) {
