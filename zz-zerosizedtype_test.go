@@ -13,11 +13,11 @@ func TestZeroSizedType_MustPanic(t *testing.T) {
 	t.Run("struct{}: Insert()", func(t *testing.T) {
 		t.Parallel()
 
-		defer func(name string) {
+		defer func() {
 			if r := recover(); r == nil {
-				t.Errorf("%s must panic", name)
+				t.Error("struct{}: Insert() must panic")
 			}
-		}("struct{}: Insert()")
+		}()
 
 		fast := new(Fast[struct{}])
 		fast.Insert(mpp("::1/128"), struct{}{})
@@ -26,11 +26,11 @@ func TestZeroSizedType_MustPanic(t *testing.T) {
 	t.Run("struct{}: InsertPersist()", func(t *testing.T) {
 		t.Parallel()
 
-		defer func(name string) {
+		defer func() {
 			if r := recover(); r == nil {
-				t.Errorf("%s must panic", name)
+				t.Error("struct{}: InsertPersist() must panic")
 			}
-		}("struct{}: InsertPersist()")
+		}()
 
 		fast := new(Fast[struct{}])
 		fast.InsertPersist(mpp("::1/128"), struct{}{})
@@ -39,11 +39,11 @@ func TestZeroSizedType_MustPanic(t *testing.T) {
 	t.Run("[0]byte: Insert()", func(t *testing.T) {
 		t.Parallel()
 
-		defer func(name string) {
+		defer func() {
 			if r := recover(); r == nil {
-				t.Errorf("%s must panic", name)
+				t.Error("[0]byte: Insert() must panic")
 			}
-		}("[0]byte: Insert()")
+		}()
 
 		fast := new(Fast[[0]byte])
 		fast.Insert(mpp("::1/128"), [0]byte{})
@@ -52,11 +52,11 @@ func TestZeroSizedType_MustPanic(t *testing.T) {
 	t.Run("[0]byte: InsertPersist()", func(t *testing.T) {
 		t.Parallel()
 
-		defer func(name string) {
+		defer func() {
 			if r := recover(); r == nil {
-				t.Errorf("%s must panic", name)
+				t.Error("[0]byte: InsertPersist() must panic")
 			}
-		}("[0]byte: InsertPersist()")
+		}()
 
 		fast := new(Fast[[0]byte])
 		fast.InsertPersist(mpp("::1/128"), [0]byte{})
