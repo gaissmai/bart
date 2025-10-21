@@ -28,7 +28,8 @@ import (
 // However, the ART algorithm requires that different prefixes, even with
 // identical payload V, result in distinct value pointers. This is not
 // guaranteed for zero-sized values; thus, zero-sized types as payload V
-// results in undefined behavior.
+// would result in undefined behavior so the input methods panic if they
+// detect it.
 //
 // Performance note: Do not pass IPv4-in-IPv6 addresses (e.g., ::ffff:192.0.2.1)
 // as input. The methods do not perform automatic unmapping to avoid unnecessary
@@ -36,8 +37,8 @@ import (
 // Users should unmap IPv4-in-IPv6 addresses to their native IPv4 form
 // (e.g., 192.0.2.1) before calling these methods.
 type Fast[V any] struct {
-	// used by -copylocks checker from `go vet`.
-	_ [0]sync.Mutex
+	// used for zero-sized type checks during insert
+	once sync.Once
 
 	// the root nodes are fast nodes with fixed size arrays
 	root4 nodes.FastNode[V]
@@ -54,6 +55,33 @@ func (f *Fast[V]) rootNodeByVersion(is4 bool) *nodes.FastNode[V] {
 		return &f.root4
 	}
 	return &f.root6
+}
+
+// Insert adds or updates a prefix-value pair in the routing table.
+// If the prefix already exists, its value is updated; otherwise a new entry is created.
+// Invalid prefixes are silently ignored.
+//
+// The prefix is automatically canonicalized using pfx.Masked() to ensure
+// consistent behavior regardless of host bits in the input.
+func (t *Fast[V]) Insert(pfx netip.Prefix, val V) {
+	t.once.Do(panicOnZST[V])
+	t.insert(pfx, val)
+}
+
+// InsertPersist is similar to Insert but the receiver isn't modified.
+//
+// All nodes touched during insert are cloned and a new Fast is returned.
+// This is not a full [Fast.Clone], all untouched nodes are still referenced
+// from both Tables.
+//
+// If the payload type V contains pointers or needs deep copying,
+// it must implement the [bart.Cloner] interface to support correct cloning.
+//
+// Due to cloning overhead this is significantly slower than Insert,
+// typically taking μsec instead of nsec.
+func (t *Fast[V]) InsertPersist(pfx netip.Prefix, val V) *Fast[V] {
+	t.once.Do(panicOnZST[V])
+	return t.insertPersist(pfx, val)
 }
 
 // Contains reports whether any stored prefix covers the given IP address.

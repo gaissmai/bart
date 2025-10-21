@@ -25,6 +25,7 @@
 package bart
 
 import (
+	"fmt"
 	"net/netip"
 
 	"github.com/gaissmai/bart/internal/nodes"
@@ -110,4 +111,21 @@ func cloneVal[V any](val V) V {
 		return val
 	}
 	return c.Clone()
+}
+
+// panicOnZST panics if V ia a zero sized type.
+// bart.Fast rejects zero-sized types as payload.
+func panicOnZST[V any]() {
+	// returns the same memory address for zero-sized types.
+	a, b := escapeToHeap[V]()
+	if a == b {
+		panic(fmt.Errorf("%T is a zero-sized type, not allowed as payload for bart.Fast", *a))
+	}
+}
+
+// escapeToHeap, use noinline that it really escapes to heap.
+//
+//go:noinline
+func escapeToHeap[V any]() (*V, *V) {
+	return new(V), new(V)
 }
