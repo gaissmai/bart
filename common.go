@@ -113,7 +113,7 @@ func cloneVal[V any](val V) V {
 	return c.Clone()
 }
 
-// panicOnZST panics if V ia a zero sized type.
+// panicOnZST panics if V is a zero sized type.
 // bart.Fast rejects zero-sized types as payload.
 func panicOnZST[V any]() {
 	// returns the same memory address for zero-sized types.
