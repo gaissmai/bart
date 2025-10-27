@@ -138,7 +138,7 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	n := t.rootNodeByVersion(is4)
 
 	// stack of the traversed nodes for fast backtracking, if needed
-	stack := [maxTreeDepth]*nodes.BartNode[V]{}
+	stack := [nodes.MaxTreeDepth]*nodes.BartNode[V]{}
 
 	// run variable, used after for loop
 	var depth int
@@ -147,7 +147,7 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 LOOP:
 	// find leaf node
 	for depth, octet = range octets {
-		depth = depth & depthMask // BCE, Lookup must be fast
+		depth = depth & nodes.DepthMask // BCE, Lookup must be fast
 
 		// push current node on stack for fast backtracking
 		stack[depth] = n
@@ -180,7 +180,7 @@ LOOP:
 
 	// start backtracking, unwind the stack, bounds check eliminated
 	for ; depth >= 0; depth-- {
-		depth = depth & depthMask // BCE
+		depth = depth & nodes.DepthMask // BCE
 
 		n = stack[depth]
 
@@ -239,12 +239,12 @@ func (t *Table[V]) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpmPfx netip
 	bits := pfx.Bits()
 	is4 := ip.Is4()
 	octets := ip.AsSlice()
-	lastOctetPlusOne, lastBits := lastOctetPlusOneAndLastBits(pfx)
+	lastOctetPlusOne, lastBits := nodes.LastOctetPlusOneAndLastBits(pfx)
 
 	n := t.rootNodeByVersion(is4)
 
 	// record path to leaf node
-	stack := [maxTreeDepth]*nodes.BartNode[V]{}
+	stack := [nodes.MaxTreeDepth]*nodes.BartNode[V]{}
 
 	var depth int
 	var octet byte
@@ -252,7 +252,7 @@ func (t *Table[V]) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpmPfx netip
 LOOP:
 	// find the last node on the octets path in the trie,
 	for depth, octet = range octets {
-		depth = depth & depthMask // BCE
+		depth = depth & nodes.DepthMask // BCE
 
 		// stepped one past the last stride of interest; back up to last and break
 		if depth > lastOctetPlusOne {
@@ -303,7 +303,7 @@ LOOP:
 
 	// start backtracking, unwind the stack
 	for ; depth >= 0; depth-- {
-		depth = depth & depthMask // BCE
+		depth = depth & nodes.DepthMask // BCE
 
 		n = stack[depth]
 

@@ -1,4 +1,4 @@
-// Code generated from file "aa-tests_tmpl.go"; DO NOT EDIT.
+// Code generated from file "commontests_tmpl.go"; DO NOT EDIT.
 
 // Copyright (c) 2025 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
@@ -258,7 +258,7 @@ func TestInsertDeleteLiteNode(t *testing.T) {
 
 			if t.Failed() {
 				buf := new(strings.Builder)
-				n.DumpRec(buf, StridePath{}, 0, tt.is4, false)
+				n.DumpRec(buf, StridePath{}, 0, tt.is4)
 				t.Logf("%s:\n%s", tt.name, buf.String())
 			}
 
@@ -282,7 +282,7 @@ func TestInsertDeleteLiteNode(t *testing.T) {
 
 			if t.Failed() {
 				buf := new(strings.Builder)
-				n.DumpRec(buf, StridePath{}, 0, tt.is4, false)
+				n.DumpRec(buf, StridePath{}, 0, tt.is4)
 				t.Logf("%s:\n%s", tt.name, buf.String())
 			}
 		})
@@ -310,7 +310,7 @@ func TestInsertDeleteLiteNode(t *testing.T) {
 
 			if t.Failed() {
 				buf := new(strings.Builder)
-				n.DumpRec(buf, StridePath{}, 0, tt.is4, false)
+				n.DumpRec(buf, StridePath{}, 0, tt.is4)
 				t.Logf("%s:\n%s", tt.name, buf.String())
 			}
 
@@ -334,7 +334,7 @@ func TestInsertDeleteLiteNode(t *testing.T) {
 
 			if t.Failed() {
 				buf := new(strings.Builder)
-				n.DumpRec(buf, StridePath{}, 0, tt.is4, false)
+				n.DumpRec(buf, StridePath{}, 0, tt.is4)
 				t.Logf("%s:\n%s", tt.name, buf.String())
 			}
 		})

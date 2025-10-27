@@ -618,12 +618,12 @@ func (l *liteTable[V]) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpmPfx n
 	bits := pfx.Bits()
 	is4 := ip.Is4()
 	octets := ip.AsSlice()
-	lastOctetPlusOne, lastBits := lastOctetPlusOneAndLastBits(pfx)
+	lastOctetPlusOne, lastBits := nodes.LastOctetPlusOneAndLastBits(pfx)
 
 	n := l.rootNodeByVersion(is4)
 
 	// record path to leaf node
-	stack := [maxTreeDepth]*nodes.LiteNode[V]{}
+	stack := [nodes.MaxTreeDepth]*nodes.LiteNode[V]{}
 
 	var depth int
 	var octet byte
@@ -631,7 +631,7 @@ func (l *liteTable[V]) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpmPfx n
 LOOP:
 	// find the last node on the octets path in the trie,
 	for depth, octet = range octets {
-		depth = depth & depthMask // BCE
+		depth = depth & nodes.DepthMask // BCE
 
 		// stepped one past the last stride of interest; back up to last and break
 		if depth > lastOctetPlusOne {
@@ -682,7 +682,7 @@ LOOP:
 
 	// start backtracking, unwind the stack
 	for ; depth >= 0; depth-- {
-		depth = depth & depthMask // BCE
+		depth = depth & nodes.DepthMask // BCE
 
 		n = stack[depth]
 

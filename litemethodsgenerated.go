@@ -1,4 +1,4 @@
-// Code generated from file "aa-allmethods_tmpl.go"; DO NOT EDIT.
+// Code generated from file "commonmethods_tmpl.go"; DO NOT EDIT.
 
 // Copyright (c) 2025 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
@@ -684,7 +684,7 @@ func (t *liteTable[V]) fprint(w io.Writer, is4 bool) error {
 		Is4:  is4,
 	}
 
-	return n.FprintRec(w, startParent, "", shouldPrintValues[V]())
+	return n.FprintRec(w, startParent, "")
 }
 
 // MarshalText implements the [encoding.TextMarshaler] interface,
@@ -758,7 +758,7 @@ func (t *liteTable[V]) dumpListRec(anyNode any, parentIdx uint8, path stridePath
 
 	// sort the items by prefix
 	slices.SortFunc(directItems, func(a, b nodes.TrieItem[V]) int {
-		return cmpPrefix(a.Cidr, b.Cidr)
+		return nodes.CmpPrefix(a.Cidr, b.Cidr)
 	})
 
 	dumpNodes := make([]DumpListNode[V], 0, len(directItems))
@@ -795,7 +795,7 @@ func (t *liteTable[V]) dump(w io.Writer) {
 		fmt.Fprintf(w, "### IPv4: size(%d), subnodes(%d), prefixes(%d), leaves(%d), fringes(%d)",
 			t.size4, stats.SubNodes, stats.Prefixes, stats.Leaves, stats.Fringes)
 
-		t.root4.DumpRec(w, stridePath{}, 0, true, shouldPrintValues[V]())
+		t.root4.DumpRec(w, stridePath{}, 0, true)
 	}
 
 	if t.size6 > 0 {
@@ -804,6 +804,6 @@ func (t *liteTable[V]) dump(w io.Writer) {
 		fmt.Fprintf(w, "### IPv6: size(%d), subnodes(%d), prefixes(%d), leaves(%d), fringes(%d)",
 			t.size6, stats.SubNodes, stats.Prefixes, stats.Leaves, stats.Fringes)
 
-		t.root6.DumpRec(w, stridePath{}, 0, false, shouldPrintValues[V]())
+		t.root6.DumpRec(w, stridePath{}, 0, false)
 	}
 }

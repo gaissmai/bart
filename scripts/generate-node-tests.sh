@@ -30,9 +30,10 @@ generated_files=()
 
 for nodeType in "${NODE_TYPES[@]}"; do
     # Build output filename, e.g. litetestsgenerated_test.go
-    template_base="${template_file##*-}"                                # basename: tests_tmpl.go
-    type_prefix="${nodeType,,}"                                         # litenode
-    type_prefix="${type_prefix/node/}"                                  # lite
+    type_prefix="${nodeType,,}"                                         # e.g. litenode
+    type_prefix="${type_prefix/node/}"                                  # -> lite
+
+    template_base="${template_file##*common}"                           # -> tests_tmpl.go
     base_mangled="${template_base/_tmpl/generated_test}"                # testsgenerated_test.go
     output_file="${type_prefix}${base_mangled}"                         # litetestsgenerated_test.go
     

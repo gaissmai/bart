@@ -64,8 +64,8 @@ func (n *_NODE_TYPE[V]) Lookup(uint8) (_ V, _ bool)                             
 func (n *_NODE_TYPE[V]) LookupIdx(uint8) (_ uint8, _ V, _ bool)                          { return }
 func (n *_NODE_TYPE[V]) Supernets(netip.Prefix, func(netip.Prefix, V) bool)              { return }
 func (n *_NODE_TYPE[V]) Subnets(netip.Prefix, func(netip.Prefix, V) bool)                { return }
-func (n *_NODE_TYPE[V]) FprintRec(io.Writer, nodes.TrieItem[V], string, bool) (_ error)  { return }
-func (n *_NODE_TYPE[V]) DumpRec(io.Writer, stridePath, int, bool, bool)                  { return }
+func (n *_NODE_TYPE[V]) FprintRec(io.Writer, nodes.TrieItem[V], string) (_ error)        { return }
+func (n *_NODE_TYPE[V]) DumpRec(io.Writer, stridePath, int, bool)                        { return }
 func (n *_NODE_TYPE[V]) AllRec(stridePath, int, bool, func(netip.Prefix, V) bool) (_ bool) {
 	return
 }
@@ -74,7 +74,8 @@ func (n *_NODE_TYPE[V]) AllRecSorted(stridePath, int, bool, func(netip.Prefix, V
 	return
 }
 
-func (t *_TABLE_TYPE[V]) rootNodeByVersion(is4 bool) (n *_NODE_TYPE[V]) { return }
+func (t *_TABLE_TYPE[V]) rootNodeByVersion(is4 bool) (_ *_NODE_TYPE[V])     { return }
+func (t *_TABLE_TYPE[V]) InsertPersist(netip.Prefix, V) (_ *_TABLE_TYPE[V]) { return }
 
 // ### GENERATE DELETE END ###
 
@@ -744,7 +745,7 @@ func (t *_TABLE_TYPE[V]) fprint(w io.Writer, is4 bool) error {
 		Is4:  is4,
 	}
 
-	return n.FprintRec(w, startParent, "", shouldPrintValues[V]())
+	return n.FprintRec(w, startParent, "")
 }
 
 // MarshalText implements the [encoding.TextMarshaler] interface,
@@ -818,7 +819,7 @@ func (t *_TABLE_TYPE[V]) dumpListRec(anyNode any, parentIdx uint8, path stridePa
 
 	// sort the items by prefix
 	slices.SortFunc(directItems, func(a, b nodes.TrieItem[V]) int {
-		return cmpPrefix(a.Cidr, b.Cidr)
+		return nodes.CmpPrefix(a.Cidr, b.Cidr)
 	})
 
 	dumpNodes := make([]DumpListNode[V], 0, len(directItems))
@@ -855,7 +856,7 @@ func (t *_TABLE_TYPE[V]) dump(w io.Writer) {
 		fmt.Fprintf(w, "### IPv4: size(%d), subnodes(%d), prefixes(%d), leaves(%d), fringes(%d)",
 			t.size4, stats.SubNodes, stats.Prefixes, stats.Leaves, stats.Fringes)
 
-		t.root4.DumpRec(w, stridePath{}, 0, true, shouldPrintValues[V]())
+		t.root4.DumpRec(w, stridePath{}, 0, true)
 	}
 
 	if t.size6 > 0 {
@@ -864,6 +865,6 @@ func (t *_TABLE_TYPE[V]) dump(w io.Writer) {
 		fmt.Fprintf(w, "### IPv6: size(%d), subnodes(%d), prefixes(%d), leaves(%d), fringes(%d)",
 			t.size6, stats.SubNodes, stats.Prefixes, stats.Leaves, stats.Fringes)
 
-		t.root6.DumpRec(w, stridePath{}, 0, false, shouldPrintValues[V]())
+		t.root6.DumpRec(w, stridePath{}, 0, false)
 	}
 }

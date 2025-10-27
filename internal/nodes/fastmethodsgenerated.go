@@ -1,4 +1,4 @@
-// Code generated from file "aa-nodemethods_tmpl.go"; DO NOT EDIT.
+// Code generated from file "commonmethods_tmpl.go"; DO NOT EDIT.
 
 // Copyright (c) 2025 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
@@ -777,19 +777,19 @@ func (n *FastNode[V]) EqualRec(o *FastNode[V]) bool {
 // subnodes). The path slice and depth together represent the byte-wise path
 // from the root to the current node; depth is incremented for each recursion.
 // The is4 flag controls IPv4/IPv6 formatting used by dump.
-func (n *FastNode[V]) DumpRec(w io.Writer, path StridePath, depth int, is4 bool, printVals bool) {
+func (n *FastNode[V]) DumpRec(w io.Writer, path StridePath, depth int, is4 bool) {
 	if n == nil || n.IsEmpty() {
 		return
 	}
 
 	// dump this node
-	n.Dump(w, path, depth, is4, printVals)
+	n.Dump(w, path, depth, is4)
 
 	// node may have children, rec-descent down
 	for addr, child := range n.AllChildren() {
 		if kid, ok := child.(*FastNode[V]); ok {
 			path[depth] = addr
-			kid.DumpRec(w, path, depth+1, is4, printVals)
+			kid.DumpRec(w, path, depth+1, is4)
 		}
 	}
 }
@@ -798,9 +798,12 @@ func (n *FastNode[V]) DumpRec(w io.Writer, path StridePath, depth int, is4 bool,
 // It prints the node type, depth, formatted path (IPv4 vs IPv6 controlled by `is4`),
 // and bit count, followed by any stored prefixes (and their values when applicable),
 // the set of child octets, and any path-compressed leaves or fringe entries.
-func (n *FastNode[V]) Dump(w io.Writer, path StridePath, depth int, is4 bool, printVals bool) {
+func (n *FastNode[V]) Dump(w io.Writer, path StridePath, depth int, is4 bool) {
 	bits := depth * strideLen
 	indent := strings.Repeat(".", depth)
+
+	// printing values if V is not zero-sized
+	printVal := !IsZST[V]()
 
 	// node type with depth and octet path and bits.
 	fmt.Fprintf(w, "\n%s[%s] depth:  %d path: [%s] / %d\n",
@@ -823,8 +826,8 @@ func (n *FastNode[V]) Dump(w io.Writer, path StridePath, depth int, is4 bool, pr
 
 		fmt.Fprintln(w)
 
-		// skip values, maybe the payload is the empty struct
-		if printVals {
+		// skip printing values if V is zero-sized
+		if printVal {
 
 			// print the values for this node
 			fmt.Fprintf(w, "%svalues(#%d):", indent, nPfxCount)
@@ -838,11 +841,11 @@ func (n *FastNode[V]) Dump(w io.Writer, path StridePath, depth int, is4 bool, pr
 		}
 	}
 
-	if n.ChildCount() != 0 {
-		allAddrs := make([]uint8, 0, MaxItems)
-		childAddrs := make([]uint8, 0, MaxItems)
-		leafAddrs := make([]uint8, 0, MaxItems)
-		fringeAddrs := make([]uint8, 0, MaxItems)
+	if cc := n.ChildCount(); cc != 0 {
+		allAddrs := make([]uint8, 0, cc)
+		childAddrs := make([]uint8, 0, cc)
+		leafAddrs := make([]uint8, 0, cc)
+		fringeAddrs := make([]uint8, 0, cc)
 
 		// the node has recursive child nodes or path-compressed leaves
 		for addr, child := range n.AllChildren() {
@@ -873,7 +876,9 @@ func (n *FastNode[V]) Dump(w io.Writer, path StridePath, depth int, is4 bool, pr
 
 			for _, addr := range leafAddrs {
 				kid := n.MustGetChild(addr).(*LeafNode[V])
-				if printVals {
+
+				// skip printing values if V is zero-sized
+				if printVal {
 					fmt.Fprintf(w, " %s:{%s, %v}", addrFmt(addr, is4), kid.Prefix, kid.Value)
 				} else {
 					fmt.Fprintf(w, " %s:{%s}", addrFmt(addr, is4), kid.Prefix)
@@ -891,7 +896,9 @@ func (n *FastNode[V]) Dump(w io.Writer, path StridePath, depth int, is4 bool, pr
 				fringePfx := CidrForFringe(path[:], depth, is4, addr)
 
 				kid := n.MustGetChild(addr).(*FringeNode[V])
-				if printVals {
+
+				// skip printing values if V is zero-sized
+				if printVal {
 					fmt.Fprintf(w, " %s:{%s, %v}", addrFmt(addr, is4), fringePfx, kid.Value)
 				} else {
 					fmt.Fprintf(w, " %s:{%s}", addrFmt(addr, is4), fringePfx)
@@ -925,10 +932,9 @@ func (n *FastNode[V]) Dump(w io.Writer, path StridePath, depth int, is4 bool, pr
 //   - octets: The path of octets to follow from the root
 //   - depth: Target depth to reach before dumping (0-based byte index)
 //   - is4: True for IPv4 formatting, false for IPv6
-//   - printVals: Whether to include values in the dump output
 //
 // Returns a formatted string representation of the target node or an error message.
-func (n *FastNode[V]) DumpString(octets []uint8, depth int, is4 bool, printVals bool) string {
+func (n *FastNode[V]) DumpString(octets []uint8, depth int, is4 bool) string {
 	path := StridePath{}
 	copy(path[:], octets)
 
@@ -948,7 +954,7 @@ func (n *FastNode[V]) DumpString(octets []uint8, depth int, is4 bool, printVals 
 		n = kid
 	}
 
-	n.Dump(buf, path, depth, is4, printVals)
+	n.Dump(buf, path, depth, is4)
 	return buf.String()
 }
 
@@ -1059,7 +1065,7 @@ func (n *FastNode[V]) StatsRec() (s StatsT) {
 // FprintRec recursively prints a hierarchical CIDR tree representation
 // starting from this node to the provided writer. The output shows the
 // routing table structure in human-readable format for debugging and analysis.
-func (n *FastNode[V]) FprintRec(w io.Writer, parent TrieItem[V], pad string, printVals bool) error {
+func (n *FastNode[V]) FprintRec(w io.Writer, parent TrieItem[V], pad string) error {
 	// recursion stop condition
 	if n == nil || n.IsEmpty() {
 		return nil
@@ -1088,7 +1094,7 @@ func (n *FastNode[V]) FprintRec(w io.Writer, parent TrieItem[V], pad string, pri
 		var err error
 		// val is the empty struct, don't print it
 		switch {
-		case !printVals:
+		case IsZST[V](): // skip printing values if V is zero-sized
 			_, err = fmt.Fprintf(w, "%s%s\n", pad+glyph, item.Cidr)
 		default:
 			_, err = fmt.Fprintf(w, "%s%s (%v)\n", pad+glyph, item.Cidr, item.Val)
@@ -1100,7 +1106,7 @@ func (n *FastNode[V]) FprintRec(w io.Writer, parent TrieItem[V], pad string, pri
 
 		// rec-descent with this item as parent
 		nextNode, _ := item.Node.(*FastNode[V])
-		if err = nextNode.FprintRec(w, item, pad+space, printVals); err != nil {
+		if err = nextNode.FprintRec(w, item, pad+space); err != nil {
 			return err
 		}
 	}

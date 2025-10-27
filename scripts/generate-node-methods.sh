@@ -30,12 +30,12 @@ generated_files=()
 
 for nodeType in "${NODE_TYPES[@]}"; do
     # Build output filename, e.g. bartmethodsgenerated.go
-    template_base="${template_file##*-}"                          # basename: nodemethods_tmpl.go
-    type_prefix="${nodeType,,}"                                   # bartnode
-    type_prefix="${type_prefix/node/}"                            # bart
-    base_mangled="${template_base/_tmpl/generated}"               # nodemethodsgenerated.go
-    base_mangled="${base_mangled//node/}"                         # methodsgenerated.go (global)
-    output_file="${type_prefix}${base_mangled}"                   # bartmethodsgenerated.go
+    type_prefix="${nodeType,,}"                                   # e.g. bartnode
+    type_prefix="${type_prefix/node/}"                            # -> bart
+
+    template_base="${template_file##*common}"                     # -> methods_tmpl.go
+    base_mangled="${template_base/_tmpl/generated}"               # -> methodsgenerated.go
+    output_file="${type_prefix}${base_mangled}"                   # e.g. -> bartmethodsgenerated.go
 
     # Remove go:generate directives and build constraint, add generated header, substitute node type
     sed -e "1i\\

@@ -33,10 +33,9 @@ for tableType in "${TABLE_TYPES[@]}"; do
     type_prefix="${type_prefix/#table/bart}"             # table     -> bart
     type_prefix="${type_prefix/#litetable/lite}"         # litetable -> lite
 
-    template_base="${template_file##*-}"                 # basename: alltests_tmpl.go
-    base_mangled="${template_base/_tmpl/generated_test}" # alltestsgenerated_test.go
-    base_mangled="${base_mangled//all/}"                 # testsgenerated_test.go (global)
-    output_file="${type_prefix}${base_mangled}"          # litetestsgenerated_test.go
+    template_base="${template_file##*common}"            # -> tests_tmpl.go
+    base_mangled="${template_base/_tmpl/generated_test}" # -> testsgenerated_test.go
+    output_file="${type_prefix}${base_mangled}"          # e.g. -> litetestsgenerated_test.go
 
     # Remove go:generate directives and build constraint, add generated header, substitute node type
     sed -e "1i\\
