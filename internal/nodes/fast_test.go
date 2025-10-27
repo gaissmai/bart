@@ -478,7 +478,7 @@ func TestFastNode_Stats_Dump_Fprint_DirectItems(t *testing.T) {
 
 	// DumpRec (ensure contains a known prefix)
 	var dump bytes.Buffer
-	n.DumpRec(&dump, StridePath{}, 0, true, true)
+	n.DumpRec(&dump, StridePath{}, 0, true)
 	if out := dump.String(); !strings.Contains(out, "10.0.0.0/8") {
 		t.Errorf("DumpRec output missing 10.0.0.0/8: %s", out)
 	}
@@ -486,7 +486,7 @@ func TestFastNode_Stats_Dump_Fprint_DirectItems(t *testing.T) {
 	// FprintRec
 	var tree bytes.Buffer
 	start := TrieItem[int]{Node: n, Path: StridePath{}, Idx: 0, Is4: true}
-	if err := n.FprintRec(&tree, start, "", true); err != nil {
+	if err := n.FprintRec(&tree, start, ""); err != nil {
 		t.Fatalf("FprintRec error: %v", err)
 	}
 	if out := tree.String(); !strings.Contains(out, "10.1.0.0/16") {
@@ -633,7 +633,7 @@ func TestFastNode_FprintRec_and_DirectItemsRec_Smoke(t *testing.T) {
 
 	var buf bytes.Buffer
 	start := TrieItem[int]{Node: n, Path: StridePath{}, Idx: 0, Is4: true}
-	if err := n.FprintRec(&buf, start, "", true); err != nil {
+	if err := n.FprintRec(&buf, start, ""); err != nil {
 		t.Fatalf("FprintRec error: %v", err)
 	}
 	out := buf.String()
@@ -2046,31 +2046,25 @@ func TestFastNode_DumpString_IPv4_DeepSubtree(t *testing.T) {
 	root.InsertChild(10, lvl1)
 
 	// Deep dump [10,1] with Values
-	outDeep := root.DumpString([]uint8{10, 1}, 2, true, true)
+	outDeep := root.DumpString([]uint8{10, 1}, 2, true)
 	if outDeep == "" || strings.Contains(outDeep, "ERROR:") {
 		t.Fatalf("unexpected dump: %q", outDeep)
 	}
 	if !strings.Contains(outDeep, "depth:") {
 		t.Fatalf("missing depth marker in deep dump: %q", outDeep)
 	}
-	// Werte sichtbar bei printVals=true
+
 	if !strings.Contains(outDeep, "424242") || !strings.Contains(outDeep, "515151") {
 		t.Fatalf("deep dump should contain lvl2 values, got: %q", outDeep)
 	}
 
 	// Intermediate dump [10] with Values
-	outLvl1 := root.DumpString([]uint8{10}, 1, true, true)
+	outLvl1 := root.DumpString([]uint8{10}, 1, true)
 	if strings.Contains(outLvl1, "ERROR:") {
 		t.Fatalf("lvl1 dump error: %q", outLvl1)
 	}
 	if !strings.Contains(outLvl1, "333") {
 		t.Fatalf("lvl1 dump should contain value 333, got: %q", outLvl1)
-	}
-
-	// Deep dump without Values
-	outDeepNoVals := root.DumpString([]uint8{10, 1}, 2, true, false)
-	if strings.Contains(outDeepNoVals, "424242") || strings.Contains(outDeepNoVals, "515151") {
-		t.Fatalf("deep dump without values should not contain values, got: %q", outDeepNoVals)
 	}
 }
 
@@ -2078,7 +2072,7 @@ func TestFastNode_DumpString_Error_KidNotSet_AtRootStep(t *testing.T) {
 	t.Parallel()
 	var root FastNode[int]
 
-	out := root.DumpString([]uint8{10}, 1, true, true)
+	out := root.DumpString([]uint8{10}, 1, true)
 	if out == "" || !strings.Contains(out, "ERROR:") || !strings.Contains(out, "NOT set in node") || !strings.Contains(out, "[0]") {
 		t.Fatalf("expected missing-kid error with [0], got: %q", out)
 	}
@@ -2090,7 +2084,7 @@ func TestFastNode_DumpString_Error_KidNotSet_AtDeeperStep(t *testing.T) {
 	lvl1 := &FastNode[int]{}
 	root.InsertChild(10, lvl1)
 
-	out := root.DumpString([]uint8{10, 1}, 2, true, true)
+	out := root.DumpString([]uint8{10, 1}, 2, true)
 	if out == "" || !strings.Contains(out, "ERROR:") || !strings.Contains(out, "NOT set in node") || !strings.Contains(out, "[1]") {
 		t.Fatalf("expected missing-kid error with [1], got: %q", out)
 	}
@@ -2104,7 +2098,7 @@ func TestFastNode_DumpString_Error_KidWrongType_LeafAtDeeperStep(t *testing.T) {
 	lvl1.InsertChild(1, leaf)
 	root.InsertChild(10, lvl1)
 
-	out := root.DumpString([]uint8{10, 1}, 2, true, true)
+	out := root.DumpString([]uint8{10, 1}, 2, true)
 	if out == "" || !strings.Contains(out, "ERROR:") || !strings.Contains(out, "NO FastNode") || !strings.Contains(out, "[1]") {
 		t.Fatalf("expected wrong-type error (Leaf), got: %q", out)
 	}
@@ -2121,7 +2115,7 @@ func TestFastNode_DumpString_Error_KidWrongType_FringeAtDeeperStep(t *testing.T)
 	lvl1.InsertChild(2, fringe)
 	root.InsertChild(10, lvl1)
 
-	out := root.DumpString([]uint8{10, 2}, 2, true, true)
+	out := root.DumpString([]uint8{10, 2}, 2, true)
 	if out == "" || !strings.Contains(out, "ERROR:") || !strings.Contains(out, "NO FastNode") || !strings.Contains(out, "[1]") {
 		t.Fatalf("expected wrong-type error (Fringe), got: %q", out)
 	}

@@ -479,7 +479,7 @@ func TestBartNode_Stats_Dump_Fprint_DirectItems(t *testing.T) {
 
 	// DumpRec
 	var dump bytes.Buffer
-	n.DumpRec(&dump, StridePath{}, 0, true, true)
+	n.DumpRec(&dump, StridePath{}, 0, true)
 	if out := dump.String(); !strings.Contains(out, "10.0.0.0/8") {
 		t.Errorf("DumpRec output missing 10.0.0.0/8: %s", out)
 	}
@@ -487,7 +487,7 @@ func TestBartNode_Stats_Dump_Fprint_DirectItems(t *testing.T) {
 	// FprintRec
 	var tree bytes.Buffer
 	start := TrieItem[int]{Node: n, Path: StridePath{}, Idx: 0, Is4: true}
-	if err := n.FprintRec(&tree, start, "", true); err != nil {
+	if err := n.FprintRec(&tree, start, ""); err != nil {
 		t.Fatalf("FprintRec error: %v", err)
 	}
 	if out := tree.String(); !strings.Contains(out, "10.1.0.0/16") {
@@ -640,7 +640,7 @@ func TestBartNode_FprintRec_and_DirectItemsRec_Smoke(t *testing.T) {
 
 	var buf bytes.Buffer
 	start := TrieItem[int]{Node: n, Path: StridePath{}, Idx: 0, Is4: true}
-	if err := n.FprintRec(&buf, start, "", true); err != nil {
+	if err := n.FprintRec(&buf, start, ""); err != nil {
 		t.Fatalf("FprintRec error: %v", err)
 	}
 	out := buf.String()
@@ -1081,13 +1081,18 @@ func TestBartNode_OverlapsIdx(t *testing.T) {
 		// We need an ancestor of 133
 		idx := art.OctetToIdx(10)
 		// Find parent
-		for idx > 1 {
-			idx = idx / 2
+
+		found := false
+		for ; idx >= 1; idx >>= 1 {
 			if n.OverlapsIdx(idx) {
 				// This should eventually return true for ancestors
 				// But since we have no prefixes, only children, it depends on allotment tables
+				found = true
 				break
 			}
+		}
+		if !found {
+			t.Error("expected some ancestor idx to overlap child")
 		}
 	})
 
@@ -2142,7 +2147,7 @@ func TestBartNode_DumpString_IPv4_DeepSubtree(t *testing.T) {
 	root.InsertChild(10, lvl1)
 
 	// 1) Dump the deeper node at path [10, 1] with values printed.
-	outDeep := root.DumpString([]uint8{10, 1}, 2, true, true)
+	outDeep := root.DumpString([]uint8{10, 1}, 2, true)
 
 	if outDeep == "" {
 		t.Fatalf("DumpString returned empty output")
@@ -2159,18 +2164,12 @@ func TestBartNode_DumpString_IPv4_DeepSubtree(t *testing.T) {
 	}
 
 	// 2) Dump the intermediate node at path [10] with values printed.
-	outLvl1 := root.DumpString([]uint8{10}, 1, true, true)
+	outLvl1 := root.DumpString([]uint8{10}, 1, true)
 	if strings.Contains(outLvl1, "ERROR:") {
 		t.Fatalf("DumpString (lvl1) returned an error: %q", outLvl1)
 	}
 	if !strings.Contains(outLvl1, "333") {
 		t.Fatalf("lvl1 dump should contain value 333, got: %q", outLvl1)
-	}
-
-	// 3) Dump the deeper node again but without values; ensure values are absent.
-	outDeepNoVals := root.DumpString([]uint8{10, 1}, 2, true, false)
-	if strings.Contains(outDeepNoVals, "424242") || strings.Contains(outDeepNoVals, "515151") {
-		t.Fatalf("deep dump without values should not include value strings, got: %q", outDeepNoVals)
 	}
 }
 
@@ -2180,7 +2179,7 @@ func TestBartNode_DumpString_Error_KidNotSet_AtRootStep(t *testing.T) {
 	var root BartNode[int]
 
 	// depth=1, path[0]=10, but no kid at 10
-	out := root.DumpString([]uint8{10}, 1, true, true)
+	out := root.DumpString([]uint8{10}, 1, true)
 
 	if out == "" || !strings.Contains(out, "ERROR:") {
 		t.Fatalf("expected ERROR, got: %q", out)
@@ -2204,7 +2203,7 @@ func TestBartNode_DumpString_Error_KidNotSet_AtDeeperStep(t *testing.T) {
 	root.InsertChild(10, lvl1)
 
 	// depth=2, path[0]=10 existiert, path[1]=1 fehlt
-	out := root.DumpString([]uint8{10, 1}, 2, true, true)
+	out := root.DumpString([]uint8{10, 1}, 2, true)
 
 	if out == "" || !strings.Contains(out, "ERROR:") {
 		t.Fatalf("expected ERROR, got: %q", out)
@@ -2228,7 +2227,7 @@ func TestBartNode_DumpString_Error_KidWrongType_LeafAtDeeperStep(t *testing.T) {
 	lvl1.InsertChild(1, leaf)
 	root.InsertChild(10, lvl1)
 
-	out := root.DumpString([]uint8{10, 1}, 2, true, true)
+	out := root.DumpString([]uint8{10, 1}, 2, true)
 
 	if out == "" || !strings.Contains(out, "ERROR:") {
 		t.Fatalf("expected ERROR, got: %q", out)
@@ -2256,7 +2255,7 @@ func TestBartNode_DumpString_Error_KidWrongType_FringeAtDeeperStep(t *testing.T)
 	lvl1.InsertChild(2, fringe)
 	root.InsertChild(10, lvl1)
 
-	out := root.DumpString([]uint8{10, 2}, 2, true, true)
+	out := root.DumpString([]uint8{10, 2}, 2, true)
 
 	if out == "" || !strings.Contains(out, "ERROR:") {
 		t.Fatalf("expected ERROR, got: %q", out)

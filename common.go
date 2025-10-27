@@ -35,35 +35,9 @@ import (
 	_ "github.com/gaissmai/bart/internal/bitset"
 )
 
-// These types, constants, and functions are required in the bart package
-// and in internal/nodes. To prevent drift in implementation or values,
-// they are either aliased, copied or wrapped.
-
+// stridePath is required in many places in the bart package and in
+// internal/nodes. Aliased to keep the code readable.
 type stridePath = nodes.StridePath
-
-const (
-	maxItems     = nodes.MaxItems
-	maxTreeDepth = nodes.MaxTreeDepth
-	depthMask    = nodes.DepthMask
-)
-
-func lastOctetPlusOneAndLastBits(pfx netip.Prefix) (lastOctetPlusOne int, lastBits uint8) {
-	return nodes.LastOctetPlusOneAndLastBits(pfx)
-}
-
-// cmpPrefix compares two netip.Prefix values and reports their ordering.
-func cmpPrefix(a, b netip.Prefix) int {
-	return nodes.CmpPrefix(a, b)
-}
-
-// shouldPrintValues reports whether values of type V should be printed.
-// It returns true if V is not the empty struct, false otherwise.
-func shouldPrintValues[V any]() bool {
-	var zero V
-
-	_, isEmptyStruct := any(zero).(struct{})
-	return !isEmptyStruct
-}
 
 // Equaler is a generic interface for types that can decide their own
 // equality logic. It can be used to override the potentially expensive
@@ -114,21 +88,9 @@ func cloneVal[V any](val V) V {
 }
 
 // panicOnZST panics if V is a zero sized type.
-// bart.Fast rejects zero-sized types as payload.
+// bart.Fast must reject zero-sized types as payload.
 func panicOnZST[V any]() {
-	// returns the same memory address for zero-sized types.
-	a, b := escapeToHeap[V]()
-	if a == b {
-		panic(fmt.Errorf("%T is a zero-sized type, not allowed as payload for bart.Fast", *a))
+	if nodes.IsZST[V]() {
+		panic(fmt.Errorf("%T is a zero-sized type, not allowed as payload for bart.Fast", *new(V)))
 	}
-}
-
-// escapeToHeap forces two allocations to escape to the heap.
-// The noinline directive prevents compiler optimizations that could
-// prove address equality or elide allocations, ensuring reliable
-// ZST detection.
-//
-//go:noinline
-func escapeToHeap[V any]() (*V, *V) {
-	return new(V), new(V)
 }

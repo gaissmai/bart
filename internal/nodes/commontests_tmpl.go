@@ -28,7 +28,7 @@ import (
 type _NODE_TYPE[V any] struct{}
 
 func (n *_NODE_TYPE[V]) StatsRec() (_ StatsT)                                              { return }
-func (n *_NODE_TYPE[V]) DumpRec(io.Writer, StridePath, int, bool, bool)                    { return }
+func (n *_NODE_TYPE[V]) DumpRec(io.Writer, StridePath, int, bool)                          { return }
 func (n *_NODE_TYPE[V]) Insert(netip.Prefix, V, int) (_ bool)                              { return }
 func (n *_NODE_TYPE[V]) Delete(netip.Prefix) (_ bool)                                      { return }
 func (n *_NODE_TYPE[V]) InsertPersist(CloneFunc[V], netip.Prefix, V, int) (_ bool)         { return }
@@ -284,7 +284,7 @@ func TestInsertDelete_NODE_TYPE(t *testing.T) {
 
 			if t.Failed() {
 				buf := new(strings.Builder)
-				n.DumpRec(buf, StridePath{}, 0, tt.is4, false)
+				n.DumpRec(buf, StridePath{}, 0, tt.is4)
 				t.Logf("%s:\n%s", tt.name, buf.String())
 			}
 
@@ -308,7 +308,7 @@ func TestInsertDelete_NODE_TYPE(t *testing.T) {
 
 			if t.Failed() {
 				buf := new(strings.Builder)
-				n.DumpRec(buf, StridePath{}, 0, tt.is4, false)
+				n.DumpRec(buf, StridePath{}, 0, tt.is4)
 				t.Logf("%s:\n%s", tt.name, buf.String())
 			}
 		})
@@ -336,7 +336,7 @@ func TestInsertDelete_NODE_TYPE(t *testing.T) {
 
 			if t.Failed() {
 				buf := new(strings.Builder)
-				n.DumpRec(buf, StridePath{}, 0, tt.is4, false)
+				n.DumpRec(buf, StridePath{}, 0, tt.is4)
 				t.Logf("%s:\n%s", tt.name, buf.String())
 			}
 
@@ -360,7 +360,7 @@ func TestInsertDelete_NODE_TYPE(t *testing.T) {
 
 			if t.Failed() {
 				buf := new(strings.Builder)
-				n.DumpRec(buf, StridePath{}, 0, tt.is4, false)
+				n.DumpRec(buf, StridePath{}, 0, tt.is4)
 				t.Logf("%s:\n%s", tt.name, buf.String())
 			}
 		})

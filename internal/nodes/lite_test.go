@@ -447,7 +447,7 @@ func TestLiteNode_Stats_Dump_Fprint_DirectItems(t *testing.T) {
 
 	// DumpRec (non-brittle: just ensure prefixes appear)
 	var dump bytes.Buffer
-	n.DumpRec(&dump, StridePath{}, 0, true, false)
+	n.DumpRec(&dump, StridePath{}, 0, true)
 	out := dump.String()
 	if !strings.Contains(out, "10.0.0.0/8") {
 		t.Errorf("DumpRec missing 10.0.0.0/8: %s", out)
@@ -456,7 +456,7 @@ func TestLiteNode_Stats_Dump_Fprint_DirectItems(t *testing.T) {
 	// FprintRec (hierarchical)
 	var tree bytes.Buffer
 	start := TrieItem[int]{Node: n, Path: StridePath{}, Idx: 0, Is4: true}
-	if err := n.FprintRec(&tree, start, "", false); err != nil {
+	if err := n.FprintRec(&tree, start, ""); err != nil {
 		t.Fatalf("FprintRec error: %v", err)
 	}
 	treeOut := tree.String()
@@ -539,7 +539,7 @@ func TestLiteNode_FprintRec_and_DirectItemsRec_Smoke(t *testing.T) {
 
 	var buf bytes.Buffer
 	start := TrieItem[int]{Node: n, Path: StridePath{}, Idx: 0, Is4: true}
-	if err := n.FprintRec(&buf, start, "", false); err != nil {
+	if err := n.FprintRec(&buf, start, ""); err != nil {
 		t.Fatalf("FprintRec error: %v", err)
 	}
 	if buf.Len() == 0 {
@@ -1938,7 +1938,7 @@ func TestLiteNode_DumpString_IPv4_DeepSubtree(t *testing.T) {
 	root.InsertChild(10, lvl1)
 
 	// Deep dump [10,1]
-	outDeep := root.DumpString([]uint8{10, 1}, 2, true, true)
+	outDeep := root.DumpString([]uint8{10, 1}, 2, true)
 	if outDeep == "" || strings.Contains(outDeep, "ERROR:") {
 		t.Fatalf("unexpected dump: %q", outDeep)
 	}
@@ -1947,15 +1947,9 @@ func TestLiteNode_DumpString_IPv4_DeepSubtree(t *testing.T) {
 	}
 
 	// Intermediate dump [10]
-	outLvl1 := root.DumpString([]uint8{10}, 1, true, true)
+	outLvl1 := root.DumpString([]uint8{10}, 1, true)
 	if strings.Contains(outLvl1, "ERROR:") {
 		t.Fatalf("lvl1 dump error: %q", outLvl1)
-	}
-
-	// Deep dump without values
-	outDeepNoVals := root.DumpString([]uint8{10, 1}, 2, true, false)
-	if outDeepNoVals == "" || strings.Contains(outDeepNoVals, "ERROR:") {
-		t.Fatalf("unexpected dump (no vals): %q", outDeepNoVals)
 	}
 }
 
@@ -1963,7 +1957,7 @@ func TestLiteNode_DumpString_Error_KidNotSet_AtRootStep(t *testing.T) {
 	t.Parallel()
 	var root LiteNode[int]
 
-	out := root.DumpString([]uint8{10}, 1, true, true)
+	out := root.DumpString([]uint8{10}, 1, true)
 	if out == "" || !strings.Contains(out, "ERROR:") || !strings.Contains(out, "NOT set in node") || !strings.Contains(out, "[0]") {
 		t.Fatalf("expected missing-kid error with [0], got: %q", out)
 	}
@@ -1975,7 +1969,7 @@ func TestLiteNode_DumpString_Error_KidNotSet_AtDeeperStep(t *testing.T) {
 	lvl1 := &LiteNode[int]{}
 	root.InsertChild(10, lvl1)
 
-	out := root.DumpString([]uint8{10, 1}, 2, true, true)
+	out := root.DumpString([]uint8{10, 1}, 2, true)
 	if out == "" || !strings.Contains(out, "ERROR:") || !strings.Contains(out, "NOT set in node") || !strings.Contains(out, "[1]") {
 		t.Fatalf("expected missing-kid error with [1], got: %q", out)
 	}
@@ -1989,7 +1983,7 @@ func TestLiteNode_DumpString_Error_KidWrongType_LeafAtDeeperStep(t *testing.T) {
 	lvl1.InsertChild(1, leaf)
 	root.InsertChild(10, lvl1)
 
-	out := root.DumpString([]uint8{10, 1}, 2, true, true)
+	out := root.DumpString([]uint8{10, 1}, 2, true)
 	if out == "" || !strings.Contains(out, "ERROR:") || !strings.Contains(out, "NO LiteNode") || !strings.Contains(out, "[1]") {
 		t.Fatalf("expected wrong-type error (Leaf), got: %q", out)
 	}
@@ -2006,7 +2000,7 @@ func TestLiteNode_DumpString_Error_KidWrongType_FringeAtDeeperStep(t *testing.T)
 	lvl1.InsertChild(2, fringe)
 	root.InsertChild(10, lvl1)
 
-	out := root.DumpString([]uint8{10, 2}, 2, true, true)
+	out := root.DumpString([]uint8{10, 2}, 2, true)
 	if out == "" || !strings.Contains(out, "ERROR:") || !strings.Contains(out, "NO LiteNode") || !strings.Contains(out, "[1]") {
 		t.Fatalf("expected wrong-type error (Fringe), got: %q", out)
 	}
