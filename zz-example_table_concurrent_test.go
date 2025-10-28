@@ -10,6 +10,14 @@ import (
 	"github.com/gaissmai/bart"
 )
 
+// Cloner is an interface that enables deep cloning of values of type V.
+// If a value implements Cloner[V], Table methods such as InsertPersist,
+// ModifyPersist, DeletePersist, UnionPersist, Union and Clone will use
+// its Clone method to perform deep copies.
+type Cloner[V any] interface {
+	Clone() V
+}
+
 // testVal is a simple sample value type.
 // We use *testVal as the generic payload type V, which is a pointer type,
 // so it must implement Cloner[*testVal].

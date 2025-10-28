@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	"github.com/gaissmai/bart/internal/nodes"
+	"github.com/gaissmai/bart/internal/value"
 )
 
 func (t *Table[V]) sizeUpdate(is4 bool, delta int) {
@@ -79,7 +80,7 @@ func (t *Table[V]) insertPersist(pfx netip.Prefix, val V) *Table[V] {
 
 	// Create a cloning function for deep copying values;
 	// returns nil if V does not implement the Cloner interface.
-	cloneFn := cloneFnFactory[V]()
+	cloneFn := value.CloneFnFactory[V]()
 
 	// Clone root node corresponding to the IP version, for copy-on-write.
 	n := &pt.root4
@@ -182,7 +183,7 @@ func (t *Table[V]) DeletePersist(pfx netip.Prefix) *Table[V] {
 
 	// Create a cloning function for deep copying values;
 	// returns nil if V does not implement the Cloner interface.
-	cloneFn := cloneFnFactory[V]()
+	cloneFn := value.CloneFnFactory[V]()
 
 	// Clone root node corresponding to the IP version, for copy-on-write.
 	if is4 {
@@ -256,7 +257,7 @@ func (t *Table[V]) ModifyPersist(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, d
 	val := oldVal
 
 	// to clone or not to clone ...
-	cloneFn := cloneFnFactory[V]()
+	cloneFn := value.CloneFnFactory[V]()
 	if cloneFn != nil && ok {
 		val = cloneFn(oldVal)
 	}
@@ -422,7 +423,7 @@ func (t *Table[V]) Union(o *Table[V]) {
 
 	// Create a cloning function for deep copying values;
 	// returns nil if V does not implement the Cloner interface.
-	cloneFn := cloneFnFactory[V]()
+	cloneFn := value.CloneFnFactory[V]()
 
 	dup4 := t.root4.UnionRec(cloneFn, &o.root4, 0)
 	dup6 := t.root6.UnionRec(cloneFn, &o.root6, 0)
@@ -443,7 +444,7 @@ func (t *Table[V]) UnionPersist(o *Table[V]) *Table[V] {
 
 	// Create a cloning function for deep copying values;
 	// returns nil if V does not implement the Cloner interface.
-	cloneFn := cloneFnFactory[V]()
+	cloneFn := value.CloneFnFactory[V]()
 
 	// new Table with root nodes just copied.
 	pt := &Table[V]{
@@ -499,7 +500,7 @@ func (t *Table[V]) Clone() *Table[V] {
 
 	c := new(Table[V])
 
-	cloneFn := cloneFnFactory[V]()
+	cloneFn := value.CloneFnFactory[V]()
 
 	c.root4 = *t.root4.CloneRec(cloneFn)
 	c.root6 = *t.root6.CloneRec(cloneFn)

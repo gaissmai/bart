@@ -37,3 +37,43 @@ func TestIsZeroSizedType(t *testing.T) {
 		}
 	}
 }
+
+func TestPanicOnZST(t *testing.T) {
+	t.Parallel()
+
+	t.Run("struct{}", func(t *testing.T) {
+		t.Parallel()
+
+		defer func() {
+			if r := recover(); r == nil {
+				t.Error("struct{} must panic")
+			}
+		}()
+
+		PanicOnZST[struct{}]()
+	})
+
+	t.Run("[0]byte", func(t *testing.T) {
+		t.Parallel()
+
+		defer func() {
+			if r := recover(); r == nil {
+				t.Error("[0]byte must panic")
+			}
+		}()
+
+		PanicOnZST[[0]byte]()
+	})
+
+	t.Run("int", func(t *testing.T) {
+		t.Parallel()
+
+		defer func() {
+			if r := recover(); r != nil {
+				t.Error("int must not panic")
+			}
+		}()
+
+		PanicOnZST[int]()
+	})
+}

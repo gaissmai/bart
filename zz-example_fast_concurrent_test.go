@@ -10,10 +10,6 @@ import (
 	"github.com/gaissmai/bart"
 )
 
-// If the payload V either contains or is a pointer,
-// it must implement the [bart.Cloner] interface.
-var _ bart.Cloner[*testVal] = (*testVal)(nil)
-
 // #######################################
 
 // ExampleFast_concurrent demonstrates safe concurrent usage of bart.Fast.

@@ -111,7 +111,7 @@ func (n *FastNode[V]) Insert(pfx netip.Prefix, val V, depth int) (exists bool) {
 // InsertPersist is similar to insert but the receiver isn't modified.
 // Assumes the caller has pre-cloned the root (COW). It clones the
 // internal nodes along the descent path before mutating them.
-func (n *FastNode[V]) InsertPersist(cloneFn CloneFunc[V], pfx netip.Prefix, val V, depth int) (exists bool) {
+func (n *FastNode[V]) InsertPersist(cloneFn value.CloneFunc[V], pfx netip.Prefix, val V, depth int) (exists bool) {
 	ip := pfx.Addr() // the pfx must be in canonical form
 	octets := ip.AsSlice()
 	lastOctetPlusOne, lastBits := LastOctetPlusOneAndLastBits(pfx)
@@ -362,7 +362,7 @@ func (n *FastNode[V]) Delete(pfx netip.Prefix) (exists bool) {
 // DeletePersist is similar to delete but does not mutate the original trie.
 // Assumes the caller has pre-cloned the root (COW). It clones the
 // internal nodes along the descent path before mutating them.
-func (n *FastNode[V]) DeletePersist(cloneFn CloneFunc[V], pfx netip.Prefix) (exists bool) {
+func (n *FastNode[V]) DeletePersist(cloneFn value.CloneFunc[V], pfx netip.Prefix) (exists bool) {
 	ip := pfx.Addr() // the pfx must be in canonical form
 	is4 := ip.Is4()
 	octets := ip.AsSlice()
@@ -711,7 +711,7 @@ func (n *FastNode[V]) EqualRec(o *FastNode[V]) bool {
 
 	for idx, nVal := range n.AllIndices() {
 		oVal := o.MustGetPrefix(idx) // mustGet is ok, bitsets are equal
-		if !Equal(nVal, oVal) {
+		if !value.Equal(nVal, oVal) {
 			return false
 		}
 	}
@@ -745,7 +745,7 @@ func (n *FastNode[V]) EqualRec(o *FastNode[V]) bool {
 			}
 
 			// compare values
-			if !Equal(nKid.Value, oKid.Value) {
+			if !value.Equal(nKid.Value, oKid.Value) {
 				return false
 			}
 
@@ -757,7 +757,7 @@ func (n *FastNode[V]) EqualRec(o *FastNode[V]) bool {
 			}
 
 			// compare values
-			if !Equal(nKid.Value, oKid.Value) {
+			if !value.Equal(nKid.Value, oKid.Value) {
 				return false
 			}
 
@@ -1223,9 +1223,9 @@ func (n *FastNode[V]) DirectItemsRec(parentIdx uint8, path StridePath, depth int
 // The merge operation is destructive on the receiver n, but leaves the source node o unchanged.
 //
 // Returns the number of duplicate prefixes that were overwritten during merging.
-func (n *FastNode[V]) UnionRec(cloneFn CloneFunc[V], o *FastNode[V], depth int) (duplicates int) {
+func (n *FastNode[V]) UnionRec(cloneFn value.CloneFunc[V], o *FastNode[V], depth int) (duplicates int) {
 	if cloneFn == nil {
-		cloneFn = copyVal
+		cloneFn = value.CopyVal
 	}
 
 	buf := [256]uint8{}
@@ -1256,9 +1256,9 @@ func (n *FastNode[V]) UnionRec(cloneFn CloneFunc[V], o *FastNode[V], depth int) 
 }
 
 // UnionRecPersist is similar to unionRec but performs an immutable union of nodes.
-func (n *FastNode[V]) UnionRecPersist(cloneFn CloneFunc[V], o *FastNode[V], depth int) (duplicates int) {
+func (n *FastNode[V]) UnionRecPersist(cloneFn value.CloneFunc[V], o *FastNode[V], depth int) (duplicates int) {
 	if cloneFn == nil {
-		cloneFn = copyVal
+		cloneFn = value.CopyVal
 	}
 
 	buf := [256]uint8{}
@@ -1307,7 +1307,7 @@ func (n *FastNode[V]) UnionRecPersist(cloneFn CloneFunc[V], o *FastNode[V], dept
 //	fringe, node    <-- insert new node, push this fringe down, union rec-descent
 //	fringe, leaf    <-- insert new node, push this fringe down, insert other leaf at depth+1
 //	fringe, fringe  <-- just overwrite value
-func (n *FastNode[V]) handleMatrix(cloneFn CloneFunc[V], thisExists bool, thisChild, otherChild any, addr uint8, depth int) int {
+func (n *FastNode[V]) handleMatrix(cloneFn value.CloneFunc[V], thisExists bool, thisChild, otherChild any, addr uint8, depth int) int {
 	// Do ALL type assertions upfront - reduces line noise
 	var (
 		thisNode, thisIsNode     = thisChild.(*FastNode[V])
@@ -1424,7 +1424,7 @@ func (n *FastNode[V]) handleMatrix(cloneFn CloneFunc[V], thisExists bool, thisCh
 //	fringe, node    <-- insert new node, push this fringe down, union rec-descent
 //	fringe, leaf    <-- insert new node, push this fringe down, insert other leaf at depth+1
 //	fringe, fringe  <-- just overwrite value
-func (n *FastNode[V]) handleMatrixPersist(cloneFn CloneFunc[V], thisExists bool, thisChild, otherChild any, addr uint8, depth int) int {
+func (n *FastNode[V]) handleMatrixPersist(cloneFn value.CloneFunc[V], thisExists bool, thisChild, otherChild any, addr uint8, depth int) int {
 	// Do ALL type assertions upfront - reduces line noise
 	var (
 		thisNode, thisIsNode     = thisChild.(*FastNode[V])

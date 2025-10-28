@@ -622,6 +622,11 @@ func TestDump_ZST_BartNode(t *testing.T) {
 
 	output := buf.String()
 
+	// For ZST, dump should print prefixes(#N) but skip the "values(#N):" section
+	if !strings.Contains(output, "prefxs(") {
+		t.Errorf("Expected 'prefxs()' section, but not found in:\n%s", output)
+	}
+
 	// For ZST, dump should print prefxs(#N) but skip the "values(#N):" section
 	if strings.Contains(output, "values(") {
 		t.Errorf("Expected no 'values()' section for ZST, but found it in:\n%s", output)
@@ -648,6 +653,11 @@ func TestDump_NonZST_BartNode(t *testing.T) {
 
 	output := buf.String()
 
+	// dump should include the "prefxs(#N):" section
+	if !strings.Contains(output, "prefxs(") {
+		t.Errorf("Expected 'prefxs()' section, but not found in:\n%s", output)
+	}
+
 	// For non-ZST, dump should include the "values(#N):" section
 	if !strings.Contains(output, "values(") {
 		t.Errorf("Expected 'values()' section for non-ZST, but not found in:\n%s", output)
@@ -661,6 +671,8 @@ func TestDump_NonZST_BartNode(t *testing.T) {
 
 // TestFprintRec_ZST verifies FprintRec does not print values for zero-sized types.
 func TestFprintRec_ZST_BartNode(t *testing.T) {
+	t.Parallel()
+
 	node := new(BartNode[struct{}])
 
 	pfx := mpp("10.0.0.0/7")

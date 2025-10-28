@@ -7,11 +7,11 @@ import (
 	"cmp"
 	"fmt"
 	"net/netip"
-	"reflect"
 	"strconv"
 	"strings"
 
 	"github.com/gaissmai/bart/internal/art"
+	"github.com/gaissmai/bart/internal/value"
 )
 
 // strideLen represents the byte stride length for the multibit trie.
@@ -331,48 +331,11 @@ func LastOctetPlusOneAndLastBits(pfx netip.Prefix) (lastOctetPlusOne int, lastBi
 	return bits >> 3, uint8(bits & 7)
 }
 
-// Equaler is a generic interface for types that can decide their own
-// equality logic. It can be used to override the potentially expensive
-// default comparison with [reflect.DeepEqual].
-type Equaler[V any] interface {
-	Equal(other V) bool
-}
-
-// Equal compares two values of type V for equality.
-// If V implements Equaler[V], that custom equality method is used,
-// avoiding the potentially expensive reflect.DeepEqual.
-// Otherwise, reflect.DeepEqual is used as a fallback.
-func Equal[V any](v1, v2 V) bool {
-	// you can't assert directly on a type parameter
-	if v1, ok := any(v1).(Equaler[V]); ok {
-		return v1.Equal(v2)
-	}
-	// fallback
-	return reflect.DeepEqual(v1, v2)
-}
-
-// Cloner is an interface that enables deep cloning of values of type V.
-// If a value implements Cloner[V], Table methods such as InsertPersist,
-// ModifyPersist, DeletePersist, UnionPersist, Union and Clone will use
-// its Clone method to perform deep copies.
-type Cloner[V any] interface {
-	Clone() V
-}
-
-// CloneFunc is a type definition for a function that takes a value of type V
-// and returns the (possibly cloned) value of type V.
-type CloneFunc[V any] func(V) V
-
-// copyVal just copies the value.
-func copyVal[V any](val V) V {
-	return val
-}
-
 // CloneLeaf creates and returns a copy of the leafNode receiver.
 // If cloneFn is nil, the value is copied directly without modification.
 // Otherwise, cloneFn is applied to the value for deep cloning.
 // The prefix field is always copied as is.
-func (l *LeafNode[V]) CloneLeaf(cloneFn CloneFunc[V]) *LeafNode[V] {
+func (l *LeafNode[V]) CloneLeaf(cloneFn value.CloneFunc[V]) *LeafNode[V] {
 	if cloneFn == nil {
 		return &LeafNode[V]{Prefix: l.Prefix, Value: l.Value}
 	}
@@ -382,7 +345,7 @@ func (l *LeafNode[V]) CloneLeaf(cloneFn CloneFunc[V]) *LeafNode[V] {
 // cloneFringe creates and returns a copy of the fringeNode receiver.
 // If cloneFn is nil, the value is copied directly without modification.
 // Otherwise, cloneFn is applied to the value for deep cloning.
-func (l *FringeNode[V]) CloneFringe(cloneFn CloneFunc[V]) *FringeNode[V] {
+func (l *FringeNode[V]) CloneFringe(cloneFn value.CloneFunc[V]) *FringeNode[V] {
 	if cloneFn == nil {
 		return &FringeNode[V]{Value: l.Value}
 	}

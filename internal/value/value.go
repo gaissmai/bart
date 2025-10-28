@@ -17,6 +17,11 @@
 // This is an internal package used by the bart data structure implementation.
 package value
 
+import (
+	"fmt"
+	"reflect"
+)
+
 // IsZST reports whether type V is a zero-sized type (ZST).
 //
 // Zero-sized types such as struct{}, [0]byte, or structs/arrays with no fields
@@ -45,4 +50,74 @@ func IsZST[V any]() bool {
 //go:noinline
 func escapeToHeap[V any]() (*V, *V) {
 	return new(V), new(V)
+}
+
+// PanicOnZST panics if V is a zero sized type.
+// bart.Fast must reject zero-sized types as payload.
+func PanicOnZST[V any]() {
+	if IsZST[V]() {
+		panic(fmt.Errorf("%T is a zero-sized type, not allowed as payload for bart.Fast", *new(V)))
+	}
+}
+
+// Equaler is a generic interface for types that can decide their own
+// equality logic. It can be used to override the potentially expensive
+// default comparison with [reflect.DeepEqual].
+type Equaler[V any] interface {
+	Equal(other V) bool
+}
+
+// Equal compares two values of type V for equality.
+// If V implements Equaler[V], that custom equality method is used,
+// avoiding the potentially expensive reflect.DeepEqual.
+// Otherwise, reflect.DeepEqual is used as a fallback.
+func Equal[V any](v1, v2 V) bool {
+	// you can't assert directly on a type parameter
+	if v1, ok := any(v1).(Equaler[V]); ok {
+		return v1.Equal(v2)
+	}
+	// fallback
+	return reflect.DeepEqual(v1, v2)
+}
+
+// Cloner is an interface that enables deep cloning of values of type V.
+// If a value implements Cloner[V], Table methods such as InsertPersist,
+// ModifyPersist, DeletePersist, UnionPersist, Union and Clone will use
+// its Clone method to perform deep copies.
+type Cloner[V any] interface {
+	Clone() V
+}
+
+// CloneFunc is a type definition for a function that takes a value of type V
+// and returns the (possibly cloned) value of type V.
+type CloneFunc[V any] func(V) V
+
+// CloneFnFactory returns a CloneFunc.
+// If V implements Cloner[V], the returned function should perform
+// a deep copy using Clone(), otherwise it returns nil.
+func CloneFnFactory[V any]() CloneFunc[V] {
+	var zero V
+	// you can't assert directly on a type parameter
+	if _, ok := any(zero).(Cloner[V]); ok {
+		return CloneVal[V]
+	}
+	return nil
+}
+
+// CloneVal returns a deep clone of val by calling Clone when
+// val implements Cloner[V]. If val does not implement
+// Cloner[V] or the Cloner receiver is nil (val is a nil pointer),
+// CloneVal returns val unchanged.
+func CloneVal[V any](val V) V {
+	// you can't assert directly on a type parameter
+	c, ok := any(val).(Cloner[V])
+	if !ok || c == nil {
+		return val
+	}
+	return c.Clone()
+}
+
+// CopyVal just copies the value of any type V.
+func CopyVal[V any](val V) V {
+	return val
 }

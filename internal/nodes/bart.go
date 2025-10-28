@@ -8,6 +8,7 @@ import (
 
 	"github.com/gaissmai/bart/internal/lpm"
 	"github.com/gaissmai/bart/internal/sparse"
+	"github.com/gaissmai/bart/internal/value"
 )
 
 // BartNode is a trie level BartNode in the multibit routing table.
@@ -191,7 +192,7 @@ func (n *BartNode[V]) Lookup(idx uint8) (val V, ok bool) {
 //
 // Note: The returned node is a new instance with copied slices but only shallow copies of nested nodes,
 // except for LeafNode and FringeNode children which are cloned according to cloneFn.
-func (n *BartNode[V]) CloneFlat(cloneFn CloneFunc[V]) *BartNode[V] {
+func (n *BartNode[V]) CloneFlat(cloneFn value.CloneFunc[V]) *BartNode[V] {
 	if n == nil {
 		return nil
 	}
@@ -248,7 +249,7 @@ func (n *BartNode[V]) CloneFlat(cloneFn CloneFunc[V]) *BartNode[V] {
 //
 // Returns a new instance of BartNode[V] which is a complete deep clone of the
 // receiver node with all descendants.
-func (n *BartNode[V]) CloneRec(cloneFn CloneFunc[V]) *BartNode[V] {
+func (n *BartNode[V]) CloneRec(cloneFn value.CloneFunc[V]) *BartNode[V] {
 	if n == nil {
 		return nil
 	}
