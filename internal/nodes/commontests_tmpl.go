@@ -13,6 +13,7 @@ package nodes
 // useful for gopls during development, deleted during go generate
 
 import (
+	"bytes"
 	"io"
 	"iter"
 	"math/rand/v2"
@@ -80,7 +81,7 @@ func (n *_NODE_TYPE[V]) allSorted6() iter.Seq2[netip.Prefix, V] {
 	}
 }
 
-func TestInsertDelete_NODE_TYPE(t *testing.T) {
+func TestInsertDelete__NODE_TYPE(t *testing.T) {
 	t.Parallel()
 
 	zero := 0
@@ -367,7 +368,7 @@ func TestInsertDelete_NODE_TYPE(t *testing.T) {
 	}
 }
 
-func TestAllIterators_NODE_TYPE(t *testing.T) {
+func TestAllIterators__NODE_TYPE(t *testing.T) {
 	t.Parallel()
 	n := workLoadN()
 
@@ -417,7 +418,7 @@ func TestAllIterators_NODE_TYPE(t *testing.T) {
 	}
 }
 
-func TestSupernets4_NODE_TYPE(t *testing.T) {
+func TestSupernets4__NODE_TYPE(t *testing.T) {
 	t.Parallel()
 	n := workLoadN()
 	prng := rand.New(rand.NewPCG(42, 42))
@@ -450,7 +451,7 @@ func TestSupernets4_NODE_TYPE(t *testing.T) {
 	}
 }
 
-func TestSupernets6_NODE_TYPE(t *testing.T) {
+func TestSupernets6__NODE_TYPE(t *testing.T) {
 	t.Parallel()
 	n := workLoadN()
 	prng := rand.New(rand.NewPCG(42, 42))
@@ -483,7 +484,7 @@ func TestSupernets6_NODE_TYPE(t *testing.T) {
 	}
 }
 
-func TestSubnets4_NODE_TYPE(t *testing.T) {
+func TestSubnets4__NODE_TYPE(t *testing.T) {
 	t.Parallel()
 	n := workLoadN()
 	prng := rand.New(rand.NewPCG(42, 42))
@@ -557,7 +558,7 @@ func TestSubnets4_NODE_TYPE(t *testing.T) {
 	}
 }
 
-func TestSubnets6_NODE_TYPE(t *testing.T) {
+func TestSubnets6__NODE_TYPE(t *testing.T) {
 	t.Parallel()
 	n := workLoadN()
 	prng := rand.New(rand.NewPCG(42, 42))
@@ -628,5 +629,125 @@ func TestSubnets6_NODE_TYPE(t *testing.T) {
 				t.Errorf("Subnets expected equal to golden implementation")
 			}
 		}
+	}
+}
+
+// TestDump_ZST verifies that dump does not print values when V is a zero-sized type.
+func TestDump_ZST__NODE_TYPE(t *testing.T) {
+	t.Parallel()
+
+	node := new(_NODE_TYPE[struct{}])
+
+	// Insert prefix to populate the node
+	pfx := mpp("10.0.0.0/7")
+	node.Insert(pfx, struct{}{}, 0)
+
+	var buf strings.Builder
+	path := StridePath{}
+	node.dump(&buf, path, 0, true)
+
+	output := buf.String()
+
+	// For ZST, dump should print prefxs(#N) but skip the "values(#N):" section
+	if strings.Contains(output, "values(") {
+		t.Errorf("Expected no 'values()' section for ZST, but found it in:\n%s", output)
+	}
+}
+
+// TestDump_NonZST verifies that dump prints values when V is not a zero-sized type.
+func TestDump_NonZST__NODE_TYPE(t *testing.T) {
+	t.Parallel()
+
+	node := new(_NODE_TYPE[int])
+
+	// Skip for LiteNode (no real payload)
+	if _, isLite := any(node).(*LiteNode[int]); isLite {
+		t.Skip("LiteNode has no real payload")
+	}
+
+	pfx := mpp("10.0.0.0/7")
+	node.Insert(pfx, 42, 0)
+
+	var buf strings.Builder
+	path := StridePath{}
+	node.dump(&buf, path, 0, true)
+
+	output := buf.String()
+
+	// For non-ZST, dump should include the "values(#N):" section
+	if !strings.Contains(output, "values(") {
+		t.Errorf("Expected 'values()' section for non-ZST, but not found in:\n%s", output)
+	}
+
+	// Should contain the actual value
+	if !strings.Contains(output, "42") {
+		t.Errorf("Expected value '42' in output, but not found in:\n%s", output)
+	}
+}
+
+// TestFprintRec_ZST verifies FprintRec does not print values for zero-sized types.
+func TestFprintRec_ZST__NODE_TYPE(t *testing.T) {
+	node := new(_NODE_TYPE[struct{}])
+
+	pfx := mpp("10.0.0.0/7")
+	node.Insert(pfx, struct{}{}, 0)
+
+	parent := TrieItem[struct{}]{
+		Node:  nil,
+		Is4:   true,
+		Path:  StridePath{},
+		Depth: 0,
+		Idx:   0,
+		Cidr:  mpp("0.0.0.0/0"),
+	}
+
+	var buf bytes.Buffer
+	if err := node.FprintRec(&buf, parent, ""); err != nil {
+		t.Fatalf("FprintRec failed: %v", err)
+	}
+
+	output := buf.String()
+
+	// For ZST, output should show prefix but no value in parentheses
+	if strings.Contains(output, "10.0.0.0/7 (") || strings.Contains(output, "10.0.0.0/7(") {
+		t.Errorf("Expected no value in parentheses for ZST prefix, but found in:\n%s", output)
+	}
+}
+
+// TestFprintRec_NonZST verifies FprintRec prints values for non-zero-sized types.
+func TestFprintRec_NonZST__NODE_TYPE(t *testing.T) {
+	t.Parallel()
+
+	node := new(_NODE_TYPE[string])
+
+	// Skip for LiteNode (no real payload)
+	if _, isLite := any(node).(*LiteNode[string]); isLite {
+		t.Skip("LiteNode has no real payload")
+	}
+
+	pfx := mpp("10.0.0.0/7")
+	node.Insert(pfx, "testval", 0)
+
+	parent := TrieItem[string]{
+		Node:  nil,
+		Is4:   true,
+		Path:  StridePath{},
+		Depth: 0,
+		Idx:   0,
+		Cidr:  mpp("0.0.0.0/0"),
+		Val:   "Default Gateway",
+	}
+
+	var buf bytes.Buffer
+
+	if err := node.FprintRec(&buf, parent, ""); err != nil {
+		t.Fatalf("FprintRec failed: %v", err)
+	}
+
+	output := buf.String()
+
+	// For non-ZST, output should show both prefix and value
+	if !strings.Contains(output, "10.0.0.0/7") || !strings.Contains(output, "testval") {
+		t.Errorf("Expected prefix and value 'testval' in output, but got:\n%s", output)
 	}
 }

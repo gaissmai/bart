@@ -784,7 +784,7 @@ func (n *FastNode[V]) DumpRec(w io.Writer, path StridePath, depth int, is4 bool)
 	}
 
 	// dump this node
-	n.Dump(w, path, depth, is4)
+	n.dump(w, path, depth, is4)
 
 	// node may have children, rec-descent down
 	for addr, child := range n.AllChildren() {
@@ -795,16 +795,16 @@ func (n *FastNode[V]) DumpRec(w io.Writer, path StridePath, depth int, is4 bool)
 	}
 }
 
-// Dump writes a human-readable representation of the node to `w`.
+// dump writes a human-readable representation of the node to `w`.
 // It prints the node type, depth, formatted path (IPv4 vs IPv6 controlled by `is4`),
 // and bit count, followed by any stored prefixes (and their values when applicable),
 // the set of child octets, and any path-compressed leaves or fringe entries.
-func (n *FastNode[V]) Dump(w io.Writer, path StridePath, depth int, is4 bool) {
+func (n *FastNode[V]) dump(w io.Writer, path StridePath, depth int, is4 bool) {
 	bits := depth * strideLen
 	indent := strings.Repeat(".", depth)
 
 	// printing values if V is not zero-sized
-	printVal := !value.IsZST[V]()
+	printValues := !value.IsZST[V]()
 
 	// node type with depth and octet path and bits.
 	fmt.Fprintf(w, "\n%s[%s] depth:  %d path: [%s] / %d\n",
@@ -828,7 +828,7 @@ func (n *FastNode[V]) Dump(w io.Writer, path StridePath, depth int, is4 bool) {
 		fmt.Fprintln(w)
 
 		// skip printing values if V is zero-sized
-		if printVal {
+		if printValues {
 
 			// print the values for this node
 			fmt.Fprintf(w, "%svalues(#%d):", indent, nPfxCount)
@@ -879,7 +879,7 @@ func (n *FastNode[V]) Dump(w io.Writer, path StridePath, depth int, is4 bool) {
 				kid := n.MustGetChild(addr).(*LeafNode[V])
 
 				// skip printing values if V is zero-sized
-				if printVal {
+				if printValues {
 					fmt.Fprintf(w, " %s:{%s, %v}", addrFmt(addr, is4), kid.Prefix, kid.Value)
 				} else {
 					fmt.Fprintf(w, " %s:{%s}", addrFmt(addr, is4), kid.Prefix)
@@ -899,7 +899,7 @@ func (n *FastNode[V]) Dump(w io.Writer, path StridePath, depth int, is4 bool) {
 				kid := n.MustGetChild(addr).(*FringeNode[V])
 
 				// skip printing values if V is zero-sized
-				if printVal {
+				if printValues {
 					fmt.Fprintf(w, " %s:{%s, %v}", addrFmt(addr, is4), fringePfx, kid.Value)
 				} else {
 					fmt.Fprintf(w, " %s:{%s}", addrFmt(addr, is4), fringePfx)
@@ -955,7 +955,7 @@ func (n *FastNode[V]) DumpString(octets []uint8, depth int, is4 bool) string {
 		n = kid
 	}
 
-	n.Dump(buf, path, depth, is4)
+	n.dump(buf, path, depth, is4)
 	return buf.String()
 }
 
@@ -1081,7 +1081,7 @@ func (n *FastNode[V]) FprintRec(w io.Writer, parent TrieItem[V], pad string) err
 	})
 
 	// printing values if V is not zero-sized
-	printVal := !value.IsZST[V]()
+	printValues := !value.IsZST[V]()
 
 	// for all direct item under this node ...
 	for i, item := range directItems {
@@ -1097,7 +1097,7 @@ func (n *FastNode[V]) FprintRec(w io.Writer, parent TrieItem[V], pad string) err
 
 		var err error
 		// val is the empty struct, don't print it
-		if printVal {
+		if printValues {
 			_, err = fmt.Fprintf(w, "%s%s (%v)\n", pad+glyph, item.Cidr, item.Val)
 		} else {
 			// skip printing values if V is zero-sized
