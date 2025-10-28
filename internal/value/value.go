@@ -1,6 +1,20 @@
 // Copyright (c) 2025 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
+// Package value provides utilities for working with generic type parameters
+// as payload at runtime.
+//
+// The primary functionality is zero-sized type (ZST) detection via IsZST[V].
+// This is critical for runtime validation: Fast[V] cannot work correctly with
+// zero-sized types (like struct{} or [0]byte). IsZST enables a safety check
+// that panics during [Fast.Insert] and [Fast.InsertPersist] operations when
+// a zero-sized type is detected.
+//
+// Additionally, ZST detection improves the clarity of debug output. Since
+// zero-sized types carry no information in their values, omitting them from
+// dumps and prints reduces line noise and makes the output more readable.
+//
+// This is an internal package used by the bart data structure implementation.
 package value
 
 // IsZST reports whether type V is a zero-sized type (ZST).

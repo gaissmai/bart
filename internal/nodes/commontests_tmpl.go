@@ -29,7 +29,9 @@ import (
 type _NODE_TYPE[V any] struct{}
 
 func (n *_NODE_TYPE[V]) StatsRec() (_ StatsT)                                              { return }
+func (n *_NODE_TYPE[V]) dump(io.Writer, StridePath, int, bool)                             { return }
 func (n *_NODE_TYPE[V]) DumpRec(io.Writer, StridePath, int, bool)                          { return }
+func (n *_NODE_TYPE[V]) FprintRec(io.Writer, TrieItem[V], string) (_ error)                { return }
 func (n *_NODE_TYPE[V]) Insert(netip.Prefix, V, int) (_ bool)                              { return }
 func (n *_NODE_TYPE[V]) Delete(netip.Prefix) (_ bool)                                      { return }
 func (n *_NODE_TYPE[V]) InsertPersist(CloneFunc[V], netip.Prefix, V, int) (_ bool)         { return }

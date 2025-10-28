@@ -474,6 +474,10 @@ func (t *liteTable[V]) UnionPersist(o *liteTable[V]) *liteTable[V] {
 // Equal checks whether two tables are structurally and semantically equal.
 // It ensures both trees (IPv4-based and IPv6-based) have the same sizes and
 // recursively compares their root nodes.
+//
+// Value comparisons use reflect.DeepEqual by default. To avoid the potentially
+// expensive reflect.DeepEqual, the payload type V can implement the Equaler[V]
+// interface to provide custom equality logic.
 func (t *liteTable[V]) Equal(o *liteTable[V]) bool {
 	if o == nil || t.size4 != o.size4 || t.size6 != o.size6 {
 		return false

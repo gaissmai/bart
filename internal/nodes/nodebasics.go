@@ -338,9 +338,10 @@ type Equaler[V any] interface {
 	Equal(other V) bool
 }
 
-// equal compares two values of type V for equality.
-// If V implements Equaler[V], that custom equality method is used.
-// Otherwise, [reflect.DeepEqual] is used as a fallback.
+// Equal compares two values of type V for equality.
+// If V implements Equaler[V], that custom equality method is used,
+// avoiding the potentially expensive reflect.DeepEqual.
+// Otherwise, reflect.DeepEqual is used as a fallback.
 func Equal[V any](v1, v2 V) bool {
 	// you can't assert directly on a type parameter
 	if v1, ok := any(v1).(Equaler[V]); ok {

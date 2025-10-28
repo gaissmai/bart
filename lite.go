@@ -392,6 +392,8 @@ func (l *Lite) Overlaps6(o *Lite) bool {
 // Equal checks whether two tables are structurally and semantically equal.
 // It ensures both trees (IPv4-based and IPv6-based) have the same sizes and
 // recursively compares their root nodes.
+//
+// Note: Lite has no payload values, so this only checks structural equality.
 func (l *Lite) Equal(o *Lite) bool {
 	if o == nil || l.size4 != o.size4 || l.size6 != o.size6 {
 		return false
