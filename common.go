@@ -29,6 +29,7 @@ import (
 	"net/netip"
 
 	"github.com/gaissmai/bart/internal/nodes"
+	"github.com/gaissmai/bart/internal/value"
 
 	// inlining hint, see also the TestInlineBitSet256Functions.
 	// without this silent import the BitSet256 functions are not inlined
@@ -90,7 +91,7 @@ func cloneVal[V any](val V) V {
 // panicOnZST panics if V is a zero sized type.
 // bart.Fast must reject zero-sized types as payload.
 func panicOnZST[V any]() {
-	if nodes.IsZST[V]() {
+	if value.IsZST[V]() {
 		panic(fmt.Errorf("%T is a zero-sized type, not allowed as payload for bart.Fast", *new(V)))
 	}
 }

@@ -23,6 +23,7 @@ import (
 	"github.com/gaissmai/bart/internal/allot"
 	"github.com/gaissmai/bart/internal/art"
 	"github.com/gaissmai/bart/internal/bitset"
+	"github.com/gaissmai/bart/internal/value"
 )
 
 type _NODE_TYPE[V any] struct {
@@ -837,7 +838,7 @@ func (n *_NODE_TYPE[V]) Dump(w io.Writer, path StridePath, depth int, is4 bool) 
 	indent := strings.Repeat(".", depth)
 
 	// printing values if V is not zero-sized
-	printVal := !IsZST[V]()
+	printVal := !value.IsZST[V]()
 
 	// node type with depth and octet path and bits.
 	fmt.Fprintf(w, "\n%s[%s] depth:  %d path: [%s] / %d\n",
@@ -1113,6 +1114,9 @@ func (n *_NODE_TYPE[V]) FprintRec(w io.Writer, parent TrieItem[V], pad string) e
 		return CmpPrefix(a.Cidr, b.Cidr)
 	})
 
+	// printing values if V is not zero-sized
+	printVal := !value.IsZST[V]()
+
 	// for all direct item under this node ...
 	for i, item := range directItems {
 		// symbols used in tree
@@ -1127,11 +1131,11 @@ func (n *_NODE_TYPE[V]) FprintRec(w io.Writer, parent TrieItem[V], pad string) e
 
 		var err error
 		// val is the empty struct, don't print it
-		switch {
-		case IsZST[V](): // skip printing values if V is zero-sized
-			_, err = fmt.Fprintf(w, "%s%s\n", pad+glyph, item.Cidr)
-		default:
+		if printVal {
 			_, err = fmt.Fprintf(w, "%s%s (%v)\n", pad+glyph, item.Cidr, item.Val)
+		} else {
+			// skip printing values if V is zero-sized
+			_, err = fmt.Fprintf(w, "%s%s\n", pad+glyph, item.Cidr)
 		}
 
 		if err != nil {
