@@ -9,9 +9,10 @@ import (
 	"github.com/gaissmai/bart/internal/bitset"
 	"github.com/gaissmai/bart/internal/lpm"
 	"github.com/gaissmai/bart/internal/sparse"
+	"github.com/gaissmai/bart/internal/value"
 )
 
-// LiteNode is the core building block of the slimmed-down BART trie.
+// LiteNode is the internal node of the slimmed-down BART trie.
 //
 // Each LiteNode represents one stride (8 bits) of the address space and stores
 // both routing prefixes and child pointers for further trie traversal. It is
@@ -20,33 +21,23 @@ import (
 //
 // A LiteNode has two main responsibilities:
 //   - **Prefix storage**: Up to 256 possible prefixes (one per stride index) are
-//     managed in a BitSet (prefixes). Lookups use longest-prefix match (LPM)
-//     via backtracking along the complete binary tree (CBT) encoded in this bitset.
+//     managed in a BitSet (Prefixes). Lookups use longest-prefix match (LPM)
+//     via bitset intersection.
 //   - **Child management**: Child pointers are held in a sparse-array of at most
 //     256 entries. A child can be another *LiteNode[V] for further traversal, or
 //     a path-compressed terminal node: *LeafNode (explicit prefix storage)
 //     or *FringeNode (implicit prefix at stride boundary).
 //
 // Fields:
-//   - prefixes: BitSet256 indicating which prefix indices are occupied.
-//   - children: Sparse array holding subnodes or compressed leaf/fringe nodes.
-//   - pfxCount: Number of prefix entries actually stored in this node.
-//
-// Invariants:
-//   - pfxCount always matches the number of set bits in prefixes.
-//   - children only contains entries at addresses (0–255) explicitly present.
-//   - Node emptiness (no prefixes and no children) implies a candidate for removal.
+//   - Prefixes: BitSet256 indicating which prefix indices are occupied.
+//   - Children: Sparse array holding subnodes or compressed leaf/fringe nodes.
+//   - Count: Number of prefix entries actually stored in this node.
 //
 // Generic design note:
 //
 //	LiteNode is *pseudo-generic*: the type parameter V does not occur in the
 //	struct fields itself. Instead, it is a **phantom type** used solely to make
-//	LiteNode[V] satisfy the generic interface nodeReadWriter[V].
-//	This allows LiteNode, fastNode, and node to be interchangeable under the
-//	same interface abstraction, enabling generic algorithms for insertion,
-//	lookup, dumping, and traversal, regardless of the internal representation.
-//	The compiler enforces type correctness at the interface boundary, while
-//	the internal layout of LiteNode stays lean (no value payloads).
+//	LiteNode[V] methods also be generated from one template.
 //
 // Memory model:
 //   - Prefix presence is tracked only via bitset (values are not stored directly).
@@ -56,9 +47,9 @@ import (
 // Usage notes:
 //   - Routing insertions place prefixes either into the prefix table (if aligned)
 //     or into compressed child nodes (leaf/fringe).
-//   - Lookup/contains use the precomputed CBT-backtracking bitset (lpm.LookupTbl)
+//   - Lookup/Contains use the precomputed CBT-backtracking bitset (lpm.LookupTbl)
 //     for fast longest-prefix match within stride.
-//   - purgeAndCompress reclaims empty / sparse nodes on unwind to keep the trie compact.
+//   - PurgeAndCompress reclaims empty / sparse nodes on unwind to keep the trie compact.
 type LiteNode[V any] struct {
 	Children sparse.Array256[any]
 	Prefixes struct {
@@ -212,7 +203,7 @@ func (n *LiteNode[V]) Lookup(idx uint8) (_ V, ok bool) {
 // CloneFlat returns a shallow copy of the current node.
 //
 // CloneFn is only used for interface satisfaction.
-func (n *LiteNode[V]) CloneFlat(_ CloneFunc[V]) *LiteNode[V] {
+func (n *LiteNode[V]) CloneFlat(_ value.CloneFunc[V]) *LiteNode[V] {
 	if n == nil {
 		return nil
 	}
@@ -245,7 +236,7 @@ func (n *LiteNode[V]) CloneFlat(_ CloneFunc[V]) *LiteNode[V] {
 //
 // Returns a new instance of LiteNode[V] which is a complete deep clone of the
 // receiver node with all descendants.
-func (n *LiteNode[V]) CloneRec(_ CloneFunc[V]) *LiteNode[V] {
+func (n *LiteNode[V]) CloneRec(_ value.CloneFunc[V]) *LiteNode[V] {
 	if n == nil {
 		return nil
 	}

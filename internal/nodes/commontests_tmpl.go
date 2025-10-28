@@ -24,6 +24,7 @@ import (
 
 	"github.com/gaissmai/bart/internal/tests/golden"
 	"github.com/gaissmai/bart/internal/tests/random"
+	"github.com/gaissmai/bart/internal/value"
 )
 
 type _NODE_TYPE[V any] struct{}
@@ -34,8 +35,8 @@ func (n *_NODE_TYPE[V]) DumpRec(io.Writer, StridePath, int, bool)               
 func (n *_NODE_TYPE[V]) FprintRec(io.Writer, TrieItem[V], string) (_ error)                { return }
 func (n *_NODE_TYPE[V]) Insert(netip.Prefix, V, int) (_ bool)                              { return }
 func (n *_NODE_TYPE[V]) Delete(netip.Prefix) (_ bool)                                      { return }
-func (n *_NODE_TYPE[V]) InsertPersist(CloneFunc[V], netip.Prefix, V, int) (_ bool)         { return }
-func (n *_NODE_TYPE[V]) DeletePersist(CloneFunc[V], netip.Prefix) (_ bool)                 { return }
+func (n *_NODE_TYPE[V]) InsertPersist(value.CloneFunc[V], netip.Prefix, V, int) (_ bool)   { return }
+func (n *_NODE_TYPE[V]) DeletePersist(value.CloneFunc[V], netip.Prefix) (_ bool)           { return }
 func (n *_NODE_TYPE[V]) Subnets(netip.Prefix, func(netip.Prefix, V) bool)                  { return }
 func (n *_NODE_TYPE[V]) Supernets(netip.Prefix, func(netip.Prefix, V) bool)                { return }
 func (n *_NODE_TYPE[V]) AllRec(StridePath, int, bool, func(netip.Prefix, V) bool) (_ bool) { return }
@@ -650,6 +651,11 @@ func TestDump_ZST__NODE_TYPE(t *testing.T) {
 
 	output := buf.String()
 
+	// For ZST, dump should print prefixes(#N) but skip the "values(#N):" section
+	if !strings.Contains(output, "prefxs(") {
+		t.Errorf("Expected 'prefxs()' section, but not found in:\n%s", output)
+	}
+
 	// For ZST, dump should print prefxs(#N) but skip the "values(#N):" section
 	if strings.Contains(output, "values(") {
 		t.Errorf("Expected no 'values()' section for ZST, but found it in:\n%s", output)
@@ -676,6 +682,11 @@ func TestDump_NonZST__NODE_TYPE(t *testing.T) {
 
 	output := buf.String()
 
+	// dump should include the "prefxs(#N):" section
+	if !strings.Contains(output, "prefxs(") {
+		t.Errorf("Expected 'prefxs()' section, but not found in:\n%s", output)
+	}
+
 	// For non-ZST, dump should include the "values(#N):" section
 	if !strings.Contains(output, "values(") {
 		t.Errorf("Expected 'values()' section for non-ZST, but not found in:\n%s", output)
@@ -689,6 +700,8 @@ func TestDump_NonZST__NODE_TYPE(t *testing.T) {
 
 // TestFprintRec_ZST verifies FprintRec does not print values for zero-sized types.
 func TestFprintRec_ZST__NODE_TYPE(t *testing.T) {
+	t.Parallel()
+
 	node := new(_NODE_TYPE[struct{}])
 
 	pfx := mpp("10.0.0.0/7")

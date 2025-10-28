@@ -9,6 +9,7 @@ import (
 
 	"github.com/gaissmai/bart/internal/art"
 	"github.com/gaissmai/bart/internal/nodes"
+	"github.com/gaissmai/bart/internal/value"
 )
 
 // Fast follows the ART design by Knuth in using fixed arrays at each level
@@ -64,7 +65,7 @@ func (f *Fast[V]) rootNodeByVersion(is4 bool) *nodes.FastNode[V] {
 // The prefix is automatically canonicalized using pfx.Masked() to ensure
 // consistent behavior regardless of host bits in the input.
 func (t *Fast[V]) Insert(pfx netip.Prefix, val V) {
-	t.once.Do(panicOnZST[V])
+	t.once.Do(value.PanicOnZST[V])
 	t.insert(pfx, val)
 }
 
@@ -80,7 +81,7 @@ func (t *Fast[V]) Insert(pfx netip.Prefix, val V) {
 // Due to cloning overhead this is significantly slower than Insert,
 // typically taking μsec instead of nsec.
 func (t *Fast[V]) InsertPersist(pfx netip.Prefix, val V) *Fast[V] {
-	t.once.Do(panicOnZST[V])
+	t.once.Do(value.PanicOnZST[V])
 	return t.insertPersist(pfx, val)
 }
 

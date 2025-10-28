@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/gaissmai/bart/internal/art"
+	"github.com/gaissmai/bart/internal/value"
 )
 
 // helpers
@@ -24,10 +25,10 @@ func workLoadN() int {
 // cloneFnFactory returns a CloneFunc.
 // If V implements Cloner[V], the returned function should perform
 // a deep copy using Clone(), otherwise it returns nil.
-func cloneFnFactory[V any]() CloneFunc[V] {
+func cloneFnFactory[V any]() value.CloneFunc[V] {
 	var zero V
 	// you can't assert directly on a type parameter
-	if _, ok := any(zero).(Cloner[V]); ok {
+	if _, ok := any(zero).(value.Cloner[V]); ok {
 		return cloneVal[V]
 	}
 	return nil
@@ -38,7 +39,7 @@ func cloneFnFactory[V any]() CloneFunc[V] {
 // asserted Cloner is nil, val is returned unchanged.
 func cloneVal[V any](val V) V {
 	// you can't assert directly on a type parameter
-	c, ok := any(val).(Cloner[V])
+	c, ok := any(val).(value.Cloner[V])
 	if !ok || c == nil {
 		return val
 	}

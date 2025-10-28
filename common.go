@@ -25,11 +25,9 @@
 package bart
 
 import (
-	"fmt"
 	"net/netip"
 
 	"github.com/gaissmai/bart/internal/nodes"
-	"github.com/gaissmai/bart/internal/value"
 
 	// inlining hint, see also the TestInlineBitSet256Functions.
 	// without this silent import the BitSet256 functions are not inlined
@@ -40,58 +38,10 @@ import (
 // internal/nodes. Aliased to keep the code readable.
 type stridePath = nodes.StridePath
 
-// Equaler is a generic interface for types that can decide their own
-// equality logic. It can be used to override the potentially expensive
-// default comparison with [reflect.DeepEqual].
-type Equaler[V any] interface {
-	Equal(other V) bool
-}
-
-// Cloner is an interface that enables deep cloning of values of type V.
-// If a value implements Cloner[V], Table methods such as InsertPersist,
-// ModifyPersist, DeletePersist, UnionPersist, Union and Clone will use
-// its Clone method to perform deep copies.
-type Cloner[V any] interface {
-	Clone() V
-}
-
 // DumpListNode contains CIDR, Value and Subnets, representing the trie
 // in a sorted, recursive representation, especially useful for serialization.
 type DumpListNode[V any] struct {
 	CIDR    netip.Prefix      `json:"cidr"`
 	Value   V                 `json:"value"`
 	Subnets []DumpListNode[V] `json:"subnets,omitempty"`
-}
-
-// cloneFnFactory returns a CloneFunc.
-// If V implements Cloner[V], the returned function should perform
-// a deep copy using Clone(), otherwise it returns nil.
-func cloneFnFactory[V any]() nodes.CloneFunc[V] {
-	var zero V
-	// you can't assert directly on a type parameter
-	if _, ok := any(zero).(Cloner[V]); ok {
-		return cloneVal[V]
-	}
-	return nil
-}
-
-// cloneVal returns a deep clone of val by calling Clone when
-// val implements Cloner[V]. If val does not implement
-// Cloner[V] or the Cloner receiver is nil (val is a nil pointer),
-// cloneVal returns val unchanged.
-func cloneVal[V any](val V) V {
-	// you can't assert directly on a type parameter
-	c, ok := any(val).(Cloner[V])
-	if !ok || c == nil {
-		return val
-	}
-	return c.Clone()
-}
-
-// panicOnZST panics if V is a zero sized type.
-// bart.Fast must reject zero-sized types as payload.
-func panicOnZST[V any]() {
-	if value.IsZST[V]() {
-		panic(fmt.Errorf("%T is a zero-sized type, not allowed as payload for bart.Fast", *new(V)))
-	}
 }

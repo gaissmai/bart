@@ -8,14 +8,15 @@ import (
 
 	"github.com/gaissmai/bart/internal/bitset"
 	"github.com/gaissmai/bart/internal/lpm"
+	"github.com/gaissmai/bart/internal/value"
 )
 
 // FastNode is a trie level node in the multibit routing table.
 //
 // Each FastNode contains two conceptually different fixed sized arrays:
-//   - prefixes: representing routes, using a complete binary tree layout
+//   - Prefixes: representing routes, using a complete binary tree layout
 //     driven by the baseIndex() function from the ART algorithm.
-//   - children: holding subtries or path-compressed leaves or fringes.
+//   - Children: holding subtries or path-compressed leaves or fringes.
 //
 // See doc/artlookup.pdf for the mapping mechanics and prefix tree details.
 type FastNode[V any] struct {
@@ -40,7 +41,7 @@ type FastNode[V any] struct {
 	}
 
 	// PfxCount is an O(1) counter tracking the number of prefixes in this node.
-	// This replaces expensive prefixesBitSet.Size() calls with direct counter access.
+	// This replaces expensive Prefixes.BitSet256.Size() calls with direct counter access.
 	// Automatically maintained during insertPrefix() and deletePrefix() operations.
 	PfxCount uint16
 
@@ -297,7 +298,7 @@ func (n *FastNode[V]) allot(idx uint8, oldValPtr, valPtr *V) {
 // CloneFlat returns a shallow copy of the current FastNode[V],
 // Its semantics are identical to [bartNode.CloneFlat] but the
 // implementation is more complex.
-func (n *FastNode[V]) CloneFlat(cloneFn CloneFunc[V]) *FastNode[V] {
+func (n *FastNode[V]) CloneFlat(cloneFn value.CloneFunc[V]) *FastNode[V] {
 	if n == nil {
 		return nil
 	}
@@ -354,7 +355,7 @@ func (n *FastNode[V]) CloneFlat(cloneFn CloneFunc[V]) *FastNode[V] {
 
 // CloneRec performs a recursive deep copy of the FastNode[V] and all its descendants.
 // Its semantics are identical to [bartNode.cloneRec].
-func (n *FastNode[V]) CloneRec(cloneFn CloneFunc[V]) *FastNode[V] {
+func (n *FastNode[V]) CloneRec(cloneFn value.CloneFunc[V]) *FastNode[V] {
 	if n == nil {
 		return nil
 	}
