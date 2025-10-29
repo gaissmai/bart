@@ -12,49 +12,26 @@ import (
 	"github.com/gaissmai/bart/internal/value"
 )
 
-// LiteNode is the internal node of the slimmed-down BART trie.
+// LiteNode is a trie level node in the multibit routing table.
 //
-// Each LiteNode represents one stride (8 bits) of the address space and stores
-// both routing prefixes and child pointers for further trie traversal. It is
-// designed as a memory-efficient alternative to classic ART-style nodes,
-// using compact bitsets and sparse arrays instead of full lookup tables.
+// Each LiteNode contains two conceptually different bitset-based arrays:
+//   - Prefixes: a BitSet256 tracking which prefix indices are occupied,
+//     with Count tracking the number of active entries.
+//   - Children: holding subtries or path-compressed leaves/fringes with
+//     a branching factor of 256 (8 bits per stride).
 //
-// A LiteNode has two main responsibilities:
-//   - **Prefix storage**: Up to 256 possible prefixes (one per stride index) are
-//     managed in a BitSet (Prefixes). Lookups use longest-prefix match (LPM)
-//     via bitset intersection.
-//   - **Child management**: Child pointers are held in a sparse-array of at most
-//     256 entries. A child can be another *LiteNode[V] for further traversal, or
-//     a path-compressed terminal node: *LeafNode (explicit prefix storage)
-//     or *FringeNode (implicit prefix at stride boundary).
+// Entries in Children may be:
+//   - *LiteNode[V]   -> internal child node for further traversal
+//   - *LeafNode[V]   -> path-comp. node (depth < maxDepth - 1)
+//   - *FringeNode[V] -> path-comp. node (depth == maxDepth - 1, stride-aligned)
 //
-// Fields:
-//   - Prefixes: BitSet256 indicating which prefix indices are occupied.
-//   - Children: Sparse array holding subnodes or compressed leaf/fringe nodes.
-//   - Count: Number of prefix entries actually stored in this node.
-//
-// Generic design note:
-//
-//	LiteNode is *pseudo-generic*: the type parameter V does not occur in the
-//	struct fields itself. Instead, it is a **phantom type** used solely to make
-//	LiteNode[V] methods also be generated from one template.
-//
-// Memory model:
-//   - Prefix presence is tracked only via bitset (values are not stored directly).
-//   - No values are stored; lite tracks presence only.
-//   - LiteNode acts solely as the internal routing structure.
-//
-// Usage notes:
-//   - Routing insertions place prefixes either into the prefix table (if aligned)
-//     or into compressed child nodes (leaf/fringe).
-//   - Lookup/Contains use the precomputed CBT-backtracking bitset (lpm.LookupTbl)
-//     for fast longest-prefix match within stride.
-//   - PurgeAndCompress reclaims empty / sparse nodes on unwind to keep the trie compact.
+// Note: The type parameter V is a phantom type used solely for common
+// method generation; LiteNode stores no values.
 type LiteNode[V any] struct {
 	Children sparse.Array256[any]
 	Prefixes struct {
-		bitset.BitSet256
 		// no values
+		bitset.BitSet256
 		Count uint16
 	}
 }

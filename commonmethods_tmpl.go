@@ -120,7 +120,7 @@ func (t *_TABLE_TYPE[V]) insert(pfx netip.Prefix, val V) {
 // from both Tables.
 //
 // If the payload type V contains pointers or needs deep copying,
-// it must implement the Cloner interface to support correct cloning.
+// it must implement the value.Cloner interface to support correct cloning.
 //
 // Due to cloning overhead this is significantly slower than insert,
 // typically taking μsec instead of nsec.
@@ -140,7 +140,7 @@ func (t *_TABLE_TYPE[V]) insertPersist(pfx netip.Prefix, val V) *_TABLE_TYPE[V] 
 	}
 
 	// Create a cloning function for deep copying values;
-	// returns nil if V does not implement the Cloner interface.
+	// returns nil if V does not implement the value.Cloner interface.
 	cloneFn := value.CloneFnFactory[V]()
 
 	// Clone root node corresponding to the IP version, for copy-on-write.
@@ -217,7 +217,7 @@ func (t *_TABLE_TYPE[V]) Get(pfx netip.Prefix) (val V, exists bool) {
 // returned unchanged.
 //
 // If the payload type V contains pointers or requires deep copying,
-// it must implement the Cloner interface for correct cloning.
+// it must implement the Clone method for correct cloning.
 //
 // Due to cloning overhead this is significantly slower than Delete,
 // typically taking μsec instead of nsec.
@@ -243,7 +243,7 @@ func (t *_TABLE_TYPE[V]) DeletePersist(pfx netip.Prefix) *_TABLE_TYPE[V] {
 	}
 
 	// Create a cloning function for deep copying values;
-	// returns nil if V does not implement the Cloner interface.
+	// returns nil if V does not implement the value.Cloner interface.
 	cloneFn := value.CloneFnFactory[V]()
 
 	// Clone root node corresponding to the IP version, for copy-on-write.
@@ -476,14 +476,14 @@ func (t *_TABLE_TYPE[V]) Overlaps6(o *_TABLE_TYPE[V]) bool {
 // All prefixes and values from the other table (o) are inserted into the receiver.
 // If a duplicate prefix exists in both tables, the value from o replaces the existing entry.
 // This duplicate is shallow-copied by default, but if the value type V implements the
-// Cloner interface, the value is deeply cloned before insertion. See also _TABLE_TYPE.Clone.
+// Clone method, the value is deeply cloned before insertion. See also _TABLE_TYPE.Clone.
 func (t *_TABLE_TYPE[V]) Union(o *_TABLE_TYPE[V]) {
 	if o == nil || o == t || (o.size4 == 0 && o.size6 == 0) {
 		return
 	}
 
 	// Create a cloning function for deep copying values;
-	// returns nil if V does not implement the Cloner interface.
+	// returns nil if V does not implement the value.Cloner interface.
 	cloneFn := value.CloneFnFactory[V]()
 
 	dup4 := t.root4.UnionRec(cloneFn, &o.root4, 0)
@@ -504,7 +504,7 @@ func (t *_TABLE_TYPE[V]) UnionPersist(o *_TABLE_TYPE[V]) *_TABLE_TYPE[V] {
 	}
 
 	// Create a cloning function for deep copying values;
-	// returns nil if V does not implement the Cloner interface.
+	// returns nil if V does not implement the value.Cloner interface.
 	cloneFn := value.CloneFnFactory[V]()
 
 	// new _TABLE_TYPE with root nodes just copied.
@@ -538,8 +538,18 @@ func (t *_TABLE_TYPE[V]) UnionPersist(o *_TABLE_TYPE[V]) *_TABLE_TYPE[V] {
 // recursively compares their root nodes.
 //
 // Value comparisons use reflect.DeepEqual by default. To avoid the potentially
-// expensive reflect.DeepEqual, the payload type V can implement the Equaler[V]
-// interface to provide custom equality logic.
+// expensive reflect.DeepEqual, the payload type V can provide custom equality
+// by implementing the following method:
+//
+//	Equal(other V) bool
+//
+// Example:
+//
+//	type MyValue struct { ID int }
+//	func (v MyValue) Equal(other MyValue) bool { return v.ID == other.ID }
+//
+// The bart package will automatically detect and use this method via Go's
+// structural typing.
 func (t *_TABLE_TYPE[V]) Equal(o *_TABLE_TYPE[V]) bool {
 	if o == nil || t.size4 != o.size4 || t.size6 != o.size6 {
 		return false
@@ -552,8 +562,20 @@ func (t *_TABLE_TYPE[V]) Equal(o *_TABLE_TYPE[V]) bool {
 }
 
 // Clone returns a copy of the routing table.
-// The payload of type V is shallow copied, but if type V implements the [Cloner] interface,
-// the values are cloned.
+// The payload of type V is shallow copied by default. To enable deep copying,
+// implement the following method on your value type:
+//
+//	Clone() V
+//
+// Example:
+//
+//	type MyValue struct { Data []byte }
+//	func (v MyValue) Clone() MyValue {
+//	    return MyValue{Data: slices.Clone(v.Data)}
+//	}
+//
+// The bart package will automatically detect and use this method via Go's
+// structural typing.
 func (t *_TABLE_TYPE[V]) Clone() *_TABLE_TYPE[V] {
 	if t == nil {
 		return nil
