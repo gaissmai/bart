@@ -13,24 +13,26 @@ import (
 
 // FastNode is a trie level node in the multibit routing table.
 //
-// Each FastNode contains two conceptually different fixed sized arrays
-// and two counters:
-//   - PfxCount is an O(1) counter tracking the number of prefixes.
-//   - CldCount is an O(1) counter tracking the number of child nodes.
-//   - Prefixes: representing routes, using a complete binary tree layout
-//     driven by the baseIndex() function from the ART algorithm.
-//   - Children: holding subtries or path-compressed leaves or fringes.
+// Each FastNode contains two sections (Prefixes and Children), each with
+// a BitSet256 tracking occupied indices and a fixed-size Items array:
+//   - Prefixes.BitSet256: tracks which prefix indices are occupied.
+//   - Prefixes.Items: [256]*V storing routing entry values.
+//   - Children.BitSet256: tracks which child indices are occupied.
+//   - Children.Items: [256]*any holding subtries or path-compressed leaves/fringes
+//     (branching factor 256, 8 bits per stride).
+//   - PfxCount: cached count of active prefixes (avoids BitSet.Size() calls).
+//   - CldCount: cached count of child nodes (avoids BitSet.Size() calls).
 //
-// Children.items: **FastNode or path-compressed **leaf- or **fringeNode
-// an array of "pointers to" the empty interface and not an array of
-// empty interfaces.
+// Prefixes use a complete binary tree layout driven by the baseIndex() function
+// from the ART algorithm for fast LPM lookup.
 //
-// - interface{}  takes 2 words, even if nil.
-// - *interface{} requires only 1 word when nil.
+// Entries in Children.Items (each *any containing a pointer) may be:
+//   - **FastNode[V]   -> internal child node for further traversal
+//   - **LeafNode[V]   -> path-comp. node (depth < maxDepth - 1)
+//   - **FringeNode[V] -> path-comp. node (depth == maxDepth - 1, stride-aligned)
 //
-// Since many slots are nil, this reduces memory by 30%. The added
-// indirection does not have a measurable performance impact, but makes
-// the code more complex.
+// Note: Children.Items uses *any (pointer to any) instead of any to reduce memory by
+// ~30%, since many slots are nil and *any takes 1 word vs 2 words for nil any.
 type FastNode[V any] struct {
 	// Prefixes holding prefix -> value pointers, organized as a CBT
 	// for fast LPM lookup within the node.
@@ -42,11 +44,11 @@ type FastNode[V any] struct {
 	// Children holding subtries or path-compressed leaves or fringes.
 	Children struct {
 		bitset.BitSet256
-		Items [256]*any
+		Items [256]*any // pointer to any, see explanation above
 	}
 
 	// PfxCount replaces expensive BitSet256.Size() calls. Automatically
-	// maintained during insertPrefix() and deletePrefix() operations.
+	// maintained during InsertPrefix() and DeletePrefix() operations.
 	PfxCount uint16
 
 	// CldCount replaces expensive BitSet.Size() calls. Automatically

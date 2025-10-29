@@ -22,6 +22,19 @@
 // and routers.
 //
 // All variants also support copy-on-write persistence.
+//
+// For complex or pointer value types, you must provide custom deep cloning
+// using Go's structural typing, implementing the following method on your
+// value type V:
+//
+//	func (v V) Clone() V
+//
+// For custom Equality implement the following method on your value type V:
+//
+//	func (v V) Equal(other V) bool
+//
+// The bart package detects the interface satisfaction automatically at
+// runtime using type assertions.
 package bart
 
 import (

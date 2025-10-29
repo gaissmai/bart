@@ -336,6 +336,10 @@ func LastOctetPlusOneAndLastBits(pfx netip.Prefix) (lastOctetPlusOne int, lastBi
 // Otherwise, cloneFn is applied to the value for deep cloning.
 // The prefix field is always copied as is.
 func (l *LeafNode[V]) CloneLeaf(cloneFn value.CloneFunc[V]) *LeafNode[V] {
+	if l == nil {
+		return nil
+	}
+
 	if cloneFn == nil {
 		return &LeafNode[V]{Prefix: l.Prefix, Value: l.Value}
 	}
@@ -346,6 +350,10 @@ func (l *LeafNode[V]) CloneLeaf(cloneFn value.CloneFunc[V]) *LeafNode[V] {
 // If cloneFn is nil, the value is copied directly without modification.
 // Otherwise, cloneFn is applied to the value for deep cloning.
 func (l *FringeNode[V]) CloneFringe(cloneFn value.CloneFunc[V]) *FringeNode[V] {
+	if l == nil {
+		return nil
+	}
+
 	if cloneFn == nil {
 		return &FringeNode[V]{Value: l.Value}
 	}
