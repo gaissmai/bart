@@ -23,8 +23,8 @@ import (
 // or take a long time in comparison to reads,
 // providing high performance for concurrent workloads.
 //
-// If the payload V either contains or is a pointer,
-// it must implement the Cloner interface.
+// If the payload V either contains pointers or is a pointer,
+// implement a Clone method so persistent ops can deep-copy values.
 func ExampleFast_concurrent() {
 	var tblAtomicPtr atomic.Pointer[bart.Fast[*testVal]]
 	var tblMutex sync.Mutex

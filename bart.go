@@ -81,6 +81,8 @@ func (t *Table[V]) InsertPersist(pfx netip.Prefix, val V) *Table[V] {
 // return a new value and a delete flag: del == false inserts or updates,
 // del == true deletes the entry if it exists (otherwise no-op).
 //
+// The callback is invoked at most once per call.
+//
 // The operation is determined by the callback function, which is called with:
 //
 //	val:   the current value (or zero value if not found)

@@ -132,8 +132,8 @@ func (l *Lite) DeletePersist(pfx netip.Prefix) *Lite {
 	return &Lite{*lp}
 }
 
-// Modify applies an insert, update, or delete operation for the given
-// prefix.
+// Modify applies an insert, update, or delete for the given prefix.
+// The prefix is canonicalized (Masked) internally before the operation.
 // The operation is determined by the callback function, which is called with:
 //
 //	true:  the prefix is in table

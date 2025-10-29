@@ -10,15 +10,13 @@ import (
 	"github.com/gaissmai/bart"
 )
 
-// testVal is a simple sample value type.
-// We use *testVal as the generic payload type V, which is a pointer type,
-// so it must implement Cloner[V].
+// We use *testVal as the generic payload type V (a pointer type).
 type testVal struct {
 	data int
 }
 
-// Clone ensures deep copying for use with ...Persist implementing the
-// Cloner interface.
+// Clone enables deep copying for ...Persist operations.
+// Detected via structural typing (presence of a matching Clone method).
 func (v *testVal) Clone() *testVal {
 	if v == nil {
 		return nil
@@ -39,8 +37,8 @@ func (v *testVal) Clone() *testVal {
 // or take a long time in comparison to reads,
 // providing high performance for concurrent workloads.
 //
-// If the payload V either contains a pointer or is a pointer,
-// it must implement the Cloner interface.
+// If the payload V either contains pointers or is a pointer,
+// implement a Clone method (structural typing is used).
 func ExampleTable_concurrent() {
 	var tblAtomicPtr atomic.Pointer[bart.Table[*testVal]]
 	var tblMutex sync.Mutex
