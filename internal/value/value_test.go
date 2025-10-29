@@ -60,9 +60,12 @@ func TestIsZeroSizedType(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		if tt.got != tt.want {
-			t.Errorf("%s, want %v, got %v", tt.name, tt.want, tt.got)
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if tt.got != tt.want {
+				t.Fatalf("want %v, got %v", tt.want, tt.got)
+			}
+		})
 	}
 }
 
