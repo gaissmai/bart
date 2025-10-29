@@ -513,9 +513,6 @@ func (l *liteTable[V]) Insert(pfx netip.Prefix, val V) {
 // This is not a full [liteTable.Clone], all untouched nodes are still referenced
 // from both Tables.
 //
-// If the payload type V contains pointers or needs deep copying,
-// it must implement the [bart.Cloner] interface to support correct cloning.
-//
 // Due to cloning overhead this is significantly slower than Insert,
 // typically taking μsec instead of nsec.
 func (l *liteTable[V]) InsertPersist(pfx netip.Prefix, val V) *liteTable[V] {

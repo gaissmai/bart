@@ -24,7 +24,7 @@ import (
 // providing high performance for concurrent workloads.
 //
 // If the payload V either contains or is a pointer,
-// it must implement the [bart.Cloner] interface.
+// it must implement the Cloner interface.
 func ExampleFast_concurrent() {
 	var tblAtomicPtr atomic.Pointer[bart.Fast[*testVal]]
 	var tblMutex sync.Mutex
