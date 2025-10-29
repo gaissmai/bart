@@ -85,6 +85,49 @@ func (t *Fast[V]) InsertPersist(pfx netip.Prefix, val V) *Fast[V] {
 	return t.insertPersist(pfx, val)
 }
 
+// Modify applies an insert, update, or delete operation for the value
+// associated with the given prefix. The supplied callback decides the
+// operation: it is called with the current value (or zero if not found)
+// and a boolean indicating whether the prefix exists. The callback must
+// return a new value and a delete flag: del == false inserts or updates,
+// del == true deletes the entry if it exists (otherwise no-op).
+//
+// The operation is determined by the callback function, which is called with:
+//
+//	val:   the current value (or zero value if not found)
+//	found: true if the prefix currently exists, false otherwise
+//
+// The callback returns:
+//
+//	val: the new value to insert or update (ignored if del == true)
+//	del: true to delete the entry, false to insert or update
+//
+// Summary of callback semantics:
+//
+//	| cb-input        | cb-return       | Ops    |
+//	------------------------------------- --------
+//	| (zero,   false) | (_,      true)  | no-op  |
+//	| (zero,   false) | (newVal, false) | insert |
+//	| (oldVal, true)  | (newVal, false) | update |
+//	| (oldVal, true)  | (_,      true)  | delete |
+//	------------------------------------- --------
+func (t *Fast[V]) Modify(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, del bool)) {
+	t.once.Do(value.PanicOnZST[V])
+	if !pfx.IsValid() {
+		return
+	}
+
+	// canonicalize prefix
+	pfx = pfx.Masked()
+
+	is4 := pfx.Addr().Is4()
+
+	n := t.rootNodeByVersion(is4)
+
+	delta := n.Modify(pfx, cb)
+	t.sizeUpdate(is4, delta)
+}
+
 // Contains reports whether any stored prefix covers the given IP address.
 // Returns false for invalid IP addresses.
 //
