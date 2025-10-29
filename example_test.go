@@ -5,6 +5,7 @@ package bart_test
 
 import (
 	"fmt"
+	"maps"
 	"net/netip"
 	"os"
 
@@ -184,4 +185,31 @@ func ExampleTable_Supernets_rangeoverfunc() {
 	// Output:
 	// 2001:db8::/32
 	// 2000::/3
+}
+
+type route struct {
+	ASN   int
+	Attrs map[string]string
+}
+
+func (r route) Equal(other route) bool {
+	return r.ASN == other.ASN && maps.Equal(r.Attrs, other.Attrs)
+}
+
+func (r route) Clone() route {
+	return route{
+		ASN:   r.ASN,
+		Attrs: maps.Clone(r.Attrs),
+	}
+}
+
+// Example of a custom value type with both equality and cloning
+func ExampleTable_customValue() {
+	table := new(bart.Table[route])
+	table = table.InsertPersist(mpp("10.0.0.0/8"), route{ASN: 64512, Attrs: map[string]string{"foo": "bar"}})
+	clone := table.Clone()
+	fmt.Printf("Cloned tables are equal: %v\n", table.Equal(clone))
+
+	// Output:
+	// Cloned tables are equal: true
 }

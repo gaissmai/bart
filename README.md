@@ -177,9 +177,9 @@ provides clear advantages for any routing daemon.
 But as always, it depends on the specific use case.
 
 See the concurrent tests for concrete examples of this pattern:
-- [ExampleFast](zz-example_fast_concurrent_test.go)
-- [ExampleLite](zz-example_lite_concurrent_test.go)
-- [ExampleTable](zz-example_table_concurrent_test.go)
+- [ExampleFast](example_fast_concurrent_test.go)
+- [ExampleLite](example_lite_concurrent_test.go)
+- [ExampleTable](example_table_concurrent_test.go)
 
 
 ## Additional Use Cases
