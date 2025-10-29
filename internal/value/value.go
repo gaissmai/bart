@@ -1,18 +1,34 @@
 // Copyright (c) 2025 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
-// Package value provides utilities for working with generic type parameters
-// as payload at runtime.
+// Package value provides runtime utilities for working with generic type
+// parameters as payload values in bart data structures.
 //
-// The primary functionality is zero-sized type (ZST) detection via IsZST[V].
-// This is critical for runtime validation: Fast[V] cannot work correctly with
-// zero-sized types (like struct{} or [0]byte). IsZST enables a safety check
-// that panics during [Fast.Insert] and [Fast.InsertPersist] operations when
-// a zero-sized type is detected.
+// The package offers three main categories of utilities:
 //
-// Additionally, ZST detection improves the clarity of debug output. Since
-// zero-sized types carry no information in their values, omitting them from
-// dumps and prints reduces line noise and makes the output more readable.
+// # Zero-Sized Type (ZST) Detection
+//
+// IsZST[V] detects whether a type parameter V is a zero-sized type (such as
+// struct{} or [0]byte). This serves two purposes:
+//   - Runtime validation: Fast[V] cannot work correctly with zero-sized types
+//     and must reject them. PanicOnZST enables a safety check that panics
+//     during Fast.Insert and Fast.InsertPersist operations.
+//   - Debug output clarity: Zero-sized types carry no information in their
+//     values. Omitting them from dumps and prints reduces line noise and
+//     improves readability.
+//
+// # Value Equality
+//
+// The Equaler[V] interface and Equal function enable custom equality logic
+// for payload values. When V implements Equaler[V], the Equal function uses
+// that implementation, avoiding the potentially expensive reflect.DeepEqual.
+//
+// # Value Cloning
+//
+// The Cloner[V] interface and associated functions (CloneFnFactory, CloneVal,
+// CopyVal) support deep copying of payload values for persistent operations.
+// When V implements Cloner[V], bart methods like InsertPersist, DeletePersist,
+// and UnionPersist use the Clone method to create independent copies.
 //
 // This is an internal package used by the bart data structure implementation.
 package value

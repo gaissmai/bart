@@ -10,22 +10,15 @@ import (
 	"github.com/gaissmai/bart"
 )
 
-// Cloner is an interface that enables deep cloning of values of type V.
-// If a value implements Cloner[V], Table methods such as InsertPersist,
-// ModifyPersist, DeletePersist, UnionPersist, Union and Clone will use
-// its Clone method to perform deep copies.
-type Cloner[V any] interface {
-	Clone() V
-}
-
 // testVal is a simple sample value type.
 // We use *testVal as the generic payload type V, which is a pointer type,
-// so it must implement Cloner[*testVal].
+// so it must implement Cloner[V].
 type testVal struct {
 	data int
 }
 
-// Clone ensures deep copying for use with ...Persist.
+// Clone ensures deep copying for use with ...Persist implementing the
+// Cloner interface.
 func (v *testVal) Clone() *testVal {
 	if v == nil {
 		return nil
@@ -47,7 +40,7 @@ func (v *testVal) Clone() *testVal {
 // providing high performance for concurrent workloads.
 //
 // If the payload V either contains a pointer or is a pointer,
-// it must implement the [bart.Cloner] interface.
+// it must implement the Cloner interface.
 func ExampleTable_concurrent() {
 	var tblAtomicPtr atomic.Pointer[bart.Table[*testVal]]
 	var tblMutex sync.Mutex

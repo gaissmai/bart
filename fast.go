@@ -76,7 +76,7 @@ func (t *Fast[V]) Insert(pfx netip.Prefix, val V) {
 // from both Tables.
 //
 // If the payload type V contains pointers or needs deep copying,
-// it must implement the [bart.Cloner] interface to support correct cloning.
+// it must implement the Cloner interface to support correct cloning.
 //
 // Due to cloning overhead this is significantly slower than Insert,
 // typically taking μsec instead of nsec.

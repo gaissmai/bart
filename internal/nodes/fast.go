@@ -13,41 +13,44 @@ import (
 
 // FastNode is a trie level node in the multibit routing table.
 //
-// Each FastNode contains two conceptually different fixed sized arrays:
+// Each FastNode contains two conceptually different fixed sized arrays
+// and two counters:
+//   - PfxCount is an O(1) counter tracking the number of prefixes.
+//   - CldCount is an O(1) counter tracking the number of child nodes.
 //   - Prefixes: representing routes, using a complete binary tree layout
 //     driven by the baseIndex() function from the ART algorithm.
 //   - Children: holding subtries or path-compressed leaves or fringes.
 //
-// See doc/artlookup.pdf for the mapping mechanics and prefix tree details.
+// Children.items: **FastNode or path-compressed **leaf- or **fringeNode
+// an array of "pointers to" the empty interface and not an array of
+// empty interfaces.
+//
+// - interface{}  takes 2 words, even if nil.
+// - *interface{} requires only 1 word when nil.
+//
+// Since many slots are nil, this reduces memory by 30%. The added
+// indirection does not have a measurable performance impact, but makes
+// the code more complex.
 type FastNode[V any] struct {
+	// Prefixes holding prefix -> value pointers, organized as a CBT
+	// for fast LPM lookup within the node.
 	Prefixes struct {
 		bitset.BitSet256
 		Items [256]*V
 	}
 
-	// Children.items: **FastNode or path-compressed **leaf- or **fringeNode
-	// an array of "pointers to" the empty interface,
-	// and not an array of empty interfaces.
-	//
-	// - any  ( interface{}) takes 2 words, even if nil.
-	// - *any (*interface{}) requires only 1 word when nil.
-	//
-	// Since many slots are nil, this reduces memory by 30%.
-	// The added indirection does not have a measurable performance impact,
-	// but makes the code uglier.
+	// Children holding subtries or path-compressed leaves or fringes.
 	Children struct {
 		bitset.BitSet256
 		Items [256]*any
 	}
 
-	// PfxCount is an O(1) counter tracking the number of prefixes in this node.
-	// This replaces expensive Prefixes.BitSet256.Size() calls with direct counter access.
-	// Automatically maintained during insertPrefix() and deletePrefix() operations.
+	// PfxCount replaces expensive BitSet256.Size() calls. Automatically
+	// maintained during insertPrefix() and deletePrefix() operations.
 	PfxCount uint16
 
-	// CldCount is an O(1) counter tracking the number of child nodes in this node.
-	// This replaces expensive childrenBitSet.Size() calls with direct counter access.
-	// Automatically maintained during insertChild() and deleteChild() operations.
+	// CldCount replaces expensive BitSet.Size() calls. Automatically
+	// maintained during InsertChild() and DeleteChild() operations.
 	CldCount uint16
 }
 

@@ -11,35 +11,31 @@ import (
 	"github.com/gaissmai/bart/internal/value"
 )
 
-// BartNode is a trie level BartNode in the multibit routing table.
+// BartNode is a trie level node in the multibit routing table.
 //
 // Each BartNode contains two conceptually different arrays:
-//   - prefixes: representing routes, using a complete binary tree layout
-//     driven by the baseIndex() function from the ART algorithm.
-//   - children: holding subtries or path-compressed leaves/fringes with
+//   - Prefixes stores routing entries (prefix -> value),
+//     laid out as a complete binary tree using the baseIndex()
+//     function from the ART algorithm.
+//   - Children: holding subtries or path-compressed leaves/fringes with
 //     a branching factor of 256 (8 bits per stride).
+//   - Children holds subnodes for the 256 possible next-hop paths
+//     at this trie level (8-bit stride).
+//
+// Entries in Children may be:
+//   - *BartNode[V]   -> internal child node for further traversal
+//   - *LeafNode[V]   -> path-comp. node (depth < maxDepth - 1)
+//   - *FringeNode[V] -> path-comp. node (depth == maxDepth - 1, stride-aligned: /8, /16, ... /128)
+//
+// Note: Both *LeafNode and *FringeNode entries are only created by path compression.
+// Prefixes that match exactly at the maximum trie depth (depth == maxDepth) are
+// never stored as Children, but always directly in the prefixes array at that level.
 //
 // Unlike the original ART, this implementation uses popcount-compressed sparse arrays
 // instead of fixed-size arrays. Array slots are not pre-allocated; insertion
 // and lookup rely on fast bitset operations and precomputed rank indexes.
-//
-// See doc/artlookup.pdf for the mapping mechanics and prefix tree details.
 type BartNode[V any] struct {
-	// Prefixes stores routing entries (prefix -> value),
-	// laid out as a complete binary tree using baseIndex().
 	Prefixes sparse.Array256[V]
-
-	// Children holds subnodes for the 256 possible next-hop paths
-	// at this trie level (8-bit stride).
-	//
-	// Entries in Children may be:
-	//   - *BartNode[V]   -> internal child node for further traversal
-	//   - *LeafNode[V]   -> path-comp. node (depth < maxDepth - 1)
-	//   - *FringeNode[V] -> path-comp. node (depth == maxDepth - 1, stride-aligned: /8, /16, ... /128)
-	//
-	// Note: Both *LeafNode and *FringeNode entries are only created by path compression.
-	// Prefixes that match exactly at the maximum trie depth (depth == maxDepth) are
-	// never stored as Children, but always directly in the prefixes array at that level.
 	Children sparse.Array256[any]
 }
 
