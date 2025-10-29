@@ -714,3 +714,117 @@ func TestIntegration(t *testing.T) {
 		}
 	})
 }
+
+func TestLeafNode_CloneLeaf(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil_receiver", func(t *testing.T) {
+		t.Parallel()
+		var l *LeafNode[int]
+		cloned := l.CloneLeaf(nil)
+
+		if cloned != nil {
+			t.Error("CloneLeaf should return nil for nil receiver")
+		}
+	})
+
+	t.Run("nil_cloneFn", func(t *testing.T) {
+		t.Parallel()
+		pfx := netip.MustParsePrefix("10.0.0.0/24")
+		l := &LeafNode[int]{Prefix: pfx, Value: 42}
+
+		cloned := l.CloneLeaf(nil)
+
+		if cloned == nil {
+			t.Fatal("CloneLeaf should return non-nil for non-nil receiver")
+		}
+		if cloned.Prefix != pfx {
+			t.Error("CloneLeaf should preserve Prefix")
+		}
+		if cloned.Value != 42 {
+			t.Error("CloneLeaf should preserve Value with nil cloneFn")
+		}
+		if cloned == l {
+			t.Error("CloneLeaf should return a new instance")
+		}
+	})
+
+	t.Run("with_cloneFn", func(t *testing.T) {
+		t.Parallel()
+		type clonableInt struct {
+			Val int
+		}
+
+		pfx := netip.MustParsePrefix("192.168.0.0/16")
+		l := &LeafNode[clonableInt]{Prefix: pfx, Value: clonableInt{Val: 99}}
+
+		cloneFn := func(v clonableInt) clonableInt {
+			return clonableInt{Val: v.Val * 2}
+		}
+
+		cloned := l.CloneLeaf(cloneFn)
+
+		if cloned == nil {
+			t.Fatal("CloneLeaf should return non-nil")
+		}
+		if cloned.Prefix != pfx {
+			t.Error("CloneLeaf should preserve Prefix")
+		}
+		if cloned.Value.Val != 198 {
+			t.Errorf("CloneLeaf should apply cloneFn, got %d, want 198", cloned.Value.Val)
+		}
+	})
+}
+
+func TestFringeNode_CloneFringe(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil_receiver", func(t *testing.T) {
+		t.Parallel()
+		var f *FringeNode[int]
+		cloned := f.CloneFringe(nil)
+
+		if cloned != nil {
+			t.Error("CloneFringe should return nil for nil receiver")
+		}
+	})
+
+	t.Run("nil_cloneFn", func(t *testing.T) {
+		t.Parallel()
+		f := &FringeNode[int]{Value: 42}
+
+		cloned := f.CloneFringe(nil)
+
+		if cloned == nil {
+			t.Fatal("CloneFringe should return non-nil for non-nil receiver")
+		}
+		if cloned.Value != 42 {
+			t.Error("CloneFringe should preserve Value with nil cloneFn")
+		}
+		if cloned == f {
+			t.Error("CloneFringe should return a new instance")
+		}
+	})
+
+	t.Run("with_cloneFn", func(t *testing.T) {
+		t.Parallel()
+		type clonableString struct {
+			Str string
+		}
+
+		f := &FringeNode[clonableString]{Value: clonableString{Str: "hello"}}
+
+		cloneFn := func(v clonableString) clonableString {
+			return clonableString{Str: v.Str + "_cloned"}
+		}
+
+		cloned := f.CloneFringe(cloneFn)
+
+		if cloned == nil {
+			t.Fatal("CloneFringe should return non-nil")
+		}
+		if cloned.Value.Str != "hello_cloned" {
+			t.Errorf("CloneFringe should apply cloneFn, got %q, want %q", cloned.Value.Str, "hello_cloned")
+		}
+	})
+}

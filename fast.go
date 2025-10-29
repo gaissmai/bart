@@ -64,9 +64,9 @@ func (f *Fast[V]) rootNodeByVersion(is4 bool) *nodes.FastNode[V] {
 //
 // The prefix is automatically canonicalized using pfx.Masked() to ensure
 // consistent behavior regardless of host bits in the input.
-func (t *Fast[V]) Insert(pfx netip.Prefix, val V) {
-	t.once.Do(value.PanicOnZST[V])
-	t.insert(pfx, val)
+func (f *Fast[V]) Insert(pfx netip.Prefix, val V) {
+	f.once.Do(value.PanicOnZST[V])
+	f.insert(pfx, val)
 }
 
 // InsertPersist is similar to Insert but the receiver isn't modified.
@@ -80,9 +80,9 @@ func (t *Fast[V]) Insert(pfx netip.Prefix, val V) {
 //
 // Due to cloning overhead this is significantly slower than Insert,
 // typically taking μsec instead of nsec.
-func (t *Fast[V]) InsertPersist(pfx netip.Prefix, val V) *Fast[V] {
-	t.once.Do(value.PanicOnZST[V])
-	return t.insertPersist(pfx, val)
+func (f *Fast[V]) InsertPersist(pfx netip.Prefix, val V) *Fast[V] {
+	f.once.Do(value.PanicOnZST[V])
+	return f.insertPersist(pfx, val)
 }
 
 // Modify applies an insert, update, or delete operation for the value
@@ -111,8 +111,8 @@ func (t *Fast[V]) InsertPersist(pfx netip.Prefix, val V) *Fast[V] {
 //	| (oldVal, true)  | (newVal, false) | update |
 //	| (oldVal, true)  | (_,      true)  | delete |
 //	------------------------------------- --------
-func (t *Fast[V]) Modify(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, del bool)) {
-	t.once.Do(value.PanicOnZST[V])
+func (f *Fast[V]) Modify(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, del bool)) {
+	f.once.Do(value.PanicOnZST[V])
 	if !pfx.IsValid() {
 		return
 	}
@@ -122,10 +122,10 @@ func (t *Fast[V]) Modify(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, del bool)
 
 	is4 := pfx.Addr().Is4()
 
-	n := t.rootNodeByVersion(is4)
+	n := f.rootNodeByVersion(is4)
 
 	delta := n.Modify(pfx, cb)
-	t.sizeUpdate(is4, delta)
+	f.sizeUpdate(is4, delta)
 }
 
 // Contains reports whether any stored prefix covers the given IP address.

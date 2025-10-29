@@ -120,7 +120,12 @@ func (t *_TABLE_TYPE[V]) insert(pfx netip.Prefix, val V) {
 // from both Tables.
 //
 // If the payload type V contains pointers or needs deep copying,
-// it must implement the value.Cloner interface to support correct cloning.
+// implement:
+//
+//	func (v V) Clone() V
+//
+// The bart package detects this via structural typing and deep‑copies
+// values during persistent ops.
 //
 // Due to cloning overhead this is significantly slower than insert,
 // typically taking μsec instead of nsec.
@@ -140,7 +145,7 @@ func (t *_TABLE_TYPE[V]) insertPersist(pfx netip.Prefix, val V) *_TABLE_TYPE[V] 
 	}
 
 	// Create a cloning function for deep copying values;
-	// returns nil if V does not implement the value.Cloner interface.
+	// returns nil if V does not provide a Clone() V method.
 	cloneFn := value.CloneFnFactory[V]()
 
 	// Clone root node corresponding to the IP version, for copy-on-write.
@@ -243,7 +248,7 @@ func (t *_TABLE_TYPE[V]) DeletePersist(pfx netip.Prefix) *_TABLE_TYPE[V] {
 	}
 
 	// Create a cloning function for deep copying values;
-	// returns nil if V does not implement the value.Cloner interface.
+	// returns nil if V does not provide a Clone() V method.
 	cloneFn := value.CloneFnFactory[V]()
 
 	// Clone root node corresponding to the IP version, for copy-on-write.
@@ -441,7 +446,7 @@ func (t *_TABLE_TYPE[V]) Union(o *_TABLE_TYPE[V]) {
 	}
 
 	// Create a cloning function for deep copying values;
-	// returns nil if V does not implement the value.Cloner interface.
+	// returns nil if V does not provide a Clone() V method.
 	cloneFn := value.CloneFnFactory[V]()
 
 	dup4 := t.root4.UnionRec(cloneFn, &o.root4, 0)
@@ -462,7 +467,7 @@ func (t *_TABLE_TYPE[V]) UnionPersist(o *_TABLE_TYPE[V]) *_TABLE_TYPE[V] {
 	}
 
 	// Create a cloning function for deep copying values;
-	// returns nil if V does not implement the value.Cloner interface.
+	// returns nil if V does not provide a Clone() V method.
 	cloneFn := value.CloneFnFactory[V]()
 
 	// new _TABLE_TYPE with root nodes just copied.
