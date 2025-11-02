@@ -737,6 +737,7 @@ func TestLeafNode_CloneLeaf(t *testing.T) {
 
 		if cloned == nil {
 			t.Fatal("CloneLeaf should return non-nil for non-nil receiver")
+			return // redundant, but staticcheck is otherwise confused
 		}
 		if cloned.Prefix != pfx {
 			t.Error("CloneLeaf should preserve Prefix")
@@ -766,6 +767,7 @@ func TestLeafNode_CloneLeaf(t *testing.T) {
 
 		if cloned == nil {
 			t.Fatal("CloneLeaf should return non-nil")
+			return // redundant, but staticcheck is otherwise confused
 		}
 		if cloned.Prefix != pfx {
 			t.Error("CloneLeaf should preserve Prefix")
@@ -797,6 +799,7 @@ func TestFringeNode_CloneFringe(t *testing.T) {
 
 		if cloned == nil {
 			t.Fatal("CloneFringe should return non-nil for non-nil receiver")
+			return // redundant, but staticcheck is otherweise confused
 		}
 		if cloned.Value != 42 {
 			t.Error("CloneFringe should preserve Value with nil cloneFn")
@@ -822,6 +825,7 @@ func TestFringeNode_CloneFringe(t *testing.T) {
 
 		if cloned == nil {
 			t.Fatal("CloneFringe should return non-nil")
+			return // redundant, but staticcheck is otherwise confused
 		}
 		if cloned.Value.Str != "hello_cloned" {
 			t.Errorf("CloneFringe should apply cloneFn, got %q, want %q", cloned.Value.Str, "hello_cloned")

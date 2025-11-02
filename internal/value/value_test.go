@@ -330,7 +330,7 @@ func TestCloneVal_TypedNil(t *testing.T) {
 
 	t.Run("interface_with_typed_nil", func(t *testing.T) {
 		t.Parallel()
-		var i interface{} = (*int)(nil)
+		var i any = (*int)(nil)
 		cloned := CloneVal(i)
 
 		if cloned != i {
@@ -434,7 +434,7 @@ func TestCopyVal_TypedNil(t *testing.T) {
 
 	t.Run("interface_with_typed_nil", func(t *testing.T) {
 		t.Parallel()
-		var i interface{} = (*int)(nil)
+		var i any = (*int)(nil)
 		copied := CopyVal(i)
 
 		// CopyVal is a value copy, so interface contents are copied
