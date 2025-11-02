@@ -21,6 +21,8 @@ linters:
     - copyloopvar
     - tparallel
     - gochecknoglobals
+    - nolintlint
+    - modernize
   settings:
     govet:
       enable:
