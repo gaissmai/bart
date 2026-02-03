@@ -8,6 +8,7 @@ import (
 	"context"
 	"os/exec"
 	"regexp"
+	"runtime"
 	"testing"
 	"time"
 )
@@ -20,6 +21,10 @@ import (
 // The functions to check are listed in the funcs slice. If any function is
 // missing the inlining message, the test fails.
 func TestInlineBitSet256Functions(t *testing.T) {
+	if runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64" {
+		t.Skip("Test only for 64-bit amd64 or arm64")
+	}
+
 	// List of functions expected to be inlined
 	funcs := []string{
 		"bitset.(*BitSet256).Set",
