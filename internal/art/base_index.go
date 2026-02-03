@@ -10,9 +10,6 @@
 //	can inline OctetToIdx with cost 5
 //	can inline PfxBits with cost 21
 //	can inline PfxToIdx with cost 17
-//
-// Please read the ART paper ./doc/artlookup.pdf
-// to understand the baseIndex algorithm.
 package art
 
 import "math/bits"

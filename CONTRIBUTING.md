@@ -6,7 +6,7 @@ Contributions are welcome! Please open an issue first to discuss substantial cha
 - Follow Go formatting and lint rules (golangci-lint passes locally).
 - Run `go test ./...` before sending PRs.
 - Add/adjust tests with good coverage.
-- Update docs/README when behavior or APIs change.
+- Update README when behavior or APIs change.
 - Keep commits focused; prefer small, reviewable PRs.
 
 ### Governance

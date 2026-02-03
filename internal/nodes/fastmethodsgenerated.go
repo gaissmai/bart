@@ -1121,8 +1121,6 @@ func (n *FastNode[V]) FprintRec(w io.Writer, parent TrieItem[V], pad string) err
 // DirectItemsRec, returns the direct covered items by parent.
 // It's a complex recursive function, you have to know the data structure
 // by heart to understand this function!
-//
-// See the  artlookup.pdf paper in the doc folder, the baseIndex function is the key.
 func (n *FastNode[V]) DirectItemsRec(parentIdx uint8, path StridePath, depth int, is4 bool) (directItems []TrieItem[V]) {
 	// recursion stop condition
 	if n == nil || n.IsEmpty() {

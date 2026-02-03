@@ -260,8 +260,6 @@ func (n *FastNode[V]) LookupIdx(idx uint8) (top uint8, val V, ok bool) {
 // allot is the core of the ART algorithm, enabling efficient insertion/deletion
 // while preserving very fast lookups.
 //
-// See doc/artlookup.pdf for the mapping mechanics and prefix tree details.
-//
 // Example of (uninterrupted) allotment sequence:
 //
 //	addr/bits: 0/5 -> {0/5, 0/6, 4/6, 0/7, 2/7, 4/7, 6/7}
