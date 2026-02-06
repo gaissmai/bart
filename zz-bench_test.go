@@ -19,9 +19,9 @@ import (
 func roundFloat64(f float64) float64 { return math.Round(f*100) / 100 }
 
 func BenchmarkFullFastMatch4(b *testing.B) {
-	fast := new(Fast[struct{}])
+	fast := new(Fast[bool])
 	for _, pfx := range tier1.routes4() {
-		fast.Insert(pfx, struct{}{})
+		fast.Insert(pfx, true)
 	}
 
 	matchIP4 := tier1.matchIP4()
@@ -53,9 +53,9 @@ func BenchmarkFullFastMatch4(b *testing.B) {
 }
 
 func BenchmarkFullFastMatch6(b *testing.B) {
-	fast := new(Fast[struct{}])
+	fast := new(Fast[bool])
 	for _, pfx := range tier1.routes6() {
-		fast.Insert(pfx, struct{}{})
+		fast.Insert(pfx, true)
 	}
 
 	matchIP6 := tier1.matchIP6()
@@ -87,9 +87,9 @@ func BenchmarkFullFastMatch6(b *testing.B) {
 }
 
 func BenchmarkFullFastMiss4(b *testing.B) {
-	fast := new(Fast[struct{}])
+	fast := new(Fast[bool])
 	for _, pfx := range tier1.routes4() {
-		fast.Insert(pfx, struct{}{})
+		fast.Insert(pfx, true)
 	}
 
 	missIP4 := tier1.missIP4()
@@ -121,9 +121,9 @@ func BenchmarkFullFastMiss4(b *testing.B) {
 }
 
 func BenchmarkFullFastMiss6(b *testing.B) {
-	fast := new(Fast[struct{}])
+	fast := new(Fast[bool])
 	for _, pfx := range tier1.routes6() {
-		fast.Insert(pfx, struct{}{})
+		fast.Insert(pfx, true)
 	}
 
 	missIP6 := tier1.missIP6()
@@ -155,9 +155,9 @@ func BenchmarkFullFastMiss6(b *testing.B) {
 }
 
 func BenchmarkFullBartMatch4(b *testing.B) {
-	bart := new(Table[struct{}])
+	bart := new(Table[bool])
 	for _, pfx := range tier1.routes4() {
-		bart.Insert(pfx, struct{}{})
+		bart.Insert(pfx, true)
 	}
 
 	matchIP4 := tier1.matchIP4()
@@ -189,9 +189,9 @@ func BenchmarkFullBartMatch4(b *testing.B) {
 }
 
 func BenchmarkFullBartMatch6(b *testing.B) {
-	bart := new(Table[struct{}])
+	bart := new(Table[bool])
 	for _, pfx := range tier1.routes6() {
-		bart.Insert(pfx, struct{}{})
+		bart.Insert(pfx, true)
 	}
 
 	matchIP6 := tier1.matchIP6()
@@ -223,9 +223,9 @@ func BenchmarkFullBartMatch6(b *testing.B) {
 }
 
 func BenchmarkFullBartMiss4(b *testing.B) {
-	bart := new(Table[struct{}])
+	bart := new(Table[bool])
 	for _, pfx := range tier1.routes4() {
-		bart.Insert(pfx, struct{}{})
+		bart.Insert(pfx, true)
 	}
 
 	missIP4 := tier1.missIP4()
@@ -257,9 +257,9 @@ func BenchmarkFullBartMiss4(b *testing.B) {
 }
 
 func BenchmarkFullBartMiss6(b *testing.B) {
-	bart := new(Table[struct{}])
+	bart := new(Table[bool])
 	for _, pfx := range tier1.routes6() {
-		bart.Insert(pfx, struct{}{})
+		bart.Insert(pfx, true)
 	}
 
 	missIP6 := tier1.missIP6()
