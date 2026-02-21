@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Karl Gaissmaier
+// Copyright (c) 2026 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
 package bart
@@ -91,11 +91,11 @@ func noPanic(t *testing.T, name string, fn func()) {
 	fn()
 }
 
-func noPanicRangeOverFunc[V any](t *testing.T, name string, fn any) {
+func mustPanicRangeOverFunc[V any](t *testing.T, name string, fn any) {
 	t.Helper()
 	defer func() {
-		if r := recover(); r != nil {
-			t.Fatalf("%s panicked: %v", name, r)
+		if recover() == nil {
+			t.Fatalf("%s must panic", name)
 		}
 	}()
 

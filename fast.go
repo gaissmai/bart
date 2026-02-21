@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Karl Gaissmaier
+// Copyright (c) 2026 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
 package bart
@@ -19,7 +19,9 @@ import (
 // speed.
 //
 // The zero value is ready to use.
+//
 // A Fast table must not be copied by value; always pass by pointer.
+// Nil pointers as receivers or arguments are forbidden and will panic.
 //
 // The payload type MUST NOT be a zero-sized value (for example: struct{}
 // or [0]byte). According to the Go specification:

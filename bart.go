@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Karl Gaissmaier
+// Copyright (c) 2026 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
 package bart
@@ -16,12 +16,13 @@ import (
 //
 // The zero value is ready to use.
 //
+// A Table must not be copied by value; always pass by pointer.
+// Nil pointers as receivers or arguments are forbidden and will panic.
+//
 // The Table is safe for concurrent reads, but concurrent reads and writes
 // must be externally synchronized. Mutation via Insert/Delete requires locks,
 // or alternatively, use ...Persist methods which return a modified copy
 // without altering the original table (copy-on-write).
-//
-// A Table must not be copied by value; always pass by pointer.
 //
 // Performance note: Do not pass IPv4-in-IPv6 addresses (e.g., ::ffff:192.0.2.1)
 // as input. The methods do not perform automatic unmapping to avoid unnecessary
