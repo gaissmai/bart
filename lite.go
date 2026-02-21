@@ -198,6 +198,11 @@ func (l *Lite) Union(o *Lite) {
 	if o == nil {
 		return
 	}
+	if l == nil {
+		l = o.Clone()
+		return
+	}
+
 	l.liteTable.Union(&o.liteTable)
 }
 
@@ -207,7 +212,7 @@ func (l *Lite) Union(o *Lite) {
 // If o is nil or empty, no nodes are touched and the receiver may be
 // returned unchanged.
 func (l *Lite) UnionPersist(o *Lite) *Lite {
-	if o == nil || (o.size4 == 0 && o.size6 == 0) {
+	if l == nil || o == nil || o == l || (o.size4 == 0 && o.size6 == 0) {
 		return l
 	}
 	lp := l.liteTable.UnionPersist(&o.liteTable)
