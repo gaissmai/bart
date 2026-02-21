@@ -1,6 +1,6 @@
 // Code generated from file "commonmethods_tmpl.go"; DO NOT EDIT.
 
-// Copyright (c) 2025 Karl Gaissmaier
+// Copyright (c) 2026 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
 package bart
@@ -266,9 +266,6 @@ func (t *Fast[V]) ModifyPersist(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, de
 // Returns an empty iterator if the prefix is invalid.
 func (t *Fast[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
-		if t == nil {
-			return
-		}
 		if !pfx.IsValid() {
 			return
 		}
@@ -298,9 +295,6 @@ func (t *Fast[V]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 // Returns an empty iterator if the prefix is invalid.
 func (t *Fast[V]) Subnets(pfx netip.Prefix) iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
-		if t == nil {
-			return
-		}
 		if !pfx.IsValid() {
 			return
 		}
@@ -351,15 +345,12 @@ func (t *Fast[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 // This is useful for conflict detection, policy enforcement,
 // or validating mutually exclusive routing domains.
 func (t *Fast[V]) Overlaps(o *Fast[V]) bool {
-	if o == nil {
-		return false
-	}
 	return t.Overlaps4(o) || t.Overlaps6(o)
 }
 
 // Overlaps4 is like [Fast.Overlaps] but for the v4 routing table only.
 func (t *Fast[V]) Overlaps4(o *Fast[V]) bool {
-	if o == nil || t.size4 == 0 || o.size4 == 0 {
+	if t.size4 == 0 || o.size4 == 0 {
 		return false
 	}
 	return t.root4.Overlaps(&o.root4, 0)
@@ -367,7 +358,7 @@ func (t *Fast[V]) Overlaps4(o *Fast[V]) bool {
 
 // Overlaps6 is like [Fast.Overlaps] but for the v6 routing table only.
 func (t *Fast[V]) Overlaps6(o *Fast[V]) bool {
-	if o == nil || t.size6 == 0 || o.size6 == 0 {
+	if t.size6 == 0 || o.size6 == 0 {
 		return false
 	}
 	return t.root6.Overlaps(&o.root6, 0)
@@ -380,7 +371,11 @@ func (t *Fast[V]) Overlaps6(o *Fast[V]) bool {
 // This duplicate is shallow-copied by default, but if the value type V implements the
 // Clone method, the value is deeply cloned before insertion. See also Fast.Clone.
 func (t *Fast[V]) Union(o *Fast[V]) {
-	if o == nil || o == t || (o.size4 == 0 && o.size6 == 0) {
+	if o.size4 == 0 && o.size6 == 0 {
+		return
+	}
+	// t is unchanged
+	if o == t {
 		return
 	}
 
@@ -398,10 +393,13 @@ func (t *Fast[V]) Union(o *Fast[V]) {
 // UnionPersist is similar to [Union] but the receiver isn't modified.
 //
 // All nodes touched during union are cloned and a new *Fast is returned.
-// If o is nil or empty, no nodes are touched and the receiver may be
+// If o is empty, no nodes are touched and the receiver may be
 // returned unchanged.
 func (t *Fast[V]) UnionPersist(o *Fast[V]) *Fast[V] {
-	if o == nil || o == t || (o.size4 == 0 && o.size6 == 0) {
+	if o.size4 == 0 && o.size6 == 0 {
+		return t
+	}
+	if o == t {
 		return t
 	}
 
@@ -453,7 +451,7 @@ func (t *Fast[V]) UnionPersist(o *Fast[V]) *Fast[V] {
 // The bart package will automatically detect and use this method via Go's
 // structural typing.
 func (t *Fast[V]) Equal(o *Fast[V]) bool {
-	if o == nil || t.size4 != o.size4 || t.size6 != o.size6 {
+	if t.size4 != o.size4 || t.size6 != o.size6 {
 		return false
 	}
 	if o == t {
@@ -479,10 +477,6 @@ func (t *Fast[V]) Equal(o *Fast[V]) bool {
 // The bart package will automatically detect and use this method via Go's
 // structural typing.
 func (t *Fast[V]) Clone() *Fast[V] {
-	if t == nil {
-		return nil
-	}
-
 	c := new(Fast[V])
 
 	cloneFn := value.CloneFnFactory[V]()
@@ -539,9 +533,6 @@ func (t *Fast[V]) Size6() int {
 //	}
 func (t *Fast[V]) All() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
-		if t == nil {
-			return
-		}
 		_ = t.root4.AllRec(stridePath{}, 0, true, yield) && t.root6.AllRec(stridePath{}, 0, false, yield)
 	}
 }
@@ -549,9 +540,6 @@ func (t *Fast[V]) All() iter.Seq2[netip.Prefix, V] {
 // All4 is like [Fast.All] but only for the v4 routing table.
 func (t *Fast[V]) All4() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
-		if t == nil {
-			return
-		}
 		_ = t.root4.AllRec(stridePath{}, 0, true, yield)
 	}
 }
@@ -559,9 +547,6 @@ func (t *Fast[V]) All4() iter.Seq2[netip.Prefix, V] {
 // All6 is like [Fast.All] but only for the v6 routing table.
 func (t *Fast[V]) All6() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
-		if t == nil {
-			return
-		}
 		_ = t.root6.AllRec(stridePath{}, 0, false, yield)
 	}
 }
@@ -585,9 +570,6 @@ func (t *Fast[V]) All6() iter.Seq2[netip.Prefix, V] {
 // traversal is required use persistent table methods.
 func (t *Fast[V]) AllSorted() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
-		if t == nil {
-			return
-		}
 		_ = t.root4.AllRecSorted(stridePath{}, 0, true, yield) &&
 			t.root6.AllRecSorted(stridePath{}, 0, false, yield)
 	}
@@ -596,9 +578,6 @@ func (t *Fast[V]) AllSorted() iter.Seq2[netip.Prefix, V] {
 // AllSorted4 is like [Fast.AllSorted] but only for the v4 routing table.
 func (t *Fast[V]) AllSorted4() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
-		if t == nil {
-			return
-		}
 		_ = t.root4.AllRecSorted(stridePath{}, 0, true, yield)
 	}
 }
@@ -606,9 +585,6 @@ func (t *Fast[V]) AllSorted4() iter.Seq2[netip.Prefix, V] {
 // AllSorted6 is like [Fast.AllSorted] but only for the v6 routing table.
 func (t *Fast[V]) AllSorted6() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
-		if t == nil {
-			return
-		}
 		_ = t.root6.AllRecSorted(stridePath{}, 0, false, yield)
 	}
 }
@@ -636,11 +612,8 @@ func (t *Fast[V]) AllSorted6() iter.Seq2[netip.Prefix, V] {
 //	   │  └─ 2001:db8::/32 (V)
 //	   └─ fe80::/10 (V)
 func (t *Fast[V]) Fprint(w io.Writer) error {
-	if w == nil {
+	if w == nil && t != nil {
 		return fmt.Errorf("nil writer")
-	}
-	if t == nil {
-		return nil
 	}
 
 	// v4
@@ -691,10 +664,6 @@ func (t *Fast[V]) MarshalText() ([]byte, error) {
 // MarshalJSON dumps the table into two sorted lists: for ipv4 and ipv6.
 // Every root and subnet is an array, not a map, because the order matters.
 func (t *Fast[V]) MarshalJSON() ([]byte, error) {
-	if t == nil {
-		return []byte("null"), nil
-	}
-
 	result := struct {
 		Ipv4 []DumpListNode[V] `json:"ipv4,omitempty"`
 		Ipv6 []DumpListNode[V] `json:"ipv6,omitempty"`
@@ -714,18 +683,12 @@ func (t *Fast[V]) MarshalJSON() ([]byte, error) {
 // DumpList4 dumps the ipv4 tree into a list of roots and their subnets.
 // It can be used to analyze the tree or build the text or JSON serialization.
 func (t *Fast[V]) DumpList4() []DumpListNode[V] {
-	if t == nil {
-		return nil
-	}
 	return t.dumpListRec(&t.root4, 0, stridePath{}, 0, true)
 }
 
 // DumpList6 dumps the ipv6 tree into a list of roots and their subnets.
 // It can be used to analyze the tree or build custom JSON representation.
 func (t *Fast[V]) DumpList6() []DumpListNode[V] {
-	if t == nil {
-		return nil
-	}
 	return t.dumpListRec(&t.root6, 0, stridePath{}, 0, false)
 }
 
@@ -775,10 +738,6 @@ func (t *Fast[V]) dumpString() string {
 
 // dump the table structure and all the nodes to w.
 func (t *Fast[V]) dump(w io.Writer) {
-	if t == nil {
-		return
-	}
-
 	if t.size4 > 0 {
 		stats := t.root4.StatsRec()
 		fmt.Fprintln(w)
