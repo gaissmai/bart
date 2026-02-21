@@ -351,7 +351,7 @@ func (t *Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 // This is useful for conflict detection, policy enforcement,
 // or validating mutually exclusive routing domains.
 func (t *Table[V]) Overlaps(o *Table[V]) bool {
-	if o == nil {
+	if t == nil || o == nil {
 		return false
 	}
 	return t.Overlaps4(o) || t.Overlaps6(o)
@@ -359,7 +359,7 @@ func (t *Table[V]) Overlaps(o *Table[V]) bool {
 
 // Overlaps4 is like [Table.Overlaps] but for the v4 routing table only.
 func (t *Table[V]) Overlaps4(o *Table[V]) bool {
-	if o == nil || t.size4 == 0 || o.size4 == 0 {
+	if t == nil || o == nil || t.size4 == 0 || o.size4 == 0 {
 		return false
 	}
 	return t.root4.Overlaps(&o.root4, 0)
@@ -367,7 +367,7 @@ func (t *Table[V]) Overlaps4(o *Table[V]) bool {
 
 // Overlaps6 is like [Table.Overlaps] but for the v6 routing table only.
 func (t *Table[V]) Overlaps6(o *Table[V]) bool {
-	if o == nil || t.size6 == 0 || o.size6 == 0 {
+	if t == nil || o == nil || t.size6 == 0 || o.size6 == 0 {
 		return false
 	}
 	return t.root6.Overlaps(&o.root6, 0)
@@ -381,6 +381,10 @@ func (t *Table[V]) Overlaps6(o *Table[V]) bool {
 // Clone method, the value is deeply cloned before insertion. See also Table.Clone.
 func (t *Table[V]) Union(o *Table[V]) {
 	if o == nil || o == t || (o.size4 == 0 && o.size6 == 0) {
+		return
+	}
+	if t == nil {
+		t = o.Clone()
 		return
 	}
 
@@ -401,7 +405,7 @@ func (t *Table[V]) Union(o *Table[V]) {
 // If o is nil or empty, no nodes are touched and the receiver may be
 // returned unchanged.
 func (t *Table[V]) UnionPersist(o *Table[V]) *Table[V] {
-	if o == nil || o == t || (o.size4 == 0 && o.size6 == 0) {
+	if t == nil || o == nil || o == t || (o.size4 == 0 && o.size6 == 0) {
 		return t
 	}
 
@@ -453,7 +457,7 @@ func (t *Table[V]) UnionPersist(o *Table[V]) *Table[V] {
 // The bart package will automatically detect and use this method via Go's
 // structural typing.
 func (t *Table[V]) Equal(o *Table[V]) bool {
-	if o == nil || t.size4 != o.size4 || t.size6 != o.size6 {
+	if t == nil || o == nil || t.size4 != o.size4 || t.size6 != o.size6 {
 		return false
 	}
 	if o == t {
@@ -498,16 +502,25 @@ func (t *Table[V]) Clone() *Table[V] {
 
 // Size returns the prefix count.
 func (t *Table[V]) Size() int {
+	if t == nil {
+		return 0
+	}
 	return t.size4 + t.size6
 }
 
 // Size4 returns the IPv4 prefix count.
 func (t *Table[V]) Size4() int {
+	if t == nil {
+		return 0
+	}
 	return t.size4
 }
 
 // Size6 returns the IPv6 prefix count.
 func (t *Table[V]) Size6() int {
+	if t == nil {
+		return 0
+	}
 	return t.size6
 }
 

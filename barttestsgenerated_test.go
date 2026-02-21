@@ -55,10 +55,6 @@ func TestTableNil_Table(t *testing.T) {
 		mustPanic(t, "fprint", func() { tbl1.fprint(nil, true) })
 		mustPanic(t, "fprint", func() { tbl1.fprint(nil, false) })
 
-		mustPanic(t, "Size", func() { tbl1.Size() })
-		mustPanic(t, "Size4", func() { tbl1.Size4() })
-		mustPanic(t, "Size6", func() { tbl1.Size6() })
-
 		mustPanic(t, "Get", func() { tbl1.Get(pfx4) })
 		mustPanic(t, "Insert", func() { tbl1.Insert(pfx4, nil) })
 		mustPanic(t, "InsertPersist", func() { tbl1.InsertPersist(pfx4, nil) })
@@ -70,12 +66,17 @@ func TestTableNil_Table(t *testing.T) {
 		mustPanic(t, "Lookup", func() { tbl1.Lookup(ip6) })
 		mustPanic(t, "LookupPrefix", func() { tbl1.LookupPrefix(pfx4) })
 		mustPanic(t, "LookupPrefixLPM", func() { tbl1.LookupPrefixLPM(pfx4) })
-		mustPanic(t, "Union", func() { tbl1.Union(tbl2) })
-		mustPanic(t, "UnionPersist", func() { tbl1.UnionPersist(tbl2) })
+
+		mustPanic(t, "OverlapsPrefix", func() { tbl1.OverlapsPrefix(pfx4) })
+		mustPanic(t, "OverlapsPrefix", func() { tbl1.OverlapsPrefix(pfx6) })
 	})
 
 	t.Run("noPanic", func(t *testing.T) {
 		t.Parallel()
+
+		noPanic(t, "Size", func() { tbl1.Size() })
+		noPanic(t, "Size4", func() { tbl1.Size4() })
+		noPanic(t, "Size6", func() { tbl1.Size6() })
 
 		noPanic(t, "Overlaps", func() { tbl1.Overlaps(nil) })
 		noPanic(t, "Overlaps4", func() { tbl1.Overlaps4(nil) })
@@ -85,15 +86,16 @@ func TestTableNil_Table(t *testing.T) {
 		noPanic(t, "Overlaps4", func() { tbl2.Overlaps4(tbl2) })
 		noPanic(t, "Overlaps6", func() { tbl2.Overlaps6(tbl2) })
 
-		mustPanic(t, "Overlaps", func() { tbl1.Overlaps(tbl2) })
-		mustPanic(t, "Overlaps4", func() { tbl1.Overlaps4(tbl2) })
-		mustPanic(t, "Overlaps6", func() { tbl1.Overlaps6(tbl2) })
-		mustPanic(t, "OverlapsPrefix", func() { tbl1.OverlapsPrefix(pfx4) })
-		mustPanic(t, "OverlapsPrefix", func() { tbl1.OverlapsPrefix(pfx6) })
+		noPanic(t, "Overlaps", func() { tbl1.Overlaps(tbl2) })
+		noPanic(t, "Overlaps4", func() { tbl1.Overlaps4(tbl2) })
+		noPanic(t, "Overlaps6", func() { tbl1.Overlaps6(tbl2) })
 
-		mustPanic(t, "Equal", func() { tbl1.Equal(tbl2) })
+		noPanic(t, "Equal", func() { tbl1.Equal(tbl2) })
 		noPanic(t, "Equal", func() { tbl1.Equal(tbl1) })
 		noPanic(t, "Equal", func() { tbl2.Equal(tbl2) })
+
+		noPanic(t, "Union", func() { tbl1.Union(tbl2) })
+		noPanic(t, "UnionPersist", func() { tbl1.UnionPersist(tbl2) })
 
 		noPanic(t, "dump", func() { tbl1.dump(nil) })
 		noPanic(t, "dumpString", func() { tbl1.dumpString() })

@@ -215,6 +215,46 @@ func (l *Lite) UnionPersist(o *Lite) *Lite {
 	return &Lite{*lp}
 }
 
+// Size returns the prefix count.
+func (l *Lite) Size() int {
+	if l == nil {
+		return 0
+	}
+	return l.liteTable.Size()
+}
+
+// Size4 returns the IPv4 prefix count.
+func (l *Lite) Size4() int {
+	if l == nil {
+		return 0
+	}
+	return l.liteTable.Size4()
+}
+
+// Size6 returns the IPv6 prefix count.
+func (l *Lite) Size6() int {
+	if l == nil {
+		return 0
+	}
+	return l.liteTable.Size6()
+}
+
+// dump the table structure and all the nodes to w.
+func (l *Lite) dump(w io.Writer) {
+	if l == nil {
+		return
+	}
+	l.liteTable.dump(w)
+}
+
+// dumpString is just a wrapper for dump.
+func (l *Lite) dumpString() string {
+	if l == nil {
+		return ""
+	}
+	return l.liteTable.dumpString()
+}
+
 // All returns an iterator over all prefixes in the table.
 //
 // The entries from both IPv4 and IPv6 subtries are yielded using an internal recursive traversal.
@@ -367,7 +407,7 @@ func (l *Lite) Supernets(pfx netip.Prefix) iter.Seq[netip.Prefix] {
 // It is intentionally not nil-receiver safe: calling with a nil
 // receiver will panic by design.
 func (l *Lite) Overlaps(o *Lite) bool {
-	if o == nil {
+	if l == nil || o == nil {
 		return false
 	}
 	return l.liteTable.Overlaps(&o.liteTable)
@@ -375,7 +415,7 @@ func (l *Lite) Overlaps(o *Lite) bool {
 
 // Overlaps4 is like [Lite.Overlaps] but for the v4 routing table only.
 func (l *Lite) Overlaps4(o *Lite) bool {
-	if o == nil {
+	if l == nil || o == nil {
 		return false
 	}
 	return l.liteTable.Overlaps4(&o.liteTable)
@@ -383,7 +423,7 @@ func (l *Lite) Overlaps4(o *Lite) bool {
 
 // Overlaps6 is like [Lite.Overlaps] but for the v6 routing table only.
 func (l *Lite) Overlaps6(o *Lite) bool {
-	if o == nil {
+	if l == nil || o == nil {
 		return false
 	}
 	return l.liteTable.Overlaps6(&o.liteTable)
@@ -395,7 +435,7 @@ func (l *Lite) Overlaps6(o *Lite) bool {
 //
 // Note: Lite has no payload values, so this only checks structural equality.
 func (l *Lite) Equal(o *Lite) bool {
-	if o == nil || l.size4 != o.size4 || l.size6 != o.size6 {
+	if l == nil || o == nil || l.size4 != o.size4 || l.size6 != o.size6 {
 		return false
 	}
 	return l.liteTable.Equal(&o.liteTable)

@@ -412,7 +412,7 @@ func (t *_TABLE_TYPE[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 // This is useful for conflict detection, policy enforcement,
 // or validating mutually exclusive routing domains.
 func (t *_TABLE_TYPE[V]) Overlaps(o *_TABLE_TYPE[V]) bool {
-	if o == nil {
+	if t == nil || o == nil {
 		return false
 	}
 	return t.Overlaps4(o) || t.Overlaps6(o)
@@ -420,7 +420,7 @@ func (t *_TABLE_TYPE[V]) Overlaps(o *_TABLE_TYPE[V]) bool {
 
 // Overlaps4 is like [_TABLE_TYPE.Overlaps] but for the v4 routing table only.
 func (t *_TABLE_TYPE[V]) Overlaps4(o *_TABLE_TYPE[V]) bool {
-	if o == nil || t.size4 == 0 || o.size4 == 0 {
+	if t == nil || o == nil || t.size4 == 0 || o.size4 == 0 {
 		return false
 	}
 	return t.root4.Overlaps(&o.root4, 0)
@@ -428,7 +428,7 @@ func (t *_TABLE_TYPE[V]) Overlaps4(o *_TABLE_TYPE[V]) bool {
 
 // Overlaps6 is like [_TABLE_TYPE.Overlaps] but for the v6 routing table only.
 func (t *_TABLE_TYPE[V]) Overlaps6(o *_TABLE_TYPE[V]) bool {
-	if o == nil || t.size6 == 0 || o.size6 == 0 {
+	if t == nil || o == nil || t.size6 == 0 || o.size6 == 0 {
 		return false
 	}
 	return t.root6.Overlaps(&o.root6, 0)
@@ -442,6 +442,10 @@ func (t *_TABLE_TYPE[V]) Overlaps6(o *_TABLE_TYPE[V]) bool {
 // Clone method, the value is deeply cloned before insertion. See also _TABLE_TYPE.Clone.
 func (t *_TABLE_TYPE[V]) Union(o *_TABLE_TYPE[V]) {
 	if o == nil || o == t || (o.size4 == 0 && o.size6 == 0) {
+		return
+	}
+	if t == nil {
+		t = o.Clone()
 		return
 	}
 
@@ -462,7 +466,7 @@ func (t *_TABLE_TYPE[V]) Union(o *_TABLE_TYPE[V]) {
 // If o is nil or empty, no nodes are touched and the receiver may be
 // returned unchanged.
 func (t *_TABLE_TYPE[V]) UnionPersist(o *_TABLE_TYPE[V]) *_TABLE_TYPE[V] {
-	if o == nil || o == t || (o.size4 == 0 && o.size6 == 0) {
+	if t == nil || o == nil || o == t || (o.size4 == 0 && o.size6 == 0) {
 		return t
 	}
 
@@ -514,7 +518,7 @@ func (t *_TABLE_TYPE[V]) UnionPersist(o *_TABLE_TYPE[V]) *_TABLE_TYPE[V] {
 // The bart package will automatically detect and use this method via Go's
 // structural typing.
 func (t *_TABLE_TYPE[V]) Equal(o *_TABLE_TYPE[V]) bool {
-	if o == nil || t.size4 != o.size4 || t.size6 != o.size6 {
+	if t == nil || o == nil || t.size4 != o.size4 || t.size6 != o.size6 {
 		return false
 	}
 	if o == t {
@@ -559,16 +563,25 @@ func (t *_TABLE_TYPE[V]) Clone() *_TABLE_TYPE[V] {
 
 // Size returns the prefix count.
 func (t *_TABLE_TYPE[V]) Size() int {
+	if t == nil {
+		return 0
+	}
 	return t.size4 + t.size6
 }
 
 // Size4 returns the IPv4 prefix count.
 func (t *_TABLE_TYPE[V]) Size4() int {
+	if t == nil {
+		return 0
+	}
 	return t.size4
 }
 
 // Size6 returns the IPv6 prefix count.
 func (t *_TABLE_TYPE[V]) Size6() int {
+	if t == nil {
+		return 0
+	}
 	return t.size6
 }
 
