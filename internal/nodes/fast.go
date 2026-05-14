@@ -23,7 +23,7 @@ import (
 //   - childRankCache for cached rank values for fast trie traversal
 //
 // Entries in Children may be:
-//   - *BartNode[V]   -> internal child node for further traversal
+//   - *FastNode[V]   -> internal child node for further traversal
 //   - *LeafNode[V]   -> path-comp. node (depth < maxDepth - 1)
 //   - *FringeNode[V] -> path-comp. node (depth == maxDepth - 1, stride-aligned: /8, /16, ... /128)
 //
