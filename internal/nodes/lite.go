@@ -130,8 +130,7 @@ func (n *LiteNode[V]) AllChildren() iter.Seq2[uint8, any] {
 		var buf [256]uint8
 		addrs := n.Children.AsSlice(&buf)
 		for i, addr := range addrs {
-			child := n.Children.Items[i]
-			if !yield(addr, child) {
+			if !yield(addr, n.Children.Items[i]) {
 				return
 			}
 		}
