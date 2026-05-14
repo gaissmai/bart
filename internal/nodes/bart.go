@@ -84,9 +84,8 @@ func (n *BartNode[V]) MustGetPrefix(idx uint8) (val V) {
 func (n *BartNode[V]) AllIndices() iter.Seq2[uint8, V] {
 	return func(yield func(uint8, V) bool) {
 		var buf [256]uint8
-		for _, idx := range n.Prefixes.AsSlice(&buf) {
-			val := n.MustGetPrefix(idx)
-			if !yield(idx, val) {
+		for i, idx := range n.Prefixes.AsSlice(&buf) {
+			if !yield(idx, n.Prefixes.Items[i]) {
 				return
 			}
 		}
@@ -127,8 +126,7 @@ func (n *BartNode[V]) AllChildren() iter.Seq2[uint8, any] {
 		var buf [256]uint8
 		addrs := n.Children.AsSlice(&buf)
 		for i, addr := range addrs {
-			child := n.Children.Items[i]
-			if !yield(addr, child) {
+			if !yield(addr, n.Children.Items[i]) {
 				return
 			}
 		}
