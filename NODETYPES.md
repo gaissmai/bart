@@ -36,19 +36,12 @@ type LiteNode struct {
 ### FastNode[V] - Fixed Array Node
  ```go
 type FastNode[V any] struct {
-    prefixes struct {
-        bitset.BitSet256
-        items [256]*V
-    }                                // 2,048 + 32 bytes BitSet256
-    children struct {
-        bitset.BitSet256
-        items [256]*any              // pointer-to-interface for 8‑byte nils
-    }                                // 2,048 + 32 bytes BitSet256
-    pfxCount uint16
-    cldCount uint16                  // + padding
+    prefixes sparse.Array256[V]        // 56 + n×sizeof(V)  
+    children sparse.Array256[childRef] // 56 + m×sizeof(childRef)
+    childRankCache [256]uint8          // 256
  }
  ```
-**Memory Usage:** **4,168 bytes** (fixed, regardless of occupancy)
+**Memory Usage:** **256 + 112 bytes + n×sizeof(V) + m×sizeof(childRef)**
  
 ## Real-World Example
 **Scenario:** Node with 10 prefixes, 5 children
@@ -57,7 +50,7 @@ type FastNode[V any] struct {
  |-----------|------|----------|----------|-----------|------------------|
  | LiteNode | 96 | 0 | 5×16=80 | 176 bytes | **17** |
  | BartNode[int] | 112 | 10×8=80 | 5×16=80 | 272 bytes | **27** |
- | FastNode[int] | 4,168 | 0 | 0 | 4,168 bytes | **417** |
+ | FastNode[int] | 368 | 10×8=80 | 5×16=80 | 528 bytes | **53** |
  
 ¹ Values assume childRef = 16 bytes and pointer to payload = 8 bytes
 
@@ -88,7 +81,7 @@ The actual payload struct referenced by the pointer is **not included** in these
 |-----------|------|-----------|-----------|----------|-----------|------------|-------------------|
 | **LiteNode** | 96 B | 0 | 15×16=240 B | 336 B | +160 B | +0 B | **16.8** |
 | **BartNode[V]** | 112 B | 10×8=80 B | 15×16=240 B | 432 B | +200 B | +40 B | **21.6** |
-| **FastNode[V]** | 4,168 B | 0 | 0 | 4,168 B | +200 B | +40 B | **208.4** |
+| **FastNode[V]** | 368 B | 10×8=80 B | 15×16=240 B | 688 B | +200 B | +40 B | **34.4** |
 
 **Notes:**
 1. Prefixes: LiteNode stores no values (0B); BartNode/FastNode store 10×8B pointers to payload structs
@@ -133,7 +126,6 @@ The actual payload struct referenced by the pointer is **not included** in these
 - **Pipeline-friendly**: Only 4 bitset operations (4×uint64) per level, optimized for CPU pipelining
 - **No backtracking**: Traditional longest-prefix-match backtracking replaced with direct table lookups
  
-### FastNode[V] - Direct Array Access per Level
-- **Zero indirection per level**: Direct array indexing `prefixes[idx]` and `children[idx]`
-- **Cache-optimal**: Contiguous memory layout within each level
-- **Performance advantage**: Still ~40% faster per level despite sparse optimizations
+### FastNode[V] - Direct Array Access for next child per Level
+- **Zero indirection per level**: Direct slice indexing for `children[idx]`, no rank calculation.
+- **Performance advantage**: ~25% faster level traversing

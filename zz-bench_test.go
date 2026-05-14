@@ -291,17 +291,17 @@ func BenchmarkFullBartMiss6(b *testing.B) {
 }
 
 func BenchmarkBartOverlaps4(b *testing.B) {
-	lt := new(Lite)
+	lt := new(Table[any])
 
 	for _, route := range tier1.routes4() {
-		lt.Insert(route)
+		lt.Insert(route, nil)
 	}
 
 	for i := 1; i <= 1<<20; i *= 2 {
 		prng := rand.New(rand.NewPCG(42, 42))
-		lt2 := new(Lite)
+		lt2 := new(Table[any])
 		for _, pfx := range random.RealWorldPrefixes4(prng, i) {
-			lt2.Insert(pfx)
+			lt2.Insert(pfx, nil)
 		}
 
 		b.Run(fmt.Sprintf("With_%4d", i), func(b *testing.B) {
@@ -313,17 +313,17 @@ func BenchmarkBartOverlaps4(b *testing.B) {
 }
 
 func BenchmarkBartOverlaps6(b *testing.B) {
-	lt := new(Lite)
+	lt := new(Table[any])
 
 	for _, route := range tier1.routes6() {
-		lt.Insert(route)
+		lt.Insert(route, nil)
 	}
 
 	for i := 1; i <= 1<<20; i *= 2 {
 		prng := rand.New(rand.NewPCG(42, 42))
-		lt2 := new(Lite)
+		lt2 := new(Table[any])
 		for _, pfx := range random.RealWorldPrefixes6(prng, i) {
-			lt2.Insert(pfx)
+			lt2.Insert(pfx, nil)
 		}
 
 		b.Run(fmt.Sprintf("With_%4d", i), func(b *testing.B) {
@@ -334,16 +334,162 @@ func BenchmarkBartOverlaps6(b *testing.B) {
 	}
 }
 
+func BenchmarkFastOverlaps4(b *testing.B) {
+	lt := new(Fast[any])
+
+	for _, route := range tier1.routes4() {
+		lt.Insert(route, nil)
+	}
+
+	for i := 1; i <= 1<<20; i *= 2 {
+		prng := rand.New(rand.NewPCG(42, 42))
+		lt2 := new(Fast[any])
+		for _, pfx := range random.RealWorldPrefixes4(prng, i) {
+			lt2.Insert(pfx, nil)
+		}
+
+		b.Run(fmt.Sprintf("With_%4d", i), func(b *testing.B) {
+			for b.Loop() {
+				lt.Overlaps4(lt2)
+			}
+		})
+	}
+}
+
+func BenchmarkFastOverlaps6(b *testing.B) {
+	lt := new(Fast[any])
+
+	for _, route := range tier1.routes6() {
+		lt.Insert(route, nil)
+	}
+
+	for i := 1; i <= 1<<20; i *= 2 {
+		prng := rand.New(rand.NewPCG(42, 42))
+		lt2 := new(Fast[any])
+		for _, pfx := range random.RealWorldPrefixes6(prng, i) {
+			lt2.Insert(pfx, nil)
+		}
+
+		b.Run(fmt.Sprintf("With_%4d", i), func(b *testing.B) {
+			for b.Loop() {
+				lt.Overlaps6(lt2)
+			}
+		})
+	}
+}
+
+func BenchmarkFastMemory4(b *testing.B) {
+	var startMem, endMem runtime.MemStats
+
+	bart := new(Fast[bool])
+	runtime.GC()
+	runtime.ReadMemStats(&startMem)
+
+	b.Run(fmt.Sprintf("Fast[]: %d", len(tier1.routes4())), func(b *testing.B) {
+		for _, route := range tier1.routes4() {
+			bart.Insert(route, false)
+		}
+
+		runtime.GC()
+		runtime.ReadMemStats(&endMem)
+
+		stats := bart.root4.StatsRec()
+		if stats.Prefixes == 0 {
+			b.Skip("No prefixes inserted")
+		}
+
+		bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
+		b.ReportMetric(roundFloat64(bytes/float64(bart.Size())), "bytes/route")
+
+		b.ReportMetric(float64(stats.Prefixes), "pfxs")
+		b.ReportMetric(float64(stats.SubNodes), "nodes")
+		b.ReportMetric(float64(stats.Leaves), "leaves")
+		b.ReportMetric(float64(stats.Fringes), "fringes")
+		b.ReportMetric(0, "ns/op")
+	})
+}
+
+func BenchmarkFastMemory6(b *testing.B) {
+	var startMem, endMem runtime.MemStats
+
+	bart := new(Fast[bool])
+	runtime.GC()
+	runtime.ReadMemStats(&startMem)
+
+	b.Run(fmt.Sprintf("Fast[]: %d", len(tier1.routes6())), func(b *testing.B) {
+		for _, route := range tier1.routes6() {
+			bart.Insert(route, false)
+		}
+
+		runtime.GC()
+		runtime.ReadMemStats(&endMem)
+
+		stats := bart.root6.StatsRec()
+		if stats.Prefixes == 0 {
+			b.Skip("No prefixes inserted")
+		}
+
+		bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
+		b.ReportMetric(roundFloat64(bytes/float64(bart.Size())), "bytes/route")
+
+		b.ReportMetric(float64(stats.Prefixes), "pfxs")
+		b.ReportMetric(float64(stats.SubNodes), "nodes")
+		b.ReportMetric(float64(stats.Leaves), "leaves")
+		b.ReportMetric(float64(stats.Fringes), "fringes")
+		b.ReportMetric(0, "ns/op")
+	})
+}
+
+func BenchmarkFastMemory(b *testing.B) {
+	var startMem, endMem runtime.MemStats
+
+	bart := new(Fast[bool])
+	runtime.GC()
+	runtime.ReadMemStats(&startMem)
+
+	b.Run(fmt.Sprintf("Fast[]: %d", len(tier1.routes())), func(b *testing.B) {
+		for _, route := range tier1.routes() {
+			bart.Insert(route, false)
+		}
+
+		runtime.GC()
+		runtime.ReadMemStats(&endMem)
+
+		s4 := bart.root4.StatsRec()
+		s6 := bart.root6.StatsRec()
+		stats := nodes.StatsT{
+			Prefixes: s4.Prefixes + s6.Prefixes,
+			Children: s4.Children + s6.Children,
+			SubNodes: s4.SubNodes + s6.SubNodes,
+			Leaves:   s4.Leaves + s6.Leaves,
+			Fringes:  s4.Fringes + s6.Fringes,
+		}
+
+		if stats.Prefixes == 0 {
+			b.Skip("No prefixes inserted")
+		}
+
+		bytes := float64(endMem.HeapAlloc - startMem.HeapAlloc)
+		b.ReportMetric(roundFloat64(bytes/float64(bart.Size())), "bytes/route")
+
+		b.ReportMetric(float64(stats.Prefixes), "pfxs")
+		b.ReportMetric(float64(stats.SubNodes), "nodes")
+		b.ReportMetric(float64(stats.Leaves), "leaves")
+		b.ReportMetric(float64(stats.Fringes), "fringes")
+		b.ReportMetric(0, "ns/op")
+	})
+}
+
 func BenchmarkBartMemory4(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 
-	bart := new(Table[struct{}])
+	bart := new(Table[bool])
 	runtime.GC()
 	runtime.ReadMemStats(&startMem)
 
 	b.Run(fmt.Sprintf("Table[]: %d", len(tier1.routes4())), func(b *testing.B) {
 		for _, route := range tier1.routes4() {
-			bart.Insert(route, struct{}{})
+			bart.Insert(route, false)
 		}
 
 		runtime.GC()
@@ -368,13 +514,13 @@ func BenchmarkBartMemory4(b *testing.B) {
 func BenchmarkBartMemory6(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 
-	bart := new(Table[struct{}])
+	bart := new(Table[bool])
 	runtime.GC()
 	runtime.ReadMemStats(&startMem)
 
 	b.Run(fmt.Sprintf("Table[]: %d", len(tier1.routes6())), func(b *testing.B) {
 		for _, route := range tier1.routes6() {
-			bart.Insert(route, struct{}{})
+			bart.Insert(route, false)
 		}
 
 		runtime.GC()
@@ -399,13 +545,13 @@ func BenchmarkBartMemory6(b *testing.B) {
 func BenchmarkBartMemory(b *testing.B) {
 	var startMem, endMem runtime.MemStats
 
-	bart := new(Table[struct{}])
+	bart := new(Table[bool])
 	runtime.GC()
 	runtime.ReadMemStats(&startMem)
 
 	b.Run(fmt.Sprintf("Table[]: %d", len(tier1.routes())), func(b *testing.B) {
 		for _, route := range tier1.routes() {
-			bart.Insert(route, struct{}{})
+			bart.Insert(route, false)
 		}
 
 		runtime.GC()
@@ -706,7 +852,6 @@ func BenchmarkFastWorstCaseMiss4(b *testing.B) {
 		}
 	})
 }
-
 func BenchmarkBartWorstCaseMatch6(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
 		tbl := new(Table[string])

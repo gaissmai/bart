@@ -107,7 +107,8 @@ func (n *LiteNode[V]) DeletePrefix(idx uint8) (exists bool) {
 // The child can be a *LiteNode[V], *LeafNode, or *FringeNode.
 // Returns true if a child already existed at that address.
 func (n *LiteNode[V]) InsertChild(addr uint8, child any) (exists bool) {
-	return n.Children.InsertAt(addr, child)
+	_, exists = n.Children.InsertAt(addr, child)
+	return
 }
 
 // GetChild retrieves the child node at the specified address.

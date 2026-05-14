@@ -8,31 +8,25 @@ import (
 	"sync"
 
 	"github.com/gaissmai/bart/internal/art"
+	"github.com/gaissmai/bart/internal/lpm"
 	"github.com/gaissmai/bart/internal/nodes"
-	"github.com/gaissmai/bart/internal/value"
 )
 
-// Fast follows the ART design by Knuth in using fixed arrays at each level
-// combined with the same path and fringe compression invented for BART.
+// Fast is similar to Table but uses additional 256 bytes in each node
+// for faster level traversing in the multibit trie.
 //
-// As a result Fast sacrifices memory efficiency to achieve 50-100% higher
-// speed.
+// As a result Fast sacrifices memory efficiency to achieve 25% better
+// speed in lookup and contains.
 //
 // The zero value is ready to use.
 //
-// A Fast table must not be copied by value; always pass by pointer.
+// A Fast must not be copied by value; always pass by pointer.
 // Nil pointers as receivers or arguments are forbidden and will panic.
 //
-// The payload type MUST NOT be a zero-sized value (for example: struct{}
-// or [0]byte). According to the Go specification:
-//
-//	"Pointers to distinct zero-size variables may or may not be equal."
-//
-// However, the ART algorithm requires that different prefixes, even with
-// identical payload V, result in distinct value pointers. This is not
-// guaranteed for zero-sized values; thus, zero-sized types as payload V
-// would result in undefined behavior so the input methods panic if they
-// detect it.
+// The Fast is safe for concurrent reads, but concurrent reads and writes
+// must be externally synchronized. Mutation via Insert/Delete requires locks,
+// or alternatively, use ...Persist methods which return a modified copy
+// without altering the original table (copy-on-write).
 //
 // Performance note: Do not pass IPv4-in-IPv6 addresses (e.g., ::ffff:192.0.2.1)
 // as input. The methods do not perform automatic unmapping to avoid unnecessary
@@ -40,10 +34,10 @@ import (
 // Users should unmap IPv4-in-IPv6 addresses to their native IPv4 form
 // (e.g., 192.0.2.1) before calling these methods.
 type Fast[V any] struct {
-	// used for zero-sized type checks during insert
-	once sync.Once
+	// used by -copylocks checker from `go vet`.
+	_ [0]sync.Mutex
 
-	// the root nodes are fast nodes with fixed size arrays
+	// the root nodes, implemented as popcount compressed multibit tries
 	root4 nodes.FastNode[V]
 	root6 nodes.FastNode[V]
 
@@ -52,12 +46,12 @@ type Fast[V any] struct {
 	size6 int
 }
 
-// rootNodeByVersion, root node getter for ip version and trie levels.
-func (f *Fast[V]) rootNodeByVersion(is4 bool) *nodes.FastNode[V] {
+// rootNodeByVersion, root node getter for ip version.
+func (t *Fast[V]) rootNodeByVersion(is4 bool) *nodes.FastNode[V] {
 	if is4 {
-		return &f.root4
+		return &t.root4
 	}
-	return &f.root6
+	return &t.root6
 }
 
 // Insert adds or updates a prefix-value pair in the routing table.
@@ -66,25 +60,23 @@ func (f *Fast[V]) rootNodeByVersion(is4 bool) *nodes.FastNode[V] {
 //
 // The prefix is automatically canonicalized using pfx.Masked() to ensure
 // consistent behavior regardless of host bits in the input.
-func (f *Fast[V]) Insert(pfx netip.Prefix, val V) {
-	f.once.Do(value.PanicOnZST[V])
-	f.insert(pfx, val)
+func (t *Fast[V]) Insert(pfx netip.Prefix, val V) {
+	t.insert(pfx, val)
 }
 
 // InsertPersist is similar to Insert but the receiver isn't modified.
 //
 // All nodes touched during insert are cloned and a new Fast is returned.
 // This is not a full [Fast.Clone], all untouched nodes are still referenced
-// from both Tables.
+// from both Fasts.
 //
 // If the payload type V contains pointers or needs deep copying,
 // it must implement the Clone method to support correct cloning.
 //
 // Due to cloning overhead this is significantly slower than Insert,
 // typically taking μsec instead of nsec.
-func (f *Fast[V]) InsertPersist(pfx netip.Prefix, val V) *Fast[V] {
-	f.once.Do(value.PanicOnZST[V])
-	return f.insertPersist(pfx, val)
+func (t *Fast[V]) InsertPersist(pfx netip.Prefix, val V) *Fast[V] {
+	return t.insertPersist(pfx, val)
 }
 
 // Modify applies an insert, update, or delete operation for the value
@@ -93,6 +85,8 @@ func (f *Fast[V]) InsertPersist(pfx netip.Prefix, val V) *Fast[V] {
 // and a boolean indicating whether the prefix exists. The callback must
 // return a new value and a delete flag: del == false inserts or updates,
 // del == true deletes the entry if it exists (otherwise no-op).
+//
+// The callback is invoked at most once per call.
 //
 // The operation is determined by the callback function, which is called with:
 //
@@ -113,8 +107,7 @@ func (f *Fast[V]) InsertPersist(pfx netip.Prefix, val V) *Fast[V] {
 //	| (oldVal, true)  | (newVal, false) | update |
 //	| (oldVal, true)  | (_,      true)  | delete |
 //	------------------------------------- --------
-func (f *Fast[V]) Modify(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, del bool)) {
-	f.once.Do(value.PanicOnZST[V])
+func (t *Fast[V]) Modify(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, del bool)) {
 	if !pfx.IsValid() {
 		return
 	}
@@ -124,10 +117,10 @@ func (f *Fast[V]) Modify(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, del bool)
 
 	is4 := pfx.Addr().Is4()
 
-	n := f.rootNodeByVersion(is4)
+	n := t.rootNodeByVersion(is4)
 
 	delta := n.Modify(pfx, cb)
-	f.sizeUpdate(is4, delta)
+	t.sizeUpdate(is4, delta)
 }
 
 // Contains reports whether any stored prefix covers the given IP address.
@@ -138,36 +131,35 @@ func (f *Fast[V]) Modify(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, del bool)
 //
 // It does not return the value nor the prefix of the matching item,
 // but as a test against an allow-/deny-list it's often sufficient
-// and even few nanoseconds faster than [Table.Lookup].
-func (f *Fast[V]) Contains(ip netip.Addr) bool {
+// and even few nanoseconds faster than [Fast.Lookup].
+func (t *Fast[V]) Contains(ip netip.Addr) bool {
 	// speed is top priority: no explicit test for ip.IsValid
 	// if ip is invalid, AsSlice() returns nil, Contains returns false.
 	is4 := ip.Is4()
-	n := f.rootNodeByVersion(is4)
+	n := t.rootNodeByVersion(is4)
 
 	for _, octet := range ip.AsSlice() {
-		if n.Contains(art.OctetToIdx(octet)) {
+		// for contains, any lpm match is good enough, no backtracking needed
+		if n.PrefixCount() != 0 && n.Contains(art.OctetToIdx(octet)) {
 			return true
 		}
 
-		kidAny, exists := n.GetChild(octet)
-		if !exists {
-			// no next node
+		// stop traversing?
+		if !n.Children.Test(octet) {
 			return false
 		}
+		kid := n.MustGetChild(octet)
 
 		// kid is node or leaf or fringe at octet
-		switch kid := kidAny.(type) {
+		switch kid := kid.(type) {
 		case *nodes.FastNode[V]:
-			n = kid // continue
+			n = kid // descend down to next trie level
 
 		case *nodes.FringeNode[V]:
 			// fringe is the default-route for all possible octets below
 			return true
 
 		case *nodes.LeafNode[V]:
-			// due to path compression, the octet path between
-			// leaf and prefix may diverge
 			return kid.Prefix.Contains(ip)
 		}
 	}
@@ -175,56 +167,83 @@ func (f *Fast[V]) Contains(ip netip.Addr) bool {
 	return false
 }
 
-// Lookup performs longest-prefix matching for the given IP address and returns
-// the associated value of the most specific matching prefix.
-// Returns the zero value of V and false if no prefix matches.
-// Returns false for invalid IP addresses.
+// Lookup performs a longest prefix match (LPM) lookup for the given address.
+// It finds the most specific (longest) prefix in the routing table that
+// contains the given address and returns its associated value.
 //
-// This is the core routing table operation used for packet forwarding decisions.
+// This is the fundamental operation for IP routing decisions, finding the
+// best matching route for a destination address.
 //
-// Its semantics are identical to [Table.Lookup].
-func (f *Fast[V]) Lookup(ip netip.Addr) (val V, ok bool) {
+// Returns the associated value and true if a matching prefix is found.
+// Returns zero value and false if no prefix contains the address.
+func (t *Fast[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	if !ip.IsValid() {
 		return val, ok
 	}
 
 	is4 := ip.Is4()
-	n := f.rootNodeByVersion(is4)
+	octets := ip.AsSlice()
 
-	for _, octet := range ip.AsSlice() {
-		// save the current best LPM val, lookup is cheap for nodes.FastNode
-		if bestLPM, ok2 := n.Lookup(art.OctetToIdx(octet)); ok2 {
-			val = bestLPM
-			ok = ok2
+	n := t.rootNodeByVersion(is4)
+
+	// stack of the traversed nodes for fast backtracking, if needed
+	stack := [nodes.MaxTreeDepth]*nodes.FastNode[V]{}
+
+	// run variable, used after for loop
+	var depth int
+	var octet byte
+
+LOOP:
+	// find leaf node
+	for depth, octet = range octets {
+		depth &= nodes.DepthMask // BCE, Lookup must be fast
+
+		// push current node on stack for fast backtracking
+		stack[depth] = n
+
+		// go down in tight loop to last octet
+		if !n.Children.Test(octet) {
+			// no more nodes below octet
+			break LOOP
 		}
+		kid := n.MustGetChild(octet)
 
-		kidAny, exists := n.GetChild(octet)
-		if !exists {
-			// no next node
-			return val, ok
-		}
-
-		// next kid is fast, fringe or leaf node.
-		switch kid := kidAny.(type) {
+		// kid is node or leaf or fringe at octet
+		switch kid := kid.(type) {
 		case *nodes.FastNode[V]:
 			n = kid
+			continue LOOP // descend down to next trie level
 
 		case *nodes.FringeNode[V]:
 			// fringe is the default-route for all possible nodes below
 			return kid.Value, true
 
 		case *nodes.LeafNode[V]:
-			// due to path compression, the octet path between
-			// leaf and prefix may diverge
 			if kid.Prefix.Contains(ip) {
 				return kid.Value, true
 			}
-			// maybe there is a current best value from upper levels
-			return val, ok
+			// reached a path compressed prefix, stop traversing
+			break LOOP
 		}
 	}
 
-	panic("unreachable")
+	// start backtracking, unwind the stack, bounds check eliminated
+	for ; depth >= 0; depth-- {
+		depth &= nodes.DepthMask // BCE
+
+		n = stack[depth]
+
+		// longest prefix match, skip if node has no prefixes
+		if n.PrefixCount() != 0 {
+			idx := art.OctetToIdx(octets[depth])
+			// lookupIdx() manually inlined
+			if lpmIdx, ok2 := n.Prefixes.IntersectionTop(&lpm.LookupTbl[idx]); ok2 {
+				return n.MustGetPrefix(lpmIdx), ok2
+			}
+		}
+	}
+
+	return val, ok
 }
 
 // LookupPrefix performs a longest prefix match lookup for any address within
@@ -236,8 +255,8 @@ func (f *Fast[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 //
 // Returns the value and true if a matching prefix is found.
 // Returns zero value and false if no match exists.
-func (f *Fast[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
-	_, val, ok = f.lookupPrefixLPM(pfx, false)
+func (t *Fast[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
+	_, val, ok = t.lookupPrefixLPM(pfx, false)
 	return val, ok
 }
 
@@ -253,11 +272,11 @@ func (f *Fast[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
 //
 // Returns the matching prefix, its associated value, and true if found.
 // Returns zero values and false if no match exists.
-func (f *Fast[V]) LookupPrefixLPM(pfx netip.Prefix) (lpmPfx netip.Prefix, val V, ok bool) {
-	return f.lookupPrefixLPM(pfx, true)
+func (t *Fast[V]) LookupPrefixLPM(pfx netip.Prefix) (lpmPfx netip.Prefix, val V, ok bool) {
+	return t.lookupPrefixLPM(pfx, true)
 }
 
-func (f *Fast[V]) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpmPfx netip.Prefix, val V, ok bool) {
+func (t *Fast[V]) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpmPfx netip.Prefix, val V, ok bool) {
 	if !pfx.IsValid() {
 		return lpmPfx, val, ok
 	}
@@ -271,7 +290,7 @@ func (f *Fast[V]) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpmPfx netip.
 	octets := ip.AsSlice()
 	lastOctetPlusOne, lastBits := nodes.LastOctetPlusOneAndLastBits(pfx)
 
-	n := f.rootNodeByVersion(is4)
+	n := t.rootNodeByVersion(is4)
 
 	// record path to leaf node
 	stack := [nodes.MaxTreeDepth]*nodes.FastNode[V]{}
@@ -282,7 +301,7 @@ func (f *Fast[V]) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpmPfx netip.
 LOOP:
 	// find the last node on the octets path in the trie,
 	for depth, octet = range octets {
-		depth = depth & nodes.DepthMask // BCE
+		depth &= nodes.DepthMask // BCE
 
 		// stepped one past the last stride of interest; back up to last and break
 		if depth > lastOctetPlusOne {
@@ -293,13 +312,13 @@ LOOP:
 		stack[depth] = n
 
 		// go down in tight loop to leaf node
-		kidAny, exists := n.GetChild(octet)
-		if !exists {
+		if !n.Children.Test(octet) {
 			break LOOP
 		}
+		kid := n.MustGetChild(octet)
 
 		// kid is node or leaf or fringe at octet
-		switch kid := kidAny.(type) {
+		switch kid := kid.(type) {
 		case *nodes.FastNode[V]:
 			n = kid
 			continue LOOP // descend down to next trie level
@@ -333,12 +352,12 @@ LOOP:
 
 	// start backtracking, unwind the stack
 	for ; depth >= 0; depth-- {
-		depth = depth & nodes.DepthMask // BCE
+		depth &= nodes.DepthMask // BCE
 
 		n = stack[depth]
 
 		// longest prefix match, skip if node has no prefixes
-		if n.PfxCount == 0 {
+		if n.Prefixes.Len() == 0 {
 			continue
 		}
 
@@ -355,25 +374,27 @@ LOOP:
 			idx = art.OctetToIdx(octet)
 		}
 
-		switch withLPM {
-		case false: // LookupPrefix
-			if val, ok = n.Lookup(idx); ok {
+		// manually inlined: lookupIdx(idx)
+		var topIdx uint8
+		if topIdx, ok = n.Prefixes.IntersectionTop(&lpm.LookupTbl[idx]); ok {
+			val = n.MustGetPrefix(topIdx)
+
+			// called from LookupPrefix
+			if !withLPM {
 				return netip.Prefix{}, val, ok
 			}
 
-		case true: // LookupPrefixLPM
-			if lpmIdx, val2, ok2 := n.LookupIdx(idx); ok2 {
-				// get the bits from depth and lpmIdx
-				pfxBits := int(art.PfxBits(depth, lpmIdx))
+			// called from LookupPrefixLPM
 
-				// calculate the lpmPfx from incoming ip and new mask
-				// netip.Addr.Prefix canonicalizes. Invariant: art.PfxBits(depth, topIdx)
-				// yields a valid mask (v4: 0..32, v6: 0..128), so error is impossible.
-				lpmPfx, _ = ip.Prefix(pfxBits)
-				return lpmPfx, val2, ok2
-			}
+			// get the bits from depth and top idx
+			pfxBits := int(art.PfxBits(depth, topIdx))
+
+			// calculate the lpmPfx from incoming ip and new mask
+			// netip.Addr.Prefix canonicalizes. Invariant: art.PfxBits(depth, topIdx)
+			// yields a valid mask (v4: 0..32, v6: 0..128), so error is impossible.
+			lpmPfx, _ = ip.Prefix(pfxBits)
+			return lpmPfx, val, ok
 		}
-		// continue rewinding the stack
 	}
 
 	return lpmPfx, val, ok

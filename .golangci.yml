@@ -23,6 +23,7 @@ linters:
     - gochecknoglobals
     - nolintlint
     - modernize
+    - gocritic
   settings:
     govet:
       enable:
