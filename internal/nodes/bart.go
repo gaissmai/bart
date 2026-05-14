@@ -63,7 +63,8 @@ func (n *BartNode[V]) ChildCount() int {
 // It returns true if a prefix already existed at that index (indicating an update),
 // false if this is a new insertion.
 func (n *BartNode[V]) InsertPrefix(idx uint8, val V) (exists bool) {
-	return n.Prefixes.InsertAt(idx, val)
+	_, exists = n.Prefixes.InsertAt(idx, val)
+	return
 }
 
 // GetPrefix retrieves the value associated with the prefix at the given index.
@@ -103,7 +104,8 @@ func (n *BartNode[V]) DeletePrefix(idx uint8) (exists bool) {
 // The child can be a *BartNode[V], *LeafNode[V], or *FringeNode[V].
 // Returns true if a child already existed at that address.
 func (n *BartNode[V]) InsertChild(addr uint8, child any) (exists bool) {
-	return n.Children.InsertAt(addr, child)
+	_, exists = n.Children.InsertAt(addr, child)
+	return
 }
 
 // GetChild retrieves the child node at the specified address.

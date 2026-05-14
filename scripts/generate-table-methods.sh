@@ -23,7 +23,7 @@ if grep -q "TODO" "${template_file}"; then
 fi
 
 # Table types to generate
-readonly TABLE_TYPES=("Table" "Fast" "liteTable")
+readonly TABLE_TYPES=("Table" "liteTable" "Fast")
 
 # for goimports, see below
 generated_files=()

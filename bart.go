@@ -192,7 +192,7 @@ func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 LOOP:
 	// find leaf node
 	for depth, octet = range octets {
-		depth = depth & nodes.DepthMask // BCE, Lookup must be fast
+		depth &= nodes.DepthMask // BCE, Lookup must be fast
 
 		// push current node on stack for fast backtracking
 		stack[depth] = n
@@ -225,7 +225,7 @@ LOOP:
 
 	// start backtracking, unwind the stack, bounds check eliminated
 	for ; depth >= 0; depth-- {
-		depth = depth & nodes.DepthMask // BCE
+		depth &= nodes.DepthMask // BCE
 
 		n = stack[depth]
 
@@ -297,7 +297,7 @@ func (t *Table[V]) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpmPfx netip
 LOOP:
 	// find the last node on the octets path in the trie,
 	for depth, octet = range octets {
-		depth = depth & nodes.DepthMask // BCE
+		depth &= nodes.DepthMask // BCE
 
 		// stepped one past the last stride of interest; back up to last and break
 		if depth > lastOctetPlusOne {
@@ -348,7 +348,7 @@ LOOP:
 
 	// start backtracking, unwind the stack
 	for ; depth >= 0; depth-- {
-		depth = depth & nodes.DepthMask // BCE
+		depth &= nodes.DepthMask // BCE
 
 		n = stack[depth]
 

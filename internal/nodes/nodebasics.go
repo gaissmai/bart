@@ -218,7 +218,7 @@ func CmpIndexRank(aIdx, bIdx uint8) int {
 //
 // Returns the reconstructed netip.Prefix.
 func CidrFromPath(path StridePath, depth int, is4 bool, idx uint8) netip.Prefix {
-	depth = depth & DepthMask // BCE
+	depth &= DepthMask // BCE
 
 	// retrieve the last octet and pfxLen
 	octet, pfxLen := art.IdxToPfx(idx)
@@ -257,7 +257,7 @@ func CidrFromPath(path StridePath, depth int, is4 bool, idx uint8) netip.Prefix 
 //
 // Returns the reconstructed netip.Prefix for the fringe.
 func CidrForFringe(octets []byte, depth int, is4 bool, lastOctet uint8) netip.Prefix {
-	depth = depth & DepthMask // BCE
+	depth &= DepthMask // BCE
 
 	var path StridePath
 	copy(path[:], octets)
@@ -326,8 +326,6 @@ func LastOctetPlusOneAndLastBits(pfx netip.Prefix) (lastOctetPlusOne int, lastBi
 	// lastOctetPlusOne:  range from 0..4 or 0..16 !ATTENTION: not 0..3 or 0..15
 	// lastBits:          range from 0..7
 	bits := pfx.Bits()
-
-	//nolint:gosec  // G115: narrowing conversion is safe here (bits in [0..128])
 	return bits >> 3, uint8(bits & 7)
 }
 

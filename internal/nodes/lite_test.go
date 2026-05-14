@@ -947,7 +947,7 @@ func TestLiteNode_OverlapsIdx(t *testing.T) {
 
 		idx := art.OctetToIdx(10)
 		for idx > 1 {
-			idx = idx / 2
+			idx /= 2
 			if n.OverlapsIdx(idx) {
 				break
 			}
@@ -2279,7 +2279,7 @@ func TestLiteDeleteIsReverseOfInsert4(t *testing.T) {
 		lite.Insert(pfx, struct{}{}, 0)
 	}
 
-	for i := len(pfxs) - 1; i >= 0; i-- {
+	for i := range slices.Backward(pfxs) {
 		lite.Delete(pfxs[i])
 	}
 
@@ -2308,7 +2308,7 @@ func TestLiteDeleteIsReverseOfInsert6(t *testing.T) {
 		lite.Insert(pfx, struct{}{}, 0)
 	}
 
-	for i := len(pfxs) - 1; i >= 0; i-- {
+	for i := range slices.Backward(pfxs) {
 		lite.Delete(pfxs[i])
 	}
 
