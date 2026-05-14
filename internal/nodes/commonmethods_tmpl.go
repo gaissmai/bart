@@ -328,7 +328,7 @@ func (n *_NODE_TYPE[V]) Delete(pfx netip.Prefix) (exists bool) {
 
 	// find the trie node
 	for depth, octet := range octets {
-		depth = depth & DepthMask // BCE, Delete must be fast
+		depth &= DepthMask // BCE, Delete must be fast
 
 		// push current node on stack for path recording
 		stack[depth] = n
@@ -570,7 +570,7 @@ func (n *_NODE_TYPE[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V
 
 	// find the proper trie node to update prefix
 	for depth, octet := range octets {
-		depth = depth & DepthMask // BCE
+		depth &= DepthMask // BCE
 
 		// push current node on stack for path recording
 		stack[depth] = n

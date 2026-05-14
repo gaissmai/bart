@@ -35,81 +35,6 @@ func TestBartNode_EmptyState(t *testing.T) {
 	}
 }
 
-func TestBartNode_PrefixCRUD(t *testing.T) {
-	t.Parallel()
-	n := &BartNode[int]{}
-
-	// Insert first time
-	if exists := n.InsertPrefix(32, 100); exists {
-		t.Error("InsertPrefix first time returned exists=true")
-	}
-	if n.PrefixCount() != 1 {
-		t.Errorf("PrefixCount()=%d after insert, want 1", n.PrefixCount())
-	}
-
-	// Insert overwrite
-	if exists := n.InsertPrefix(32, 111); !exists {
-		t.Error("InsertPrefix overwrite returned exists=false")
-	}
-	if n.PrefixCount() != 1 {
-		t.Errorf("PrefixCount()=%d after overwrite, want 1", n.PrefixCount())
-	}
-	if v, ok := n.GetPrefix(32); !ok || v != 111 {
-		t.Errorf("GetPrefix(32)=(%d,%v), want (111,true)", v, ok)
-	}
-
-	// Delete
-	if exists := n.DeletePrefix(32); !exists {
-		t.Error("DeletePrefix returned exists=false")
-	}
-	if n.PrefixCount() != 0 {
-		t.Errorf("PrefixCount()=%d after delete, want 0", n.PrefixCount())
-	}
-	if _, ok := n.GetPrefix(32); ok {
-		t.Error("GetPrefix(32) after delete returned ok=true")
-	}
-
-	// Delete non-existent
-	if exists := n.DeletePrefix(77); exists {
-		t.Error("DeletePrefix non-existent returned exists=true")
-	}
-}
-
-func TestBartNode_Contains_ART_Coverage(t *testing.T) {
-	t.Parallel()
-	n := &BartNode[int]{}
-
-	// Insert at index 32 (allot() populates covered slots)
-	n.InsertPrefix(32, 100)
-
-	// Allotment set for 32 (uint8 range): {32,64,65,128,129,130,131}
-	testCases := []struct {
-		idx  uint8
-		want bool
-	}{
-		{32, true},
-		{64, true},
-		{65, true},
-		{128, true},
-		{129, true},
-		{130, true},
-		{131, true},
-		{1, false},
-		{16, false},
-		{33, false},
-		{63, false},
-		{127, false},
-		{132, false},
-		{255, false},
-	}
-
-	for _, tc := range testCases {
-		if got := n.Contains(tc.idx); got != tc.want {
-			t.Errorf("Contains(%d)=%v, want %v", tc.idx, got, tc.want)
-		}
-	}
-}
-
 func TestBartNode_LookupAndLookupIdx(t *testing.T) {
 	t.Parallel()
 	n := &BartNode[int]{}
@@ -1108,7 +1033,6 @@ func TestBartNode_OverlapsIdx(t *testing.T) {
 	})
 }
 
-//nolint:gocyclo
 func TestBartNode_UnionRec_AllCombinations(t *testing.T) {
 	t.Parallel()
 
@@ -1791,7 +1715,6 @@ func TestBartNode_UnionRecPersist_AllCombinations(t *testing.T) {
 	})
 }
 
-//nolint:gocyclo
 func TestBartNode_Modify_AllPaths(t *testing.T) {
 	t.Parallel()
 

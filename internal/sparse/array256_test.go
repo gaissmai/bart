@@ -52,7 +52,6 @@ func TestSparseArrayGet(t *testing.T) {
 	a.InsertAt(255, 255)
 
 	for range 100 {
-		//nolint:gosec // G115: integer overflow conversion uint -> uint8
 		i := uint8(rand.UintN(100))
 		v, ok := a.Get(i)
 		if !ok {
