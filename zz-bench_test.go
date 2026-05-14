@@ -643,9 +643,9 @@ var (
 
 func BenchmarkBartWorstCaseMatch4(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
-		tbl := new(Table[string])
+		tbl := new(Table[any])
 		for _, p := range worstCasePfxsIP4 {
-			tbl.Insert(p, p.String())
+			tbl.Insert(p, nil)
 		}
 
 		for b.Loop() {
@@ -654,9 +654,9 @@ func BenchmarkBartWorstCaseMatch4(b *testing.B) {
 	})
 
 	b.Run("Lookup", func(b *testing.B) {
-		tbl := new(Table[string])
+		tbl := new(Table[any])
 		for _, p := range worstCasePfxsIP4 {
-			tbl.Insert(p, p.String())
+			tbl.Insert(p, nil)
 		}
 		tbl.Insert(ipv4DefaultRoute, ipv4DefaultRoute.String())
 		tbl.Delete(worstCaseProbePfx4)
@@ -667,9 +667,9 @@ func BenchmarkBartWorstCaseMatch4(b *testing.B) {
 	})
 
 	b.Run("LookupPrefix", func(b *testing.B) {
-		tbl := new(Table[string])
+		tbl := new(Table[any])
 		for _, p := range worstCasePfxsIP4 {
-			tbl.Insert(p, p.String())
+			tbl.Insert(p, nil)
 		}
 		tbl.Insert(ipv4DefaultRoute, ipv4DefaultRoute.String())
 		tbl.Delete(worstCaseProbePfx4)
@@ -680,9 +680,9 @@ func BenchmarkBartWorstCaseMatch4(b *testing.B) {
 	})
 
 	b.Run("LookupPrefixLPM", func(b *testing.B) {
-		tbl := new(Table[string])
+		tbl := new(Table[any])
 		for _, p := range worstCasePfxsIP4 {
-			tbl.Insert(p, p.String())
+			tbl.Insert(p, nil)
 		}
 		tbl.Insert(ipv4DefaultRoute, ipv4DefaultRoute.String())
 		tbl.Delete(worstCaseProbePfx4)
@@ -695,9 +695,9 @@ func BenchmarkBartWorstCaseMatch4(b *testing.B) {
 
 func BenchmarkFastWorstCaseMatch4(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
-		tbl := new(Fast[string])
+		tbl := new(Fast[any])
 		for _, p := range worstCasePfxsIP4 {
-			tbl.Insert(p, p.String())
+			tbl.Insert(p, nil)
 		}
 
 		for b.Loop() {
@@ -706,9 +706,9 @@ func BenchmarkFastWorstCaseMatch4(b *testing.B) {
 	})
 
 	b.Run("Lookup", func(b *testing.B) {
-		tbl := new(Fast[string])
+		tbl := new(Fast[any])
 		for _, p := range worstCasePfxsIP4 {
-			tbl.Insert(p, p.String())
+			tbl.Insert(p, nil)
 		}
 		tbl.Insert(ipv4DefaultRoute, ipv4DefaultRoute.String())
 		tbl.Delete(worstCaseProbePfx4)
@@ -719,9 +719,9 @@ func BenchmarkFastWorstCaseMatch4(b *testing.B) {
 	})
 
 	b.Run("LookupPrefix", func(b *testing.B) {
-		tbl := new(Fast[string])
+		tbl := new(Fast[any])
 		for _, p := range worstCasePfxsIP4 {
-			tbl.Insert(p, p.String())
+			tbl.Insert(p, nil)
 		}
 		tbl.Insert(ipv4DefaultRoute, ipv4DefaultRoute.String())
 		tbl.Delete(worstCaseProbePfx4)
@@ -732,9 +732,9 @@ func BenchmarkFastWorstCaseMatch4(b *testing.B) {
 	})
 
 	b.Run("LookupPrefixLPM", func(b *testing.B) {
-		tbl := new(Fast[string])
+		tbl := new(Fast[any])
 		for _, p := range worstCasePfxsIP4 {
-			tbl.Insert(p, p.String())
+			tbl.Insert(p, nil)
 		}
 		tbl.Insert(ipv4DefaultRoute, ipv4DefaultRoute.String())
 		tbl.Delete(worstCaseProbePfx4)
@@ -747,9 +747,9 @@ func BenchmarkFastWorstCaseMatch4(b *testing.B) {
 
 func BenchmarkBartWorstCaseMiss4(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
-		tbl := new(Table[string])
+		tbl := new(Table[any])
 		for _, p := range worstCasePfxsIP4 {
-			tbl.Insert(p, p.String())
+			tbl.Insert(p, nil)
 		}
 
 		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
@@ -760,9 +760,9 @@ func BenchmarkBartWorstCaseMiss4(b *testing.B) {
 	})
 
 	b.Run("Lookup", func(b *testing.B) {
-		tbl := new(Table[string])
+		tbl := new(Table[any])
 		for _, p := range worstCasePfxsIP4 {
-			tbl.Insert(p, p.String())
+			tbl.Insert(p, nil)
 		}
 
 		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
@@ -773,9 +773,9 @@ func BenchmarkBartWorstCaseMiss4(b *testing.B) {
 	})
 
 	b.Run("LookupPrefix", func(b *testing.B) {
-		tbl := new(Table[string])
+		tbl := new(Table[any])
 		for _, p := range worstCasePfxsIP4 {
-			tbl.Insert(p, p.String())
+			tbl.Insert(p, nil)
 		}
 
 		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
@@ -786,9 +786,9 @@ func BenchmarkBartWorstCaseMiss4(b *testing.B) {
 	})
 
 	b.Run("LookupPrefixLPM", func(b *testing.B) {
-		tbl := new(Table[string])
+		tbl := new(Table[any])
 		for _, p := range worstCasePfxsIP4 {
-			tbl.Insert(p, p.String())
+			tbl.Insert(p, nil)
 		}
 
 		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
@@ -801,9 +801,9 @@ func BenchmarkBartWorstCaseMiss4(b *testing.B) {
 
 func BenchmarkFastWorstCaseMiss4(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
-		tbl := new(Fast[string])
+		tbl := new(Fast[any])
 		for _, p := range worstCasePfxsIP4 {
-			tbl.Insert(p, p.String())
+			tbl.Insert(p, nil)
 		}
 
 		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
@@ -814,9 +814,9 @@ func BenchmarkFastWorstCaseMiss4(b *testing.B) {
 	})
 
 	b.Run("Lookup", func(b *testing.B) {
-		tbl := new(Fast[string])
+		tbl := new(Fast[any])
 		for _, p := range worstCasePfxsIP4 {
-			tbl.Insert(p, p.String())
+			tbl.Insert(p, nil)
 		}
 
 		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
@@ -827,9 +827,9 @@ func BenchmarkFastWorstCaseMiss4(b *testing.B) {
 	})
 
 	b.Run("LookupPrefix", func(b *testing.B) {
-		tbl := new(Fast[string])
+		tbl := new(Fast[any])
 		for _, p := range worstCasePfxsIP4 {
-			tbl.Insert(p, p.String())
+			tbl.Insert(p, nil)
 		}
 
 		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
@@ -840,9 +840,9 @@ func BenchmarkFastWorstCaseMiss4(b *testing.B) {
 	})
 
 	b.Run("LookupPrefixLPM", func(b *testing.B) {
-		tbl := new(Fast[string])
+		tbl := new(Fast[any])
 		for _, p := range worstCasePfxsIP4 {
-			tbl.Insert(p, p.String())
+			tbl.Insert(p, nil)
 		}
 
 		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
@@ -854,9 +854,9 @@ func BenchmarkFastWorstCaseMiss4(b *testing.B) {
 }
 func BenchmarkBartWorstCaseMatch6(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
-		tbl := new(Table[string])
+		tbl := new(Table[any])
 		for _, p := range worstCasePfxsIP6 {
-			tbl.Insert(p, p.String())
+			tbl.Insert(p, nil)
 		}
 
 		for b.Loop() {
@@ -865,9 +865,9 @@ func BenchmarkBartWorstCaseMatch6(b *testing.B) {
 	})
 
 	b.Run("Lookup", func(b *testing.B) {
-		tbl := new(Table[string])
+		tbl := new(Table[any])
 		for _, p := range worstCasePfxsIP6 {
-			tbl.Insert(p, p.String())
+			tbl.Insert(p, nil)
 		}
 		tbl.Insert(ipv6DefaultRoute, ipv6DefaultRoute.String())
 		tbl.Delete(worstCaseProbePfx6)
@@ -878,9 +878,9 @@ func BenchmarkBartWorstCaseMatch6(b *testing.B) {
 	})
 
 	b.Run("LookupPrefix", func(b *testing.B) {
-		tbl := new(Table[string])
+		tbl := new(Table[any])
 		for _, p := range worstCasePfxsIP6 {
-			tbl.Insert(p, p.String())
+			tbl.Insert(p, nil)
 		}
 		tbl.Insert(ipv6DefaultRoute, ipv6DefaultRoute.String())
 		tbl.Delete(worstCaseProbePfx6)
@@ -891,9 +891,9 @@ func BenchmarkBartWorstCaseMatch6(b *testing.B) {
 	})
 
 	b.Run("LookupPrefixLPM", func(b *testing.B) {
-		tbl := new(Table[string])
+		tbl := new(Table[any])
 		for _, p := range worstCasePfxsIP6 {
-			tbl.Insert(p, p.String())
+			tbl.Insert(p, nil)
 		}
 		tbl.Insert(ipv6DefaultRoute, ipv6DefaultRoute.String())
 		tbl.Delete(worstCaseProbePfx6)
@@ -906,9 +906,9 @@ func BenchmarkBartWorstCaseMatch6(b *testing.B) {
 
 func BenchmarkFastWorstCaseMatch6(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
-		tbl := new(Fast[string])
+		tbl := new(Fast[any])
 		for _, p := range worstCasePfxsIP6 {
-			tbl.Insert(p, p.String())
+			tbl.Insert(p, nil)
 		}
 
 		for b.Loop() {
@@ -917,9 +917,9 @@ func BenchmarkFastWorstCaseMatch6(b *testing.B) {
 	})
 
 	b.Run("Lookup", func(b *testing.B) {
-		tbl := new(Fast[string])
+		tbl := new(Fast[any])
 		for _, p := range worstCasePfxsIP6 {
-			tbl.Insert(p, p.String())
+			tbl.Insert(p, nil)
 		}
 		tbl.Insert(ipv6DefaultRoute, ipv6DefaultRoute.String())
 		tbl.Delete(worstCaseProbePfx6)
@@ -930,9 +930,9 @@ func BenchmarkFastWorstCaseMatch6(b *testing.B) {
 	})
 
 	b.Run("LookupPrefix", func(b *testing.B) {
-		tbl := new(Fast[string])
+		tbl := new(Fast[any])
 		for _, p := range worstCasePfxsIP6 {
-			tbl.Insert(p, p.String())
+			tbl.Insert(p, nil)
 		}
 		tbl.Insert(ipv6DefaultRoute, ipv6DefaultRoute.String())
 		tbl.Delete(worstCaseProbePfx6)
@@ -943,9 +943,9 @@ func BenchmarkFastWorstCaseMatch6(b *testing.B) {
 	})
 
 	b.Run("LookupPrefixLPM", func(b *testing.B) {
-		tbl := new(Fast[string])
+		tbl := new(Fast[any])
 		for _, p := range worstCasePfxsIP6 {
-			tbl.Insert(p, p.String())
+			tbl.Insert(p, nil)
 		}
 		tbl.Insert(ipv6DefaultRoute, ipv6DefaultRoute.String())
 		tbl.Delete(worstCaseProbePfx6)
@@ -958,9 +958,9 @@ func BenchmarkFastWorstCaseMatch6(b *testing.B) {
 
 func BenchmarkBartWorstCaseMiss6(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
-		tbl := new(Table[string])
+		tbl := new(Table[any])
 		for _, p := range worstCasePfxsIP6 {
-			tbl.Insert(p, p.String())
+			tbl.Insert(p, nil)
 		}
 
 		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
@@ -971,9 +971,9 @@ func BenchmarkBartWorstCaseMiss6(b *testing.B) {
 	})
 
 	b.Run("Lookup", func(b *testing.B) {
-		tbl := new(Table[string])
+		tbl := new(Table[any])
 		for _, p := range worstCasePfxsIP6 {
-			tbl.Insert(p, p.String())
+			tbl.Insert(p, nil)
 		}
 
 		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
@@ -984,9 +984,9 @@ func BenchmarkBartWorstCaseMiss6(b *testing.B) {
 	})
 
 	b.Run("LookupPrefix", func(b *testing.B) {
-		tbl := new(Table[string])
+		tbl := new(Table[any])
 		for _, p := range worstCasePfxsIP6 {
-			tbl.Insert(p, p.String())
+			tbl.Insert(p, nil)
 		}
 
 		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
@@ -997,9 +997,9 @@ func BenchmarkBartWorstCaseMiss6(b *testing.B) {
 	})
 
 	b.Run("LookupPrefixLPM", func(b *testing.B) {
-		tbl := new(Table[string])
+		tbl := new(Table[any])
 		for _, p := range worstCasePfxsIP6 {
-			tbl.Insert(p, p.String())
+			tbl.Insert(p, nil)
 		}
 
 		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
@@ -1012,9 +1012,9 @@ func BenchmarkBartWorstCaseMiss6(b *testing.B) {
 
 func BenchmarkFastWorstCaseMiss6(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
-		tbl := new(Fast[string])
+		tbl := new(Fast[any])
 		for _, p := range worstCasePfxsIP6 {
-			tbl.Insert(p, p.String())
+			tbl.Insert(p, nil)
 		}
 
 		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
@@ -1025,9 +1025,9 @@ func BenchmarkFastWorstCaseMiss6(b *testing.B) {
 	})
 
 	b.Run("Lookup", func(b *testing.B) {
-		tbl := new(Fast[string])
+		tbl := new(Fast[any])
 		for _, p := range worstCasePfxsIP6 {
-			tbl.Insert(p, p.String())
+			tbl.Insert(p, nil)
 		}
 
 		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
@@ -1038,9 +1038,9 @@ func BenchmarkFastWorstCaseMiss6(b *testing.B) {
 	})
 
 	b.Run("LookupPrefix", func(b *testing.B) {
-		tbl := new(Fast[string])
+		tbl := new(Fast[any])
 		for _, p := range worstCasePfxsIP6 {
-			tbl.Insert(p, p.String())
+			tbl.Insert(p, nil)
 		}
 
 		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
@@ -1051,9 +1051,9 @@ func BenchmarkFastWorstCaseMiss6(b *testing.B) {
 	})
 
 	b.Run("LookupPrefixLPM", func(b *testing.B) {
-		tbl := new(Fast[string])
+		tbl := new(Fast[any])
 		for _, p := range worstCasePfxsIP6 {
-			tbl.Insert(p, p.String())
+			tbl.Insert(p, nil)
 		}
 
 		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
