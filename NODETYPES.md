@@ -126,6 +126,6 @@ The actual payload struct referenced by the pointer is **not included** in these
 - **Pipeline-friendly**: Only 4 bitset operations (4×uint64) per level, optimized for CPU pipelining
 - **No backtracking**: Traditional longest-prefix-match backtracking replaced with direct table lookups
  
-### FastNode[V] - Direct Array Access for next child per Level
-- **Zero indirection per level**: Direct slice indexing for `children[idx]`, no rank calculation.
-- **Performance advantage**: ~25% faster level traversing
+### FastNode[V] - Cached Child Access per Level
+- **No rank recomputation per level**: Uses `childRankCache[idx]` to index sparse child storage quickly.
+- **Performance advantage**: ~25% faster level traversal
