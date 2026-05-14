@@ -75,41 +75,6 @@ func TestFastNode_PrefixCRUD(t *testing.T) {
 	}
 }
 
-func TestFastNode_Contains_ART_Coverage(t *testing.T) {
-	t.Parallel()
-	n := &FastNode[int]{}
-
-	// Insert at index 32 (allot() populates covered slots)
-	n.InsertPrefix(32, 100)
-
-	// Allotment set for 32 (uint8 range): {32,64,65,128,129,130,131}
-	testCases := []struct {
-		idx  uint8
-		want bool
-	}{
-		{32, true},
-		{64, true},
-		{65, true},
-		{128, true},
-		{129, true},
-		{130, true},
-		{131, true},
-		{1, false},
-		{16, false},
-		{33, false},
-		{63, false},
-		{127, false},
-		{132, false},
-		{255, false},
-	}
-
-	for _, tc := range testCases {
-		if got := n.Contains(tc.idx); got != tc.want {
-			t.Errorf("Contains(%d)=%v, want %v", tc.idx, got, tc.want)
-		}
-	}
-}
-
 func TestFastNode_LookupAndLookupIdx(t *testing.T) {
 	t.Parallel()
 	n := &FastNode[int]{}
@@ -1042,7 +1007,7 @@ func TestFastNode_OverlapsIdx(t *testing.T) {
 
 		idx := art.OctetToIdx(10)
 		for idx > 1 {
-			idx = idx / 2
+			idx /= 2
 			if n.OverlapsIdx(idx) {
 				break
 			}

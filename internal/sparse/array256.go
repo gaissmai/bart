@@ -108,24 +108,36 @@ func (a *Array256[T]) Copy() *Array256[T] {
 	return c
 }
 
-// InsertAt adds the value to the index i. If a value already exists there,
-// it is overwritten and true is returned.
+// InsertAt inserts or overwrites the value at sparse index i.
 //
-// Otherwise, the value is inserted, the bit is marked, and false returned.
-func (a *Array256[T]) InsertAt(i uint8, value T) (exists bool) {
-	// slot exists, overwrite value
+// If the slot at i already exists, its value is overwritten in-place and
+// (rank0, true) is returned, where rank0 = Rank(i)-1 is the 0-based index
+// into Items[].
+//
+// If the slot is new, the bit for i is set, the value is inserted into Items[]
+// at the correct packed position, and (rank0, false) is returned.
+//
+// rank0 can be cached by the caller to directly access Items[rank0]
+// without a second Rank() call.
+func (a *Array256[T]) InsertAt(i uint8, value T) (rank0 int, exists bool) {
+
+	// slot exists, just overwrite value
 	if a.Test(i) {
-		a.Items[a.Rank(i)-1] = value
-		return true
+		rank0 = a.Rank(i) - 1
+		a.Items[rank0] = value
+		return rank0, true
 	}
 
 	// new, insert into bitset ...
 	a.BitSet256.Set(i)
 
-	// ... and slice
-	a.insertItem(a.Rank(i)-1, value)
+	// recalc Rank after Set()
+	rank0 = a.Rank(i) - 1
 
-	return false
+	// ... and insert value into slice
+	a.insertItem(rank0, value)
+
+	return rank0, false
 }
 
 // DeleteAt removes the value at index i from the sparse array,
