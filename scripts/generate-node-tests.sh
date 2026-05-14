@@ -23,7 +23,7 @@ if grep -q "TODO" "${template_file}"; then
 fi
 
 # Node types to generate
-readonly NODE_TYPES=("BartNode" "FastNode" "LiteNode")
+readonly NODE_TYPES=("BartNode" "LiteNode" "FastNode")
 
 # for goimports, see below
 generated_files=()

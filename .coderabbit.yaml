@@ -24,10 +24,9 @@ reviews:
   auto_apply_labels: false
   suggested_reviewers: false
   auto_assign_reviewers: false
-  poem: true
+  poem: false
   labeling_instructions: []
   path_filters:
-    - '!**/doc/**'
     - '!**/testdata/**'
   path_instructions: []
   abort_on_close: true

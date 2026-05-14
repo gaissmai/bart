@@ -57,7 +57,7 @@ func (n *LiteNode[V]) ChildCount() int {
 }
 
 // InsertPrefix adds a routing entry at the specified index.
-// It returns true if a prefix already existed at that index
+// It returns true if a prefix already existed at that index,
 // false if this is a new insertion.
 func (n *LiteNode[V]) InsertPrefix(idx uint8, _ V) (exists bool) {
 	if exists = n.Prefixes.Test(idx); exists {
@@ -68,13 +68,14 @@ func (n *LiteNode[V]) InsertPrefix(idx uint8, _ V) (exists bool) {
 	return exists
 }
 
-// prefix is set at the given index.
 func (n *LiteNode[V]) GetPrefix(idx uint8) (_ V, exists bool) {
+	// no docstring by intention
 	exists = n.Prefixes.Test(idx)
 	return
 }
 
 func (n *LiteNode[V]) MustGetPrefix(idx uint8) (_ V) {
+	// no docstring by intention
 	return
 }
 
@@ -107,7 +108,8 @@ func (n *LiteNode[V]) DeletePrefix(idx uint8) (exists bool) {
 // The child can be a *LiteNode[V], *LeafNode, or *FringeNode.
 // Returns true if a child already existed at that address.
 func (n *LiteNode[V]) InsertChild(addr uint8, child any) (exists bool) {
-	return n.Children.InsertAt(addr, child)
+	_, exists = n.Children.InsertAt(addr, child)
+	return
 }
 
 // GetChild retrieves the child node at the specified address.
@@ -129,8 +131,7 @@ func (n *LiteNode[V]) AllChildren() iter.Seq2[uint8, any] {
 		var buf [256]uint8
 		addrs := n.Children.AsSlice(&buf)
 		for i, addr := range addrs {
-			child := n.Children.Items[i]
-			if !yield(addr, child) {
+			if !yield(addr, n.Children.Items[i]) {
 				return
 			}
 		}
@@ -171,7 +172,7 @@ func (n *LiteNode[V]) LookupIdx(idx uint8) (top uint8, _ V, ok bool) {
 	return
 }
 
-// Lookup is just a simple wrapper for lookupIdx.
+// Lookup is just a simple wrapper for LookupIdx.
 func (n *LiteNode[V]) Lookup(idx uint8) (_ V, ok bool) {
 	_, _, ok = n.LookupIdx(idx)
 	return

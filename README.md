@@ -38,12 +38,8 @@ sparse arrays for **level compression**.
 Combined with a **novel path and fringe compression**, this design reduces
 memory consumption by nearly two orders of magnitude compared to classical ART.
 
-For **bart.Fast** this binary tree is represented with fixed arrays
-without level compression (classical ART), but combined with the same
-novel **path and fringe compression** from BART. This design
-reduces memory consumption by more than an order of magnitude compared
-to classical ART and thus makes ART usable in the first place for large
-routing tables.
+For **bart.Fast**, an additional 256 bytes per node are used to
+achieve faster level traversal in the multibit trie.
 
 **bart.Lite** is a special form of **bart.Table**, but without a payload, and therefore
 has the lowest memory overhead while maintaining the same lookup times.
@@ -110,12 +106,13 @@ func main() {
  
  | Aspect | Table | Lite | Fast |
  |--------|-------------|-------------|-------------|
- | **Per-level Speed** | ⚡ **O(1)** | ⚡ **O(1)** | 🚀 **O(1), 50-100% faster** |
+ | **Per-level Speed** | ⚡ **O(1)** | ⚡ **O(1)** | 🚀 **O(1), ~25% faster** |
  | **Overall Lookup** | O(trie_depth) | O(trie_depth) | O(trie_depth) |
  | **IPv4 Performance** | ~3 level traversals | ~3 level traversals | ~3 level traversals |
  | **IPv6 Performance** | ~6 level traversals | ~6 level traversals | ~6 level traversals |
  | **IPv6 vs IPv4** | ~2× slower | ~2× slower | ~2× slower |
- | **Memory** | efficient | very efficient | inefficient |
+ | **Memory** | efficient | very efficient | less efficient |
+ | **Update** | very fast | best | fast |
 
 A more detailed description can be found in [NODETYPES.md](NODETYPES.md).
 
@@ -124,15 +121,18 @@ A more detailed description can be found in [NODETYPES.md](NODETYPES.md).
 ### 🎯 **bart.Table[V]** - The Balanced Choice                                                                        
 - **Recommended** for most routing table use cases
 - Near-optimal per-level performance with excellent memory efficiency
+- Very fast updates (insert/delete)
 - Perfect balance for both IPv4 and IPv6 routing tables (use it for RIB)
  
 ### 🪶 **bart.Lite** - The Minimalist
 - **Specialized** for prefix-only operations, no payload
-- Same per-level performance as *bart.Table[V]* but 35% less memory
+- Same per-level performance as *bart.Table[V]* but ~35% less memory
+- Optimal updates (insert/delete), ~25% faster than *bart.Table[V]*
 - Ideal for IPv4/IPv6 allowlists and set-based operations (use it for ACL)
  
-### 🚀 **bart.Fast[V]** - The Performance Champion
-- **50-100% faster** when memory constraints allow
+### 🚀 **bart.Fast[V]** - The Lookup Performance Champion
+- **~25% faster** when memory constraints allow
+- Fast updates (insert/delete), ~50% slower than *bart.Table[V]*
 - Best choice for lookup-intensive applications (use it for FIB)
 
 ## Bitset Efficiency
@@ -268,11 +268,13 @@ $ GOAMD64=v3 go test -run=xxx -bench=FullFastM/Lookup$ -cpu=1
 goos: linux
 goarch: amd64
 pkg: github.com/gaissmai/bart
-cpu: Intel(R) Core(TM) i5-8250U CPU @ 1.60GHz
-BenchmarkFullFastMatch4/Lookup           124476082          9.63 ns/op
-BenchmarkFullFastMatch6/Lookup           91032597          13.20 ns/op
-BenchmarkFullFastMiss4/Lookup            134171480          8.93 ns/op
-BenchmarkFullFastMiss6/Lookup            75634396          15.79 ns/op
+cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
+BenchmarkFullFastMatch4/Lookup         	129484557	         9.274 ns/op
+BenchmarkFullFastMatch6/Lookup         	65185531	        17.99 ns/op
+BenchmarkFullFastMiss4/Lookup          	92448910	        12.81 ns/op
+BenchmarkFullFastMiss6/Lookup          	64323817	        18.66 ns/op
+PASS
+ok  	github.com/gaissmai/bart	6.647s
 ```
 
 ## Compatibility Guarantees
