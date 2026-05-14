@@ -457,11 +457,13 @@ func TestCmpIndexRank(t *testing.T) {
 
 			// Check the sign of the result
 			var resultSign int
-			if result > 0 {
+
+			switch {
+			case result > 0:
 				resultSign = 1
-			} else if result < 0 {
+			case result < 0:
 				resultSign = -1
-			} else {
+			default:
 				resultSign = 0
 			}
 
@@ -669,7 +671,6 @@ func TestIntegration(t *testing.T) {
 		for _, tc := range testCases {
 			octets := make([]byte, 16)
 			for i := range octets {
-				//nolint:gosec
 				octets[i] = uint8(i + 1) // some non-zero pattern
 			}
 
@@ -686,7 +687,6 @@ func TestIntegration(t *testing.T) {
 		// Test that ART index operations are consistent
 		// Use int counter to avoid uint8 overflow
 		for i := 1; i <= 255; i++ {
-			//nolint:gosec
 			idx := uint8(i)
 			octet, pfxLen := art.IdxToPfx(idx)
 

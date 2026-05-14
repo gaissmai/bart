@@ -41,6 +41,7 @@ func Prefix6(prng *rand.Rand) netip.Prefix {
 func IP4(prng *rand.Rand) netip.Addr {
 	var b [4]byte
 	for i := range b {
+		//nolint:gosec // G115: integer overflow conversion uint -> byte
 		b[i] = byte(prng.UintN(256))
 	}
 	return netip.AddrFrom4(b)
@@ -49,6 +50,7 @@ func IP4(prng *rand.Rand) netip.Addr {
 func IP6(prng *rand.Rand) netip.Addr {
 	var b [16]byte
 	for i := range b {
+		//nolint:gosec // G115: integer overflow conversion uint -> byte
 		b[i] = byte(prng.UintN(256))
 	}
 	return netip.AddrFrom16(b)
