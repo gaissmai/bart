@@ -11,7 +11,7 @@ import (
 	"github.com/gaissmai/bart/internal/value"
 )
 
-// Each FatNode contains two conceptually different arrays:
+// Each FastNode contains two conceptually different arrays:
 //
 //   - Prefixes stores routing entries (prefix -> value),
 //     laid out as a complete binary tree using the baseIndex()
