@@ -107,25 +107,25 @@ func (n *FastNode[V]) DeletePrefix(idx uint8) (exists bool) {
 func (n *FastNode[V]) InsertChild(addr uint8, child any) (exists bool) {
 	var rank0 int
 	rank0, exists = n.Children.InsertAt(addr, child)
-
 	if exists {
+		// Update only: the value at addr is overwritten in-place by InsertAt.
+		// childRankCache[addr] is not refreshed because the rank is unchanged
+		// the position of addr in the sparse slice does not shift on an update.
+		// rank0 is discarded intentionally.
 		return
 	}
 
 	// new child inserted? cache the rank value for this addr
 	//nolint:gosec // G115: integer overflow conversion int -> uint8
 	n.childRankCache[addr] = uint8(rank0)
-
 	if addr == 255 {
 		return exists
 	}
-
 	// increment all cached ranks, starting with i > addr
 	tail := n.childRankCache[addr+1:]
 	for i := range tail {
 		tail[i]++
 	}
-
 	return
 }
 
