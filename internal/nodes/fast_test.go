@@ -75,6 +75,166 @@ func TestFastNode_PrefixCRUD(t *testing.T) {
 	}
 }
 
+func TestFastNode_Contains_CBT_AncestorCoverage(t *testing.T) {
+	t.Parallel()
+	n := &FastNode[int]{}
+
+	// idx=32 == art.PfxToIdx(0, 5), represents the prefix 0/5 in this stride.
+	// In the CBT (complete binary tree):
+	//   children of 32:     64 (32<<1), 65 (32<<1|1)
+	//   grandchildren:     128, 129 (via 64) and 130, 131 (via 65)
+	insertIdx := art.PfxToIdx(0, 5) // == 32
+
+	// Before any insertion: nothing matches.
+	for _, idx := range []uint8{32, 64, 65, 128, 129, 130, 131} {
+		if n.Contains(idx) {
+			t.Errorf("Contains(%d)=true before insert, want false", idx)
+		}
+	}
+
+	n.InsertPrefix(insertIdx, 1)
+
+	// Direct hit at the inserted index.
+	if !n.Contains(insertIdx) {
+		t.Errorf("Contains(%d)=false after insert, want true", insertIdx)
+	}
+
+	// Children of 32 in CBT: 64>>1==32, 65>>1==32.
+	for _, idx := range []uint8{64, 65} {
+		if !n.Contains(idx) {
+			t.Errorf("Contains(%d)=false, want true: child of 32 in CBT", idx)
+		}
+	}
+
+	// Grandchildren of 32: 128>>1==64>>1==32, 129>>1==64>>1==32,
+	//                      130>>1==65>>1==32, 131>>1==65>>1==32.
+	for _, idx := range []uint8{128, 129, 130, 131} {
+		if !n.Contains(idx) {
+			t.Errorf("Contains(%d)=false, want true: grandchild of 32 in CBT", idx)
+		}
+	}
+
+	// Indices NOT in the subtree of 32: siblings and their descendants.
+	for _, idx := range []uint8{1, 2, 3, 4, 8, 16, 33, 66, 67, 132} {
+		if n.Contains(idx) {
+			t.Errorf("Contains(%d)=true, want false: not a descendant of 32 in CBT", idx)
+		}
+	}
+
+	// After deletion the ancestor coverage must be gone.
+	n.DeletePrefix(insertIdx)
+	for _, idx := range []uint8{32, 64, 65, 128, 129, 130, 131} {
+		if n.Contains(idx) {
+			t.Errorf("Contains(%d)=true after delete, want false", idx)
+		}
+	}
+}
+
+func TestFastNode_Contains_CBT_TwoPrefixes(t *testing.T) {
+	t.Parallel()
+	n := &FastNode[int]{}
+
+	// prefix1: 0/4 -> idx=16 (wider, covers 0.0.0.0–15.x.x.x in this stride)
+	// prefix2: 0/6 -> idx=64 (narrower, strictly contained within prefix1's subtree)
+	//
+	// CBT subtree relationships:
+	//   prefix1 subtree (idx 16): 32, 33, 64, 65, 66, 67, 128–135, …
+	//   prefix2 subtree (idx 64): 128, 129
+	//   -> prefix2 subtree ⊂ prefix1 subtree
+	idx1 := art.PfxToIdx(0, 4) // == 16
+	idx2 := art.PfxToIdx(0, 6) // == 64
+
+	// 1. Empty node: nothing matches
+	for _, idx := range []uint8{16, 32, 33, 64, 65, 66, 67, 128, 129} {
+		if n.Contains(idx) {
+			t.Errorf("empty: Contains(%d)=true, want false", idx)
+		}
+	}
+
+	// 2. Only prefix1 inserted
+	n.InsertPrefix(idx1, 1)
+
+	// prefix1 itself and its whole subtree -> true
+	for _, idx := range []uint8{16, 32, 33, 64, 65, 66, 67, 128, 129, 130, 131} {
+		if !n.Contains(idx) {
+			t.Errorf("only prefix1: Contains(%d)=false, want true", idx)
+		}
+	}
+	// outside prefix1's subtree -> false
+	for _, idx := range []uint8{1, 2, 3, 4, 8, 17, 34, 35, 68} {
+		if n.Contains(idx) {
+			t.Errorf("only prefix1: Contains(%d)=true, want false (not in subtree of 16)", idx)
+		}
+	}
+	// LookupIdx must return prefix1 for all descendants
+	for _, idx := range []uint8{32, 64, 128, 129} {
+		if top, _, ok := n.LookupIdx(idx); !ok || top != idx1 {
+			t.Errorf("only prefix1: LookupIdx(%d) top=%d ok=%v, want top=%d true", idx, top, ok, idx1)
+		}
+	}
+
+	// 3. Both prefix1 and prefix2 inserted
+	n.InsertPrefix(idx2, 2)
+
+	// Zone A: prefix2's subtree -> prefix2 is the more-specific match (LPM = idx2)
+	for _, idx := range []uint8{64, 128, 129} {
+		if !n.Contains(idx) {
+			t.Errorf("both: Contains(%d)=false, want true (in subtree of 64)", idx)
+		}
+		if top, val, ok := n.LookupIdx(idx); !ok || top != idx2 || val != 2 {
+			t.Errorf("both: LookupIdx(%d) top=%d val=%d ok=%v, want top=%d val=2 true", idx, top, val, ok, idx2)
+		}
+	}
+	// Zone B: in prefix1's subtree but NOT in prefix2's subtree -> LPM = idx1
+	for _, idx := range []uint8{16, 32, 33, 65, 66, 67} {
+		if !n.Contains(idx) {
+			t.Errorf("both: Contains(%d)=false, want true (in subtree of 16, not 64)", idx)
+		}
+		if top, val, ok := n.LookupIdx(idx); !ok || top != idx1 || val != 1 {
+			t.Errorf("both: LookupIdx(%d) top=%d val=%d ok=%v, want top=%d val=1 true", idx, top, val, ok, idx1)
+		}
+	}
+	// Zone C: outside prefix1's subtree -> no match at all
+	for _, idx := range []uint8{1, 2, 3, 4, 8, 17, 34, 35, 68} {
+		if n.Contains(idx) {
+			t.Errorf("both: Contains(%d)=true, want false (outside both prefixes)", idx)
+		}
+		if _, _, ok := n.LookupIdx(idx); ok {
+			t.Errorf("both: LookupIdx(%d) ok=true, want false", idx)
+		}
+	}
+
+	// 4. Only prefix2 inserted (prefix1 deleted)
+	n.DeletePrefix(idx1)
+
+	// Zone A: still matches via prefix2
+	for _, idx := range []uint8{64, 128, 129} {
+		if !n.Contains(idx) {
+			t.Errorf("only prefix2: Contains(%d)=false, want true", idx)
+		}
+	}
+	// Zone B: prefix1 gone, prefix2 does NOT cover these -> false
+	for _, idx := range []uint8{16, 32, 33, 65, 66, 67} {
+		if n.Contains(idx) {
+			t.Errorf("only prefix2: Contains(%d)=true, want false (prefix1 deleted)", idx)
+		}
+	}
+	// Zone C: still false
+	for _, idx := range []uint8{1, 2, 3, 4, 8, 17, 34, 35, 68} {
+		if n.Contains(idx) {
+			t.Errorf("only prefix2: Contains(%d)=true, want false", idx)
+		}
+	}
+
+	// 5. Both deleted: back to empty
+	n.DeletePrefix(idx2)
+	for _, idx := range []uint8{16, 32, 33, 64, 65, 66, 67, 128, 129} {
+		if n.Contains(idx) {
+			t.Errorf("after delete all: Contains(%d)=true, want false", idx)
+		}
+	}
+}
+
 func TestFastNode_LookupAndLookupIdx(t *testing.T) {
 	t.Parallel()
 	n := &FastNode[int]{}
