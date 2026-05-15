@@ -13,7 +13,7 @@ reviews:
   review_status: true
   commit_status: true
   fail_commit_status: false
-  collapse_walkthrough: false
+  collapse_walkthrough: true
   changed_files_summary: true
   sequence_diagrams: true
   estimate_code_review_effort: true
