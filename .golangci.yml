@@ -39,6 +39,7 @@ linters:
       - linters:
           - gochecknoglobals
           - gosec
+          - gocyclo
         path: _test\.go
     presets:
       - comments
