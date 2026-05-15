@@ -965,7 +965,6 @@ func TestLiteNode_OverlapsIdx(t *testing.T) {
 	})
 }
 
-//nolint:gocyclo
 func TestLiteNode_UnionRec_AllCombinations(t *testing.T) {
 	t.Parallel()
 
@@ -1640,7 +1639,6 @@ func TestLiteNode_UnionRecPersist_AllCombinations(t *testing.T) {
 	})
 }
 
-//nolint:gocyclo
 func TestLiteNode_Modify_AllPaths(t *testing.T) {
 	t.Parallel()
 

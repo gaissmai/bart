@@ -1185,7 +1185,6 @@ func TestFastNode_OverlapsIdx(t *testing.T) {
 	})
 }
 
-//nolint:gocyclo
 func TestFastNode_UnionRec_AllCombinations(t *testing.T) {
 	t.Parallel()
 
@@ -1868,7 +1867,6 @@ func TestFastNode_UnionRecPersist_AllCombinations(t *testing.T) {
 	})
 }
 
-//nolint:gocyclo
 func TestFastNode_Modify_AllPaths(t *testing.T) {
 	t.Parallel()
 

@@ -1108,7 +1108,6 @@ func TestBartNode_OverlapsIdx(t *testing.T) {
 	})
 }
 
-//nolint:gocyclo
 func TestBartNode_UnionRec_AllCombinations(t *testing.T) {
 	t.Parallel()
 
@@ -1791,7 +1790,6 @@ func TestBartNode_UnionRecPersist_AllCombinations(t *testing.T) {
 	})
 }
 
-//nolint:gocyclo
 func TestBartNode_Modify_AllPaths(t *testing.T) {
 	t.Parallel()
 
