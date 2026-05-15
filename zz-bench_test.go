@@ -290,7 +290,7 @@ func BenchmarkFullBartMiss6(b *testing.B) {
 	})
 }
 
-func BenchmarkBartOverlaps4(b *testing.B) {
+func BenchmarkTableOverlaps4(b *testing.B) {
 	lt := new(Table[any])
 
 	for _, route := range tier1.routes4() {
@@ -312,7 +312,7 @@ func BenchmarkBartOverlaps4(b *testing.B) {
 	}
 }
 
-func BenchmarkBartOverlaps6(b *testing.B) {
+func BenchmarkTableOverlaps6(b *testing.B) {
 	lt := new(Table[any])
 
 	for _, route := range tier1.routes6() {
