@@ -47,11 +47,11 @@ type Fast[V any] struct {
 }
 
 // rootNodeByVersion, root node getter for ip version.
-func (t *Fast[V]) rootNodeByVersion(is4 bool) *nodes.FastNode[V] {
+func (f *Fast[V]) rootNodeByVersion(is4 bool) *nodes.FastNode[V] {
 	if is4 {
-		return &t.root4
+		return &f.root4
 	}
-	return &t.root6
+	return &f.root6
 }
 
 // Insert adds or updates a prefix-value pair in the routing table.
@@ -60,8 +60,8 @@ func (t *Fast[V]) rootNodeByVersion(is4 bool) *nodes.FastNode[V] {
 //
 // The prefix is automatically canonicalized using pfx.Masked() to ensure
 // consistent behavior regardless of host bits in the input.
-func (t *Fast[V]) Insert(pfx netip.Prefix, val V) {
-	t.insert(pfx, val)
+func (f *Fast[V]) Insert(pfx netip.Prefix, val V) {
+	f.insert(pfx, val)
 }
 
 // InsertPersist is similar to Insert but the receiver isn't modified.
@@ -75,8 +75,8 @@ func (t *Fast[V]) Insert(pfx netip.Prefix, val V) {
 //
 // Due to cloning overhead this is significantly slower than Insert,
 // typically taking μsec instead of nsec.
-func (t *Fast[V]) InsertPersist(pfx netip.Prefix, val V) *Fast[V] {
-	return t.insertPersist(pfx, val)
+func (f *Fast[V]) InsertPersist(pfx netip.Prefix, val V) *Fast[V] {
+	return f.insertPersist(pfx, val)
 }
 
 // Modify applies an insert, update, or delete operation for the value
@@ -107,7 +107,7 @@ func (t *Fast[V]) InsertPersist(pfx netip.Prefix, val V) *Fast[V] {
 //	| (oldVal, true)  | (newVal, false) | update |
 //	| (oldVal, true)  | (_,      true)  | delete |
 //	------------------------------------- --------
-func (t *Fast[V]) Modify(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, del bool)) {
+func (f *Fast[V]) Modify(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, del bool)) {
 	if !pfx.IsValid() {
 		return
 	}
@@ -117,10 +117,10 @@ func (t *Fast[V]) Modify(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, del bool)
 
 	is4 := pfx.Addr().Is4()
 
-	n := t.rootNodeByVersion(is4)
+	n := f.rootNodeByVersion(is4)
 
 	delta := n.Modify(pfx, cb)
-	t.sizeUpdate(is4, delta)
+	f.sizeUpdate(is4, delta)
 }
 
 // Contains reports whether any stored prefix covers the given IP address.
@@ -132,11 +132,11 @@ func (t *Fast[V]) Modify(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, del bool)
 // It does not return the value nor the prefix of the matching item,
 // but as a test against an allow-/deny-list it's often sufficient
 // and even few nanoseconds faster than [Fast.Lookup].
-func (t *Fast[V]) Contains(ip netip.Addr) bool {
+func (f *Fast[V]) Contains(ip netip.Addr) bool {
 	// speed is top priority: no explicit test for ip.IsValid
 	// if ip is invalid, AsSlice() returns nil, Contains returns false.
 	is4 := ip.Is4()
-	n := t.rootNodeByVersion(is4)
+	n := f.rootNodeByVersion(is4)
 
 	for _, octet := range ip.AsSlice() {
 		// for contains, any lpm match is good enough, no backtracking needed
@@ -176,7 +176,7 @@ func (t *Fast[V]) Contains(ip netip.Addr) bool {
 //
 // Returns the associated value and true if a matching prefix is found.
 // Returns zero value and false if no prefix contains the address.
-func (t *Fast[V]) Lookup(ip netip.Addr) (val V, ok bool) {
+func (f *Fast[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	if !ip.IsValid() {
 		return val, ok
 	}
@@ -184,7 +184,7 @@ func (t *Fast[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	is4 := ip.Is4()
 	octets := ip.AsSlice()
 
-	n := t.rootNodeByVersion(is4)
+	n := f.rootNodeByVersion(is4)
 
 	// stack of the traversed nodes for fast backtracking, if needed
 	stack := [nodes.MaxTreeDepth]*nodes.FastNode[V]{}
@@ -255,8 +255,8 @@ LOOP:
 //
 // Returns the value and true if a matching prefix is found.
 // Returns zero value and false if no match exists.
-func (t *Fast[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
-	_, val, ok = t.lookupPrefixLPM(pfx, false)
+func (f *Fast[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
+	_, val, ok = f.lookupPrefixLPM(pfx, false)
 	return val, ok
 }
 
@@ -272,11 +272,11 @@ func (t *Fast[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
 //
 // Returns the matching prefix, its associated value, and true if found.
 // Returns zero values and false if no match exists.
-func (t *Fast[V]) LookupPrefixLPM(pfx netip.Prefix) (lpmPfx netip.Prefix, val V, ok bool) {
-	return t.lookupPrefixLPM(pfx, true)
+func (f *Fast[V]) LookupPrefixLPM(pfx netip.Prefix) (lpmPfx netip.Prefix, val V, ok bool) {
+	return f.lookupPrefixLPM(pfx, true)
 }
 
-func (t *Fast[V]) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpmPfx netip.Prefix, val V, ok bool) {
+func (f *Fast[V]) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpmPfx netip.Prefix, val V, ok bool) {
 	if !pfx.IsValid() {
 		return lpmPfx, val, ok
 	}
@@ -290,7 +290,7 @@ func (t *Fast[V]) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpmPfx netip.
 	octets := ip.AsSlice()
 	lastOctetPlusOne, lastBits := nodes.LastOctetPlusOneAndLastBits(pfx)
 
-	n := t.rootNodeByVersion(is4)
+	n := f.rootNodeByVersion(is4)
 
 	// record path to leaf node
 	stack := [nodes.MaxTreeDepth]*nodes.FastNode[V]{}
