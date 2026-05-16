@@ -261,7 +261,7 @@ func (t *Table[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
 // match any address in the provided prefix range.
 //
 // This is functionally identical to LookupPrefix but additionally returns the
-// matching prefix (lpmPfx) itself along with the value.
+// matching LPM prefix itself along with the value.
 //
 // This method is slower than LookupPrefix and should only be used if the
 // matching lpm entry is also required for other reasons.

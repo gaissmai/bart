@@ -179,7 +179,7 @@ func NewFringeNode[V any](val V) *FringeNode[V] {
 //
 // Examples:
 //
-//	e.g. prefix is addr/8, or addr/16, or ... addr/128
+//	e.g., prefix is addr/8, or addr/16, or ... addr/128
 //	depth <  lastOctet :  a leaf, path-compressed
 //	depth == lastOctet :  a fringe, path-compressed
 //	depth == lastOctet+1: a prefix with octet/pfx == 0/0 => idx == 1, a strides default route
@@ -193,7 +193,7 @@ func IsFringe(depth int, pfx netip.Prefix) bool {
 	return depth == lastOctetPlusOne-1 && lastBits == 0
 }
 
-// cmpIndexRank, sort indexes in prefix sort order.
+// CmpIndexRank, sort indexes in prefix sort order.
 func CmpIndexRank(aIdx, bIdx uint8) int {
 	// convert idx [1..255] to prefix
 	aOctet, aBits := art.IdxToPfx(aIdx)
@@ -285,7 +285,7 @@ func CidrForFringe(octets []byte, depth int, is4 bool, lastOctet uint8) netip.Pr
 // LastOctetPlusOneAndLastBits returns the count of full 8‑bit strides (bits/8)
 // and the leftover bits in the final stride (bits%8) for pfx.
 //
-// ATTENTION: Split the IP prefixes at 8bit borders, count from 0.
+// ATTENTION: Split the IP prefixes at 8-bit borders, count from 0.
 //
 //	/7, /15, /23, /31, ..., /127
 //
@@ -341,7 +341,7 @@ func (l *LeafNode[V]) CloneLeaf(cloneFn value.CloneFunc[V]) *LeafNode[V] {
 	return &LeafNode[V]{Prefix: l.Prefix, Value: cloneFn(l.Value)}
 }
 
-// cloneFringe creates and returns a copy of the fringeNode receiver.
+// CloneFringe creates and returns a copy of the FringeNode receiver.
 // If cloneFn is nil, the value is copied directly without modification.
 // Otherwise, cloneFn is applied to the value for deep cloning.
 func (l *FringeNode[V]) CloneFringe(cloneFn value.CloneFunc[V]) *FringeNode[V] {

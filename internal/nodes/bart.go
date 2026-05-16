@@ -14,13 +14,13 @@ import (
 // BartNode is a trie level node in the multibit routing table.
 //
 // Each BartNode contains two conceptually different arrays:
+//
 //   - Prefixes stores routing entries (prefix -> value),
 //     laid out as a complete binary tree using the baseIndex()
 //     function from the ART algorithm.
+//
 //   - Children: holding subtries or path-compressed leaves/fringes with
 //     a branching factor of 256 (8 bits per stride).
-//   - Children holds subnodes for the 256 possible next-hop paths
-//     at this trie level (8-bit stride).
 //
 // Entries in Children may be:
 //   - *BartNode[V]   -> internal child node for further traversal
@@ -172,7 +172,7 @@ func (n *BartNode[V]) LookupIdx(idx uint8) (top uint8, val V, ok bool) {
 	return top, val, ok
 }
 
-// Lookup is just a simple wrapper for lookupIdx.
+// Lookup is just a simple wrapper for LookupIdx.
 func (n *BartNode[V]) Lookup(idx uint8) (val V, ok bool) {
 	_, val, ok = n.LookupIdx(idx)
 	return val, ok

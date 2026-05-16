@@ -101,7 +101,7 @@ func (f *Fast[V]) InsertPersist(pfx netip.Prefix, val V) *Fast[V] {
 // Summary of callback semantics:
 //
 //	| cb-input        | cb-return       | Ops    |
-//	------------------------------------- --------
+//	|-----------------|-----------------|--------|
 //	| (zero,   false) | (_,      true)  | no-op  |
 //	| (zero,   false) | (newVal, false) | insert |
 //	| (oldVal, true)  | (newVal, false) | update |
@@ -129,7 +129,7 @@ func (f *Fast[V]) Modify(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, del bool)
 // This performs longest-prefix matching and returns true if any prefix
 // in the routing table contains the IP address, regardless of the associated value.
 //
-// It does not return the value nor the prefix of the matching item,
+// It does not return the value or the prefix of the matching item,
 // but as a test against an allow-/deny-list it's often sufficient
 // and even few nanoseconds faster than [Fast.Lookup].
 func (f *Fast[V]) Contains(ip netip.Addr) bool {
@@ -215,7 +215,7 @@ LOOP:
 			continue LOOP // descend down to next trie level
 
 		case *nodes.FringeNode[V]:
-			// fringe is the default-route for all possible nodes below
+			// fringe is the default-route for all possible octets below
 			return kid.Value, true
 
 		case *nodes.LeafNode[V]:
@@ -265,7 +265,7 @@ func (f *Fast[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
 // match any address in the provided prefix range.
 //
 // This is functionally identical to LookupPrefix but additionally returns the
-// matching prefix (lpmPfx) itself along with the value.
+// matching LPM prefix itself along with the value.
 //
 // This method is slower than LookupPrefix and should only be used if the
 // matching lpm entry is also required for other reasons.

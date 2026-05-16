@@ -11,7 +11,7 @@ import (
 	"github.com/gaissmai/bart/internal/value"
 )
 
-// Each FastNode contains two conceptually different arrays:
+// Each FastNode contains three conceptually different arrays:
 //
 //   - Prefixes stores routing entries (prefix -> value),
 //     laid out as a complete binary tree using the baseIndex()
@@ -220,7 +220,7 @@ func (n *FastNode[V]) LookupIdx(idx uint8) (top uint8, val V, ok bool) {
 	return top, val, ok
 }
 
-// Lookup is just a simple wrapper for lookupIdx.
+// Lookup is just a simple wrapper for LookupIdx.
 func (n *FastNode[V]) Lookup(idx uint8) (val V, ok bool) {
 	_, val, ok = n.LookupIdx(idx)
 	return val, ok

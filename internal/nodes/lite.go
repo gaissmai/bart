@@ -57,7 +57,7 @@ func (n *LiteNode[V]) ChildCount() int {
 }
 
 // InsertPrefix adds a routing entry at the specified index.
-// It returns true if a prefix already existed at that index
+// It returns true if a prefix already existed at that index,
 // false if this is a new insertion.
 func (n *LiteNode[V]) InsertPrefix(idx uint8, _ V) (exists bool) {
 	if exists = n.Prefixes.Test(idx); exists {
@@ -68,13 +68,14 @@ func (n *LiteNode[V]) InsertPrefix(idx uint8, _ V) (exists bool) {
 	return exists
 }
 
-// prefix is set at the given index.
 func (n *LiteNode[V]) GetPrefix(idx uint8) (_ V, exists bool) {
+	// no docstring by intention
 	exists = n.Prefixes.Test(idx)
 	return
 }
 
 func (n *LiteNode[V]) MustGetPrefix(idx uint8) (_ V) {
+	// no docstring by intention
 	return
 }
 
@@ -171,7 +172,7 @@ func (n *LiteNode[V]) LookupIdx(idx uint8) (top uint8, _ V, ok bool) {
 	return
 }
 
-// Lookup is just a simple wrapper for lookupIdx.
+// Lookup is just a simple wrapper for LookupIdx.
 func (n *LiteNode[V]) Lookup(idx uint8) (_ V, ok bool) {
 	_, _, ok = n.LookupIdx(idx)
 	return
