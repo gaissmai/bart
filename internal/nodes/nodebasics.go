@@ -285,9 +285,6 @@ func CidrForFringe(octets []byte, depth int, is4 bool, lastOctet uint8) netip.Pr
 // LastOctetPlusOneAndLastBits returns the count of full 8‑bit strides (bits/8)
 // and the leftover bits in the final stride (bits%8) for pfx.
 //
-// lastOctetPlusOne is the count of full 8‑bit strides (bits/8).
-// lastBits is the remaining bit count in the final stride (bits%8),
-//
 // ATTENTION: Split the IP prefixes at 8bit borders, count from 0.
 //
 //	/7, /15, /23, /31, ..., /127
@@ -297,16 +294,16 @@ func CidrForFringe(octets []byte, depth int, is4 bool, lastOctet uint8) netip.Pr
 //
 //	0.0.0.0/0      => lastOctetPlusOne:  0, lastBits: 0 (default route)
 //	0.0.0.0/7      => lastOctetPlusOne:  0, lastBits: 7
-//	0.0.0.0/8      => lastOctetPlusOne:  1, lastBits: 0 (possible fringe)
-//	10.0.0.0/8     => lastOctetPlusOne:  1, lastBits: 0 (possible fringe)
+//	0.0.0.0/8      => lastOctetPlusOne:  1, lastBits: 0 (fringe candidate)
+//	10.0.0.0/8     => lastOctetPlusOne:  1, lastBits: 0 (fringe candidate)
 //	10.0.0.0/22    => lastOctetPlusOne:  2, lastBits: 6
 //	10.0.0.0/29    => lastOctetPlusOne:  3, lastBits: 5
-//	10.0.0.0/32    => lastOctetPlusOne:  4, lastBits: 0 (possible fringe)
+//	10.0.0.0/32    => lastOctetPlusOne:  4, lastBits: 0 (fringe candidate)
 //
 //	::/0           => lastOctetPlusOne:  0, lastBits: 0 (default route)
-//	::1/128        => lastOctetPlusOne: 16, lastBits: 0 (possible fringe)
+//	::1/128        => lastOctetPlusOne: 16, lastBits: 0 (fringe candidate)
 //	2001:db8::/42  => lastOctetPlusOne:  5, lastBits: 2
-//	2001:db8::/56  => lastOctetPlusOne:  7, lastBits: 0 (possible fringe)
+//	2001:db8::/56  => lastOctetPlusOne:  7, lastBits: 0 (fringe candidate)
 //
 //	/32 and /128 prefixes are special, they never form a new node,
 //	At the end of the trie (IPv4: depth 4, IPv6: depth 16) they are always
