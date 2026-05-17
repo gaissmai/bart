@@ -7,7 +7,7 @@
 When generating or modifying code:
 
 - Do not use emojis or typographic quotes
-- Never use Unicode characters, ALWAYS use plain ASCII.
+- NEVER use Unicode characters, ALWAYS use plain ASCII.
 
 # Module Overview Files
 When reviewing any PR in this repository, ALWAYS consult the following files for context:
@@ -29,7 +29,7 @@ These files describe the module's architecture and design intent.
   then look at the source file from which this file was generated,
   and NEVER make any changes or suggestions to generated files.
 
-- Files like `bartmethodsgenerated.go`, `litemethodsgenerated.go`, and `fastmethodsgenerated.go`
+- e.g., Files like `bartmethodsgenerated.go`, `litemethodsgenerated.go`, and `fastmethodsgenerated.go`
   are all generated from `commonmethods_tmpl.go` and share dependencies (e.g. `internal/allot`).
   Before calling a package obsolete, verify it is unused across ALL generated files, not just the
   one being changed in the PR.
