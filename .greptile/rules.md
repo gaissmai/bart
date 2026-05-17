@@ -8,6 +8,8 @@ When generating or modifying code:
 
 - Do not use emojis or typographic quotes
 - NEVER use Unicode characters, ALWAYS use plain ASCII.
+- Do not flag issues in PR reviews that are already covered by linters.
+- Only comment on logic, correctness, architecture, security, and issues that linters would not catch.
 
 # Module Overview Files
 When reviewing any PR in this repository, ALWAYS consult the following files for context:
