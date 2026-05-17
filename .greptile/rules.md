@@ -10,6 +10,7 @@ When generating or modifying code:
 - NEVER use Unicode characters, ALWAYS use plain ASCII.
 - Do not flag issues in PR reviews that are already covered by linters.
 - Only comment on logic, correctness, architecture, security, and issues that linters would not catch.
+- Whenever you conduct a PR review, ALWAYS post a message at the end, even if you didn't find anything.
 
 # Module Overview Files
 When reviewing any PR in this repository, ALWAYS consult the following files for context:
