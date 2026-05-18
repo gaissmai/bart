@@ -37,7 +37,7 @@ for tableType in "${TABLE_TYPES[@]}"; do
     base_mangled="${template_base/_tmpl/generated}" # -> methodsgenerated.go
     output_file="${type_prefix}${base_mangled}"     # e.g. -> bartmethodsgenerated.go
 
-    # Remove go:generate directives and build constraint, add generated header, substitute node type
+    # Remove go:generate directives and build constraint, add generated header, substitute table type
     sed -e "1i\\
 // Code generated from file \"${template_file}\"; DO NOT EDIT." \
         -e '/^\/\/go:build generate\b/d' \
