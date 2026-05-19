@@ -5,16 +5,12 @@ package bart
 
 import (
 	"fmt"
-	"math"
 	"math/rand/v2"
 	"net/netip"
 	"testing"
 
 	"github.com/gaissmai/bart/internal/tests/random"
 )
-
-// roundFloat64 to 2 decimal places
-func roundFloat64(f float64) float64 { return math.Round(f*100) / 100 }
 
 func BenchmarkFullFastMatch4(b *testing.B) {
 	fast := new(Fast[bool])
