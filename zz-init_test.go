@@ -102,11 +102,6 @@ func (t1 *tier1T) init() {
 }
 
 // getters for the tier1 routing info
-func (t1 *tier1T) routes() []netip.Prefix {
-	t1.init()
-	return t1._routes
-}
-
 func (t1 *tier1T) routes4() []netip.Prefix {
 	t1.init()
 	return t1._routes4
