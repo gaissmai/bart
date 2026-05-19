@@ -154,8 +154,11 @@ func (n *FastNode[V]) GetChild(addr uint8) (any, bool) {
 // MustGetChild retrieves the child at addr using the pre-cached rank stored in
 // childRankCache[addr] for a direct O(1) array access without an existence check.
 //
-// If addr is absent, the behaviour is undefined: either a wrong child is
-// returned silently, or the call panics with an index-out-of-range error.
+// The caller must guarantee that addr is present (Children.Test(addr) == true).
+// If addr is absent, childRankCache[addr] contains the number of occupied
+// addresses less than addr (maintained by InsertChild/DeleteChild), so the
+// behaviour is undefined: either a wrong child is returned silently, or the
+// call panics with an index-out-of-range error.
 func (n *FastNode[V]) MustGetChild(addr uint8) any {
 	rank0 := n.childRankCache[addr]
 	return n.Children.Items[rank0]
