@@ -12,6 +12,20 @@ import (
 	"github.com/gaissmai/bart"
 )
 
+// We use *testVal as the generic payload type V (a pointer type).
+type testVal struct {
+	data int
+}
+
+// Clone enables deep copying for ...Persist operations.
+// Detected via structural typing (presence of a matching Clone method).
+func (v *testVal) Clone() *testVal {
+	if v == nil {
+		return nil
+	}
+	return &testVal{data: v.data}
+}
+
 var (
 	mpa = netip.MustParseAddr
 	mpp = netip.MustParsePrefix
