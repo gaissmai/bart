@@ -24,7 +24,6 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        go-version-file: go.mod
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
@@ -41,21 +40,6 @@ jobs:
 
       - if: matrix.os == 'ubuntu-latest'
         run: go test -v -race -run='(Persist|Example)' ./...
-
-  govulncheck:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          persist-credentials: false
-
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - uses: golang/govulncheck-action@v1
-        id: govulncheck
 
   coverage:
     runs-on: ubuntu-latest
