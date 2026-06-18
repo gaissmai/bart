@@ -9,13 +9,9 @@
 // # Zero-Sized Type (ZST) Detection
 //
 // IsZST[V] detects whether a type parameter V is a zero-sized type (such as
-// struct{} or [0]byte). This serves two purposes:
-//   - Runtime validation: Fast[V] cannot work correctly with zero-sized types
-//     and must reject them. PanicOnZST enables a safety check that panics
-//     during Fast.Insert and Fast.InsertPersist operations.
-//   - Debug output clarity: Zero-sized types carry no information in their
-//     values. Omitting them from dumps and prints reduces line noise and
-//     improves readability.
+// struct{} or [0]byte). Zero-sized types carry no information in their
+// values. Omitting them from dumps and prints reduces line noise and
+// improves readability.
 //
 // # Value Equality
 //
