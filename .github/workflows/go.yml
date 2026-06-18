@@ -2,18 +2,21 @@ name: CI
 on:
   push:
     branches: ["main", "devel"]
-    paths:
+    paths: &paths
+      - 'go.mod'
+      - 'go.sum'
       - '**.go'
-      - '**.yml'
       - '**.yaml'
+      - '**.yml'
   pull_request:
     branches: ["main", "devel"]
+    paths: *paths
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -21,27 +24,36 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        go-version: ['stable', 'oldstable']
+        go-version-file: go.mod
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
       - uses: actions/setup-go@v6
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version-file: go.mod
           cache: true
+
       - run: go test -v ./...
-      - if: runner.os == 'Linux'
+
+      - if: matrix.os == 'ubuntu-latest'
         run: go test -v -race -run='(Persist|Example)' ./...
 
   govulncheck:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
       - uses: actions/setup-go@v6
         with:
-          go-version: stable
+          go-version-file: go.mod
           cache: true
+
       - uses: golang/govulncheck-action@v1
         id: govulncheck
 
@@ -49,9 +61,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
       - uses: actions/setup-go@v6
         with:
-          go-version: stable
+          go-version-file: go.mod
           cache: true
 
       - name: Test Coverage
@@ -65,12 +80,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
       - uses: actions/setup-go@v6
         with:
-          go-version: stable
-          cache: true
+          go-version-file: go.mod
+          cache: false
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.12.0
+          version: latest
