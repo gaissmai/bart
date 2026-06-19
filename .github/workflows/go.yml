@@ -21,24 +21,38 @@ concurrency:
 
 jobs:
   test:
+    name: Test (Ubuntu / Go ${{ matrix.go-version-name }})
+    runs-on: ubuntu-latest
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
+        go-version-name: ['stable', 'from-gomod']
+        include:
+          - go-version-name: 'stable'
+            go-version: 'stable'
+          - go-version-name: 'from-gomod'
+            go-version-file: 'go.mod'
+
     steps:
-      - uses: actions/checkout@v5
+      - name: Checkout Code
+        uses: actions/checkout@v5
         with:
           persist-credentials: false
 
-      - uses: actions/setup-go@v6
+      - name: Set up Go
+        uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version: ${{ matrix.go-version }}
+          go-version-file: ${{ matrix.go-version-file }}
           cache: true
 
-      - run: go test -v ./...
+      - name: Install Dependencies
+        run: go mod download
 
-      - if: matrix.os == 'ubuntu-latest'
+      - name: Run Tests
+        run: go test -v ./...
+
+      - name: Run -race Tests
         run: go test -v -race -run='(Persist|Example)' ./...
 
   coverage:
@@ -50,7 +64,7 @@ jobs:
 
       - uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version: stable
           cache: true
 
       - name: Test Coverage
@@ -69,7 +83,7 @@ jobs:
 
       - uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version: stable
           cache: false
 
       - name: golangci-lint
