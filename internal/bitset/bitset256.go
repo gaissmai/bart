@@ -201,12 +201,19 @@ func (b *BitSet256) LastSet() (last uint8, ok bool) {
 	return
 }
 
-// AsSlice returns a slice containing all set bits in the BitSet256.
+// AsSlice extracts the indices of all set bits in the BitSet256, returning them
+// as uint8 values in strictly ascending order.
 //
-// The bits are returned in ascending order as uint8 values. The provided buf
-// must be a pointer to an array of 256 uint8s; it is used as backing
-// storage for the result to avoid heap allocations. The returned slice shares
-// its backing array with buf and is only valid until buf is modified or reused.
+// Performance Considerations:
+// To guarantee zero heap allocations and enable compiler inlining, the caller must
+// provide a pointer to a 256-byte array (`buf`) as backing storage. The method
+// populates this array in-place and returns a sliced view (`[]uint8`) tailored to
+// the actual number of set bits.
+//
+// Safety and Lifecycle:
+// The returned slice directly shares the underlying storage of `buf` and is only
+// valid until `buf` is modified or reused. This pattern is highly recommended for
+// hot paths and performance-critical loops where heap churn must be avoided.
 func (b *BitSet256) AsSlice(buf *[256]uint8) []uint8 {
 	size := 0
 	for wIdx, word := range b {
@@ -217,19 +224,22 @@ func (b *BitSet256) AsSlice(buf *[256]uint8) []uint8 {
 		}
 	}
 
+	// tailor to the actual number of set bits
 	return buf[:size]
 }
 
-// Bits returns a slice containing all set bits in the BitSet256.
+// Bits returns a slice containing the indices of all set bits in strictly
+// ascending order as uint8 values.
 //
-// The bits are returned in ascending order as uint8 values. Bits allocates
-// a new slice on the heap for the result. For allocation-free collection,
-// use [AsSlice] with a pre-allocated buffer.
+// Performance Considerations:
+// Unlike [AsSlice], this method dynamically allocates a new slice on the
+// heap to store the result. It is designed for convenience and APIs where the lifecycle
+// of the returned slice needs to outlive the immediate caller's stack frame.
 //
-// Example usage:
-//
-//	bits := b.Bits()
-//	// bits now contains the indices of all set bits in b
+// Usage Guidance:
+// Use Bits when convenience is preferred over raw performance, or when the result
+// must be returned across boundaries where stack-allocated buffers cannot safely escape.
+// For high-throughput or allocation-free processing, prefer [AsSlice].
 func (b *BitSet256) Bits() []uint8 {
 	return b.AsSlice(&[256]uint8{})
 }
