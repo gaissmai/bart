@@ -1688,9 +1688,7 @@ func (n *_NODE_TYPE[V]) AllRecSorted(path StridePath, depth int, is4 bool, yield
 				}
 			case *FringeNode[V]:
 				fringePfx := CidrForFringe(path[:], depth, is4, childAddr)
-				// callback for this fringe
 				if !yield(fringePfx, kid.Value) {
-					// early exit
 					return false
 				}
 
@@ -1725,9 +1723,7 @@ func (n *_NODE_TYPE[V]) AllRecSorted(path StridePath, depth int, is4 bool, yield
 			}
 		case *FringeNode[V]:
 			fringePfx := CidrForFringe(path[:], depth, is4, addr)
-			// callback for this fringe
 			if !yield(fringePfx, kid.Value) {
-				// early exit
 				return false
 			}
 
