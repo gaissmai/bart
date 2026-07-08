@@ -576,30 +576,12 @@ func (t *_TABLE_TYPE[V]) Size6() int {
 
 // All returns an iterator over all prefix–value pairs in the table.
 //
-// The entries from both IPv4 and IPv6 subtries are yielded using an internal recursive traversal.
-// The iteration order is unspecified and may vary between calls; for a stable order, use AllSorted.
+// The iteration order is unspecified and may vary between calls; for a stable order,
+// use [_TABLE_TYPE.AllSorted].
 //
-// You can use All directly in a for-range loop without providing a yield function.
-// The Go compiler automatically synthesizes the yield callback for you:
-//
-//	for prefix, value := range t.All() {
-//	    fmt.Println(prefix, value)
-//	}
-//
-// Under the hood, the loop body is passed as a yield function to the iterator.
-// If you break or return from the loop, iteration stops early as expected.
-//
-// IMPORTANT: Modifying or deleting entries during iteration is not allowed,
+// IMPORTANT: Modifying the table during iteration is not allowed,
 // as this would interfere with the internal traversal and may corrupt or
-// prematurely terminate the iteration. If mutation of the table during
-// traversal is required use persistent table methods, e.g.
-//
-//	pt := t // shallow copy of t
-//	for pfx, val := range t.All() {
-//		if cond(pfx, val) {
-//		  pt = pt.DeletePersist(pfx)
-//	  }
-//	}
+// prematurely terminate the iteration.
 func (t *_TABLE_TYPE[V]) All() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
 		_ = t.root4.AllRec(stridePath{}, 0, true, yield) && t.root6.AllRec(stridePath{}, 0, false, yield)
@@ -620,23 +602,8 @@ func (t *_TABLE_TYPE[V]) All6() iter.Seq2[netip.Prefix, V] {
 	}
 }
 
-// AllSorted returns an iterator over all prefix–value pairs in the table,
-// ordered in canonical CIDR prefix sort order.
-//
-// This can be used directly with a for-range loop;
-// the Go compiler provides the yield function implicitly:
-//
-//	for prefix, value := range t.AllSorted() {
-//	    fmt.Println(prefix, value)
-//	}
-//
-// The traversal is stable and predictable across calls.
-// Iteration stops early if you break out of the loop.
-//
-// IMPORTANT: Deleting entries during iteration is not allowed,
-// as this would interfere with the internal traversal and may corrupt or
-// prematurely terminate the iteration. If mutation of the table during
-// traversal is required use persistent table methods.
+// AllSorted is like [_TABLE_TYPE.All] but the iteration is ordered in canonical
+// CIDR prefix sort order.
 func (t *_TABLE_TYPE[V]) AllSorted() iter.Seq2[netip.Prefix, V] {
 	return func(yield func(netip.Prefix, V) bool) {
 		_ = t.root4.AllRecSorted(stridePath{}, 0, true, yield) &&
