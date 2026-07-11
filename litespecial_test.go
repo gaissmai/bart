@@ -108,3 +108,52 @@ func TestTableInvalid_LiteTable(t *testing.T) {
 	noPanic(t, "Union", func() { tbl1.Union(tbl2) })
 	noPanic(t, "UnionPersist", func() { tbl1.UnionPersist(tbl2) })
 }
+
+func TestLiteIteratorsEarlyExit(t *testing.T) {
+	t.Parallel()
+
+	tbl := new(Lite)
+	tbl.Insert(mpp("10.0.0.0/8"))
+	tbl.Insert(mpp("10.20.0.0/16"))
+	tbl.Insert(mpp("2001:db8::/32"))
+
+	// Test All early exit
+	count := 0
+	for range tbl.All() {
+		count++
+		break // early exit
+	}
+	if count != 1 {
+		t.Errorf("expected 1, got %d", count)
+	}
+
+	// Test AllSorted early exit
+	count = 0
+	for range tbl.AllSorted() {
+		count++
+		break // early exit
+	}
+	if count != 1 {
+		t.Errorf("expected 1, got %d", count)
+	}
+
+	// Test Subnets early exit
+	count = 0
+	for range tbl.Subnets(mpp("10.0.0.0/8")) {
+		count++
+		break
+	}
+	if count != 1 {
+		t.Errorf("expected 1, got %d", count)
+	}
+
+	// Test Supernets early exit
+	count = 0
+	for range tbl.Supernets(mpp("10.20.0.0/16")) {
+		count++
+		break
+	}
+	if count != 1 {
+		t.Errorf("expected 1, got %d", count)
+	}
+}

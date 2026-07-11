@@ -51,12 +51,12 @@ type Array256[T any] struct {
 
 // Set panics. The bitset is internally coupled with Items[].
 // Use InsertAt to add or overwrite at index i.
-func (a *Array256[T]) Set(uint) {
+func (a *Array256[T]) Set(uint8) {
 	panic("forbidden, use InsertAt")
 }
 
 // Clear panics. The bitset is internally coupled with Items[].
-func (a *Array256[T]) Clear(uint) {
+func (a *Array256[T]) Clear(uint8) {
 	panic("forbidden, use DeleteAt")
 }
 
@@ -72,7 +72,7 @@ func (a *Array256[T]) Clear(uint) {
 //	                ⬆
 //
 //	BitSet256.Test(5):     true
-//	BitSet256.Rank(5):     2,
+//	BitSet256.Rank(5):     2
 func (a *Array256[T]) Get(i uint8) (value T, ok bool) {
 	if a.Test(i) {
 		return a.Items[a.Rank(i)-1], true
@@ -128,11 +128,12 @@ func (a *Array256[T]) InsertAt(i uint8, value T) (rank0 int, exists bool) {
 		return rank0, true
 	}
 
+	// Since i is not set yet, Rank(i) before Set(i) is exactly
+	// the index where the new item should be inserted (equivalent to Rank(i)-1 after Set(i)).
+	rank0 = a.Rank(i)
+
 	// new, insert into bitset ...
 	a.BitSet256.Set(i)
-
-	// recalc Rank after Set()
-	rank0 = a.Rank(i) - 1
 
 	// ... and insert value into slice
 	a.insertItem(rank0, value)
@@ -166,7 +167,7 @@ func (a *Array256[T]) DeleteAt(i uint8) (value T, exists bool) {
 // shifting all following elements one position to the right to make space.
 //
 // This method must be called with the correct insertion index - that is,
-// the rank-0 value of the corresponding bit index i in BitSet256 once it's set.
+// the rank-0 value of the corresponding bit index i in BitSet256 (calculated before Set(i)).
 //
 // The slice will be extended by one element. If the capacity allows, this is done
 // without reallocation (fast path); otherwise slice growth occurs (slow path).

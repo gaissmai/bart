@@ -832,3 +832,13 @@ func TestFringeNode_CloneFringe(t *testing.T) {
 		}
 	})
 }
+
+func TestAddrFmt(t *testing.T) {
+	t.Parallel()
+	if got := addrFmt(127, true); got != "127" {
+		t.Errorf("addrFmt(127, true) = %q, want \"127\"", got)
+	}
+	if got := addrFmt(127, false); got != "0x7f" {
+		t.Errorf("addrFmt(127, false) = %q, want \"0x7f\"", got)
+	}
+}

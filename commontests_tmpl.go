@@ -2247,3 +2247,53 @@ func TestTableEqual__TABLE_TYPE(t *testing.T) {
 		}
 	})
 }
+
+func TestTableExtra__TABLE_TYPE(t *testing.T) {
+	t.Parallel()
+
+	// 1. Equal: checking self equality
+	t1 := new(_TABLE_TYPE[int])
+	t1.Insert(mpp("10.0.0.0/8"), 42)
+	t1.Insert(mpp("2001:db8::/32"), 42)
+
+	if !t1.Equal(t1) {
+		t.Error("expected table to be equal to itself")
+	}
+
+	// 2. Equal: checking different size4 / size6
+	t2 := new(_TABLE_TYPE[int])
+	t2.Insert(mpp("10.0.0.0/8"), 42)
+	if t1.Equal(t2) {
+		t.Error("expected false for different size6")
+	}
+
+	t3 := new(_TABLE_TYPE[int])
+	t3.Insert(mpp("2001:db8::/32"), 42)
+	if t1.Equal(t3) {
+		t.Error("expected false for different size4")
+	}
+
+	// 3. Overlaps6: checking when size6 is 0
+	emptyT := new(_TABLE_TYPE[int])
+	if t1.Overlaps6(emptyT) {
+		t.Error("expected false when other table has no IPv6 prefixes")
+	}
+	if emptyT.Overlaps6(t1) {
+		t.Error("expected false when this table has no IPv6 prefixes")
+	}
+
+	// 4. Fprint: nil writer check
+	var nilWriter io.Writer = nil
+	if err := t1.Fprint(nilWriter); err == nil {
+		t.Error("expected error when writing to nil writer")
+	}
+
+	// 5. ModifyPersist: no-op deletion of non-existing key
+	t4 := new(_TABLE_TYPE[int])
+	t5 := t4.ModifyPersist(mpp("10.0.0.0/8"), func(val int, ok bool) (int, bool) {
+		return 0, true
+	})
+	if t5 != t4 {
+		t.Error("expected same table pointer for no-op ModifyPersist")
+	}
+}
