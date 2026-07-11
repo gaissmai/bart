@@ -737,3 +737,501 @@ func TestFprintRec_NonZST_LiteNode(t *testing.T) {
 		t.Errorf("Expected prefix and value 'testval' in output, but got:\n%s", output)
 	}
 }
+
+// TestEqualRec_LiteNode tests the recursive node equality comparison.
+func TestEqualRec_LiteNode(t *testing.T) {
+	t.Parallel()
+
+	// nil checks
+	var nilNode1, nilNode2 *LiteNode[int]
+	if !nilNode1.EqualRec(nilNode2) {
+		t.Error("nil nodes should be equal")
+	}
+
+	n1 := new(LiteNode[int])
+	if n1.EqualRec(nilNode1) {
+		t.Error("non-nil node should not be equal to nil")
+	}
+	if nilNode1.EqualRec(n1) {
+		t.Error("nil node should not be equal to non-nil")
+	}
+
+	// identical nodes
+	if !n1.EqualRec(n1) {
+		t.Error("node should be equal to itself")
+	}
+
+	// different prefix bitsets
+	n2 := new(LiteNode[int])
+	n1.Insert(mpp("10.0.0.0/7"), 42, 0)
+	if n1.EqualRec(n2) {
+		t.Error("nodes with different prefixes should not be equal")
+	}
+
+	// different values
+	// Skip for LiteNode because it has no real payload values
+	if _, isLite := any(n1).(*LiteNode[int]); !isLite {
+		n2.Insert(mpp("10.0.0.0/7"), 43, 0)
+		if n1.EqualRec(n2) {
+			t.Error("nodes with same prefixes but different values should not be equal")
+		}
+	}
+
+	// same prefix and value
+	n2_same := new(LiteNode[int])
+	n2_same.Insert(mpp("10.0.0.0/7"), 42, 0)
+	if _, isLite := any(n1).(*LiteNode[int]); !isLite {
+		if !n1.EqualRec(n2_same) {
+			t.Error("nodes with same prefixes and values should be equal")
+		}
+	}
+
+	// different children bitsets
+	n3 := new(LiteNode[int])
+	n4 := new(LiteNode[int])
+	n3.Insert(mpp("10.0.0.0/8"), 42, 0) // this is a fringe node at depth 1, and inserts into Children
+	if n3.EqualRec(n4) {
+		t.Error("nodes with different children should not be equal")
+	}
+
+	// fringe nodes with different values
+	if _, isLite := any(n3).(*LiteNode[int]); !isLite {
+		n4.Insert(mpp("10.0.0.0/8"), 43, 0)
+		if n3.EqualRec(n4) {
+			t.Error("nodes with different fringe values should not be equal")
+		}
+	}
+
+	// leaf nodes with different prefixes/values
+	n5 := new(LiteNode[int])
+	n6 := new(LiteNode[int])
+	n5.Insert(mpp("10.20.0.0/15"), 42, 0) // leaf node at depth 1
+	n6.Insert(mpp("10.30.0.0/15"), 42, 0) // different leaf node prefix
+	if n5.EqualRec(n6) {
+		t.Error("nodes with different leaf prefixes should not be equal")
+	}
+
+	if _, isLite := any(n5).(*LiteNode[int]); !isLite {
+		n7 := new(LiteNode[int])
+		n7.Insert(mpp("10.20.0.0/15"), 43, 0) // different leaf value
+		if n5.EqualRec(n7) {
+			t.Error("nodes with different leaf values should not be equal")
+		}
+	}
+}
+
+// TestOverlapsExtra_LiteNode tests specific edge cases in trie overlap detection.
+func TestOverlapsExtra_LiteNode(t *testing.T) {
+	t.Parallel()
+
+	// 1. Test OverlapsSameChildren loop continuation & completion (returning false)
+	t.Run("same_children_no_overlap", func(t *testing.T) {
+		t.Parallel()
+		n1 := new(LiteNode[int])
+		n2 := new(LiteNode[int])
+
+		// Insert disjoint child subnets at address 10 and 20
+		n1.Insert(mpp("10.10.1.0/24"), 42, 0)
+		n1.Insert(mpp("10.20.1.0/24"), 42, 0)
+
+		n2.Insert(mpp("10.10.2.0/24"), 42, 0)
+		n2.Insert(mpp("10.20.2.0/24"), 42, 0)
+
+		if n1.Overlaps(n2, 0) {
+			t.Error("expected no overlap between disjoint child subnets")
+		}
+	})
+
+	// 2. Test OverlapsSameChildren loop continuation & early exit (returning true)
+	t.Run("same_children_first_no_overlap_second_overlap", func(t *testing.T) {
+		t.Parallel()
+		n1 := new(LiteNode[int])
+		n2 := new(LiteNode[int])
+
+		// Address 10 does not overlap, address 20 does overlap
+		n1.Insert(mpp("10.10.1.0/24"), 42, 0)
+		n1.Insert(mpp("10.20.1.0/24"), 42, 0)
+
+		n2.Insert(mpp("10.10.2.0/24"), 42, 0)
+		n2.Insert(mpp("10.20.1.0/24"), 42, 0) // overlap here
+
+		if !n1.Overlaps(n2, 0) {
+			t.Error("expected overlap since second child subnet overlaps")
+		}
+	})
+
+	// 3. Test OverlapsSameChildren with matching child at address 255 that does not overlap
+	t.Run("same_children_boundary_255_no_overlap", func(t *testing.T) {
+		t.Parallel()
+		n1 := new(LiteNode[int])
+		n2 := new(LiteNode[int])
+
+		n1.Insert(mpp("10.255.1.0/24"), 42, 0)
+		n2.Insert(mpp("10.255.2.0/24"), 42, 0)
+
+		if n1.Overlaps(n2, 0) {
+			t.Error("expected no overlap on boundary 255")
+		}
+	})
+
+	// 4. Test OverlapsPrefixAtDepth with LeafNode and FringeNode
+	t.Run("prefix_overlaps_leaf_node_true", func(t *testing.T) {
+		t.Parallel()
+		n1 := new(LiteNode[int])
+		n1.Insert(mpp("10.20.0.0/15"), 42, 0)
+
+		if !n1.OverlapsPrefixAtDepth(mpp("10.20.0.0/16"), 0) {
+			t.Error("expected overlap with leaf node prefix")
+		}
+	})
+
+	t.Run("prefix_overlaps_leaf_node_false", func(t *testing.T) {
+		t.Parallel()
+		n1 := new(LiteNode[int])
+		n1.Insert(mpp("10.20.0.0/15"), 42, 0)
+
+		if n1.OverlapsPrefixAtDepth(mpp("10.30.0.0/16"), 0) {
+			t.Error("expected no overlap with disjoint prefix")
+		}
+	})
+
+	t.Run("prefix_overlaps_fringe_node", func(t *testing.T) {
+		t.Parallel()
+		n1 := new(LiteNode[int])
+		n1.Insert(mpp("10.0.0.0/8"), 42, 0)
+
+		if !n1.OverlapsPrefixAtDepth(mpp("10.0.0.0/16"), 0) {
+			t.Error("expected overlap with fringe node")
+		}
+	})
+
+	// 5. Test OverlapsPrefixAtDepth with deeper path walk
+	t.Run("prefix_overlaps_idx_at_last_octet", func(t *testing.T) {
+		t.Parallel()
+		n1 := new(LiteNode[int])
+		n1.Insert(mpp("10.20.30.0/24"), 42, 0)
+
+		if !n1.OverlapsPrefixAtDepth(mpp("10.20.0.0/16"), 0) {
+			t.Error("expected overlap at last octet")
+		}
+	})
+
+	t.Run("prefix_overlaps_contains_at_depth", func(t *testing.T) {
+		t.Parallel()
+		n1 := new(LiteNode[int])
+		n1.Insert(mpp("10.128.30.0/24"), 42, 0)
+		n1.Insert(mpp("10.128.0.0/9"), 42, 0)
+
+		if !n1.OverlapsPrefixAtDepth(mpp("10.128.30.0/24"), 0) {
+			t.Error("expected overlap with contains check at depth 1")
+		}
+	})
+}
+
+// TestDumpStringExtra_LiteNode tests type classification in DumpString and DumpRec.
+func TestDumpStringExtra_LiteNode(t *testing.T) {
+	t.Parallel()
+
+	// 1. Create a halfNode at the root
+	n1 := new(LiteNode[int])
+	// LeafNode under child slot 10:
+	n1.Insert(mpp("10.20.0.0/15"), 42, 0)
+	// Internal node under child slot 11 (requires branching to prevent path compression):
+	n1.Insert(mpp("11.30.40.0/24"), 42, 0)
+	n1.Insert(mpp("11.30.50.0/24"), 42, 0)
+
+	dump1 := n1.DumpString(nil, 0, true)
+	if !strings.Contains(dump1, "HALF") {
+		t.Errorf("expected HALF node type in dump, got:\n%s", dump1)
+	}
+
+	// 2. Create a pathNode at the root
+	n2 := new(LiteNode[int])
+	// Branching paths under child slot 10 to create an internal node at root child 10
+	n2.Insert(mpp("10.20.30.0/24"), 42, 0)
+	n2.Insert(mpp("10.20.40.0/24"), 42, 0)
+
+	dump2 := n2.DumpString(nil, 0, true)
+	if !strings.Contains(dump2, "PATH") {
+		t.Errorf("expected PATH node type in dump, got:\n%s", dump2)
+	}
+
+	// 3. Test DumpRec on nil/empty node
+	var nilNode *LiteNode[int]
+	var buf bytes.Buffer
+	nilNode.DumpRec(&buf, StridePath{}, 0, true)
+	if buf.Len() != 0 {
+		t.Error("expected empty buffer for nil DumpRec")
+	}
+
+	buf.Reset()
+	emptyNode := new(LiteNode[int])
+	emptyNode.DumpRec(&buf, StridePath{}, 0, true)
+	if buf.Len() != 0 {
+		t.Error("expected empty buffer for empty DumpRec")
+	}
+}
+
+// TestDeletePurgeExtra_LiteNode tests the bottom-up trie compression on delete.
+func TestDeletePurgeExtra_LiteNode(t *testing.T) {
+	t.Parallel()
+
+	// 1. Trigger PurgeAndCompress: case childCount == 1 with LeafNode
+	t.Run("purge_leaf_node", func(t *testing.T) {
+		t.Parallel()
+		n := new(LiteNode[int])
+		n.Insert(mpp("10.20.10.0/24"), 42, 0)
+		n.Insert(mpp("10.20.20.0/24"), 42, 0)
+
+		n.Delete(mpp("10.20.20.0/24"))
+
+		if _, ok := n.Get(mpp("10.20.10.0/24")); !ok {
+			t.Error("expected remaining leaf node to be present")
+		}
+	})
+
+	// 2. Trigger PurgeAndCompress: case childCount == 1 with FringeNode
+	t.Run("purge_fringe_node", func(t *testing.T) {
+		t.Parallel()
+		n := new(LiteNode[int])
+		n.Insert(mpp("10.20.0.0/16"), 42, 0)
+		n.Insert(mpp("10.30.0.0/16"), 42, 0)
+
+		n.Delete(mpp("10.30.0.0/16"))
+
+		if _, ok := n.Get(mpp("10.20.0.0/16")); !ok {
+			t.Error("expected remaining fringe node to be present")
+		}
+	})
+
+	// 3. Trigger PurgeAndCompress: case pfxCount == 1
+	t.Run("purge_single_prefix", func(t *testing.T) {
+		t.Parallel()
+		n := new(LiteNode[int])
+		n.Insert(mpp("10.20.0.0/16"), 42, 0)
+		n.Insert(mpp("10.0.0.0/8"), 42, 0)
+
+		n.Delete(mpp("10.20.0.0/16"))
+
+		if _, ok := n.Get(mpp("10.0.0.0/8")); !ok {
+			t.Error("expected remaining prefix to be present")
+		}
+	})
+}
+
+// TestUnionRecExtra_LiteNode tests specific edge cases in trie Union operations.
+func TestUnionRecExtra_LiteNode(t *testing.T) {
+	t.Parallel()
+
+	_, isLite := any(new(LiteNode[int])).(*LiteNode[int])
+
+	// 1. Cover handleMatrix case 2: thisIsNode && otherIsLeaf, where leaf already exists in thisNode
+	t.Run("node_leaf_exists", func(t *testing.T) {
+		t.Parallel()
+		n1 := new(LiteNode[int])
+		n2 := new(LiteNode[int])
+
+		// Both n1 and n2 have child at octet 10, but:
+		// n1's child is an internal node (requires branching to prevent path compression)
+		n1.Insert(mpp("10.10.10.0/24"), 42, 0)
+		n1.Insert(mpp("10.10.20.0/24"), 42, 0)
+
+		// n2's child is a LeafNode with "10.10.20.0/24"
+		n2.Insert(mpp("10.10.20.0/24"), 43, 0)
+
+		n1.UnionRec(cloneFnFactory[int](), n2, 0)
+
+		val, ok := n1.Get(mpp("10.10.20.0/24"))
+		if !ok {
+			t.Fatal("expected prefix to exist")
+		}
+		if !isLite && val != 43 {
+			t.Errorf("expected value 43, got %v", val)
+		}
+	})
+
+	// 2. Cover handleMatrix case 2: thisIsNode && otherIsFringe, where fringe already exists in thisNode
+	t.Run("node_fringe_exists", func(t *testing.T) {
+		t.Parallel()
+		n1 := new(LiteNode[int])
+		n2 := new(LiteNode[int])
+
+		// Both n1 and n2 have child at octet 10.
+		// n1's child is an internal node and contains the default route/fringe "10.0.0.0/8"
+		n1.Insert(mpp("10.10.10.0/24"), 42, 0)
+		n1.Insert(mpp("10.0.0.0/8"), 42, 0)
+
+		// n2's child is a FringeNode "10.0.0.0/8"
+		n2.Insert(mpp("10.0.0.0/8"), 43, 0)
+
+		n1.UnionRec(cloneFnFactory[int](), n2, 0)
+
+		val, ok := n1.Get(mpp("10.0.0.0/8"))
+		if !ok {
+			t.Fatal("expected prefix to exist")
+		}
+		if !isLite && val != 43 {
+			t.Errorf("expected value 43, got %v", val)
+		}
+	})
+
+	// 3. Cover handleMatrixPersist case 2 counterpart
+	t.Run("node_leaf_exists_persist", func(t *testing.T) {
+		t.Parallel()
+		n1 := new(LiteNode[int])
+		n2 := new(LiteNode[int])
+
+		n1.Insert(mpp("10.10.10.0/24"), 42, 0)
+		n1.Insert(mpp("10.10.20.0/24"), 42, 0)
+
+		n2.Insert(mpp("10.10.20.0/24"), 43, 0)
+
+		n1.UnionRecPersist(cloneFnFactory[int](), n2, 0)
+
+		val, ok := n1.Get(mpp("10.10.20.0/24"))
+		if !ok {
+			t.Fatal("expected prefix to exist")
+		}
+		if !isLite && val != 43 {
+			t.Errorf("expected value 43, got %v", val)
+		}
+	})
+
+	t.Run("node_fringe_exists_persist", func(t *testing.T) {
+		t.Parallel()
+		n1 := new(LiteNode[int])
+		n2 := new(LiteNode[int])
+
+		n1.Insert(mpp("10.10.10.0/24"), 42, 0)
+		n1.Insert(mpp("10.0.0.0/8"), 42, 0)
+
+		n2.Insert(mpp("10.0.0.0/8"), 43, 0)
+
+		n1.UnionRecPersist(cloneFnFactory[int](), n2, 0)
+
+		val, ok := n1.Get(mpp("10.0.0.0/8"))
+		if !ok {
+			t.Fatal("expected prefix to exist")
+		}
+		if !isLite && val != 43 {
+			t.Errorf("expected value 43, got %v", val)
+		}
+	})
+}
+
+// TestSubnetsEarlyExit_LiteNode tests early termination in Subnets traversal.
+func TestSubnetsEarlyExit_LiteNode(t *testing.T) {
+	t.Parallel()
+
+	n := new(LiteNode[int])
+	n.Insert(mpp("10.0.0.0/8"), 1, 0)
+	n.Insert(mpp("10.10.10.0/24"), 2, 0)
+	n.Insert(mpp("10.10.20.0/24"), 3, 0)
+	n.Insert(mpp("10.20.0.0/15"), 4, 0)
+
+	// Traversal 1: yield returns false immediately
+	yieldCount := 0
+	n.Subnets(mpp("10.0.0.0/8"), func(pfx netip.Prefix, val int) bool {
+		yieldCount++
+		return false // stop immediately
+	})
+
+	if yieldCount != 1 {
+		t.Errorf("expected yieldCount to be 1, got %d", yieldCount)
+	}
+
+	// Traversal 2: yield returns false after 2 items
+	yieldCount = 0
+	n.Subnets(mpp("10.0.0.0/8"), func(pfx netip.Prefix, val int) bool {
+		yieldCount++
+		if yieldCount == 2 {
+			return false
+		}
+		return true
+	})
+
+	if yieldCount != 2 {
+		t.Errorf("expected yieldCount to be 2, got %d", yieldCount)
+	}
+}
+
+// TestSupernetsExtra_LiteNode tests specific edge cases and early exits in Supernets traversal.
+func TestSupernetsExtra_LiteNode(t *testing.T) {
+	t.Parallel()
+
+	n := new(LiteNode[int])
+	// LeafNode at depth 1:
+	n.Insert(mpp("10.20.0.0/15"), 1, 0)
+	// FringeNode at depth 1:
+	n.Insert(mpp("10.30.0.0/16"), 2, 0)
+	// Normal prefixes:
+	n.Insert(mpp("10.0.0.0/8"), 3, 0)
+	n.Insert(mpp("10.40.50.0/24"), 4, 0)
+
+	// 1. LeafNode longer prefix check
+	yielded := []netip.Prefix{}
+	n.Supernets(mpp("10.20.0.0/15"), func(pfx netip.Prefix, val int) bool {
+		yielded = append(yielded, pfx)
+		return true
+	})
+	if len(yielded) != 2 {
+		t.Errorf("expected 2 supernets, got %v", yielded)
+	}
+
+	// 2. FringeNode longer prefix check
+	yielded = []netip.Prefix{}
+	n.Supernets(mpp("10.30.0.0/16"), func(pfx netip.Prefix, val int) bool {
+		yielded = append(yielded, pfx)
+		return true
+	})
+	if len(yielded) != 2 {
+		t.Errorf("expected 2 supernets, got %v", yielded)
+	}
+
+	// 3. Early exits on yield
+	// LeafNode yield false
+	yieldCount := 0
+	n.Supernets(mpp("10.20.0.0/15"), func(pfx netip.Prefix, val int) bool {
+		yieldCount++
+		if pfx == mpp("10.20.0.0/15") {
+			return false
+		}
+		return true
+	})
+	if yieldCount != 1 {
+		t.Errorf("expected yieldCount 1 on leaf early exit, got %d", yieldCount)
+	}
+
+	// FringeNode yield false
+	yieldCount = 0
+	n.Supernets(mpp("10.30.0.0/16"), func(pfx netip.Prefix, val int) bool {
+		yieldCount++
+		if pfx == mpp("10.30.0.0/16") {
+			return false
+		}
+		return true
+	})
+	if yieldCount != 1 {
+		t.Errorf("expected yieldCount 1 on fringe early exit, got %d", yieldCount)
+	}
+
+	// Backtracking yield false
+	yieldCount = 0
+	n.Supernets(mpp("10.40.50.0/24"), func(pfx netip.Prefix, val int) bool {
+		yieldCount++
+		return false
+	})
+	if yieldCount != 1 {
+		t.Errorf("expected yieldCount 1 on backtracking early exit, got %d", yieldCount)
+	}
+
+	// 4. Trigger depth > lastOctetPlusOne
+	yielded = []netip.Prefix{}
+	n.Supernets(mpp("10.40.0.0/16"), func(pfx netip.Prefix, val int) bool {
+		yielded = append(yielded, pfx)
+		return true
+	})
+	if len(yielded) != 1 || yielded[0] != mpp("10.0.0.0/8") {
+		t.Errorf("expected only 10.0.0.0/8, got %v", yielded)
+	}
+}

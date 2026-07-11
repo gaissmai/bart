@@ -4,6 +4,7 @@
 package sparse
 
 import (
+	"fmt"
 	"math/rand/v2"
 	"slices"
 	"testing"
@@ -204,6 +205,66 @@ func TestSparseArrayCopy(t *testing.T) {
 					t.Error("Copy mutation leaked into original")
 				}
 				aCopy.Items[0] = old
+			}
+		})
+	}
+}
+
+func BenchmarkGet(b *testing.B) {
+	a := new(Array256[int])
+	for i := range uint8(10) {
+		a.InsertAt(i*2, int(i))
+	}
+
+	b.Run("Get present", func(b *testing.B) {
+		for b.Loop() {
+			_, _ = a.Get(10)
+		}
+	})
+	b.Run("Get absent", func(b *testing.B) {
+		for b.Loop() {
+			_, _ = a.Get(11)
+		}
+	})
+	b.Run("MustGet", func(b *testing.B) {
+		for b.Loop() {
+			_ = a.MustGet(10)
+		}
+	})
+}
+
+func BenchmarkInsertAt(b *testing.B) {
+	b.Run("Overwrite", func(b *testing.B) {
+		a := new(Array256[int])
+		a.InsertAt(100, 100)
+		for b.Loop() {
+			_, _ = a.InsertAt(100, 200)
+		}
+	})
+
+	for _, size := range []int{1, 2, 4, 8, 16, 32, 64, 128, 256} {
+		b.Run(fmt.Sprintf("Insert new %d", size), func(b *testing.B) {
+			for b.Loop() {
+				a := new(Array256[int])
+				for i := range size {
+					_, _ = a.InsertAt(uint8(i), i)
+				}
+			}
+		})
+	}
+}
+
+func BenchmarkInsertAndDeleteAt(b *testing.B) {
+	for _, size := range []int{1, 2, 4, 8, 16, 32, 64, 128, 256} {
+		b.Run(fmt.Sprintf("Insert and Delete all %d", size), func(b *testing.B) {
+			for b.Loop() {
+				a := new(Array256[int])
+				for i := range size {
+					_, _ = a.InsertAt(uint8(i), i)
+				}
+				for i := range size {
+					_, _ = a.DeleteAt(uint8(i))
+				}
 			}
 		})
 	}
