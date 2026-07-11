@@ -58,12 +58,22 @@ func TestZeroValue(t *testing.T) {
 	b.IntersectionTop(&c)
 }
 
-func TestTest(t *testing.T) {
+func TestSetClearTest(t *testing.T) {
 	t.Parallel()
 	var b BitSet256
-	b.Set(100)
-	if !b.Test(100) {
-		t.Errorf("Test(%d) is false", 100)
+	for i := range 256 {
+		bit := uint8(i)
+		if b.Test(bit) {
+			t.Errorf("expected bit %d to be clear initially", bit)
+		}
+		b.Set(bit)
+		if !b.Test(bit) {
+			t.Errorf("expected bit %d to be set after Set", bit)
+		}
+		b.Clear(bit)
+		if b.Test(bit) {
+			t.Errorf("expected bit %d to be clear after Clear", bit)
+		}
 	}
 }
 
@@ -586,36 +596,88 @@ func TestIntersectsAny(t *testing.T) {
 
 func TestIntersectionTop(t *testing.T) {
 	t.Parallel()
-	var a BitSet256
-	var b BitSet256
-	for i := uint8(1); i < 100; i += 2 {
-		a.Set(i)
-		b.Set(i - 1)
-		b.Set(i)
-	}
-	for i := uint8(100); i < 200; i++ {
-		b.Set(i)
+	testCases := []struct {
+		name    string
+		a, b    []uint8
+		wantIdx uint8
+		wantOk  bool
+	}{
+		{
+			name:    "both empty",
+			a:       []uint8{},
+			b:       []uint8{},
+			wantIdx: 0,
+			wantOk:  false,
+		},
+		{
+			name:    "disjoint",
+			a:       []uint8{10, 20},
+			b:       []uint8{30, 40},
+			wantIdx: 0,
+			wantOk:  false,
+		},
+		{
+			name:    "match word 0",
+			a:       []uint8{5, 10},
+			b:       []uint8{10, 15},
+			wantIdx: 10,
+			wantOk:  true,
+		},
+		{
+			name:    "match word 1",
+			a:       []uint8{70, 80},
+			b:       []uint8{60, 70},
+			wantIdx: 70,
+			wantOk:  true,
+		},
+		{
+			name:    "match word 2",
+			a:       []uint8{130, 140},
+			b:       []uint8{140, 150},
+			wantIdx: 140,
+			wantOk:  true,
+		},
+		{
+			name:    "match word 3",
+			a:       []uint8{200, 210},
+			b:       []uint8{210, 220},
+			wantIdx: 210,
+			wantOk:  true,
+		},
+		{
+			name:    "multiple matches",
+			a:       []uint8{10, 70, 130, 200},
+			b:       []uint8{10, 70, 130, 200},
+			wantIdx: 200,
+			wantOk:  true,
+		},
 	}
 
-	wantTop, wantOk := uint8(99), true
-	gotTop, gotOk := a.IntersectionTop(&b)
+	for _, tc := range testCases {
+		var a, b BitSet256
+		for _, v := range tc.a {
+			a.Set(v)
+		}
+		for _, v := range tc.b {
+			b.Set(v)
+		}
 
-	if wantOk != gotOk {
-		t.Errorf("IntersectionTop, want %v, got %v", wantOk, gotOk)
-	}
-	if wantTop != gotTop {
-		t.Errorf("IntersectionTop, want %v, got %v", wantTop, gotTop)
-	}
+		gotIdx, gotOk := a.IntersectionTop(&b)
+		if gotOk != tc.wantOk {
+			t.Errorf("IntersectionTop, %s: got ok %v, want %v", tc.name, gotOk, tc.wantOk)
+		}
+		if gotIdx != tc.wantIdx {
+			t.Errorf("IntersectionTop, %s: got idx %d, want %d", tc.name, gotIdx, tc.wantIdx)
+		}
 
-	wantTop, wantOk = uint8(99), true
-	gotTop, gotOk = b.IntersectionTop(&a)
-
-	if wantOk != gotOk {
-		t.Errorf("IntersectionTop, want %v, got %v", wantOk, gotOk)
-	}
-
-	if wantTop != gotTop {
-		t.Errorf("IntersectionTop, want %v, got %v", wantTop, gotTop)
+		// Commutative check
+		gotIdx2, gotOk2 := b.IntersectionTop(&a)
+		if gotOk2 != tc.wantOk {
+			t.Errorf("IntersectionTop (commutative), %s: got ok %v, want %v", tc.name, gotOk2, tc.wantOk)
+		}
+		if gotIdx2 != tc.wantIdx {
+			t.Errorf("IntersectionTop (commutative), %s: got idx %d, want %d", tc.name, gotIdx2, tc.wantIdx)
+		}
 	}
 }
 
@@ -715,13 +777,11 @@ func BenchmarkIntersectsAny(b *testing.B) {
 }
 
 func BenchmarkUnion(b *testing.B) {
-	b.Run("Union", func(b *testing.B) {
-		aa := &BitSet256{0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010}
-		bb := &BitSet256{0b1111_1111_1111, 0b1111_1111_1111, 0b1111_1111_1111, 0b1111_1111_1111}
-		for b.Loop() {
-			aa.Union(bb)
-		}
-	})
+	aa := &BitSet256{0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010}
+	bb := &BitSet256{0b1111_1111_1111, 0b1111_1111_1111, 0b1111_1111_1111, 0b1111_1111_1111}
+	for b.Loop() {
+		aa.Union(bb)
+	}
 }
 
 func BenchmarkIntersection(b *testing.B) {
@@ -858,5 +918,34 @@ func BenchmarkAsSlice(b *testing.B) {
 				aa.AsSlice(&buf)
 			}
 		})
+	}
+}
+
+func BenchmarkBits(b *testing.B) {
+	for i, aa := range []BitSet256{
+		{1},
+		{1, 1},
+		{1, 1, 1},
+		{1, 1, 1, 1},
+	} {
+		b.Run(fmt.Sprintf("sparse at %d", i), func(b *testing.B) {
+			for b.Loop() {
+				_ = aa.Bits()
+			}
+		})
+	}
+}
+
+func BenchmarkSet(b *testing.B) {
+	var aa BitSet256
+	for b.Loop() {
+		aa.Set(100)
+	}
+}
+
+func BenchmarkClear(b *testing.B) {
+	var aa BitSet256
+	for b.Loop() {
+		aa.Clear(100)
 	}
 }
