@@ -34,7 +34,7 @@ func PfxToIdx(octet, pfxLen uint8) uint8 {
 	if pfxLen > 7 {
 		panic("PfxToIdx: invalid pfxLen > 7")
 	}
-	return octet>>(8-pfxLen) + 1<<pfxLen
+	return octet>>(8-pfxLen) | 1<<pfxLen
 }
 
 // OctetToIdx maps octet/8 prefixes from [256..511] => [128..255] to start
