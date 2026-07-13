@@ -14,7 +14,9 @@
 // optimizations for memory efficiency and lookup speed.
 //
 // `Table` and `Lite` use popcount compression for memory efficiency, while
-// `Fast` trades memory for maximum lookup speed with uncompressed arrays.
+// `Fast` trades additional memory and slower updates for maximum lookup
+// speed: a child-rank cache is maintained on every insert/delete, so
+// lookups avoid popcount but updates pay the caching cost.
 //
 // BART excels at efficient set operations on routing tables including Union,
 // Overlaps, Equal, Subnets, and Supernets with optimal complexity, making it
