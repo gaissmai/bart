@@ -34,6 +34,7 @@ func PfxToIdx(octet, pfxLen uint8) uint8 {
 	if pfxLen > 7 {
 		panic("PfxToIdx: invalid pfxLen > 7")
 	}
+	//  use '|' instead of '+', maybe a little bit faster
 	return octet>>(8-pfxLen) | 1<<pfxLen
 }
 
@@ -49,7 +50,8 @@ func PfxToIdx(octet, pfxLen uint8) uint8 {
 //	got to parent idx:
 //	    (octet+256)>>1 == octet>>1 + 128
 func OctetToIdx(octet uint8) uint8 {
-	return octet>>1 + 128
+	//  use '|' instead of '+', maybe a little bit faster
+	return octet>>1 | 128
 }
 
 // IdxToPfx returns the octet and prefix len of baseIdx.
