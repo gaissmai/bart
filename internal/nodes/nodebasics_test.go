@@ -54,7 +54,7 @@ var mpp = func(s string) netip.Prefix {
 	panic(fmt.Sprintf("%s is not canonicalized as %s", s, pfx.Masked()))
 }
 
-func TestLastOctetPlusOneAndLastBits(t *testing.T) {
+func TestStrideCount(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -111,13 +111,13 @@ func TestLastOctetPlusOneAndLastBits(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		lastOctetPlusOne, gotBits := LastOctetPlusOneAndLastBits(tc.pfx)
-		if lastOctetPlusOne != tc.wantDepth {
-			t.Errorf("LastOctetPlusOneAndLastBits(%d), lastOctetPlusOne got: %d, want: %d",
-				tc.pfx.Bits(), lastOctetPlusOne, tc.wantDepth)
+		strideCount, gotBits := DivMod8(tc.pfx)
+		if strideCount != tc.wantDepth {
+			t.Errorf("StrideCount(%d), strideCount got: %d, want: %d",
+				tc.pfx.Bits(), strideCount, tc.wantDepth)
 		}
 		if gotBits != tc.wantBits {
-			t.Errorf("LastOctetPlusOneAndLastBits(%d), lastBits got: %d, want: %d",
+			t.Errorf("StrideCount(%d), lastBits got: %d, want: %d",
 				tc.pfx.Bits(), gotBits, tc.wantBits)
 		}
 	}
@@ -289,79 +289,79 @@ func TestCidrForFringe(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name      string
-		octets    []byte
-		depth     int
-		is4       bool
-		lastOctet uint8
-		expected  string
+		name       string
+		octets     []byte
+		depth      int
+		is4        bool
+		fringeByte uint8
+		expected   string
 	}{
 		// IPv4 test cases
 		{
-			name:      "IPv4 fringe /8 at depth 0",
-			octets:    []byte{10, 0, 0, 0},
-			depth:     0,
-			is4:       true,
-			lastOctet: 0,
-			expected:  "0.0.0.0/8", // path[0] = lastOctet = 0
+			name:       "IPv4 fringe /8 at depth 0",
+			octets:     []byte{10, 0, 0, 0},
+			depth:      0,
+			is4:        true,
+			fringeByte: 0,
+			expected:   "0.0.0.0/8", // path[0] = fringeByte = 0
 		},
 		{
-			name:      "IPv4 fringe /16 at depth 1",
-			octets:    []byte{192, 168, 0, 0},
-			depth:     1,
-			is4:       true,
-			lastOctet: 0,
-			expected:  "192.0.0.0/16", // path[1] = lastOctet = 0
+			name:       "IPv4 fringe /16 at depth 1",
+			octets:     []byte{192, 168, 0, 0},
+			depth:      1,
+			is4:        true,
+			fringeByte: 0,
+			expected:   "192.0.0.0/16", // path[1] = fringeByte = 0
 		},
 		{
-			name:      "IPv4 fringe with non-zero lastOctet",
-			octets:    []byte{172, 16, 0, 0},
-			depth:     2,
-			is4:       true,
-			lastOctet: 50,
-			expected:  "172.16.50.0/24", // path[2] = lastOctet = 50
+			name:       "IPv4 fringe with non-zero fringeByte",
+			octets:     []byte{172, 16, 0, 0},
+			depth:      2,
+			is4:        true,
+			fringeByte: 50,
+			expected:   "172.16.50.0/24", // path[2] = fringeByte = 50
 		},
 
 		// IPv6 test cases - KORRIGIERT
 		{
-			name:      "IPv6 fringe /8 at depth 0",
-			octets:    []byte{0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
-			depth:     0,
-			is4:       false,
-			lastOctet: 0,
-			expected:  "::/8", // path[0] = lastOctet = 0
+			name:       "IPv6 fringe /8 at depth 0",
+			octets:     []byte{0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+			depth:      0,
+			is4:        false,
+			fringeByte: 0,
+			expected:   "::/8", // path[0] = fringeByte = 0
 		},
 		{
-			name:      "IPv6 fringe /16 at depth 1",
-			octets:    []byte{0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
-			depth:     1,
-			is4:       false,
-			lastOctet: 0,
-			expected:  "2000::/16", // path[1] = lastOctet = 0
+			name:       "IPv6 fringe /16 at depth 1",
+			octets:     []byte{0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+			depth:      1,
+			is4:        false,
+			fringeByte: 0,
+			expected:   "2000::/16", // path[1] = fringeByte = 0
 		},
 		{
-			name:      "IPv6 fringe /64 at depth 7",
-			octets:    []byte{0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
-			depth:     7,
-			is4:       false,
-			lastOctet: 0,
-			expected:  "2001:db8::/64", // path[7] = lastOctet = 0 (overwrites the 0x01)
+			name:       "IPv6 fringe /64 at depth 7",
+			octets:     []byte{0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+			depth:      7,
+			is4:        false,
+			fringeByte: 0,
+			expected:   "2001:db8::/64", // path[7] = fringeByte = 0 (overwrites the 0x01)
 		},
 		{
-			name:      "IPv6 fringe /128 at depth 15 (host route)",
-			octets:    []byte{0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},
-			depth:     15,
-			is4:       false,
-			lastOctet: 0,
-			expected:  "2001:db8:0:1::/128", // path[15] = lastOctet = 0 (overwrites the 0x01)
+			name:       "IPv6 fringe /128 at depth 15 (host route)",
+			octets:     []byte{0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01},
+			depth:      15,
+			is4:        false,
+			fringeByte: 0,
+			expected:   "2001:db8:0:1::/128", // path[15] = fringeByte = 0 (overwrites the 0x01)
 		},
 		{
-			name:      "IPv6 fringe with non-zero lastOctet",
-			octets:    []byte{0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
-			depth:     7,
-			is4:       false,
-			lastOctet: 0xff,
-			expected:  "fe80:0:0:ff::/64", // path[7] = lastOctet = 0xff
+			name:       "IPv6 fringe with non-zero fringeByte",
+			octets:     []byte{0xfe, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+			depth:      7,
+			is4:        false,
+			fringeByte: 0xff,
+			expected:   "fe80:0:0:ff::/64", // path[7] = fringeByte = 0xff
 		},
 	}
 
@@ -369,7 +369,7 @@ func TestCidrForFringe(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			result := CidrForFringe(tt.octets, tt.depth, tt.is4, tt.lastOctet)
+			result := CidrForFringe(tt.octets, tt.depth, tt.is4, tt.fringeByte)
 
 			if result.String() != tt.expected {
 				t.Errorf("Test %s: cidrForFringe() = %v, want %v", tt.name, result, tt.expected)
@@ -421,9 +421,9 @@ func TestIsFringe(t *testing.T) {
 			result := IsFringe(tt.depth, pfx)
 
 			if result != tt.expected {
-				lastOctetPlusOne, lastBits := LastOctetPlusOneAndLastBits(pfx)
-				t.Errorf("Test %s: isFringe(%d, %v) = %v, want %v (lastOctetPlusOne=%d, lastBits=%d)",
-					tt.name, tt.depth, pfx, result, tt.expected, lastOctetPlusOne, lastBits)
+				strideCount, lastBits := DivMod8(pfx)
+				t.Errorf("Test %s: isFringe(%d, %v) = %v, want %v (strideCount=%d, lastBits=%d)",
+					tt.name, tt.depth, pfx, result, tt.expected, strideCount, lastBits)
 			}
 		})
 	}
@@ -555,7 +555,7 @@ func TestCidrForFringeEdgeCases(t *testing.T) {
 		octets := []byte{10, 20, 30, 40}
 		// depth 32 should be masked to 0 (32 & 15 = 0)
 		result := CidrForFringe(octets, 32, true, 50)
-		expected := "50.0.0.0/8" // depth masked to 0, so lastOctet goes to path[0]
+		expected := "50.0.0.0/8" // depth masked to 0, so fringeByte goes to path[0]
 		if result.String() != expected {
 			t.Errorf("Expected %s with masked depth, got %s", expected, result.String())
 		}
@@ -566,7 +566,7 @@ func TestCidrForFringeEdgeCases(t *testing.T) {
 		// Test that bytes after depth+1 are cleared
 		octets := []byte{0xac, 0x10, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e}
 		result := CidrForFringe(octets, 2, false, 0x63) // IPv6 depth 2
-		// lastOctet 0x63 goes to path[2], bytes after are cleared
+		// fringeByte 0x63 goes to path[2], bytes after are cleared
 		expected := "ac10:6300::/24" // (2+1)*8 = 24 bits
 		if result.String() != expected {
 			t.Errorf("Expected canonicalized result %s, got %s", expected, result.String())

@@ -1225,7 +1225,7 @@ func TestSupernetsExtra_BartNode(t *testing.T) {
 		t.Errorf("expected yieldCount 1 on backtracking early exit, got %d", yieldCount)
 	}
 
-	// 4. Trigger depth > lastOctetPlusOne
+	// 4. Trigger depth > strideCount
 	yielded = []netip.Prefix{}
 	n.Supernets(mpp("10.40.0.0/16"), func(pfx netip.Prefix, val int) bool {
 		yielded = append(yielded, pfx)
