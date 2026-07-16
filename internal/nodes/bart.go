@@ -11,29 +11,31 @@ import (
 	"github.com/gaissmai/bart/internal/value"
 )
 
-// BartNode is a trie level node in the multibit routing table.
+// BartNode represents a single trie level in the multibit routing table.
 //
-// Each BartNode contains two conceptually different arrays:
+// Unlike the original ART algorithm, this implementation uses popcount-compressed
+// sparse arrays instead of fixed-size allocations. Insertions and lookups rely on
+// fast bitset operations and precomputed rank indexes to maximize CPU cache efficiency.
 //
-//   - Prefixes stores routing entries (prefix -> value),
-//     laid out as a complete binary tree using the baseIndex()
-//     function from the ART algorithm.
+// Each BartNode maintains two distinct sparse arrays:
 //
-//   - Children: holding subtries or path-compressed leaves/fringes with
-//     a branching factor of 256 (8 bits per stride).
+//  1. Prefixes: Stores routing entries (prefix -> value) for the current stride.
+//     These are laid out as a complete binary tree using the baseIndex()
+//     function mapping from the ART algorithm. Prefixes that match exactly at
+//     the maximum trie depth are always stored here.
 //
-// Entries in Children may be:
-//   - *BartNode[V]   -> internal child node for further traversal
-//   - *LeafNode[V]   -> path-comp. node (depth < maxDepth - 1)
-//   - *FringeNode[V] -> path-comp. node (depth == maxDepth - 1, stride-aligned: /8, /16, ... /128)
+//  2. Children: Holds pointers to the next logical levels with a branching
+//     factor of 256 (8 bits per stride).
 //
-// Note: Both *LeafNode and *FringeNode entries are only created by path compression.
-// Prefixes that match exactly at the maximum trie depth (depth == maxDepth) are
-// never stored as Children, but always directly in the prefixes array at that level.
+// A slot in the Children array may contain one of three types:
+//   - *BartNode[V]:   An internal intermediate node for further trie traversal.
+//   - *LeafNode[V]:   A path-compressed node for unaligned prefixes (depth < strideCount - 1).
+//   - *FringeNode[V]: A path-compressed node for stride-aligned prefixes (/8, /16, ... /128).
+//     Occurs only at (depth == strideCount - 1).
 //
-// Unlike the original ART, this implementation uses popcount-compressed sparse arrays
-// instead of fixed-size arrays. Array slots are not pre-allocated; insertion
-// and lookup rely on fast bitset operations and precomputed rank indexes.
+// Note: LeafNode and FringeNode are created through path compression and
+// are automatically split into regular BartNodes when a more specific prefix
+// is inserted that requires further branching.
 type BartNode[V any] struct {
 	Prefixes sparse.Array256[V]
 	Children sparse.Array256[any]
