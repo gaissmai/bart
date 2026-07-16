@@ -322,7 +322,7 @@ func TestCidrForFringe(t *testing.T) {
 			expected:   "172.16.50.0/24", // path[2] = fringeByte = 50
 		},
 
-		// IPv6 test cases - KORRIGIERT
+		// IPv6 test cases
 		{
 			name:       "IPv6 fringe /8 at depth 0",
 			octets:     []byte{0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},

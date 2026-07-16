@@ -365,9 +365,9 @@ LOOP:
 		// all others are just host routes
 		var idx uint8
 		octet = octets[depth]
-		// Last “octet” from prefix, update/insert prefix into node.
+		// Last “octet” from prefix
 		// Note: For /32 and /128, depth never reaches strideCount (4 or 16),
-		// so those are handled below via the fringe/leaf path.
+		// so those are handled above via the fringe/leaf path.
 		if depth == strideCount {
 			idx = art.PfxToIdx(octet, lastBits)
 		} else {

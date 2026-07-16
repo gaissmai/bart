@@ -12,26 +12,15 @@ import (
 	"github.com/gaissmai/bart/internal/value"
 )
 
-// LiteNode is a trie level node in the multibit routing table.
-//
-// Each LiteNode contains two conceptually different bitset-based arrays:
-//   - Prefixes: a BitSet256 tracking which prefix indices are occupied,
-//     with Count tracking the number of active entries.
-//   - Children: holding subtries or path-compressed leaves/fringes with
-//     a branching factor of 256 (8 bits per stride).
-//
-// Entries in Children may be:
-//   - *LiteNode[V]   -> internal child node for further traversal
-//   - *LeafNode[V]   -> path-comp. node (depth < maxDepth - 1)
-//   - *FringeNode[V] -> path-comp. node (depth == maxDepth - 1, stride-aligned)
-//
-// Note: The type parameter V is a phantom type used solely for common
-// method generation; LiteNode stores no values.
+// LiteNode is a space-optimized version of [BartNode] that tracks prefix existence
+// without storing associated values.
 type LiteNode[V any] struct {
 	Children sparse.Array256[any]
 	Prefixes struct {
-		// no values
+		// BitSet256 tracks the presence of prefixes at this level.
 		bitset.BitSet256
+		// Count maintains the current number of set bits, updated on modification
+		// to avoid redundant population counting.
 		Count uint16
 	}
 }
