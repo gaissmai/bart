@@ -1722,7 +1722,7 @@ func TestBartNode_Modify_AllPaths(t *testing.T) {
 		t.Parallel()
 		n := &BartNode[int]{}
 
-		// Use /0 for depth=0, lastOctetPlusOne=0, so depth == lastOctetPlusOne
+		// Use /0 for depth=0, strideCount=0, so depth == strideCount
 		delta := n.Modify(mpp("0.0.0.0/0"), func(val int, found bool) (int, bool) {
 			if found {
 				t.Error("Should not find non-existent prefix")

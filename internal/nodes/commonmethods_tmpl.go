@@ -68,7 +68,7 @@ func (n *_NODE_TYPE[V]) LookupIdx(uint8) (_ uint8, _ V, _ bool)          { retur
 func (n *_NODE_TYPE[V]) Insert(pfx netip.Prefix, val V, depth int) (exists bool) {
 	ip := pfx.Addr() // the pfx must be in canonical form
 	octets := ip.AsSlice()
-	lastOctetPlusOne, lastBits := LastOctetPlusOneAndLastBits(pfx)
+	strideCount, lastBits := DivMod8(pfx)
 
 	// find the proper trie node to insert prefix
 	// start with prefix octet at depth
@@ -76,7 +76,7 @@ func (n *_NODE_TYPE[V]) Insert(pfx netip.Prefix, val V, depth int) (exists bool)
 		octet := octets[depth]
 
 		// last masked octet: insert/override prefix/val into node
-		if depth == lastOctetPlusOne {
+		if depth == strideCount {
 			return n.InsertPrefix(art.PfxToIdx(octet, lastBits), val)
 		}
 
@@ -148,7 +148,7 @@ func (n *_NODE_TYPE[V]) Insert(pfx netip.Prefix, val V, depth int) (exists bool)
 func (n *_NODE_TYPE[V]) InsertPersist(cloneFn value.CloneFunc[V], pfx netip.Prefix, val V, depth int) (exists bool) {
 	ip := pfx.Addr() // the pfx must be in canonical form
 	octets := ip.AsSlice()
-	lastOctetPlusOne, lastBits := LastOctetPlusOneAndLastBits(pfx)
+	strideCount, lastBits := DivMod8(pfx)
 
 	// find the proper trie node to insert prefix
 	// start with prefix octet at depth
@@ -156,7 +156,7 @@ func (n *_NODE_TYPE[V]) InsertPersist(cloneFn value.CloneFunc[V], pfx netip.Pref
 		octet := octets[depth]
 
 		// last masked octet: insert/override prefix/val into node
-		if depth == lastOctetPlusOne {
+		if depth == strideCount {
 			return n.InsertPrefix(art.PfxToIdx(octet, lastBits), val)
 		}
 
@@ -320,7 +320,7 @@ func (n *_NODE_TYPE[V]) Delete(pfx netip.Prefix) (exists bool) {
 	ip := pfx.Addr()
 	is4 := ip.Is4()
 	octets := ip.AsSlice()
-	lastOctetPlusOne, lastBits := LastOctetPlusOneAndLastBits(pfx)
+	strideCount, lastBits := DivMod8(pfx)
 
 	// record the nodes on the path to the deleted node, needed to purge
 	// and/or path compress nodes after the deletion of a prefix
@@ -334,9 +334,9 @@ func (n *_NODE_TYPE[V]) Delete(pfx netip.Prefix) (exists bool) {
 		stack[depth] = n
 
 		// Last “octet” from prefix, update/insert prefix into node.
-		// Note: For /32 and /128, depth never reaches lastOctetPlusOne (4/16),
+		// Note: For /32 and /128, depth never reaches strideCount (4/16),
 		// so those are handled below via the fringe/leaf path.
-		if depth == lastOctetPlusOne {
+		if depth == strideCount {
 			// try to delete prefix in trie node
 			if exists = n.DeletePrefix(art.PfxToIdx(octet, lastBits)); !exists {
 				return false
@@ -400,7 +400,7 @@ func (n *_NODE_TYPE[V]) DeletePersist(cloneFn value.CloneFunc[V], pfx netip.Pref
 	ip := pfx.Addr() // the pfx must be in canonical form
 	is4 := ip.Is4()
 	octets := ip.AsSlice()
-	lastOctetPlusOne, lastBits := LastOctetPlusOneAndLastBits(pfx)
+	strideCount, lastBits := DivMod8(pfx)
 
 	// Stack to keep track of cloned nodes along the path,
 	// needed for purge and path compression after delete.
@@ -411,7 +411,7 @@ func (n *_NODE_TYPE[V]) DeletePersist(cloneFn value.CloneFunc[V], pfx netip.Pref
 		// Keep track of the cloned node at current depth.
 		stack[depth] = n
 
-		if depth == lastOctetPlusOne {
+		if depth == strideCount {
 			// Attempt to delete the prefix from the node's prefixes.
 			if exists = n.DeletePrefix(art.PfxToIdx(octet, lastBits)); !exists {
 				// Prefix not found, nothing deleted.
@@ -502,11 +502,11 @@ func (n *_NODE_TYPE[V]) Get(pfx netip.Prefix) (val V, exists bool) {
 	// values derived from pfx
 	ip := pfx.Addr()
 	octets := ip.AsSlice()
-	lastOctetPlusOne, lastBits := LastOctetPlusOneAndLastBits(pfx)
+	strideCount, lastBits := DivMod8(pfx)
 
 	// find the trie node
 	for depth, octet := range octets {
-		if depth == lastOctetPlusOne {
+		if depth == strideCount {
 			return n.GetPrefix(art.PfxToIdx(octet, lastBits))
 		}
 
@@ -562,7 +562,7 @@ func (n *_NODE_TYPE[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V
 	ip := pfx.Addr()
 	is4 := ip.Is4()
 	octets := ip.AsSlice()
-	lastOctetPlusOne, lastBits := LastOctetPlusOneAndLastBits(pfx)
+	strideCount, lastBits := DivMod8(pfx)
 
 	// record the nodes on the path to the deleted node, needed to purge
 	// and/or path compress nodes after the deletion of a prefix
@@ -576,9 +576,9 @@ func (n *_NODE_TYPE[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V
 		stack[depth] = n
 
 		// Last “octet” from prefix, update/insert prefix into node.
-		// Note: For /32 and /128, depth never reaches lastOctetPlusOne (4/16),
+		// Note: For /32 and /128, depth never reaches strideCount (4/16),
 		// so those are handled below via the fringe/leaf path.
-		if depth == lastOctetPlusOne {
+		if depth == strideCount {
 			idx := art.PfxToIdx(octet, lastBits)
 
 			oldVal, existed := n.GetPrefix(idx)
@@ -1911,7 +1911,7 @@ func (n *_NODE_TYPE[V]) Supernets(pfx netip.Prefix, yield func(netip.Prefix, V) 
 	ip := pfx.Addr()
 	is4 := ip.Is4()
 	octets := ip.AsSlice()
-	lastOctetPlusOne, lastBits := LastOctetPlusOneAndLastBits(pfx)
+	strideCount, lastBits := DivMod8(pfx)
 
 	// stack of the traversed nodes for reverse ordering of supernets
 	stack := [MaxTreeDepth]*_NODE_TYPE[V]{}
@@ -1924,7 +1924,7 @@ func (n *_NODE_TYPE[V]) Supernets(pfx netip.Prefix, yield func(netip.Prefix, V) 
 LOOP:
 	for depth, octet = range octets {
 		// stepped one past the last stride of interest; back up to last and exit
-		if depth > lastOctetPlusOne {
+		if depth > strideCount {
 			depth--
 			break
 		}
@@ -1986,9 +1986,9 @@ LOOP:
 		var idx uint8
 		octet = octets[depth]
 		// Last “octet” from prefix, update/insert prefix into node.
-		// Note: For /32 and /128, depth never reaches lastOctetPlusOne (4/16),
+		// Note: For /32 and /128, depth never reaches strideCount (4/16),
 		// so those are handled below via the fringe/leaf path.
-		if depth == lastOctetPlusOne {
+		if depth == strideCount {
 			idx = art.PfxToIdx(octet, lastBits)
 		} else {
 			idx = art.OctetToIdx(octet)
@@ -2028,14 +2028,14 @@ func (n *_NODE_TYPE[V]) Subnets(pfx netip.Prefix, yield func(netip.Prefix, V) bo
 	ip := pfx.Addr()
 	is4 := ip.Is4()
 	octets := ip.AsSlice()
-	lastOctetPlusOne, lastBits := LastOctetPlusOneAndLastBits(pfx)
+	strideCount, lastBits := DivMod8(pfx)
 
 	// find the trie node
 	for depth, octet := range octets {
 		// Last “octet” from prefix, update/insert prefix into node.
-		// Note: For /32 and /128, depth never reaches lastOctetPlusOne (4/16),
+		// Note: For /32 and /128, depth never reaches strideCount (4/16),
 		// so those are handled below via the fringe/leaf path.
-		if depth == lastOctetPlusOne {
+		if depth == strideCount {
 			idx := art.PfxToIdx(octet, lastBits)
 			n.EachSubnet(octets, depth, is4, idx, yield)
 			return
@@ -2298,17 +2298,17 @@ func (n *_NODE_TYPE[V]) OverlapsSameChildren(o *_NODE_TYPE[V], depth int) bool {
 func (n *_NODE_TYPE[V]) OverlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
 	ip := pfx.Addr()
 	octets := ip.AsSlice()
-	lastOctetPlusOne, lastBits := LastOctetPlusOneAndLastBits(pfx)
+	strideCount, lastBits := DivMod8(pfx)
 
 	for ; depth < len(octets); depth++ {
-		if depth > lastOctetPlusOne {
+		if depth > strideCount {
 			break
 		}
 
 		octet := octets[depth]
 
 		// full octet path in node trie, check overlap with last prefix octet
-		if depth == lastOctetPlusOne {
+		if depth == strideCount {
 			return n.OverlapsIdx(art.PfxToIdx(octet, lastBits))
 		}
 

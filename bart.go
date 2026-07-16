@@ -284,7 +284,7 @@ func (t *Table[V]) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpmPfx netip
 	bits := pfx.Bits()
 	is4 := ip.Is4()
 	octets := ip.AsSlice()
-	lastOctetPlusOne, lastBits := nodes.LastOctetPlusOneAndLastBits(pfx)
+	strideCount, lastBits := nodes.DivMod8(pfx)
 
 	n := t.rootNodeByVersion(is4)
 
@@ -300,7 +300,7 @@ LOOP:
 		depth &= nodes.DepthMask // BCE
 
 		// stepped one past the last stride of interest; back up to last and break
-		if depth > lastOctetPlusOne {
+		if depth > strideCount {
 			depth--
 			break
 		}
@@ -362,9 +362,9 @@ LOOP:
 		var idx uint8
 		octet = octets[depth]
 		// Last “octet” from prefix, update/insert prefix into node.
-		// Note: For /32 and /128, depth never reaches lastOctetPlusOne (4 or 16),
+		// Note: For /32 and /128, depth never reaches strideCount (4 or 16),
 		// so those are handled below via the fringe/leaf path.
-		if depth == lastOctetPlusOne {
+		if depth == strideCount {
 			idx = art.PfxToIdx(octet, lastBits)
 		} else {
 			idx = art.OctetToIdx(octet)
