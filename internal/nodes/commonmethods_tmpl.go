@@ -71,8 +71,9 @@ func (n *_NODE_TYPE[V]) LookupIdx(uint8) (_ uint8, _ V, _ bool)          { retur
 // Returns true if an existing prefix was updated, false if a new insertion occurred.
 func (n *_NODE_TYPE[V]) Insert(pfx netip.Prefix, val V, depth int) (exists bool) {
 	ip := pfx.Addr() // the pfx must be in canonical form
+	pfxLen := pfx.Bits()
 	octets := ip.AsSlice()
-	strideCount, lastBits := DivMod8(pfx)
+	strideCount, lastBits := DivMod8(pfxLen)
 
 	// Traverse the prefix's octets. Each depth corresponds to an 8-bit stride.
 	// We descend through the trie until we either reach the final stride (depth == strideCount)
@@ -92,7 +93,7 @@ func (n *_NODE_TYPE[V]) Insert(pfx netip.Prefix, val V, depth int) (exists bool)
 			// If the prefix is perfectly aligned with the next stride boundary (e.g., /16 at depth 1),
 			// it acts as a default route for everything below it. We store it as a FringeNode.
 			// Otherwise, it has trailing bits or crosses boundaries, so we store it as a LeafNode.
-			if IsFringe(depth, pfx) {
+			if IsFringe(depth, pfxLen) {
 				return n.InsertChild(octet, NewFringeNode(val))
 			}
 			return n.InsertChild(octet, NewLeafNode(pfx, val))
@@ -129,7 +130,7 @@ func (n *_NODE_TYPE[V]) Insert(pfx netip.Prefix, val V, depth int) (exists bool)
 		case *FringeNode[V]:
 			// Collision with an existing path-compressed FringeNode.
 			// If the incoming prefix is also a fringe at this depth, update the value.
-			if IsFringe(depth, pfx) {
+			if IsFringe(depth, pfxLen) {
 				kid.Value = val
 				return true
 			}
@@ -175,8 +176,9 @@ func (n *_NODE_TYPE[V]) Insert(pfx netip.Prefix, val V, depth int) (exists bool)
 // Returns true if an existing prefix was updated, false if a new insertion occurred.
 func (n *_NODE_TYPE[V]) InsertPersist(cloneFn value.CloneFunc[V], pfx netip.Prefix, val V, depth int) (exists bool) {
 	ip := pfx.Addr() // the pfx must be in canonical form
+	pfxLen := pfx.Bits()
 	octets := ip.AsSlice()
-	strideCount, lastBits := DivMod8(pfx)
+	strideCount, lastBits := DivMod8(pfxLen)
 
 	// Traverse the prefix's octets. Each depth corresponds to an 8-bit stride.
 	// We descend through the trie until we either reach the final stride (depth == strideCount)
@@ -196,7 +198,7 @@ func (n *_NODE_TYPE[V]) InsertPersist(cloneFn value.CloneFunc[V], pfx netip.Pref
 			// If the prefix is perfectly aligned with the next stride boundary (e.g., /16 at depth 1),
 			// it acts as a default route for everything below it. We store it as a FringeNode.
 			// Otherwise, it has trailing bits or crosses boundaries, so we store it as a LeafNode.
-			if IsFringe(depth, pfx) {
+			if IsFringe(depth, pfxLen) {
 				return n.InsertChild(octet, NewFringeNode(val))
 			}
 			return n.InsertChild(octet, NewLeafNode(pfx, val))
@@ -236,7 +238,7 @@ func (n *_NODE_TYPE[V]) InsertPersist(cloneFn value.CloneFunc[V], pfx netip.Pref
 		case *FringeNode[V]:
 			// Collision with an existing path-compressed FringeNode.
 			// If the incoming prefix is also a fringe at this depth, update the value.
-			if IsFringe(depth, pfx) {
+			if IsFringe(depth, pfxLen) {
 				kid.Value = val
 				return true
 			}
@@ -354,9 +356,10 @@ func (n *_NODE_TYPE[V]) PurgeAndCompress(stack []*_NODE_TYPE[V], octets []uint8,
 // now-empty nodes and restore path compression upward.
 func (n *_NODE_TYPE[V]) Delete(pfx netip.Prefix) (exists bool) {
 	ip := pfx.Addr() // pfx must be in canonical (masked) form
+	pfxLen := pfx.Bits()
 	is4 := ip.Is4()
 	octets := ip.AsSlice()
-	strideCount, lastBits := DivMod8(pfx)
+	strideCount, lastBits := DivMod8(pfxLen)
 
 	// Record ancestor nodes as we descend; PurgeAndCompress uses this stack to
 	// walk back up and clean up empty or re-compressible nodes after deletion.
@@ -394,7 +397,7 @@ func (n *_NODE_TYPE[V]) Delete(pfx netip.Prefix) (exists bool) {
 		case *FringeNode[V]:
 			// A FringeNode holds a single stride-aligned prefix (/8, /16, ...).
 			// If pfx does not qualify as a fringe at this depth, it cannot be here.
-			if !IsFringe(depth, pfx) {
+			if !IsFringe(depth, pfxLen) {
 				return false
 			}
 
@@ -437,9 +440,10 @@ func (n *_NODE_TYPE[V]) Delete(pfx netip.Prefix) (exists bool) {
 // now-empty nodes and restore path compression upward.
 func (n *_NODE_TYPE[V]) DeletePersist(cloneFn value.CloneFunc[V], pfx netip.Prefix) (exists bool) {
 	ip := pfx.Addr() // pfx must be in canonical (masked) form
+	pfxLen := pfx.Bits()
 	is4 := ip.Is4()
 	octets := ip.AsSlice()
-	strideCount, lastBits := DivMod8(pfx)
+	strideCount, lastBits := DivMod8(pfxLen)
 
 	// Record ancestor nodes as we descend; PurgeAndCompress uses this stack to
 	// walk back up and clean up empty or re-compressible nodes after deletion.
@@ -484,7 +488,7 @@ func (n *_NODE_TYPE[V]) DeletePersist(cloneFn value.CloneFunc[V], pfx netip.Pref
 		case *FringeNode[V]:
 			// A FringeNode holds a single stride-aligned prefix (/8, /16, ...).
 			// If pfx does not qualify as a fringe at this depth, it cannot be here.
-			if !IsFringe(depth, pfx) {
+			if !IsFringe(depth, pfxLen) {
 				return false
 			}
 
@@ -533,8 +537,9 @@ func (n *_NODE_TYPE[V]) DeletePersist(cloneFn value.CloneFunc[V], pfx netip.Pref
 func (n *_NODE_TYPE[V]) Get(pfx netip.Prefix) (val V, exists bool) {
 	// The prefix must be provided in canonical (masked) form for correct trie traversal.
 	ip := pfx.Addr()
+	pfxLen := pfx.Bits()
 	octets := ip.AsSlice()
-	strideCount, lastBits := DivMod8(pfx)
+	strideCount, lastBits := DivMod8(pfxLen)
 
 	// Traverse the trie octet by octet based on the prefix path.
 	for depth, octet := range octets {
@@ -559,7 +564,7 @@ func (n *_NODE_TYPE[V]) Get(pfx netip.Prefix) (val V, exists bool) {
 		case *FringeNode[V]:
 			// Reached a path-compressed FringeNode.
 			// Verify if the prefix qualifies as a fringe at this depth to return a match.
-			if IsFringe(depth, pfx) {
+			if IsFringe(depth, pfxLen) {
 				return kid.Value, true
 			}
 			return val, false
@@ -598,9 +603,10 @@ func (n *_NODE_TYPE[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V
 	var zero V
 
 	ip := pfx.Addr()
+	pfxLen := pfx.Bits()
 	is4 := ip.Is4()
 	octets := ip.AsSlice()
-	strideCount, lastBits := DivMod8(pfx)
+	strideCount, lastBits := DivMod8(pfxLen)
 
 	// record the nodes on the path to the deleted node, needed to purge
 	// and/or path compress nodes after the deletion of a prefix
@@ -657,7 +663,7 @@ func (n *_NODE_TYPE[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V
 			}
 
 			// insert
-			if IsFringe(depth, pfx) {
+			if IsFringe(depth, pfxLen) {
 				n.InsertChild(octet, NewFringeNode(newVal))
 			} else {
 				n.InsertChild(octet, NewLeafNode(pfx, newVal))
@@ -716,7 +722,7 @@ func (n *_NODE_TYPE[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V
 
 		case *FringeNode[V]:
 			// update existing value if prefix is fringe
-			if IsFringe(depth, pfx) {
+			if IsFringe(depth, pfxLen) {
 				newVal, del := cb(kid.Value, true)
 				if !del {
 					kid.Value = newVal
@@ -1947,9 +1953,10 @@ func (n *_NODE_TYPE[V]) EachSubnet(octets []byte, depth int, is4 bool, pfxIdx ui
 // the iteration early.
 func (n *_NODE_TYPE[V]) Supernets(pfx netip.Prefix, yield func(netip.Prefix, V) bool) {
 	ip := pfx.Addr()
+	pfxLen := pfx.Bits()
 	is4 := ip.Is4()
 	octets := ip.AsSlice()
-	strideCount, lastBits := DivMod8(pfx)
+	strideCount, lastBits := DivMod8(pfxLen)
 
 	// stack of the traversed nodes for reverse ordering of supernets
 	stack := [MaxTreeDepth]*_NODE_TYPE[V]{}
@@ -2063,9 +2070,10 @@ LOOP:
 func (n *_NODE_TYPE[V]) Subnets(pfx netip.Prefix, yield func(netip.Prefix, V) bool) {
 	// values derived from pfx
 	ip := pfx.Addr()
+	pfxLen := pfx.Bits()
 	is4 := ip.Is4()
 	octets := ip.AsSlice()
-	strideCount, lastBits := DivMod8(pfx)
+	strideCount, lastBits := DivMod8(pfxLen)
 
 	// find the trie node
 	for depth, octet := range octets {
@@ -2334,8 +2342,9 @@ func (n *_NODE_TYPE[V]) OverlapsSameChildren(o *_NODE_TYPE[V], depth int) bool {
 // trie traversal across varying prefix lengths and compression levels.
 func (n *_NODE_TYPE[V]) OverlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
 	ip := pfx.Addr()
+	pfxLen := pfx.Bits()
 	octets := ip.AsSlice()
-	strideCount, lastBits := DivMod8(pfx)
+	strideCount, lastBits := DivMod8(pfxLen)
 
 	for ; depth < len(octets); depth++ {
 		if depth > strideCount {
