@@ -15,7 +15,8 @@ import (
 //
 // Unlike the original ART algorithm, this implementation uses popcount-compressed
 // sparse arrays instead of fixed-size allocations. Insertions and lookups rely on
-// fast bitset operations and precomputed rank indexes to maximize CPU cache efficiency.
+// fast bitset operations and precomputed lookup tables to maximize CPU pipelining
+// and cache efficiency.
 //
 // Each BartNode maintains two distinct sparse arrays:
 //
@@ -29,9 +30,8 @@ import (
 //
 // A slot in the Children array may contain one of three types:
 //   - *BartNode[V]:   An internal intermediate node for further trie traversal.
-//   - *LeafNode[V]:   A path-compressed node for unaligned prefixes (depth < strideCount - 1).
-//   - *FringeNode[V]: A path-compressed node for stride-aligned prefixes (/8, /16, ... /128).
-//     Occurs only at (depth == strideCount - 1).
+//   - *FringeNode[V]: A path-compressed node if it qualifies as fringe [IsFringe]
+//   - *LeafNode[V]:   A path-compressed node otherwise.
 //
 // Note: LeafNode and FringeNode are created through path compression and
 // are automatically split into regular BartNodes when a more specific prefix

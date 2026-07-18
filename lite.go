@@ -166,11 +166,12 @@ func (l *Lite) Modify(pfx netip.Prefix, cb func(exists bool) (del bool)) {
 // ModifyPersist is similar to Modify but the receiver isn't modified and
 // a new *Lite is returned.
 func (l *Lite) ModifyPersist(pfx netip.Prefix, cb func(exists bool) (del bool)) *Lite {
-	wrappedFn := func(_ struct{}, exists bool) (_ struct{}, del bool) {
+	// wrap callback to match the signature of liteTable.ModifyPersist
+	cbWrapper := func(_ struct{}, exists bool) (_ struct{}, del bool) {
 		return struct{}{}, cb(exists)
 	}
 
-	lp := l.liteTable.ModifyPersist(pfx, wrappedFn)
+	lp := l.liteTable.ModifyPersist(pfx, cbWrapper)
 	//nolint:govet // copy of *lp is here by intention
 	return &Lite{*lp}
 }
@@ -570,7 +571,7 @@ func (l *liteTable[V]) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpmPfx n
 	pfxLen := pfx.Bits()
 	is4 := ip.Is4()
 	octets := ip.AsSlice()
-	strideCount, lastBits := nodes.DivMod8(pfxLen)
+	strideCount, modBits := nodes.DivMod8(pfxLen)
 
 	n := l.rootNodeByVersion(is4)
 
@@ -643,15 +644,13 @@ LOOP:
 			continue
 		}
 
-		// only the lastOctet may have a different prefix len
-		// all others are just host routes
 		var idx uint8
 		octet = octets[depth]
-		// Last “octet” from prefix
-		// Note: For /32 and /128, depth never reaches strideCount (4 or 16),
-		// so those are handled below via the fringe/leaf path.
+
+		// only the final stride may have a different prefix len
+		// all others are just host routes
 		if depth == strideCount {
-			idx = art.PfxToIdx(octet, lastBits)
+			idx = art.PfxToIdx(octet, modBits)
 		} else {
 			idx = art.OctetToIdx(octet)
 		}
