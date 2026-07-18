@@ -567,10 +567,10 @@ func (l *liteTable[V]) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpmPfx n
 	pfx = pfx.Masked()
 
 	ip := pfx.Addr()
-	bits := pfx.Bits()
+	pfxLen := pfx.Bits()
 	is4 := ip.Is4()
 	octets := ip.AsSlice()
-	strideCount, lastBits := nodes.DivMod8(pfx)
+	strideCount, lastBits := nodes.DivMod8(pfxLen)
 
 	n := l.rootNodeByVersion(is4)
 
@@ -607,7 +607,7 @@ LOOP:
 
 		case *nodes.LeafNode[V]:
 			// reached a path compressed prefix, stop traversing
-			if kid.Prefix.Bits() > bits || !kid.Prefix.Contains(ip) {
+			if kid.Prefix.Bits() > pfxLen || !kid.Prefix.Contains(ip) {
 				break LOOP
 			}
 			return kid.Prefix, true
@@ -616,7 +616,7 @@ LOOP:
 			// the bits of the fringe are defined by the depth
 			// maybe the LPM isn't needed, saves some cycles
 			fringeBits := (depth + 1) << 3
-			if fringeBits > bits {
+			if fringeBits > pfxLen {
 				break LOOP
 			}
 
