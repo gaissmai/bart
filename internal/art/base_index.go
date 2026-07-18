@@ -4,12 +4,12 @@
 // Package art summarizes the functions and inverse functions
 // for mapping between a prefix and a baseIndex.
 //
-//	can inline IdxToPfx with cost 37
-//	can inline IdxToRange with cost 68
-//	can inline NetMask with cost 14
-//	can inline OctetToIdx with cost 5
+//	can inline OctetToIdx with cost 6
+//	can inline PfxToIdx with cost 10
+//	can inline NetMask with cost 13
 //	can inline PfxBits with cost 21
-//	can inline PfxToIdx with cost 17
+//	can inline IdxToPfx with cost 39
+//	can inline IdxToRange with cost 71
 package art
 
 import "math/bits"
@@ -29,11 +29,8 @@ import "math/bits"
 //		                 + -----------------------
 //		                               0b0000_1101 = 13
 //
-// Panics if `pfxLen > 7`.
+// ATTENTION: For pfxLen values > 7 the result is undefined!
 func PfxToIdx(octet, pfxLen uint8) uint8 {
-	if pfxLen > 7 {
-		panic("PfxToIdx: invalid pfxLen > 7")
-	}
 	//  use '|' instead of '+', maybe a little bit faster
 	return octet>>(8-pfxLen) | 1<<pfxLen
 }
