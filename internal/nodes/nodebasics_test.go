@@ -111,7 +111,7 @@ func TestStrideCount(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		strideCount, gotBits := DivMod8(tc.pfx)
+		strideCount, gotBits := DivMod8(tc.pfx.Bits())
 		if strideCount != tc.wantDepth {
 			t.Errorf("StrideCount(%d), strideCount got: %d, want: %d",
 				tc.pfx.Bits(), strideCount, tc.wantDepth)
@@ -418,10 +418,10 @@ func TestIsFringe(t *testing.T) {
 			t.Parallel()
 
 			pfx := netip.MustParsePrefix(tt.prefix)
-			result := IsFringe(tt.depth, pfx)
+			result := IsFringe(tt.depth, pfx.Bits())
 
 			if result != tt.expected {
-				strideCount, lastBits := DivMod8(pfx)
+				strideCount, lastBits := DivMod8(pfx.Bits())
 				t.Errorf("Test %s: isFringe(%d, %v) = %v, want %v (strideCount=%d, lastBits=%d)",
 					tt.name, tt.depth, pfx, result, tt.expected, strideCount, lastBits)
 			}
@@ -675,7 +675,7 @@ func TestIntegration(t *testing.T) {
 			}
 
 			fringe := CidrForFringe(octets, tc.depth, tc.is4, 0)
-			if !IsFringe(tc.depth, fringe) {
+			if !IsFringe(tc.depth, fringe.Bits()) {
 				t.Errorf("Prefix created by cidrForFringe at depth %d (is4=%t) should be detected as fringe: %v",
 					tc.depth, tc.is4, fringe)
 			}

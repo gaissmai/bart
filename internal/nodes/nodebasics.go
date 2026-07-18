@@ -187,8 +187,8 @@ func NewFringeNode[V any](val V) *FringeNode[V] {
 //   - A prefix qualifies as a fringe if:
 //     depth == strideCount - 1 && remainder == 0
 //     (i.e., aligned on stride boundary, /8, /16, ... /128 bits)
-func IsFringe(depth int, pfx netip.Prefix) bool {
-	strideCount, lastBits := DivMod8(pfx)
+func IsFringe(depth int, pfxLen int) bool {
+	strideCount, lastBits := DivMod8(pfxLen)
 	return depth == strideCount-1 && lastBits == 0
 }
 
@@ -282,7 +282,7 @@ func CidrForFringe(octets []byte, depth int, is4 bool, fringeByte uint8) netip.P
 }
 
 // DivMod8 returns the count of full 8‑bit strides (bits/8)
-// and the remaining bits in the final stride (bits%8) for pfx.
+// and the remaining bits in the final stride (bits%8) for pfxLen.
 //
 // ATTENTION: Split the IP prefixes at 8-bit borders, count from 0.
 //
@@ -311,18 +311,18 @@ func CidrForFringe(octets []byte, depth int, is4 bool, fringeByte uint8) netip.P
 // We are not splitting at /8, /16, ..., because this would mean that the
 // first node would have 512 prefixes, 9 bits from [0-8]. All remaining nodes
 // would then only have 8 bits from [9-16], [17-24], [25..32], ...
-// but the algorithm would then require a variable length bitset.
+// but the algorithm would then require a variable length bitset
+// or imply a double-sized bitset.
 //
 // If you can commit to a fixed size of [4]uint64, then the algorithm is
 // much faster due to modern CPUs.
 //
 // Perhaps a future Go version that supports SIMD instructions for the [4]uint64 vectors
 // will make the algorithm even faster on suitable hardware.
-func DivMod8(pfx netip.Prefix) (strideCount int, remainder uint8) {
+func DivMod8(pfxLen int) (strideCount int, remainder uint8) {
 	// strideCount:  range from 0..4 or 0..16
 	// remainder:    range from 0..7
-	bits := pfx.Bits()
-	return bits >> 3, uint8(bits & 7)
+	return pfxLen >> 3, uint8(pfxLen & 7)
 }
 
 // CloneLeaf creates and returns a copy of the leafNode receiver.
