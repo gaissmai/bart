@@ -117,7 +117,7 @@ func TestStrideCount(t *testing.T) {
 				tc.pfx.Bits(), strideCount, tc.wantDepth)
 		}
 		if gotBits != tc.wantBits {
-			t.Errorf("StrideCount(%d), lastBits got: %d, want: %d",
+			t.Errorf("StrideCount(%d), modBits got: %d, want: %d",
 				tc.pfx.Bits(), gotBits, tc.wantBits)
 		}
 	}

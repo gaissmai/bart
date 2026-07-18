@@ -159,37 +159,20 @@ func NewFringeNode[V any](val V) *FringeNode[V] {
 	return &FringeNode[V]{Value: val}
 }
 
-// IsFringe determines whether a prefix qualifies as a "fringe node" -
-// that is, a special kind of path-compressed leaf inserted at the final
-// possible trie level (depth == strideCount - 1).
+// IsFringe determines whether a prefix qualifies as a "FringeNode".
+// Only prefixes that are stride-aligned (i.e., /8, /16, ..., /128)
+// can be fringe-compressed. If these prefixes are inserted at a position
+// where depth == (strideCount-1), they are treated as FringeNodes;
+// at positions where depth < (strideCount-1), they are treated as LeafNodes.
 //
-// Both "leaves" and "fringes" are path-compressed terminal entries;
-// the distinction lies in their position within the trie:
+// Example for a stride-aligned prefix like 192.168.1.0/24 (strideCount = 3, modBits = 0):
 //
-//   - A leaf is inserted at any intermediate level if no further stride
-//     boundary matches (depth < strideCount - 1).
-//
-//   - A fringe is inserted at the last possible stride level
-//     (depth == strideCount - 1) before a prefix would otherwise land
-//     as a direct prefix in the next level (depth == strideCount).
-//
-// Special property:
-//   - A fringe acts as a default route for all downstream bit patterns
-//     extending beyond its prefix.
-//
-// Examples for a stride-aligned prefix like 192.168.1.0/24 (strideCount = 3, remainder = 0):
-//
-//	depth <  2  (depth < strideCount - 1)  : A leaf, path-compressed.
-//	depth == 2  (depth == strideCount - 1) : A fringe, path-compressed.
-//	depth == 3  (depth == strideCount)     : A direct prefix with octet == 0 => idx == 1 (default route).
-//
-// Logic:
-//   - A prefix qualifies as a fringe if:
-//     depth == strideCount - 1 && remainder == 0
-//     (i.e., aligned on stride boundary, /8, /16, ... /128 bits)
+//	depth = 3,  depth == strideCount     : A direct prefix with 0/0 (default route for subtrie).
+//	depth = 2,  depth == (strideCount-1) : A path-compressed fringe.
+//	depth < 2,  depth  < (strideCount-1) : A path-compressed leaf.
 func IsFringe(depth int, pfxLen int) bool {
-	strideCount, lastBits := DivMod8(pfxLen)
-	return depth == strideCount-1 && lastBits == 0
+	strideCount, modBits := DivMod8(pfxLen)
+	return depth == strideCount-1 && modBits == 0
 }
 
 // CmpIndexRank, sort indexes in prefix sort order.
@@ -291,18 +274,18 @@ func CidrForFringe(octets []byte, depth int, is4 bool, fringeByte uint8) netip.P
 //	BitPos: [0-7],[8-15],[16-23],[24-31],[32]
 //	BitPos: [0-7],[8-15],[16-23],[24-31],[32-39],[40-47],[48-55],[56-63],...,[120-127],[128]
 //
-//	0.0.0.0/0      => strideCount:  0, remainder: 0 (default route)
-//	0.0.0.0/7      => strideCount:  0, remainder: 7
-//	0.0.0.0/8      => strideCount:  1, remainder: 0 (fringe candidate)
-//	10.0.0.0/8     => strideCount:  1, remainder: 0 (fringe candidate)
-//	10.0.0.0/22    => strideCount:  2, remainder: 6
-//	10.0.0.0/29    => strideCount:  3, remainder: 5
-//	10.0.0.0/32    => strideCount:  4, remainder: 0 (fringe candidate)
+//	0.0.0.0/0      => strideCount:  0, modBits: 0 (default route)
+//	0.0.0.0/7      => strideCount:  0, modBits: 7
+//	0.0.0.0/8      => strideCount:  1, modBits: 0 (fringe candidate)
+//	10.0.0.0/8     => strideCount:  1, modBits: 0 (fringe candidate)
+//	10.0.0.0/22    => strideCount:  2, modBits: 6
+//	10.0.0.0/29    => strideCount:  3, modBits: 5
+//	10.0.0.0/32    => strideCount:  4, modBits: 0 (fringe candidate)
 //
-//	::/0           => strideCount:  0, remainder: 0 (default route)
-//	::1/128        => strideCount: 16, remainder: 0 (fringe candidate)
-//	2001:db8::/42  => strideCount:  5, remainder: 2
-//	2001:db8::/56  => strideCount:  7, remainder: 0 (fringe candidate)
+//	::/0           => strideCount:  0, modBits: 0 (default route)
+//	::1/128        => strideCount: 16, modBits: 0 (fringe candidate)
+//	2001:db8::/42  => strideCount:  5, modBits: 2
+//	2001:db8::/56  => strideCount:  7, modBits: 0 (fringe candidate)
 //
 //	/32 and /128 prefixes are special, they never form a new node,
 //	At the end of the trie (IPv4: depth 4, IPv6: depth 16) they are always
@@ -319,9 +302,9 @@ func CidrForFringe(octets []byte, depth int, is4 bool, fringeByte uint8) netip.P
 //
 // Perhaps a future Go version that supports SIMD instructions for the [4]uint64 vectors
 // will make the algorithm even faster on suitable hardware.
-func DivMod8(pfxLen int) (strideCount int, remainder uint8) {
-	// strideCount:  range from 0..4 or 0..16
-	// remainder:    range from 0..7
+func DivMod8(pfxLen int) (strideCount int, modBits uint8) {
+	// strideCount: range from 0..4 or 0..16
+	// modBits:     range from 0..7
 	return pfxLen >> 3, uint8(pfxLen & 7)
 }
 

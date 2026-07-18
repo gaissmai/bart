@@ -20,7 +20,7 @@ type LiteNode[V any] struct {
 		// BitSet256 tracks the presence of prefixes at this level.
 		bitset.BitSet256
 		// Count maintains the current number of set bits, updated on modification
-		// to avoid redundant population counting.
+		// to avoid expensive population counting.
 		Count uint16
 	}
 }
