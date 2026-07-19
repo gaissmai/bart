@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Karl Gaissmaier
+// Copyright (c) 2026 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
 package value
@@ -35,6 +35,25 @@ type nonClonableType struct {
 	Data map[string]int
 }
 
+// ptrEqualer implements Equaler via a pointer receiver.
+// This is the type needed to trigger the nil-pointer guard in Equal.
+type ptrEqualer struct{ Value int }
+
+func (e *ptrEqualer) Equal(other *ptrEqualer) bool {
+	if other == nil {
+		return false
+	}
+	return e.Value == other.Value
+}
+
+// ptrCloner implements Cloner via a pointer receiver.
+// This is the type needed to trigger the nil-pointer guard in CloneVal.
+type ptrCloner struct{ Value int }
+
+func (c *ptrCloner) Clone() *ptrCloner {
+	return &ptrCloner{Value: c.Value}
+}
+
 func TestIsZeroSizedType(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -56,6 +75,21 @@ func TestIsZeroSizedType(t *testing.T) {
 			name: "int",
 			got:  IsZST[int](),
 			want: false,
+		},
+		{
+			name: "pointer_to_ZST",
+			got:  IsZST[*struct{}](),
+			want: false, // a pointer always has non-zero size
+		},
+		{
+			name: "named_empty_struct",
+			got:  IsZST[equalableType](),
+			want: false,
+		},
+		{
+			name: "array_of_ZST",
+			got:  IsZST[[100]struct{}](),
+			want: true, // an array of zero-sized elements is itself zero-sized
 		},
 	}
 
@@ -151,6 +185,51 @@ func TestEqual(t *testing.T) {
 			t.Error("Equal should not treat typed-nil inside interface equal to nil interface")
 		}
 	})
+
+	t.Run("typed_nil_pointer_with_Equaler_guard", func(t *testing.T) {
+		t.Parallel()
+		var v1 *ptrEqualer = nil
+		var v2 *ptrEqualer = nil
+		v3 := &ptrEqualer{Value: 42}
+
+		// nil == nil: guard prevents panic, falls back to interface comparison
+		if !Equal(v1, v2) {
+			t.Error("Equal should return true for two typed-nil Equaler pointers")
+		}
+		// nil != non-nil
+		if Equal(v1, v3) {
+			t.Error("Equal should return false for typed-nil vs non-nil Equaler pointer")
+		}
+		// non-nil via Equal method still works
+		v4 := &ptrEqualer{Value: 42}
+		if !Equal(v3, v4) {
+			t.Error("Equal should return true for equal non-nil Equaler pointers")
+		}
+		v5 := &ptrEqualer{Value: 99}
+		if Equal(v3, v5) {
+			t.Error("Equal should return false for unequal non-nil Equaler pointers")
+		}
+	})
+
+	t.Run("pointer_without_Equaler_uses_DeepEqual", func(t *testing.T) {
+		t.Parallel()
+		// *int does not implement Equaler[*int], so Equal must fall back to
+		// reflect.DeepEqual, which dereferences pointers for comparison.
+		a, b := 42, 42
+		v1, v2 := &a, &b
+		if v1 == v2 {
+			t.Fatal("test setup invalid: pointers must differ")
+		}
+		if !Equal(v1, v2) {
+			t.Error("Equal should return true for distinct pointers to equal values via DeepEqual")
+		}
+
+		c := 99
+		v3 := &c
+		if Equal(v1, v3) {
+			t.Error("Equal should return false for pointers to different values via DeepEqual")
+		}
+	})
 }
 
 func TestCloneFnFactory(t *testing.T) {
@@ -190,6 +269,43 @@ func TestCloneFnFactory(t *testing.T) {
 		fn := CloneFnFactory[int]()
 		if fn != nil {
 			t.Error("CloneFnFactory should return nil for simple types")
+		}
+	})
+
+	t.Run("pointer_type_with_Cloner_interface", func(t *testing.T) {
+		t.Parallel()
+		fn := CloneFnFactory[*ptrCloner]()
+		if fn == nil {
+			t.Fatal("CloneFnFactory should return non-nil function for *ptrCloner")
+		}
+
+		// nil pointer must not panic
+		var nilPtr *ptrCloner
+		if fn(nilPtr) != nil {
+			t.Error("CloneFunc should return nil for a nil pointer")
+		}
+
+		// non-nil pointer must produce an independent clone
+		original := &ptrCloner{Value: 42}
+		cloned := fn(original)
+		if cloned == original {
+			t.Error("CloneFunc should return a new pointer, not the same one")
+		}
+		if cloned.Value != original.Value {
+			t.Error("Cloned value should equal original value")
+		}
+	})
+
+	t.Run("value_type_with_pointer_receiver_Clone_returns_nil", func(t *testing.T) {
+		t.Parallel()
+		// ptrCloner.Clone has a pointer receiver and returns *ptrCloner, so the
+		// value type ptrCloner does NOT implement Cloner[ptrCloner] (only
+		// *ptrCloner implements Cloner[*ptrCloner]). CloneFnFactory must
+		// correctly respect Go method-set semantics via reflect.TypeFor,
+		// rather than reporting a false positive for the value type.
+		fn := CloneFnFactory[ptrCloner]()
+		if fn != nil {
+			t.Error("CloneFnFactory should return nil for a value type whose Clone method has a pointer receiver")
 		}
 	})
 }
@@ -236,6 +352,16 @@ func TestCloneVal(t *testing.T) {
 		cloned := CloneVal(original)
 		if original != cloned {
 			t.Error("CloneVal should return same value for simple types")
+		}
+	})
+
+	t.Run("pointer_typed_nil_with_Cloner_guard", func(t *testing.T) {
+		t.Parallel()
+		var p *ptrCloner = nil
+		// Without the nil guard this would panic calling Clone() on a nil receiver.
+		cloned := CloneVal(p)
+		if cloned != nil {
+			t.Error("CloneVal should return nil for typed-nil pointer implementing Cloner")
 		}
 	})
 }
