@@ -458,6 +458,9 @@ func (t *Fast[V]) UnionPersist(o *Fast[V]) *Fast[V] {
 //
 // The bart package will automatically detect and use this method via Go's
 // structural typing.
+//
+// Note: If V implements Equal(V) bool with a pointer receiver, the Equal
+// method should handle nil receivers gracefully.
 func (t *Fast[V]) Equal(o *Fast[V]) bool {
 	if t.size4 != o.size4 || t.size6 != o.size6 {
 		return false
@@ -484,6 +487,9 @@ func (t *Fast[V]) Equal(o *Fast[V]) bool {
 //
 // The bart package will automatically detect and use this method via Go's
 // structural typing.
+//
+// Note: If V implements Clone() V with a pointer receiver, the Clone
+// method should handle nil receivers gracefully.
 func (t *Fast[V]) Clone() *Fast[V] {
 	c := new(Fast[V])
 

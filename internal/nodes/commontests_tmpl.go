@@ -35,8 +35,8 @@ func (n *_NODE_TYPE[V]) DumpRec(io.Writer, StridePath, int, bool)               
 func (n *_NODE_TYPE[V]) FprintRec(io.Writer, TrieItem[V], string) (_ error)                { return }
 func (n *_NODE_TYPE[V]) Insert(netip.Prefix, V, int) (_ bool)                              { return }
 func (n *_NODE_TYPE[V]) Delete(netip.Prefix) (_ bool)                                      { return }
-func (n *_NODE_TYPE[V]) InsertPersist(value.CloneFunc[V], netip.Prefix, V, int) (_ bool)   { return }
-func (n *_NODE_TYPE[V]) DeletePersist(value.CloneFunc[V], netip.Prefix) (_ bool)           { return }
+func (n *_NODE_TYPE[V]) InsertPersist(func(V) V, netip.Prefix, V, int) (_ bool)            { return }
+func (n *_NODE_TYPE[V]) DeletePersist(func(V) V, netip.Prefix) (_ bool)                    { return }
 func (n *_NODE_TYPE[V]) Subnets(netip.Prefix, func(netip.Prefix, V) bool)                  { return }
 func (n *_NODE_TYPE[V]) Supernets(netip.Prefix, func(netip.Prefix, V) bool)                { return }
 func (n *_NODE_TYPE[V]) AllRec(StridePath, int, bool, func(netip.Prefix, V) bool) (_ bool) { return }
@@ -1068,7 +1068,7 @@ func TestUnionRecExtra__NODE_TYPE(t *testing.T) {
 		// n2's child is a LeafNode with "10.10.20.0/24"
 		n2.Insert(mpp("10.10.20.0/24"), 43, 0)
 
-		n1.UnionRec(cloneFnFactory[int](), n2, 0)
+		n1.UnionRec(value.CloneFnFactory[int](), n2, 0)
 
 		val, ok := n1.Get(mpp("10.10.20.0/24"))
 		if !ok {
@@ -1093,7 +1093,7 @@ func TestUnionRecExtra__NODE_TYPE(t *testing.T) {
 		// n2's child is a FringeNode "10.0.0.0/8"
 		n2.Insert(mpp("10.0.0.0/8"), 43, 0)
 
-		n1.UnionRec(cloneFnFactory[int](), n2, 0)
+		n1.UnionRec(value.CloneFnFactory[int](), n2, 0)
 
 		val, ok := n1.Get(mpp("10.0.0.0/8"))
 		if !ok {
@@ -1115,7 +1115,7 @@ func TestUnionRecExtra__NODE_TYPE(t *testing.T) {
 
 		n2.Insert(mpp("10.10.20.0/24"), 43, 0)
 
-		n1.UnionRecPersist(cloneFnFactory[int](), n2, 0)
+		n1.UnionRecPersist(value.CloneFnFactory[int](), n2, 0)
 
 		val, ok := n1.Get(mpp("10.10.20.0/24"))
 		if !ok {
@@ -1136,7 +1136,7 @@ func TestUnionRecExtra__NODE_TYPE(t *testing.T) {
 
 		n2.Insert(mpp("10.0.0.0/8"), 43, 0)
 
-		n1.UnionRecPersist(cloneFnFactory[int](), n2, 0)
+		n1.UnionRecPersist(value.CloneFnFactory[int](), n2, 0)
 
 		val, ok := n1.Get(mpp("10.0.0.0/8"))
 		if !ok {

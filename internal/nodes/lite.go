@@ -9,7 +9,6 @@ import (
 	"github.com/gaissmai/bart/internal/bitset"
 	"github.com/gaissmai/bart/internal/lpm"
 	"github.com/gaissmai/bart/internal/sparse"
-	"github.com/gaissmai/bart/internal/value"
 )
 
 // LiteNode is a space-optimized version of [BartNode] that tracks prefix existence
@@ -170,7 +169,7 @@ func (n *LiteNode[V]) Lookup(idx uint8) (_ V, ok bool) {
 // CloneFlat returns a shallow copy of the current node.
 //
 // CloneFn is only used for interface satisfaction.
-func (n *LiteNode[V]) CloneFlat(_ value.CloneFunc[V]) *LiteNode[V] {
+func (n *LiteNode[V]) CloneFlat(_ func(V) V) *LiteNode[V] {
 	if n == nil {
 		return nil
 	}
@@ -203,7 +202,7 @@ func (n *LiteNode[V]) CloneFlat(_ value.CloneFunc[V]) *LiteNode[V] {
 //
 // Returns a new instance of LiteNode[V] which is a complete deep clone of the
 // receiver node with all descendants.
-func (n *LiteNode[V]) CloneRec(_ value.CloneFunc[V]) *LiteNode[V] {
+func (n *LiteNode[V]) CloneRec(_ func(V) V) *LiteNode[V] {
 	if n == nil {
 		return nil
 	}

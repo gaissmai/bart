@@ -519,6 +519,9 @@ func (t *_TABLE_TYPE[V]) UnionPersist(o *_TABLE_TYPE[V]) *_TABLE_TYPE[V] {
 //
 // The bart package will automatically detect and use this method via Go's
 // structural typing.
+//
+// Note: If V implements Equal(V) bool with a pointer receiver, the Equal
+// method should handle nil receivers gracefully.
 func (t *_TABLE_TYPE[V]) Equal(o *_TABLE_TYPE[V]) bool {
 	if t.size4 != o.size4 || t.size6 != o.size6 {
 		return false
@@ -545,6 +548,9 @@ func (t *_TABLE_TYPE[V]) Equal(o *_TABLE_TYPE[V]) bool {
 //
 // The bart package will automatically detect and use this method via Go's
 // structural typing.
+//
+// Note: If V implements Clone() V with a pointer receiver, the Clone
+// method should handle nil receivers gracefully.
 func (t *_TABLE_TYPE[V]) Clone() *_TABLE_TYPE[V] {
 	c := new(_TABLE_TYPE[V])
 
