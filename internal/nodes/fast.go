@@ -8,7 +8,6 @@ import (
 
 	"github.com/gaissmai/bart/internal/lpm"
 	"github.com/gaissmai/bart/internal/sparse"
-	"github.com/gaissmai/bart/internal/value"
 )
 
 // FastNode is based on [BartNode], but it also uses a cache ([256]uint8)
@@ -210,7 +209,7 @@ func (n *FastNode[V]) Lookup(idx uint8) (val V, ok bool) {
 //
 // Note: The returned node is a new instance with copied slices but only shallow copies of nested nodes,
 // except for LeafNode and FringeNode children which are cloned according to cloneFn.
-func (n *FastNode[V]) CloneFlat(cloneFn value.CloneFunc[V]) *FastNode[V] {
+func (n *FastNode[V]) CloneFlat(cloneFn func(V) V) *FastNode[V] {
 	if n == nil {
 		return nil
 	}
@@ -268,7 +267,7 @@ func (n *FastNode[V]) CloneFlat(cloneFn value.CloneFunc[V]) *FastNode[V] {
 //
 // Returns a new instance of FastNode[V] which is a complete deep clone of the
 // receiver node with all descendants.
-func (n *FastNode[V]) CloneRec(cloneFn value.CloneFunc[V]) *FastNode[V] {
+func (n *FastNode[V]) CloneRec(cloneFn func(V) V) *FastNode[V] {
 	if n == nil {
 		return nil
 	}
