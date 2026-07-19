@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Karl Gaissmaier
+// Copyright (c) 2026 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
 // Package value provides runtime utilities for working with generic type
@@ -36,31 +36,10 @@ import (
 // IsZST reports whether type V is a zero-sized type (ZST).
 //
 // Zero-sized types such as struct{}, [0]byte, or structs/arrays with no fields
-// occupy no memory. The Go runtime optimizes allocations of ZSTs by returning
-// pointers to the same memory address (typically runtime.zerobase).
-//
-// This function exploits that optimization: it allocates two instances of V
-// and compares their addresses. If the addresses are equal, V must be a ZST,
-// since distinct non-zero-sized allocations would have different addresses.
-//
-// The helper escapeToHeap ensures both allocations reach the heap and prevents
-// the compiler from proving address equality at compile time, which would
-// invalidate the runtime check.
+// occupy no memory. This function uses reflection to determine the size of the
+// type safely without relying on the unsafe package.
 func IsZST[V any]() bool {
-	a, b := escapeToHeap[V]()
-	return a == b
-}
-
-// escapeToHeap forces two allocations of type V to escape to the heap.
-//
-// The go:noinline directive is critical: it prevents the compiler from inlining
-// this function and optimizing away the allocations or proving that a == b at
-// compile time. Without it, the compiler could elide one allocation or determine
-// the result statically, breaking the ZST detection heuristic.
-//
-//go:noinline
-func escapeToHeap[V any]() (*V, *V) {
-	return new(V), new(V)
+	return reflect.TypeFor[V]().Size() == 0
 }
 
 // Equaler is a generic interface for types that can decide their own
@@ -71,14 +50,25 @@ type Equaler[V any] interface {
 }
 
 // Equal compares two values of type V for equality.
-// If V implements Equaler[V], that custom equality method is used,
-// avoiding the potentially expensive reflect.DeepEqual.
-// Otherwise, reflect.DeepEqual is used as a fallback.
+//
+// If V implements Equaler[V], its custom equality method is used to
+// avoid the potentially expensive [reflect.DeepEqual]. As a safety measure,
+// if v1 is a typed nil pointer, Equal gracefully falls back to a fast,
+// direct interface comparison to prevent nil receiver panics.
+//
+// If V does not implement Equaler[V], [reflect.DeepEqual] is used as a fallback.
 func Equal[V any](v1, v2 V) bool {
-	// you can't assert directly on a type parameter
-	if v1, ok := any(v1).(Equaler[V]); ok {
-		return v1.Equal(v2)
+	if eq, ok := any(v1).(Equaler[V]); ok {
+
+		// Guard against typed nil pointers wrapped in the interface.
+		// Calling Equal on a typed nil might panic if not handled by the receiver.
+		rv := reflect.ValueOf(eq) // Avoid re-boxing v1
+		if rv.Kind() == reflect.Pointer && rv.IsNil() {
+			return any(v1) == any(v2) // Fast path for nil pointers
+		}
+		return eq.Equal(v2)
 	}
+
 	// fallback
 	return reflect.DeepEqual(v1, v2)
 }
@@ -99,25 +89,34 @@ type CloneFunc[V any] func(V) V
 // If V implements Cloner[V], the returned function should perform
 // a deep copy using Clone(), otherwise it returns nil.
 func CloneFnFactory[V any]() CloneFunc[V] {
-	var zero V
-	// you can't assert directly on a type parameter
-	if _, ok := any(zero).(Cloner[V]); ok {
+	// Safely check if the type V implements Cloner[V] using modern Go reflection.
+	// This avoids instantiating values or triggering strictly nil interface bugs.
+	if reflect.TypeFor[V]().Implements(reflect.TypeFor[Cloner[V]]()) {
 		return CloneVal[V]
 	}
 	return nil
 }
 
-// CloneVal returns a deep clone of val by calling Clone when
-// val implements Cloner[V]. If val does not implement
-// Cloner[V] or the Cloner receiver is nil (val is a nil pointer),
-// CloneVal returns val unchanged.
+// CloneVal returns a deep clone of val by calling its Clone method
+// if val implements [Cloner].
+//
+// If val does not implement the interface, or if it is a typed nil pointer,
+// CloneVal safely returns val unchanged to prevent potential nil receiver panics.
 func CloneVal[V any](val V) V {
-	// you can't assert directly on a type parameter
-	c, ok := any(val).(Cloner[V])
-	if !ok || c == nil {
-		return val
+	if c, ok := any(val).(Cloner[V]); ok {
+
+		// A typed nil pointer inside an interface makes the interface itself non-nil.
+		// We must use reflection to safely determine if the underlying value is nil.
+		rv := reflect.ValueOf(c) // Avoid re-boxing val
+		if rv.Kind() == reflect.Pointer && rv.IsNil() {
+			return val
+		}
+
+		return c.Clone()
 	}
-	return c.Clone()
+
+	// fallback
+	return val
 }
 
 // CopyVal just copies the value of any type V.
