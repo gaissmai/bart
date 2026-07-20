@@ -9,22 +9,22 @@
 // # Zero-Sized Type (ZST) Detection
 //
 // IsZST[V] detects whether a type parameter V is a zero-sized type (such as
-// struct{} or [0]byte). Zero-sized types carry no information in their
+// `struct{}` or `[0]byte`). Zero-sized types carry no information in their
 // values. Omitting them from dumps and prints reduces line noise and
 // improves readability.
 //
 // # Value Equality
 //
-// The Equaler[V] interface and Equal function enable custom equality logic
-// for payload values. When V implements Equaler[V], the Equal function uses
-// that implementation, avoiding the potentially expensive reflect.DeepEqual.
+// The [Equal] function enables custom equality logic for payload values.
+// When V implements an `Equal(V) bool` method, [Equal] uses that implementation,
+// avoiding the potentially expensive [reflect.DeepEqual] fallback.
 //
 // # Value Cloning
 //
-// The Cloner[V] interface and associated functions (CloneFnFactory, CloneVal,
-// CopyVal) support deep copying of payload values for persistent operations.
-// When V implements Cloner[V], bart methods like InsertPersist, DeletePersist,
-// and UnionPersist use the Clone method to create independent copies.
+// The [CloneFnFactory] supports copying of payload values for persistent
+// operations. When V implements a `Clone() V` method,
+// bart methods like InsertPersist, DeletePersist, and UnionPersist use the
+// generated clone function to create independent copies.
 //
 // This is an internal package used by the bart data structure implementation.
 package value
@@ -35,7 +35,7 @@ import (
 
 // IsZST reports whether type V is a zero-sized type (ZST).
 //
-// Zero-sized types such as struct{}, [0]byte, or structs/arrays with no fields
+// Zero-sized types such as `struct{}`, `[0]byte`, or structs/arrays with no fields
 // occupy no memory. This function uses reflection to determine the size of the
 // type safely without relying on the unsafe package.
 func IsZST[V any]() bool {
@@ -44,10 +44,10 @@ func IsZST[V any]() bool {
 
 // Equal compares two values of type V for equality.
 //
-// If V implements an Equal(V) bool method, its custom equality logic is used.
+// If V implements an `Equal(V) bool` method, its custom equality logic is used.
 // Otherwise, it falls back to [reflect.DeepEqual].
 //
-// Note: If V implements Equal(V) bool with a pointer receiver, the Equal
+// Note: If V implements `Equal(V) bool` with a pointer receiver, the `Equal`
 // method should handle nil receivers gracefully.
 func Equal[V any](v1, v2 V) bool {
 	if eq, ok := any(v1).(interface{ Equal(V) bool }); ok {
@@ -58,11 +58,11 @@ func Equal[V any](v1, v2 V) bool {
 }
 
 // CloneFnFactory returns a function that takes a value of type V and returns
-// a copy by calling its Clone method.
+// a copy by calling its `Clone` method.
 //
-// If V does not implement a Clone() V method, it returns nil.
+// If V does not implement a `Clone() V` method, it returns nil.
 //
-// Note: If V implements Clone() V with a pointer receiver, the Clone
+// Note: If V implements `Clone() V` with a pointer receiver, the `Clone`
 // method should handle nil receivers gracefully.
 func CloneFnFactory[V any]() func(V) V {
 	var zero V
