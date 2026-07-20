@@ -131,7 +131,7 @@ func (n *BartNode[V]) Insert(pfx netip.Prefix, val V, depth int) (exists bool) {
 //   - depth: The current depth in the trie (0-based byte index).
 //
 // Returns true if an existing prefix was updated, false if a new insertion occurred.
-func (n *BartNode[V]) InsertPersist(cloneFn value.CloneFunc[V], pfx netip.Prefix, val V, depth int) (exists bool) {
+func (n *BartNode[V]) InsertPersist(cloneFn func(V) V, pfx netip.Prefix, val V, depth int) (exists bool) {
 	ip := pfx.Addr() // the pfx must be in canonical form
 	pfxLen := pfx.Bits()
 	octets := ip.AsSlice()
@@ -397,7 +397,7 @@ func (n *BartNode[V]) Delete(pfx netip.Prefix) (exists bool) {
 //
 // After a successful deletion, PurgeAndCompress walks the ancestor stack to prune
 // now-empty nodes and restore path compression upward.
-func (n *BartNode[V]) DeletePersist(cloneFn value.CloneFunc[V], pfx netip.Prefix) (exists bool) {
+func (n *BartNode[V]) DeletePersist(cloneFn func(V) V, pfx netip.Prefix) (exists bool) {
 	ip := pfx.Addr() // pfx must be in canonical (masked) form
 	pfxLen := pfx.Bits()
 	is4 := ip.Is4()
@@ -579,6 +579,7 @@ func (n *BartNode[V]) Modify(pfx netip.Prefix, cb func(val V, found bool) (_ V, 
 		stack[depth] = n
 
 		// The current depth matches the prefix's stride count, meaning this is the final
+		// stride for this prefix. Insert or update it directly in this node's prefix table.
 		if depth == strideCount {
 			idx := art.PfxToIdx(octet, modBits)
 
@@ -1256,7 +1257,7 @@ func (n *BartNode[V]) DirectItemsRec(parentIdx uint8, path StridePath, depth int
 // The merge operation is destructive on the receiver n, but leaves the source node o unchanged.
 //
 // Returns the number of duplicate prefixes that were overwritten during merging.
-func (n *BartNode[V]) UnionRec(cloneFn value.CloneFunc[V], o *BartNode[V], depth int) (duplicates int) {
+func (n *BartNode[V]) UnionRec(cloneFn func(V) V, o *BartNode[V], depth int) (duplicates int) {
 	if cloneFn == nil {
 		cloneFn = value.CopyVal
 	}
@@ -1289,7 +1290,7 @@ func (n *BartNode[V]) UnionRec(cloneFn value.CloneFunc[V], o *BartNode[V], depth
 }
 
 // UnionRecPersist is similar to unionRec but performs an immutable union of nodes.
-func (n *BartNode[V]) UnionRecPersist(cloneFn value.CloneFunc[V], o *BartNode[V], depth int) (duplicates int) {
+func (n *BartNode[V]) UnionRecPersist(cloneFn func(V) V, o *BartNode[V], depth int) (duplicates int) {
 	if cloneFn == nil {
 		cloneFn = value.CopyVal
 	}
@@ -1340,7 +1341,7 @@ func (n *BartNode[V]) UnionRecPersist(cloneFn value.CloneFunc[V], o *BartNode[V]
 //	fringe, node    <-- insert new node, push this fringe down, union rec-descent
 //	fringe, leaf    <-- insert new node, push this fringe down, insert other leaf at depth+1
 //	fringe, fringe  <-- just overwrite value
-func (n *BartNode[V]) handleMatrix(cloneFn value.CloneFunc[V], thisExists bool, thisChild, otherChild any, addr uint8, depth int) int {
+func (n *BartNode[V]) handleMatrix(cloneFn func(V) V, thisExists bool, thisChild, otherChild any, addr uint8, depth int) int {
 	// Do ALL type assertions upfront - reduces line noise
 	var (
 		thisNode, thisIsNode     = thisChild.(*BartNode[V])
@@ -1457,7 +1458,7 @@ func (n *BartNode[V]) handleMatrix(cloneFn value.CloneFunc[V], thisExists bool, 
 //	fringe, node    <-- insert new node, push this fringe down, union rec-descent
 //	fringe, leaf    <-- insert new node, push this fringe down, insert other leaf at depth+1
 //	fringe, fringe  <-- just overwrite value
-func (n *BartNode[V]) handleMatrixPersist(cloneFn value.CloneFunc[V], thisExists bool, thisChild, otherChild any, addr uint8, depth int) int {
+func (n *BartNode[V]) handleMatrixPersist(cloneFn func(V) V, thisExists bool, thisChild, otherChild any, addr uint8, depth int) int {
 	// Do ALL type assertions upfront - reduces line noise
 	var (
 		thisNode, thisIsNode     = thisChild.(*BartNode[V])

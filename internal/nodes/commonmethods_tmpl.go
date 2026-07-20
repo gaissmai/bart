@@ -31,23 +31,23 @@ type _NODE_TYPE[V any] struct {
 	Children struct{ bitset.BitSet256 }
 }
 
-func (n *_NODE_TYPE[V]) IsEmpty() (_ bool)                               { return }
-func (n *_NODE_TYPE[V]) PrefixCount() (_ int)                            { return }
-func (n *_NODE_TYPE[V]) ChildCount() (_ int)                             { return }
-func (n *_NODE_TYPE[V]) MustGetPrefix(uint8) (_ V)                       { return }
-func (n *_NODE_TYPE[V]) MustGetChild(uint8) (_ any)                      { return }
-func (n *_NODE_TYPE[V]) InsertPrefix(uint8, V) (_ bool)                  { return }
-func (n *_NODE_TYPE[V]) DeletePrefix(uint8) (_ bool)                     { return }
-func (n *_NODE_TYPE[V]) GetChild(uint8) (_ any, _ bool)                  { return }
-func (n *_NODE_TYPE[V]) GetPrefix(uint8) (_ V, _ bool)                   { return }
-func (n *_NODE_TYPE[V]) InsertChild(uint8, any) (_ bool)                 { return }
-func (n *_NODE_TYPE[V]) DeleteChild(uint8) (_ bool)                      { return }
-func (n *_NODE_TYPE[V]) CloneRec(value.CloneFunc[V]) (_ *_NODE_TYPE[V])  { return }
-func (n *_NODE_TYPE[V]) CloneFlat(value.CloneFunc[V]) (_ *_NODE_TYPE[V]) { return }
-func (n *_NODE_TYPE[V]) AllIndices() (seq2 iter.Seq2[uint8, V])          { return }
-func (n *_NODE_TYPE[V]) AllChildren() (seq2 iter.Seq2[uint8, any])       { return }
-func (n *_NODE_TYPE[V]) Contains(uint8) (_ bool)                         { return }
-func (n *_NODE_TYPE[V]) LookupIdx(uint8) (_ uint8, _ V, _ bool)          { return }
+func (n *_NODE_TYPE[V]) IsEmpty() (_ bool)                         { return }
+func (n *_NODE_TYPE[V]) PrefixCount() (_ int)                      { return }
+func (n *_NODE_TYPE[V]) ChildCount() (_ int)                       { return }
+func (n *_NODE_TYPE[V]) MustGetPrefix(uint8) (_ V)                 { return }
+func (n *_NODE_TYPE[V]) MustGetChild(uint8) (_ any)                { return }
+func (n *_NODE_TYPE[V]) InsertPrefix(uint8, V) (_ bool)            { return }
+func (n *_NODE_TYPE[V]) DeletePrefix(uint8) (_ bool)               { return }
+func (n *_NODE_TYPE[V]) GetChild(uint8) (_ any, _ bool)            { return }
+func (n *_NODE_TYPE[V]) GetPrefix(uint8) (_ V, _ bool)             { return }
+func (n *_NODE_TYPE[V]) InsertChild(uint8, any) (_ bool)           { return }
+func (n *_NODE_TYPE[V]) DeleteChild(uint8) (_ bool)                { return }
+func (n *_NODE_TYPE[V]) CloneRec(func(V) V) (_ *_NODE_TYPE[V])     { return }
+func (n *_NODE_TYPE[V]) CloneFlat(func(V) V) (_ *_NODE_TYPE[V])    { return }
+func (n *_NODE_TYPE[V]) AllIndices() (seq2 iter.Seq2[uint8, V])    { return }
+func (n *_NODE_TYPE[V]) AllChildren() (seq2 iter.Seq2[uint8, any]) { return }
+func (n *_NODE_TYPE[V]) Contains(uint8) (_ bool)                   { return }
+func (n *_NODE_TYPE[V]) LookupIdx(uint8) (_ uint8, _ V, _ bool)    { return }
 
 // ### GENERATE DELETE END ###
 
@@ -165,7 +165,7 @@ func (n *_NODE_TYPE[V]) Insert(pfx netip.Prefix, val V, depth int) (exists bool)
 //   - depth: The current depth in the trie (0-based byte index).
 //
 // Returns true if an existing prefix was updated, false if a new insertion occurred.
-func (n *_NODE_TYPE[V]) InsertPersist(cloneFn value.CloneFunc[V], pfx netip.Prefix, val V, depth int) (exists bool) {
+func (n *_NODE_TYPE[V]) InsertPersist(cloneFn func(V) V, pfx netip.Prefix, val V, depth int) (exists bool) {
 	ip := pfx.Addr() // the pfx must be in canonical form
 	pfxLen := pfx.Bits()
 	octets := ip.AsSlice()
@@ -431,7 +431,7 @@ func (n *_NODE_TYPE[V]) Delete(pfx netip.Prefix) (exists bool) {
 //
 // After a successful deletion, PurgeAndCompress walks the ancestor stack to prune
 // now-empty nodes and restore path compression upward.
-func (n *_NODE_TYPE[V]) DeletePersist(cloneFn value.CloneFunc[V], pfx netip.Prefix) (exists bool) {
+func (n *_NODE_TYPE[V]) DeletePersist(cloneFn func(V) V, pfx netip.Prefix) (exists bool) {
 	ip := pfx.Addr() // pfx must be in canonical (masked) form
 	pfxLen := pfx.Bits()
 	is4 := ip.Is4()
@@ -1291,7 +1291,7 @@ func (n *_NODE_TYPE[V]) DirectItemsRec(parentIdx uint8, path StridePath, depth i
 // The merge operation is destructive on the receiver n, but leaves the source node o unchanged.
 //
 // Returns the number of duplicate prefixes that were overwritten during merging.
-func (n *_NODE_TYPE[V]) UnionRec(cloneFn value.CloneFunc[V], o *_NODE_TYPE[V], depth int) (duplicates int) {
+func (n *_NODE_TYPE[V]) UnionRec(cloneFn func(V) V, o *_NODE_TYPE[V], depth int) (duplicates int) {
 	if cloneFn == nil {
 		cloneFn = value.CopyVal
 	}
@@ -1324,7 +1324,7 @@ func (n *_NODE_TYPE[V]) UnionRec(cloneFn value.CloneFunc[V], o *_NODE_TYPE[V], d
 }
 
 // UnionRecPersist is similar to unionRec but performs an immutable union of nodes.
-func (n *_NODE_TYPE[V]) UnionRecPersist(cloneFn value.CloneFunc[V], o *_NODE_TYPE[V], depth int) (duplicates int) {
+func (n *_NODE_TYPE[V]) UnionRecPersist(cloneFn func(V) V, o *_NODE_TYPE[V], depth int) (duplicates int) {
 	if cloneFn == nil {
 		cloneFn = value.CopyVal
 	}
@@ -1375,7 +1375,7 @@ func (n *_NODE_TYPE[V]) UnionRecPersist(cloneFn value.CloneFunc[V], o *_NODE_TYP
 //	fringe, node    <-- insert new node, push this fringe down, union rec-descent
 //	fringe, leaf    <-- insert new node, push this fringe down, insert other leaf at depth+1
 //	fringe, fringe  <-- just overwrite value
-func (n *_NODE_TYPE[V]) handleMatrix(cloneFn value.CloneFunc[V], thisExists bool, thisChild, otherChild any, addr uint8, depth int) int {
+func (n *_NODE_TYPE[V]) handleMatrix(cloneFn func(V) V, thisExists bool, thisChild, otherChild any, addr uint8, depth int) int {
 	// Do ALL type assertions upfront - reduces line noise
 	var (
 		thisNode, thisIsNode     = thisChild.(*_NODE_TYPE[V])
@@ -1492,7 +1492,7 @@ func (n *_NODE_TYPE[V]) handleMatrix(cloneFn value.CloneFunc[V], thisExists bool
 //	fringe, node    <-- insert new node, push this fringe down, union rec-descent
 //	fringe, leaf    <-- insert new node, push this fringe down, insert other leaf at depth+1
 //	fringe, fringe  <-- just overwrite value
-func (n *_NODE_TYPE[V]) handleMatrixPersist(cloneFn value.CloneFunc[V], thisExists bool, thisChild, otherChild any, addr uint8, depth int) int {
+func (n *_NODE_TYPE[V]) handleMatrixPersist(cloneFn func(V) V, thisExists bool, thisChild, otherChild any, addr uint8, depth int) int {
 	// Do ALL type assertions upfront - reduces line noise
 	var (
 		thisNode, thisIsNode     = thisChild.(*_NODE_TYPE[V])

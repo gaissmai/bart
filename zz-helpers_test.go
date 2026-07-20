@@ -39,6 +39,9 @@ type MyInt int
 
 // implement the Clone method
 func (i *MyInt) Clone() *MyInt {
+	if i == nil {
+		return i
+	}
 	a := *i
 	return &a
 }

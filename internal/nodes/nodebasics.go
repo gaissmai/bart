@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/gaissmai/bart/internal/art"
-	"github.com/gaissmai/bart/internal/value"
 )
 
 // strideLen represents the byte stride length for the multibit trie.
@@ -312,7 +311,7 @@ func DivMod8(pfxLen int) (strideCount int, modBits uint8) {
 // If cloneFn is nil, the value is copied directly without modification.
 // Otherwise, cloneFn is applied to the value for deep cloning.
 // The prefix field is always copied as is.
-func (l *LeafNode[V]) CloneLeaf(cloneFn value.CloneFunc[V]) *LeafNode[V] {
+func (l *LeafNode[V]) CloneLeaf(cloneFn func(V) V) *LeafNode[V] {
 	if l == nil {
 		return nil
 	}
@@ -326,7 +325,7 @@ func (l *LeafNode[V]) CloneLeaf(cloneFn value.CloneFunc[V]) *LeafNode[V] {
 // CloneFringe creates and returns a copy of the FringeNode receiver.
 // If cloneFn is nil, the value is copied directly without modification.
 // Otherwise, cloneFn is applied to the value for deep cloning.
-func (l *FringeNode[V]) CloneFringe(cloneFn value.CloneFunc[V]) *FringeNode[V] {
+func (l *FringeNode[V]) CloneFringe(cloneFn func(V) V) *FringeNode[V] {
 	if l == nil {
 		return nil
 	}

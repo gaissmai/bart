@@ -14,6 +14,7 @@ import (
 	"github.com/gaissmai/bart/internal/art"
 	"github.com/gaissmai/bart/internal/tests/golden"
 	"github.com/gaissmai/bart/internal/tests/random"
+	"github.com/gaissmai/bart/internal/value"
 )
 
 func TestLiteNode_EmptyState(t *testing.T) {
@@ -968,7 +969,7 @@ func TestLiteNode_OverlapsIdx(t *testing.T) {
 func TestLiteNode_UnionRec_AllCombinations(t *testing.T) {
 	t.Parallel()
 
-	cloneFn := cloneFnFactory[int]()
+	cloneFn := value.CloneFnFactory[int]()
 
 	t.Run("null_plus_node", func(t *testing.T) {
 		t.Parallel()
@@ -1321,7 +1322,7 @@ func TestLiteNode_UnionRec_AllCombinations(t *testing.T) {
 func TestLiteNode_UnionRecPersist_AllCombinations(t *testing.T) {
 	t.Parallel()
 
-	cloneFn := cloneFnFactory[int]()
+	cloneFn := value.CloneFnFactory[int]()
 
 	t.Run("null_plus_node_persist", func(t *testing.T) {
 		t.Parallel()

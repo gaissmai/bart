@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/gaissmai/bart/internal/art"
-	"github.com/gaissmai/bart/internal/value"
 )
 
 // helpers
@@ -20,30 +19,6 @@ func workLoadN() int {
 		return 100
 	}
 	return 1_000
-}
-
-// cloneFnFactory returns a CloneFunc.
-// If V implements Cloner[V], the returned function should perform
-// a deep copy using Clone(), otherwise it returns nil.
-func cloneFnFactory[V any]() value.CloneFunc[V] {
-	var zero V
-	// you can't assert directly on a type parameter
-	if _, ok := any(zero).(value.Cloner[V]); ok {
-		return cloneVal[V]
-	}
-	return nil
-}
-
-// cloneVal returns a deep clone of val by calling its Clone method when
-// val implements Cloner[V]. If val does not implement Cloner[V] or the
-// asserted Cloner is nil, val is returned unchanged.
-func cloneVal[V any](val V) V {
-	// you can't assert directly on a type parameter
-	c, ok := any(val).(value.Cloner[V])
-	if !ok || c == nil {
-		return val
-	}
-	return c.Clone()
 }
 
 var mpp = func(s string) netip.Prefix {

@@ -42,81 +42,42 @@ func IsZST[V any]() bool {
 	return reflect.TypeFor[V]().Size() == 0
 }
 
-// Equaler is a generic interface for types that can decide their own
-// equality logic. It can be used to override the potentially expensive
-// default comparison with [reflect.DeepEqual].
-type Equaler[V any] interface {
-	Equal(other V) bool
-}
-
 // Equal compares two values of type V for equality.
 //
-// If V implements Equaler[V], its custom equality method is used to
-// avoid the potentially expensive [reflect.DeepEqual]. As a safety measure,
-// if v1 is a typed nil pointer, Equal gracefully falls back to a fast,
-// direct interface comparison to prevent nil receiver panics.
+// If V implements an Equal(V) bool method, its custom equality logic is used.
+// Otherwise, it falls back to [reflect.DeepEqual].
 //
-// If V does not implement Equaler[V], [reflect.DeepEqual] is used as a fallback.
+// Note: If V implements Equal(V) bool with a pointer receiver, the Equal
+// method should handle nil receivers gracefully.
 func Equal[V any](v1, v2 V) bool {
-	if eq, ok := any(v1).(Equaler[V]); ok {
-
-		// Guard against typed nil pointers wrapped in the interface.
-		// Calling Equal on a typed nil might panic if not handled by the receiver.
-		rv := reflect.ValueOf(eq) // Avoid re-boxing v1
-		if rv.Kind() == reflect.Pointer && rv.IsNil() {
-			return any(v1) == any(v2) // Fast path for nil pointers
-		}
+	if eq, ok := any(v1).(interface{ Equal(V) bool }); ok {
 		return eq.Equal(v2)
 	}
 
-	// fallback
 	return reflect.DeepEqual(v1, v2)
 }
 
-// Cloner is an interface that enables deep cloning of values of type V.
-// If a value implements Cloner[V], Table methods such as InsertPersist,
-// ModifyPersist, DeletePersist, UnionPersist, Union and Clone will use
-// its Clone method to perform deep copies.
-type Cloner[V any] interface {
-	Clone() V
-}
-
-// CloneFunc is a type definition for a function that takes a value of type V
-// and returns the (possibly cloned) value of type V.
-type CloneFunc[V any] func(V) V
-
-// CloneFnFactory returns a CloneFunc.
-// If V implements Cloner[V], the returned function should perform
-// a deep copy using Clone(), otherwise it returns nil.
-func CloneFnFactory[V any]() CloneFunc[V] {
-	// Safely check if the type V implements Cloner[V] using modern Go reflection.
-	// This avoids instantiating values or triggering strictly nil interface bugs.
-	if reflect.TypeFor[V]().Implements(reflect.TypeFor[Cloner[V]]()) {
-		return CloneVal[V]
-	}
-	return nil
-}
-
-// CloneVal returns a deep clone of val by calling its Clone method
-// if val implements [Cloner].
+// CloneFnFactory returns a function that takes a value of type V and returns
+// a copy by calling its Clone method.
 //
-// If val does not implement the interface, or if it is a typed nil pointer,
-// CloneVal safely returns val unchanged to prevent potential nil receiver panics.
-func CloneVal[V any](val V) V {
-	if c, ok := any(val).(Cloner[V]); ok {
+// If V does not implement a Clone() V method, it returns nil.
+//
+// Note: If V implements Clone() V with a pointer receiver, the Clone
+// method should handle nil receivers gracefully.
+func CloneFnFactory[V any]() func(V) V {
+	var zero V
 
-		// A typed nil pointer inside an interface makes the interface itself non-nil.
-		// We must use reflection to safely determine if the underlying value is nil.
-		rv := reflect.ValueOf(c) // Avoid re-boxing val
-		if rv.Kind() == reflect.Pointer && rv.IsNil() {
-			return val
+	// Safely check if V implements the clone method using an inline interface.
+	if _, ok := any(zero).(interface{ Clone() V }); ok {
+		// Return an anonymous closure directly.
+		// Since we already proved V implements the interface above,
+		// the direct type assertion here is guaranteed to succeed.
+		return func(val V) V {
+			return any(val).(interface{ Clone() V }).Clone()
 		}
-
-		return c.Clone()
 	}
 
-	// fallback
-	return val
+	return nil
 }
 
 // CopyVal just copies the value of any type V.

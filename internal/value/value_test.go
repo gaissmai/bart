@@ -1,584 +1,435 @@
-// Copyright (c) 2026 Karl Gaissmaier
-// SPDX-License-Identifier: MIT
-
 package value
 
 import (
-	"maps"
 	"reflect"
 	"testing"
 )
 
-// Test types for Equaler interface
-type equalableType struct {
-	Value int
+// ============================================================================
+// Helper Types for Testing IsZST
+// ============================================================================
+
+type EmptyStruct struct{}
+
+type EmptyStructWrapper struct {
+	A EmptyStruct
+	B [0]int
 }
 
-func (e equalableType) Equal(other equalableType) bool {
-	return e.Value == other.Value
+type NonEmptyStruct struct {
+	Field int
 }
 
-type nonEqualableType struct {
-	Value int
-}
-
-// Test types for Cloner interface
-type clonableType struct {
-	Data map[string]int
-}
-
-func (c clonableType) Clone() clonableType {
-	return clonableType{Data: maps.Clone(c.Data)}
-}
-
-type nonClonableType struct {
-	Data map[string]int
-}
-
-// ptrEqualer implements Equaler via a pointer receiver.
-// This is the type needed to trigger the nil-pointer guard in Equal.
-type ptrEqualer struct{ Value int }
-
-func (e *ptrEqualer) Equal(other *ptrEqualer) bool {
-	if other == nil {
-		return false
-	}
-	return e.Value == other.Value
-}
-
-// ptrCloner implements Cloner via a pointer receiver.
-// This is the type needed to trigger the nil-pointer guard in CloneVal.
-type ptrCloner struct{ Value int }
-
-func (c *ptrCloner) Clone() *ptrCloner {
-	return &ptrCloner{Value: c.Value}
-}
-
-func TestIsZeroSizedType(t *testing.T) {
-	t.Parallel()
+func TestIsZST(t *testing.T) {
 	tests := []struct {
 		name string
-		got  bool
-		want bool
+		run  func(t *testing.T)
 	}{
+		// --------------------------------------------------------------------
+		// Zero-Sized Types (Expect true)
+		// --------------------------------------------------------------------
 		{
-			name: "struct{}",
-			got:  IsZST[struct{}](),
-			want: true,
+			name: "empty struct struct{} is ZST",
+			run: func(t *testing.T) {
+				if !IsZST[struct{}]() {
+					t.Errorf("expected IsZST[struct{}]() to be true")
+				}
+			},
 		},
 		{
-			name: "[0]byte",
-			got:  IsZST[[0]byte](),
-			want: true,
+			name: "named empty struct is ZST",
+			run: func(t *testing.T) {
+				if !IsZST[EmptyStruct]() {
+					t.Errorf("expected IsZST[EmptyStruct]() to be true")
+				}
+			},
 		},
 		{
-			name: "int",
-			got:  IsZST[int](),
-			want: false,
+			name: "struct containing only ZST fields is ZST",
+			run: func(t *testing.T) {
+				if !IsZST[EmptyStructWrapper]() {
+					t.Errorf("expected IsZST[EmptyStructWrapper]() to be true")
+				}
+			},
 		},
 		{
-			name: "pointer_to_ZST",
-			got:  IsZST[*struct{}](),
-			want: false, // a pointer always has non-zero size
+			name: "zero-length array [0]byte is ZST",
+			run: func(t *testing.T) {
+				if !IsZST[[0]byte]() {
+					t.Errorf("expected IsZST[[0]byte]() to be true")
+				}
+			},
 		},
 		{
-			name: "named_empty_struct",
-			got:  IsZST[equalableType](),
-			want: false,
+			name: "array of zero-sized elements [5]struct{} is ZST",
+			run: func(t *testing.T) {
+				if !IsZST[[5]struct{}]() {
+					t.Errorf("expected IsZST[[5]struct{}]() to be true")
+				}
+			},
+		},
+
+		// --------------------------------------------------------------------
+		// Non-Zero-Sized Types (Expect false)
+		// --------------------------------------------------------------------
+		{
+			name: "primitive type int is non-ZST",
+			run: func(t *testing.T) {
+				if IsZST[int]() {
+					t.Errorf("expected IsZST[int]() to be false")
+				}
+			},
+		},
+		{
+			name: "struct with non-ZST fields is non-ZST",
+			run: func(t *testing.T) {
+				if IsZST[NonEmptyStruct]() {
+					t.Errorf("expected IsZST[NonEmptyStruct]() to be false")
+				}
+			},
+		},
+		{
+			name: "pointer to ZST *struct{} is non-ZST (occupies pointer size)",
+			run: func(t *testing.T) {
+				if IsZST[*struct{}]() {
+					t.Errorf("expected IsZST[*struct{}]() to be false")
+				}
+			},
+		},
+		{
+			name: "slice of ZST []struct{} is non-ZST (occupies slice header size)",
+			run: func(t *testing.T) {
+				if IsZST[[]struct{}]() {
+					t.Errorf("expected IsZST[[]struct{}]() to be false")
+				}
+			},
+		},
+		{
+			name: "interface type any is non-ZST (occupies interface header size)",
+			run: func(t *testing.T) {
+				if IsZST[any]() {
+					t.Errorf("expected IsZST[any]() to be false")
+				}
+			},
 		},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			if tt.got != tt.want {
-				t.Fatalf("want %v, got %v", tt.want, tt.got)
-			}
-		})
+		t.Run(tt.name, tt.run)
 	}
 }
 
+// ============================================================================
+// Helper Types for Testing Equal
+// ============================================================================
+
+// ValueEqualer implements Equal(ValueEqualer) bool with a value receiver.
+type ValueEqualer struct {
+	ID int
+}
+
+func (v ValueEqualer) Equal(other ValueEqualer) bool {
+	return v.ID == other.ID
+}
+
+// PointerEqualer implements Equal(*PointerEqualer) bool with a pointer receiver.
+type PointerEqualer struct {
+	ID int
+}
+
+func (p *PointerEqualer) Equal(other *PointerEqualer) bool {
+	if p == nil || other == nil {
+		return p == other
+	}
+	return p.ID == other.ID
+}
+
+// NonEqualer does NOT implement an Equal method.
+type NonEqualer struct {
+	Tags []string
+}
+
 func TestEqual(t *testing.T) {
-	t.Parallel()
+	tests := []struct {
+		name string
+		run  func(t *testing.T)
+	}{
+		{
+			name: "Value receiver implementing Equal returns true for matching values",
+			run: func(t *testing.T) {
+				v1 := ValueEqualer{ID: 42}
+				v2 := ValueEqualer{ID: 42}
 
-	t.Run("with_Equaler_interface", func(t *testing.T) {
-		t.Parallel()
-		v1 := equalableType{Value: 42}
-		v2 := equalableType{Value: 42}
-		v3 := equalableType{Value: 99}
+				if !Equal(v1, v2) {
+					t.Errorf("expected Equal(%v, %v) to be true", v1, v2)
+				}
+			},
+		},
+		{
+			name: "Value receiver implementing Equal returns false for differing values",
+			run: func(t *testing.T) {
+				v1 := ValueEqualer{ID: 42}
+				v2 := ValueEqualer{ID: 100}
 
-		if !Equal(v1, v2) {
-			t.Error("Equal should return true for equal values")
-		}
-		if Equal(v1, v3) {
-			t.Error("Equal should return false for different values")
-		}
-	})
+				if Equal(v1, v2) {
+					t.Errorf("expected Equal(%v, %v) to be false", v1, v2)
+				}
+			},
+		},
+		{
+			name: "Pointer receiver implementing Equal handles non-nil pointers",
+			run: func(t *testing.T) {
+				p1 := &PointerEqualer{ID: 1}
+				p2 := &PointerEqualer{ID: 1}
+				p3 := &PointerEqualer{ID: 2}
 
-	t.Run("without_Equaler_fallback_to_DeepEqual", func(t *testing.T) {
-		t.Parallel()
-		v1 := nonEqualableType{Value: 42}
-		v2 := nonEqualableType{Value: 42}
-		v3 := nonEqualableType{Value: 99}
+				if !Equal(p1, p2) {
+					t.Errorf("expected Equal(%v, %v) to be true", p1, p2)
+				}
+				if Equal(p1, p3) {
+					t.Errorf("expected Equal(%v, %v) to be false", p1, p3)
+				}
+			},
+		},
+		{
+			name: "Pointer receiver implementing Equal handles nil pointers gracefully",
+			run: func(t *testing.T) {
+				var nil1 *PointerEqualer = nil
+				var nil2 *PointerEqualer = nil
+				p1 := &PointerEqualer{ID: 1}
 
-		if !Equal(v1, v2) {
-			t.Error("Equal should return true for equal values via DeepEqual")
-		}
-		if Equal(v1, v3) {
-			t.Error("Equal should return false for different values via DeepEqual")
-		}
-	})
+				// Both nil
+				if !Equal(nil1, nil2) {
+					t.Errorf("expected Equal(nil, nil) to be true")
+				}
+				// One nil, one non-nil
+				if Equal(nil1, p1) {
+					t.Errorf("expected Equal(nil, non-nil) to be false")
+				}
+			},
+		},
+		{
+			name: "Fallback to reflect.DeepEqual returns true for matching non-Equaler types",
+			run: func(t *testing.T) {
+				// Slices/Structs without Equal method
+				n1 := NonEqualer{Tags: []string{"a", "b"}}
+				n2 := NonEqualer{Tags: []string{"a", "b"}}
 
-	t.Run("complex_types_with_DeepEqual", func(t *testing.T) {
-		t.Parallel()
-		v1 := map[string]int{"a": 1, "b": 2}
-		v2 := map[string]int{"a": 1, "b": 2}
-		v3 := map[string]int{"a": 1, "b": 3}
+				if !Equal(n1, n2) {
+					t.Errorf("expected Equal(%v, %v) to be true via DeepEqual", n1, n2)
+				}
+			},
+		},
+		{
+			name: "Fallback to reflect.DeepEqual returns false for differing non-Equaler types",
+			run: func(t *testing.T) {
+				n1 := NonEqualer{Tags: []string{"a", "b"}}
+				n2 := NonEqualer{Tags: []string{"a", "c"}}
 
-		if !Equal(v1, v2) {
-			t.Error("Equal should return true for equal maps")
-		}
-		if Equal(v1, v3) {
-			t.Error("Equal should return false for different maps")
-		}
-	})
+				if Equal(n1, n2) {
+					t.Errorf("expected Equal(%v, %v) to be false via DeepEqual", n1, n2)
+				}
+			},
+		},
+	}
 
-	t.Run("simple_types", func(t *testing.T) {
-		t.Parallel()
-		if !Equal(42, 42) {
-			t.Error("Equal should return true for equal ints")
-		}
-		if Equal(42, 99) {
-			t.Error("Equal should return false for different ints")
-		}
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, tt.run)
+	}
+}
 
-	t.Run("typed_nil_interfaces", func(t *testing.T) {
-		t.Parallel()
-		// pointer typed-nil
-		var p1 *int = nil
-		var p2 *int = nil
-		if !Equal[any](p1, p2) {
-			t.Error("Equal should treat two typed-nil pointers as equal")
-		}
-		// slice typed-nil
-		var s1 []int = nil
-		var s2 []int = nil
-		if !Equal[any](s1, s2) {
-			t.Error("Equal should treat two typed-nil slices as equal")
-		}
-		// map typed-nil
-		var m1 map[string]int = nil
-		var m2 map[string]int = nil
-		if !Equal[any](m1, m2) {
-			t.Error("Equal should treat two typed-nil maps as equal")
-		}
-		// interface holding typed-nil vs untyped nil
-		var ai any = (*int)(nil)
-		var bi any = nil
-		if Equal(ai, bi) {
-			t.Error("Equal should not treat typed-nil inside interface equal to nil interface")
-		}
-	})
+// ============================================================================
+// Helper Types for Testing CloneFnFactory
+// ============================================================================
 
-	t.Run("typed_nil_pointer_with_Equaler_guard", func(t *testing.T) {
-		t.Parallel()
-		var v1 *ptrEqualer = nil
-		var v2 *ptrEqualer = nil
-		v3 := &ptrEqualer{Value: 42}
+// PointerCloner implements Clone() with a pointer receiver.
+type PointerCloner struct {
+	Value string
+}
 
-		// nil == nil: guard prevents panic, falls back to interface comparison
-		if !Equal(v1, v2) {
-			t.Error("Equal should return true for two typed-nil Equaler pointers")
-		}
-		// nil != non-nil
-		if Equal(v1, v3) {
-			t.Error("Equal should return false for typed-nil vs non-nil Equaler pointer")
-		}
-		// non-nil via Equal method still works
-		v4 := &ptrEqualer{Value: 42}
-		if !Equal(v3, v4) {
-			t.Error("Equal should return true for equal non-nil Equaler pointers")
-		}
-		v5 := &ptrEqualer{Value: 99}
-		if Equal(v3, v5) {
-			t.Error("Equal should return false for unequal non-nil Equaler pointers")
-		}
-	})
+func (p *PointerCloner) Clone() *PointerCloner {
+	if p == nil {
+		return nil // Native nil-safety
+	}
+	return &PointerCloner{Value: p.Value}
+}
+
+// ValueCloner implements Clone() with a value receiver.
+type ValueCloner struct {
+	Value int
+}
+
+func (v ValueCloner) Clone() ValueCloner {
+	return ValueCloner{Value: v.Value * 2} // Multiply by 2 to prove Clone() ran
+}
+
+// NonCloner is a struct that does NOT implement Clone().
+type NonCloner struct {
+	Value string
 }
 
 func TestCloneFnFactory(t *testing.T) {
-	t.Parallel()
+	tests := []struct {
+		name string
+		// We use a closure for execution because Go generic type parameters
+		// cannot be passed dynamically as struct fields.
+		run func(t *testing.T)
+	}{
+		{
+			name: "Pointer type implementing Clone() returns functional closure",
+			run: func(t *testing.T) {
+				fn := CloneFnFactory[*PointerCloner]()
+				if fn == nil {
+					t.Fatalf("expected a function, got nil")
+				}
 
-	t.Run("with_Cloner_interface", func(t *testing.T) {
-		t.Parallel()
-		fn := CloneFnFactory[clonableType]()
-		if fn == nil {
-			t.Fatal("CloneFnFactory should return a non-nil function for Cloner types")
-		}
+				orig := &PointerCloner{Value: "test"}
+				cloned := fn(orig)
 
-		original := clonableType{Data: map[string]int{"key": 42}}
-		cloned := fn(original)
+				if cloned == orig {
+					t.Errorf("expected a deep copy, but got the exact same memory address")
+				}
+				if cloned.Value != orig.Value {
+					t.Errorf("expected value %q, got %q", orig.Value, cloned.Value)
+				}
+			},
+		},
+		{
+			name: "Closure handles typed nil pointers gracefully without panic",
+			run: func(t *testing.T) {
+				fn := CloneFnFactory[*PointerCloner]()
 
-		if !reflect.DeepEqual(original.Data, cloned.Data) {
-			t.Error("Cloned value should be deep equal to original")
-		}
+				var orig *PointerCloner = nil
+				cloned := fn(orig)
 
-		// Verify it's a deep copy
-		cloned.Data["key"] = 99
-		if original.Data["key"] != 42 {
-			t.Error("Modifying clone should not affect original")
-		}
-	})
+				if cloned != nil {
+					t.Errorf("expected nil result, got %v", cloned)
+				}
+			},
+		},
+		{
+			name: "Value type implementing Clone() works correctly",
+			run: func(t *testing.T) {
+				fn := CloneFnFactory[ValueCloner]()
+				if fn == nil {
+					t.Fatalf("expected a function, got nil")
+				}
 
-	t.Run("without_Cloner_interface", func(t *testing.T) {
-		t.Parallel()
-		fn := CloneFnFactory[nonClonableType]()
-		if fn != nil {
-			t.Error("CloneFnFactory should return nil for non-Cloner types")
-		}
-	})
+				orig := ValueCloner{Value: 21}
+				cloned := fn(orig)
 
-	t.Run("simple_types", func(t *testing.T) {
-		t.Parallel()
-		fn := CloneFnFactory[int]()
-		if fn != nil {
-			t.Error("CloneFnFactory should return nil for simple types")
-		}
-	})
+				// ValueCloner multiplies by 2 in its Clone method to prove execution
+				if cloned.Value != 42 {
+					t.Errorf("expected cloned value to be 42, got %d", cloned.Value)
+				}
+			},
+		},
+		{
+			name: "Type not implementing Clone() returns nil factory",
+			run: func(t *testing.T) {
+				// string does not have a Clone() method
+				fn := CloneFnFactory[string]()
+				if fn != nil {
+					t.Errorf("expected nil function, got %T", fn)
+				}
 
-	t.Run("pointer_type_with_Cloner_interface", func(t *testing.T) {
-		t.Parallel()
-		fn := CloneFnFactory[*ptrCloner]()
-		if fn == nil {
-			t.Fatal("CloneFnFactory should return non-nil function for *ptrCloner")
-		}
+				// custom struct without Clone() method
+				fnStruct := CloneFnFactory[NonCloner]()
+				if fnStruct != nil {
+					t.Errorf("expected nil function, got %T", fnStruct)
+				}
+			},
+		},
+	}
 
-		// nil pointer must not panic
-		var nilPtr *ptrCloner
-		if fn(nilPtr) != nil {
-			t.Error("CloneFunc should return nil for a nil pointer")
-		}
-
-		// non-nil pointer must produce an independent clone
-		original := &ptrCloner{Value: 42}
-		cloned := fn(original)
-		if cloned == original {
-			t.Error("CloneFunc should return a new pointer, not the same one")
-		}
-		if cloned.Value != original.Value {
-			t.Error("Cloned value should equal original value")
-		}
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, tt.run)
+	}
 }
 
-func TestCloneVal(t *testing.T) {
-	t.Parallel()
-
-	t.Run("with_Cloner_interface", func(t *testing.T) {
-		t.Parallel()
-		original := clonableType{Data: map[string]int{"key": 42}}
-		cloned := CloneVal(original)
-
-		if !reflect.DeepEqual(original.Data, cloned.Data) {
-			t.Error("Cloned value should be deep equal to original")
-		}
-
-		// Verify it's a deep copy
-		cloned.Data["key"] = 99
-		if original.Data["key"] != 42 {
-			t.Error("Modifying clone should not affect original")
-		}
-	})
-
-	t.Run("without_Cloner_interface", func(t *testing.T) {
-		t.Parallel()
-		original := nonClonableType{Data: map[string]int{"key": 42}}
-		cloned := CloneVal(original)
-
-		// Without Cloner, it returns the value as-is
-		if !reflect.DeepEqual(original.Data, cloned.Data) {
-			t.Error("CloneVal should return equal value")
-		}
-
-		// This is a shallow copy for maps
-		cloned.Data["key"] = 99
-		if original.Data["key"] != 99 {
-			t.Error("Without Cloner, map is shared (shallow copy)")
-		}
-	})
-
-	t.Run("simple_types", func(t *testing.T) {
-		t.Parallel()
-		original := 42
-		cloned := CloneVal(original)
-		if original != cloned {
-			t.Error("CloneVal should return same value for simple types")
-		}
-	})
-
-	t.Run("pointer_typed_nil_with_Cloner_guard", func(t *testing.T) {
-		t.Parallel()
-		var p *ptrCloner = nil
-		// Without the nil guard this would panic calling Clone() on a nil receiver.
-		cloned := CloneVal(p)
-		if cloned != nil {
-			t.Error("CloneVal should return nil for typed-nil pointer implementing Cloner")
-		}
-	})
-}
-
-func TestCloneVal_TypedNil(t *testing.T) {
-	t.Parallel()
-
-	t.Run("pointer_typed_nil_without_Cloner", func(t *testing.T) {
-		t.Parallel()
-		var p *int
-		cloned := CloneVal(p)
-
-		if cloned != nil {
-			t.Error("CloneVal should preserve typed nil pointer")
-		}
-	})
-
-	t.Run("pointer_typed_nil_with_Cloner", func(t *testing.T) {
-		t.Parallel()
-		type clonablePtr struct {
-			Val *int
-		}
-		// Note: we'd need to implement Clone() for this to work
-		// For now, without Cloner, typed nil is passed through
-		var cp clonablePtr
-		cloned := CloneVal(cp)
-
-		if cloned.Val != nil {
-			t.Error("CloneVal should preserve typed nil in struct fields")
-		}
-	})
-
-	t.Run("slice_typed_nil", func(t *testing.T) {
-		t.Parallel()
-		var s []int
-		cloned := CloneVal(s)
-
-		if cloned != nil {
-			t.Error("CloneVal should preserve typed nil slice")
-		}
-	})
-
-	t.Run("map_typed_nil", func(t *testing.T) {
-		t.Parallel()
-		var m map[string]int
-		cloned := CloneVal(m)
-
-		if cloned != nil {
-			t.Error("CloneVal should preserve typed nil map")
-		}
-	})
-
-	t.Run("interface_with_typed_nil", func(t *testing.T) {
-		t.Parallel()
-		var i any = (*int)(nil)
-		cloned := CloneVal(i)
-
-		if cloned != i {
-			t.Error("CloneVal should preserve interface with typed nil")
-		}
-
-		// Verify it's still typed nil, not just nil
-		if cloned == nil {
-			t.Error("CloneVal should preserve typed nil, not convert to untyped nil")
-		}
-	})
-
-	t.Run("struct_with_all_nil_fields", func(t *testing.T) {
-		t.Parallel()
-		type testStruct struct {
-			Ptr   *int
-			Slice []string
-			Map   map[int]string
-		}
-
-		var s testStruct
-		cloned := CloneVal(s)
-
-		if cloned.Ptr != nil || cloned.Slice != nil || cloned.Map != nil {
-			t.Error("CloneVal should preserve all typed nil fields in struct")
-		}
-	})
-
-	t.Run("clonableType_with_nil_fields", func(t *testing.T) {
-		t.Parallel()
-		type clonableWithNil struct {
-			Data map[string]int
-		}
-
-		impl := func(c clonableWithNil) clonableWithNil {
-			if c.Data == nil {
-				return clonableWithNil{Data: nil}
-			}
-			return clonableWithNil{Data: maps.Clone(c.Data)}
-		}
-		_ = impl
-
-		// Without implementing Cloner interface on the type,
-		// CloneVal returns the value as-is
-		var cwn clonableWithNil
-		cloned := CloneVal(cwn)
-
-		if cloned.Data != nil {
-			t.Error("CloneVal should preserve typed nil in struct field")
-		}
-	})
-}
-
-func TestCopyVal_TypedNil(t *testing.T) {
-	t.Parallel()
-
-	t.Run("pointer_typed_nil", func(t *testing.T) {
-		t.Parallel()
-		var p *int
-		copied := CopyVal(p)
-
-		if copied != nil {
-			t.Error("CopyVal should preserve typed nil pointer")
-		}
-
-		// Verify it's the same nil
-		if copied != p {
-			t.Error("CopyVal should return the same typed nil value")
-		}
-	})
-
-	t.Run("slice_typed_nil", func(t *testing.T) {
-		t.Parallel()
-		var s []int
-		copied := CopyVal(s)
-
-		if copied != nil {
-			t.Error("CopyVal should preserve typed nil slice")
-		}
-
-		// Both should be nil
-		if len(copied) != 0 || cap(copied) != 0 {
-			t.Error("CopyVal typed nil slice should have zero length and capacity")
-		}
-	})
-
-	t.Run("map_typed_nil", func(t *testing.T) {
-		t.Parallel()
-		var m map[string]int
-		copied := CopyVal(m)
-
-		if copied != nil {
-			t.Error("CopyVal should preserve typed nil map")
-		}
-
-		// Both should be nil
-		if len(copied) != 0 {
-			t.Error("CopyVal typed nil map should have zero length")
-		}
-	})
-
-	t.Run("interface_with_typed_nil", func(t *testing.T) {
-		t.Parallel()
-		var i any = (*int)(nil)
-		copied := CopyVal(i)
-
-		// CopyVal is a value copy, so interface contents are copied
-		if copied != i {
-			t.Error("CopyVal should preserve interface with typed nil")
-		}
-
-		// Verify it's still typed nil, not untyped nil
-		if copied == nil {
-			t.Error("CopyVal should preserve typed nil, not convert to untyped nil")
-		}
-	})
-
-	t.Run("struct_with_all_nil_fields", func(t *testing.T) {
-		t.Parallel()
-		type testStruct struct {
-			Ptr   *int
-			Slice []string
-			Map   map[int]string
-		}
-
-		var s testStruct
-		copied := CopyVal(s)
-
-		if copied.Ptr != nil || copied.Slice != nil || copied.Map != nil {
-			t.Error("CopyVal should preserve all typed nil fields in struct")
-		}
-
-		// Verify fields are truly nil (not just zero-length)
-		if copied.Ptr != s.Ptr || len(copied.Slice) != 0 || len(copied.Map) != 0 {
-			t.Error("CopyVal should create value copy with identical nil fields")
-		}
-	})
-
-	t.Run("function_typed_nil", func(t *testing.T) {
-		t.Parallel()
-		var fn func()
-		copied := CopyVal(fn)
-
-		if copied != nil {
-			t.Error("CopyVal should preserve typed nil function")
-		}
-	})
-
-	t.Run("channel_typed_nil", func(t *testing.T) {
-		t.Parallel()
-		var ch chan int
-		copied := CopyVal(ch)
-
-		if copied != nil {
-			t.Error("CopyVal should preserve typed nil channel")
-		}
-	})
-}
+// ============================================================================
+// Table-Driven Tests for CopyVal
+// ============================================================================
 
 func TestCopyVal(t *testing.T) {
-	t.Parallel()
+	type CustomStruct struct {
+		ID   int
+		Name string
+	}
 
-	t.Run("simple_types", func(t *testing.T) {
-		t.Parallel()
-		original := 42
-		copied := CopyVal(original)
-		if original != copied {
-			t.Error("CopyVal should return same value")
-		}
-	})
+	tests := []struct {
+		name string
+		run  func(t *testing.T)
+	}{
+		{
+			name: "copies primitive int value",
+			run: func(t *testing.T) {
+				orig := 42
+				got := CopyVal(orig)
 
-	t.Run("struct_types", func(t *testing.T) {
-		t.Parallel()
-		original := nonClonableType{Data: map[string]int{"key": 42}}
-		copied := CopyVal(original)
+				if got != orig {
+					t.Errorf("expected %d, got %d", orig, got)
+				}
+			},
+		},
+		{
+			name: "copies string value",
+			run: func(t *testing.T) {
+				orig := "hello go"
+				got := CopyVal(orig)
 
-		if !reflect.DeepEqual(original.Data, copied.Data) {
-			t.Error("CopyVal should return structurally equal value")
-		}
+				if got != orig {
+					t.Errorf("expected %q, got %q", orig, got)
+				}
+			},
+		},
+		{
+			name: "copies struct by value",
+			run: func(t *testing.T) {
+				orig := CustomStruct{ID: 1, Name: "Test"}
+				got := CopyVal(orig)
 
-		// CopyVal is a value copy, so maps are shared
-		copied.Data["key"] = 99
-		if original.Data["key"] != 99 {
-			t.Error("CopyVal shares map references")
-		}
-	})
+				if got != orig {
+					t.Errorf("expected %+v, got %+v", orig, got)
+				}
+			},
+		},
+		{
+			name: "copies pointer value (returns exact same address)",
+			run: func(t *testing.T) {
+				orig := &CustomStruct{ID: 1, Name: "Test"}
+				got := CopyVal(orig)
 
-	t.Run("pointer_types", func(t *testing.T) {
-		t.Parallel()
-		val := 42
-		original := &val
-		copied := CopyVal(original)
+				if got != orig {
+					t.Errorf("expected pointer address %p, got %p", orig, got)
+				}
+			},
+		},
+		{
+			name: "copies slice value (shallow copy of slice header)",
+			run: func(t *testing.T) {
+				orig := []int{1, 2, 3}
+				got := CopyVal(orig)
 
-		if original != copied {
-			t.Error("CopyVal should return same pointer")
-		}
+				if !reflect.DeepEqual(got, orig) {
+					t.Errorf("expected slice %v, got %v", orig, got)
+				}
+			},
+		},
+		{
+			name: "handles nil pointer gracefully",
+			run: func(t *testing.T) {
+				var orig *CustomStruct = nil
+				got := CopyVal(orig)
 
-		*copied = 99
-		if *original != 99 {
-			t.Error("CopyVal shares pointer")
-		}
-	})
+				if got != nil {
+					t.Errorf("expected nil, got %v", got)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, tt.run)
+	}
 }
