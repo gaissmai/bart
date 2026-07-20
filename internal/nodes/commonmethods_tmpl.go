@@ -1293,7 +1293,7 @@ func (n *_NODE_TYPE[V]) DirectItemsRec(parentIdx uint8, path StridePath, depth i
 // Returns the number of duplicate prefixes that were overwritten during merging.
 func (n *_NODE_TYPE[V]) UnionRec(cloneFn func(V) V, o *_NODE_TYPE[V], depth int) (duplicates int) {
 	if cloneFn == nil {
-		cloneFn = value.CopyVal
+		cloneFn = func(v V) V { return v }
 	}
 
 	buf := [256]uint8{}
@@ -1326,7 +1326,7 @@ func (n *_NODE_TYPE[V]) UnionRec(cloneFn func(V) V, o *_NODE_TYPE[V], depth int)
 // UnionRecPersist is similar to unionRec but performs an immutable union of nodes.
 func (n *_NODE_TYPE[V]) UnionRecPersist(cloneFn func(V) V, o *_NODE_TYPE[V], depth int) (duplicates int) {
 	if cloneFn == nil {
-		cloneFn = value.CopyVal
+		cloneFn = func(v V) V { return v }
 	}
 
 	buf := [256]uint8{}

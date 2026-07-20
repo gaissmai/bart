@@ -79,8 +79,3 @@ func CloneFnFactory[V any]() func(V) V {
 
 	return nil
 }
-
-// CopyVal just copies the value of any type V.
-func CopyVal[V any](val V) V {
-	return val
-}

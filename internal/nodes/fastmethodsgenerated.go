@@ -1259,7 +1259,7 @@ func (n *FastNode[V]) DirectItemsRec(parentIdx uint8, path StridePath, depth int
 // Returns the number of duplicate prefixes that were overwritten during merging.
 func (n *FastNode[V]) UnionRec(cloneFn func(V) V, o *FastNode[V], depth int) (duplicates int) {
 	if cloneFn == nil {
-		cloneFn = value.CopyVal
+		cloneFn = func(v V) V { return v }
 	}
 
 	buf := [256]uint8{}
@@ -1292,7 +1292,7 @@ func (n *FastNode[V]) UnionRec(cloneFn func(V) V, o *FastNode[V], depth int) (du
 // UnionRecPersist is similar to unionRec but performs an immutable union of nodes.
 func (n *FastNode[V]) UnionRecPersist(cloneFn func(V) V, o *FastNode[V], depth int) (duplicates int) {
 	if cloneFn == nil {
-		cloneFn = value.CopyVal
+		cloneFn = func(v V) V { return v }
 	}
 
 	buf := [256]uint8{}

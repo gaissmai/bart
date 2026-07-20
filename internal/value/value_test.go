@@ -1,7 +1,6 @@
 package value
 
 import (
-	"reflect"
 	"testing"
 )
 
@@ -337,93 +336,6 @@ func TestCloneFnFactory(t *testing.T) {
 				fnStruct := CloneFnFactory[NonCloner]()
 				if fnStruct != nil {
 					t.Errorf("expected nil function, got %T", fnStruct)
-				}
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, tt.run)
-	}
-}
-
-// ============================================================================
-// Table-Driven Tests for CopyVal
-// ============================================================================
-
-func TestCopyVal(t *testing.T) {
-	type CustomStruct struct {
-		ID   int
-		Name string
-	}
-
-	tests := []struct {
-		name string
-		run  func(t *testing.T)
-	}{
-		{
-			name: "copies primitive int value",
-			run: func(t *testing.T) {
-				orig := 42
-				got := CopyVal(orig)
-
-				if got != orig {
-					t.Errorf("expected %d, got %d", orig, got)
-				}
-			},
-		},
-		{
-			name: "copies string value",
-			run: func(t *testing.T) {
-				orig := "hello go"
-				got := CopyVal(orig)
-
-				if got != orig {
-					t.Errorf("expected %q, got %q", orig, got)
-				}
-			},
-		},
-		{
-			name: "copies struct by value",
-			run: func(t *testing.T) {
-				orig := CustomStruct{ID: 1, Name: "Test"}
-				got := CopyVal(orig)
-
-				if got != orig {
-					t.Errorf("expected %+v, got %+v", orig, got)
-				}
-			},
-		},
-		{
-			name: "copies pointer value (returns exact same address)",
-			run: func(t *testing.T) {
-				orig := &CustomStruct{ID: 1, Name: "Test"}
-				got := CopyVal(orig)
-
-				if got != orig {
-					t.Errorf("expected pointer address %p, got %p", orig, got)
-				}
-			},
-		},
-		{
-			name: "copies slice value (shallow copy of slice header)",
-			run: func(t *testing.T) {
-				orig := []int{1, 2, 3}
-				got := CopyVal(orig)
-
-				if !reflect.DeepEqual(got, orig) {
-					t.Errorf("expected slice %v, got %v", orig, got)
-				}
-			},
-		},
-		{
-			name: "handles nil pointer gracefully",
-			run: func(t *testing.T) {
-				var orig *CustomStruct = nil
-				got := CopyVal(orig)
-
-				if got != nil {
-					t.Errorf("expected nil, got %v", got)
 				}
 			},
 		},
