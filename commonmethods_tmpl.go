@@ -506,22 +506,14 @@ func (t *_TABLE_TYPE[V]) UnionPersist(o *_TABLE_TYPE[V]) *_TABLE_TYPE[V] {
 // It ensures both trees (IPv4-based and IPv6-based) have the same sizes and
 // recursively compares their root nodes.
 //
-// Value comparisons use reflect.DeepEqual by default. To avoid the potentially
-// expensive reflect.DeepEqual, the payload type V can provide custom equality
-// by implementing the following method:
+// If V implements an `Equal(V) bool` method, its custom equality logic is used.
+// Otherwise, values are compared directly using the == operator.
 //
-//	Equal(other V) bool
-//
-// Example:
-//
-//	type MyValue struct { ID int }
-//	func (v MyValue) Equal(other MyValue) bool { return v.ID == other.ID }
-//
-// The bart package will automatically detect and use this method via Go's
-// structural typing.
-//
-// Note: If V implements Equal(V) bool with a pointer receiver, the Equal
+// Note: If V implements `Equal(V) bool` with a pointer receiver, the Equal
 // method should handle nil receivers gracefully.
+//
+// ATTENTION: If V is not comparable at runtime (such as a slice or map without an `Equal`
+// method), a runtime panic will occur.
 func (t *_TABLE_TYPE[V]) Equal(o *_TABLE_TYPE[V]) bool {
 	if t.size4 != o.size4 || t.size6 != o.size6 {
 		return false

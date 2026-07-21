@@ -28,10 +28,6 @@
 // This is an internal package used by the bart data structure implementation.
 package value
 
-import (
-	"reflect"
-)
-
 // IsEmptyStruct reports whether type V is the unnamed empty struct type `struct{}`.
 func IsEmptyStruct[V any]() bool {
 	var zero V
@@ -42,16 +38,19 @@ func IsEmptyStruct[V any]() bool {
 // Equal compares two values of type V for equality.
 //
 // If V implements an `Equal(V) bool` method, its custom equality logic is used.
-// Otherwise, it falls back to [reflect.DeepEqual].
+// Otherwise, values are compared directly using the == operator.
 //
-// Note: If V implements `Equal(V) bool` with a pointer receiver, the `Equal`
+// If V is not comparable at runtime (such as a slice or map without an Equal
+// method), a runtime panic will occur.
+//
+// Note: If V implements Equal(V) bool with a pointer receiver, the Equal
 // method should handle nil receivers gracefully.
 func Equal[V any](v1, v2 V) bool {
 	if eq, ok := any(v1).(interface{ Equal(V) bool }); ok {
 		return eq.Equal(v2)
 	}
 
-	return reflect.DeepEqual(v1, v2)
+	return any(v1) == any(v2)
 }
 
 // CloneFnFactory returns a function that takes a value of type V and returns
