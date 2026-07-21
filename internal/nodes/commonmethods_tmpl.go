@@ -873,8 +873,8 @@ func (n *_NODE_TYPE[V]) dump(w io.Writer, path StridePath, depth int, is4 bool) 
 	bits := depth * strideLen
 	indent := strings.Repeat(".", depth)
 
-	// printing values if V is not zero-sized
-	printValues := !value.IsZST[V]()
+	// printing values if V is not the empty struct{}
+	printValues := !value.IsEmptyStruct[V]()
 
 	// node type with depth and octet path and bits.
 	fmt.Fprintf(w, "\n%s[%s] depth:  %d path: [%s] / %d\n",
@@ -1150,8 +1150,8 @@ func (n *_NODE_TYPE[V]) FprintRec(w io.Writer, parent TrieItem[V], pad string) e
 		return CmpPrefix(a.Cidr, b.Cidr)
 	})
 
-	// printing values if V is not zero-sized
-	printValues := !value.IsZST[V]()
+	// printing values if V is not the empty struct{}
+	printValues := !value.IsEmptyStruct[V]()
 
 	// for all direct item under this node ...
 	for i, item := range directItems {

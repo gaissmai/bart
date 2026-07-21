@@ -6,12 +6,11 @@
 //
 // The package offers three main categories of utilities:
 //
-// # Zero-Sized Type (ZST) Detection
+// # V as type struct{} Detection
 //
-// IsZST[V] detects whether a type parameter V is a zero-sized type (such as
-// `struct{}` or `[0]byte`). Zero-sized types carry no information in their
-// values. Omitting them from dumps and prints reduces line noise and
-// improves readability.
+// IsEmptyStruct[V] detects whether a type parameter V is a `struct{}`. These
+// types carry no information in their values. Omitting them from dumps
+// and prints reduces line noise and improves readability.
 //
 // # Value Equality
 //
@@ -33,13 +32,11 @@ import (
 	"reflect"
 )
 
-// IsZST reports whether type V is a zero-sized type (ZST).
-//
-// Zero-sized types such as `struct{}`, `[0]byte`, or structs/arrays with no fields
-// occupy no memory. This function uses reflection to determine the size of the
-// type safely without relying on the unsafe package.
-func IsZST[V any]() bool {
-	return reflect.TypeFor[V]().Size() == 0
+// IsEmptyStruct reports whether type V is the unnamed empty struct type `struct{}`.
+func IsEmptyStruct[V any]() bool {
+	var zero V
+	_, ok := any(zero).(struct{})
+	return ok
 }
 
 // Equal compares two values of type V for equality.
