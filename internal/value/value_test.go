@@ -1,8 +1,22 @@
 package value
 
 import (
+	"slices"
 	"testing"
 )
+
+// ============================================================================
+// Helper to assert that a function panics.
+// ============================================================================
+func expectPanic(t *testing.T, fn func()) {
+	t.Helper()
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("expected code to panic, but it did not")
+		}
+	}()
+	fn()
+}
 
 // ============================================================================
 // Helper Types for Testing IsEmptyStruct
@@ -116,122 +130,152 @@ func TestIsEmptyStruct(t *testing.T) {
 }
 
 // ============================================================================
-// Helper Types for Testing Equal
+// Helper Types for Testing
 // ============================================================================
 
-// ValueEqualer implements Equal(ValueEqualer) bool with a value receiver.
-type ValueEqualer struct {
+// CustomVal implements Equal(CustomVal) bool with a value receiver.
+type CustomVal struct {
 	ID int
 }
 
-func (v ValueEqualer) Equal(other ValueEqualer) bool {
-	return v.ID == other.ID
+func (c CustomVal) Equal(other CustomVal) bool {
+	return c.ID == other.ID
 }
 
-// PointerEqualer implements Equal(*PointerEqualer) bool with a pointer receiver.
-type PointerEqualer struct {
+// CustomPtr implements Equal(*CustomPtr) bool with a pointer receiver.
+type CustomPtr struct {
 	ID int
 }
 
-func (p *PointerEqualer) Equal(other *PointerEqualer) bool {
-	if p == nil || other == nil {
-		return p == other
+func (c *CustomPtr) Equal(other *CustomPtr) bool {
+	if c == nil && other == nil {
+		return true
 	}
-	return p.ID == other.ID
+	if c == nil || other == nil {
+		return false
+	}
+	return c.ID == other.ID
 }
 
-// NonEqualer does NOT implement an Equal method.
-type NonEqualer struct {
-	Tags []string
+// UncomparableWithEqual contains a slice (uncomparable), but implements Equal.
+type UncomparableWithEqual struct {
+	Data []int
 }
 
-func TestEqual(t *testing.T) {
-	tests := []struct {
-		name string
-		run  func(t *testing.T)
-	}{
-		{
-			name: "Value receiver implementing Equal returns true for matching values",
-			run: func(t *testing.T) {
-				v1 := ValueEqualer{ID: 42}
-				v2 := ValueEqualer{ID: 42}
+func (u UncomparableWithEqual) Equal(other UncomparableWithEqual) bool {
+	return slices.Equal(u.Data, other.Data)
+}
 
-				if !Equal(v1, v2) {
-					t.Errorf("expected Equal(%v, %v) to be true", v1, v2)
-				}
-			},
-		},
-		{
-			name: "Value receiver implementing Equal returns false for differing values",
-			run: func(t *testing.T) {
-				v1 := ValueEqualer{ID: 42}
-				v2 := ValueEqualer{ID: 100}
+// PlainStruct is a standard comparable struct without an Equal method.
+type PlainStruct struct {
+	A int
+	B string
+}
 
-				if Equal(v1, v2) {
-					t.Errorf("expected Equal(%v, %v) to be false", v1, v2)
-				}
-			},
-		},
-		{
-			name: "Pointer receiver implementing Equal handles non-nil pointers",
-			run: func(t *testing.T) {
-				p1 := &PointerEqualer{ID: 1}
-				p2 := &PointerEqualer{ID: 1}
-				p3 := &PointerEqualer{ID: 2}
+// ============================================================================
+// Test Suite
+// ============================================================================
 
-				if !Equal(p1, p2) {
-					t.Errorf("expected Equal(%v, %v) to be true", p1, p2)
-				}
-				if Equal(p1, p3) {
-					t.Errorf("expected Equal(%v, %v) to be false", p1, p3)
-				}
-			},
-		},
-		{
-			name: "Pointer receiver implementing Equal handles nil pointers gracefully",
-			run: func(t *testing.T) {
-				var nil1 *PointerEqualer = nil
-				var nil2 *PointerEqualer = nil
-				p1 := &PointerEqualer{ID: 1}
+func TestEqual_ComparableAndCustom(t *testing.T) {
+	t.Run("primitive types", func(t *testing.T) {
+		if !Equal(42, 42) {
+			t.Errorf("expected 42 == 42")
+		}
+		if Equal(42, 43) {
+			t.Errorf("expected 42 != 43")
+		}
+		if !Equal("hello", "hello") {
+			t.Errorf("expected 'hello' == 'hello'")
+		}
+		if Equal("hello", "world") {
+			t.Errorf("expected 'hello' != 'world'")
+		}
+	})
 
-				// Both nil
-				if !Equal(nil1, nil2) {
-					t.Errorf("expected Equal(nil, nil) to be true")
-				}
-				// One nil, one non-nil
-				if Equal(nil1, p1) {
-					t.Errorf("expected Equal(nil, non-nil) to be false")
-				}
-			},
-		},
-		{
-			name: "Fallback to reflect.DeepEqual returns true for matching non-Equaler types",
-			run: func(t *testing.T) {
-				// Slices/Structs without Equal method
-				n1 := NonEqualer{Tags: []string{"a", "b"}}
-				n2 := NonEqualer{Tags: []string{"a", "b"}}
+	t.Run("plain comparable structs", func(t *testing.T) {
+		s1 := PlainStruct{A: 1, B: "test"}
+		s2 := PlainStruct{A: 1, B: "test"}
+		s3 := PlainStruct{A: 2, B: "test"}
 
-				if !Equal(n1, n2) {
-					t.Errorf("expected Equal(%v, %v) to be true via DeepEqual", n1, n2)
-				}
-			},
-		},
-		{
-			name: "Fallback to reflect.DeepEqual returns false for differing non-Equaler types",
-			run: func(t *testing.T) {
-				n1 := NonEqualer{Tags: []string{"a", "b"}}
-				n2 := NonEqualer{Tags: []string{"a", "c"}}
+		if !Equal(s1, s2) {
+			t.Errorf("expected structs to be equal")
+		}
+		if Equal(s1, s3) {
+			t.Errorf("expected structs to be unequal")
+		}
+	})
 
-				if Equal(n1, n2) {
-					t.Errorf("expected Equal(%v, %v) to be false via DeepEqual", n1, n2)
-				}
-			},
-		},
-	}
+	t.Run("empty struct struct{}", func(t *testing.T) {
+		if !Equal(struct{}{}, struct{}{}) {
+			t.Errorf("expected struct{}{} == struct{}{}")
+		}
+	})
 
-	for _, tt := range tests {
-		t.Run(tt.name, tt.run)
-	}
+	t.Run("custom Equal with value receiver", func(t *testing.T) {
+		v1 := CustomVal{ID: 10}
+		v2 := CustomVal{ID: 10}
+		v3 := CustomVal{ID: 20}
+
+		if !Equal(v1, v2) {
+			t.Errorf("expected custom equal to return true")
+		}
+		if Equal(v1, v3) {
+			t.Errorf("expected custom equal to return false")
+		}
+	})
+
+	t.Run("custom Equal with pointer receiver", func(t *testing.T) {
+		p1 := &CustomPtr{ID: 10}
+		p2 := &CustomPtr{ID: 10}
+		p3 := &CustomPtr{ID: 20}
+
+		if !Equal(p1, p2) {
+			t.Errorf("expected pointers to be equal via custom method")
+		}
+		if Equal(p1, p3) {
+			t.Errorf("expected pointers to be unequal via custom method")
+		}
+
+		// nil receiver checks
+		var nil1, nil2 *CustomPtr
+		if !Equal(nil1, nil2) {
+			t.Errorf("expected two nil pointers to be equal")
+		}
+		if Equal(p1, nil1) {
+			t.Errorf("expected non-nil and nil pointer to be unequal")
+		}
+	})
+
+	t.Run("uncomparable type WITH Equal method (must not panic)", func(t *testing.T) {
+		u1 := UncomparableWithEqual{Data: []int{1, 2, 3}}
+		u2 := UncomparableWithEqual{Data: []int{1, 2, 3}}
+		u3 := UncomparableWithEqual{Data: []int{1, 2, 4}}
+
+		if !Equal(u1, u2) {
+			t.Errorf("expected u1 and u2 to be equal")
+		}
+		if Equal(u1, u3) {
+			t.Errorf("expected u1 and u3 to be unequal")
+		}
+	})
+}
+
+func TestEqual_PanicsOnUncomparable(t *testing.T) {
+	t.Run("slice without Equal method panics", func(t *testing.T) {
+		expectPanic(t, func() {
+			s1 := []int{1, 2, 3}
+			s2 := []int{1, 2, 3}
+			_ = Equal(s1, s2)
+		})
+	})
+
+	t.Run("map without Equal method panics", func(t *testing.T) {
+		expectPanic(t, func() {
+			m1 := map[string]int{"a": 1}
+			m2 := map[string]int{"a": 1}
+			_ = Equal(m1, m2)
+		})
+	})
 }
 
 // ============================================================================
