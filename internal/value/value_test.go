@@ -5,109 +5,106 @@ import (
 )
 
 // ============================================================================
-// Helper Types for Testing IsZST
+// Helper Types for Testing IsEmptyStruct
 // ============================================================================
 
-type EmptyStruct struct{}
+// NamedEmpty is a named type defined as struct{}.
+// It occupies 0 bytes, but is distinct from the unnamed struct{}.
+type NamedEmpty struct{}
 
-type EmptyStructWrapper struct {
-	A EmptyStruct
-	B [0]int
+type NonEmpty struct {
+	Value int
 }
 
-type NonEmptyStruct struct {
-	Field int
-}
-
-func TestIsZST(t *testing.T) {
+func TestIsEmptyStruct(t *testing.T) {
 	tests := []struct {
 		name string
 		run  func(t *testing.T)
 	}{
 		// --------------------------------------------------------------------
-		// Zero-Sized Types (Expect true)
+		// Positive Case (Expect true)
 		// --------------------------------------------------------------------
 		{
-			name: "empty struct struct{} is ZST",
+			name: "unnamed empty struct struct{} returns true",
 			run: func(t *testing.T) {
-				if !IsZST[struct{}]() {
-					t.Errorf("expected IsZST[struct{}]() to be true")
-				}
-			},
-		},
-		{
-			name: "named empty struct is ZST",
-			run: func(t *testing.T) {
-				if !IsZST[EmptyStruct]() {
-					t.Errorf("expected IsZST[EmptyStruct]() to be true")
-				}
-			},
-		},
-		{
-			name: "struct containing only ZST fields is ZST",
-			run: func(t *testing.T) {
-				if !IsZST[EmptyStructWrapper]() {
-					t.Errorf("expected IsZST[EmptyStructWrapper]() to be true")
-				}
-			},
-		},
-		{
-			name: "zero-length array [0]byte is ZST",
-			run: func(t *testing.T) {
-				if !IsZST[[0]byte]() {
-					t.Errorf("expected IsZST[[0]byte]() to be true")
-				}
-			},
-		},
-		{
-			name: "array of zero-sized elements [5]struct{} is ZST",
-			run: func(t *testing.T) {
-				if !IsZST[[5]struct{}]() {
-					t.Errorf("expected IsZST[[5]struct{}]() to be true")
+				if !IsEmptyStruct[struct{}]() {
+					t.Errorf("expected IsEmptyStruct[struct{}]() to be true")
 				}
 			},
 		},
 
 		// --------------------------------------------------------------------
-		// Non-Zero-Sized Types (Expect false)
+		// Negative Cases (Expect false)
 		// --------------------------------------------------------------------
 		{
-			name: "primitive type int is non-ZST",
+			name: "named empty struct returns false (distinct type from struct{})",
 			run: func(t *testing.T) {
-				if IsZST[int]() {
-					t.Errorf("expected IsZST[int]() to be false")
+				if IsEmptyStruct[NamedEmpty]() {
+					t.Errorf("expected IsEmptyStruct[NamedEmpty]() to be false")
 				}
 			},
 		},
 		{
-			name: "struct with non-ZST fields is non-ZST",
+			name: "primitive type int returns false",
 			run: func(t *testing.T) {
-				if IsZST[NonEmptyStruct]() {
-					t.Errorf("expected IsZST[NonEmptyStruct]() to be false")
+				if IsEmptyStruct[int]() {
+					t.Errorf("expected IsEmptyStruct[int]() to be false")
 				}
 			},
 		},
 		{
-			name: "pointer to ZST *struct{} is non-ZST (occupies pointer size)",
+			name: "primitive type string returns false",
 			run: func(t *testing.T) {
-				if IsZST[*struct{}]() {
-					t.Errorf("expected IsZST[*struct{}]() to be false")
+				if IsEmptyStruct[string]() {
+					t.Errorf("expected IsEmptyStruct[string]() to be false")
 				}
 			},
 		},
 		{
-			name: "slice of ZST []struct{} is non-ZST (occupies slice header size)",
+			name: "non-empty struct returns false",
 			run: func(t *testing.T) {
-				if IsZST[[]struct{}]() {
-					t.Errorf("expected IsZST[[]struct{}]() to be false")
+				if IsEmptyStruct[NonEmpty]() {
+					t.Errorf("expected IsEmptyStruct[NonEmpty]() to be false")
 				}
 			},
 		},
 		{
-			name: "interface type any is non-ZST (occupies interface header size)",
+			name: "zero-sized array [0]byte returns false (is ZST, but not struct{})",
 			run: func(t *testing.T) {
-				if IsZST[any]() {
-					t.Errorf("expected IsZST[any]() to be false")
+				if IsEmptyStruct[[0]byte]() {
+					t.Errorf("expected IsEmptyStruct[[0]byte]() to be false")
+				}
+			},
+		},
+		{
+			name: "array of empty structs [1]struct{} returns false",
+			run: func(t *testing.T) {
+				if IsEmptyStruct[[1]struct{}]() {
+					t.Errorf("expected IsEmptyStruct[[1]struct{}]() to be false")
+				}
+			},
+		},
+		{
+			name: "pointer to empty struct *struct{} returns false",
+			run: func(t *testing.T) {
+				if IsEmptyStruct[*struct{}]() {
+					t.Errorf("expected IsEmptyStruct[*struct{}]() to be false")
+				}
+			},
+		},
+		{
+			name: "interface type any returns false",
+			run: func(t *testing.T) {
+				if IsEmptyStruct[any]() {
+					t.Errorf("expected IsEmptyStruct[any]() to be false")
+				}
+			},
+		},
+		{
+			name: "slice of empty structs []struct{} returns false",
+			run: func(t *testing.T) {
+				if IsEmptyStruct[[]struct{}]() {
+					t.Errorf("expected IsEmptyStruct[[]struct{}]() to be false")
 				}
 			},
 		},
