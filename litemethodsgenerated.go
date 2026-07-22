@@ -15,9 +15,18 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/gaissmai/bart/internal/art"
 	"github.com/gaissmai/bart/internal/nodes"
 	"github.com/gaissmai/bart/internal/value"
 )
+
+// rootNodeByVersion, root node getter for ip version.
+func (f *liteTable[V]) rootNodeByVersion(is4 bool) *nodes.LiteNode[V] {
+	if is4 {
+		return &f.root4
+	}
+	return &f.root6
+}
 
 func (t *liteTable[V]) sizeUpdate(is4 bool, delta int) {
 	if is4 {
@@ -25,6 +34,75 @@ func (t *liteTable[V]) sizeUpdate(is4 bool, delta int) {
 		return
 	}
 	t.size6 += delta
+}
+
+// Contains reports whether any stored prefix covers the given IP address.
+// Returns false for invalid IP addresses.
+//
+// This performs longest-prefix matching and returns true if any prefix
+// in the routing table contains the IP address, regardless of the associated value.
+//
+// It does not return the value or the prefix of the matching item,
+// but as a test against an allow-/deny-list it's often sufficient
+// and even few nanoseconds faster than [liteTable.Lookup].
+func (f *liteTable[V]) Contains(ip netip.Addr) bool {
+	// speed is top priority: no explicit test for ip.IsValid
+	// if ip is invalid, AsSlice() returns nil, Contains returns false.
+	is4 := ip.Is4()
+	n := f.rootNodeByVersion(is4)
+
+	for _, octet := range ip.AsSlice() {
+		// for contains, any lpm match is good enough, no backtracking needed
+		if n.PrefixCount() != 0 && n.Contains(art.OctetToIdx(octet)) {
+			return true
+		}
+
+		// stop traversing?
+		if !n.Children.Test(octet) {
+			return false
+		}
+		kid := n.MustGetChild(octet)
+
+		// kid is node or leaf or fringe at octet
+		switch kid := kid.(type) {
+		case *nodes.LiteNode[V]:
+			n = kid // descend down to next trie level
+
+		case *nodes.FringeNode[V]:
+			// fringe is the default-route for all possible octets below
+			return true
+
+		case *nodes.LeafNode[V]:
+			return kid.Prefix.Contains(ip)
+		}
+	}
+
+	return false
+}
+
+// Insert adds or updates a prefix-value pair in the routing table.
+// If the prefix already exists, its value is updated; otherwise a new entry is created.
+// Invalid prefixes are silently ignored.
+//
+// The prefix is automatically canonicalized using pfx.Masked() to ensure
+// consistent behavior regardless of host bits in the input.
+func (t *liteTable[V]) Insert(pfx netip.Prefix, val V) {
+	t.insert(pfx, val)
+}
+
+// InsertPersist is similar to Insert but the receiver isn't modified.
+//
+// All nodes touched during insert are cloned and a new trie is returned.
+// This is not a full [liteTable.Clone], all untouched nodes are still referenced
+// from both tries.
+//
+// If the payload type V contains pointers or needs deep copying,
+// it must implement the Clone method to support correct cloning.
+//
+// Due to cloning overhead this is significantly slower than Insert,
+// typically taking μsec instead of nsec.
+func (t *liteTable[V]) InsertPersist(pfx netip.Prefix, val V) *liteTable[V] {
+	return t.insertPersist(pfx, val)
 }
 
 // insert adds or updates a prefix-value pair in the routing table.
@@ -206,6 +284,50 @@ func (t *liteTable[V]) DeletePersist(pfx netip.Prefix) *liteTable[V] {
 	}
 
 	return pt
+}
+
+// Modify applies an insert, update, or delete operation for the value
+// associated with the given prefix. The supplied callback decides the
+// operation: it is called with the current value (or zero if not found)
+// and a boolean indicating whether the prefix exists. The callback must
+// return a new value and a delete flag: del == false inserts or updates,
+// del == true deletes the entry if it exists (otherwise no-op).
+//
+// The callback is invoked at most once per call.
+//
+// The operation is determined by the callback function, which is called with:
+//
+//	val:   the current value (or zero value if not found)
+//	found: true if the prefix currently exists, false otherwise
+//
+// The callback returns:
+//
+//	val: the new value to insert or update (ignored if del == true)
+//	del: true to delete the entry, false to insert or update
+//
+// Summary of callback semantics:
+//
+//	| cb-input        | cb-return       | Ops    |
+//	------------------------------------- --------
+//	| (zero,   false) | (_,      true)  | no-op  |
+//	| (zero,   false) | (newVal, false) | insert |
+//	| (oldVal, true)  | (newVal, false) | update |
+//	| (oldVal, true)  | (_,      true)  | delete |
+//	------------------------------------- --------
+func (t *liteTable[V]) Modify(pfx netip.Prefix, cb func(_ V, ok bool) (_ V, del bool)) {
+	if !pfx.IsValid() {
+		return
+	}
+
+	// canonicalize prefix
+	pfx = pfx.Masked()
+
+	is4 := pfx.Addr().Is4()
+
+	n := t.rootNodeByVersion(is4)
+
+	delta := n.Modify(pfx, cb)
+	t.sizeUpdate(is4, delta)
 }
 
 // ModifyPersist is similar to Modify but the receiver isn't modified and
