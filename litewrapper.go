@@ -102,6 +102,10 @@ func (l *Lite) Insert(pfx netip.Prefix) {
 // for further lock-free ops.
 func (l *Lite) InsertPersist(pfx netip.Prefix) *Lite {
 	lp := l.liteTable.InsertPersist(pfx, struct{}{})
+	if lp == &l.liteTable {
+		// pfx is invalid or didn't exist
+		return l
+	}
 	//nolint:govet // copy of *lp is here by intention
 	return &Lite{*lp}
 }
@@ -166,6 +170,11 @@ func (l *Lite) ModifyPersist(pfx netip.Prefix, cb func(exists bool) (del bool)) 
 	}
 
 	lp := l.liteTable.ModifyPersist(pfx, cbWrapper)
+	if lp == &l.liteTable {
+		// pfx is invalid or didn't exist
+		return l
+	}
+
 	//nolint:govet // copy of *lp is here by intention
 	return &Lite{*lp}
 }
