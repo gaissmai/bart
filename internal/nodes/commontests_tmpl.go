@@ -635,8 +635,8 @@ func TestSubnets6__NODE_TYPE(t *testing.T) {
 	}
 }
 
-// TestDump_ZST verifies that dump does not print values when V is a zero-sized type.
-func TestDump_ZST__NODE_TYPE(t *testing.T) {
+// TestDump_EMPTY_STRUCT verifies that dump does not print values when V is a empty struct type.
+func TestDump_EMPTY_STRUCT__NODE_TYPE(t *testing.T) {
 	t.Parallel()
 
 	node := new(_NODE_TYPE[struct{}])
@@ -651,19 +651,19 @@ func TestDump_ZST__NODE_TYPE(t *testing.T) {
 
 	output := buf.String()
 
-	// For ZST, dump should print prefixes(#N) but skip the "values(#N):" section
+	// For EMPTY_STRUCT, dump should print prefixes(#N) but skip the "values(#N):" section
 	if !strings.Contains(output, "prefxs(") {
 		t.Errorf("Expected 'prefxs()' section, but not found in:\n%s", output)
 	}
 
-	// For ZST, dump should print prefxs(#N) but skip the "values(#N):" section
+	// For EMPTY_STRUCT, dump should print prefxs(#N) but skip the "values(#N):" section
 	if strings.Contains(output, "values(") {
-		t.Errorf("Expected no 'values()' section for ZST, but found it in:\n%s", output)
+		t.Errorf("Expected no 'values()' section for EMPTY_STRUCT, but found it in:\n%s", output)
 	}
 }
 
-// TestDump_NonZST verifies that dump prints values when V is not a zero-sized type.
-func TestDump_NonZST__NODE_TYPE(t *testing.T) {
+// TestDump_NonEMPTY_STRUCT verifies that dump prints values when V is not a empty struct type.
+func TestDump_NonEMPTY_STRUCT__NODE_TYPE(t *testing.T) {
 	t.Parallel()
 
 	node := new(_NODE_TYPE[int])
@@ -687,9 +687,9 @@ func TestDump_NonZST__NODE_TYPE(t *testing.T) {
 		t.Errorf("Expected 'prefxs()' section, but not found in:\n%s", output)
 	}
 
-	// For non-ZST, dump should include the "values(#N):" section
+	// For non-EMPTY_STRUCT, dump should include the "values(#N):" section
 	if !strings.Contains(output, "values(") {
-		t.Errorf("Expected 'values()' section for non-ZST, but not found in:\n%s", output)
+		t.Errorf("Expected 'values()' section for non-EMPTY_STRUCT, but not found in:\n%s", output)
 	}
 
 	// Should contain the actual value
@@ -698,8 +698,8 @@ func TestDump_NonZST__NODE_TYPE(t *testing.T) {
 	}
 }
 
-// TestFprintRec_ZST verifies FprintRec does not print values for zero-sized types.
-func TestFprintRec_ZST__NODE_TYPE(t *testing.T) {
+// TestFprintRec_EMPTY_STRUCT verifies FprintRec does not print values for empty struct types.
+func TestFprintRec_EMPTY_STRUCT__NODE_TYPE(t *testing.T) {
 	t.Parallel()
 
 	node := new(_NODE_TYPE[struct{}])
@@ -723,14 +723,14 @@ func TestFprintRec_ZST__NODE_TYPE(t *testing.T) {
 
 	output := buf.String()
 
-	// For ZST, output should show prefix but no value in parentheses
+	// For EMPTY_STRUCT, output should show prefix but no value in parentheses
 	if strings.Contains(output, "10.0.0.0/7 (") || strings.Contains(output, "10.0.0.0/7(") {
-		t.Errorf("Expected no value in parentheses for ZST prefix, but found in:\n%s", output)
+		t.Errorf("Expected no value in parentheses for EMPTY_STRUCT prefix, but found in:\n%s", output)
 	}
 }
 
-// TestFprintRec_NonZST verifies FprintRec prints values for non-zero-sized types.
-func TestFprintRec_NonZST__NODE_TYPE(t *testing.T) {
+// TestFprintRec_NonEMPTY_STRUCT verifies FprintRec prints values for non-empty struct types.
+func TestFprintRec_NonEMPTY_STRUCT__NODE_TYPE(t *testing.T) {
 	t.Parallel()
 
 	node := new(_NODE_TYPE[string])
@@ -761,7 +761,7 @@ func TestFprintRec_NonZST__NODE_TYPE(t *testing.T) {
 
 	output := buf.String()
 
-	// For non-ZST, output should show both prefix and value
+	// For non-EMPTY_STRUCT, output should show both prefix and value
 	if !strings.Contains(output, "10.0.0.0/7") || !strings.Contains(output, "testval") {
 		t.Errorf("Expected prefix and value 'testval' in output, but got:\n%s", output)
 	}

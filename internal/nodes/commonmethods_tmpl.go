@@ -779,15 +779,17 @@ func (n *_NODE_TYPE[V]) EqualRec(o *_NODE_TYPE[V]) bool {
 		return false
 	}
 
+	// ### GENERATE SKIP_LITE START ###
 	for idx, nVal := range n.AllIndices() {
-		oVal := o.MustGetPrefix(idx) // mustGet is ok, bitsets are equal
+		oVal := o.MustGetPrefix(idx) // MustGet is ok, bitsets are equal
 		if !value.Equal(nVal, oVal) {
 			return false
 		}
 	}
+	// ### GENERATE SKIP_LITE END ###
 
 	for addr, nKid := range n.AllChildren() {
-		oKid := o.MustGetChild(addr) // mustGet is ok, bitsets are equal
+		oKid := o.MustGetChild(addr) // MustGet is ok, bitsets are equal
 
 		switch nKid := nKid.(type) {
 		case *_NODE_TYPE[V]:
@@ -814,10 +816,14 @@ func (n *_NODE_TYPE[V]) EqualRec(o *_NODE_TYPE[V]) bool {
 				return false
 			}
 
+			// ### GENERATE SKIP_LITE START ###
+
 			// compare values
 			if !value.Equal(nKid.Value, oKid.Value) {
 				return false
 			}
+
+			// ### GENERATE SKIP_LITE END ###
 
 		case *FringeNode[V]:
 			// oKid must also be a fringe
@@ -825,11 +831,16 @@ func (n *_NODE_TYPE[V]) EqualRec(o *_NODE_TYPE[V]) bool {
 			if !ok {
 				return false
 			}
+			_ = oKid // mark as used for LiteNode (where value checks are stripped)
+
+			// ### GENERATE SKIP_LITE START ###
 
 			// compare values
 			if !value.Equal(nKid.Value, oKid.Value) {
 				return false
 			}
+
+			// ### GENERATE SKIP_LITE END ###
 
 		default:
 			panic("logic error, wrong node type")
@@ -897,7 +908,7 @@ func (n *_NODE_TYPE[V]) dump(w io.Writer, path StridePath, depth int, is4 bool) 
 
 		fmt.Fprintln(w)
 
-		// skip printing values if V is zero-sized
+		// skip printing values if V is empty struct
 		if printValues {
 
 			// print the values for this node
@@ -948,7 +959,7 @@ func (n *_NODE_TYPE[V]) dump(w io.Writer, path StridePath, depth int, is4 bool) 
 			for _, addr := range leafAddrs {
 				kid := n.MustGetChild(addr).(*LeafNode[V])
 
-				// skip printing values if V is zero-sized
+				// skip printing values if V is empty struct
 				if printValues {
 					fmt.Fprintf(w, " %s:{%s, %v}", addrFmt(addr, is4), kid.Prefix, kid.Value)
 				} else {
@@ -968,7 +979,7 @@ func (n *_NODE_TYPE[V]) dump(w io.Writer, path StridePath, depth int, is4 bool) 
 
 				kid := n.MustGetChild(addr).(*FringeNode[V])
 
-				// skip printing values if V is zero-sized
+				// skip printing values if V is empty struct
 				if printValues {
 					fmt.Fprintf(w, " %s:{%s, %v}", addrFmt(addr, is4), fringePfx, kid.Value)
 				} else {
@@ -1170,7 +1181,7 @@ func (n *_NODE_TYPE[V]) FprintRec(w io.Writer, parent TrieItem[V], pad string) e
 		if printValues {
 			_, err = fmt.Fprintf(w, "%s%s (%v)\n", pad+glyph, item.Cidr, item.Val)
 		} else {
-			// skip printing values if V is zero-sized
+			// skip printing values if V is empty struct
 			_, err = fmt.Fprintf(w, "%s%s\n", pad+glyph, item.Cidr)
 		}
 
