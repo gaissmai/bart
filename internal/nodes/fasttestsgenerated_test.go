@@ -695,6 +695,10 @@ func TestFprintRec_EMPTY_STRUCT_FastNode(t *testing.T) {
 
 	output := buf.String()
 
+	if !strings.Contains(output, pfx.String()) {
+		t.Errorf("Expected '%s' in output, got:\n%s", pfx, output)
+	}
+
 	// For EMPTY_STRUCT, output should show prefix but no value in parentheses
 	if strings.Contains(output, "10.0.0.0/7 (") || strings.Contains(output, "10.0.0.0/7(") {
 		t.Errorf("Expected no value in parentheses for EMPTY_STRUCT prefix, but found in:\n%s", output)
