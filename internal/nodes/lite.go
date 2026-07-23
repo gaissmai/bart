@@ -24,24 +24,9 @@ type LiteNode[V any] struct {
 	}
 }
 
-// IsEmpty returns true if the node contains no routing entries (prefixes)
-// and no child nodes. Empty nodes are candidates for compression or removal
-// during trie optimization.
-func (n *LiteNode[V]) IsEmpty() bool {
-	if n == nil {
-		return true
-	}
-	return n.Prefixes.Count == 0 && n.Children.Len() == 0
-}
-
 // PrefixCount returns the number of prefixes stored in this node.
 func (n *LiteNode[V]) PrefixCount() int {
 	return int(n.Prefixes.Count)
-}
-
-// ChildCount returns the number of slots used in this node.
-func (n *LiteNode[V]) ChildCount() int {
-	return n.Children.Len()
 }
 
 // InsertPrefix adds a routing entry at the specified index.
@@ -54,6 +39,17 @@ func (n *LiteNode[V]) InsertPrefix(idx uint8, _ V) (exists bool) {
 	n.Prefixes.Set(idx)
 	n.Prefixes.Count++
 	return exists
+}
+
+// DeletePrefix removes the prefix at the specified index.
+// Returns true if the prefix existed, and false otherwise.
+func (n *LiteNode[V]) DeletePrefix(idx uint8) (exists bool) {
+	if exists = n.Prefixes.Test(idx); !exists {
+		return false
+	}
+	n.Prefixes.Clear(idx)
+	n.Prefixes.Count--
+	return true
 }
 
 func (n *LiteNode[V]) GetPrefix(idx uint8) (_ V, exists bool) {
@@ -81,17 +77,6 @@ func (n *LiteNode[V]) AllIndices() iter.Seq2[uint8, V] {
 	}
 }
 
-// DeletePrefix removes the prefix at the specified index.
-// Returns true if the prefix existed, and false otherwise.
-func (n *LiteNode[V]) DeletePrefix(idx uint8) (exists bool) {
-	if exists = n.Prefixes.Test(idx); !exists {
-		return false
-	}
-	n.Prefixes.Clear(idx)
-	n.Prefixes.Count--
-	return true
-}
-
 // InsertChild adds a child node at the specified address (0-255).
 // The child can be a *LiteNode[V], *LeafNode, or *FringeNode.
 // Returns true if a child already existed at that address.
@@ -112,37 +97,11 @@ func (n *LiteNode[V]) MustGetChild(addr uint8) any {
 	return n.Children.MustGet(addr)
 }
 
-// AllChildren returns an iterator over all child nodes.
-// Each iteration yields the child's address (uint8) and the child node (any).
-func (n *LiteNode[V]) AllChildren() iter.Seq2[uint8, any] {
-	return func(yield func(addr uint8, child any) bool) {
-		var buf [256]uint8
-		addrs := n.Children.AsSlice(&buf)
-		for i, addr := range addrs {
-			if !yield(addr, n.Children.Items[i]) {
-				return
-			}
-		}
-	}
-}
-
 // DeleteChild removes the child node at the specified address.
 // This operation is idempotent - removing a non-existent child is safe.
 func (n *LiteNode[V]) DeleteChild(addr uint8) (exists bool) {
 	_, exists = n.Children.DeleteAt(addr)
 	return exists
-}
-
-// Contains returns true if an index (idx) has any matching longest-prefix
-// in the current node’s prefix table.
-//
-// This function performs a presence check.
-//
-// The prefix table is structured as a complete binary tree (CBT), and LPM testing
-// is done via a bitset operation that maps the traversal path from the given index
-// toward its possible ancestors.
-func (n *LiteNode[V]) Contains(idx uint8) bool {
-	return n.Prefixes.Intersects(&lpm.LookupTbl[idx])
 }
 
 // LookupIdx performs a longest-prefix match (LPM) lookup for the given index (idx)
@@ -167,8 +126,6 @@ func (n *LiteNode[V]) Lookup(idx uint8) (_ V, ok bool) {
 }
 
 // CloneFlat returns a shallow copy of the current node.
-//
-// CloneFn is only used for interface satisfaction.
 func (n *LiteNode[V]) CloneFlat(_ func(V) V) *LiteNode[V] {
 	if n == nil {
 		return nil
@@ -186,36 +143,5 @@ func (n *LiteNode[V]) CloneFlat(_ func(V) V) *LiteNode[V] {
 	c.Children = *(n.Children.Copy())
 
 	// no values to copy
-	return c
-}
-
-// CloneRec performs a recursive deep copy of the node and all its descendants.
-//
-// cloneFn is only used for interface satisfaction.
-//
-// It first creates a shallow clone of the current node using CloneFlat.
-// Then it recursively clones all child nodes of type *LiteNode[V],
-// performing a full deep clone down the subtree.
-//
-// Child nodes of type *LeafNode and *FringeNode are already copied
-// by CloneFlat.
-//
-// Returns a new instance of LiteNode[V] which is a complete deep clone of the
-// receiver node with all descendants.
-func (n *LiteNode[V]) CloneRec(_ func(V) V) *LiteNode[V] {
-	if n == nil {
-		return nil
-	}
-
-	// Perform a flat clone of the current node.
-	c := n.CloneFlat(nil)
-
-	// Recursively clone all child nodes of type *LiteNode[V]
-	for i, kidAny := range c.Children.Items {
-		if kid, ok := kidAny.(*LiteNode[V]); ok {
-			c.Children.Items[i] = kid.CloneRec(nil)
-		}
-	}
-
 	return c
 }

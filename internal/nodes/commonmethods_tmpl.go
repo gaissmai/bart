@@ -23,6 +23,7 @@ import (
 	"github.com/gaissmai/bart/internal/allot"
 	"github.com/gaissmai/bart/internal/art"
 	"github.com/gaissmai/bart/internal/bitset"
+	"github.com/gaissmai/bart/internal/lpm"
 	"github.com/gaissmai/bart/internal/value"
 )
 
@@ -50,6 +51,84 @@ func (n *_NODE_TYPE[V]) Contains(uint8) (_ bool)                   { return }
 func (n *_NODE_TYPE[V]) LookupIdx(uint8) (_ uint8, _ V, _ bool)    { return }
 
 // ### GENERATE DELETE END ###
+
+// IsEmpty returns true if the node contains no routing entries (prefixes)
+// and no child nodes. Empty nodes are candidates for compression or removal
+// during trie optimization.
+func (n *_NODE_TYPE[V]) IsEmpty() bool {
+	if n == nil {
+		return true
+	}
+	return n.PrefixCount() == 0 && n.ChildCount() == 0
+}
+
+// ChildCount returns the number of slots used in this node.
+func (n *_NODE_TYPE[V]) ChildCount() int {
+	return n.Children.Len()
+}
+
+// ### GENERATE SKIP_LITE START ###
+
+// PrefixCount returns the number of prefixes stored in this node.
+func (n *_NODE_TYPE[V]) PrefixCount() int {
+	return n.Prefixes.Len()
+}
+
+// GetPrefix retrieves the value associated with the prefix at the given index.
+// Returns the value and true if found, or zero value and false if not present.
+func (n *_NODE_TYPE[V]) GetPrefix(idx uint8) (val V, exists bool) {
+	return n.Prefixes.Get(idx)
+}
+
+// MustGetPrefix retrieves the value at the specified index, panicking if not found.
+// This method should only be used when the caller is certain the index exists.
+func (n *_NODE_TYPE[V]) MustGetPrefix(idx uint8) (val V) {
+	return n.Prefixes.MustGet(idx)
+}
+
+// InsertPrefix adds or updates a routing entry at the specified index with the given value.
+// It returns true if a prefix already existed at that index (indicating an update),
+// false if this is a new insertion.
+func (n *_NODE_TYPE[V]) InsertPrefix(idx uint8, val V) (exists bool) {
+	_, exists = n.Prefixes.InsertAt(idx, val)
+	return
+}
+
+// DeletePrefix removes the prefix at the specified index.
+// Returns true if the prefix existed, otherwise false.
+func (n *_NODE_TYPE[V]) DeletePrefix(idx uint8) (exists bool) {
+	_, exists = n.Prefixes.DeleteAt(idx)
+	return exists
+}
+
+// AllIndices returns an iterator over all prefix entries.
+// Each iteration yields the prefix index (uint8) and its associated value (V).
+func (n *_NODE_TYPE[V]) AllIndices() iter.Seq2[uint8, V] {
+	return func(yield func(uint8, V) bool) {
+		var buf [256]uint8
+		for i, idx := range n.Prefixes.AsSlice(&buf) {
+			if !yield(idx, n.Prefixes.Items[i]) {
+				return
+			}
+		}
+	}
+}
+
+// ### GENERATE SKIP_LITE END ###
+
+// AllChildren returns an iterator over all child nodes.
+// Each iteration yields the child's address (uint8) and the child node (any).
+func (n *_NODE_TYPE[V]) AllChildren() iter.Seq2[uint8, any] {
+	return func(yield func(addr uint8, child any) bool) {
+		var buf [256]uint8
+		addrs := n.Children.AsSlice(&buf)
+		for i, addr := range addrs {
+			if !yield(addr, n.Children.Items[i]) {
+				return
+			}
+		}
+	}
+}
 
 // Insert adds or updates a network prefix and its associated value in the trie.
 // Traversal begins at the specified byte depth.
@@ -577,6 +656,48 @@ func (n *_NODE_TYPE[V]) Get(pfx netip.Prefix) (val V, exists bool) {
 
 	panic("unreachable")
 }
+
+// Contains returns true if an index (idx) has any matching longest-prefix
+// in the current node’s prefix table.
+//
+// This function performs a presence check without retrieving the associated value.
+// It is faster than a full lookup, as it only tests for intersection with the
+// backtracking bitset for the given index.
+//
+// The prefix table is structured as a complete binary tree (CBT), and LPM testing
+// is done via a bitset operation that maps the traversal path from the given index
+// toward its possible ancestors.
+func (n *_NODE_TYPE[V]) Contains(idx uint8) bool {
+	return n.Prefixes.Intersects(&lpm.LookupTbl[idx])
+}
+
+// ### GENERATE SKIP_LITE START ###
+
+// LookupIdx performs a longest-prefix match (LPM) lookup for the given index (idx)
+// within the 8-bit stride-based prefix table at this trie depth.
+//
+// The function returns the matched base index, associated value, and true if a
+// matching prefix exists at this level; otherwise, ok is false.
+//
+// Internally, the prefix table is organized as a complete binary tree (CBT) indexed
+// via the baseIndex function. Unlike the original ART algorithm, this implementation
+// does not use an allotment-based approach. Instead, it performs CBT backtracking
+// using a bitset-based operation with a precomputed backtracking pattern specific to idx.
+func (n *_NODE_TYPE[V]) LookupIdx(idx uint8) (top uint8, val V, ok bool) {
+	// top is the idx of the longest-prefix-match
+	if top, ok = n.Prefixes.IntersectionTop(&lpm.LookupTbl[idx]); ok {
+		return top, n.MustGetPrefix(top), true
+	}
+	return top, val, ok
+}
+
+// Lookup is just a simple wrapper for LookupIdx.
+func (n *_NODE_TYPE[V]) Lookup(idx uint8) (val V, ok bool) {
+	_, val, ok = n.LookupIdx(idx)
+	return val, ok
+}
+
+// ### GENERATE SKIP_LITE END ###
 
 // Modify performs an in-place modification of a prefix using the provided callback function.
 // The callback receives the current value (if found) and existence flag, and returns
@@ -2469,4 +2590,36 @@ func (n *_NODE_TYPE[V]) OverlapsTwoChildren(nChild, oChild any, depth int) bool 
 	default:
 		panic("logic error, wrong node type combination")
 	}
+}
+
+// CloneRec performs a recursive deep copy of the node and all its descendants.
+//
+// If cloneFn is nil, the stored values are copied directly without modification.
+// Otherwise cloneFn is applied to each stored value for deep cloning.
+//
+// This method first creates a shallow clone of the current node using CloneFlat,
+// applying cloneFn to values as described there. Then it recursively clones all
+// child nodes of type *_NODE_TYPE[V], performing a full deep clone down the subtree.
+//
+// Child nodes of type *LeafNode[V] and *FringeNode[V] are already cloned
+// by CloneFlat.
+//
+// Returns a new instance of _NODE_TYPE[V] which is a complete deep clone of the
+// receiver node with all descendants.
+func (n *_NODE_TYPE[V]) CloneRec(cloneFn func(V) V) *_NODE_TYPE[V] {
+	if n == nil {
+		return nil
+	}
+
+	// Perform a flat clone of the current node.
+	c := n.CloneFlat(cloneFn)
+
+	// Recursively clone all child nodes of type *_NODE_TYPE[V]
+	for i, kidAny := range c.Children.Items {
+		if kid, ok := kidAny.(*_NODE_TYPE[V]); ok {
+			c.Children.Items[i] = kid.CloneRec(cloneFn)
+		}
+	}
+
+	return c
 }

@@ -8,14 +8,45 @@ package nodes
 import (
 	"fmt"
 	"io"
+	"iter"
 	"net/netip"
 	"slices"
 	"strings"
 
 	"github.com/gaissmai/bart/internal/allot"
 	"github.com/gaissmai/bart/internal/art"
+	"github.com/gaissmai/bart/internal/lpm"
 	"github.com/gaissmai/bart/internal/value"
 )
+
+// IsEmpty returns true if the node contains no routing entries (prefixes)
+// and no child nodes. Empty nodes are candidates for compression or removal
+// during trie optimization.
+func (n *LiteNode[V]) IsEmpty() bool {
+	if n == nil {
+		return true
+	}
+	return n.PrefixCount() == 0 && n.ChildCount() == 0
+}
+
+// ChildCount returns the number of slots used in this node.
+func (n *LiteNode[V]) ChildCount() int {
+	return n.Children.Len()
+}
+
+// AllChildren returns an iterator over all child nodes.
+// Each iteration yields the child's address (uint8) and the child node (any).
+func (n *LiteNode[V]) AllChildren() iter.Seq2[uint8, any] {
+	return func(yield func(addr uint8, child any) bool) {
+		var buf [256]uint8
+		addrs := n.Children.AsSlice(&buf)
+		for i, addr := range addrs {
+			if !yield(addr, n.Children.Items[i]) {
+				return
+			}
+		}
+	}
+}
 
 // Insert adds or updates a network prefix and its associated value in the trie.
 // Traversal begins at the specified byte depth.
@@ -542,6 +573,20 @@ func (n *LiteNode[V]) Get(pfx netip.Prefix) (val V, exists bool) {
 	}
 
 	panic("unreachable")
+}
+
+// Contains returns true if an index (idx) has any matching longest-prefix
+// in the current node’s prefix table.
+//
+// This function performs a presence check without retrieving the associated value.
+// It is faster than a full lookup, as it only tests for intersection with the
+// backtracking bitset for the given index.
+//
+// The prefix table is structured as a complete binary tree (CBT), and LPM testing
+// is done via a bitset operation that maps the traversal path from the given index
+// toward its possible ancestors.
+func (n *LiteNode[V]) Contains(idx uint8) bool {
+	return n.Prefixes.Intersects(&lpm.LookupTbl[idx])
 }
 
 // Modify performs an in-place modification of a prefix using the provided callback function.
@@ -2408,4 +2453,36 @@ func (n *LiteNode[V]) OverlapsTwoChildren(nChild, oChild any, depth int) bool {
 	default:
 		panic("logic error, wrong node type combination")
 	}
+}
+
+// CloneRec performs a recursive deep copy of the node and all its descendants.
+//
+// If cloneFn is nil, the stored values are copied directly without modification.
+// Otherwise cloneFn is applied to each stored value for deep cloning.
+//
+// This method first creates a shallow clone of the current node using CloneFlat,
+// applying cloneFn to values as described there. Then it recursively clones all
+// child nodes of type *LiteNode[V], performing a full deep clone down the subtree.
+//
+// Child nodes of type *LeafNode[V] and *FringeNode[V] are already cloned
+// by CloneFlat.
+//
+// Returns a new instance of LiteNode[V] which is a complete deep clone of the
+// receiver node with all descendants.
+func (n *LiteNode[V]) CloneRec(cloneFn func(V) V) *LiteNode[V] {
+	if n == nil {
+		return nil
+	}
+
+	// Perform a flat clone of the current node.
+	c := n.CloneFlat(cloneFn)
+
+	// Recursively clone all child nodes of type *LiteNode[V]
+	for i, kidAny := range c.Children.Items {
+		if kid, ok := kidAny.(*LiteNode[V]); ok {
+			c.Children.Items[i] = kid.CloneRec(cloneFn)
+		}
+	}
+
+	return c
 }
