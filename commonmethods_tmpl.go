@@ -142,8 +142,6 @@ func (f *_TABLE_TYPE[V]) Contains(ip netip.Addr) bool {
 	return false
 }
 
-// ### GENERATE SKIP_LITE START ###
-
 // Lookup performs a longest prefix match (LPM) lookup for the given address.
 // It finds the most specific (longest) prefix in the routing table that
 // contains the given address and returns its associated value.
@@ -334,7 +332,7 @@ LOOP:
 		n = stack[depth]
 
 		// longest prefix match, skip if node has no prefixes
-		if n.Prefixes.Len() == 0 {
+		if n.PrefixCount() == 0 {
 			continue
 		}
 
@@ -374,8 +372,6 @@ LOOP:
 
 	return lpmPfx, val, ok
 }
-
-// ### GENERATE SKIP_LITE END ###
 
 // Insert adds or updates a prefix-value pair in the routing table.
 // If the prefix already exists, its value is updated; otherwise a new entry is created.

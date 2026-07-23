@@ -43,16 +43,6 @@ for tableType in "${!NODE_TYPES[@]}"; do
     base_mangled="${template_base/_tmpl/generated}"  # -> methodsgenerated.go
     output_file="${type_prefix}${base_mangled}"      # e.g. -> bartmethodsgenerated.go
 
-    # Use an array to pass flags and expressions safely to sed without quote-splitting issues
-    lite_filter=()
-    if [[ "${nodeType,,}" == *lite* ]]; then
-        # Delete all lines between the markers (inclusive) for LiteNode
-        lite_filter+=(-e '/GENERATE SKIP_LITE START/,/GENERATE SKIP_LITE END/d')
-    else
-        # For Table/Fast nodes, keep the enclosed code and remove only the marker comment lines
-        lite_filter+=(-e '/GENERATE SKIP_LITE/d')
-    fi
-
     # Single-pass sed substitution:
     # 1. Insert generated header
     # 2. Strip build tags and go:generate directives
@@ -63,7 +53,6 @@ for tableType in "${!NODE_TYPES[@]}"; do
         -e '/^\/\/go:build generate\b/d' \
         -e '/^\/\/go:generate\b/d' \
         -e '/GENERATE DELETE START/,/GENERATE DELETE END/d' \
-        "${lite_filter[@]}" \
         -e "s|_TABLE_TYPE|${tableType}|g" \
         -e "s|_NODE_TYPE|${nodeType}|g" \
         "${template_file}" > "${output_file}"

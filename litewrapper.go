@@ -58,7 +58,7 @@ func (l *Lite) Lookup(ip netip.Addr) bool {
 //
 // Returns true if a matching prefix is found, otherwise false.
 func (l *Lite) LookupPrefix(pfx netip.Prefix) bool {
-	_, ok := l.lookupPrefixLPM(pfx, false)
+	_, _, ok := l.lookupPrefixLPM(pfx, false)
 	return ok
 }
 
@@ -74,7 +74,7 @@ func (l *Lite) LookupPrefix(pfx netip.Prefix) bool {
 //
 // Returns the matching prefix and true if found, otherwise the zero value and false.
 func (l *Lite) LookupPrefixLPM(pfx netip.Prefix) (lpmPfx netip.Prefix, ok bool) {
-	lpmPfx, ok = l.lookupPrefixLPM(pfx, true)
+	lpmPfx, _, ok = l.lookupPrefixLPM(pfx, true)
 	return
 }
 
