@@ -271,7 +271,7 @@ LOOP:
 		n = stack[depth]
 
 		// longest prefix match, skip if node has no prefixes
-		if n.Prefixes.Len() == 0 {
+		if n.PrefixCount() == 0 {
 			continue
 		}
 
