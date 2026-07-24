@@ -160,8 +160,6 @@ func (b *BitSet256) popcnt() (cnt int) {
   return
 }
 ```
-Future Go versions with SIMD intrinsics for `uint64` vectors may unlock
-additional speedups on compatible hardware.
 
 ## Concurrency model
 
