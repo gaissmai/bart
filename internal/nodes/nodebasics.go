@@ -298,9 +298,6 @@ func CidrForFringe(octets []byte, depth int, is4 bool, fringeByte uint8) netip.P
 //
 // If you can commit to a fixed size of [4]uint64, then the algorithm is
 // much faster due to modern CPUs.
-//
-// Perhaps a future Go version that supports SIMD instructions for the [4]uint64 vectors
-// will make the algorithm even faster on suitable hardware.
 func DivMod8(pfxLen int) (strideCount int, modBits uint8) {
 	// strideCount: range from 0..4 or 0..16
 	// modBits:     range from 0..7

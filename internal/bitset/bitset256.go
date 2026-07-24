@@ -12,8 +12,6 @@
 // Internally, the bitset is represented by four uint64 words, providing
 // fast bit-level access through direct indexing and hardware-accelerated primitives.
 //
-// If Go eventually supports SIMD intrinsics, this can be further optimized.
-//
 // For external consumers, the API intentionally avoids dynamic allocation except
 // when explicitly requested (via Bits()).
 package bitset
