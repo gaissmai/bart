@@ -132,9 +132,6 @@ func (n *LiteNode[V]) CloneFlat(_ func(V) V) *LiteNode[V] {
 	}
 
 	c := new(LiteNode[V])
-	if n.IsEmpty() {
-		return c
-	}
 
 	// copy simple values
 	c.Prefixes = n.Prefixes

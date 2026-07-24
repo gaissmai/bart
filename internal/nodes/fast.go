@@ -100,9 +100,6 @@ func (n *FastNode[V]) CloneFlat(cloneFn func(V) V) *FastNode[V] {
 	}
 
 	c := new(FastNode[V])
-	if n.IsEmpty() {
-		return c
-	}
 
 	// copy ...
 	c.Prefixes = *(n.Prefixes.Copy())
