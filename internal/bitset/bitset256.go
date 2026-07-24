@@ -94,6 +94,8 @@ func (b *BitSet256) Test(bit uint8) (ok bool) {
 // the CPU to parallelize these operations internally (pipelining), avoiding
 // branch misprediction and maximizing instruction throughput. This technique
 // is especially effective for bitsets with known, fixed word count.
+//
+//nolint:gosec  // G115: integer overflow conversion int -> uint
 func (b *BitSet256) FirstSet() (first uint8, ok bool) {
 	// optimized for pipelining, can still inline with cost 79
 	x0 := bits.TrailingZeros64(b[0])
@@ -102,19 +104,15 @@ func (b *BitSet256) FirstSet() (first uint8, ok bool) {
 	x3 := bits.TrailingZeros64(b[3])
 
 	if x0 != 64 {
-		//nolint:gosec  // G115: integer overflow conversion int -> uint
 		return uint8(x0), true
 	}
 	if x1 != 64 {
-		//nolint:gosec  // G115: integer overflow conversion int -> uint
 		return uint8(x1 + 64), true
 	}
 	if x2 != 64 {
-		//nolint:gosec  // G115: integer overflow conversion int -> uint
 		return uint8(x2 + 128), true
 	}
 	if x3 != 64 {
-		//nolint:gosec  // G115: integer overflow conversion int -> uint
 		return uint8(x3 + 192), true
 	}
 
@@ -137,20 +135,20 @@ func (b *BitSet256) FirstSet() (first uint8, ok bool) {
 //	b.NextSet(5)   ->   5, true
 //	b.NextSet(6)   -> 130, true
 //	b.NextSet(200) ->   0, false
+//
+//nolint:gosec  // G115: integer overflow conversion int -> uint
 func (b *BitSet256) NextSet(bit uint8) (next uint8, ok bool) {
 	wIdx := int(bit >> 6)
 
 	// process the first (maybe partial) word
 	first := b[wIdx] >> (bit & 63)
 	if first != 0 {
-		//nolint:gosec  // G115: integer overflow conversion int -> uint
 		return bit + uint8(bits.TrailingZeros64(first)), true
 	}
 
 	// process the following words until next bit is set
 	for wIdx++; wIdx < 4; wIdx++ {
 		if next := b[wIdx]; next != 0 {
-			//nolint:gosec  // G115: integer overflow conversion int -> uint
 			return uint8(wIdx<<6 + bits.TrailingZeros64(next)), true
 		}
 	}
@@ -170,23 +168,21 @@ func (b *BitSet256) NextSet(bit uint8) (next uint8, ok bool) {
 //	bs.Set(130)
 //	bs.Set(214)
 //	index, ok := bs.LastSet()  // index == 214, ok == true
+//
+//nolint:gosec  // G115: integer overflow conversion int -> uint
 func (b *BitSet256) LastSet() (last uint8, ok bool) {
 	// optimized by unrolling the loop.
 	// This enables compiler inlining and is ~20% faster.
 	if b[3] != 0 {
-		//nolint:gosec  // G115: integer overflow conversion int -> uint
 		return uint8(bits.Len64(b[3]) + 191), true
 	}
 	if b[2] != 0 {
-		//nolint:gosec  // G115: integer overflow conversion int -> uint
 		return uint8(bits.Len64(b[2]) + 127), true
 	}
 	if b[1] != 0 {
-		//nolint:gosec  // G115: integer overflow conversion int -> uint
 		return uint8(bits.Len64(b[1]) + 63), true
 	}
 	if b[0] != 0 {
-		//nolint:gosec  // G115: integer overflow conversion int -> uint
 		return uint8(bits.Len64(b[0]) - 1), true
 	}
 	return 0, false
@@ -205,11 +201,12 @@ func (b *BitSet256) LastSet() (last uint8, ok bool) {
 // The returned slice directly shares the underlying storage of `buf` and is only
 // valid until `buf` is modified or reused. This pattern is highly recommended for
 // hot paths and performance-critical loops where heap churn must be avoided.
+//
+//nolint:gosec  // G115: integer overflow conversion int -> uint
 func (b *BitSet256) AsSlice(buf *[256]uint8) []uint8 {
 	size := 0
 	for wIdx, word := range b {
 		for ; word != 0; size++ {
-			//nolint:gosec  // G115: integer overflow conversion int -> uint
 			buf[size] = uint8(wIdx<<6 + bits.TrailingZeros64(word))
 			word &= word - 1 // clear the rightmost set bit
 		}
@@ -239,16 +236,16 @@ func (b *BitSet256) Bits() []uint8 {
 // and returns the highest (top-most) set bit of the result.
 // If the intersection is non-empty, it returns the top bit index and true.
 // If the intersection is empty, ok is false and top is 0.
+//
+//nolint:gosec  // G115: integer overflow conversion int -> uint8
 func (b *BitSet256) IntersectionTop(c *BitSet256) (top uint8, ok bool) {
 	// optimized by unrolling the first word check.
 	// This enables compiler inlining and is ~15% faster.
 	if w := b[3] & c[3]; w != 0 {
-		//nolint:gosec  // G115: integer overflow conversion int -> uint8
 		return uint8(191 + bits.Len64(w)), true
 	}
 	for wIdx := 2; wIdx >= 0; wIdx-- {
 		if w := b[wIdx] & c[wIdx]; w != 0 {
-			//nolint:gosec  // G115: integer overflow conversion int -> uint8
 			return uint8(wIdx<<6 + bits.Len64(w) - 1), true
 		}
 	}

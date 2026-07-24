@@ -62,7 +62,7 @@ func IdxToPfx(idx uint8) (octet, pfxLen uint8) {
 	// so we subtract 1 to recover the prefix length (which is always >= 0).
 	// Invariant: idx==0 is invalid
 
-	//nolint:gosec  //G115: integer overflow conversion int -> uint8 (gosec)
+	//nolint:gosec  //G115: integer overflow conversion int -> uint8
 	pfxLen = uint8(bits.Len8(idx)) - 1
 
 	// Compute the number of bits to shift back to obtain the original octet.
