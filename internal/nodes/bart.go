@@ -80,9 +80,6 @@ func (n *BartNode[V]) CloneFlat(cloneFn func(V) V) *BartNode[V] {
 	}
 
 	c := new(BartNode[V])
-	if n.IsEmpty() {
-		return c
-	}
 
 	// copy ...
 	c.Prefixes = *(n.Prefixes.Copy())
