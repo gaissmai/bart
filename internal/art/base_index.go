@@ -17,7 +17,7 @@ import "math/bits"
 // PfxToIdx maps 8bit prefixes to numbers. The prefixes range from 0/0 to 255/7
 // The return values range from 1 to 255.
 //
-//	  [0x0000_00001 .. 0x1111_1111] = [1 .. 255]
+//	  [0x0000_0001 .. 0x1111_1111] = [1 .. 255]
 //
 //		example: octet/pfxLen: 160/3 = 0b1010_0000/3 => IdxToPfx(160/3) => 13
 //
