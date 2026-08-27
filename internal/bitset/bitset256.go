@@ -34,6 +34,7 @@ package bitset
 
 import (
 	"math/bits"
+	"unsafe"
 )
 
 // BitSet256 represents a fixed-size bitset for the range [0..255],
@@ -41,58 +42,21 @@ import (
 type BitSet256 struct{ W0, W1, W2, W3 uint64 }
 
 // Set returns a new BitSet256 with the bit at position set to 1.
-func (b BitSet256) Set(bit uint8) BitSet256 {
-	word := bit >> 6
-	mask := uint64(1) << (bit & 63)
-
-	switch word {
-	case 0:
-		b.W0 |= mask
-	case 1:
-		b.W1 |= mask
-	case 2:
-		b.W2 |= mask
-	default:
-		b.W3 |= mask
-	}
-
-	return b
+func (b *BitSet256) Set(bit uint8) {
+	words := (*[4]uint64)(unsafe.Pointer(b))
+	words[bit>>6] |= uint64(1) << (bit & 63)
 }
 
 // Clear returns a new BitSet256 with the bit at position set to 0.
-func (b BitSet256) Clear(bit uint8) BitSet256 {
-	word := bit >> 6
-	mask := ^(uint64(1) << (bit & 63))
-
-	switch word {
-	case 0:
-		b.W0 &= mask
-	case 1:
-		b.W1 &= mask
-	case 2:
-		b.W2 &= mask
-	default:
-		b.W3 &= mask
-	}
-
-	return b
+func (b *BitSet256) Clear(bit uint8) {
+	words := (*[4]uint64)(unsafe.Pointer(b))
+	words[bit>>6] &= ^(uint64(1) << (bit & 63))
 }
 
 // Test reports whether the bit at position bit (0..255) is set.
-func (b BitSet256) Test(bit uint8) (result bool) {
-	word := bit >> 6
-	mask := uint64(1) << (bit & 63)
-
-	switch word {
-	case 0:
-		return b.W0&mask != 0
-	case 1:
-		return b.W1&mask != 0
-	case 2:
-		return b.W2&mask != 0
-	default:
-		return b.W3&mask != 0
-	}
+func (b *BitSet256) Test(bit uint8) (result bool) {
+	words := (*[4]uint64)(unsafe.Pointer(b))
+	return words[bit>>6]&(uint64(1)<<(bit&63)) != 0
 }
 
 // FirstSet returns the index of the lowest (first) bit that is set in the BitSet256.

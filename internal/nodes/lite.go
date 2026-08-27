@@ -36,7 +36,7 @@ func (n *LiteNode[V]) InsertPrefix(idx uint8, _ V) (exists bool) {
 	if exists = n.Prefixes.Test(idx); exists {
 		return exists
 	}
-	n.Prefixes.BitSet256 = n.Prefixes.Set(idx)
+	n.Prefixes.Set(idx)
 	n.Prefixes.Count++
 	return exists
 }
@@ -47,7 +47,7 @@ func (n *LiteNode[V]) DeletePrefix(idx uint8) (exists bool) {
 	if exists = n.Prefixes.Test(idx); !exists {
 		return false
 	}
-	n.Prefixes.BitSet256 = n.Prefixes.Clear(idx)
+	n.Prefixes.Clear(idx)
 	n.Prefixes.Count--
 	return true
 }

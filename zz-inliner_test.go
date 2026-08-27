@@ -27,9 +27,9 @@ func TestInlineBitSet256Functions(t *testing.T) {
 
 	// List of functions expected to be inlined
 	funcs := []string{
-		"bitset.BitSet256.Set",
-		"bitset.BitSet256.Clear",
-		"bitset.BitSet256.Test",
+		"bitset.(*BitSet256).Set",
+		"bitset.(*BitSet256).Clear",
+		"bitset.(*BitSet256).Test",
 		"bitset.BitSet256.IsEmpty",
 		//
 		"bitset.BitSet256.FirstSet",
