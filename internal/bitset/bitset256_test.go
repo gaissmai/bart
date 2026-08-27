@@ -43,15 +43,15 @@ func TestZeroValue(t *testing.T) {
 
 	b = BitSet256{}
 	c := BitSet256{}
-	b.Union(&c)
+	b.Union(c)
 
 	b = BitSet256{}
 	c = BitSet256{}
-	b = b.Intersection(&c)
+	b = b.Intersection(c)
 
 	b = BitSet256{}
 	c = BitSet256{}
-	b.Intersects(&c)
+	b.Intersects(c)
 
 	b = BitSet256{}
 	c = BitSet256{}
@@ -529,10 +529,10 @@ func TestUnion(t *testing.T) {
 	}
 
 	c := a
-	c.Union(&b)
+	c.Union(b)
 
 	d := b
-	d.Union(&a)
+	d.Union(a)
 
 	if c.Size() != 200 {
 		t.Errorf("Union should have 200 bits set, but had %d", c.Size())
@@ -556,10 +556,10 @@ func TestInplaceIntersection(t *testing.T) {
 	}
 
 	c := a
-	c = c.Intersection(&b)
+	c = c.Intersection(b)
 
 	d := b
-	d = d.Intersection(&a)
+	d = d.Intersection(a)
 	if c.Size() != 50 {
 		t.Errorf("Intersection should have 50 bits set, but had %d", c.Size())
 	}
@@ -581,14 +581,14 @@ func TestIntersectsAny(t *testing.T) {
 	}
 
 	want := false
-	got := a.Intersects(&b)
+	got := a.Intersects(b)
 	if want != got {
 		t.Errorf("Intersection should be %v, but got: %v", want, got)
 	}
 
 	b = a
 	want = true
-	got = a.Intersects(&b)
+	got = a.Intersects(b)
 	if want != got {
 		t.Errorf("Intersection should be %v, but got: %v", want, got)
 	}
@@ -762,31 +762,31 @@ func BenchmarkIntersectsAny(b *testing.B) {
 	aa := BitSet256{1, 1, 1, 1}
 
 	for i, bb := range []BitSet256{
-		{1},
-		{0, 1},
-		{0, 0, 1},
+		{1, 0, 0, 0},
+		{0, 1, 0, 0},
+		{0, 0, 1, 0},
 		{0, 0, 0, 1},
 		{},
 	} {
 		b.Run(fmt.Sprintf("Any: at %d", i), func(b *testing.B) {
 			for b.Loop() {
-				aa.Intersects(&bb)
+				aa.Intersects(bb)
 			}
 		})
 	}
 }
 
 func BenchmarkUnion(b *testing.B) {
-	aa := &BitSet256{0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010}
-	bb := &BitSet256{0b1111_1111_1111, 0b1111_1111_1111, 0b1111_1111_1111, 0b1111_1111_1111}
+	aa := BitSet256{0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010}
+	bb := BitSet256{0b1111_1111_1111, 0b1111_1111_1111, 0b1111_1111_1111, 0b1111_1111_1111}
 	for b.Loop() {
 		aa.Union(bb)
 	}
 }
 
 func BenchmarkIntersection(b *testing.B) {
-	aa := &BitSet256{0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010}
-	bb := &BitSet256{0b1111_1111_1111, 0b1111_1111_1111, 0b1111_1111_1111, 0b1111_1111_1111}
+	aa := BitSet256{0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010}
+	bb := BitSet256{0b1111_1111_1111, 0b1111_1111_1111, 0b1111_1111_1111, 0b1111_1111_1111}
 	for b.Loop() {
 		aa.Intersection(bb)
 	}
@@ -813,9 +813,9 @@ func BenchmarkRank(b *testing.B) {
 
 func BenchmarkIsEmpty(b *testing.B) {
 	for i, bb := range []BitSet256{
-		{1},
-		{0, 1},
-		{0, 0, 1},
+		{1, 0, 0, 0},
+		{0, 1, 0, 0},
+		{0, 0, 1, 0},
 		{0, 0, 0, 1},
 		{},
 	} {
@@ -845,9 +845,9 @@ func BenchmarkFirstSet(b *testing.B) {
 
 func BenchmarkNextSet(b *testing.B) {
 	for i, bb := range []BitSet256{
-		{1},
-		{0, 1},
-		{0, 0, 1},
+		{1, 0, 0, 0},
+		{0, 1, 0, 0},
+		{0, 0, 1, 0},
 		{0, 0, 0, 1},
 		{},
 	} {
@@ -893,9 +893,9 @@ func BenchmarkLastSet(b *testing.B) {
 
 func BenchmarkAsSlice(b *testing.B) {
 	for i, aa := range []BitSet256{
-		{1},
-		{1, 1},
-		{1, 1, 1},
+		{1, 0, 0, 0},
+		{1, 1, 0, 0},
+		{1, 1, 1, 0},
 		{1, 1, 1, 1},
 	} {
 		b.Run(fmt.Sprintf("sparse at %d", i), func(b *testing.B) {
@@ -907,9 +907,9 @@ func BenchmarkAsSlice(b *testing.B) {
 	}
 
 	for i, aa := range []BitSet256{
-		{math.MaxUint64},
-		{math.MaxUint64, math.MaxUint64},
-		{math.MaxUint64, math.MaxUint64, math.MaxUint64},
+		{math.MaxUint64, 0, 0, 0},
+		{math.MaxUint64, math.MaxUint64, 0, 0},
+		{math.MaxUint64, math.MaxUint64, math.MaxUint64, 0},
 		{math.MaxUint64, math.MaxUint64, math.MaxUint64, math.MaxUint64},
 	} {
 		b.Run(fmt.Sprintf("dense at %d", i), func(b *testing.B) {
@@ -923,9 +923,9 @@ func BenchmarkAsSlice(b *testing.B) {
 
 func BenchmarkBits(b *testing.B) {
 	for i, aa := range []BitSet256{
-		{1},
-		{1, 1},
-		{1, 1, 1},
+		{1, 0, 0, 0},
+		{1, 1, 0, 0},
+		{1, 1, 1, 0},
 		{1, 1, 1, 1},
 	} {
 		b.Run(fmt.Sprintf("sparse at %d", i), func(b *testing.B) {

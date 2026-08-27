@@ -34,6 +34,7 @@ package bitset
 
 import (
 	"math/bits"
+	"unsafe"
 )
 
 //   wordIdx calculates the wordIndex of bit i in a []uint64
@@ -55,21 +56,24 @@ import (
 
 // BitSet256 represents a fixed-size bitset for the range [0..255],
 // stored as four uint64 words (256 bits total).
-type BitSet256 [4]uint64
+type BitSet256 struct{ a, b, c, d uint64 }
 
 // Set sets the bit at position bit (0..255).
 func (b *BitSet256) Set(bit uint8) {
-	b[bit>>6] |= 1 << (bit & 63)
+	a := (*[4]uint64)(unsafe.Pointer(b))
+	a[bit>>6] |= 1 << (bit & 63)
 }
 
 // Clear clears the bit at position bit (0..255).
 func (b *BitSet256) Clear(bit uint8) {
-	b[bit>>6] &^= 1 << (bit & 63)
+	a := (*[4]uint64)(unsafe.Pointer(b))
+	a[bit>>6] &^= 1 << (bit & 63)
 }
 
 // Test reports whether the bit at position bit (0..255) is set.
 func (b *BitSet256) Test(bit uint8) (ok bool) {
-	return b[bit>>6]&(1<<(bit&63)) != 0
+	a := (*[4]uint64)(unsafe.Pointer(b))
+	return a[bit>>6]&(1<<(bit&63)) != 0
 }
 
 // FirstSet returns the index of the lowest (first) bit that is set in the BitSet256.
@@ -94,12 +98,12 @@ func (b *BitSet256) Test(bit uint8) (ok bool) {
 // is especially effective for bitsets with known, fixed word count.
 //
 //nolint:gosec  // G115: integer overflow conversion int -> uint
-func (b *BitSet256) FirstSet() (first uint8, ok bool) {
+func (b BitSet256) FirstSet() (first uint8, ok bool) {
 	// optimized for pipelining, can still inline with cost 79
-	x0 := bits.TrailingZeros64(b[0])
-	x1 := bits.TrailingZeros64(b[1])
-	x2 := bits.TrailingZeros64(b[2])
-	x3 := bits.TrailingZeros64(b[3])
+	x0 := bits.TrailingZeros64(b.a)
+	x1 := bits.TrailingZeros64(b.b)
+	x2 := bits.TrailingZeros64(b.c)
+	x3 := bits.TrailingZeros64(b.d)
 
 	if x0 != 64 {
 		return uint8(x0), true
@@ -136,17 +140,18 @@ func (b *BitSet256) FirstSet() (first uint8, ok bool) {
 //
 //nolint:gosec  // G115: integer overflow conversion int -> uint
 func (b *BitSet256) NextSet(bit uint8) (next uint8, ok bool) {
+	a := (*[4]uint64)(unsafe.Pointer(b))
 	wIdx := int(bit >> 6)
 
 	// process the first (maybe partial) word
-	first := b[wIdx] >> (bit & 63)
+	first := a[wIdx] >> (bit & 63)
 	if first != 0 {
 		return bit + uint8(bits.TrailingZeros64(first)), true
 	}
 
 	// process the following words until next bit is set
 	for wIdx++; wIdx < 4; wIdx++ {
-		if next := b[wIdx]; next != 0 {
+		if next := a[wIdx]; next != 0 {
 			return uint8(wIdx<<6 + bits.TrailingZeros64(next)), true
 		}
 	}
@@ -168,20 +173,20 @@ func (b *BitSet256) NextSet(bit uint8) (next uint8, ok bool) {
 //	index, ok := bs.LastSet()  // index == 214, ok == true
 //
 //nolint:gosec  // G115: integer overflow conversion int -> uint
-func (b *BitSet256) LastSet() (last uint8, ok bool) {
+func (b BitSet256) LastSet() (last uint8, ok bool) {
 	// optimized by unrolling the loop.
 	// This enables compiler inlining and is ~20% faster.
-	if b[3] != 0 {
-		return uint8(bits.Len64(b[3]) + 191), true
+	if b.d != 0 {
+		return uint8(bits.Len64(b.d) + 191), true
 	}
-	if b[2] != 0 {
-		return uint8(bits.Len64(b[2]) + 127), true
+	if b.c != 0 {
+		return uint8(bits.Len64(b.c) + 127), true
 	}
-	if b[1] != 0 {
-		return uint8(bits.Len64(b[1]) + 63), true
+	if b.b != 0 {
+		return uint8(bits.Len64(b.b) + 63), true
 	}
-	if b[0] != 0 {
-		return uint8(bits.Len64(b[0]) - 1), true
+	if b.a != 0 {
+		return uint8(bits.Len64(b.a) - 1), true
 	}
 	return 0, false
 }
@@ -201,9 +206,10 @@ func (b *BitSet256) LastSet() (last uint8, ok bool) {
 // hot paths and performance-critical loops where heap churn must be avoided.
 //
 //nolint:gosec  // G115: integer overflow conversion int -> uint
-func (b *BitSet256) AsSlice(buf *[256]uint8) []uint8 {
+func (b BitSet256) AsSlice(buf *[256]uint8) []uint8 {
+	a := (*[4]uint64)(unsafe.Pointer(&b))
 	size := 0
-	for wIdx, word := range b {
+	for wIdx, word := range a {
 		for ; word != 0; size++ {
 			buf[size] = uint8(wIdx<<6 + bits.TrailingZeros64(word))
 			word &= word - 1 // clear the rightmost set bit
@@ -237,13 +243,16 @@ func (b *BitSet256) Bits() []uint8 {
 //
 //nolint:gosec  // G115: integer overflow conversion int -> uint8
 func (b *BitSet256) IntersectionTop(c *BitSet256) (top uint8, ok bool) {
+	a := (*[4]uint64)(unsafe.Pointer(b))
+	d := (*[4]uint64)(unsafe.Pointer(c))
+
 	// optimized by unrolling the first word check.
 	// This enables compiler inlining and is ~15% faster.
-	if w := b[3] & c[3]; w != 0 {
+	if w := a[3] & d[3]; w != 0 {
 		return uint8(191 + bits.Len64(w)), true
 	}
 	for wIdx := 2; wIdx >= 0; wIdx-- {
-		if w := b[wIdx] & c[wIdx]; w != 0 {
+		if w := a[wIdx] & d[wIdx]; w != 0 {
 			return uint8(wIdx<<6 + bits.Len64(w) - 1), true
 		}
 	}
@@ -272,51 +281,51 @@ func (b *BitSet256) IntersectionTop(c *BitSet256) (top uint8, ok bool) {
 //
 // This avoids dynamic mask construction and enables branch-free, highly
 // predictable performance.
-func (b *BitSet256) Rank(idx uint8) (rnk int) {
-	rnk += bits.OnesCount64(b[0] & rankMask[idx][0])
-	rnk += bits.OnesCount64(b[1] & rankMask[idx][1])
-	rnk += bits.OnesCount64(b[2] & rankMask[idx][2])
-	rnk += bits.OnesCount64(b[3] & rankMask[idx][3])
+func (b BitSet256) Rank(idx uint8) (rnk int) {
+	rnk += bits.OnesCount64(b.a & rankMask[idx].a)
+	rnk += bits.OnesCount64(b.b & rankMask[idx].b)
+	rnk += bits.OnesCount64(b.c & rankMask[idx].c)
+	rnk += bits.OnesCount64(b.d & rankMask[idx].d)
 	return
 }
 
 // IsEmpty reports whether all 256 bits are zero.
-func (b *BitSet256) IsEmpty() bool {
-	return b[0]|b[1]|b[2]|b[3] == 0
+func (b BitSet256) IsEmpty() bool {
+	return b.a|b.b|b.c|b.d == 0
 }
 
 // Intersects reports whether the receiver and c have at least one bit in common.
-func (b *BitSet256) Intersects(c *BitSet256) bool {
-	return b[0]&c[0] != 0 ||
-		b[1]&c[1] != 0 ||
-		b[2]&c[2] != 0 ||
-		b[3]&c[3] != 0
+func (b BitSet256) Intersects(c BitSet256) bool {
+	return b.a&c.a != 0 ||
+		b.b&c.b != 0 ||
+		b.c&c.c != 0 ||
+		b.d&c.d != 0
 }
 
 // Intersection returns a new BitSet256 containing only the bits
 // that are set in both the receiver and c (bitwise AND).
-func (b *BitSet256) Intersection(c *BitSet256) (bs BitSet256) {
-	bs[0] = b[0] & c[0]
-	bs[1] = b[1] & c[1]
-	bs[2] = b[2] & c[2]
-	bs[3] = b[3] & c[3]
+func (b BitSet256) Intersection(c BitSet256) (bs BitSet256) {
+	bs.a = b.a & c.a
+	bs.b = b.b & c.b
+	bs.c = b.c & c.c
+	bs.d = b.d & c.d
 	return
 }
 
 // Union sets all bits in the receiver that are set in c (in-place bitwise OR).
-func (b *BitSet256) Union(c *BitSet256) {
-	b[0] |= c[0]
-	b[1] |= c[1]
-	b[2] |= c[2]
-	b[3] |= c[3]
+func (b *BitSet256) Union(c BitSet256) {
+	b.a |= c.a
+	b.b |= c.b
+	b.c |= c.c
+	b.d |= c.d
 }
 
 // Size returns the population count, i.e. the number of set bits.
-func (b *BitSet256) Size() (cnt int) {
-	cnt += bits.OnesCount64(b[0])
-	cnt += bits.OnesCount64(b[1])
-	cnt += bits.OnesCount64(b[2])
-	cnt += bits.OnesCount64(b[3])
+func (b BitSet256) Size() (cnt int) {
+	cnt += bits.OnesCount64(b.a)
+	cnt += bits.OnesCount64(b.b)
+	cnt += bits.OnesCount64(b.c)
+	cnt += bits.OnesCount64(b.d)
 	return
 }
 
