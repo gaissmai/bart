@@ -55,7 +55,7 @@ func TestZeroValue(t *testing.T) {
 
 	b = BitSet256{}
 	c = BitSet256{}
-	b.IntersectionTop(&c)
+	b.IntersectionTop(c)
 }
 
 func TestSetClearTest(t *testing.T) {
@@ -66,11 +66,11 @@ func TestSetClearTest(t *testing.T) {
 		if b.Test(bit) {
 			t.Errorf("expected bit %d to be clear initially", bit)
 		}
-		b.Set(bit)
+		b = b.Set(bit)
 		if !b.Test(bit) {
 			t.Errorf("expected bit %d to be set after Set", bit)
 		}
-		b.Clear(bit)
+		b = b.Clear(bit)
 		if b.Test(bit) {
 			t.Errorf("expected bit %d to be clear after Clear", bit)
 		}
@@ -132,7 +132,7 @@ func TestFirstSet(t *testing.T) {
 	for _, tc := range testCases {
 		var b BitSet256
 		for _, u := range tc.set {
-			b.Set(u)
+			b = b.Set(u)
 		}
 
 		idx, ok := b.FirstSet()
@@ -208,7 +208,7 @@ func TestLastSet(t *testing.T) {
 	for _, tc := range testCases {
 		var b BitSet256
 		for _, u := range tc.set {
-			b.Set(u)
+			b = b.Set(u)
 		}
 
 		idx, ok := b.LastSet()
@@ -296,11 +296,11 @@ func TestNextSet(t *testing.T) {
 	for _, tc := range testCases {
 		var b BitSet256
 		for _, u := range tc.set {
-			b.Set(u)
+			b = b.Set(u)
 		}
 
 		for _, u := range tc.del {
-			b.Clear(u) // without compact
+			b = b.Clear(u) // without compact
 		}
 
 		idx, ok := b.NextSet(tc.start)
@@ -361,11 +361,11 @@ func TestIsEmpty(t *testing.T) {
 	for _, tc := range testCases {
 		var b BitSet256
 		for _, u := range tc.set {
-			b.Set(u)
+			b = b.Set(u)
 		}
 
 		for _, u := range tc.del {
-			b.Clear(u) // without compact
+			b = b.Clear(u) // without compact
 		}
 
 		got := b.IsEmpty()
@@ -421,11 +421,11 @@ func TestAll(t *testing.T) {
 	for _, tc := range testCases {
 		var b BitSet256
 		for _, u := range tc.set {
-			b.Set(u)
+			b = b.Set(u)
 		}
 
 		for _, u := range tc.del {
-			b.Clear(u) // without compact
+			b = b.Clear(u) // without compact
 		}
 
 		buf := b.Bits()
@@ -482,11 +482,11 @@ func TestAsSlice(t *testing.T) {
 	for _, tc := range testCases {
 		var b BitSet256
 		for _, u := range tc.set {
-			b.Set(u)
+			b = b.Set(u)
 		}
 
 		for _, u := range tc.del {
-			b.Clear(u) // without compact
+			b = b.Clear(u) // without compact
 		}
 
 		buf := b.AsSlice(&[256]uint8{})
@@ -509,7 +509,7 @@ func TestCount2(t *testing.T) {
 			t.Errorf("Count reported as %d, but it should be %d", sz, i/3)
 			break
 		}
-		b.Set(i)
+		b = b.Set(i)
 	}
 }
 
@@ -520,12 +520,12 @@ func TestUnion(t *testing.T) {
 	var b BitSet256
 
 	for i := uint8(1); i < 100; i += 2 {
-		a.Set(i)
-		b.Set(i - 1)
+		a = a.Set(i)
+		b = b.Set(i - 1)
 	}
 
 	for i := uint8(100); i < 200; i++ {
-		b.Set(i)
+		b = b.Set(i)
 	}
 
 	c := a
@@ -547,12 +547,12 @@ func TestInplaceIntersection(t *testing.T) {
 	var a BitSet256
 	var b BitSet256
 	for i := uint8(1); i < 100; i += 2 {
-		a.Set(i)
-		b.Set(i - 1)
-		b.Set(i)
+		a = a.Set(i)
+		b = b.Set(i - 1)
+		b = b.Set(i)
 	}
 	for i := uint8(100); i < 200; i++ {
-		b.Set(i)
+		b = b.Set(i)
 	}
 
 	c := a
@@ -574,10 +574,10 @@ func TestIntersectsAny(t *testing.T) {
 	var b BitSet256
 
 	for i := uint8(1); i < 100; i++ {
-		a.Set(i)
+		a = a.Set(i)
 	}
 	for i := uint8(100); i < 200; i++ {
-		b.Set(i)
+		b = b.Set(i)
 	}
 
 	want := false
@@ -656,13 +656,13 @@ func TestIntersectionTop(t *testing.T) {
 	for _, tc := range testCases {
 		var a, b BitSet256
 		for _, v := range tc.a {
-			a.Set(v)
+			a = a.Set(v)
 		}
 		for _, v := range tc.b {
-			b.Set(v)
+			b = b.Set(v)
 		}
 
-		gotIdx, gotOk := a.IntersectionTop(&b)
+		gotIdx, gotOk := a.IntersectionTop(b)
 		if gotOk != tc.wantOk {
 			t.Errorf("IntersectionTop, %s: got ok %v, want %v", tc.name, gotOk, tc.wantOk)
 		}
@@ -671,7 +671,7 @@ func TestIntersectionTop(t *testing.T) {
 		}
 
 		// Commutative check
-		gotIdx2, gotOk2 := b.IntersectionTop(&a)
+		gotIdx2, gotOk2 := b.IntersectionTop(a)
 		if gotOk2 != tc.wantOk {
 			t.Errorf("IntersectionTop (commutative), %s: got ok %v, want %v", tc.name, gotOk2, tc.wantOk)
 		}
@@ -737,7 +737,7 @@ func TestRank(t *testing.T) {
 
 	var b BitSet256
 	for _, v := range u {
-		b.Set(v)
+		b = b.Set(v)
 	}
 
 	for _, tc := range tests {
@@ -869,7 +869,7 @@ func BenchmarkIntersectionTop(b *testing.B) {
 	} {
 		b.Run(fmt.Sprintf("Top: at %d", i), func(b *testing.B) {
 			for b.Loop() {
-				aa.IntersectionTop(&aa)
+				aa.IntersectionTop(aa)
 			}
 		})
 	}
