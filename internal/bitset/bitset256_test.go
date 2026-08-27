@@ -529,10 +529,10 @@ func TestUnion(t *testing.T) {
 	}
 
 	c := a
-	c.Union(b)
+	c = c.Union(b)
 
 	d := b
-	d.Union(a)
+	d = d.Union(a)
 
 	if c.Size() != 200 {
 		t.Errorf("Union should have 200 bits set, but had %d", c.Size())

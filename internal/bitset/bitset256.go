@@ -38,7 +38,7 @@ import (
 
 // BitSet256 represents a fixed-size bitset for the range [0..255],
 // stored as four uint64 words (256 bits total).
-type BitSet256 struct{ w0, w1, w2, w3 uint64 }
+type BitSet256 struct{ W0, W1, W2, W3 uint64 }
 
 // Set returns a new BitSet256 with the bit at position set to 1.
 func (b BitSet256) Set(bit uint8) BitSet256 {
@@ -46,13 +46,13 @@ func (b BitSet256) Set(bit uint8) BitSet256 {
 
 	switch bit >> 6 {
 	case 0:
-		b.w0 |= mask
+		b.W0 |= mask
 	case 1:
-		b.w1 |= mask
+		b.W1 |= mask
 	case 2:
-		b.w2 |= mask
+		b.W2 |= mask
 	default:
-		b.w3 |= mask
+		b.W3 |= mask
 	}
 
 	return b
@@ -64,13 +64,13 @@ func (b BitSet256) Clear(bit uint8) BitSet256 {
 
 	switch bit >> 6 {
 	case 0:
-		b.w0 &= mask
+		b.W0 &= mask
 	case 1:
-		b.w1 &= mask
+		b.W1 &= mask
 	case 2:
-		b.w2 &= mask
+		b.W2 &= mask
 	default:
-		b.w3 &= mask
+		b.W3 &= mask
 	}
 
 	return b
@@ -83,13 +83,13 @@ func (b BitSet256) Test(bit uint8) bool {
 
 	switch word {
 	case 0:
-		return (b.w0 & mask) != 0
+		return (b.W0 & mask) != 0
 	case 1:
-		return (b.w1 & mask) != 0
+		return (b.W1 & mask) != 0
 	case 2:
-		return (b.w2 & mask) != 0
+		return (b.W2 & mask) != 0
 	default: // case 3
-		return (b.w3 & mask) != 0
+		return (b.W3 & mask) != 0
 	}
 }
 
@@ -117,10 +117,10 @@ func (b BitSet256) Test(bit uint8) bool {
 //nolint:gosec  // G115: integer overflow conversion int -> uint
 func (b BitSet256) FirstSet() (first uint8, ok bool) {
 	// optimized for pipelining, can still inline with cost 79
-	x0 := bits.TrailingZeros64(b.w0)
-	x1 := bits.TrailingZeros64(b.w1)
-	x2 := bits.TrailingZeros64(b.w2)
-	x3 := bits.TrailingZeros64(b.w3)
+	x0 := bits.TrailingZeros64(b.W0)
+	x1 := bits.TrailingZeros64(b.W1)
+	x2 := bits.TrailingZeros64(b.W2)
+	x3 := bits.TrailingZeros64(b.W3)
 
 	if x0 != 64 {
 		return uint8(x0), true
@@ -162,27 +162,27 @@ func (b BitSet256) NextSet(bit uint8) (uint8, bool) {
 
 	switch wIdx {
 	case 0:
-		b.w0 &= mask
+		b.W0 &= mask
 	case 1:
-		b.w0 = 0
-		b.w1 &= mask
+		b.W0 = 0
+		b.W1 &= mask
 	case 2:
-		b.w0, b.w1 = 0, 0
-		b.w2 &= mask
+		b.W0, b.W1 = 0, 0
+		b.W2 &= mask
 	case 3:
-		b.w0, b.w1, b.w2 = 0, 0, 0
-		b.w3 &= mask
+		b.W0, b.W1, b.W2 = 0, 0, 0
+		b.W3 &= mask
 	}
 
 	switch {
-	case b.w0 != 0:
-		return uint8(bits.TrailingZeros64(b.w0)), true
-	case b.w1 != 0:
-		return 64 + uint8(bits.TrailingZeros64(b.w1)), true
-	case b.w2 != 0:
-		return 128 + uint8(bits.TrailingZeros64(b.w2)), true
-	case b.w3 != 0:
-		return 192 + uint8(bits.TrailingZeros64(b.w3)), true
+	case b.W0 != 0:
+		return uint8(bits.TrailingZeros64(b.W0)), true
+	case b.W1 != 0:
+		return 64 + uint8(bits.TrailingZeros64(b.W1)), true
+	case b.W2 != 0:
+		return 128 + uint8(bits.TrailingZeros64(b.W2)), true
+	case b.W3 != 0:
+		return 192 + uint8(bits.TrailingZeros64(b.W3)), true
 	}
 
 	return 0, false
@@ -202,17 +202,17 @@ func (b BitSet256) NextSet(bit uint8) (uint8, bool) {
 //	bs.Set(214)
 //	index, ok := bs.LastSet()  // index == 214, ok == true
 func (b BitSet256) LastSet() (last uint8, ok bool) {
-	if b.w3 != 0 {
-		return uint8(bits.Len64(b.w3) + 191), true
+	if b.W3 != 0 {
+		return uint8(bits.Len64(b.W3) + 191), true
 	}
-	if b.w2 != 0 {
-		return uint8(bits.Len64(b.w2) + 127), true
+	if b.W2 != 0 {
+		return uint8(bits.Len64(b.W2) + 127), true
 	}
-	if b.w1 != 0 {
-		return uint8(bits.Len64(b.w1) + 63), true
+	if b.W1 != 0 {
+		return uint8(bits.Len64(b.W1) + 63), true
 	}
-	if b.w0 != 0 {
-		return uint8(bits.Len64(b.w0) - 1), true
+	if b.W0 != 0 {
+		return uint8(bits.Len64(b.W0) - 1), true
 	}
 	return 0, false
 }
@@ -231,7 +231,7 @@ func (b BitSet256) LastSet() (last uint8, ok bool) {
 // valid until `buf` is modified or reused. This pattern is highly recommended for
 // hot paths and performance-critical loops where heap churn must be avoided.
 func (b BitSet256) AsSlice(buf *[256]uint8) []uint8 {
-	words := [4]uint64{b.w0, b.w1, b.w2, b.w3}
+	words := [4]uint64{b.W0, b.W1, b.W2, b.W3}
 	size := 0
 
 	for wIdx, word := range words {
@@ -266,19 +266,20 @@ func (b BitSet256) Bits() []uint8 {
 // If the intersection is non-empty, it returns the top bit index and true.
 // If the intersection is empty, ok is false and top is 0.
 func (b BitSet256) IntersectionTop(c BitSet256) (top uint8, ok bool) {
-	b.w3 &= c.w3
-	b.w2 &= c.w2
-	b.w1 &= c.w1
-	b.w0 &= c.w0
+	b.W3 &= c.W3
+	b.W2 &= c.W2
+	b.W1 &= c.W1
+	b.W0 &= c.W0
 
-	if b.w3 != 0 {
-		return uint8(bits.Len64(b.w3) + 191), true
-	} else if b.w2 != 0 {
-		return uint8(bits.Len64(b.w2) + 127), true
-	} else if b.w1 != 0 {
-		return uint8(bits.Len64(b.w1) + 63), true
-	} else if b.w0 != 0 {
-		return uint8(bits.Len64(b.w0) - 1), true
+	switch {
+	case b.W3 != 0:
+		return uint8(bits.Len64(b.W3) + 191), true
+	case b.W2 != 0:
+		return uint8(bits.Len64(b.W2) + 127), true
+	case b.W1 != 0:
+		return uint8(bits.Len64(b.W1) + 63), true
+	case b.W0 != 0:
+		return uint8(bits.Len64(b.W0) - 1), true
 	}
 
 	return 0, false
@@ -307,46 +308,47 @@ func (b BitSet256) IntersectionTop(c BitSet256) (top uint8, ok bool) {
 // This avoids dynamic mask construction and enables branch-free, highly
 // predictable performance.
 func (b BitSet256) Rank(idx uint8) int {
-	return bits.OnesCount64(b.w0&rankMask[idx].w0) +
-		bits.OnesCount64(b.w1&rankMask[idx].w1) +
-		bits.OnesCount64(b.w2&rankMask[idx].w2) +
-		bits.OnesCount64(b.w3&rankMask[idx].w3)
+	return bits.OnesCount64(b.W0&rankMask[idx].W0) +
+		bits.OnesCount64(b.W1&rankMask[idx].W1) +
+		bits.OnesCount64(b.W2&rankMask[idx].W2) +
+		bits.OnesCount64(b.W3&rankMask[idx].W3)
 }
 
 // IsEmpty reports whether all 256 bits are zero.
 func (b BitSet256) IsEmpty() bool {
-	return b.w0|b.w1|b.w2|b.w3 == 0
+	return b.W0|b.W1|b.W2|b.W3 == 0
 }
 
 // Intersects reports whether the receiver and c have at least one bit in common.
 func (b BitSet256) Intersects(c BitSet256) bool {
-	return ((b.w0 & c.w0) | (b.w1 & c.w1) | (b.w2 & c.w2) | (b.w3 & c.w3)) != 0
+	return ((b.W0 & c.W0) | (b.W1 & c.W1) | (b.W2 & c.W2) | (b.W3 & c.W3)) != 0
 }
 
 // Intersection returns a new BitSet256 containing only the bits
 // that are set in both the receiver and c (bitwise AND).
 func (b BitSet256) Intersection(c BitSet256) BitSet256 {
-	b.w0 &= c.w0
-	b.w1 &= c.w1
-	b.w2 &= c.w2
-	b.w3 &= c.w3
+	b.W0 &= c.W0
+	b.W1 &= c.W1
+	b.W2 &= c.W2
+	b.W3 &= c.W3
 	return b
 }
 
-// Union sets all bits in the receiver that are set in c (in-place bitwise OR).
-func (b *BitSet256) Union(c BitSet256) {
-	b.w0 |= c.w0
-	b.w1 |= c.w1
-	b.w2 |= c.w2
-	b.w3 |= c.w3
+// Union returns a new BitSet256 containing the bitwise OR union of b and c.
+func (b BitSet256) Union(c BitSet256) BitSet256 {
+	b.W0 |= c.W0
+	b.W1 |= c.W1
+	b.W2 |= c.W2
+	b.W3 |= c.W3
+	return b
 }
 
 // Size returns the population count, i.e. the number of set bits.
 func (b BitSet256) Size() int {
-	return bits.OnesCount64(b.w0) +
-		bits.OnesCount64(b.w1) +
-		bits.OnesCount64(b.w2) +
-		bits.OnesCount64(b.w3)
+	return bits.OnesCount64(b.W0) +
+		bits.OnesCount64(b.W1) +
+		bits.OnesCount64(b.W2) +
+		bits.OnesCount64(b.W3)
 }
 
 // rankMask is a table of bitmasks with all bits set to 1 up to and including a given bit position.

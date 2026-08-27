@@ -631,7 +631,7 @@ func (n *BartNode[V]) Get(pfx netip.Prefix) (val V, exists bool) {
 // is done via a bitset operation that maps the traversal path from the given index
 // toward its possible ancestors.
 func (n *BartNode[V]) Contains(idx uint8) bool {
-	return n.Prefixes.Intersects(&lpm.LookupTbl[idx])
+	return n.Prefixes.Intersects(lpm.LookupTbl[idx])
 }
 
 // LookupIdx performs a longest-prefix match (LPM) lookup for the given index (idx)
@@ -646,7 +646,7 @@ func (n *BartNode[V]) Contains(idx uint8) bool {
 // using a bitset-based operation with a precomputed backtracking pattern specific to idx.
 func (n *BartNode[V]) LookupIdx(idx uint8) (top uint8, val V, ok bool) {
 	// top is the idx of the longest-prefix-match
-	if top, ok = n.Prefixes.IntersectionTop(&lpm.LookupTbl[idx]); ok {
+	if top, ok = n.Prefixes.IntersectionTop(lpm.LookupTbl[idx]); ok {
 		return top, n.MustGetPrefix(top), true
 	}
 	return top, val, ok
@@ -2262,7 +2262,7 @@ func (n *BartNode[V]) Overlaps(o *BartNode[V], depth int) bool {
 	}
 
 	// stop condition, no child with identical octet in n and o
-	if !n.Children.Intersects(&o.Children.BitSet256) {
+	if !n.Children.Intersects(o.Children.BitSet256) {
 		return false
 	}
 
@@ -2276,7 +2276,7 @@ func (n *BartNode[V]) Overlaps(o *BartNode[V], depth int) bool {
 // of the n-prefixes is contained in o, or vice versa.
 func (n *BartNode[V]) OverlapsRoutes(o *BartNode[V]) bool {
 	// some prefixes are identical, trivial overlap
-	if n.Prefixes.Intersects(&o.Prefixes.BitSet256) {
+	if n.Prefixes.Intersects(o.Prefixes.BitSet256) {
 		return true
 	}
 
@@ -2365,7 +2365,7 @@ func (n *BartNode[V]) OverlapsChildrenIn(o *BartNode[V]) bool {
 
 	// use allot table with prefixes as bitsets, bitsets are precalculated.
 	for _, idx := range n.Prefixes.AsSlice(&buf) {
-		if o.Children.Intersects(&allot.FringeRoutesLookupTbl[idx]) {
+		if o.Children.Intersects(allot.FringeRoutesLookupTbl[idx]) {
 			return true
 		}
 	}
@@ -2381,7 +2381,7 @@ func (n *BartNode[V]) OverlapsChildrenIn(o *BartNode[V]) bool {
 // node/leaf/fringe combinations.
 func (n *BartNode[V]) OverlapsSameChildren(o *BartNode[V], depth int) bool {
 	// intersect the child bitsets from n with o
-	commonChildren := n.Children.Intersection(&o.Children.BitSet256)
+	commonChildren := n.Children.Intersection(o.Children.BitSet256)
 
 	for addr, ok := commonChildren.NextSet(0); ok; {
 		nChild := n.MustGetChild(addr)
@@ -2480,12 +2480,12 @@ func (n *BartNode[V]) OverlapsIdx(idx uint8) bool {
 	}
 
 	// 2. Test if prefix overlaps any route in this node
-	if n.Prefixes.Intersects(&allot.PfxRoutesLookupTbl[idx]) {
+	if n.Prefixes.Intersects(allot.PfxRoutesLookupTbl[idx]) {
 		return true
 	}
 
 	// 3. Test if prefix overlaps any child in this node
-	return n.Children.Intersects(&allot.FringeRoutesLookupTbl[idx])
+	return n.Children.Intersects(allot.FringeRoutesLookupTbl[idx])
 }
 
 // OverlapsTwoChildren handles all 3x3 combinations of

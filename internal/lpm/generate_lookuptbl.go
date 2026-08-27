@@ -173,7 +173,7 @@ func genLookupTbl() string {
 		// Walk up the binary tree by repeatedly right-shifting
 		// Each iteration moves to the parent node (idx >> 1)
 		for i := idx; i > 0; i >>= 1 {
-			lookupTbl[idx].Set(uint8(i))
+			lookupTbl[idx] = lookupTbl[idx].Set(uint8(i))
 		}
 	}
 

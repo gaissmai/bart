@@ -36,7 +36,7 @@ func (n *LiteNode[V]) InsertPrefix(idx uint8, _ V) (exists bool) {
 	if exists = n.Prefixes.Test(idx); exists {
 		return exists
 	}
-	n.Prefixes.Set(idx)
+	n.Prefixes.BitSet256 = n.Prefixes.Set(idx)
 	n.Prefixes.Count++
 	return exists
 }
@@ -47,7 +47,7 @@ func (n *LiteNode[V]) DeletePrefix(idx uint8) (exists bool) {
 	if exists = n.Prefixes.Test(idx); !exists {
 		return false
 	}
-	n.Prefixes.Clear(idx)
+	n.Prefixes.BitSet256 = n.Prefixes.Clear(idx)
 	n.Prefixes.Count--
 	return true
 }
@@ -115,7 +115,7 @@ func (n *LiteNode[V]) DeleteChild(addr uint8) (exists bool) {
 // does not use an allotment-based approach. Instead, it performs CBT backtracking
 // using a bitset-based operation with a precomputed backtracking pattern specific to idx.
 func (n *LiteNode[V]) LookupIdx(idx uint8) (top uint8, _ V, ok bool) {
-	top, ok = n.Prefixes.IntersectionTop(&lpm.LookupTbl[idx])
+	top, ok = n.Prefixes.IntersectionTop(lpm.LookupTbl[idx])
 	return
 }
 

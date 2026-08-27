@@ -151,7 +151,7 @@ LOOP:
 		if n.PrefixCount() != 0 {
 			idx := art.OctetToIdx(octets[depth])
 			// lookupIdx() manually inlined
-			if lpmIdx, ok2 := n.Prefixes.IntersectionTop(&lpm.LookupTbl[idx]); ok2 {
+			if lpmIdx, ok2 := n.Prefixes.IntersectionTop(lpm.LookupTbl[idx]); ok2 {
 				return n.MustGetPrefix(lpmIdx), ok2
 			}
 		}
@@ -288,7 +288,7 @@ LOOP:
 
 		// manually inlined: lookupIdx(idx)
 		var topIdx uint8
-		if topIdx, ok = n.Prefixes.IntersectionTop(&lpm.LookupTbl[idx]); ok {
+		if topIdx, ok = n.Prefixes.IntersectionTop(lpm.LookupTbl[idx]); ok {
 			val = n.MustGetPrefix(topIdx)
 
 			// called from LookupPrefix

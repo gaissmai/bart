@@ -141,9 +141,9 @@ func genAllotTables() (prefix, fringe [256]bitset.BitSet256) {
 		for i := 0; i < len(stack); i++ {
 			j := stack[i]
 			if j < 256 {
-				prefixAllotTbl[idx].Set(uint8(j))
+				prefixAllotTbl[idx] = prefixAllotTbl[idx].Set(uint8(j))
 			} else {
-				fringeAllotTbl[idx].Set(uint8(j - 256))
+				fringeAllotTbl[idx] = fringeAllotTbl[idx].Set(uint8(j - 256))
 			}
 
 			// max j is 511, so stop the duplication at 256 and above
