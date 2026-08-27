@@ -42,9 +42,10 @@ type BitSet256 struct{ W0, W1, W2, W3 uint64 }
 
 // Set returns a new BitSet256 with the bit at position set to 1.
 func (b BitSet256) Set(bit uint8) BitSet256 {
+	word := bit >> 6
 	mask := uint64(1) << (bit & 63)
 
-	switch bit >> 6 {
+	switch word {
 	case 0:
 		b.W0 |= mask
 	case 1:
@@ -60,9 +61,10 @@ func (b BitSet256) Set(bit uint8) BitSet256 {
 
 // Clear returns a new BitSet256 with the bit at position set to 0.
 func (b BitSet256) Clear(bit uint8) BitSet256 {
+	word := bit >> 6
 	mask := ^(uint64(1) << (bit & 63))
 
-	switch bit >> 6 {
+	switch word {
 	case 0:
 		b.W0 &= mask
 	case 1:
@@ -77,19 +79,19 @@ func (b BitSet256) Clear(bit uint8) BitSet256 {
 }
 
 // Test reports whether the bit at position bit (0..255) is set.
-func (b BitSet256) Test(bit uint8) bool {
+func (b BitSet256) Test(bit uint8) (result bool) {
 	word := bit >> 6
 	mask := uint64(1) << (bit & 63)
 
 	switch word {
 	case 0:
-		return (b.W0 & mask) != 0
+		return b.W0&mask != 0
 	case 1:
-		return (b.W1 & mask) != 0
+		return b.W1&mask != 0
 	case 2:
-		return (b.W2 & mask) != 0
-	default: // case 3
-		return (b.W3 & mask) != 0
+		return b.W2&mask != 0
+	default:
+		return b.W3&mask != 0
 	}
 }
 
