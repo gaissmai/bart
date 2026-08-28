@@ -33,8 +33,8 @@ func TestInlineBitSet256Functions(t *testing.T) {
 		"bitset.BitSet256.IsEmpty",
 		//
 		"bitset.BitSet256.FirstSet",
-		//"bitset.BitSet256.NextSet",
 		"bitset.BitSet256.LastSet",
+		// "bitset.BitSet256.NextSet",
 		//
 		"bitset.BitSet256.Intersects",
 		"bitset.BitSet256.Intersection",
