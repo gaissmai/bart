@@ -227,10 +227,10 @@ func (b *BitSet256) Bits() []uint8 {
 // If the intersection is non-empty, it returns the top bit index and true.
 // If the intersection is empty, ok is false and top is 0.
 func (b BitSet256) IntersectionTop(c BitSet256) (top uint8, ok bool) {
-	b.W0 &= c.W0
-	b.W1 &= c.W1
-	b.W2 &= c.W2
 	b.W3 &= c.W3
+	b.W2 &= c.W2
+	b.W1 &= c.W1
+	b.W0 &= c.W0
 
 	switch {
 	case b.W3 != 0:

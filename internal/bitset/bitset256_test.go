@@ -875,6 +875,24 @@ func BenchmarkIntersectionTop(b *testing.B) {
 	}
 }
 
+func BenchmarkIntersectionTop2(b *testing.B) {
+	for i, aa := range []BitSet256{
+		{0, 0, 0, 0},
+		{1, 0, 0, 0},
+		{0, 1, 0, 0},
+		{0, 0, 1, 0},
+		{0, 0, 0, 1},
+	} {
+		bb := BitSet256{}
+		b.Run(fmt.Sprintf("Top: at %d", i), func(b *testing.B) {
+			for b.Loop() {
+				bb = aa.Intersection(aa)
+				_, _ = bb.LastSet()
+			}
+		})
+	}
+}
+
 func BenchmarkLastSet(b *testing.B) {
 	for i, aa := range []BitSet256{
 		{0, 0, 0, 0},
