@@ -32,6 +32,22 @@ package bitset
 // can inline (*BitSet256).Test with cost 15
 // can inline (*BitSet256).Union with cost 36
 
+// can inline (*BitSet256).AsSlice with cost 47
+// can inline (*BitSet256).Bits with cost 52
+// can inline (*BitSet256).Clear with cost 18
+// can inline BitSet256.FirstSet with cost 71
+// can inline BitSet256.IntersectionTop with cost 80
+// can inline BitSet256.Intersection with cost 22
+// can inline BitSet256.Intersects with cost 26
+// can inline BitSet256.IsEmpty with cost 14
+// can inline BitSet256.LastSet with cost 59
+// can inline BitSet256.Rank with cost 40
+// can inline (*BitSet256).Set with cost 17
+// can inline BitSet256.Size with cost 20
+// can inline (*BitSet256).Test with cost 20
+// can inline BitSet256.Union with cost 22
+// cannot inline BitSet256.NextSet: function too complex: cost 121 exceeds budget 80
+
 import (
 	"math/bits"
 	"unsafe"
@@ -85,16 +101,14 @@ func (b BitSet256) FirstSet() (first uint8, ok bool) {
 	x2 := bits.TrailingZeros64(b.W2)
 	x3 := bits.TrailingZeros64(b.W3)
 
-	if x0 != 64 {
+	switch {
+	case x0 != 64:
 		return uint8(x0), true
-	}
-	if x1 != 64 {
+	case x1 != 64:
 		return uint8(x1 + 64), true
-	}
-	if x2 != 64 {
+	case x2 != 64:
 		return uint8(x2 + 128), true
-	}
-	if x3 != 64 {
+	case x3 != 64:
 		return uint8(x3 + 192), true
 	}
 
