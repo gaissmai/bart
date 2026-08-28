@@ -27,13 +27,13 @@ func TestZeroValue(t *testing.T) {
 	b.Clear(100)
 
 	b = BitSet256{}
-	b.Size()
+	_ = b.Size()
 
 	b = BitSet256{}
-	b.Rank(100)
+	_ = b.Rank(100)
 
 	b = BitSet256{}
-	b.Test(42)
+	_ = b.Test(42)
 
 	b = BitSet256{}
 	b.NextSet(0)
@@ -43,7 +43,7 @@ func TestZeroValue(t *testing.T) {
 
 	b = BitSet256{}
 	c := BitSet256{}
-	b.Union(c)
+	_ = b.Union(c)
 
 	b = BitSet256{}
 	c = BitSet256{}
@@ -51,11 +51,11 @@ func TestZeroValue(t *testing.T) {
 
 	b = BitSet256{}
 	c = BitSet256{}
-	b.Intersects(c)
+	_ = b.Intersects(c)
 
 	b = BitSet256{}
 	c = BitSet256{}
-	b.IntersectionTop(c)
+	_, _ = b.IntersectionTop(c)
 }
 
 func TestSetClearTest(t *testing.T) {

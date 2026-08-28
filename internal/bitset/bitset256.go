@@ -95,6 +95,8 @@ func (b *BitSet256) Test(bit uint8) (result bool) {
 // the CPU to parallelize these operations internally (pipelining), avoiding
 // branch misprediction and maximizing instruction throughput. This technique
 // is especially effective for bitsets with known, fixed word count.
+//
+//nolint:gosec  // G115: integer overflow conversion int -> uint
 func (b BitSet256) FirstSet() (first uint8, ok bool) {
 	x0 := bits.TrailingZeros64(b.W0)
 	x1 := bits.TrailingZeros64(b.W1)
@@ -131,6 +133,8 @@ func (b BitSet256) FirstSet() (first uint8, ok bool) {
 //	b.NextSet(5)   ->   5, true
 //	b.NextSet(6)   -> 130, true
 //	b.NextSet(200) ->   0, false
+//
+//nolint:gosec  // G115: integer overflow conversion int -> uint
 func (b BitSet256) NextSet(bit uint8) (uint8, bool) {
 	wIdx := bit >> 6
 	mask := ^uint64(0) << (bit & 63)
@@ -176,6 +180,8 @@ func (b BitSet256) NextSet(bit uint8) (uint8, bool) {
 //	bs.Set(130)
 //	bs.Set(214)
 //	index, ok := bs.LastSet()  // index == 214, ok == true
+//
+//nolint:gosec  // G115: integer overflow conversion int -> uint
 func (b BitSet256) LastSet() (last uint8, ok bool) {
 	if b.W3 != 0 {
 		return uint8(bits.Len64(b.W3) + 191), true
@@ -205,6 +211,8 @@ func (b BitSet256) LastSet() (last uint8, ok bool) {
 // The returned slice directly shares the underlying storage of `buf` and is only
 // valid until `buf` is modified or reused. This pattern is highly recommended for
 // hot paths and performance-critical loops where heap churn must be avoided.
+//
+//nolint:gosec  // G115: integer overflow conversion int -> uint
 func (b *BitSet256) AsSlice(buf *[256]uint8) []uint8 {
 	words := (*[4]uint64)(unsafe.Pointer(b))
 	size := 0
@@ -240,6 +248,8 @@ func (b *BitSet256) Bits() []uint8 {
 // and returns the highest (top-most) set bit of the result.
 // If the intersection is non-empty, it returns the top bit index and true.
 // If the intersection is empty, ok is false and top is 0.
+//
+//nolint:gosec  // G115: integer overflow conversion int -> uint
 func (b BitSet256) IntersectionTop(c BitSet256) (top uint8, ok bool) {
 	b.W3 &= c.W3
 	b.W2 &= c.W2
