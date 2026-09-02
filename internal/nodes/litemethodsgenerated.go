@@ -281,8 +281,7 @@ func (n *LiteNode[V]) PurgeAndCompress(stack []*LiteNode[V], octets []uint8, is4
 		case childCount == 1:
 			// The node has exactly one child. We determine if it is a path node,
 			// a compressed LeafNode, or a compressed FringeNode.
-			singleAddr, _ := n.Children.FirstSet()
-			anyKid := n.MustGetChild(singleAddr)
+			anyKid := n.Children.Items[0]
 
 			switch kid := anyKid.(type) {
 			case *LiteNode[V]:
@@ -302,6 +301,7 @@ func (n *LiteNode[V]) PurgeAndCompress(stack []*LiteNode[V], octets []uint8, is4
 				// Reconstruct the full prefix for the fringe, as path compression
 				// requires the entire CIDR path, not just the remainder.
 				// depth is the parent's depth, so we offset by 1 for the kid's position.
+				singleAddr, _ := n.Children.FirstSet()
 				fringePfx := CidrForFringe(octets, depth+1, is4, singleAddr)
 
 				parent.Insert(fringePfx, kid.Value, depth)
