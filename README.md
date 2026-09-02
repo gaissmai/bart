@@ -144,20 +144,21 @@ For maximum performance, specify the CPU feature set when compiling.
 See the [Go minimum requirements](https://go.dev/wiki/MinimumRequirements#architectures) for details.
 
 ```bash
-# On ARM64, Go auto-selects CPU instructions.
 # Example for AMD64, choose v2/v3/v4 to match your CPU features.
 GOAMD64=v3 go build
+
+# On ARM64, Go auto-selects CPU instructions.
+
 ```
 Critical loops over these fixed-size bitsets can be unrolled for additional speed,
 ensuring predictable memory access and efficient use of CPU pipelines.
 
 ```go
 func (b *BitSet256) popcnt() (cnt int) {
-  cnt += bits.OnesCount64(b[0])
-  cnt += bits.OnesCount64(b[1])
-  cnt += bits.OnesCount64(b[2])
-  cnt += bits.OnesCount64(b[3])
-  return
+  return bits.OnesCount64(b[0]) +
+      bits.OnesCount64(b[1]) +
+      bits.OnesCount64(b[2]) +
+      bits.OnesCount64(b[3])
 }
 ```
 
