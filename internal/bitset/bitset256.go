@@ -28,7 +28,7 @@ package bitset
 // can inline (*BitSet256).NextSet with cost 65
 // can inline (*BitSet256).Rank with cost 57
 // can inline (*BitSet256).Set with cost 12
-// can inline (*BitSet256).Size with cost 33
+// can inline (*BitSet256).Size with cost 28
 // can inline (*BitSet256).Test with cost 15
 // can inline (*BitSet256).Union with cost 36
 
@@ -312,12 +312,11 @@ func (b *BitSet256) Union(c *BitSet256) {
 }
 
 // Size returns the population count, i.e. the number of set bits.
-func (b *BitSet256) Size() (cnt int) {
-	cnt += bits.OnesCount64(b[0])
-	cnt += bits.OnesCount64(b[1])
-	cnt += bits.OnesCount64(b[2])
-	cnt += bits.OnesCount64(b[3])
-	return
+func (b *BitSet256) Size() int {
+	return bits.OnesCount64(b[0]) +
+		bits.OnesCount64(b[1]) +
+		bits.OnesCount64(b[2]) +
+		bits.OnesCount64(b[3])
 }
 
 // rankMask is a table of bitmasks with all bits set to 1 up to and including a given bit position.
