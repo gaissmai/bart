@@ -26,7 +26,7 @@ package bitset
 // can inline (*BitSet256).IsEmpty with cost 22
 // can inline (*BitSet256).LastSet with cost 75
 // can inline (*BitSet256).NextSet with cost 65
-// can inline (*BitSet256).Rank with cost 57
+// can inline (*BitSet256).Rank with cost 52
 // can inline (*BitSet256).Set with cost 12
 // can inline (*BitSet256).Size with cost 28
 // can inline (*BitSet256).Test with cost 15
@@ -272,12 +272,11 @@ func (b *BitSet256) IntersectionTop(c *BitSet256) (top uint8, ok bool) {
 //
 // This avoids dynamic mask construction and enables branch-free, highly
 // predictable performance.
-func (b *BitSet256) Rank(idx uint8) (rnk int) {
-	rnk += bits.OnesCount64(b[0] & rankMask[idx][0])
-	rnk += bits.OnesCount64(b[1] & rankMask[idx][1])
-	rnk += bits.OnesCount64(b[2] & rankMask[idx][2])
-	rnk += bits.OnesCount64(b[3] & rankMask[idx][3])
-	return
+func (b *BitSet256) Rank(idx uint8) int {
+	return bits.OnesCount64(b[0]&rankMask[idx][0]) +
+		bits.OnesCount64(b[1]&rankMask[idx][1]) +
+		bits.OnesCount64(b[2]&rankMask[idx][2]) +
+		bits.OnesCount64(b[3]&rankMask[idx][3])
 }
 
 // IsEmpty reports whether all 256 bits are zero.
