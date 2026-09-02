@@ -77,9 +77,6 @@ func (n *_NODE_TYPE[V]) AllRecSorted(stridePath, int, bool, func(netip.Prefix, V
 	return
 }
 
-func (t *_TABLE_TYPE[V]) rootNodeByVersion(is4 bool) (_ *_NODE_TYPE[V])     { return }
-func (t *_TABLE_TYPE[V]) InsertPersist(netip.Prefix, V) (_ *_TABLE_TYPE[V]) { return }
-
 // ### GENERATE DELETE END ###
 
 // rootNodeByVersion, root node getter for ip version.
@@ -380,31 +377,6 @@ LOOP:
 // The prefix is automatically canonicalized using pfx.Masked() to ensure
 // consistent behavior regardless of host bits in the input.
 func (t *_TABLE_TYPE[V]) Insert(pfx netip.Prefix, val V) {
-	t.insert(pfx, val)
-}
-
-// InsertPersist is similar to Insert but the receiver isn't modified.
-//
-// All nodes touched during insert are cloned and a new trie is returned.
-// This is not a full [_TABLE_TYPE.Clone], all untouched nodes are still referenced
-// from both tries.
-//
-// If the payload type V contains pointers or needs deep copying,
-// it must implement the Clone method to support correct cloning.
-//
-// Due to cloning overhead this is significantly slower than Insert,
-// typically taking μsec instead of nsec.
-func (t *_TABLE_TYPE[V]) InsertPersist(pfx netip.Prefix, val V) *_TABLE_TYPE[V] {
-	return t.insertPersist(pfx, val)
-}
-
-// insert adds or updates a prefix-value pair in the routing table.
-// If the prefix already exists, its value is updated; otherwise a new entry is created.
-// Invalid prefixes are silently ignored.
-//
-// The prefix is automatically canonicalized using pfx.Masked() to ensure
-// consistent behavior regardless of host bits in the input.
-func (t *_TABLE_TYPE[V]) insert(pfx netip.Prefix, val V) {
 	if !pfx.IsValid() {
 		return
 	}
@@ -423,23 +395,18 @@ func (t *_TABLE_TYPE[V]) insert(pfx netip.Prefix, val V) {
 	t.sizeUpdate(is4, 1)
 }
 
-// insertPersist is similar to insert but the receiver isn't modified.
+// InsertPersist is similar to Insert but the receiver isn't modified.
 //
-// All nodes touched during insert are cloned and a new _TABLE_TYPE is returned.
+// All nodes touched during insert are cloned and a new trie is returned.
 // This is not a full [_TABLE_TYPE.Clone], all untouched nodes are still referenced
-// from both Tables.
+// from both tries.
 //
 // If the payload type V contains pointers or needs deep copying,
-// implement:
+// it must implement the Clone method to support correct cloning.
 //
-//	func (v V) Clone() V
-//
-// The bart package detects this via structural typing and deep‑copies
-// values during persistent ops.
-//
-// Due to cloning overhead this is significantly slower than insert,
+// Due to cloning overhead this is significantly slower than Insert,
 // typically taking μsec instead of nsec.
-func (t *_TABLE_TYPE[V]) insertPersist(pfx netip.Prefix, val V) *_TABLE_TYPE[V] {
+func (t *_TABLE_TYPE[V]) InsertPersist(pfx netip.Prefix, val V) *_TABLE_TYPE[V] {
 	if !pfx.IsValid() {
 		return t
 	}
