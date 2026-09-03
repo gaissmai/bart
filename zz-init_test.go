@@ -15,7 +15,11 @@ import (
 )
 
 // location of the full tier1 routing info
-const prefixFile = "./internal/tests/testdata/prefixes.txt.gz"
+const (
+	prefixFile = "./internal/tests/testdata/prefixes.txt.gz"
+	n          = 1024
+	mask       = n - 1
+)
 
 type tier1T struct {
 	_once sync.Once // load and parse it only once
@@ -24,21 +28,25 @@ type tier1T struct {
 	_routes4 []netip.Prefix // all v4 tier1 routes
 	_routes6 []netip.Prefix // all v6 tier1 routes
 
-	_matchIP4 netip.Addr // matching v4 address in tier1 routes
-	_matchIP6 netip.Addr // matching v6 address in tier1 routes
+	_n_matchIP4 []netip.Addr // matching v4 address in tier1 routes
+	_n_matchIP6 []netip.Addr // matching v6 address in tier1 routes
 
-	_missIP4 netip.Addr // missing v4 address in tier1 routes
-	_missIP6 netip.Addr // missing v6 address in tier1 routes
+	_n_missIP4 []netip.Addr // missing v4 address in tier1 routes
+	_n_missIP6 []netip.Addr // missing v6 address in tier1 routes
 
-	_matchPfx4 netip.Prefix // matching v4 prefix in tier1 routes
-	_matchPfx6 netip.Prefix // matching v6 prefix in tier1 routes
+	_n_matchPfx4 []netip.Prefix // matching v4 prefix in tier1 routes
+	_n_matchPfx6 []netip.Prefix // matching v6 prefix in tier1 routes
 
-	_missPfx4 netip.Prefix // missing v4 prefix in tier1 routes
-	_missPfx6 netip.Prefix // missing v6 prefix in tier1 routes
+	_n_missPfx4 []netip.Prefix // missing v4 prefix in tier1 routes
+	_n_missPfx6 []netip.Prefix // missing v6 prefix in tier1 routes
 }
 
 // holds the tier1 routes
 var tier1 = &tier1T{}
+
+func init() {
+	tier1.init()
+}
 
 // init parses the tier1 route table once at first use and caches it
 func (t1 *tier1T) init() {
@@ -66,15 +74,15 @@ func (t1 *tier1T) init() {
 			t1._routes = append(t1._routes, cidr)
 		}
 
-		if err = scanner.Err(); err != nil {
-			panic(fmt.Errorf("reading %s, %w", prefixFile, err))
-		}
-
 		// shuffle the routes
 		prng := rand.New(rand.NewPCG(42, 42))
 		prng.Shuffle(len(t1._routes), func(i, j int) {
 			t1._routes[i], t1._routes[j] = t1._routes[j], t1._routes[i]
 		})
+
+		if err = scanner.Err(); err != nil {
+			panic(fmt.Errorf("reading %s, %w", prefixFile, err))
+		}
 
 		// split into v4 and v6 prefixes
 		for _, pfx := range t1._routes {
@@ -87,17 +95,17 @@ func (t1 *tier1T) init() {
 		}
 
 		// calculate match/miss info once
-		t1._doMatchIP4()
-		t1._doMatchIP6()
+		t1._doMatchIP4(n)
+		t1._doMatchIP6(n)
 
-		t1._doMissIP4()
-		t1._doMissIP6()
+		t1._doMissIP4(n)
+		t1._doMissIP6(n)
 
-		t1._doMatchPfx4()
-		t1._doMatchPfx6()
+		t1._doMatchPfx4(n)
+		t1._doMatchPfx6(n)
 
-		t1._doMissPfx4()
-		t1._doMissPfx6()
+		t1._doMissPfx4(n)
+		t1._doMissPfx6(n)
 	})
 }
 
@@ -112,48 +120,48 @@ func (t1 *tier1T) routes6() []netip.Prefix {
 	return t1._routes6
 }
 
-func (t1 *tier1T) matchIP4() netip.Addr {
+func (t1 *tier1T) matchIP4() []netip.Addr {
 	t1.init()
-	return t1._matchIP4
+	return t1._n_matchIP4
 }
 
-func (t1 *tier1T) matchIP6() netip.Addr {
+func (t1 *tier1T) matchIP6() []netip.Addr {
 	t1.init()
-	return t1._matchIP6
+	return t1._n_matchIP6
 }
 
-func (t1 *tier1T) missIP4() netip.Addr {
+func (t1 *tier1T) missIP4() []netip.Addr {
 	t1.init()
-	return t1._missIP4
+	return t1._n_missIP4
 }
 
-func (t1 *tier1T) missIP6() netip.Addr {
+func (t1 *tier1T) missIP6() []netip.Addr {
 	t1.init()
-	return t1._missIP6
+	return t1._n_missIP6
 }
 
-func (t1 *tier1T) matchPfx4() netip.Prefix {
+func (t1 *tier1T) matchPfx4() []netip.Prefix {
 	t1.init()
-	return t1._matchPfx4
+	return t1._n_matchPfx4
 }
 
-func (t1 *tier1T) matchPfx6() netip.Prefix {
+func (t1 *tier1T) matchPfx6() []netip.Prefix {
 	t1.init()
-	return t1._matchPfx6
+	return t1._n_matchPfx6
 }
 
-func (t1 *tier1T) missPfx4() netip.Prefix {
+func (t1 *tier1T) missPfx4() []netip.Prefix {
 	t1.init()
-	return t1._missPfx4
+	return t1._n_missPfx4
 }
 
-func (t1 *tier1T) missPfx6() netip.Prefix {
+func (t1 *tier1T) missPfx6() []netip.Prefix {
 	t1.init()
-	return t1._missPfx6
+	return t1._n_missPfx6
 }
 
 // process the match/miss info once during t1.init()
-func (t1 *tier1T) _doMatchIP4() {
+func (t1 *tier1T) _doMatchIP4(n int) {
 	lt := new(Lite)
 	for _, pfx := range t1._routes4 {
 		lt.Insert(pfx)
@@ -166,15 +174,17 @@ func (t1 *tier1T) _doMatchIP4() {
 		}
 
 		if ok := lt.Contains(probe); ok {
-			t1._matchIP4 = probe
-			return
+			t1._n_matchIP4 = append(t1._n_matchIP4, probe)
+			if len(t1._n_matchIP4) >= n {
+				return
+			}
 		}
 
 	}
-	panic(fmt.Sprintf("no matching IPv4 address found after checking %d routes", len(t1._routes4)))
+	panic(fmt.Sprintf("no matching %d IPv4 address found after checking %d routes", n, len(t1._routes4)))
 }
 
-func (t1 *tier1T) _doMatchIP6() {
+func (t1 *tier1T) _doMatchIP6(n int) {
 	lt := new(Lite)
 	for _, pfx := range t1._routes6 {
 		lt.Insert(pfx)
@@ -187,15 +197,17 @@ func (t1 *tier1T) _doMatchIP6() {
 		}
 
 		if ok := lt.Contains(probe); ok {
-			t1._matchIP6 = probe
-			return
+			t1._n_matchIP6 = append(t1._n_matchIP6, probe)
+			if len(t1._n_matchIP6) >= n {
+				return
+			}
 		}
 
 	}
-	panic(fmt.Sprintf("no matching IPv6 address found after checking %d routes", len(t1._routes6)))
+	panic(fmt.Sprintf("no matching %d IPv6 address found after checking %d routes", n, len(t1._routes6)))
 }
 
-func (t1 *tier1T) _doMissIP4() {
+func (t1 *tier1T) _doMissIP4(n int) {
 	lt := new(Lite)
 	for _, pfx := range t1._routes4 {
 		lt.Insert(pfx)
@@ -208,14 +220,16 @@ func (t1 *tier1T) _doMissIP4() {
 		}
 
 		if ok := lt.Contains(probe); !ok {
-			t1._missIP4 = probe
-			return
+			t1._n_missIP4 = append(t1._n_missIP4, probe)
+			if len(t1._n_missIP4) >= n {
+				return
+			}
 		}
 	}
-	panic(fmt.Sprintf("no missing IPv4 address found after checking %d routes", len(t1._routes4)))
+	panic(fmt.Sprintf("no missing %d IPv4 address found after checking %d routes", n, len(t1._routes4)))
 }
 
-func (t1 *tier1T) _doMissIP6() {
+func (t1 *tier1T) _doMissIP6(n int) {
 	lt := new(Lite)
 	for _, pfx := range t1._routes6 {
 		lt.Insert(pfx)
@@ -228,14 +242,16 @@ func (t1 *tier1T) _doMissIP6() {
 		}
 
 		if ok := lt.Contains(probe); !ok {
-			t1._missIP6 = probe
-			return
+			t1._n_missIP6 = append(t1._n_missIP6, probe)
+			if len(t1._n_missIP6) >= n {
+				return
+			}
 		}
 	}
-	panic(fmt.Sprintf("no missing IPv6 address found after checking %d routes", len(t1._routes6)))
+	panic(fmt.Sprintf("no missing %d IPv6 address found after checking %d routes", n, len(t1._routes6)))
 }
 
-func (t1 *tier1T) _doMatchPfx4() {
+func (t1 *tier1T) _doMatchPfx4(n int) {
 	lt := new(Lite)
 	for _, pfx := range t1._routes4 {
 		lt.Insert(pfx)
@@ -248,15 +264,17 @@ func (t1 *tier1T) _doMatchPfx4() {
 		}
 
 		if ok := lt.LookupPrefix(probe); ok {
-			t1._matchPfx4 = probe
-			return
+			t1._n_matchPfx4 = append(t1._n_matchPfx4, probe)
+			if len(t1._n_matchPfx4) >= n {
+				return
+			}
 		}
 
 	}
-	panic(fmt.Sprintf("no matching IPv4 prefix found after checking %d routes", len(t1._routes4)))
+	panic(fmt.Sprintf("no matching %d IPv4 prefix found after checking %d routes", n, len(t1._routes4)))
 }
 
-func (t1 *tier1T) _doMatchPfx6() {
+func (t1 *tier1T) _doMatchPfx6(n int) {
 	lt := new(Lite)
 	for _, pfx := range t1._routes6 {
 		lt.Insert(pfx)
@@ -269,14 +287,16 @@ func (t1 *tier1T) _doMatchPfx6() {
 		}
 
 		if ok := lt.LookupPrefix(probe); ok {
-			t1._matchPfx6 = probe
-			return
+			t1._n_matchPfx6 = append(t1._n_matchPfx6, probe)
+			if len(t1._n_matchPfx6) >= n {
+				return
+			}
 		}
 	}
-	panic(fmt.Sprintf("no matching IPv6 prefix found after checking %d routes", len(t1._routes6)))
+	panic(fmt.Sprintf("no matching %d IPv6 prefix found after checking %d routes", n, len(t1._routes6)))
 }
 
-func (t1 *tier1T) _doMissPfx4() {
+func (t1 *tier1T) _doMissPfx4(n int) {
 	lt := new(Lite)
 	for _, pfx := range t1._routes4 {
 		lt.Insert(pfx)
@@ -289,14 +309,16 @@ func (t1 *tier1T) _doMissPfx4() {
 		}
 
 		if ok := lt.LookupPrefix(probe); !ok {
-			t1._missPfx4 = probe
-			return
+			t1._n_missPfx4 = append(t1._n_missPfx4, probe)
+			if len(t1._n_missPfx4) >= n {
+				return
+			}
 		}
 	}
-	panic(fmt.Sprintf("no missing IPv6 prefix found after checking %d routes", len(t1._routes4)))
+	panic(fmt.Sprintf("no missing %d IPv6 prefix found after checking %d routes", n, len(t1._routes4)))
 }
 
-func (t1 *tier1T) _doMissPfx6() {
+func (t1 *tier1T) _doMissPfx6(n int) {
 	lt := new(Lite)
 	for _, pfx := range t1._routes6 {
 		lt.Insert(pfx)
@@ -309,9 +331,11 @@ func (t1 *tier1T) _doMissPfx6() {
 		}
 
 		if ok := lt.LookupPrefix(probe); !ok {
-			t1._missPfx6 = probe
-			return
+			t1._n_missPfx6 = append(t1._n_missPfx6, probe)
+			if len(t1._n_missPfx6) >= n {
+				return
+			}
 		}
 	}
-	panic(fmt.Sprintf("no missing IPv6 prefix found after checking %d routes", len(t1._routes6)))
+	panic(fmt.Sprintf("no missing %d IPv6 prefix found after checking %d routes", n, len(t1._routes6)))
 }
