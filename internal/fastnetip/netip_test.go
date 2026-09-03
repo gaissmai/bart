@@ -37,13 +37,11 @@ func TestContains4(t *testing.T) {
 			pfx := netip.MustParsePrefix(tt.prefix)
 			ip := netip.MustParseAddr(tt.ip)
 
-			// 1. Dein fastnetip Call
 			got := Contains4(&pfx, &ip)
 			if got != tt.expected {
 				t.Errorf("Contains4(%s, %s) = %v; want %v", tt.prefix, tt.ip, got, tt.expected)
 			}
 
-			// 2. Paritäts-Check gegen die Go stdlib
 			stdlibGot := pfx.Contains(ip)
 			if got != stdlibGot {
 				t.Errorf("Mismatch with stdlib for %s in %s! fastnetip=%v, stdlib=%v", tt.ip, tt.prefix, got, stdlibGot)
@@ -85,13 +83,11 @@ func TestContains6(t *testing.T) {
 			pfx := netip.MustParsePrefix(tt.prefix)
 			ip := netip.MustParseAddr(tt.ip)
 
-			// 1. Dein fastnetip Call
 			got := Contains6(&pfx, &ip)
 			if got != tt.expected {
 				t.Errorf("Contains6(%s, %s) = %v; want %v", tt.prefix, tt.ip, got, tt.expected)
 			}
 
-			// 2. Paritäts-Check gegen die Go stdlib
 			stdlibGot := pfx.Contains(ip)
 			if got != stdlibGot {
 				t.Errorf("Mismatch with stdlib for %s in %s! fastnetip=%v, stdlib=%v", tt.ip, tt.prefix, got, stdlibGot)
