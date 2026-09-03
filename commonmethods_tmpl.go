@@ -67,8 +67,9 @@ func (n *_NODE_TYPE[V]) Lookup(uint8) (_ V, _ bool)                             
 func (n *_NODE_TYPE[V]) LookupIdx(uint8) (_ uint8, _ V, _ bool)                          { return }
 func (n *_NODE_TYPE[V]) Supernets(netip.Prefix, func(netip.Prefix, V) bool)              { return }
 func (n *_NODE_TYPE[V]) Subnets(netip.Prefix, func(netip.Prefix, V) bool)                { return }
-func (n *_NODE_TYPE[V]) FprintRec(io.Writer, nodes.TrieItem[V], string) (_ error)        { return }
 func (n *_NODE_TYPE[V]) DumpRec(io.Writer, stridePath, int, bool)                        { return }
+func (n *_NODE_TYPE[V]) FprintRec(io.Writer, nodes.TrieItem[V], string) (_ error)        { return }
+
 func (n *_NODE_TYPE[V]) AllRec(stridePath, int, bool, func(netip.Prefix, V) bool) (_ bool) {
 	return
 }

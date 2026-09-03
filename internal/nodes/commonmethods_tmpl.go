@@ -32,23 +32,14 @@ type _NODE_TYPE[V any] struct {
 	Children struct{ bitset.BitSet256 }
 }
 
-func (n *_NODE_TYPE[V]) IsEmpty() (_ bool)                         { return }
-func (n *_NODE_TYPE[V]) PrefixCount() (_ int)                      { return }
-func (n *_NODE_TYPE[V]) ChildCount() (_ int)                       { return }
-func (n *_NODE_TYPE[V]) MustGetPrefix(uint8) (_ V)                 { return }
-func (n *_NODE_TYPE[V]) MustGetChild(uint8) (_ any)                { return }
-func (n *_NODE_TYPE[V]) InsertPrefix(uint8, V) (_ bool)            { return }
-func (n *_NODE_TYPE[V]) DeletePrefix(uint8) (_ bool)               { return }
-func (n *_NODE_TYPE[V]) GetChild(uint8) (_ any, _ bool)            { return }
-func (n *_NODE_TYPE[V]) GetPrefix(uint8) (_ V, _ bool)             { return }
-func (n *_NODE_TYPE[V]) InsertChild(uint8, any) (_ bool)           { return }
-func (n *_NODE_TYPE[V]) DeleteChild(uint8) (_ bool)                { return }
-func (n *_NODE_TYPE[V]) CloneRec(func(V) V) (_ *_NODE_TYPE[V])     { return }
-func (n *_NODE_TYPE[V]) CloneFlat(func(V) V) (_ *_NODE_TYPE[V])    { return }
-func (n *_NODE_TYPE[V]) AllIndices() (seq2 iter.Seq2[uint8, V])    { return }
-func (n *_NODE_TYPE[V]) AllChildren() (seq2 iter.Seq2[uint8, any]) { return }
-func (n *_NODE_TYPE[V]) Contains(uint8) (_ bool)                   { return }
-func (n *_NODE_TYPE[V]) LookupIdx(uint8) (_ uint8, _ V, _ bool)    { return }
+func (n *_NODE_TYPE[V]) PrefixCount() (_ int)                   { return }
+func (n *_NODE_TYPE[V]) ChildCount() (_ int)                    { return }
+func (n *_NODE_TYPE[V]) GetChild(uint8) (_ any, _ bool)         { return }
+func (n *_NODE_TYPE[V]) MustGetChild(uint8) (_ any)             { return }
+func (n *_NODE_TYPE[V]) InsertChild(uint8, any) (_ bool)        { return }
+func (n *_NODE_TYPE[V]) DeleteChild(uint8) (_ bool)             { return }
+func (n *_NODE_TYPE[V]) CloneRec(func(V) V) (_ *_NODE_TYPE[V])  { return }
+func (n *_NODE_TYPE[V]) CloneFlat(func(V) V) (_ *_NODE_TYPE[V]) { return }
 
 // ### GENERATE DELETE END ###
 
