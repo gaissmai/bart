@@ -44,10 +44,6 @@ type tier1T struct {
 // holds the tier1 routes
 var tier1 = &tier1T{}
 
-func init() {
-	tier1.init()
-}
-
 // init parses the tier1 route table once at first use and caches it
 func (t1 *tier1T) init() {
 	t1._once.Do(func() {
