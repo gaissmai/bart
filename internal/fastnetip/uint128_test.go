@@ -1,3 +1,5 @@
+//go:build unsafe
+
 package fastnetip
 
 import "testing"
