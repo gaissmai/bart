@@ -267,12 +267,12 @@ goos: linux
 goarch: amd64
 pkg: github.com/gaissmai/bart
 cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
-BenchmarkFullFastMatch4/Lookup         	129484557	         9.274 ns/op
-BenchmarkFullFastMatch6/Lookup         	65185531	        17.99 ns/op
-BenchmarkFullFastMiss4/Lookup          	92448910	        12.81 ns/op
-BenchmarkFullFastMiss6/Lookup          	64323817	        18.66 ns/op
+BenchmarkFullFastMatch4/Lookup         	36917803	        31.57 ns/op
+BenchmarkFullFastMatch6/Lookup         	24484578	        48.67 ns/op
+BenchmarkFullFastMiss4/Lookup          	46067090	        24.90 ns/op
+BenchmarkFullFastMiss6/Lookup          	30606994	        38.88 ns/op
 PASS
-ok  	github.com/gaissmai/bart	6.647s
+ok  	github.com/gaissmai/bart	6.466s
 ```
 
 ## Compatibility Guarantees
