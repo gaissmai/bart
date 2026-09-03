@@ -10,38 +10,34 @@
 - `BitSet256`: `[4]uint64` = **32 bytes**
 - `sparse.Array256[T]`: `BitSet256 + []T` = **56 bytes + n×sizeof(T)**
 
-**Child Reference Sizing:**
-- `childRef`: 8 bytes (pointer) or 16 bytes (interface value storage)
-- The actual size depends on implementation: 8B for `*node` pointers, 16B for `interface{}` values
-
 ### BartNode[V] - Dynamic Sparse Node
  ```go
 type BartNode[V any] struct {
-    prefixes sparse.Array256[V]        // 56 + n×sizeof(V)
-    children sparse.Array256[childRef] // 56 + m×sizeof(childRef)
+    prefixes sparse.Array256[V]   // 56 + n×sizeof(V)
+    children sparse.Array256[any] // 56 + m×16
  }
  ```
-**Memory Usage:** **112 bytes + n×sizeof(V) + m×sizeof(childRef)**
+**Memory Usage:** **112 bytes + n×sizeof(V) + m×16**
 
 ### LiteNode - Dynamic Sparse, prefixes Bitset-Only Node
  ```go
 type LiteNode struct {
-    prefixes bitset.BitSet256           // 32 bytes (presence only)
-    children sparse.Array256[childRef]  // 56 + m×sizeof(childRef)
-    pfxCount uint16                     // 2 bytes + padding
+    prefixes bitset.BitSet256      // 32 bytes (presence only)
+    children sparse.Array256[any]  // 56 + m×16
+    pfxCount uint16                // 2 bytes + padding
  }
  ```
-**Memory Usage:** **96 bytes + m×sizeof(childRef)** (no value storage)
+**Memory Usage:** **96 bytes + m×16** (no value storage)
 
 ### FastNode[V] - Fixed Array Node
  ```go
 type FastNode[V any] struct {
     prefixes sparse.Array256[V]        // 56 + n×sizeof(V)
-    children sparse.Array256[childRef] // 56 + m×sizeof(childRef)
+    children sparse.Array256[childRef] // 56 + m×16
     childRankCache [256]uint8          // 256
  }
  ```
-**Memory Usage:** **256 + 112 bytes + n×sizeof(V) + m×sizeof(childRef)**
+**Memory Usage:** **256 + 112 bytes + n×sizeof(V) + m×16**
 
 ## Real-World Example
 **Scenario:** Node with 10 prefixes, 5 children
@@ -52,7 +48,7 @@ type FastNode[V any] struct {
  | BartNode[int] | 112 | 10×8=80 | 5×16=80 | 272 bytes | **27** |
  | FastNode[int] | 368 | 10×8=80 | 5×16=80 | 528 bytes | **53** |
 
-¹ Values assume childRef = 16 bytes and pointer to payload = 8 bytes
+¹ Values assume pointer to payload = 8 bytes
 
 ## Extended Memory Example with Path Compression
 
@@ -103,10 +99,12 @@ The actual payload struct referenced by the pointer is **not included** in these
 
 **Path compression benefits:**
 - **LeafNode**: Eliminates intermediate nodes for isolated prefixes
-- **FringeNode**: Compresses /8, /16, /24 boundaries without node overhead
+- **FringeNode**: May compress /8, /16, /24, ... boundaries without node overhead
 - **Reduced trie depth**: Fewer levels = fewer lookups per route
 
-**Important:** The actual payload structs (e.g., routing information, metadata) are stored externally and referenced by the 8-byte pointers. Their sizes are not included in the per-node calculations above, as they are shared or application-specific.
+**Important:** The actual payload structs (e.g., routing information, metadata) are stored externally
+and referenced by the 8-byte pointers. Their sizes are not included in the per-node calculations above,
+as they are shared or application-specific.
 
 ## Lookup Performance Deep Dive
 
