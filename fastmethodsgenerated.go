@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	"github.com/gaissmai/bart/internal/art"
+	"github.com/gaissmai/bart/internal/fastnetip"
 	"github.com/gaissmai/bart/internal/lpm"
 	"github.com/gaissmai/bart/internal/nodes"
 	"github.com/gaissmai/bart/internal/value"
@@ -78,7 +79,10 @@ func (f *Fast[V]) Contains(ip netip.Addr) bool {
 			return true
 
 		case *nodes.LeafNode[V]:
-			return kid.Prefix.Contains(ip)
+			if is4 {
+				return fastnetip.Contains4(&kid.Prefix, &ip)
+			}
+			return fastnetip.Contains6(&kid.Prefix, &ip)
 		}
 	}
 
@@ -134,9 +138,16 @@ LOOP:
 			return kid.Value, true
 
 		case *nodes.LeafNode[V]:
-			if kid.Prefix.Contains(ip) {
-				return kid.Value, true
+			if is4 {
+				if fastnetip.Contains4(&kid.Prefix, &ip) {
+					return kid.Value, true
+				}
+			} else {
+				if fastnetip.Contains6(&kid.Prefix, &ip) {
+					return kid.Value, true
+				}
 			}
+
 			// reached a path compressed prefix, stop traversing
 			break LOOP
 		}
@@ -248,10 +259,20 @@ LOOP:
 
 		case *nodes.LeafNode[V]:
 			// reached a path compressed prefix, stop traversing
-			if kid.Prefix.Bits() > pfxLen || !kid.Prefix.Contains(ip) {
+			if kid.Prefix.Bits() > pfxLen {
 				break LOOP
 			}
-			return kid.Prefix, kid.Value, true
+
+			if is4 {
+				if fastnetip.Contains4(&kid.Prefix, &ip) {
+					return kid.Prefix, kid.Value, true
+				}
+			} else {
+				if fastnetip.Contains6(&kid.Prefix, &ip) {
+					return kid.Prefix, kid.Value, true
+				}
+			}
+			break LOOP
 
 		case *nodes.FringeNode[V]:
 			// the bits of the fringe are defined by the depth
