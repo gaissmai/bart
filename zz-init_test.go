@@ -315,7 +315,7 @@ func (t1 *tier1T) _doMissPfx4(n int) {
 			}
 		}
 	}
-	panic(fmt.Sprintf("no missing %d IPv6 prefix found after checking %d routes", n, len(t1._routes4)))
+	panic(fmt.Sprintf("no missing %d IPv4 prefix found after checking %d routes", n, len(t1._routes4)))
 }
 
 func (t1 *tier1T) _doMissPfx6(n int) {
