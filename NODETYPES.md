@@ -32,9 +32,9 @@ type LiteNode struct {
 ### FastNode[V] - Fixed Array Node
  ```go
 type FastNode[V any] struct {
-    prefixes sparse.Array256[V]        // 56 + n×sizeof(V)
-    children sparse.Array256[childRef] // 56 + m×16
-    childRankCache [256]uint8          // 256
+    prefixes sparse.Array256[V]   // 56 + n×sizeof(V)
+    children sparse.Array256[any] // 56 + m×16
+    childRankCache [256]uint8     // 256
  }
  ```
 **Memory Usage:** **256 + 112 bytes + n×sizeof(V) + m×16**
