@@ -150,10 +150,6 @@ func (f *_TABLE_TYPE[V]) Contains(ip netip.Addr) bool {
 // Returns the associated value and true if a matching prefix is found.
 // Returns zero value and false if no prefix contains the address.
 func (t *_TABLE_TYPE[V]) Lookup(ip netip.Addr) (val V, ok bool) {
-	if !ip.IsValid() {
-		return val, ok
-	}
-
 	is4 := ip.Is4()
 	octets := ip.AsSlice()
 
@@ -198,6 +194,14 @@ LOOP:
 			// reached a path compressed prefix, stop traversing
 			break LOOP
 		}
+	}
+
+	// Hot-path optimization: delay ip.IsValid() check until after traversal.
+	// Fast path: if a Fringe or Leaf matches early in LOOP, we return without ever checking IsValid().
+	// Slow path: for invalid IPs, range over nil octets is a no-op (stack[0] stays nil).
+	// We validate now before backtracking to avoid a nil pointer panic on n.PrefixCount().
+	if !ip.IsValid() {
+		return val, ok
 	}
 
 	// start backtracking, unwind the stack, bounds check eliminated
