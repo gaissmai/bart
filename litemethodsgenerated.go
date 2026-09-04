@@ -39,7 +39,7 @@ func (t *liteTable[V]) sizeUpdate(is4 bool, delta int) {
 }
 
 // Contains reports whether any stored prefix covers the given IP address.
-// Returns false for invalid IP addresses.
+// Returns false for invalid IP addresses or for IPv6 addresses with zones.
 //
 // This method performs longest-prefix matching and returns true if any prefix
 // in the routing table contains the IP address, regardless of the associated value.
@@ -56,6 +56,10 @@ func (f *liteTable[V]) Contains(ip netip.Addr) bool {
 	// if ip is invalid, AsSlice() returns nil, Contains returns false.
 	is4 := ip.Is4()
 	n := f.rootNodeByVersion(is4)
+
+	if ip.Zone() != "" {
+		return false
+	}
 
 	for _, octet := range ip.AsSlice() {
 		// for contains, any lpm match is good enough, no backtracking needed
@@ -96,10 +100,21 @@ func (f *liteTable[V]) Contains(ip netip.Addr) bool {
 // This is the fundamental operation for IP routing decisions, finding the
 // best matching route (most specific longest prefix) for a destination address.
 //
+<<<<<<< HEAD
 // Performance note: ip must not contain an IPv6 zone identifier (ip.Zone() == "").
 // Passing a zoned IPv6 address results in undefined behavior (e.g. incorrect
 // match results or false negatives).
 func (t *liteTable[V]) Lookup(ip netip.Addr) (val V, ok bool) {
+=======
+// Returns the associated value and true if a matching prefix is found.
+// Returns zero value and false if no prefix contains the address or
+// for invalid IP addresses or IPv6 addresses with zones.
+func (t *liteTable[V]) Lookup(ip netip.Addr) (val V, ok bool) {
+	if !ip.IsValid() || ip.Zone() != "" {
+		return val, ok
+	}
+
+>>>>>>> f122e5a (explicitly state that IPv6 addresses with zone identifiers returns false)
 	is4 := ip.Is4()
 	octets := ip.AsSlice()
 
