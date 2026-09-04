@@ -40,12 +40,16 @@ func (t *liteTable[V]) sizeUpdate(is4 bool, delta int) {
 // Contains reports whether any stored prefix covers the given IP address.
 // Returns false for invalid IP addresses.
 //
-// This performs longest-prefix matching and returns true if any prefix
+// This method performs longest-prefix matching and returns true if any prefix
 // in the routing table contains the IP address, regardless of the associated value.
 //
 // It does not return the value or the prefix of the matching item,
 // but as a test against an allow-/deny-list it's often sufficient
 // and even few nanoseconds faster than [liteTable.Lookup].
+//
+// Performance note: ip must not contain an IPv6 zone identifier (ip.Zone() == "").
+// Passing a zoned IPv6 address results in undefined behavior (e.g. incorrect
+// match results or false negatives).
 func (f *liteTable[V]) Contains(ip netip.Addr) bool {
 	// speed is top priority: no explicit test for ip.IsValid
 	// if ip is invalid, AsSlice() returns nil, Contains returns false.
@@ -82,19 +86,16 @@ func (f *liteTable[V]) Contains(ip netip.Addr) bool {
 }
 
 // Lookup performs a longest prefix match (LPM) lookup for the given address.
-// It finds the most specific (longest) prefix in the routing table that
-// contains the given address and returns its associated value.
+// Returns the associated value (payload) and true if a matching prefix is found.
+// Returns the zero value and false for invalid IP addresses or if no prefix contains the address.
 //
 // This is the fundamental operation for IP routing decisions, finding the
-// best matching route for a destination address.
+// best matching route (most specific longest prefix) for a destination address.
 //
-// Returns the associated value and true if a matching prefix is found.
-// Returns zero value and false if no prefix contains the address.
+// Performance note: ip must not contain an IPv6 zone identifier (ip.Zone() == "").
+// Passing a zoned IPv6 address results in undefined behavior (e.g. incorrect
+// match results or false negatives).
 func (t *liteTable[V]) Lookup(ip netip.Addr) (val V, ok bool) {
-	if !ip.IsValid() {
-		return val, ok
-	}
-
 	is4 := ip.Is4()
 	octets := ip.AsSlice()
 
@@ -139,6 +140,14 @@ LOOP:
 			// reached a path compressed prefix, stop traversing
 			break LOOP
 		}
+	}
+
+	// Hot-path optimization: delay ip.IsValid() check until after traversal.
+	// Fast path: if a Fringe or Leaf matches early in LOOP, we return without ever checking IsValid().
+	// Slow path: for invalid IPs, range over nil octets is a no-op (stack[0] stays nil).
+	// We validate now before backtracking to avoid a nil pointer panic on n.PrefixCount().
+	if !ip.IsValid() {
+		return val, ok
 	}
 
 	// start backtracking, unwind the stack, bounds check eliminated
