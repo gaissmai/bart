@@ -1,4 +1,4 @@
-//go:build !unsafe
+//go:build unsafe
 
 package fastnetip
 
@@ -122,7 +122,7 @@ var (
 // IPv4 Benchmarks
 // -----------------------------------------------------------------------------
 
-func BenchmarkContains4_Safe(b *testing.B) {
+func BenchmarkContains4_Unsafe(b *testing.B) {
 	i := 0
 	for b.Loop() {
 		ip := ips4[i&3]
@@ -135,7 +135,7 @@ func BenchmarkContains4_Safe(b *testing.B) {
 // IPv6 Benchmarks
 // -----------------------------------------------------------------------------
 
-func BenchmarkContains6_Safe(b *testing.B) {
+func BenchmarkContains6_Unsafe(b *testing.B) {
 	i := 0
 	for b.Loop() {
 		ip := ips6[i&3]
