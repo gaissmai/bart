@@ -52,6 +52,9 @@ jobs:
       - name: Run Tests
         run: go test -v ./...
 
+      - name: Run -tags=unsafe Tests
+        run: go test -v ./... -tags=unsafe
+
       - name: Run -race Tests
         run: go test -v -race -run='(Persist|Example)' ./...
 
@@ -86,7 +89,13 @@ jobs:
           go-version: stable
           cache: false
 
-      - name: golangci-lint
+      - name: golangci-lint without build tags
         uses: golangci/golangci-lint-action@v9
         with:
           version: latest
+
+      - name: golangci-lint with build tags unsafe
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: latest
+          args: --build-tags=unsafe
