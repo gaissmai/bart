@@ -38,7 +38,7 @@ func (t *liteTable[V]) sizeUpdate(is4 bool, delta int) {
 }
 
 // Contains reports whether any stored prefix covers the given IP address.
-// Returns false for invalid IP addresses or for IPv6 addresses with zones.
+// Returns false for invalid IP addresses.
 //
 // This performs longest-prefix matching and returns true if any prefix
 // in the routing table contains the IP address, regardless of the associated value.
@@ -51,10 +51,6 @@ func (f *liteTable[V]) Contains(ip netip.Addr) bool {
 	// if ip is invalid, AsSlice() returns nil, Contains returns false.
 	is4 := ip.Is4()
 	n := f.rootNodeByVersion(is4)
-
-	if ip.Zone() != "" {
-		return false
-	}
 
 	for _, octet := range ip.AsSlice() {
 		// for contains, any lpm match is good enough, no backtracking needed
@@ -93,10 +89,9 @@ func (f *liteTable[V]) Contains(ip netip.Addr) bool {
 // best matching route for a destination address.
 //
 // Returns the associated value and true if a matching prefix is found.
-// Returns zero value and false if no prefix contains the address or
-// for invalid IP addresses or IPv6 addresses with zones.
+// Returns zero value and false if no prefix contains the address.
 func (t *liteTable[V]) Lookup(ip netip.Addr) (val V, ok bool) {
-	if !ip.IsValid() || ip.Zone() != "" {
+	if !ip.IsValid() {
 		return val, ok
 	}
 

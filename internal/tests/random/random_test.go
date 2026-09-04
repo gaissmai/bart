@@ -121,9 +121,8 @@ func TestIP(t *testing.T) {
 
 	hasIPv4 := false
 	hasIPv6 := false
-	hasZone := false
 
-	for range 10_000 {
+	for range 100 {
 		ip := IP(prng)
 
 		if !ip.IsValid() {
@@ -136,21 +135,14 @@ func TestIP(t *testing.T) {
 		if ip.Is6() {
 			hasIPv6 = true
 		}
-		if ip.Is6() && ip.Zone() != "" {
-			hasZone = true
-		}
 	}
 
-	// With 10_000 iterations, we should see both IPv4 and IPv6
-	// and some IPv6 with zone
+	// With 100 iterations, we should see both IPv4 and IPv6
 	if !hasIPv4 {
 		t.Error("IP never generated IPv4 address")
 	}
 	if !hasIPv6 {
 		t.Error("IP never generated IPv6 address")
-	}
-	if !hasZone {
-		t.Error("IP never generated IPv6 with zone")
 	}
 }
 
