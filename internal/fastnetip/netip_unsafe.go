@@ -58,7 +58,6 @@ func Contains4(pfx *netip.Prefix, ip4 *netip.Addr) bool {
 func Contains6(pfx *netip.Prefix, ip6 *netip.Addr) bool {
 	ip := (*Addr)(unsafe.Pointer(ip6))
 	p := (*Prefix)(unsafe.Pointer(pfx))
-
 	bits := int(p.bitsPlusOne - 1)
 	return ip.addr.xor(p.ip.addr).and(mask6(bits)).isZero()
 }
