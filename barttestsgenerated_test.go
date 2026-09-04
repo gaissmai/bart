@@ -222,6 +222,70 @@ func TestTableLookupCompare_Table(t *testing.T) {
 	}
 }
 
+func TestTableContainsWithZone_Table(t *testing.T) {
+	// test that the IPv6 address with zone never matches
+	t.Parallel()
+
+	tbl := new(Table[any])
+	tbl.Insert(mpp("2001:db8::/32"), nil)
+
+	tests := []struct {
+		name   string
+		ip     netip.Addr
+		wantOk bool
+	}{
+		{
+			name:   "with zone",
+			ip:     mpa("2001:db8::1%enps01"),
+			wantOk: false,
+		},
+		{
+			name:   "without zone",
+			ip:     netip.MustParseAddr("2001:db8::1"),
+			wantOk: true,
+		},
+	}
+
+	for _, tc := range tests {
+		got := tbl.Contains(tc.ip)
+		if got != tc.wantOk {
+			t.Errorf("Contains IPv6 %s, got: %v, want: %v", tc.name, got, tc.wantOk)
+		}
+	}
+}
+
+func TestTableLookupWithZone_Table(t *testing.T) {
+	// test that the IPv6 address with zone never matches
+	t.Parallel()
+
+	tbl := new(Table[any])
+	tbl.Insert(mpp("2001:db8::/32"), nil)
+
+	tests := []struct {
+		name   string
+		ip     netip.Addr
+		wantOk bool
+	}{
+		{
+			name:   "with zone",
+			ip:     mpa("2001:db8::1%enps01"),
+			wantOk: false,
+		},
+		{
+			name:   "without zone",
+			ip:     netip.MustParseAddr("2001:db8::1"),
+			wantOk: true,
+		},
+	}
+
+	for _, tc := range tests {
+		_, got := tbl.Lookup(tc.ip)
+		if got != tc.wantOk {
+			t.Errorf("Lookup IPv6 %s, got: %v, want: %v", tc.name, got, tc.wantOk)
+		}
+	}
+}
+
 func TestTableLookupPrefixUnmasked_Table(t *testing.T) {
 	// test that the pfx must not be masked on input for LookupPrefix
 	t.Parallel()
