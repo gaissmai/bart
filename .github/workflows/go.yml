@@ -51,6 +51,8 @@ jobs:
 
       - name: Run Tests
         run: go test -v ./...
+
+      - name: Run -tags=unsafe Tests
         run: go test -v ./... -tags=unsafe
 
       - name: Run -race Tests
