@@ -48,7 +48,7 @@ func (l *Lite) Get(pfx netip.Prefix) bool {
 // For exact prefix existence use Get(pfx). For prefix-based LPM use
 // LookupPrefix or LookupPrefixLPM.
 //
-// Returns true if any prefix matches addr, otherwise false.
+// Returns true if any prefix matches ip, otherwise false.
 func (l *Lite) Lookup(ip netip.Addr) bool {
 	return l.Contains(ip)
 }
