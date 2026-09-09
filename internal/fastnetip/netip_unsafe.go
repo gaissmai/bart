@@ -28,7 +28,7 @@ type uint128 struct {
 // Addr mirrors the memory layout of net/netip.Addr.
 type Addr struct {
 	addr uint128
-	z    uintptr // Mirrors unique.Handle[addrDetail]
+	z    unsafe.Pointer // Mirrors unique.Handle[addrDetail]
 }
 
 // Prefix mirrors the memory layout of net/netip.Prefix.
