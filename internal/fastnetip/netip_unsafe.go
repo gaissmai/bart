@@ -37,24 +37,25 @@ type Prefix struct {
 	bitsPlusOne uint8
 }
 
-// Contains4 reports whether the IPv4 prefix pfx contains the IPv4 address ip4.
+// Contains4 reports whether pfx contains ip.
 //
-// It performs no validity, family, or zone checks. The caller must guarantee
-// that both pfx and ip4 are valid IPv4 instances.
+// Both pfx and ip must be valid IPv4 instances. When compiled with unsafe
+// optimizations, family, validity, and zone checks are bypassed for speed.
 //
 //nolint:gosec // G115: integer overflow conversion uint64 -> uint32
-func Contains4(pfx *netip.Prefix, ip4 *netip.Addr) bool {
-	ip := (*Addr)(unsafe.Pointer(ip4))
+func Contains4(pfx *netip.Prefix, ip *netip.Addr) bool {
+	ip4 := (*Addr)(unsafe.Pointer(ip))
 	p := (*Prefix)(unsafe.Pointer(pfx))
 
 	bits := p.bitsPlusOne - 1
-	return uint32((ip.addr.lo^p.ip.addr.lo)>>((32-bits)&63)) == 0
+	return uint32((ip4.addr.lo^p.ip.addr.lo)>>((32-bits)&63)) == 0
 }
 
-// Contains6 reports whether the IPv6 prefix pfx contains the IPv6 address ip6.
+// Contains6 reports whether pfx contains ip.
 //
-// It performs no validity, family, or zone checks. The caller must guarantee
-// that both pfx and ip6 are valid IPv6 instances without scoping zones.
+// Both pfx and ip must be valid IPv6 instances without scoping zones.
+// When compiled with unsafe optimizations, family, validity, and zone checks
+// are bypassed for speed.
 func Contains6(pfx *netip.Prefix, ip6 *netip.Addr) bool {
 	ip := (*Addr)(unsafe.Pointer(ip6))
 	p := (*Prefix)(unsafe.Pointer(pfx))
