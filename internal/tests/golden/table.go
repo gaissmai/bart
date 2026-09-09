@@ -10,30 +10,38 @@ import (
 	"slices"
 )
 
-// Table is a simple and slow route table, implemented as a slice of prefixes
-// and values as a golden reference for bart.
+// Table is a linear, un-optimized routing table implemented as a slice of
+// prefix-value pairs. It serves as a simple, easy-to-verify golden reference
+// for testing complex routing table implementations (like BART).
 type Table[V any] []TableItem[V]
 
+// TableItem represents a single entry in the routing table, mapping a masked
+// IP prefix to a associated value.
 type TableItem[V any] struct {
 	Pfx netip.Prefix
 	Val V
 }
 
+// String returns a human-readable representation of the TableItem.
 func (g TableItem[V]) String() string {
 	return fmt.Sprintf("(%s, %v)", g.Pfx, g.Val)
 }
 
+// Insert adds or updates a prefix-value mapping in the table.
+// The prefix is normalized (masked) before insertion.
 func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
 	pfx = pfx.Masked()
 	for i, item := range *t {
 		if item.Pfx == pfx {
-			(*t)[i].Val = val // de-dupe
+			(*t)[i].Val = val // update existing entry
 			return
 		}
 	}
-	*t = append(*t, TableItem[V]{pfx, val})
+	*t = append(*t, TableItem[V]{Pfx: pfx, Val: val})
 }
 
+// Delete removes the specified prefix from the table.
+// Returns true if the prefix was present and removed, false otherwise.
 func (t *Table[V]) Delete(pfx netip.Prefix) (exists bool) {
 	pfx = pfx.Masked()
 
@@ -46,8 +54,10 @@ func (t *Table[V]) Delete(pfx netip.Prefix) (exists bool) {
 	return false
 }
 
+// AllSorted returns a sorted list of all prefixes currently present in the table.
+// The order is determined by prefix network address first, then mask length.
 func (t Table[V]) AllSorted() []netip.Prefix {
-	var result []netip.Prefix
+	result := make([]netip.Prefix, 0, len(t))
 
 	for _, item := range t {
 		result = append(result, item.Pfx)
@@ -56,6 +66,7 @@ func (t Table[V]) AllSorted() []netip.Prefix {
 	return result
 }
 
+// Get performs an exact match search for the given prefix.
 func (t Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 	pfx = pfx.Masked()
 	for _, item := range t {
@@ -66,23 +77,25 @@ func (t Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 	return val, false
 }
 
+// Update modifies an existing prefix or inserts a new one using a callback function.
+// The callback receives the current value (or zero value) and a boolean indicating
+// whether the prefix was found. Returns the newly set value.
 func (t *Table[V]) Update(pfx netip.Prefix, cb func(V, bool) V) (val V) {
 	pfx = pfx.Masked()
 	for i, item := range *t {
 		if item.Pfx == pfx {
-			// update val
 			val = cb(item.Val, true)
 			(*t)[i].Val = val
 			return val
 		}
 	}
-	// new val
-	val = cb(val, false)
 
-	*t = append(*t, TableItem[V]{pfx, val})
+	val = cb(val, false)
+	*t = append(*t, TableItem[V]{Pfx: pfx, Val: val})
 	return val
 }
 
+// Union merges entries from tb into ta. Entries in tb override matching prefixes in ta.
 func (ta *Table[V]) Union(tb *Table[V]) {
 	for _, bItem := range *tb {
 		var match bool
@@ -99,11 +112,12 @@ func (ta *Table[V]) Union(tb *Table[V]) {
 	}
 }
 
+// Lookup performs a Longest Prefix Match (LPM) for the given IP address.
 func (t Table[V]) Lookup(addr netip.Addr) (val V, ok bool) {
 	bestLen := -1
 
 	for _, item := range t {
-		if item.Pfx.Contains(addr) && item.Pfx.Bits() > bestLen {
+		if item.Pfx.Bits() > bestLen && item.Pfx.Contains(addr) {
 			val = item.Val
 			ok = true
 			bestLen = item.Pfx.Bits()
@@ -112,26 +126,22 @@ func (t Table[V]) Lookup(addr netip.Addr) (val V, ok bool) {
 	return val, ok
 }
 
+// LookupPrefix performs a Longest Prefix Match (LPM) for a covering prefix.
+// It returns the value associated with the most specific prefix that covers pfx.
 func (t Table[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
-	pfx = pfx.Masked()
-	bestLen := -1
-
-	for _, item := range t {
-		if item.Pfx.Overlaps(pfx) && item.Pfx.Bits() <= pfx.Bits() && item.Pfx.Bits() > bestLen {
-			val = item.Val
-			ok = true
-			bestLen = item.Pfx.Bits()
-		}
-	}
+	_, val, ok = t.LookupPrefixLPM(pfx)
 	return val, ok
 }
 
+// LookupPrefixLPM performs a Longest Prefix Match (LPM) for a covering prefix.
+// It returns the matched covering prefix, its associated value, and a boolean status.
 func (t Table[V]) LookupPrefixLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) {
 	pfx = pfx.Masked()
 	bestLen := -1
 
 	for _, item := range t {
-		if item.Pfx.Overlaps(pfx) && item.Pfx.Bits() <= pfx.Bits() && item.Pfx.Bits() > bestLen {
+		// A prefix covers pfx if they overlap and item.Pfx is equal to or shorter (broader) than pfx.
+		if item.Pfx.Bits() <= pfx.Bits() && item.Pfx.Bits() > bestLen && item.Pfx.Overlaps(pfx) {
 			val = item.Val
 			lpm = item.Pfx
 			ok = true
@@ -141,12 +151,14 @@ func (t Table[V]) LookupPrefixLPM(pfx netip.Prefix) (lpm netip.Prefix, val V, ok
 	return lpm, val, ok
 }
 
+// Subnets returns all prefixes in the table that are subnets of (covered by) pfx,
+// sorted in canonical prefix order.
 func (t Table[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 	pfx = pfx.Masked()
 	var result []netip.Prefix
 
 	for _, item := range t {
-		if pfx.Overlaps(item.Pfx) && pfx.Bits() <= item.Pfx.Bits() {
+		if pfx.Bits() <= item.Pfx.Bits() && pfx.Overlaps(item.Pfx) {
 			result = append(result, item.Pfx)
 		}
 	}
@@ -154,12 +166,14 @@ func (t Table[V]) Subnets(pfx netip.Prefix) []netip.Prefix {
 	return result
 }
 
+// Supernets returns all covering prefixes (supernets) for pfx contained in the table,
+// ordered from most-specific to least-specific (longest to shortest mask length).
 func (t Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 	pfx = pfx.Masked()
 	var result []netip.Prefix
 
 	for _, item := range t {
-		if item.Pfx.Overlaps(pfx) && item.Pfx.Bits() <= pfx.Bits() {
+		if item.Pfx.Bits() <= pfx.Bits() && item.Pfx.Overlaps(pfx) {
 			result = append(result, item.Pfx)
 		}
 	}
@@ -168,18 +182,20 @@ func (t Table[V]) Supernets(pfx netip.Prefix) []netip.Prefix {
 	return result
 }
 
+// OverlapsPrefix reports whether any prefix in the table overlaps with pfx.
 func (t Table[V]) OverlapsPrefix(pfx netip.Prefix) bool {
 	pfx = pfx.Masked()
-	for _, p := range t {
-		if p.Pfx.Overlaps(pfx) {
+	for _, item := range t {
+		if item.Pfx.Overlaps(pfx) {
 			return true
 		}
 	}
 	return false
 }
 
-func (ta *Table[V]) Overlaps(tb *Table[V]) bool {
-	for _, aItem := range *ta {
+// Overlaps reports whether any prefix in ta overlaps with any prefix in tb.
+func (ta Table[V]) Overlaps(tb *Table[V]) bool {
+	for _, aItem := range ta {
 		for _, bItem := range *tb {
 			if aItem.Pfx.Overlaps(bItem.Pfx) {
 				return true
@@ -189,19 +205,18 @@ func (ta *Table[V]) Overlaps(tb *Table[V]) bool {
 	return false
 }
 
-// Sort, inplace by netip.Prefix, all prefixes are in normalized form
+// Sort orders the table in-place by prefix (IP address first, then prefix length).
 func (t *Table[V]) Sort() {
 	slices.SortFunc(*t, func(a, b TableItem[V]) int {
 		return cmpPrefix(a.Pfx, b.Pfx)
 	})
 }
 
-// cmpPrefix, helper function, compare func for prefix sort,
-// all cidrs are already normalized
+// cmpPrefix is a comparison helper for sorting prefixes.
+// Assumes both prefixes are already normalized/masked.
 func cmpPrefix(a, b netip.Prefix) int {
 	if cmpAddr := a.Addr().Compare(b.Addr()); cmpAddr != 0 {
 		return cmpAddr
 	}
-
 	return cmp.Compare(a.Bits(), b.Bits())
 }
