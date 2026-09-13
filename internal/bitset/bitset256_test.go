@@ -832,10 +832,10 @@ func BenchmarkRank(b *testing.B) {
 func BenchmarkFirstSet(b *testing.B) {
 	b.Run("Sparse", func(b *testing.B) {
 		aa := []BitSet256{
-			BitSet256{0, 0, 0, 1},
-			BitSet256{0, 0, 0, 1},
-			BitSet256{0, 0, 0, 1},
-			BitSet256{0, 0, 0, 1},
+			{0, 0, 0, 1},
+			{0, 0, 0, 1},
+			{0, 0, 0, 1},
+			{0, 0, 0, 1},
 		}
 
 		var i uint8
@@ -864,10 +864,10 @@ func BenchmarkFirstSet(b *testing.B) {
 func BenchmarkNextSet(b *testing.B) {
 	b.Run("Sparse", func(b *testing.B) {
 		aa := []BitSet256{
-			BitSet256{0, 0, 0, 1},
-			BitSet256{0, 0, 0, 1},
-			BitSet256{0, 0, 0, 1},
-			BitSet256{0, 0, 0, 1},
+			{0, 0, 0, 1},
+			{0, 0, 0, 1},
+			{0, 0, 0, 1},
+			{0, 0, 0, 1},
 		}
 
 		var i uint8
@@ -896,10 +896,10 @@ func BenchmarkNextSet(b *testing.B) {
 func BenchmarkLastSet(b *testing.B) {
 	b.Run("Sparse", func(b *testing.B) {
 		aa := []BitSet256{
-			BitSet256{1, 0, 0, 0},
-			BitSet256{1, 0, 0, 0},
-			BitSet256{1, 0, 0, 0},
-			BitSet256{1, 0, 0, 0},
+			{1, 0, 0, 0},
+			{1, 0, 0, 0},
+			{1, 0, 0, 0},
+			{1, 0, 0, 0},
 		}
 
 		var i uint8
@@ -928,10 +928,10 @@ func BenchmarkLastSet(b *testing.B) {
 func BenchmarkIntersectionTop(b *testing.B) {
 	b.Run("Sparse", func(b *testing.B) {
 		aa := []BitSet256{
-			BitSet256{1, 0, 0, 0},
-			BitSet256{1, 0, 0, 0},
-			BitSet256{1, 0, 0, 0},
-			BitSet256{1, 0, 0, 0},
+			{1, 0, 0, 0},
+			{1, 0, 0, 0},
+			{1, 0, 0, 0},
+			{1, 0, 0, 0},
 		}
 
 		var i uint8
