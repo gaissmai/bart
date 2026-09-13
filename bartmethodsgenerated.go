@@ -45,7 +45,7 @@ func (t *Table[V]) sizeUpdate(is4 bool, delta int) {
 //
 // It does not return the value or the prefix of the matching item,
 // but as a test against an allow-/deny-list it's often sufficient
-// and even few nanoseconds faster than [Lookup].
+// and even few nanoseconds faster than Lookup.
 //
 // Performance note: ip must not contain an IPv6 zone identifier (ip.Zone() == "").
 // Passing a zoned IPv6 address results in undefined behavior (e.g. incorrect
