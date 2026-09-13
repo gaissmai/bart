@@ -4,11 +4,21 @@
 package bitset
 
 import (
-	"fmt"
-	"math"
+	"math/rand/v2"
 	"slices"
 	"testing"
 )
+
+var prng = rand.New(rand.NewPCG(42, 42))
+
+func randomBitSet256() BitSet256 {
+	return BitSet256{
+		prng.Uint64(),
+		prng.Uint64(),
+		prng.Uint64(),
+		prng.Uint64(),
+	}
+}
 
 func TestZeroValue(t *testing.T) {
 	t.Parallel()
@@ -747,205 +757,281 @@ func TestRank(t *testing.T) {
 	}
 }
 
-func BenchmarkTest(b *testing.B) {
-	aa := BitSet256{0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010}
-	for _, i := range []uint8{64*4 - 1, 64*3 - 11, 64*2 - 11, 64*1 - 11, 1, 0} {
-		b.Run(fmt.Sprintf("Test: for %d", i), func(b *testing.B) {
-			for b.Loop() {
-				aa.Test(i)
-			}
-		})
-	}
-}
-
-func BenchmarkIntersectsAny(b *testing.B) {
-	aa := BitSet256{1, 1, 1, 1}
-
-	for i, bb := range []BitSet256{
-		{1},
-		{0, 1},
-		{0, 0, 1},
-		{0, 0, 0, 1},
-		{},
-	} {
-		b.Run(fmt.Sprintf("Any: at %d", i), func(b *testing.B) {
-			for b.Loop() {
-				aa.Intersects(&bb)
-			}
-		})
-	}
-}
-
-func BenchmarkUnion(b *testing.B) {
-	aa := &BitSet256{0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010}
-	bb := &BitSet256{0b1111_1111_1111, 0b1111_1111_1111, 0b1111_1111_1111, 0b1111_1111_1111}
-	for b.Loop() {
-		aa.Union(bb)
-	}
-}
-
-func BenchmarkIntersection(b *testing.B) {
-	aa := &BitSet256{0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010}
-	bb := &BitSet256{0b1111_1111_1111, 0b1111_1111_1111, 0b1111_1111_1111, 0b1111_1111_1111}
-	for b.Loop() {
-		aa.Intersection(bb)
-	}
-}
-
-func BenchmarkSize(b *testing.B) {
-	aa := BitSet256{0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010}
-
-	for b.Loop() {
-		aa.Size()
-	}
-}
-
-func BenchmarkRank(b *testing.B) {
-	aa := BitSet256{0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010, 0b0000_1010_1010}
-	for _, i := range []uint8{64*4 - 1, 64*3 - 11, 64*2 - 11, 64*1 - 11, 1, 0} {
-		b.Run(fmt.Sprintf("for %d", i), func(b *testing.B) {
-			for b.Loop() {
-				aa.Rank(i)
-			}
-		})
-	}
-}
-
 func BenchmarkIsEmpty(b *testing.B) {
-	for i, bb := range []BitSet256{
-		{1},
-		{0, 1},
-		{0, 0, 1},
-		{0, 0, 0, 1},
-		{},
-	} {
-		b.Run(fmt.Sprintf("at %d", i), func(b *testing.B) {
-			for b.Loop() {
-				bb.IsEmpty()
-			}
-		})
-	}
-}
-
-func BenchmarkFirstSet(b *testing.B) {
-	for i, bb := range []*BitSet256{
-		{1, 0, 0, 0},
-		{0, 1, 0, 0},
-		{0, 0, 1, 0},
-		{0, 0, 0, 1},
-		{0, 0, 0, 0},
-	} {
-		b.Run(fmt.Sprintf("FirstSet, at %d", i), func(b *testing.B) {
-			for b.Loop() {
-				bb.FirstSet()
-			}
-		})
-	}
-}
-
-func BenchmarkNextSet(b *testing.B) {
-	for i, bb := range []BitSet256{
-		{1},
-		{0, 1},
-		{0, 0, 1},
-		{0, 0, 0, 1},
-		{},
-	} {
-		b.Run(fmt.Sprintf("at %d", i), func(b *testing.B) {
-			for b.Loop() {
-				bb.NextSet(0)
-			}
-		})
-	}
-}
-
-func BenchmarkIntersectionTop(b *testing.B) {
-	for i, aa := range []BitSet256{
-		{0, 0, 0, 0},
-		{1, 0, 0, 0},
-		{0, 1, 0, 0},
-		{0, 0, 1, 0},
-		{0, 0, 0, 1},
-	} {
-		b.Run(fmt.Sprintf("Top: at %d", i), func(b *testing.B) {
-			for b.Loop() {
-				aa.IntersectionTop(&aa)
-			}
-		})
-	}
-}
-
-func BenchmarkLastSet(b *testing.B) {
-	for i, aa := range []BitSet256{
-		{0, 0, 0, 0},
-		{1, 0, 0, 0},
-		{0, 1, 0, 0},
-		{0, 0, 1, 0},
-		{0, 0, 0, 1},
-	} {
-		b.Run(fmt.Sprintf("Last: at %d", i), func(b *testing.B) {
-			for b.Loop() {
-				aa.LastSet()
-			}
-		})
-	}
-}
-
-func BenchmarkAsSlice(b *testing.B) {
-	for i, aa := range []BitSet256{
-		{1},
-		{1, 1},
-		{1, 1, 1},
-		{1, 1, 1, 1},
-	} {
-		b.Run(fmt.Sprintf("sparse at %d", i), func(b *testing.B) {
-			var buf [256]uint8
-			for b.Loop() {
-				aa.AsSlice(&buf)
-			}
-		})
+	aa := []BitSet256{
+		randomBitSet256(),
+		randomBitSet256(),
+		randomBitSet256(),
+		randomBitSet256(),
 	}
 
-	for i, aa := range []BitSet256{
-		{math.MaxUint64},
-		{math.MaxUint64, math.MaxUint64},
-		{math.MaxUint64, math.MaxUint64, math.MaxUint64},
-		{math.MaxUint64, math.MaxUint64, math.MaxUint64, math.MaxUint64},
-	} {
-		b.Run(fmt.Sprintf("dense at %d", i), func(b *testing.B) {
-			var buf [256]uint8
-			for b.Loop() {
-				aa.AsSlice(&buf)
-			}
-		})
-	}
-}
-
-func BenchmarkBits(b *testing.B) {
-	for i, aa := range []BitSet256{
-		{1},
-		{1, 1},
-		{1, 1, 1},
-		{1, 1, 1, 1},
-	} {
-		b.Run(fmt.Sprintf("sparse at %d", i), func(b *testing.B) {
-			for b.Loop() {
-				_ = aa.Bits()
-			}
-		})
+	var i uint8
+	for b.Loop() {
+		aa[i&3].IsEmpty()
+		i++
 	}
 }
 
 func BenchmarkSet(b *testing.B) {
-	var aa BitSet256
+	bs := randomBitSet256()
+	var bit uint8
 	for b.Loop() {
-		aa.Set(100)
+		bs.Set(bit)
+		bit++
+	}
+}
+
+func BenchmarkTest(b *testing.B) {
+	bs := randomBitSet256()
+	var bit uint8
+	for b.Loop() {
+		_ = bs.Test(bit)
+		bit++
 	}
 }
 
 func BenchmarkClear(b *testing.B) {
-	var aa BitSet256
+	bs := randomBitSet256()
+	var bit uint8
 	for b.Loop() {
-		aa.Clear(100)
+		bs.Clear(bit)
+		bit++
+	}
+}
+
+func BenchmarkSize(b *testing.B) {
+	aa := []BitSet256{
+		randomBitSet256(),
+		randomBitSet256(),
+		randomBitSet256(),
+		randomBitSet256(),
+	}
+
+	var i uint8
+	for b.Loop() {
+		aa[i&3].Size()
+		i++
+	}
+}
+
+func BenchmarkRank(b *testing.B) {
+	aa := []BitSet256{
+		randomBitSet256(),
+		randomBitSet256(),
+		randomBitSet256(),
+		randomBitSet256(),
+	}
+
+	var i uint8
+	for b.Loop() {
+		aa[i&3].Rank(i)
+		i++
+	}
+}
+
+func BenchmarkFirstSet(b *testing.B) {
+	b.Run("Sparse", func(b *testing.B) {
+		aa := []BitSet256{
+			BitSet256{0, 0, 0, 1},
+			BitSet256{0, 0, 0, 1},
+			BitSet256{0, 0, 0, 1},
+			BitSet256{0, 0, 0, 1},
+		}
+
+		var i uint8
+		for b.Loop() {
+			aa[i&3].FirstSet()
+			i++
+		}
+	})
+
+	b.Run("Dense", func(b *testing.B) {
+		aa := []BitSet256{
+			randomBitSet256(),
+			randomBitSet256(),
+			randomBitSet256(),
+			randomBitSet256(),
+		}
+
+		var i uint8
+		for b.Loop() {
+			aa[i&3].FirstSet()
+			i++
+		}
+	})
+}
+
+func BenchmarkNextSet(b *testing.B) {
+	b.Run("Sparse", func(b *testing.B) {
+		aa := []BitSet256{
+			BitSet256{0, 0, 0, 1},
+			BitSet256{0, 0, 0, 1},
+			BitSet256{0, 0, 0, 1},
+			BitSet256{0, 0, 0, 1},
+		}
+
+		var i uint8
+		for b.Loop() {
+			aa[i&3].NextSet(i)
+			i++
+		}
+	})
+
+	b.Run("Dense", func(b *testing.B) {
+		aa := []BitSet256{
+			randomBitSet256(),
+			randomBitSet256(),
+			randomBitSet256(),
+			randomBitSet256(),
+		}
+
+		var i uint8
+		for b.Loop() {
+			aa[i&3].NextSet(i)
+			i++
+		}
+	})
+}
+
+func BenchmarkLastSet(b *testing.B) {
+	b.Run("Sparse", func(b *testing.B) {
+		aa := []BitSet256{
+			BitSet256{1, 0, 0, 0},
+			BitSet256{1, 0, 0, 0},
+			BitSet256{1, 0, 0, 0},
+			BitSet256{1, 0, 0, 0},
+		}
+
+		var i uint8
+		for b.Loop() {
+			aa[i&3].LastSet()
+			i++
+		}
+	})
+
+	b.Run("Dense", func(b *testing.B) {
+		aa := []BitSet256{
+			randomBitSet256(),
+			randomBitSet256(),
+			randomBitSet256(),
+			randomBitSet256(),
+		}
+
+		var i uint8
+		for b.Loop() {
+			aa[i&3].LastSet()
+			i++
+		}
+	})
+}
+
+func BenchmarkIntersectionTop(b *testing.B) {
+	b.Run("Sparse", func(b *testing.B) {
+		aa := []BitSet256{
+			BitSet256{1, 0, 0, 0},
+			BitSet256{1, 0, 0, 0},
+			BitSet256{1, 0, 0, 0},
+			BitSet256{1, 0, 0, 0},
+		}
+
+		var i uint8
+		for b.Loop() {
+			aa[i&3].IntersectionTop(&aa[i&3])
+			i++
+		}
+	})
+
+	b.Run("Dense", func(b *testing.B) {
+		aa := []BitSet256{
+			randomBitSet256(),
+			randomBitSet256(),
+			randomBitSet256(),
+			randomBitSet256(),
+		}
+
+		var i uint8
+		for b.Loop() {
+			aa[i&3].IntersectionTop(&aa[i&3])
+			i++
+		}
+	})
+}
+
+func BenchmarkIntersects(b *testing.B) {
+	aa := randomBitSet256()
+	bb := []BitSet256{
+		randomBitSet256(),
+		randomBitSet256(),
+		randomBitSet256(),
+		randomBitSet256(),
+	}
+
+	var i uint8
+	for b.Loop() {
+		aa.Intersects(&bb[i&3])
+		i++
+	}
+}
+
+func BenchmarkUnion(b *testing.B) {
+	aa := randomBitSet256()
+	bb := []BitSet256{
+		randomBitSet256(),
+		randomBitSet256(),
+		randomBitSet256(),
+		randomBitSet256(),
+	}
+
+	var i uint8
+	for b.Loop() {
+		aa.Union(&bb[i&3])
+		i++
+	}
+}
+
+func BenchmarkIntersection(b *testing.B) {
+	aa := randomBitSet256()
+	bb := []BitSet256{
+		randomBitSet256(),
+		randomBitSet256(),
+		randomBitSet256(),
+		randomBitSet256(),
+	}
+
+	var i uint8
+	for b.Loop() {
+		aa.Intersection(&bb[i&3])
+		i++
+	}
+}
+
+func BenchmarkAsSlice(b *testing.B) {
+	aa := []BitSet256{
+		randomBitSet256(),
+		randomBitSet256(),
+		randomBitSet256(),
+		randomBitSet256(),
+	}
+
+	var buf [256]uint8
+	var i uint8
+	for b.Loop() {
+		aa[i&3].AsSlice(&buf)
+		i++
+	}
+}
+
+func BenchmarkBits(b *testing.B) {
+	aa := []BitSet256{
+		randomBitSet256(),
+		randomBitSet256(),
+		randomBitSet256(),
+		randomBitSet256(),
+	}
+
+	var i uint8
+	for b.Loop() {
+		_ = aa[i&3].Bits()
+		i++
 	}
 }
