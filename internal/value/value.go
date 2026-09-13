@@ -15,8 +15,7 @@
 // # Value Equality
 //
 // The [Equal] function enables custom equality logic for payload values.
-// When V implements an `Equal(V) bool` method, [Equal] uses that implementation,
-// avoiding the potentially expensive [reflect.DeepEqual] fallback.
+// When V implements an `Equal(V) bool` method, [Equal] uses that implementation.
 //
 // # Value Cloning
 //
