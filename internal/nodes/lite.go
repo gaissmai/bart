@@ -5,7 +5,10 @@ package nodes
 
 import (
 	"iter"
+	"slices"
 
+	"github.com/gaissmai/bart/internal/allot"
+	"github.com/gaissmai/bart/internal/art"
 	"github.com/gaissmai/bart/internal/bitset"
 	"github.com/gaissmai/bart/internal/lpm"
 	"github.com/gaissmai/bart/internal/sparse"
@@ -140,4 +143,176 @@ func (n *LiteNode[V]) CloneFlat(_ func(V) V) *LiteNode[V] {
 
 	// no values to copy
 	return c
+}
+
+// Aggregate compresses the LiteNode in-place by pruning redundant subnets,
+// removing child nodes covered by parent prefixes, and merging adjacent siblings
+// across prefixes, fringe nodes, and leaf nodes.
+//
+// The aggregation process executes the following steps in order:
+//  1. Prefix Subsumption: Removes more-specific prefixes fully covered by a
+//     broader supernet prefix within the same node's bitset.
+//  2. Child Subsumption: Deletes child nodes (fringes) that are fully covered
+//     by an existing prefix in the current node.
+//  3. Fringe Merging: Collapses pairs of adjacent FringeNode children into
+//     a single supernet prefix inserted into the current node's bitset.
+//  4. Leaf Merging: Merges pairs of adjacent LeafNode children covering a contiguous
+//     range into a single LeafNode representing their common supernet.
+//  5. Prefix Merging: Combines pairs of adjacent sibling prefixes (e.g., sharing
+//     the same parent bit sequence) into their higher-level supernet prefix.
+//  6. Recursive Descent: Recursively calls Aggregate on child LiteNode instances.
+//
+// Returns deleted, the net number of prefix/child entries pruned or merged during
+// the bottom-up compression pass.
+func (n *LiteNode[V]) Aggregate() (deleted int) {
+	var zero V
+
+	// 1. Prefix Subsumption: Remove subnets in the bitset that are fully covered by a supernet.
+	for super := range n.Prefixes.All() {
+		if super == 255 {
+			break
+		}
+
+		covered := n.Prefixes.Intersection(&allot.PfxRoutesLookupTbl[super])
+		for sub := range covered.All() {
+			// skip self
+			if sub == super {
+				continue
+			}
+			// delete covered subnet
+			n.DeletePrefix(sub)
+			deleted++
+		}
+	}
+
+	// 2. Child Subsumption: Remove child nodes covered by any prefix in this node.
+	for idx := range n.Prefixes.All() {
+		covered := n.Children.Intersection(&allot.FringeRoutesLookupTbl[idx])
+		for addr := range covered.All() {
+			n.DeleteChild(addr)
+			deleted++
+		}
+	}
+
+	// 3. Fringe Merging: Collapse adjacent FringeNode pairs into a supernet prefix.
+	more := true
+	for more { // loop as long as changes occur, maybe many passes
+		more = false
+
+		var lastFringeAddr uint8
+		for addr := range n.Children.All() {
+			anyKid := n.MustGetChild(addr)
+
+			if _, ok := anyKid.(*FringeNode[V]); !ok {
+				continue
+			}
+
+			// start/restart
+			if lastFringeAddr == 0 {
+				lastFringeAddr = addr
+				continue
+			}
+
+			// check adjacency (even address XOR 1 must equal following odd address)
+			// e.g. 8^1 == 9, 7^1 == 6
+			if lastFringeAddr^1 != addr {
+				lastFringeAddr = addr
+				continue
+			}
+
+			n.InsertPrefix(art.PfxToIdx(lastFringeAddr, 7), zero)
+			n.DeleteChild(lastFringeAddr)
+			n.DeleteChild(addr)
+
+			deleted++ // 1 prefix inserted, 2 fringes deleted
+			more = true
+
+			// reset
+			lastFringeAddr = 0
+		}
+	}
+
+	// 4. Leaf Merging: Collapse adjacent LeafNode pairs into a single supernet leaf.
+	more = true
+	for more { // loop as long as changes occur, maybe many passes
+		more = false
+		var lastLeafAddr uint8
+		var lastLeaf *LeafNode[V]
+
+		for _, addr := range n.Children.AppendBits(make([]uint8, 0, n.ChildCount())) {
+			anyKid := n.MustGetChild(addr)
+			leaf, ok := anyKid.(*LeafNode[V])
+			if !ok {
+				continue
+			}
+
+			if lastLeaf == nil {
+				lastLeafAddr = addr
+				lastLeaf = leaf
+				continue
+			}
+
+			// check adjacency (even address XOR 1 must equal following odd address)
+			// e.g. 8^1 == 9, 7^1 == 6
+			if lastLeafAddr^1 != addr {
+				lastLeafAddr = addr
+				lastLeaf = leaf
+				continue
+			}
+
+			superPfx, ok := Supernet(lastLeaf.Prefix, leaf.Prefix)
+			if !ok {
+				lastLeafAddr = addr
+				lastLeaf = leaf
+				continue
+			}
+
+			n.InsertChild(lastLeafAddr, NewLeafNode(superPfx, zero))
+			n.DeleteChild(addr)
+			deleted++ // 1 leaf updated, 1 leaf deleted
+			more = true
+
+			// reset
+			lastLeafAddr = 0
+			lastLeaf = nil
+		}
+	}
+
+	// 5. Prefix Merging: Merge adjacent prefixes within the bitset.
+	idxs := n.Prefixes.AppendBits(make([]uint8, 0, n.PrefixCount()))
+	lastIdx := uint8(0)
+	for _, idx := range slices.Backward(idxs) {
+		if idx <= 1 {
+			break
+		}
+
+		if lastIdx == 0 {
+			lastIdx = idx
+			continue
+		}
+
+		// test adjacent, 35>>1 = 17, 34>>1 = 17, set 17, delete 34,35
+		if lastIdx>>1 == idx>>1 {
+			// insert supernet
+			n.InsertPrefix(idx>>1, zero)
+
+			// delete subnets
+			n.DeletePrefix(lastIdx)
+			n.DeletePrefix(idx)
+
+			// 1 inserted, 2 deleted => 1
+			deleted++
+		}
+
+		lastIdx = idx
+	}
+
+	// 6. Recursive Descent: Top-down compression of child LiteNodes.
+	for _, anyKid := range n.Children.Items {
+		if kid, ok := anyKid.(*LiteNode[V]); ok {
+			deleted += kid.Aggregate()
+		}
+	}
+
+	return deleted
 }
