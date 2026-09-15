@@ -40,8 +40,8 @@ func TestInlineBitSet256Functions(t *testing.T) {
 		"bitset.(*BitSet256).Intersection",
 		"bitset.(*BitSet256).IntersectionTop",
 		//
+		"bitset.(*BitSet256).OnesCount",
 		"bitset.(*BitSet256).Rank",
-		"bitset.(*BitSet256).Size",
 		"bitset.(*BitSet256).Union",
 	}
 

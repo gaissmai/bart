@@ -71,10 +71,12 @@ func (n *FastNode[V]) DeletePrefix(idx uint8) (exists bool) {
 // Each iteration yields the prefix index (uint8) and its associated value (V).
 func (n *FastNode[V]) AllIndices() iter.Seq2[uint8, V] {
 	return func(yield func(uint8, V) bool) {
-		for i, idx := range n.Prefixes.Bits() {
+		i := 0
+		for idx := range n.Prefixes.All() {
 			if !yield(idx, n.Prefixes.Items[i]) {
 				return
 			}
+			i++
 		}
 	}
 }
@@ -83,10 +85,12 @@ func (n *FastNode[V]) AllIndices() iter.Seq2[uint8, V] {
 // Each iteration yields the child's address (uint8) and the child node (any).
 func (n *FastNode[V]) AllChildren() iter.Seq2[uint8, any] {
 	return func(yield func(addr uint8, child any) bool) {
-		for i, addr := range n.Children.Bits() {
+		i := 0
+		for addr := range n.Children.All() {
 			if !yield(addr, n.Children.Items[i]) {
 				return
 			}
+			i++
 		}
 	}
 }
@@ -1375,7 +1379,7 @@ func (n *FastNode[V]) UnionRec(cloneFn func(V) V, o *FastNode[V], depth int) (du
 	}
 
 	// for all prefixes in other node do ...
-	for _, oIdx := range o.Prefixes.Bits() {
+	for oIdx := range o.Prefixes.All() {
 		// clone/copy the value from other node at idx
 		val := o.MustGetPrefix(oIdx)
 		clonedVal := cloneFn(val)
@@ -1388,7 +1392,7 @@ func (n *FastNode[V]) UnionRec(cloneFn func(V) V, o *FastNode[V], depth int) (du
 	}
 
 	// for all child addrs in other node do ...
-	for _, addr := range o.Children.Bits() {
+	for addr := range o.Children.All() {
 		otherChild := o.MustGetChild(addr)
 		thisChild, thisExists := n.GetChild(addr)
 
@@ -1406,7 +1410,7 @@ func (n *FastNode[V]) UnionRecPersist(cloneFn func(V) V, o *FastNode[V], depth i
 	}
 
 	// for all prefixes in other node do ...
-	for _, oIdx := range o.Prefixes.Bits() {
+	for oIdx := range o.Prefixes.All() {
 		// clone/copy the value from other node
 		val := o.MustGetPrefix(oIdx)
 		clonedVal := cloneFn(val)
@@ -1419,12 +1423,15 @@ func (n *FastNode[V]) UnionRecPersist(cloneFn func(V) V, o *FastNode[V], depth i
 	}
 
 	// for all child addrs in other node do ...
-	for i, addr := range o.Children.Bits() {
+	i := 0
+	for addr := range o.Children.All() {
 		otherChild := o.Children.Items[i]
 		thisChild, thisExists := n.GetChild(addr)
 
 		// Use helper function to handle all 4x3 combinations
 		duplicates += n.handleMatrixPersist(cloneFn, thisExists, thisChild, otherChild, addr, depth)
+
+		i++
 	}
 
 	return duplicates
@@ -1687,7 +1694,7 @@ func (n *FastNode[V]) handleMatrixPersist(cloneFn func(V) V, thisExists bool, th
 // The traversal order is not defined. This implementation favors simplicity
 // and runtime efficiency over consistency of iteration sequence.
 func (n *FastNode[V]) AllRec(path StridePath, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
-	for _, idx := range n.Prefixes.Bits() {
+	for idx := range n.Prefixes.All() {
 		cidr := CidrFromPath(path, depth, is4, idx)
 		val := n.MustGetPrefix(idx)
 
@@ -1699,7 +1706,8 @@ func (n *FastNode[V]) AllRec(path StridePath, depth int, is4 bool, yield func(ne
 	}
 
 	// for all children (nodes and leaves) in this node do ...
-	for i, addr := range n.Children.Bits() {
+	i := 0
+	for addr := range n.Children.All() {
 		anyKid := n.Children.Items[i]
 		switch kid := anyKid.(type) {
 		case *FastNode[V]:
@@ -1726,6 +1734,8 @@ func (n *FastNode[V]) AllRec(path StridePath, depth int, is4 bool, yield func(ne
 		default:
 			panic("logic error, wrong node type")
 		}
+
+		i++
 	}
 
 	return true
@@ -1758,8 +1768,8 @@ func (n *FastNode[V]) AllRec(path StridePath, depth int, is4 bool, yield func(ne
 //
 // Returns false if yield function requests early termination.
 func (n *FastNode[V]) AllRecSorted(path StridePath, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
-	allIndices := n.Prefixes.Bits()
-	allChildAddrs := n.Children.Bits()
+	allIndices := n.Prefixes.AppendBits(make([]uint8, 0, n.PrefixCount()))
+	allChildAddrs := n.Children.AppendBits(make([]uint8, 0, n.ChildCount()))
 
 	// Sort local prefix indices into canonical CIDR rank order.
 	slices.SortFunc(allIndices, CmpIndexRank)
@@ -1871,10 +1881,10 @@ func (n *FastNode[V]) EachSubnet(octets []byte, depth int, is4 bool, pfxIdx uint
 
 	// Intersect node entries against precomputed allot tables for pfxIdx.
 	tmp = n.Prefixes.Intersection(&allot.PfxRoutesLookupTbl[pfxIdx])
-	allCoveredIndices := tmp.Bits()
+	allCoveredIndices := tmp.AppendBits(make([]uint8, 0, tmp.OnesCount()))
 
 	tmp = n.Children.Intersection(&allot.FringeRoutesLookupTbl[pfxIdx])
-	allCoveredChildAddrs := tmp.Bits()
+	allCoveredChildAddrs := tmp.AppendBits(make([]uint8, 0, tmp.OnesCount()))
 
 	// Sort covered prefix indices into canonical CIDR order.
 	slices.SortFunc(allCoveredIndices, CmpIndexRank)
@@ -2276,9 +2286,8 @@ func (n *FastNode[V]) OverlapsChildrenIn(o *FastNode[V]) bool {
 	doRange := childCount < overlapsRangeCutoff || pfxCount > overlapsRangeCutoff
 
 	// do range over, not so many children and maybe too many prefixes for other algo below
-	var buf [256]uint8
 	if doRange {
-		for _, addr := range o.Children.AsSlice(&buf) {
+		for addr := range o.Children.All() {
 			if n.Contains(art.OctetToIdx(addr)) {
 				return true
 			}
@@ -2291,7 +2300,7 @@ func (n *FastNode[V]) OverlapsChildrenIn(o *FastNode[V]) bool {
 	// build the alloted routing table from them
 
 	// use allot table with prefixes as bitsets, bitsets are precalculated.
-	for _, idx := range n.Prefixes.AsSlice(&buf) {
+	for idx := range n.Prefixes.All() {
 		if o.Children.Intersects(&allot.FringeRoutesLookupTbl[idx]) {
 			return true
 		}

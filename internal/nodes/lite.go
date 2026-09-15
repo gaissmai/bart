@@ -68,7 +68,7 @@ func (n *LiteNode[V]) MustGetPrefix(idx uint8) (_ V) {
 func (n *LiteNode[V]) AllIndices() iter.Seq2[uint8, V] {
 	var zero V
 	return func(yield func(uint8, V) bool) {
-		for _, idx := range n.Prefixes.Bits() {
+		for idx := range n.Prefixes.All() {
 			if !yield(idx, zero) {
 				return
 			}
