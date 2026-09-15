@@ -27,6 +27,21 @@ type Lite struct {
 	liteTable[struct{}]
 }
 
+// Aggregate compresses the routing table in-place by merging overlapping
+// and adjacent IP prefixes into their minimal covering CIDR blocks.
+//
+// Aggregation operates via two mechanisms:
+//  1. Overlapping: More specific subnets fully contained within
+//     a broader supernet (e.g., 10.1.0.0/16 inside 10.0.0.0/8) are redundant
+//     in a Lite table and are removed.
+//  2. Adjacent: Neighboring prefixes of equal length
+//     that completely cover their common parent (e.g., 192.168.0.0/25 and
+//     192.168.0.128/25) are combined into a single supernet (192.168.0.0/24).
+func (l *Lite) Aggregate() {
+	l.size4 -= l.root4.Aggregate()
+	l.size6 -= l.root6.Aggregate()
+}
+
 // Get performs an exact-prefix lookup and returns whether the exact
 // prefix exists. The prefix is canonicalized (Masked) before lookup.
 //
