@@ -6,6 +6,7 @@ package nodes
 import (
 	"iter"
 
+	"github.com/gaissmai/bart/internal/allot"
 	"github.com/gaissmai/bart/internal/bitset"
 	"github.com/gaissmai/bart/internal/lpm"
 	"github.com/gaissmai/bart/internal/sparse"
@@ -140,4 +141,36 @@ func (n *LiteNode[V]) CloneFlat(_ func(V) V) *LiteNode[V] {
 
 	// no values to copy
 	return c
+}
+
+func (n *LiteNode[V]) Aggregate() {
+	// welche Prefixe überlagern sich in dem node
+	next := uint8(0)
+	ok := true
+
+	for {
+		if next, ok = n.Prefixes.NextSet(next); !ok {
+			break
+		}
+
+		if next == 255 {
+			break
+		}
+
+		coveredIdxs := n.Prefixes.Intersection(&allot.PfxRoutesLookupTbl[next])
+		for idx := range coveredIdxs.All() {
+			// skip self
+			if idx == next {
+				continue
+			}
+			// delete covered
+			n.DeletePrefix(idx)
+		}
+
+		next++
+	}
+
+	// welche Prefixe überlagern Children in dem node
+	// welche Prefxie sind adjacent
+	// steige recursiv ab
 }

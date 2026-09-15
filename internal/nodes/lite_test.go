@@ -116,6 +116,62 @@ func TestLiteNode_Contains_ART_Coverage(t *testing.T) {
 	}
 }
 
+func TestLiteNode_Aggregate(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name  string
+		input []uint8
+		want  []uint8
+	}{
+		{
+			name:  "zero",
+			input: []uint8{},
+			want:  []uint8{},
+		},
+		{
+			name:  "default route",
+			input: []uint8{1, 2, 3, 4, 5, 6, 55, 230, 254, 255},
+			want:  []uint8{1},
+		},
+		{
+			name:  "last",
+			input: []uint8{255},
+			want:  []uint8{255},
+		},
+		{
+			name:  "2,3",
+			input: []uint8{2, 3},
+			want:  []uint8{2, 3},
+		},
+		{
+			name:  "2,4,5,6,...",
+			input: []uint8{2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28},
+			want:  []uint8{2, 6, 7},
+		},
+		{
+			name:  "last two",
+			input: []uint8{254, 255},
+			want:  []uint8{254, 255},
+		},
+	}
+
+	for _, tc := range testCases {
+		n := new(LiteNode[int])
+
+		for _, idx := range tc.input {
+			n.InsertPrefix(idx, 0)
+		}
+
+		n.Aggregate()
+		got := n.Prefixes.Bits()
+
+		if !slices.Equal(got, tc.want) {
+			t.Errorf("Aggregate: %s, got: %v, want: %v", tc.name, got, tc.want)
+		}
+	}
+}
+
 func TestLiteNode_LookupAndLookupIdx(t *testing.T) {
 	t.Parallel()
 	n := &LiteNode[int]{}
