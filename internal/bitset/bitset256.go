@@ -16,8 +16,9 @@
 // when explicitly requested (via Bits()).
 package bitset
 
-// can inline (*BitSet256).AsSlice with cost 42
-// can inline (*BitSet256).Bits with cost 47
+// can inline (*BitSet256).All with cost 17
+// can inline (*BitSet256).AppendBits with cost 31
+// can inline (*BitSet256).Bits with cost 66
 // can inline (*BitSet256).Clear with cost 12
 // can inline (*BitSet256).FirstSet with cost 79
 // can inline (*BitSet256).Intersects with cost 48
@@ -26,13 +27,14 @@ package bitset
 // can inline (*BitSet256).IsEmpty with cost 22
 // can inline (*BitSet256).LastSet with cost 75
 // can inline (*BitSet256).NextSet with cost 65
+// can inline (*BitSet256).OnesCount with cost 28
 // can inline (*BitSet256).Rank with cost 52
 // can inline (*BitSet256).Set with cost 12
-// can inline (*BitSet256).Size with cost 28
 // can inline (*BitSet256).Test with cost 15
 // can inline (*BitSet256).Union with cost 36
 
 import (
+	"iter"
 	"math/bits"
 )
 
@@ -186,48 +188,71 @@ func (b *BitSet256) LastSet() (last uint8, ok bool) {
 	return 0, false
 }
 
-// AsSlice extracts the indices of all set bits in the BitSet256, returning them
-// as uint8 values in strictly ascending order.
+// All returns an iterator over the indices of all set bits in the BitSet256
+// in strictly ascending order.
 //
 // Performance Considerations:
-// To guarantee zero heap allocations and enable compiler inlining, the caller must
-// provide a pointer to a 256-byte array (`buf`) as backing storage. The method
-// populates this array in-place and returns a sliced view (`[]uint8`) tailored to
-// the actual number of set bits.
+// Implemented via Go 1.23+ range-over-function iterators (iter.Seq). It is
+// fully inlinable by the compiler, zero-allocation, and avoids slice overhead
+// altogether when driving loops directly.
 //
-// Safety and Lifecycle:
-// The returned slice directly shares the underlying storage of `buf` and is only
-// valid until `buf` is modified or reused. This pattern is highly recommended for
-// hot paths and performance-critical loops where heap churn must be avoided.
+// Note on Dense BitSets:
+// While iter.Seq provides clean iterator semantics and supports early breaking,
+// calling yield() in a dense iteration loop introduces slight state-machine
+// and yield-inlining overhead compared to batch writes. For maximum throughput
+// in dense bitsets, consider using AppendBits with a pre-allocated slice buffer.
 //
-//nolint:gosec  // G115: integer overflow conversion int -> uint
-func (b *BitSet256) AsSlice(buf *[256]uint8) []uint8 {
-	size := 0
-	for wIdx, word := range b {
-		for ; word != 0; size++ {
-			buf[size] = uint8(wIdx<<6 + bits.TrailingZeros64(word))
-			word &= word - 1 // clear the rightmost set bit
+//nolint:gosec // G115: integer overflow conversion int -> uint
+func (b *BitSet256) All() iter.Seq[uint8] {
+	return func(yield func(uint8) bool) {
+		for wIdx, word := range b {
+			for word != 0 {
+				bitIdx := uint8(wIdx<<6 + bits.TrailingZeros64(word))
+				if !yield(bitIdx) {
+					return
+				}
+				word &= word - 1
+			}
 		}
 	}
-
-	// tailor to the actual number of set bits
-	return buf[:size]
 }
 
-// Bits returns a slice containing the indices of all set bits in strictly
-// ascending order as uint8 values.
+// AppendBits appends the indices of all set bits in the BitSet256 to buf
+// in strictly ascending order and returns the extended slice.
 //
 // Performance Considerations:
-// Unlike [AsSlice], this method dynamically allocates a new slice on the
-// heap to store the result. It is designed for convenience and APIs where the lifecycle
-// of the returned slice needs to outlive the immediate caller's stack frame.
+// To achieve zero heap allocations in performance-critical loops, the caller should
+// pass a slice backed by stack memory (e.g., slicing a local array `buf[:0]` or a pre-allocated buffer).
+// The function appends directly to `buf`, avoiding heap churn if `cap(buf)` is sufficient.
 //
-// Usage Guidance:
-// Use Bits when convenience is preferred over raw performance, or when the result
-// must be returned across boundaries where stack-allocated buffers cannot safely escape.
-// For high-throughput or allocation-free processing, prefer [AsSlice].
+// Safety and Lifecycle:
+// If `buf` has sufficient capacity, the returned slice shares its underlying storage.
+// If capacity is exceeded, standard slice growth rules apply and a new backing array
+// will be allocated.
+//
+//nolint:gosec // G115: integer overflow conversion int -> uint
+func (b *BitSet256) AppendBits(buf []uint8) []uint8 {
+	for wIdx, word := range b {
+		for word != 0 {
+			buf = append(buf, uint8(wIdx<<6+bits.TrailingZeros64(word)))
+			word &= word - 1
+		}
+	}
+	return buf
+}
+
+// Bits returns a newly allocated slice containing the indices of all set bits
+// in strictly ascending order as uint8 values.
+//
+// Performance Considerations:
+// Unlike [AppendBits], this method allocates backing storage on the heap.
+// It is designed for convenience when caller lifecycle management across stack
+// boundaries is required.
+//
+// For high-throughput or allocation-free processing in hot paths, prefer [AppendBits].
 func (b *BitSet256) Bits() []uint8 {
-	return b.AsSlice(&[256]uint8{})
+	// Directly allocate heap slice with exact capacity to avoid re-allocations in append.
+	return b.AppendBits(make([]uint8, 0, b.OnesCount()))
 }
 
 // IntersectionTop computes the intersection of the receiver with c
@@ -310,8 +335,8 @@ func (b *BitSet256) Union(c *BitSet256) {
 	b[3] |= c[3]
 }
 
-// Size returns the population count, i.e. the number of set bits.
-func (b *BitSet256) Size() int {
+// OnesCount returns the population count, i.e. the number of set bits.
+func (b *BitSet256) OnesCount() int {
 	return bits.OnesCount64(b[0]) +
 		bits.OnesCount64(b[1]) +
 		bits.OnesCount64(b[2]) +

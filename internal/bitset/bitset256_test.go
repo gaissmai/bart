@@ -20,6 +20,8 @@ func randomBitSet256() BitSet256 {
 	}
 }
 
+var sinkSliceUint8 []uint8
+
 func TestZeroValue(t *testing.T) {
 	t.Parallel()
 	defer func() {
@@ -37,7 +39,7 @@ func TestZeroValue(t *testing.T) {
 	b.Clear(100)
 
 	b = BitSet256{}
-	b.Size()
+	b.OnesCount()
 
 	b = BitSet256{}
 	b.Rank(100)
@@ -447,7 +449,7 @@ func TestAll(t *testing.T) {
 	}
 }
 
-func TestAsSlice(t *testing.T) {
+func TestAlls(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
 		name string
@@ -499,22 +501,83 @@ func TestAsSlice(t *testing.T) {
 			b.Clear(u) // without compact
 		}
 
-		buf := b.AsSlice(&[256]uint8{})
+		buf := slices.Collect(b.All())
 
 		if !slices.Equal(buf, tc.wantData) {
-			t.Errorf("AsSlice, %s: returned buf is not equal as expected:\ngot:  %v\nwant: %v",
+			t.Errorf("All, %s: collected buf is not equal as expected:\ngot:  %v\nwant: %v",
+				tc.name, buf, tc.wantData)
+		}
+	}
+}
+
+func TestAppendBits(t *testing.T) {
+	t.Parallel()
+	testCases := []struct {
+		name string
+		//
+		set []uint8
+		del []uint8
+		//
+		wantData []uint8
+	}{
+		{
+			name:     "null",
+			set:      []uint8{},
+			del:      []uint8{},
+			wantData: []uint8{},
+		},
+		{
+			name:     "zero",
+			set:      []uint8{0},
+			del:      []uint8{},
+			wantData: []uint8{0}, // bit #0 is set
+		},
+		{
+			name:     "1,5",
+			set:      []uint8{1, 5},
+			del:      []uint8{},
+			wantData: []uint8{1, 5},
+		},
+		{
+			name:     "many",
+			set:      []uint8{1, 65, 130, 190, 250},
+			del:      []uint8{},
+			wantData: []uint8{1, 65, 130, 190, 250},
+		},
+		{
+			name:     "special, last return",
+			set:      []uint8{1},
+			del:      []uint8{1}, // delete without compact
+			wantData: []uint8{},
+		},
+	}
+
+	for _, tc := range testCases {
+		var b BitSet256
+		for _, u := range tc.set {
+			b.Set(u)
+		}
+
+		for _, u := range tc.del {
+			b.Clear(u) // without compact
+		}
+
+		buf := b.AppendBits(make([]uint8, 0, 256))
+
+		if !slices.Equal(buf, tc.wantData) {
+			t.Errorf("AppendBits, %s: returned buf is not equal as expected:\ngot:  %v\nwant: %v",
 				tc.name, buf, tc.wantData)
 		}
 	}
 }
 
 // test setting every 3rd bit, just in case something odd is happening
-func TestCount2(t *testing.T) {
+func TestOnesCount(t *testing.T) {
 	t.Parallel()
 	var b BitSet256
 	tot := uint8(64*3 + 11)
 	for i := uint8(0); i < tot; i += 3 {
-		sz := b.Size()
+		sz := b.OnesCount()
 		if sz != int(i)/3 {
 			t.Errorf("Count reported as %d, but it should be %d", sz, i/3)
 			break
@@ -544,11 +607,11 @@ func TestUnion(t *testing.T) {
 	d := b
 	d.Union(&a)
 
-	if c.Size() != 200 {
-		t.Errorf("Union should have 200 bits set, but had %d", c.Size())
+	if c.OnesCount() != 200 {
+		t.Errorf("Union should have 200 bits set, but had %d", c.OnesCount())
 	}
-	if d.Size() != 200 {
-		t.Errorf("Union should have 200 bits set, but had %d", d.Size())
+	if d.OnesCount() != 200 {
+		t.Errorf("Union should have 200 bits set, but had %d", d.OnesCount())
 	}
 }
 
@@ -570,11 +633,11 @@ func TestInplaceIntersection(t *testing.T) {
 
 	d := b
 	d = d.Intersection(&a)
-	if c.Size() != 50 {
-		t.Errorf("Intersection should have 50 bits set, but had %d", c.Size())
+	if c.OnesCount() != 50 {
+		t.Errorf("Intersection should have 50 bits set, but had %d", c.OnesCount())
 	}
-	if d.Size() != 50 {
-		t.Errorf("Intersection should have 50 bits set, but had %d", d.Size())
+	if d.OnesCount() != 50 {
+		t.Errorf("Intersection should have 50 bits set, but had %d", d.OnesCount())
 	}
 }
 
@@ -799,7 +862,7 @@ func BenchmarkClear(b *testing.B) {
 	}
 }
 
-func BenchmarkSize(b *testing.B) {
+func BenchmarkOnesCount(b *testing.B) {
 	aa := []BitSet256{
 		randomBitSet256(),
 		randomBitSet256(),
@@ -809,7 +872,7 @@ func BenchmarkSize(b *testing.B) {
 
 	var i uint8
 	for b.Loop() {
-		aa[i&3].Size()
+		aa[i&3].OnesCount()
 		i++
 	}
 }
@@ -1005,7 +1068,9 @@ func BenchmarkIntersection(b *testing.B) {
 	}
 }
 
-func BenchmarkAsSlice(b *testing.B) {
+func BenchmarkAll(b *testing.B) {
+	var sink uint8
+
 	b.Run("Sparse", func(b *testing.B) {
 		aa := []BitSet256{
 			{0, 0, 0, 1},
@@ -1014,12 +1079,14 @@ func BenchmarkAsSlice(b *testing.B) {
 			{0, 0, 0, 1},
 		}
 
-		var buf [256]uint8
 		var i uint8
 		for b.Loop() {
-			aa[i&3].AsSlice(&buf)
+			for bit := range aa[i&3].All() {
+				sink = bit
+			}
 			i++
 		}
+		sinkSliceUint8 = append(sinkSliceUint8, sink)
 	})
 
 	b.Run("Dense", func(b *testing.B) {
@@ -1030,16 +1097,56 @@ func BenchmarkAsSlice(b *testing.B) {
 			randomBitSet256(),
 		}
 
-		var buf [256]uint8
 		var i uint8
 		for b.Loop() {
-			aa[i&3].AsSlice(&buf)
+			for bit := range aa[i&3].All() {
+				sink = bit
+			}
 			i++
 		}
+		sinkSliceUint8 = append(sinkSliceUint8, sink)
+	})
+}
+
+func BenchmarkAppendBits(b *testing.B) {
+	b.Run("Sparse", func(b *testing.B) {
+		aa := []BitSet256{
+			{0, 0, 0, 1},
+			{0, 0, 0, 1},
+			{0, 0, 0, 1},
+			{0, 0, 0, 1},
+		}
+
+		buf := make([]uint8, 0, 256)
+		var i uint8
+		for b.Loop() {
+			buf = aa[i&3].AppendBits(buf[:0])
+			i++
+		}
+		copy(sinkSliceUint8, buf)
+	})
+
+	b.Run("Dense", func(b *testing.B) {
+		aa := []BitSet256{
+			randomBitSet256(),
+			randomBitSet256(),
+			randomBitSet256(),
+			randomBitSet256(),
+		}
+
+		buf := make([]uint8, 0, 256)
+		var i uint8
+		for b.Loop() {
+			buf = aa[i&3].AppendBits(buf[:0])
+			i++
+		}
+		copy(sinkSliceUint8, buf)
 	})
 }
 
 func BenchmarkBits(b *testing.B) {
+	var sink []uint8
+
 	b.Run("Sparse", func(b *testing.B) {
 		aa := []BitSet256{
 			{0, 0, 0, 1},
@@ -1050,9 +1157,10 @@ func BenchmarkBits(b *testing.B) {
 
 		var i uint8
 		for b.Loop() {
-			_ = aa[i&3].Bits()
+			sink = aa[i&3].Bits()
 			i++
 		}
+		copy(sinkSliceUint8, sink)
 	})
 
 	b.Run("Dense", func(b *testing.B) {
@@ -1065,8 +1173,9 @@ func BenchmarkBits(b *testing.B) {
 
 		var i uint8
 		for b.Loop() {
-			_ = aa[i&3].Bits()
+			sink = aa[i&3].Bits()
 			i++
 		}
+		copy(sinkSliceUint8, sink)
 	})
 }
