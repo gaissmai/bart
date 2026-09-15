@@ -116,7 +116,7 @@ func TestLiteNode_Contains_ART_Coverage(t *testing.T) {
 	}
 }
 
-func TestLiteNode_Aggregate(t *testing.T) {
+func TestLiteNode_AggregateCoversPrefix(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
@@ -165,6 +165,80 @@ func TestLiteNode_Aggregate(t *testing.T) {
 
 		n.Aggregate()
 		got := n.Prefixes.Bits()
+
+		if !slices.Equal(got, tc.want) {
+			t.Errorf("Aggregate: %s, got: %v, want: %v", tc.name, got, tc.want)
+		}
+	}
+}
+
+func TestLiteNode_AggregateAdjacentPrefixes(t *testing.T) {
+	t.Parallel()
+
+	type pfx struct {
+		octet uint8
+		bits  uint8
+	}
+
+	testCases := []struct {
+		name  string
+		input []pfx
+		want  []pfx
+	}{
+		{
+			name:  "0/1, 128/1 = 0/0",
+			input: []pfx{pfx{0b0000_0000, 1}, pfx{0b1000_0000, 1}},
+			want:  []pfx{pfx{0b0000_0000, 0}},
+		},
+		{
+			name:  "0/2, 128/2 = 0/1",
+			input: []pfx{pfx{0b0000_0000, 2}, pfx{0b0100_0000, 2}},
+			want:  []pfx{pfx{0b0000_0000, 1}},
+		},
+		{
+			name:  "128/2, 192/2 = 128/1",
+			input: []pfx{pfx{0b1000_0000, 2}, pfx{0b1100_0000, 2}},
+			want:  []pfx{pfx{0b1000_0000, 1}},
+		},
+		{
+			name:  "nope: 2x /2",
+			input: []pfx{pfx{0b0000_0000, 2}, pfx{0b1000_0000, 2}},
+			want:  []pfx{pfx{0b0000_0000, 2}, pfx{0b1000_0000, 2}},
+		},
+		{
+			name:  "nope: 2x /2",
+			input: []pfx{pfx{0b0100_0000, 2}, pfx{0b1000_0000, 2}},
+			want:  []pfx{pfx{0b0100_0000, 2}, pfx{0b1000_0000, 2}},
+		},
+		{
+			name:  "nope: 1x /2, 1x /3",
+			input: []pfx{pfx{0b0100_0000, 2}, pfx{0b0100_0000, 3}},
+			want:  []pfx{pfx{0b0100_0000, 2}, pfx{0b0100_0000, 3}},
+		},
+	}
+
+	for _, tc := range testCases {
+		n := new(LiteNode[struct{}])
+
+		for _, pfx := range tc.input {
+			n.InsertPrefix(art.PfxToIdx(pfx.octet, pfx.bits), struct{}{})
+		}
+
+		// buf := new(bytes.Buffer)
+		// n.dump(buf, StridePath{}, 0, true)
+		// t.Logf("before: %s", buf.String())
+
+		n.Aggregate()
+
+		// buf.Reset()
+		// n.dump(buf, StridePath{}, 0, true)
+		// t.Logf("after: %s", buf.String())
+
+		var got []pfx
+		for idx := range n.Prefixes.All() {
+			octet, pfxLen := art.IdxToPfx(idx)
+			got = append(got, pfx{octet, pfxLen})
+		}
 
 		if !slices.Equal(got, tc.want) {
 			t.Errorf("Aggregate: %s, got: %v, want: %v", tc.name, got, tc.want)

@@ -5,8 +5,11 @@ package nodes
 
 import (
 	"iter"
+	"net/netip"
+	"slices"
 
 	"github.com/gaissmai/bart/internal/allot"
+	"github.com/gaissmai/bart/internal/art"
 	"github.com/gaissmai/bart/internal/bitset"
 	"github.com/gaissmai/bart/internal/lpm"
 	"github.com/gaissmai/bart/internal/sparse"
@@ -143,34 +146,134 @@ func (n *LiteNode[V]) CloneFlat(_ func(V) V) *LiteNode[V] {
 	return c
 }
 
-func (n *LiteNode[V]) Aggregate() {
-	// welche Prefixe überlagern sich in dem node
-	next := uint8(0)
-	ok := true
+func (n *LiteNode[V]) Aggregate(depth int) (deleted int) {
+	var zero V
 
-	for {
-		if next, ok = n.Prefixes.NextSet(next); !ok {
+	// welche Prefixe überlagern sich?
+	for super := range n.Prefixes.All() {
+		if super == 255 {
 			break
 		}
 
-		if next == 255 {
-			break
-		}
-
-		coveredIdxs := n.Prefixes.Intersection(&allot.PfxRoutesLookupTbl[next])
-		for idx := range coveredIdxs.All() {
+		covered := n.Prefixes.Intersection(&allot.PfxRoutesLookupTbl[super])
+		for sub := range covered.All() {
 			// skip self
-			if idx == next {
+			if sub == super {
 				continue
 			}
 			// delete covered
-			n.DeletePrefix(idx)
+			n.DeletePrefix(sub)
+			deleted++
 		}
-
-		next++
 	}
 
-	// welche Prefixe überlagern Children in dem node
-	// welche Prefxie sind adjacent
+	// welche Prefixe sind adjacent?
+	idxs := n.Prefixes.AppendBits(make([]uint8, 0, n.PrefixCount()))
+	last := uint8(0)
+	for _, idx := range slices.Backward(idxs) {
+		if idx <= 1 {
+			break
+		}
+		// test adjacent, 35>>1 = 17, 34>>1 = 17, set 17, delete 34,35
+		if last>>1 == idx>>1 {
+			// insert supernet
+			n.InsertPrefix(idx>>1, zero)
+
+			// delete subnets
+			n.DeletePrefix(last)
+			n.DeletePrefix(idx)
+
+			// 1 inserted, 2 deleted => 1
+			deleted++
+		}
+
+		last = idx
+	}
+
+	// welche Prefixe überlagern Children?
+	for idx := range n.Prefixes.All() {
+		covered := n.Children.Intersection(&allot.FringeRoutesLookupTbl[idx])
+		for addr := range covered.All() {
+			n.DeleteChild(addr)
+			deleted++
+		}
+	}
+
+	// aggegate adjacent fringes
+	var lastFringeAddr uint8
+	for addr := range n.Children.All() {
+		anyKid := n.MustGetChild(addr)
+		if _, ok := anyKid.(*FringeNode[V]); !ok {
+			continue
+		}
+
+		if lastFringeAddr^1 != addr { // e.g. 8^1 == 9, 7^1 == 6
+			lastFringeAddr = addr
+			continue
+		}
+
+		n.InsertPrefix(art.PfxToIdx(lastFringeAddr, 7), zero)
+		n.DeleteChild(lastFringeAddr)
+		n.DeleteChild(addr)
+		deleted++ // 1 prefix inserted, 2 fringes deleted
+
+		// reset
+		lastFringeAddr = 0
+	}
+
+	// aggegate adjacent leafs
+	var lastAddr uint8
+	var lastLeaf *LeafNode[V]
+	for thisAddr := range n.Children.All() {
+		anyKid := n.MustGetChild(thisAddr)
+		thisLeaf, ok := anyKid.(*LeafNode[V])
+		if !ok {
+			continue
+		}
+
+		// leafs are not adjacent, lastLeafAddr ist gerade, thisAddr ist last+1
+		if lastAddr^1 != thisAddr { // e.g. 8^1 == 9, but: 7^1 == 6
+			lastAddr = thisAddr
+			lastLeaf = thisLeaf
+			continue
+		}
+
+		superPfx, ok := supernet(lastLeaf.Prefix, thisLeaf.Prefix)
+		if !ok {
+			lastAddr = thisAddr
+			lastLeaf = thisLeaf
+			continue
+		}
+
+		n.InsertChild(lastAddr, NewLeafNode(superPfx, zero))
+		n.DeleteChild(thisAddr)
+		deleted++ // 1 leaf updated, 1 leaf deleted
+
+		// reset
+		lastAddr = 0
+		lastLeaf = nil
+
+	}
+
 	// steige recursiv ab
+	for _, anyKid := range n.Children.Items {
+		if kid, ok := anyKid.(*LiteNode[V]); ok {
+			deleted += kid.Aggregate(depth + 1)
+		}
+	}
+
+	return deleted
+}
+
+func supernet(a, b netip.Prefix) (netip.Prefix, bool) {
+	if a.Bits() != b.Bits() {
+		return netip.Prefix{}, false
+	}
+
+	super := netip.PrefixFrom(a.Addr(), a.Bits()-1)
+	if super.Overlaps(b) {
+		return super, true
+	}
+
+	return netip.Prefix{}, false
 }

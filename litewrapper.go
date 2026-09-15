@@ -27,6 +27,11 @@ type Lite struct {
 	liteTable[struct{}]
 }
 
+func (l *Lite) Aggregate() {
+	l.size4 -= l.root4.Aggregate(0)
+	l.size6 -= l.root6.Aggregate(0)
+}
+
 // Get performs an exact-prefix lookup and returns whether the exact
 // prefix exists. The prefix is canonicalized (Masked) before lookup.
 //
