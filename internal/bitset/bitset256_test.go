@@ -1006,32 +1006,67 @@ func BenchmarkIntersection(b *testing.B) {
 }
 
 func BenchmarkAsSlice(b *testing.B) {
-	aa := []BitSet256{
-		randomBitSet256(),
-		randomBitSet256(),
-		randomBitSet256(),
-		randomBitSet256(),
-	}
+	b.Run("Sparse", func(b *testing.B) {
+		aa := []BitSet256{
+			{0, 0, 0, 1},
+			{0, 0, 0, 1},
+			{0, 0, 0, 1},
+			{0, 0, 0, 1},
+		}
 
-	var buf [256]uint8
-	var i uint8
-	for b.Loop() {
-		aa[i&3].AsSlice(&buf)
-		i++
-	}
+		var buf [256]uint8
+		var i uint8
+		for b.Loop() {
+			aa[i&3].AsSlice(&buf)
+			i++
+		}
+	})
+
+	b.Run("Dense", func(b *testing.B) {
+		aa := []BitSet256{
+			randomBitSet256(),
+			randomBitSet256(),
+			randomBitSet256(),
+			randomBitSet256(),
+		}
+
+		var buf [256]uint8
+		var i uint8
+		for b.Loop() {
+			aa[i&3].AsSlice(&buf)
+			i++
+		}
+	})
 }
 
 func BenchmarkBits(b *testing.B) {
-	aa := []BitSet256{
-		randomBitSet256(),
-		randomBitSet256(),
-		randomBitSet256(),
-		randomBitSet256(),
-	}
+	b.Run("Sparse", func(b *testing.B) {
+		aa := []BitSet256{
+			{0, 0, 0, 1},
+			{0, 0, 0, 1},
+			{0, 0, 0, 1},
+			{0, 0, 0, 1},
+		}
 
-	var i uint8
-	for b.Loop() {
-		_ = aa[i&3].Bits()
-		i++
-	}
+		var i uint8
+		for b.Loop() {
+			_ = aa[i&3].Bits()
+			i++
+		}
+	})
+
+	b.Run("Dense", func(b *testing.B) {
+		aa := []BitSet256{
+			randomBitSet256(),
+			randomBitSet256(),
+			randomBitSet256(),
+			randomBitSet256(),
+		}
+
+		var i uint8
+		for b.Loop() {
+			_ = aa[i&3].Bits()
+			i++
+		}
+	})
 }
