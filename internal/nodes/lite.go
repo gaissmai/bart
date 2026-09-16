@@ -200,16 +200,19 @@ func (n *LiteNode[V]) Aggregate() (deleted int) {
 		more = false
 
 		var lastFringeAddr uint8
+		var lastFringe *FringeNode[V]
 		for addr := range n.Children.All() {
 			anyKid := n.MustGetChild(addr)
 
-			if _, ok := anyKid.(*FringeNode[V]); !ok {
+			fringe, ok := anyKid.(*FringeNode[V])
+			if !ok {
 				continue
 			}
 
 			// start/restart
-			if lastFringeAddr == 0 {
+			if lastFringe == nil {
 				lastFringeAddr = addr
+				lastFringe = fringe
 				continue
 			}
 
@@ -217,6 +220,7 @@ func (n *LiteNode[V]) Aggregate() (deleted int) {
 			// e.g. 8^1 == 9, 7^1 == 6
 			if lastFringeAddr^1 != addr {
 				lastFringeAddr = addr
+				lastFringe = fringe
 				continue
 			}
 
@@ -229,6 +233,7 @@ func (n *LiteNode[V]) Aggregate() (deleted int) {
 
 			// reset
 			lastFringeAddr = 0
+			lastFringe = nil
 		}
 	}
 
@@ -246,6 +251,7 @@ func (n *LiteNode[V]) Aggregate() (deleted int) {
 				continue
 			}
 
+			// start/restart
 			if lastLeaf == nil {
 				lastLeafAddr = addr
 				lastLeaf = leaf
