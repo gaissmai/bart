@@ -431,11 +431,12 @@ func TestLiteAggregatePreservesMembership(t *testing.T) {
 func TestTableAggregateCompare(t *testing.T) {
 	t.Parallel()
 	n := workLoadN()
-	prng := rand.New(rand.NewPCG(42, 42))
 
-	for range n {
+	for i := range 50 {
 		t.Run("subtest", func(t *testing.T) {
 			t.Parallel()
+
+			prng := rand.New(rand.NewPCG(uint64(n), uint64(i)))
 			pfxs := random.RealWorldPrefixes(prng, n)
 
 			gold := new(golden.Table[any])

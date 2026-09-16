@@ -221,8 +221,8 @@ func (t *Table[V]) Sort() {
 	})
 }
 
-// Aggregate compresses the Table in-place by merging overlapping and adjacent IP prefixes
-// that share identical values into their minimal covering CIDR blocks.
+// Aggregate compresses the Table in-place by merging overlapping and
+// adjacent IP prefixes into their minimal covering CIDR blocks.
 func (t *Table[V]) Aggregate() {
 	if len(*t) <= 1 {
 		return
@@ -259,7 +259,7 @@ func (t *Table[V]) Aggregate() {
 			// Since cmpPrefix places broader prefixes first for identical start addresses,
 			// last covers this if last contains this's network address
 			if lastItem.Pfx.Contains(thisItem.Pfx.Addr()) {
-				// this is redundant and gets dropped
+				// this covered item gets dropped
 				loop = true
 				continue
 			}
