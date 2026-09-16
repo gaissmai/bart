@@ -332,35 +332,3 @@ func (l *FringeNode[V]) CloneFringe(cloneFn func(V) V) *FringeNode[V] {
 	}
 	return &FringeNode[V]{Value: cloneFn(l.Value)}
 }
-
-// Supernet returns the common parent prefix covering both input prefixes a and b,
-// provided they form a contiguous, power-of-two aligned pair.
-//
-// Invariants:
-//   - Both prefixes a and b must be valid (pfx.IsValid() == true).
-//   - Both prefixes must belong to the same address family (IPv4 or IPv6).
-//
-// It returns the Supernet prefix with (bits - 1) and true if the prefixes can be merged;
-// otherwise, it returns an invalid netip.Prefix{} and false.
-func Supernet(a, b netip.Prefix) (netip.Prefix, bool) {
-	if a == b {
-		return netip.Prefix{}, false
-	}
-	if a.Bits() != b.Bits() {
-		return netip.Prefix{}, false
-	}
-
-	// Construct candidate parent supernet by widening the prefix length by 1 bit.
-	super := netip.PrefixFrom(a.Addr(), a.Bits()-1)
-
-	// canonicalize prefix
-	super = super.Masked()
-
-	// Verify if the parent supernet also covers prefix b.
-	if super.Overlaps(b) {
-		return super, true
-	}
-
-	// Not adjacent or aligned under the same parent boundary.
-	return netip.Prefix{}, false
-}
