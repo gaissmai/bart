@@ -282,7 +282,7 @@ func (b *BitSet256) IntersectionTop(c *BitSet256) (top uint8, ok bool) {
 // n is EVEN, and both bit n and bit n+1 were set in the original bitset.
 func (b *BitSet256) AlignedPairs() BitSet256 {
 	// Mask with bits set at all even positions (0, 2, 4, 6, ..., 62)
-	const evenBits uint64 = 0x5555555555555555
+	const evenBits uint64 = 0x5555_5555_5555_5555
 
 	// Note: No cross-word carry is needed here!
 	// Since n must be strictly EVEN (0, 2, 4...), an aligned pair (n, n+1)
