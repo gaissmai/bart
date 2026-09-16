@@ -38,8 +38,22 @@ type Lite struct {
 //     that completely cover their common parent (e.g., 192.168.0.0/25 and
 //     192.168.0.128/25) are combined into a single supernet (192.168.0.0/24).
 func (l *Lite) Aggregate() {
-	l.size4 -= l.root4.Aggregate()
-	l.size6 -= l.root6.Aggregate()
+	mod4 := l.root4.Aggregate()
+	mod6 := l.root6.Aggregate()
+
+	if mod4 {
+		l.size4 = 0
+		for range l.All4() {
+			l.size4++
+		}
+	}
+
+	if mod6 {
+		l.size6 = 0
+		for range l.All6() {
+			l.size6++
+		}
+	}
 }
 
 // Get performs an exact-prefix lookup and returns whether the exact
