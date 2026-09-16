@@ -200,22 +200,7 @@ func dropSeq2[V any](seq2 iter.Seq2[netip.Prefix, V]) iter.Seq[netip.Prefix] {
 //     common parent (e.g., 192.168.0.0/25 and 192.168.0.128/25) are combined
 //     into a single supernet (192.168.0.0/24).
 func (l *Lite) Aggregate() {
-	mod4 := l.root4.Aggregate()
-	mod6 := l.root6.Aggregate()
-
-	if mod4 != 0 {
-		l.size4 = 0
-		for range l.All4() {
-			l.size4++
-		}
-	}
-
-	if mod6 != 0 {
-		l.size6 = 0
-		for range l.All6() {
-			l.size6++
-		}
-	}
+	l.liteTable.Aggregate()
 }
 
 // Clone returns a copy of the routing table.

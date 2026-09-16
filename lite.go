@@ -29,3 +29,24 @@ type liteTable[V any] struct {
 	size4 int
 	size6 int
 }
+
+// Aggregate compresses the table in-place by merging overlapping
+// and adjacent IP prefixes into their minimal covering CIDR blocks.
+func (l *liteTable[V]) Aggregate() {
+	mod4 := l.root4.Aggregate()
+	mod6 := l.root6.Aggregate()
+
+	if mod4 != 0 {
+		l.size4 = 0
+		for range l.All4() {
+			l.size4++
+		}
+	}
+
+	if mod6 != 0 {
+		l.size6 = 0
+		for range l.All6() {
+			l.size6++
+		}
+	}
+}
