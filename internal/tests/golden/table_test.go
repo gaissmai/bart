@@ -5,6 +5,7 @@ package golden
 
 import (
 	"net/netip"
+	"slices"
 	"testing"
 )
 
@@ -468,5 +469,79 @@ func TestTableMixedIPVersions(t *testing.T) {
 	}
 	if !sorted[1].Addr().Is6() {
 		t.Error("expected IPv6 prefix second in sorted order")
+	}
+}
+
+func TestTableAggregate(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		in   Table[any]
+		want Table[any]
+	}{
+		{
+			name: "empty",
+			in:   Table[any]{},
+			want: Table[any]{},
+		},
+		{
+			name: "single",
+			in:   Table[any]{{Pfx: mpp("10.0.0.0/8")}},
+			want: Table[any]{{Pfx: mpp("10.0.0.0/8")}},
+		},
+		{
+			name: "containment",
+			in: Table[any]{
+				{Pfx: mpp("10.1.0.0/16")},
+				{Pfx: mpp("10.0.0.0/8")},
+				{Pfx: mpp("10.1.1.0/24")},
+			},
+			want: Table[any]{{Pfx: mpp("10.0.0.0/8")}},
+		},
+		{
+			name: "adjacency single merge",
+			in: Table[any]{
+				{Pfx: mpp("192.168.0.0/25")},
+				{Pfx: mpp("192.168.0.128/25")},
+			},
+			want: Table[any]{{Pfx: mpp("192.168.0.0/24")}},
+		},
+		{
+			name: "cascading merge",
+			in: Table[any]{
+				{Pfx: mpp("10.0.0.0/26")},
+				{Pfx: mpp("10.0.0.64/26")},
+				{Pfx: mpp("10.0.0.128/26")},
+				{Pfx: mpp("10.0.0.192/26")},
+			},
+			want: Table[any]{{Pfx: mpp("10.0.0.0/24")}},
+		},
+		{
+			name: "mixed v4 and v6",
+			in: Table[any]{
+				{Pfx: mpp("2001:db8::/33")},
+				{Pfx: mpp("10.0.0.0/25")},
+				{Pfx: mpp("2001:db8:8000::/33")},
+				{Pfx: mpp("10.0.0.128/25")},
+			},
+			want: Table[any]{
+				{Pfx: mpp("10.0.0.0/24")},
+				{Pfx: mpp("2001:db8::/32")},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tbl := tt.in
+			tbl.Aggregate()
+
+			if !slices.EqualFunc(tbl, tt.want, func(a, b TableItem[any]) bool { return a.Pfx == b.Pfx }) {
+				t.Errorf("got %v, want %v", tbl, tt.want)
+			}
+		})
 	}
 }

@@ -10,6 +10,15 @@ import (
 	"slices"
 )
 
+// cmpPrefix, helper function, compare func for prefix sort,
+// all cidrs are already normalized
+func cmpPrefix(a, b netip.Prefix) int {
+	if cmpAddr := a.Addr().Compare(b.Addr()); cmpAddr != 0 {
+		return cmpAddr
+	}
+	return cmp.Compare(a.Bits(), b.Bits())
+}
+
 // Table is a linear, un-optimized routing table implemented as a slice of
 // prefix-value pairs. It serves as a simple, easy-to-verify golden reference
 // for testing complex routing table implementations (like BART).
@@ -212,11 +221,67 @@ func (t *Table[V]) Sort() {
 	})
 }
 
-// cmpPrefix is a comparison helper for sorting prefixes.
-// Assumes both prefixes are already normalized/masked.
-func cmpPrefix(a, b netip.Prefix) int {
-	if cmpAddr := a.Addr().Compare(b.Addr()); cmpAddr != 0 {
-		return cmpAddr
+// Aggregate compresses the Table in-place by merging overlapping and adjacent IP prefixes
+// that share identical values into their minimal covering CIDR blocks.
+func (t *Table[V]) Aggregate() {
+	if len(*t) <= 1 {
+		return
 	}
-	return cmp.Compare(a.Bits(), b.Bits())
+
+	slices.SortFunc(*t, func(a, b TableItem[V]) int {
+		return cmpPrefix(a.Pfx, b.Pfx)
+	})
+
+	// Iteratively merge entries until no further aggregation is possible
+	for {
+		loop := false
+		var result Table[V]
+
+		for i := range len(*t) {
+			thisItem := (*t)[i]
+
+			// first result item
+			if len(result) == 0 {
+				result = append(result, thisItem)
+				continue
+			}
+
+			lastIdx := len(result) - 1
+			lastItem := &result[lastIdx]
+
+			// Only aggregate prefixes belonging to the same IP family
+			if lastItem.Pfx.Addr().Is4() != thisItem.Pfx.Addr().Is4() {
+				result = append(result, thisItem)
+				continue
+			}
+
+			// Rule 1: Overlapping / Containment
+			// Since cmpPrefix places broader prefixes first for identical start addresses,
+			// last covers this if last contains this's network address
+			if lastItem.Pfx.Contains(thisItem.Pfx.Addr()) {
+				// this is redundant and gets dropped
+				loop = true
+				continue
+			}
+
+			// Rule 2: Adjacency (merging sibling prefixes)
+			// Equal prefix length + both share a common super prefix of length (bits - 1)
+			if lastItem.Pfx.Bits() == thisItem.Pfx.Bits() && lastItem.Pfx.Bits() > 0 {
+				super, err := lastItem.Pfx.Masked().Addr().Prefix(lastItem.Pfx.Bits() - 1)
+				if err == nil && super.Contains(thisItem.Pfx.Addr()) {
+					// Merge into parent block
+					lastItem.Pfx = super
+					loop = true
+					continue
+				}
+			}
+
+			result = append(result, thisItem)
+		}
+
+		*t = result
+		if !loop {
+			break
+		}
+	}
 }

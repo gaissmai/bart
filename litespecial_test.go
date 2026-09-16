@@ -4,9 +4,13 @@
 package bart
 
 import (
+	"math/rand/v2"
 	"net/netip"
 	"slices"
 	"testing"
+
+	"github.com/gaissmai/bart/internal/tests/golden"
+	"github.com/gaissmai/bart/internal/tests/random"
 )
 
 func TestTableNilReceiver_LiteTable(t *testing.T) {
@@ -419,6 +423,37 @@ func TestLiteAggregatePreservesMembership(t *testing.T) {
 				if afterContains != beforeContains {
 					t.Errorf("Contains(%s) changed from %v to %v", address, beforeContains, afterContains)
 				}
+			}
+		})
+	}
+}
+
+func TestTableAggregateCompare(t *testing.T) {
+	t.Parallel()
+	n := workLoadN()
+	prng := rand.New(rand.NewPCG(42, 42))
+
+	for range n {
+		t.Run("subtest", func(t *testing.T) {
+			t.Parallel()
+			pfxs := random.RealWorldPrefixes(prng, n)
+
+			gold := new(golden.Table[any])
+			lite := new(Lite)
+
+			for _, pfx := range pfxs {
+				gold.Insert(pfx, nil)
+				lite.Insert(pfx)
+			}
+
+			gold.Aggregate()
+			lite.Aggregate()
+
+			goldSorted := gold.AllSorted()
+			liteSorted := slices.Collect(lite.AllSorted())
+
+			if !slices.Equal(goldSorted, liteSorted) {
+				t.Fatal("Aggregate(): tables are different!")
 			}
 		})
 	}
