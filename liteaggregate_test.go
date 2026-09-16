@@ -115,6 +115,74 @@ func TestLiteAggregate(t *testing.T) {
 			input: []string{"192.0.2.0/25", "192.0.2.128/25", "2001:db8::/65", "2001:db8:0:0:8000::/65"},
 			want:  []string{"192.0.2.0/24", "2001:db8::/64"},
 		},
+
+		// more corner cases
+		{
+			name:  "adjacent leaf siblings ipv4",
+			input: []string{"10.0.0.0/24", "10.0.1.0/24"},
+			want:  []string{"10.0.0.0/23"},
+		},
+		{
+			name:  "adjacent non-byte-aligned siblings ipv4",
+			input: []string{"10.0.0.0/25", "10.0.0.128/25"},
+			want:  []string{"10.0.0.0/24"},
+		},
+		{
+			name:  "adjacent siblings ipv6",
+			input: []string{"2001:db8::/53", "2001:db8:0:0800::/53"},
+			want:  []string{"2001:db8::/52"},
+		},
+		{
+			name:  "zero address fringe pair ipv4",
+			input: []string{"0.0.0.0/8", "1.0.0.0/8"},
+			want:  []string{"0.0.0.0/7"},
+		},
+		{
+			name:  "zero address fringe pair ipv6",
+			input: []string{"::/8", "100::/8"},
+			want:  []string{"::/7"},
+		},
+		{
+			name: "covered child with multiple routes",
+			input: []string{
+				"10.0.0.0/8",
+				"10.1.0.0/17",
+				"10.1.128.0/17",
+				"10.2.0.0/17",
+				"10.2.128.0/17",
+			},
+			want: []string{"10.0.0.0/8"},
+		},
+		{
+			name: "cascading prefix merges",
+			input: []string{
+				"0.0.0.0/5",
+				"8.0.0.0/5",
+				"16.0.0.0/5",
+				"24.0.0.0/5",
+			},
+			want: []string{"0.0.0.0/3"},
+		},
+		{
+			name:  "partial sibling set",
+			input: []string{"0.0.0.0/8", "1.0.0.0/8", "2.0.0.0/8"},
+			want:  []string{"0.0.0.0/7", "2.0.0.0/8"},
+		},
+		{
+			name:  "non-adjacent prefixes remain separate",
+			input: []string{"10.0.0.0/24", "10.0.2.0/24"},
+			want:  []string{"10.0.0.0/24", "10.0.2.0/24"},
+		},
+		{
+			name:  "single prefix",
+			input: []string{"192.0.2.1/32"},
+			want:  []string{"192.0.2.1/32"},
+		},
+		{
+			name:  "default route per family",
+			input: []string{"0.0.0.0/0", "10.0.0.0/8", "::/0", "2001:db8::/32"},
+			want:  []string{"0.0.0.0/0", "::/0"},
+		},
 	}
 
 	for _, test := range tests {
