@@ -20,7 +20,10 @@ func randomBitSet256() BitSet256 {
 	}
 }
 
-var sinkSliceUint8 []uint8
+var (
+	sinkSliceUint8 []uint8
+	sinkBitSet256  BitSet256
+)
 
 func TestZeroValue(t *testing.T) {
 	t.Parallel()
@@ -568,6 +571,76 @@ func TestAppendBits(t *testing.T) {
 			t.Errorf("AppendBits, %s: returned buf is not equal as expected:\ngot:  %v\nwant: %v",
 				tc.name, buf, tc.wantData)
 		}
+	}
+}
+
+func TestAlignedPairs(t *testing.T) {
+	const evenBits uint64 = 0x5555555555555555
+
+	tests := []struct {
+		name  string
+		input BitSet256
+		want  BitSet256
+	}{
+		{
+			name:  "Empty bitset",
+			input: BitSet256{0, 0, 0, 0},
+			want:  BitSet256{0, 0, 0, 0},
+		},
+		{
+			name:  "Aligned pair at LSB (bits 0, 1) -> MATCH at index 0",
+			input: BitSet256{3, 0, 0, 0}, // 3 = 0b0011 (bits 0 and 1 set)
+			want:  BitSet256{1, 0, 0, 0}, // Result bit 0 set
+		},
+		{
+			name:  "Unaligned pair (bits 1, 2) -> NO MATCH (odd index 1)",
+			input: BitSet256{(1 << 1) | (1 << 2), 0, 0, 0}, // Bits 1 and 2 set
+			want:  BitSet256{0, 0, 0, 0},                   // Must be filtered out
+		},
+		{
+			name:  "Multiple aligned pairs in word 0 (bits 0,1 and 4,5)",
+			input: BitSet256{(1 << 0) | (1 << 1) | (1 << 4) | (1 << 5), 0, 0, 0},
+			want:  BitSet256{(1 << 0) | (1 << 4), 0, 0, 0},
+		},
+		{
+			name:  "Word 0 upper boundary aligned pair (bits 62, 63) -> MATCH at index 62",
+			input: BitSet256{(1 << 62) | (1 << 63), 0, 0, 0},
+			want:  BitSet256{1 << 62, 0, 0, 0},
+		},
+		{
+			name:  "Cross-word boundary pair (bits 63, 64) -> NO MATCH (odd index 63)",
+			input: BitSet256{1 << 63, 1, 0, 0}, // Bit 63 (word 0) and Bit 0 (word 1)
+			want:  BitSet256{0, 0, 0, 0},       // Discarded (n=63 is odd)
+		},
+		{
+			name:  "Word 1 lower boundary aligned pair (bits 64, 65) -> MATCH at index 64",
+			input: BitSet256{0, 3, 0, 0}, // Bits 0 and 1 set in word 1
+			want:  BitSet256{0, 1, 0, 0}, // Result bit 0 set in word 1 (overall bit 64)
+		},
+		{
+			name:  "Word 3 upper boundary aligned pair (bits 254, 255) -> MATCH at index 254",
+			input: BitSet256{0, 0, 0, (1 << 62) | (1 << 63)},
+			want:  BitSet256{0, 0, 0, 1 << 62},
+		},
+		{
+			name:  "Dense sequential run (bits 0, 1, 2, 3) -> MATCH at 0 and 2",
+			input: BitSet256{0xF, 0, 0, 0}, // Bits 0, 1, 2, 3 set
+			want:  BitSet256{0x5, 0, 0, 0}, // Bits 0 and 2 set (pairs (0,1) and (2,3))
+		},
+		{
+			name:  "All bits set",
+			input: BitSet256{^uint64(0), ^uint64(0), ^uint64(0), ^uint64(0)},
+			want:  BitSet256{evenBits, evenBits, evenBits, evenBits},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.input.AlignedPairs()
+			if got != tt.want {
+				t.Errorf("AlignedPairs() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
 
@@ -1278,4 +1351,23 @@ func BenchmarkLeftShift(b *testing.B) {
 		aa[i&3].LeftShift()
 		i++
 	}
+}
+
+func BenchmarkAlignedPairs(b *testing.B) {
+	sink := BitSet256{}
+
+	aa := []BitSet256{
+		randomBitSet256(),
+		randomBitSet256(),
+		randomBitSet256(),
+		randomBitSet256(),
+	}
+
+	var i uint8
+	for b.Loop() {
+		sink = aa[i&3].AlignedPairs()
+		i++
+	}
+
+	sinkBitSet256 = sink
 }

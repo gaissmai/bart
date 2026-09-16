@@ -16,6 +16,7 @@
 // when explicitly requested (via Bits()).
 package bitset
 
+// can inline (*BitSet256).AlignedPairs with cost 46
 // can inline (*BitSet256).All with cost 17
 // can inline (*BitSet256).AppendBits with cost 31
 // can inline (*BitSet256).Bits with cost 66
@@ -275,6 +276,25 @@ func (b *BitSet256) IntersectionTop(c *BitSet256) (top uint8, ok bool) {
 		}
 	}
 	return
+}
+
+// AlignedPairs returns a new BitSet256 where bit n is set if and only if
+// n is EVEN, and both bit n and bit n+1 were set in the original bitset.
+func (b *BitSet256) AlignedPairs() BitSet256 {
+	// Mask with bits set at all even positions (0, 2, 4, 6, ..., 62)
+	const evenBits uint64 = 0x5555555555555555
+
+	// Note: No cross-word carry is needed here!
+	// Since n must be strictly EVEN (0, 2, 4...), an aligned pair (n, n+1)
+	// always resides within the exact same uint64 word (e.g., bits 62 & 63 in b[0],
+	// or bits 64 & 65 in b[1]). Cross-boundary pairs like (63, 64) start on an ODD
+	// index and are intentionally excluded by the aligned evenBits constraint.
+	return BitSet256{
+		b[0] & (b[0] >> 1) & evenBits,
+		b[1] & (b[1] >> 1) & evenBits,
+		b[2] & (b[2] >> 1) & evenBits,
+		b[3] & (b[3] >> 1) & evenBits,
+	}
 }
 
 // RightShift shifts all bits in the bitset to the right by exactly 1 bit in-place.
