@@ -26,9 +26,11 @@ package bitset
 // can inline (*BitSet256).IntersectionTop with cost 67
 // can inline (*BitSet256).IsEmpty with cost 22
 // can inline (*BitSet256).LastSet with cost 75
+// can inline (*BitSet256).LeftShift with cost 60
 // can inline (*BitSet256).NextSet with cost 65
 // can inline (*BitSet256).OnesCount with cost 28
 // can inline (*BitSet256).Rank with cost 52
+// can inline (*BitSet256).RightShift with cost 60
 // can inline (*BitSet256).Set with cost 12
 // can inline (*BitSet256).Test with cost 15
 // can inline (*BitSet256).Union with cost 36
@@ -273,6 +275,24 @@ func (b *BitSet256) IntersectionTop(c *BitSet256) (top uint8, ok bool) {
 		}
 	}
 	return
+}
+
+// RightShift shifts all bits in the bitset to the right by exactly 1 bit in-place.
+func (b *BitSet256) RightShift() {
+	// Inline carry calculation directly into assignments to lower AST complexity for inlining
+	b[0] = (b[0] >> 1) | (b[1] << 63) // Shift word 0 right, pull bit 0 of word 1 into bit 63
+	b[1] = (b[1] >> 1) | (b[2] << 63) // Shift word 1 right, pull bit 0 of word 2 into bit 63
+	b[2] = (b[2] >> 1) | (b[3] << 63) // Shift word 2 right, pull bit 0 of word 3 into bit 63
+	b[3] >>= 1                        // Shift word 3 right (zero enters at bit 63)
+}
+
+// LeftShift shifts all bits in the bitset to the left by exactly 1 bit in-place.
+func (b *BitSet256) LeftShift() {
+	// Inline carry calculation directly into assignments to lower AST complexity for inlining
+	b[3] = (b[3] << 1) | (b[2] >> 63) // Shift word 3 left, pull bit 63 of word 2 into bit 0
+	b[2] = (b[2] << 1) | (b[1] >> 63) // Shift word 2 left, pull bit 63 of word 1 into bit 0
+	b[1] = (b[1] << 1) | (b[0] >> 63) // Shift word 1 left, pull bit 63 of word 0 into bit 0
+	b[0] <<= 1                        // Shift word 0 left (zero enters at bit 0)
 }
 
 // Rank returns the number of bits set (i.e., value 1) in the BitSet256
