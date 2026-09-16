@@ -191,11 +191,11 @@ heap allocations on a modern CPU.
 ## API
 
 BART has a rich API for CRUD, lookup, comparison, iteration,
-serialization and persistence. 
+serialization and persistence.
 
-**Table** and **Fast** expose the identical API, while **Lite** deviates in
-its methods from the common API when it comes to the payload, since *Lite*
-has no payload.
+**Table** and **Fast** expose the identical API, while **Lite** deviates from
+the common API since it carries no payload. Additionally, **Lite** provides
+specialized methods like `Aggregate` to compact ACL prefixes in-place.
 
 ```go
 import "github.com/gaissmai/bart"

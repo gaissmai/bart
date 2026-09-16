@@ -27,35 +27,6 @@ type Lite struct {
 	liteTable[struct{}]
 }
 
-// Aggregate compresses the routing table in-place by merging overlapping
-// and adjacent IP prefixes into their minimal covering CIDR blocks.
-//
-// Aggregation operates via two mechanisms:
-//  1. Overlapping: More specific subnets fully contained within
-//     a broader supernet (e.g., 10.1.0.0/16 inside 10.0.0.0/8) are redundant
-//     in a Lite table and are removed.
-//  2. Adjacent: Neighboring prefixes of equal length
-//     that completely cover their common parent (e.g., 192.168.0.0/25 and
-//     192.168.0.128/25) are combined into a single supernet (192.168.0.0/24).
-func (l *Lite) Aggregate() {
-	mod4 := l.root4.Aggregate()
-	mod6 := l.root6.Aggregate()
-
-	if mod4 != 0 {
-		l.size4 = 0
-		for range l.All4() {
-			l.size4++
-		}
-	}
-
-	if mod6 != 0 {
-		l.size6 = 0
-		for range l.All6() {
-			l.size6++
-		}
-	}
-}
-
 // Get performs an exact-prefix lookup and returns whether the exact
 // prefix exists. The prefix is canonicalized (Masked) before lookup.
 //
@@ -214,6 +185,36 @@ func dropSeq2[V any](seq2 iter.Seq2[netip.Prefix, V]) iter.Seq[netip.Prefix] {
 		seq2(func(p netip.Prefix, _ V) bool {
 			return yield(p)
 		})
+	}
+}
+
+// Aggregate compresses the Lite table in-place by merging overlapping
+// and adjacent IP prefixes into their minimal covering CIDR blocks.
+//
+// When the Lite table is used as an Access Control List (ACL), aggregation
+// preserves identical access permissions while reducing memory footprint
+// via two mechanisms:
+//  1. Overlapping: More specific subnets fully contained within a broader
+//     supernet (e.g., 10.1.0.0/16 inside 10.0.0.0/8) are redundant and removed.
+//  2. Adjacent: Sibling prefixes of equal length that completely cover their
+//     common parent (e.g., 192.168.0.0/25 and 192.168.0.128/25) are combined
+//     into a single supernet (192.168.0.0/24).
+func (l *Lite) Aggregate() {
+	mod4 := l.root4.Aggregate()
+	mod6 := l.root6.Aggregate()
+
+	if mod4 != 0 {
+		l.size4 = 0
+		for range l.All4() {
+			l.size4++
+		}
+	}
+
+	if mod6 != 0 {
+		l.size6 = 0
+		for range l.All6() {
+			l.size6++
+		}
 	}
 }
 
