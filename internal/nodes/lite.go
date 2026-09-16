@@ -154,13 +154,11 @@ func (n *LiteNode[V]) CloneFlat(_ func(V) V) *LiteNode[V] {
 //     broader supernet prefix within the same node's bitset.
 //  2. Child Subsumption: Deletes child nodes (fringes) that are fully covered
 //     by an existing prefix in the current node.
-//  3. Fringe Merging: Collapses pairs of adjacent FringeNode children into
+//  3. Recursive Descent: Recursively calls Aggregate on child LiteNode instances.
+//  4. Fringe Merging: Collapses pairs of adjacent FringeNode children into
 //     a single supernet prefix inserted into the current node's bitset.
-//  4. Leaf Merging: Merges pairs of adjacent LeafNode children covering a contiguous
-//     range into a single LeafNode representing their common supernet.
 //  5. Prefix Merging: Combines pairs of adjacent sibling prefixes (e.g., sharing
 //     the same parent bit sequence) into their higher-level supernet prefix.
-//  6. Recursive Descent: Recursively calls Aggregate on child LiteNode instances.
 //
 // Returns deleted, the net number of prefix/child entries pruned or merged during
 // the bottom-up compression pass.
@@ -194,99 +192,50 @@ func (n *LiteNode[V]) Aggregate() (modified int) {
 		}
 	}
 
-	// 3. Fringe Merging: Collapse adjacent FringeNode pairs into a supernet prefix.
-	more := true
-	for more { // loop as long as changes occur, maybe many passes
-		more = false
+	// 3. Recursive Descent: Top-down compression of child LiteNodes.
+	for i, anyKid := range n.Children.Items {
+		if kid, ok := anyKid.(*LiteNode[V]); ok {
+			modified += kid.Aggregate()
 
-		var lastFringeAddr uint8
-		var lastFringe *FringeNode[V]
-		for addr := range n.Children.All() {
-			anyKid := n.MustGetChild(addr)
-
-			fringe, ok := anyKid.(*FringeNode[V])
-			if !ok {
+			// no dangling STOP node, can't promote
+			if kid.PrefixCount() != 1 || kid.ChildCount() != 0 {
 				continue
 			}
 
-			// start/restart
-			if lastFringe == nil {
-				lastFringeAddr = addr
-				lastFringe = fringe
-				continue
+			// promote as fringe after aggregation
+			// a node with just one prefix and default route (idx == 1)
+			// is a fringe one level above
+			if kid.Prefixes.Test(1) {
+				n.Children.Items[i] = NewFringeNode(zero)
 			}
-
-			// check adjacency (even address XOR 1 must equal following odd address)
-			// e.g. 8^1 == 9, 7^1 == 6
-			if lastFringeAddr^1 != addr {
-				lastFringeAddr = addr
-				lastFringe = fringe
-				continue
-			}
-
-			n.InsertPrefix(art.PfxToIdx(lastFringeAddr, 7), zero)
-			n.DeleteChild(lastFringeAddr)
-			n.DeleteChild(addr)
-
-			modified++
-			more = true
-
-			// reset
-			lastFringeAddr = 0
-			lastFringe = nil
 		}
 	}
 
-	// 4. Leaf Merging: Collapse adjacent LeafNode pairs into a single supernet leaf.
-	more = true
-	for more { // loop as long as changes occur, maybe many passes
-		more = false
-		var lastLeafAddr uint8
-		var lastLeaf *LeafNode[V]
+	// 4. Fringe Merging: Collapse adjacent FringeNode pairs into a supernet prefix.
 
-		for _, addr := range n.Children.AppendBits(make([]uint8, 0, n.ChildCount())) {
-			anyKid := n.MustGetChild(addr)
-			leaf, ok := anyKid.(*LeafNode[V])
-			if !ok {
-				continue
-			}
-
-			// start/restart
-			if lastLeaf == nil {
-				lastLeafAddr = addr
-				lastLeaf = leaf
-				continue
-			}
-
-			// check adjacency (even address XOR 1 must equal following odd address)
-			// e.g. 8^1 == 9, 7^1 == 6
-			if lastLeafAddr^1 != addr {
-				lastLeafAddr = addr
-				lastLeaf = leaf
-				continue
-			}
-
-			superPfx, ok := Supernet(lastLeaf.Prefix, leaf.Prefix)
-			if !ok {
-				lastLeafAddr = addr
-				lastLeaf = leaf
-				continue
-			}
-
-			n.InsertChild(lastLeafAddr, NewLeafNode(superPfx, zero))
-			n.DeleteChild(addr)
-
-			modified++
-			more = true
-
-			// reset
-			lastLeafAddr = 0
-			lastLeaf = nil
+	// only aligned pairs are aggregate candidates
+	alignedPairs := n.Children.AlignedPairs()
+	for addr := range alignedPairs.All() {
+		anyKid := n.MustGetChild(addr)
+		if _, ok := anyKid.(*FringeNode[V]); !ok {
+			continue
 		}
+
+		anyKid = n.MustGetChild(addr + 1)
+		if _, ok := anyKid.(*FringeNode[V]); !ok {
+			continue
+		}
+
+		// the aligned child pair are fringes, promote them as prefix: addr/7
+		n.InsertPrefix(art.PfxToIdx(addr, 7), zero)
+		n.DeleteChild(addr)
+		n.DeleteChild(addr + 1)
+
+		modified++
 	}
 
 	// 5. Prefix Merging: Merge adjacent prefixes within the bitset.
-	more = true
+	more := true
 	for more { // loop as long as changes occur, maybe many passes
 		more = false
 		idxs := n.Prefixes.AppendBits(make([]uint8, 0, n.PrefixCount()))
@@ -315,13 +264,6 @@ func (n *LiteNode[V]) Aggregate() (modified int) {
 			}
 
 			lastIdx = idx
-		}
-	}
-
-	// 6. Recursive Descent: Top-down compression of child LiteNodes.
-	for _, anyKid := range n.Children.Items {
-		if kid, ok := anyKid.(*LiteNode[V]); ok {
-			modified += kid.Aggregate()
 		}
 	}
 
