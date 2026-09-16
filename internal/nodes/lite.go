@@ -164,7 +164,7 @@ func (n *LiteNode[V]) CloneFlat(_ func(V) V) *LiteNode[V] {
 //
 // Returns deleted, the net number of prefix/child entries pruned or merged during
 // the bottom-up compression pass.
-func (n *LiteNode[V]) Aggregate() (modified bool) {
+func (n *LiteNode[V]) Aggregate() (modified int) {
 	var zero V
 
 	// 1. Prefix Subsumption: Remove subnets in the bitset that are fully covered by a supernet.
@@ -181,7 +181,7 @@ func (n *LiteNode[V]) Aggregate() (modified bool) {
 			}
 			// delete covered subnet
 			n.DeletePrefix(sub)
-			modified = true
+			modified++
 		}
 	}
 
@@ -190,7 +190,7 @@ func (n *LiteNode[V]) Aggregate() (modified bool) {
 		covered := n.Children.Intersection(&allot.FringeRoutesLookupTbl[idx])
 		for addr := range covered.All() {
 			n.DeleteChild(addr)
-			modified = true
+			modified++
 		}
 	}
 
@@ -228,7 +228,7 @@ func (n *LiteNode[V]) Aggregate() (modified bool) {
 			n.DeleteChild(lastFringeAddr)
 			n.DeleteChild(addr)
 
-			modified = true
+			modified++
 			more = true
 
 			// reset
@@ -276,7 +276,7 @@ func (n *LiteNode[V]) Aggregate() (modified bool) {
 			n.InsertChild(lastLeafAddr, NewLeafNode(superPfx, zero))
 			n.DeleteChild(addr)
 
-			modified = true
+			modified++
 			more = true
 
 			// reset
@@ -310,7 +310,7 @@ func (n *LiteNode[V]) Aggregate() (modified bool) {
 				n.DeletePrefix(lastIdx)
 				n.DeletePrefix(idx)
 
-				modified = true
+				modified++
 				more = true
 			}
 
@@ -321,7 +321,7 @@ func (n *LiteNode[V]) Aggregate() (modified bool) {
 	// 6. Recursive Descent: Top-down compression of child LiteNodes.
 	for _, anyKid := range n.Children.Items {
 		if kid, ok := anyKid.(*LiteNode[V]); ok {
-			modified = kid.Aggregate()
+			modified += kid.Aggregate()
 		}
 	}
 
