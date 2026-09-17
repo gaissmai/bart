@@ -37,16 +37,12 @@ func (l *liteTable[V]) Aggregate() {
 	mod6 := l.root6.Aggregate()
 
 	if mod4 != 0 {
-		l.size4 = 0
-		for range l.All4() {
-			l.size4++
-		}
+		stats := l.root4.StatsRec()
+		l.size4 = stats.Prefixes + stats.Leaves + stats.Fringes
 	}
 
 	if mod6 != 0 {
-		l.size6 = 0
-		for range l.All6() {
-			l.size6++
-		}
+		stats := l.root6.StatsRec()
+		l.size6 = stats.Prefixes + stats.Leaves + stats.Fringes
 	}
 }
