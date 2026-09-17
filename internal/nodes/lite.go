@@ -5,7 +5,6 @@ package nodes
 
 import (
 	"iter"
-	"slices"
 
 	"github.com/gaissmai/bart/internal/allot"
 	"github.com/gaissmai/bart/internal/art"
@@ -235,35 +234,24 @@ func (n *LiteNode[V]) Aggregate() (modified int) {
 	}
 
 	// 5. Prefix Merging: Merge adjacent prefixes within the bitset.
-	more := true
-	for more { // loop as long as changes occur, maybe many passes
-		more = false
-		idxs := n.Prefixes.AppendBits(make([]uint8, 0, n.PrefixCount()))
-		lastIdx := uint8(0)
-		for _, idx := range slices.Backward(idxs) {
-			if idx <= 1 {
-				break
-			}
+	for { // loop as long as changes occur, maybe many passes
+		more := false
 
-			if lastIdx == 0 {
-				lastIdx = idx
-				continue
-			}
+		alignedPairs := n.Prefixes.AlignedPairs()
+		for idx := range alignedPairs.All() {
+			// insert supernet
+			n.InsertPrefix(idx>>1, zero)
 
-			// test adjacent, 35>>1 = 17, 34>>1 = 17, set 17, delete 34,35
-			if lastIdx>>1 == idx>>1 {
-				// insert supernet
-				n.InsertPrefix(idx>>1, zero)
+			// delete subnets
+			n.DeletePrefix(idx)
+			n.DeletePrefix(idx + 1)
 
-				// delete subnets
-				n.DeletePrefix(lastIdx)
-				n.DeletePrefix(idx)
+			modified++
+			more = true
+		}
 
-				modified++
-				more = true
-			}
-
-			lastIdx = idx
+		if !more {
+			break
 		}
 	}
 
