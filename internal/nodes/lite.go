@@ -146,21 +146,23 @@ func (n *LiteNode[V]) CloneFlat(_ func(V) V) *LiteNode[V] {
 
 // Aggregate compresses the LiteNode in-place by pruning redundant subnets,
 // removing child nodes covered by parent prefixes, and merging adjacent siblings
-// across prefixes, fringe nodes, and leaf nodes.
+// across prefixes and fringe nodes.
 //
 // The aggregation process executes the following steps in order:
 //  1. Prefix Subsumption: Removes more-specific prefixes fully covered by a
 //     broader supernet prefix within the same node's bitset.
-//  2. Child Subsumption: Deletes child nodes (fringes) that are fully covered
+//  2. Child Subsumption: Deletes child nodes that are fully covered
 //     by an existing prefix in the current node.
 //  3. Recursive Descent: Recursively calls Aggregate on child LiteNode instances.
+//     If a child reduces to a single default route prefix (index 1) with no
+//     remaining children, it is promoted to a FringeNode.
 //  4. Fringe Merging: Collapses pairs of adjacent FringeNode children into
 //     a single supernet prefix inserted into the current node's bitset.
-//  5. Prefix Merging: Combines pairs of adjacent sibling prefixes (e.g., sharing
-//     the same parent bit sequence) into their higher-level supernet prefix.
+//  5. Prefix Merging: Repeatedly combines pairs of adjacent sibling prefixes
+//     into their higher-level supernet prefix until no more merges are possible.
 //
-// Returns deleted, the net number of prefix/child entries pruned or merged during
-// the bottom-up compression pass.
+// Returns modified, the total number of structural mutations (pruned, promoted,
+// or merged entries) performed during the aggregation pass.
 func (n *LiteNode[V]) Aggregate() (modified int) {
 	var zero V
 
@@ -196,14 +198,12 @@ func (n *LiteNode[V]) Aggregate() (modified int) {
 		if kid, ok := anyKid.(*LiteNode[V]); ok {
 			modified += kid.Aggregate()
 
-			// no dangling STOP node, can't promote
+			// Only promote if the child has collapsed into a single prefix and has no children left
 			if kid.PrefixCount() != 1 || kid.ChildCount() != 0 {
 				continue
 			}
 
-			// promote as fringe after aggregation
-			// a node with just one prefix and default route (idx == 1)
-			// is a fringe one level above
+			// Promote to FringeNode if the single remaining prefix is the default route (index 1)
 			if kid.Prefixes.Test(1) {
 				n.Children.Items[i] = NewFringeNode(zero)
 			}
@@ -215,11 +215,11 @@ func (n *LiteNode[V]) Aggregate() (modified int) {
 	// only aligned pairs are aggregate candidates
 	alignedPairs := n.Children.AlignedPairs()
 	for addr := range alignedPairs.All() {
+		// addr, addr+1 is an aligned pair
 		anyKid := n.MustGetChild(addr)
 		if _, ok := anyKid.(*FringeNode[V]); !ok {
 			continue
 		}
-
 		anyKid = n.MustGetChild(addr + 1)
 		if _, ok := anyKid.(*FringeNode[V]); !ok {
 			continue
@@ -234,7 +234,7 @@ func (n *LiteNode[V]) Aggregate() (modified int) {
 	}
 
 	// 5. Prefix Merging: Merge adjacent prefixes within the bitset.
-	for { // loop as long as changes occur, maybe many passes
+	for { // Repeat in multiple passes to handle cascading merges
 		more := false
 
 		alignedPairs := n.Prefixes.AlignedPairs()
