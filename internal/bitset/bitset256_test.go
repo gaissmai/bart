@@ -897,6 +897,51 @@ func TestIntersectionTop(t *testing.T) {
 	}
 }
 
+func TestXor(t *testing.T) {
+	tests := []struct {
+		name     string
+		initial  BitSet256
+		other    BitSet256
+		expected BitSet256
+	}{
+		{
+			name:     "XOR with zero set yields original",
+			initial:  BitSet256{1, 2, 3, 4},
+			other:    BitSet256{0, 0, 0, 0},
+			expected: BitSet256{1, 2, 3, 4},
+		},
+		{
+			name:     "XOR with self yields zero",
+			initial:  BitSet256{0xDEAD, 0xBEEF, 0x1234, 0x5678},
+			other:    BitSet256{0xDEAD, 0xBEEF, 0x1234, 0x5678},
+			expected: BitSet256{0, 0, 0, 0},
+		},
+		{
+			name:     "XOR bit toggle logic",
+			initial:  BitSet256{0b1100, 0, 0, 0},
+			other:    BitSet256{0b1010, 0, 0, 0},
+			expected: BitSet256{0b0110, 0, 0, 0},
+		},
+		{
+			name:     "XOR across all 256 bits",
+			initial:  BitSet256{1, 2, 3, 4},
+			other:    BitSet256{4, 3, 2, 1},
+			expected: BitSet256{1 ^ 4, 2 ^ 3, 3 ^ 2, 4 ^ 1},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := tt.initial
+			b.Xor(&tt.other)
+
+			if b != tt.expected {
+				t.Errorf("Xor() = %v, want %v", b, tt.expected)
+			}
+		})
+	}
+}
+
 func TestRank(t *testing.T) {
 	t.Parallel()
 	u := []uint8{0, 3, 5, 7, 11, 62, 63, 64, 70, 150, 255}
@@ -1207,6 +1252,22 @@ func BenchmarkIntersection(b *testing.B) {
 	var i uint8
 	for b.Loop() {
 		aa.Intersection(&bb[i&3])
+		i++
+	}
+}
+
+func BenchmarkXor(b *testing.B) {
+	aa := randomBitSet256()
+	bb := []BitSet256{
+		randomBitSet256(),
+		randomBitSet256(),
+		randomBitSet256(),
+		randomBitSet256(),
+	}
+
+	var i uint8
+	for b.Loop() {
+		aa.Xor(&bb[i&3])
 		i++
 	}
 }
