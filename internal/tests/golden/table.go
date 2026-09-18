@@ -6,6 +6,7 @@ package golden
 import (
 	"cmp"
 	"fmt"
+	"iter"
 	"net/netip"
 	"slices"
 )
@@ -73,6 +74,18 @@ func (t Table[V]) AllSorted() []netip.Prefix {
 	}
 	slices.SortFunc(result, cmpPrefix)
 	return result
+}
+
+// All returns a list of all prefix, value pairs currently present
+// in the table as iterator.
+func (t Table[V]) All() iter.Seq2[netip.Prefix, V] {
+	return func(yield func(pfx netip.Prefix, val V) bool) {
+		for _, item := range t {
+			if !yield(item.Pfx, item.Val) {
+				return
+			}
+		}
+	}
 }
 
 // Get performs an exact match search for the given prefix.
