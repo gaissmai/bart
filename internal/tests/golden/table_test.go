@@ -371,6 +371,75 @@ func TestTableSort(t *testing.T) {
 	}
 }
 
+func TestTableAll(t *testing.T) {
+	tests := []struct {
+		name string
+		tbl  Table[int]
+		want []TableItem[int]
+	}{
+		{
+			name: "empty table",
+			tbl:  Table[int]{},
+			want: nil,
+		},
+		{
+			name: "single entry",
+			tbl: Table[int]{
+				{Pfx: mpp("192.168.1.0/24"), Val: 1},
+			},
+			want: []TableItem[int]{
+				{Pfx: mpp("192.168.1.0/24"), Val: 1},
+			},
+		},
+		{
+			name: "multiple IPv4 and IPv6 entries",
+			tbl: Table[int]{
+				{Pfx: mpp("10.0.0.0/8"), Val: 10},
+				{Pfx: mpp("2001:db8::/32"), Val: 30},
+				{Pfx: mpp("192.168.1.0/24"), Val: 20},
+			},
+			want: []TableItem[int]{
+				{Pfx: mpp("10.0.0.0/8"), Val: 10},
+				{Pfx: mpp("2001:db8::/32"), Val: 30},
+				{Pfx: mpp("192.168.1.0/24"), Val: 20},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var got []TableItem[int]
+			for pfx, val := range tt.tbl.All() {
+				got = append(got, TableItem[int]{Pfx: pfx, Val: val})
+			}
+
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("All() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+
+	t.Run("early break", func(t *testing.T) {
+		tbl := Table[int]{
+			{Pfx: mpp("10.0.0.0/8"), Val: 1},
+			{Pfx: mpp("192.168.1.0/24"), Val: 2},
+			{Pfx: mpp("172.16.0.0/12"), Val: 3},
+		}
+
+		var count int
+		for range tbl.All() {
+			count++
+			if count == 2 {
+				break
+			}
+		}
+
+		if count != 2 {
+			t.Errorf("All() early break failed: processed %d items, want 2", count)
+		}
+	})
+}
+
 func TestTableEmpty(t *testing.T) {
 	tbl := new(Table[int])
 
