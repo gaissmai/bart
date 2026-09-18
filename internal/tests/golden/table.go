@@ -241,9 +241,11 @@ func (t *Table[V]) Aggregate() {
 		return
 	}
 
-	slices.SortFunc(*t, func(a, b TableItem[V]) int {
-		return cmpPrefix(a.Pfx, b.Pfx)
-	})
+	tableItemsSort := func(a, b TableItem[V]) int { return cmpPrefix(a.Pfx, b.Pfx) }
+
+	if !slices.IsSortedFunc(*t, tableItemsSort) {
+		slices.SortFunc(*t, tableItemsSort)
+	}
 
 	buf := make([]TableItem[V], 0, len(*t))
 
@@ -284,7 +286,7 @@ func (t *Table[V]) Aggregate() {
 			// Rule 2: Adjacency (merging sibling prefixes)
 			// Equal prefix length + both share a common super prefix of length (bits - 1)
 			if lastItem.Pfx.Bits() == thisItem.Pfx.Bits() && lastItem.Pfx.Bits() > 0 {
-				super, err := lastItem.Pfx.Masked().Addr().Prefix(lastItem.Pfx.Bits() - 1)
+				super, err := lastItem.Pfx.Addr().Prefix(lastItem.Pfx.Bits() - 1)
 				if err == nil && super.Contains(thisItem.Pfx.Addr()) {
 					// Merge into parent block
 					lastItem.Pfx = super
