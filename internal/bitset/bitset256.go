@@ -195,11 +195,6 @@ func (b *BitSet256) LastSet() (last uint8, ok bool) {
 // All returns an iterator over the indices of all set bits in the BitSet256
 // in strictly ascending order.
 //
-// Performance Considerations:
-// Implemented via Go 1.23+ range-over-function iterators (iter.Seq). It is
-// fully inlinable by the compiler, zero-allocation, and avoids slice overhead
-// altogether when driving loops directly.
-//
 // Note on Dense BitSets:
 // While iter.Seq provides clean iterator semantics and supports early breaking,
 // calling yield() in a dense iteration loop introduces slight state-machine
@@ -215,6 +210,28 @@ func (b *BitSet256) All() iter.Seq[uint8] {
 				if !yield(bitIdx) {
 					return
 				}
+				word &= word - 1
+			}
+		}
+	}
+}
+
+// AllEnumerate returns a pair iterator yielding a zero-based iteration sequence number
+// and the bit index for each set bit in the BitSet256 in strictly ascending order.
+//
+// See [BitSet256.All] for performance considerations on dense bitsets.
+//
+//nolint:gosec // G115: integer overflow conversion int -> uint
+func (b *BitSet256) AllEnumerate() iter.Seq2[uint8, uint8] {
+	return func(yield func(uint8, uint8) bool) {
+		var i uint8
+		for wIdx, word := range b {
+			for word != 0 {
+				bitIdx := uint8(wIdx<<6 + bits.TrailingZeros64(word))
+				if !yield(i, bitIdx) {
+					return
+				}
+				i++
 				word &= word - 1
 			}
 		}

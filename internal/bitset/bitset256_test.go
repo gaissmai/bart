@@ -452,65 +452,120 @@ func TestAll(t *testing.T) {
 	}
 }
 
-func TestAlls(t *testing.T) {
+// Helper to generate consecutive uint8 slices
+func makeSequence(start, length uint8) []uint8 {
+	seq := make([]uint8, length)
+	for i := range length {
+		seq[i] = start + i
+	}
+	return seq
+}
+
+func TestIterators(t *testing.T) {
 	t.Parallel()
-	testCases := []struct {
-		name string
-		//
-		set []uint8
-		del []uint8
-		//
-		wantData []uint8
+
+	tests := []struct {
+		name         string
+		bitset       BitSet256
+		wantBits     []uint8
+		wantSequence []uint8 // Zero-based sequence index for AllEnumerate
 	}{
 		{
-			name:     "null",
-			set:      []uint8{},
-			del:      []uint8{},
-			wantData: []uint8{},
+			name:         "empty bitset",
+			bitset:       BitSet256{0, 0, 0, 0},
+			wantBits:     nil,
+			wantSequence: nil,
 		},
 		{
-			name:     "zero",
-			set:      []uint8{0},
-			del:      []uint8{},
-			wantData: []uint8{0}, // bit #0 is set
+			name:         "single bit set at start",
+			bitset:       BitSet256{1, 0, 0, 0},
+			wantBits:     []uint8{0},
+			wantSequence: []uint8{0},
 		},
 		{
-			name:     "1,5",
-			set:      []uint8{1, 5},
-			del:      []uint8{},
-			wantData: []uint8{1, 5},
+			name:         "single bit set at boundary (255)",
+			bitset:       BitSet256{0, 0, 0, 1 << 63},
+			wantBits:     []uint8{255},
+			wantSequence: []uint8{0},
 		},
 		{
-			name:     "many",
-			set:      []uint8{1, 65, 130, 190, 250},
-			del:      []uint8{},
-			wantData: []uint8{1, 65, 130, 190, 250},
+			name:         "sparse bits across words",
+			bitset:       BitSet256{1 << 0, 1 << 10, 1 << 20, 1 << 30},
+			wantBits:     []uint8{0, 64 + 10, 128 + 20, 192 + 30},
+			wantSequence: []uint8{0, 1, 2, 3},
 		},
 		{
-			name:     "special, last return",
-			set:      []uint8{1},
-			del:      []uint8{1}, // delete without compact
-			wantData: []uint8{},
+			name:         "multiple bits in same word",
+			bitset:       BitSet256{0b1011, 0, 0, 0}, // Bits 0, 1, 3
+			wantBits:     []uint8{0, 1, 3},
+			wantSequence: []uint8{0, 1, 2},
+		},
+		{
+			name:         "dense word",
+			bitset:       BitSet256{0xFFFFFFFFFFFFFFFF, 0, 0, 0},
+			wantBits:     makeSequence(0, 64),
+			wantSequence: makeSequence(0, 64),
 		},
 	}
 
-	for _, tc := range testCases {
-		var b BitSet256
-		for _, u := range tc.set {
-			b.Set(u)
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-		for _, u := range tc.del {
-			b.Clear(u) // without compact
-		}
+			t.Run("All", func(t *testing.T) {
+				t.Parallel()
+				var gotBits []uint8
+				for bit := range tt.bitset.All() {
+					gotBits = append(gotBits, bit)
+				}
+				if !slices.Equal(gotBits, tt.wantBits) {
+					t.Errorf("All() = %v, want %v", gotBits, tt.wantBits)
+				}
+			})
 
-		buf := slices.Collect(b.All())
-
-		if !slices.Equal(buf, tc.wantData) {
-			t.Errorf("All, %s: collected buf is not equal as expected:\ngot:  %v\nwant: %v",
-				tc.name, buf, tc.wantData)
-		}
+			t.Run("AllEnumerate", func(t *testing.T) {
+				t.Parallel()
+				var gotSeq, gotBits []uint8
+				for i, bit := range tt.bitset.AllEnumerate() {
+					gotSeq = append(gotSeq, i)
+					gotBits = append(gotBits, bit)
+				}
+				if !slices.Equal(gotBits, tt.wantBits) {
+					t.Errorf("AllEnumerate() bits = %v, want %v", gotBits, tt.wantBits)
+				}
+				if !slices.Equal(gotSeq, tt.wantSequence) {
+					t.Errorf("AllEnumerate() sequence = %v, want %v", gotSeq, tt.wantSequence)
+				}
+			})
+		})
 	}
+
+	t.Run("early break", func(t *testing.T) {
+		t.Parallel()
+		bs := BitSet256{0b1111, 0, 0, 0} // Bits 0, 1, 2, 3
+		var count int
+
+		for range bs.All() {
+			count++
+			if count == 2 {
+				break
+			}
+		}
+		if count != 2 {
+			t.Errorf("All() early break failed: processed %d bits, want 2", count)
+		}
+
+		count = 0
+		for range bs.AllEnumerate() {
+			count++
+			if count == 2 {
+				break
+			}
+		}
+		if count != 2 {
+			t.Errorf("AllEnumerate() early break failed: processed %d bits, want 2", count)
+		}
+	})
 }
 
 func TestAppendBits(t *testing.T) {
