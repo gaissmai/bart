@@ -51,7 +51,7 @@ var exampleIPs = []netip.Addr{
 	mpa("2003:dead:beef::1"), // must NOT match
 }
 
-func ExampleLite_contains() {
+func ExampleLite_Contains() {
 	lite := new(bart.Lite)
 
 	for _, pfx := range examplePrefixes {
@@ -93,14 +93,14 @@ var input = []struct {
 	{mpp("192.168.1.0/24"), mpa("127.0.0.1")},
 }
 
-func ExampleLite_aggregate() {
+func ExampleLite_Aggregate() {
 	lite := new(bart.Lite)
 
 	for _, pfx := range examplePrefixes {
 		lite.Insert(pfx)
 	}
-
 	lite.Aggregate()
+
 	lite.Fprint(os.Stdout)
 
 	// Output:
