@@ -39,12 +39,10 @@ func (n *LiteNode[V]) ChildCount() int {
 // Each iteration yields the child's address (uint8) and the child node (any).
 func (n *LiteNode[V]) AllChildren() iter.Seq2[uint8, any] {
 	return func(yield func(addr uint8, child any) bool) {
-		i := 0
-		for addr := range n.Children.All() {
+		for i, addr := range n.Children.AllEnumerate() {
 			if !yield(addr, n.Children.Items[i]) {
 				return
 			}
-			i++
 		}
 	}
 }
