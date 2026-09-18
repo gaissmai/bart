@@ -459,3 +459,45 @@ func TestTableAggregateCompare(t *testing.T) {
 		})
 	}
 }
+
+func TestTableAggregateStructuralCompare(t *testing.T) {
+	t.Parallel()
+	n := workLoadN()
+
+	for i := range 50 {
+		t.Run("subtest", func(t *testing.T) {
+			t.Parallel()
+
+			prng := rand.New(rand.NewPCG(uint64(n), uint64(i)))
+			pfxs := random.RealWorldPrefixes(prng, n)
+
+			gold := new(golden.Table[any])
+			lt1 := new(Lite)
+			lt2 := new(Lite)
+
+			for _, pfx := range pfxs {
+				gold.Insert(pfx, nil)
+				lt1.Insert(pfx)
+			}
+
+			gold.Aggregate()
+			lt1.Aggregate()
+
+			// build lt2 with aggregated prefixes
+			for pfx := range gold.All() {
+				lt2.Insert(pfx)
+			}
+
+			lt1Sorted := slices.Collect(lt1.AllSorted())
+			lt2Sorted := slices.Collect(lt2.AllSorted())
+
+			if !slices.Equal(lt1Sorted, lt2Sorted) {
+				t.Fatal("Aggregate(): the tables have different prefixes!")
+			}
+
+			if lt1.dumpString() != lt2.dumpString() {
+				t.Fatal("Aggregate(): the tables have mismatched internal structures!")
+			}
+		})
+	}
+}
