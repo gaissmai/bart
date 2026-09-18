@@ -231,12 +231,12 @@ func (n *LiteNode[V]) AggregateRec(path StridePath, depth int, is4 bool) (modifi
 
 	// #########################################################
 	// 3. Recursive Descent: Top-down compression of child nodes
-	i := uint8(0)
-	for addr, anyKid := range n.AllChildren() {
+	for i, addr := range n.Children.AllEnumerate() {
+		anyKid := n.Children.Items[i]
+
 		kid, ok := anyKid.(*LiteNode[V])
 		// Leaf or fringe, skip over
 		if !ok {
-			i++
 			continue
 		}
 
@@ -249,7 +249,6 @@ func (n *LiteNode[V]) AggregateRec(path StridePath, depth int, is4 bool) (modifi
 
 		// Nothing to promote if combined entry count is 2 or more
 		if pfxCount+childCount >= 2 {
-			i++
 			continue
 		}
 
@@ -271,7 +270,6 @@ func (n *LiteNode[V]) AggregateRec(path StridePath, depth int, is4 bool) (modifi
 			switch grandKid := kid.Children.Items[0].(type) {
 			case *LiteNode[V]:
 				// Intermediate path node, leave as is
-				i++
 				continue
 
 			case *LeafNode[V]:
@@ -285,7 +283,6 @@ func (n *LiteNode[V]) AggregateRec(path StridePath, depth int, is4 bool) (modifi
 				n.Children.Items[i] = NewLeafNode(fringePrefix, zero)
 			}
 		}
-		i++
 	}
 
 	// #############################################################################

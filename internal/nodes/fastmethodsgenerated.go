@@ -71,12 +71,10 @@ func (n *FastNode[V]) DeletePrefix(idx uint8) (exists bool) {
 // Each iteration yields the prefix index (uint8) and its associated value (V).
 func (n *FastNode[V]) AllIndices() iter.Seq2[uint8, V] {
 	return func(yield func(uint8, V) bool) {
-		i := 0
-		for idx := range n.Prefixes.All() {
+		for i, idx := range n.Prefixes.AllEnumerate() {
 			if !yield(idx, n.Prefixes.Items[i]) {
 				return
 			}
-			i++
 		}
 	}
 }
@@ -85,12 +83,10 @@ func (n *FastNode[V]) AllIndices() iter.Seq2[uint8, V] {
 // Each iteration yields the child's address (uint8) and the child node (any).
 func (n *FastNode[V]) AllChildren() iter.Seq2[uint8, any] {
 	return func(yield func(addr uint8, child any) bool) {
-		i := 0
-		for addr := range n.Children.All() {
+		for i, addr := range n.Children.AllEnumerate() {
 			if !yield(addr, n.Children.Items[i]) {
 				return
 			}
-			i++
 		}
 	}
 }
