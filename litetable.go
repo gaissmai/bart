@@ -33,8 +33,8 @@ type liteTable[V any] struct {
 // Aggregate compresses the table in-place by merging overlapping
 // and adjacent IP prefixes into their minimal covering CIDR blocks.
 func (l *liteTable[V]) Aggregate() {
-	mod4 := l.root4.Aggregate()
-	mod6 := l.root6.Aggregate()
+	mod4 := l.root4.AggregateRec(nodes.StridePath{}, 0, true)
+	mod6 := l.root6.AggregateRec(nodes.StridePath{}, 0, false)
 
 	if mod4 != 0 {
 		stats := l.root4.StatsRec()

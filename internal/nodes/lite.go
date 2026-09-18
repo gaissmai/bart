@@ -144,75 +144,154 @@ func (n *LiteNode[V]) CloneFlat(_ func(V) V) *LiteNode[V] {
 	return c
 }
 
-// Aggregate compresses the LiteNode in-place by pruning redundant subnets,
-// removing child nodes covered by parent prefixes, and merging adjacent siblings
-// across prefixes and fringe nodes.
+// AggregateRec compresses the LiteNode in-place by pruning redundant subnets,
+// removing child nodes covered by parent prefixes, recursively compressing child
+// nodes with promotion of eligible single-entry children to FringeNode or LeafNode
+// instances, and merging adjacent sibling prefixes or fringe nodes.
 //
 // The aggregation process executes the following steps in order:
 //  1. Prefix Subsumption: Removes more-specific prefixes fully covered by a
 //     broader supernet prefix within the same node's bitset.
 //  2. Child Subsumption: Deletes child nodes that are fully covered
 //     by an existing prefix in the current node.
-//  3. Recursive Descent: Recursively calls Aggregate on child LiteNode instances.
-//     If a child reduces to a single default route prefix (index 1) with no
-//     remaining children, it is promoted to a FringeNode.
+//  3. Recursive Descent: Recursively calls AggregateRec on child LiteNode instances.
+//     If a child LiteNode contains only a single entry (a prefix or a child node),
+//     it is promoted in-place in the parent's child array:
+//     - A single default prefix (index 1) becomes a FringeNode.
+//     - Any other single prefix becomes a LeafNode with its reconstructed CIDR.
+//     - A single child *LeafNode is promoted directly.
+//     - A single child *FringeNode is reconstructed into a LeafNode and promoted.
 //  4. Fringe Merging: Collapses pairs of adjacent FringeNode children into
 //     a single supernet prefix inserted into the current node's bitset.
 //  5. Prefix Merging: Repeatedly combines pairs of adjacent sibling prefixes
 //     into their higher-level supernet prefix until no more merges are possible.
 //
-// Returns modified, the total number of structural mutations (pruned, promoted,
-// or merged entries) performed during the aggregation pass.
-func (n *LiteNode[V]) Aggregate() (modified int) {
+// Returns modified, the number of structural mutation operations performed
+// during the aggregation pass. Note that pruning an entire child node counts
+// as a single mutation event, regardless of how many nested prefixes it contained.
+func (n *LiteNode[V]) AggregateRec(path StridePath, depth int, is4 bool) (modified int) {
 	var zero V
 
+	// #########################################################################################
 	// 1. Prefix Subsumption: Remove subnets in the bitset that are fully covered by a supernet.
-	for super := range n.Prefixes.All() {
-		if super == 255 {
+	oldPfxCount := n.Prefixes.Count
+	var pfxIdx uint8
+	var ok bool
+	for {
+		// Find the next set prefix index, starting search at bit 0
+		if pfxIdx, ok = n.Prefixes.NextSet(pfxIdx); !ok {
 			break
 		}
 
-		covered := n.Prefixes.Intersection(&allot.PfxRoutesLookupTbl[super])
-		for sub := range covered.All() {
-			// skip self
-			if sub == super {
-				continue
-			}
-			// delete covered subnet
-			n.DeletePrefix(sub)
-			modified++
+		// The last prefix only overlaps with itself
+		if pfxIdx == 255 {
+			break
 		}
-	}
 
+		// Find all prefixes covered by pfxIdx using the allotment lookup table
+		covered := n.Prefixes.Intersection(&allot.PfxRoutesLookupTbl[pfxIdx])
+
+		// Clear all covered prefixes, including pfxIdx itself
+		n.Prefixes.Xor(&covered)
+
+		// Re-enable cleared pfxIdx
+		n.Prefixes.Set(pfxIdx)
+
+		// Advance index to search for the next prefix
+		pfxIdx++
+	}
+	// Recalculate prefix count after deletions
+	//nolint:gosec // G115: integer overflow conversion int -> uint16
+	n.Prefixes.Count = uint16(n.Prefixes.OnesCount())
+
+	// Track number of subsumed prefixes removed
+	modified += int(oldPfxCount - n.Prefixes.Count)
+
+	// ###########################################################################
 	// 2. Child Subsumption: Remove child nodes covered by any prefix in this node.
+	//
+	// Note: n.Children is a sparse.Array256 backed by a BitSet256 mask. To avoid
+	// mutating the sparse array structure inside the loop, we first accumulate all
+	// matching child addresses into a BitSet256 and delete them in a second pass.
+	oldChildCount := n.ChildCount()
+	var toDelete bitset.BitSet256
 	for idx := range n.Prefixes.All() {
+		// Collect child addresses covered by the current prefix using the fringe lookup table
 		covered := n.Children.Intersection(&allot.FringeRoutesLookupTbl[idx])
-		for addr := range covered.All() {
-			n.DeleteChild(addr)
-			modified++
-		}
+		toDelete.Union(&covered)
 	}
 
-	// 3. Recursive Descent: Top-down compression of child LiteNodes.
-	for i, anyKid := range n.Children.Items {
-		if kid, ok := anyKid.(*LiteNode[V]); ok {
-			modified += kid.Aggregate()
+	// Batch delete accumulated child nodes
+	for addr := range toDelete.All() {
+		n.DeleteChild(addr)
+	}
 
-			// Only promote if the child has collapsed into a single prefix and has no children left
-			if kid.PrefixCount() != 1 || kid.ChildCount() != 0 {
-				continue
-			}
+	// Track total number of subsumed children removed
+	modified += oldChildCount - n.ChildCount()
 
-			// Promote to FringeNode if the single remaining prefix is the default route (index 1)
+	// #########################################################
+	// 3. Recursive Descent: Top-down compression of child nodes
+	i := uint8(0)
+	for addr, anyKid := range n.AllChildren() {
+		kid, ok := anyKid.(*LiteNode[V])
+		// Leaf or fringe, skip over
+		if !ok {
+			i++
+			continue
+		}
+
+		// Recurse down
+		path[depth] = addr
+		modified += kid.AggregateRec(path, depth+1, is4)
+
+		pfxCount := kid.PrefixCount()
+		childCount := kid.ChildCount()
+
+		// Nothing to promote if combined entry count is 2 or more
+		if pfxCount+childCount >= 2 {
+			i++
+			continue
+		}
+
+		// Promote single-entry child nodes to lower-overhead structures
+		switch {
+		case pfxCount == 1:
+			// Promote single prefix to FringeNode or LeafNode
 			if kid.Prefixes.Test(1) {
 				n.Children.Items[i] = NewFringeNode(zero)
+			} else {
+				// Convert prefix back to LeafNode and promote
+				idx, _ := kid.Prefixes.FirstSet()
+				leafPrefix := CidrFromPath(path, depth+1, is4, idx)
+				n.Children.Items[i] = NewLeafNode(leafPrefix, zero)
+			}
+
+		case childCount == 1:
+			// Promote single grandchild to parent's child slot
+			switch grandKid := kid.Children.Items[0].(type) {
+			case *LiteNode[V]:
+				// Intermediate path node, leave as is
+				i++
+				continue
+
+			case *LeafNode[V]:
+				// Promote LeafNode directly
+				n.Children.Items[i] = grandKid
+
+			case *FringeNode[V]:
+				// Convert FringeNode back to LeafNode and promote
+				fringeByte, _ := kid.Children.FirstSet()
+				fringePrefix := CidrForFringe(path[:], depth+1, is4, fringeByte)
+				n.Children.Items[i] = NewLeafNode(fringePrefix, zero)
 			}
 		}
+		i++
 	}
 
+	// #############################################################################
 	// 4. Fringe Merging: Collapse adjacent FringeNode pairs into a supernet prefix.
 
-	// only aligned pairs are aggregate candidates
+	// Only aligned pairs are aggregation candidates
 	alignedPairs := n.Children.AlignedPairs()
 	for addr := range alignedPairs.All() {
 		// addr, addr+1 is an aligned pair
@@ -225,7 +304,7 @@ func (n *LiteNode[V]) Aggregate() (modified int) {
 			continue
 		}
 
-		// the aligned child pair are fringes, promote them as prefix: addr/7
+		// The aligned child pair are fringes; promote them as prefix: addr/7
 		n.InsertPrefix(art.PfxToIdx(addr, 7), zero)
 		n.DeleteChild(addr)
 		n.DeleteChild(addr + 1)
@@ -233,16 +312,17 @@ func (n *LiteNode[V]) Aggregate() (modified int) {
 		modified++
 	}
 
+	// #############################################################
 	// 5. Prefix Merging: Merge adjacent prefixes within the bitset.
 	for { // Repeat in multiple passes to handle cascading merges
 		more := false
 
 		alignedPairs := n.Prefixes.AlignedPairs()
 		for idx := range alignedPairs.All() {
-			// insert supernet
+			// Insert supernet
 			n.InsertPrefix(idx>>1, zero)
 
-			// delete subnets
+			// Delete subnets
 			n.DeletePrefix(idx)
 			n.DeletePrefix(idx + 1)
 
