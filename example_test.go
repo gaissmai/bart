@@ -93,6 +93,24 @@ var input = []struct {
 	{mpp("192.168.1.0/24"), mpa("127.0.0.1")},
 }
 
+func ExampleLite_aggregate() {
+	lite := new(bart.Lite)
+
+	for _, pfx := range examplePrefixes {
+		lite.Insert(pfx)
+	}
+
+	lite.Aggregate()
+	lite.Fprint(os.Stdout)
+
+	// Output:
+	// ▼
+	// └─ 192.168.0.0/16
+	// ▼
+	// ├─ 2001:7c0:3100::/40
+	// └─ fc00::/7
+}
+
 func ExampleTable_Lookup() {
 	rtbl := new(bart.Table[netip.Addr])
 	for _, item := range input {
