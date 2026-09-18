@@ -35,6 +35,7 @@ package bitset
 // can inline (*BitSet256).Set with cost 12
 // can inline (*BitSet256).Test with cost 15
 // can inline (*BitSet256).Union with cost 36
+// can inline (*BitSet256).Xor with cost 36
 
 import (
 	"iter"
@@ -365,6 +366,14 @@ func (b *BitSet256) Intersection(c *BitSet256) (bs BitSet256) {
 	bs[2] = b[2] & c[2]
 	bs[3] = b[3] & c[3]
 	return
+}
+
+// Xor sets b to the bitwise XOR of b and c.
+func (b *BitSet256) Xor(c *BitSet256) {
+	b[0] ^= c[0]
+	b[1] ^= c[1]
+	b[2] ^= c[2]
+	b[3] ^= c[3]
 }
 
 // Union sets all bits in the receiver that are set in c (in-place bitwise OR).
