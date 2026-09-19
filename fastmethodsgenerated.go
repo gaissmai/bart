@@ -38,18 +38,16 @@ func (t *Fast[V]) sizeUpdate(is4 bool, delta int) {
 }
 
 // Contains reports whether any stored prefix covers the given IP address.
-// Returns false for invalid IP addresses.
+// It returns false for invalid IP addresses.
 //
 // This method performs longest-prefix matching and returns true if any prefix
 // in the routing table contains the IP address, regardless of the associated value.
 //
-// It does not return the value or the prefix of the matching item,
-// but as a test against an allow-/deny-list it's often sufficient
-// and even few nanoseconds faster than Lookup.
+// It does not return the value or prefix of the matching item, but as a test
+// against an allow/deny list, it is often sufficient and a few nanoseconds
+// faster than Lookup.
 //
-// Performance note: ip must not contain an IPv6 zone identifier (ip.Zone() == "").
-// Passing a zoned IPv6 address results in undefined behavior (e.g. incorrect
-// match results or false negatives).
+// Any zone identifier in ip is ignored and has no effect on the lookup result.
 func (f *Fast[V]) Contains(ip netip.Addr) bool {
 	// speed is top priority: no explicit test for ip.IsValid
 	// if ip is invalid, AsSlice() returns nil, Contains returns false.
@@ -78,6 +76,11 @@ func (f *Fast[V]) Contains(ip netip.Addr) bool {
 			return true
 
 		case *nodes.LeafNode[V]:
+			if !is4 {
+				// strip the zone unconditionally
+				// see https://github.com/gaissmai/bart/pull/418#issuecomment-5735613506
+				ip = netip.PrefixFrom(ip, 0).Addr()
+			}
 			return kid.Prefix.Contains(ip)
 		}
 	}
@@ -85,16 +88,14 @@ func (f *Fast[V]) Contains(ip netip.Addr) bool {
 	return false
 }
 
-// Lookup performs a longest prefix match (LPM) lookup for the given address.
-// Returns the associated value (payload) and true if a matching prefix is found.
-// Returns the zero value and false for invalid IP addresses or if no prefix contains the address.
+// Lookup performs a longest-prefix match (LPM) lookup for the given address.
+// It returns the associated value (payload) and true if a matching prefix is found.
+// It returns the zero value and false for invalid IP addresses or if no prefix contains the address.
 //
 // This is the fundamental operation for IP routing decisions, finding the
-// best matching route (most specific longest prefix) for a destination address.
+// best matching route (the most specific longest prefix) for a destination address.
 //
-// Performance note: ip must not contain an IPv6 zone identifier (ip.Zone() == "").
-// Passing a zoned IPv6 address results in undefined behavior (e.g. incorrect
-// match results or false negatives).
+// Any zone identifier in ip is ignored and has no effect on the lookup result.
 func (t *Fast[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	is4 := ip.Is4()
 	octets := ip.AsSlice()
@@ -134,6 +135,11 @@ LOOP:
 			return kid.Value, true
 
 		case *nodes.LeafNode[V]:
+			if !is4 {
+				// strip the zone unconditionally
+				// see https://github.com/gaissmai/bart/pull/418#issuecomment-5735613506
+				ip = netip.PrefixFrom(ip, 0).Addr()
+			}
 			if kid.Prefix.Contains(ip) {
 				return kid.Value, true
 			}

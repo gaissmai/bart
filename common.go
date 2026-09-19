@@ -38,16 +38,10 @@
 // The bart package detects the interface satisfaction automatically at
 // runtime using type assertions.
 //
-// Input Preconditions and Performance:
+// Input Preconditions:
 //
-// To achieve maximum lookup throughput, query methods in this package (such as
-// Lookup and Contains) do not sanitize IP inputs on the hot path.
-// Callers are responsible for ensuring that IPv6 addresses
-// do not contain zone identifiers (ip.Zone() == "").
-//
-// Passing zoned IP addresses yields undefined behavior (such as false
-// negatives or incorrect match results). If inputs may contain zone specifiers,
-// strip them beforehand using ip.WithZone("").
+// Zoned IP addresses have no effect on lookup results; zone identifiers
+// are unconditionally stripped during lookup.
 package bart
 
 import (
