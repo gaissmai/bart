@@ -222,6 +222,95 @@ func TestTableLookupCompare_Table(t *testing.T) {
 	}
 }
 
+func TestZonedLookup_Table(t *testing.T) {
+	t.Parallel()
+
+	check := func(t *testing.T, table *Table[string], ip netip.Addr, want string, wantOK bool) {
+		t.Helper()
+
+		for _, probe := range []struct {
+			name string
+			ip   netip.Addr
+		}{
+			{name: "plain", ip: ip},
+			{name: "zoned", ip: ip.WithZone("eth0")},
+		} {
+			t.Run(probe.name, func(t *testing.T) {
+				if got := table.Contains(probe.ip); got != wantOK {
+					t.Fatalf("Contains(%q) = %v, want %v", probe.ip, got, wantOK)
+				}
+
+				// Skip value comparison for liteTable (no real payload)
+				if _, isLite := any(table).(*liteTable[string]); !isLite {
+					got, ok := table.Lookup(probe.ip)
+					if got != want || ok != wantOK {
+						t.Fatalf("Lookup(%q) = (%q, %v), want (%q, %v)", probe.ip, got, ok, want, wantOK)
+					}
+				} else {
+					_, ok := table.Lookup(probe.ip)
+					if ok != wantOK {
+						t.Fatalf("Lookup(%q) = (_, %v), want (_, %v)", probe.ip, ok, wantOK)
+					}
+				}
+			})
+		}
+	}
+
+	type route struct {
+		cidr  string
+		value string
+	}
+
+	tests := []struct {
+		name   string
+		routes []route
+		probe  string
+		want   string
+		wantOK bool
+	}{
+		{
+			name: "compressed leaf hit",
+			routes: []route{
+				{cidr: "2001:db8:1:2::/65", value: "specific"},
+			},
+			probe:  "2001:db8:1:2::1",
+			want:   "specific",
+			wantOK: true,
+		},
+		{
+			name: "leaf miss",
+			routes: []route{
+				{cidr: "2001:db8:1:2::/65", value: "specific"},
+			},
+			probe:  "2001:db8:1:2:8000::1",
+			wantOK: false,
+		},
+		{
+			name: "leaf miss falls back to less specific route",
+			routes: []route{
+				{cidr: "2001:db8:1::/48", value: "fallback"},
+				{cidr: "2001:db8:1:2::/65", value: "specific"},
+			},
+			probe:  "2001:db8:1:2:8000::1",
+			want:   "fallback",
+			wantOK: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			table := new(Table[string])
+			for _, route := range tt.routes {
+				table.Insert(mpp(route.cidr), route.value)
+			}
+
+			check(t, table, mpa(tt.probe), tt.want, tt.wantOK)
+		})
+	}
+}
+
 func TestTableLookupPrefixUnmasked_Table(t *testing.T) {
 	// test that the pfx must not be masked on input for LookupPrefix
 	t.Parallel()
