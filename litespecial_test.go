@@ -450,7 +450,7 @@ func TestTableAggregateCompare(t *testing.T) {
 			gold.Aggregate()
 			lite.Aggregate()
 
-			goldSorted := gold.AllSorted()
+			goldSorted := gold.FlatSorted().SortKeys()
 			liteSorted := slices.Collect(lite.AllSorted())
 
 			if !slices.Equal(goldSorted, liteSorted) {

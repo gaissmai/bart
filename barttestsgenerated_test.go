@@ -21,11 +21,11 @@ import (
 // ############ tests ################################
 
 // flatSorted, just a helper to compare with golden table.
-func (t *Table[V]) flatSorted() golden.Table[V] {
-	var flat golden.Table[V]
+func (t *Table[V]) flatSorted() golden.TableSlice[V] {
+	flat := golden.TableSlice[V](make([]golden.Item[V], 0, t.Size()))
 
 	for p, v := range t.AllSorted() {
-		flat = append(flat, golden.TableItem[V]{Pfx: p, Val: v})
+		flat = append(flat, golden.Item[V]{Pfx: p, Val: v})
 	}
 
 	return flat
@@ -573,17 +573,16 @@ func TestTableDeleteCompare_Table(t *testing.T) {
 			tbl.Delete(pfx)
 		}
 
-		gold.Sort()
-
+		goldFlat := gold.FlatSorted()
 		tblFlat := tbl.flatSorted()
 
 		// Skip value comparison for liteTable (no real payload)
 		if _, isLite := any(tbl).(*liteTable[string]); isLite {
-			if !slices.Equal(gold.AllSorted(), tblFlat.AllSorted()) {
+			if !slices.Equal(goldFlat.SortKeys(), tblFlat.SortKeys()) {
 				t.Fatal("expected Equal")
 			}
 		} else {
-			if !slices.Equal(*gold, tblFlat) {
+			if !slices.Equal(goldFlat, tblFlat) {
 				t.Fatal("expected Equal")
 			}
 		}
@@ -1013,16 +1012,16 @@ func TestTableModifyCompare_Table(t *testing.T) {
 		tbl.Modify(pfx, func(int, bool) (int, bool) { return i, false })
 	}
 
-	gold.Sort()
+	goldFlat := gold.FlatSorted()
 	tblFlat := tbl.flatSorted()
 
 	// Skip value comparison for liteTable (no real payload)
 	if _, isLite := any(tbl).(*liteTable[int]); isLite {
-		if !slices.Equal(gold.AllSorted(), tblFlat.AllSorted()) {
+		if !slices.Equal(goldFlat.SortKeys(), tblFlat.SortKeys()) {
 			t.Fatal("expected Equal")
 		}
 	} else {
-		if !slices.Equal(*gold, tblFlat) {
+		if !slices.Equal(goldFlat, tblFlat) {
 			t.Fatal("expected Equal")
 		}
 	}
@@ -1036,16 +1035,16 @@ func TestTableModifyCompare_Table(t *testing.T) {
 		tbl.Modify(pfx, cb2)
 	}
 
-	gold.Sort()
+	goldFlat = gold.FlatSorted()
 	tblFlat = tbl.flatSorted()
 
 	// Skip value comparison for liteTable (no real payload)
 	if _, isLite := any(tbl).(*liteTable[int]); isLite {
-		if !slices.Equal(gold.AllSorted(), tblFlat.AllSorted()) {
+		if !slices.Equal(goldFlat.SortKeys(), tblFlat.SortKeys()) {
 			t.Fatal("expected Equal")
 		}
 	} else {
-		if !slices.Equal(*gold, tblFlat) {
+		if !slices.Equal(goldFlat, tblFlat) {
 			t.Fatal("expected Equal")
 		}
 	}
@@ -1303,22 +1302,19 @@ func TestTableUnionCompare_Table(t *testing.T) {
 			tbl2.Insert(pfx, pfx.String())
 		}
 
-		gold.Union(gold2)
+		gold.Union(*gold2)
 		tbl.Union(tbl2)
 
-		// dump as slow table for comparison
+		goldFlat := gold.FlatSorted()
 		tblFlat := tbl.flatSorted()
-
-		// sort for comparison
-		gold.Sort()
 
 		// Skip value comparison for liteTable (no real payload)
 		if _, isLite := any(tbl).(*liteTable[string]); isLite {
-			if !slices.Equal(gold.AllSorted(), tblFlat.AllSorted()) {
+			if !slices.Equal(goldFlat.SortKeys(), tblFlat.SortKeys()) {
 				t.Fatal("expected Equal")
 			}
 		} else {
-			if !slices.Equal(*gold, tblFlat) {
+			if !slices.Equal(goldFlat, tblFlat) {
 				t.Fatal("expected Equal")
 			}
 		}
@@ -1352,22 +1348,19 @@ func TestTableUnionPersistCompare_Table(t *testing.T) {
 			tbl2.Insert(pfx, i)
 		}
 
-		gold.Union(gold2)
+		gold.Union(*gold2)
 		tblP := tbl.UnionPersist(tbl2)
 
-		// dump as slow table for comparison
-		flatP := tblP.flatSorted()
-
-		// sort for comparison
-		gold.Sort()
+		goldFlat := gold.FlatSorted()
+		tblFlat := tblP.flatSorted()
 
 		// Skip value comparison for liteTable (no real payload)
 		if _, isLite := any(tbl).(*liteTable[int]); isLite {
-			if !slices.Equal(gold.AllSorted(), flatP.AllSorted()) {
+			if !slices.Equal(goldFlat.SortKeys(), tblFlat.SortKeys()) {
 				t.Fatal("expected Equal")
 			}
 		} else {
-			if !slices.Equal(*gold, flatP) {
+			if !slices.Equal(goldFlat, tblFlat) {
 				t.Fatal("expected Equal")
 			}
 		}

@@ -7,10 +7,9 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"net/netip"
-	"slices"
 	"testing"
 
-	"github.com/gaissmai/bart/internal/nodes"
+	"github.com/gaissmai/bart/internal/tests/golden"
 	"github.com/gaissmai/bart/internal/tests/random"
 )
 
@@ -967,88 +966,27 @@ func BenchmarkAggregateTier1(b *testing.B) {
 		for b.Loop() {
 			// Heavy setup phase
 			b.StopTimer()
-			l := new(Lite)
+			lite := new(Lite)
 			for _, pfx := range routes {
-				l.Insert(pfx)
+				lite.Insert(pfx)
 			}
 			b.StartTimer()
 
-			l.Aggregate()
+			lite.Aggregate()
 		}
 	})
 
-	b.Run("aggregate brute force", func(b *testing.B) {
+	b.Run("golden brute force", func(b *testing.B) {
 		for b.Loop() {
 			// Heavy setup phase
 			b.StopTimer()
-			s := make([]netip.Prefix, len(routes))
-			copy(s, routes)
+			gold := golden.Table[any]{}
+			for _, pfx := range routes {
+				gold.Insert(pfx, nil)
+			}
 			b.StartTimer()
 
-			aggregate(&s)
+			gold.Aggregate()
 		}
 	})
-
-}
-
-// aggregate a slice of netip.Prefix, brute force
-func aggregate(s *[]netip.Prefix) {
-	if !slices.IsSortedFunc(*s, nodes.CmpPrefix) {
-		slices.SortFunc(*s, nodes.CmpPrefix)
-	}
-
-	buf := make([]netip.Prefix, 0, len(*s))
-
-	// Iteratively merge entries until no further aggregation is possible
-	for {
-		loop := false
-
-		// reset
-		buf = buf[:0]
-
-		for _, pfx := range *s {
-			if len(buf) == 0 {
-				buf = append(buf, pfx)
-				continue
-			}
-
-			lastIdx := len(buf) - 1
-			lastPfx := &buf[lastIdx]
-
-			// Only aggregate prefixes belonging to the same IP family
-			// step from v4 to v6
-			if lastPfx.Addr().Is4() != pfx.Addr().Is4() {
-				buf = append(buf, pfx)
-				continue
-			}
-
-			// Rule 1: Overlapping / Containment
-			// Since CmpPrefix places broader prefixes first for identical start addresses,
-			// last covers this if last contains this's network address
-			if lastPfx.Contains(pfx.Addr()) {
-				// this covered item gets dropped
-				loop = true
-				continue
-			}
-
-			// Rule 2: Adjacency (merging sibling prefixes)
-			// Equal prefix length + both share a common super prefix of length (bits - 1)
-			if lastPfx.Bits() == pfx.Bits() && lastPfx.Bits() > 0 {
-				super, err := lastPfx.Addr().Prefix(lastPfx.Bits() - 1)
-				if err == nil && super.Contains(pfx.Addr()) {
-					// Merge into parent block
-					*lastPfx = super
-					loop = true
-					continue
-				}
-			}
-
-			buf = append(buf, pfx)
-		}
-		*s = buf
-
-		if !loop {
-			break
-		}
-	}
 }
