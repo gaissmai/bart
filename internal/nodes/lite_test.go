@@ -2112,7 +2112,8 @@ func TestLiteDeleteCompare4(t *testing.T) {
 			collect = append(collect, pfx)
 		}
 
-		if !slices.Equal(gold.AllSorted(), collect) {
+		goldKeysSorted := slices.SortedFunc(gold.AllKeys(), CmpPrefix)
+		if !slices.Equal(goldKeysSorted, collect) {
 			t.Fatal("expected Equal")
 		}
 	}
@@ -2153,7 +2154,8 @@ func TestLiteDeleteCompare6(t *testing.T) {
 			collect = append(collect, pfx)
 		}
 
-		if !slices.Equal(gold.AllSorted(), collect) {
+		goldKeysSorted := slices.SortedFunc(gold.AllKeys(), CmpPrefix)
+		if !slices.Equal(goldKeysSorted, collect) {
 			t.Fatal("expected Equal")
 		}
 	}

@@ -14,36 +14,366 @@ var (
 	mpp = netip.MustParsePrefix
 )
 
-func TestTableInsert(t *testing.T) {
-	tbl := new(Table[int])
+func TestTable_Equal(t *testing.T) {
+	t.Parallel()
 
-	// Insert IPv4 prefix
-	tbl.Insert(mpp("192.168.1.0/24"), 1)
-	if len(*tbl) != 1 {
-		t.Errorf("expected table length 1, got %d", len(*tbl))
+	prefixA := mpp("192.168.1.0/24")
+	prefixB := mpp("10.0.0.0/8")
+
+	tests := []struct {
+		name string
+		ta   Table[int]
+		tb   Table[int]
+		want bool
+	}{
+		{
+			name: "both tables nil",
+			ta:   nil,
+			tb:   nil,
+			want: true,
+		},
+		{
+			name: "both tables empty",
+			ta:   Table[int]{},
+			tb:   Table[int]{},
+			want: true,
+		},
+		{
+			name: "identical key-value pairs",
+			ta:   Table[int]{prefixA: 10, prefixB: 20},
+			tb:   Table[int]{prefixA: 10, prefixB: 20},
+			want: true,
+		},
+		{
+			name: "identical keys with different values",
+			ta:   Table[int]{prefixA: 10, prefixB: 20},
+			tb:   Table[int]{prefixA: 10, prefixB: 99},
+			want: false,
+		},
+		{
+			name: "different keys",
+			ta:   Table[int]{prefixA: 10},
+			tb:   Table[int]{prefixB: 10},
+			want: false,
+		},
+		{
+			name: "one table nil, other non-empty",
+			ta:   nil,
+			tb:   Table[int]{prefixA: 10},
+			want: false,
+		},
 	}
 
-	// Insert duplicate - should update value
-	tbl.Insert(mpp("192.168.1.0/24"), 2)
-	if len(*tbl) != 1 {
-		t.Errorf("expected table length 1 after duplicate insert, got %d", len(*tbl))
-	}
-	if val, ok := tbl.Get(mpp("192.168.1.0/24")); !ok || val != 2 {
-		t.Errorf("expected value 2, got %v, ok=%v", val, ok)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	// Insert non-masked prefix - should auto-mask
-	tbl.Insert(mpp("10.1.2.3/16"), 3)
-	pfxs := tbl.AllSorted()
-	for _, pfx := range pfxs {
-		if pfx != pfx.Masked() {
-			t.Errorf("prefix %v is not masked", pfx)
-		}
+			if got := tt.ta.Equal(tt.tb); got != tt.want {
+				t.Errorf("Table.Equal() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
 
-func TestTableDelete(t *testing.T) {
-	tbl := new(Table[int])
+func TestTable_FlatSorted(t *testing.T) {
+	t.Parallel()
+
+	p10 := netip.MustParsePrefix("10.0.0.0/8")
+	p192_168_1_0_24 := netip.MustParsePrefix("192.168.1.0/24")
+	p192_168_1_0_25 := netip.MustParsePrefix("192.168.1.0/25")
+	pIPv6 := netip.MustParsePrefix("2001:db8::/32")
+
+	tests := []struct {
+		name  string
+		table Table[string]
+		want  []Item[string]
+	}{
+		{
+			name:  "nil table",
+			table: nil,
+			want:  nil,
+		},
+		{
+			name:  "empty table",
+			table: Table[string]{},
+			want:  nil,
+		},
+		{
+			name: "single element",
+			table: Table[string]{
+				p10: "A",
+			},
+			want: []Item[string]{
+				{Pfx: p10, Val: "A"},
+			},
+		},
+		{
+			name: "unsorted prefixes",
+			table: Table[string]{
+				p192_168_1_0_24: "C",
+				p10:             "A",
+				pIPv6:           "D",
+				p192_168_1_0_25: "B",
+			},
+			want: []Item[string]{
+				{Pfx: p10, Val: "A"},
+				{Pfx: p192_168_1_0_24, Val: "C"},
+				{Pfx: p192_168_1_0_25, Val: "B"},
+				{Pfx: pIPv6, Val: "D"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := tt.table.FlatSorted()
+
+			if !slices.EqualFunc(got, tt.want, func(a, b Item[string]) bool {
+				return a.Pfx == b.Pfx && a.Val == b.Val
+			}) {
+				t.Errorf("SortedItems() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestTableSlice_SortKeys(t *testing.T) {
+	t.Parallel()
+
+	p10 := mpp("10.0.0.0/8")
+	p192_24 := mpp("192.168.1.0/24")
+	p192_25 := mpp("192.168.1.0/25")
+	pIPv6 := mpp("2001:db8::/32")
+
+	tests := []struct {
+		name  string
+		slice TableSlice[string]
+		want  []netip.Prefix
+	}{
+		{
+			name:  "nil slice",
+			slice: nil,
+			want:  nil,
+		},
+		{
+			name:  "empty slice",
+			slice: TableSlice[string]{},
+			want:  nil,
+		},
+		{
+			name: "single item",
+			slice: TableSlice[string]{
+				{Pfx: p10, Val: "A"},
+			},
+			want: []netip.Prefix{p10},
+		},
+		{
+			name: "unsorted prefixes (IPv4 and IPv6)",
+			slice: TableSlice[string]{
+				{Pfx: p192_24, Val: "C"},
+				{Pfx: p10, Val: "A"},
+				{Pfx: pIPv6, Val: "D"},
+				{Pfx: p192_25, Val: "B"},
+			},
+			want: []netip.Prefix{p10, p192_24, p192_25, pIPv6},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := tt.slice.SortKeys()
+
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("SortKeys() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestTable_AllKeys(t *testing.T) {
+	t.Parallel()
+
+	p1 := mpp("10.0.0.0/8")
+	p2 := mpp("192.168.1.0/24")
+	p3 := mpp("2001:db8::/32")
+
+	tests := []struct {
+		name       string
+		table      Table[int]
+		wantKeys   []netip.Prefix
+		breakEarly bool
+	}{
+		{
+			name:     "nil table",
+			table:    nil,
+			wantKeys: nil,
+		},
+		{
+			name:     "empty table",
+			table:    Table[int]{},
+			wantKeys: nil,
+		},
+		{
+			name: "full iteration",
+			table: Table[int]{
+				p1: 1,
+				p2: 2,
+				p3: 3,
+			},
+			wantKeys: []netip.Prefix{p1, p2, p3},
+		},
+		{
+			name: "early break iteration",
+			table: Table[int]{
+				p1: 1,
+				p2: 2,
+				p3: 3,
+			},
+			wantKeys:   []netip.Prefix{p1, p2, p3},
+			breakEarly: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var got []netip.Prefix
+			for pfx := range tt.table.AllKeys() {
+				got = append(got, pfx)
+				if tt.breakEarly {
+					break // Verifies yield returning false stops iteration
+				}
+			}
+
+			if tt.breakEarly {
+				if len(tt.table) > 0 && len(got) != 1 {
+					t.Errorf("AllKeys() early break produced %d keys, want 1", len(got))
+				}
+				return
+			}
+
+			// Sort both slices since map iteration order is non-deterministic
+			slices.SortFunc(got, cmpPrefix)
+			wantSorted := slices.Clone(tt.wantKeys)
+			slices.SortFunc(wantSorted, cmpPrefix)
+
+			if !slices.Equal(got, wantSorted) {
+				t.Errorf("AllKeys() produced %v, want %v", got, wantSorted)
+			}
+		})
+	}
+}
+
+func TestTable_Insert(t *testing.T) {
+	t.Parallel()
+
+	prefixUnmasked := netip.MustParsePrefix("192.168.1.10/24") // normalizes to 192.168.1.0/24
+	prefixMasked := mpp("192.168.1.0/24")
+	prefixOther := mpp("10.0.0.0/8")
+
+	tests := []struct {
+		name       string
+		initTable  func() *Table[string]
+		pfx        netip.Prefix
+		val        string
+		wantKey    netip.Prefix
+		wantLength int
+	}{
+		{
+			name: "insert into nil pointer (safe no-op)",
+			initTable: func() *Table[string] {
+				return nil
+			},
+			pfx:        prefixMasked,
+			val:        "data",
+			wantLength: 0,
+		},
+		{
+			name: "insert into nil map (allocates in-place)",
+			initTable: func() *Table[string] {
+				var tbl Table[string] // nil map
+				return &tbl
+			},
+			pfx:        prefixMasked,
+			val:        "value-1",
+			wantKey:    prefixMasked,
+			wantLength: 1,
+		},
+		{
+			name: "insert into existing initialized map",
+			initTable: func() *Table[string] {
+				tbl := Table[string]{prefixOther: "existing"}
+				return &tbl
+			},
+			pfx:        prefixMasked,
+			val:        "value-2",
+			wantKey:    prefixMasked,
+			wantLength: 2,
+		},
+		{
+			name: "insert normalizes unmasked prefix",
+			initTable: func() *Table[string] {
+				tbl := make(Table[string])
+				return &tbl
+			},
+			pfx:        prefixUnmasked,
+			val:        "normalized-val",
+			wantKey:    prefixMasked,
+			wantLength: 1,
+		},
+		{
+			name: "overwrite existing key",
+			initTable: func() *Table[string] {
+				tbl := Table[string]{prefixMasked: "old-value"}
+				return &tbl
+			},
+			pfx:        prefixMasked,
+			val:        "new-value",
+			wantKey:    prefixMasked,
+			wantLength: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tblPtr := tt.initTable()
+			tblPtr.Insert(tt.pfx, tt.val)
+
+			if tblPtr == nil {
+				if tt.wantLength != 0 {
+					t.Fatalf("got nil table pointer, expected length %d", tt.wantLength)
+				}
+				return
+			}
+
+			tbl := *tblPtr
+			if len(tbl) != tt.wantLength {
+				t.Errorf("len(Table) = %d, want %d", len(tbl), tt.wantLength)
+			}
+
+			if tt.wantLength > 0 {
+				gotVal, exists := tbl[tt.wantKey]
+				if !exists {
+					t.Errorf("key %v not found in table", tt.wantKey)
+				}
+				if gotVal != tt.val {
+					t.Errorf("Table[%v] = %v, want %v", tt.wantKey, gotVal, tt.val)
+				}
+			}
+		})
+	}
+}
+
+func TestTable_Delete(t *testing.T) {
+	t.Parallel()
+	tbl := Table[int]{}
 	tbl.Insert(mpp("192.168.1.0/24"), 1)
 	tbl.Insert(mpp("10.0.0.0/8"), 2)
 
@@ -51,8 +381,8 @@ func TestTableDelete(t *testing.T) {
 	if !tbl.Delete(mpp("192.168.1.0/24")) {
 		t.Error("expected Delete to return true for existing prefix")
 	}
-	if len(*tbl) != 1 {
-		t.Errorf("expected table length 1 after delete, got %d", len(*tbl))
+	if len(tbl) != 1 {
+		t.Errorf("expected table length 1 after delete, got %d", len(tbl))
 	}
 
 	// Delete non-existing prefix
@@ -67,8 +397,9 @@ func TestTableDelete(t *testing.T) {
 	}
 }
 
-func TestTableGet(t *testing.T) {
-	tbl := new(Table[string])
+func TestTable_Get(t *testing.T) {
+	t.Parallel()
+	tbl := Table[string]{}
 	tbl.Insert(mpp("192.168.1.0/24"), "network")
 	tbl.Insert(mpp("2001:db8::/32"), "ipv6")
 
@@ -88,8 +419,9 @@ func TestTableGet(t *testing.T) {
 	}
 }
 
-func TestTableUpdate(t *testing.T) {
-	tbl := new(Table[int])
+func TestTable_Update(t *testing.T) {
+	t.Parallel()
+	tbl := Table[int]{}
 	tbl.Insert(mpp("192.168.1.0/24"), 10)
 
 	// Update existing entry
@@ -116,24 +448,25 @@ func TestTableUpdate(t *testing.T) {
 	if val != 100 {
 		t.Errorf("expected new value 100, got %d", val)
 	}
-	if len(*tbl) != 2 {
-		t.Errorf("expected table length 2, got %d", len(*tbl))
+	if len(tbl) != 2 {
+		t.Errorf("expected table length 2, got %d", len(tbl))
 	}
 }
 
-func TestTableUnion(t *testing.T) {
-	tbl1 := new(Table[int])
+func TestTable_Union(t *testing.T) {
+	t.Parallel()
+	tbl1 := Table[int]{}
 	tbl1.Insert(mpp("192.168.1.0/24"), 1)
 	tbl1.Insert(mpp("10.0.0.0/8"), 2)
 
-	tbl2 := new(Table[int])
+	tbl2 := Table[int]{}
 	tbl2.Insert(mpp("192.168.1.0/24"), 10) // Overlaps with tbl1
 	tbl2.Insert(mpp("172.16.0.0/12"), 3)
 
 	tbl1.Union(tbl2)
 
-	if len(*tbl1) != 3 {
-		t.Errorf("expected table length 3 after union, got %d", len(*tbl1))
+	if len(tbl1) != 3 {
+		t.Errorf("expected table length 3 after union, got %d", len(tbl1))
 	}
 
 	// Check that overlapping prefix was updated
@@ -147,8 +480,9 @@ func TestTableUnion(t *testing.T) {
 	}
 }
 
-func TestTableLookup(t *testing.T) {
-	tbl := new(Table[string])
+func TestTable_Lookup(t *testing.T) {
+	t.Parallel()
+	tbl := Table[string]{}
 	tbl.Insert(mpp("192.168.0.0/16"), "large")
 	tbl.Insert(mpp("192.168.1.0/24"), "specific")
 	tbl.Insert(mpp("10.0.0.0/8"), "ten")
@@ -167,6 +501,7 @@ func TestTableLookup(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.ip, func(t *testing.T) {
+			t.Parallel()
 			val, ok := tbl.Lookup(mpa(tt.ip))
 			if ok != tt.wantOk || val != tt.wantVal {
 				t.Errorf("Lookup(%s) = (%v, %v), want (%v, %v)", tt.ip, val, ok, tt.wantVal, tt.wantOk)
@@ -175,8 +510,9 @@ func TestTableLookup(t *testing.T) {
 	}
 }
 
-func TestTableLookupPrefix(t *testing.T) {
-	tbl := new(Table[int])
+func TestTable_LookupPrefix(t *testing.T) {
+	t.Parallel()
+	tbl := Table[int]{}
 	tbl.Insert(mpp("192.168.0.0/16"), 1)
 	tbl.Insert(mpp("192.168.1.0/24"), 2)
 
@@ -194,6 +530,7 @@ func TestTableLookupPrefix(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.prefix, func(t *testing.T) {
+			t.Parallel()
 			val, ok := tbl.LookupPrefix(mpp(tt.prefix))
 			if ok != tt.wantOk || val != tt.wantVal {
 				t.Errorf("LookupPrefix(%s) = (%v, %v), want (%v, %v)", tt.prefix, val, ok, tt.wantVal, tt.wantOk)
@@ -202,8 +539,9 @@ func TestTableLookupPrefix(t *testing.T) {
 	}
 }
 
-func TestTableLookupPrefixLPM(t *testing.T) {
-	tbl := new(Table[int])
+func TestTable_LookupPrefixLPM(t *testing.T) {
+	t.Parallel()
+	tbl := Table[int]{}
 	tbl.Insert(mpp("192.168.0.0/16"), 1)
 	tbl.Insert(mpp("192.168.1.0/24"), 2)
 
@@ -221,6 +559,7 @@ func TestTableLookupPrefixLPM(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.prefix, func(t *testing.T) {
+			t.Parallel()
 			lpm, val, ok := tbl.LookupPrefixLPM(mpp(tt.prefix))
 			if ok != tt.wantOk {
 				t.Errorf("LookupPrefixLPM(%s) ok = %v, want %v", tt.prefix, ok, tt.wantOk)
@@ -237,8 +576,9 @@ func TestTableLookupPrefixLPM(t *testing.T) {
 	}
 }
 
-func TestTableSubnets(t *testing.T) {
-	tbl := new(Table[int])
+func TestTable_Subnets(t *testing.T) {
+	t.Parallel()
+	tbl := Table[int]{}
 	tbl.Insert(mpp("192.168.0.0/16"), 1)
 	tbl.Insert(mpp("192.168.1.0/24"), 2)
 	tbl.Insert(mpp("192.168.1.0/25"), 3)
@@ -266,8 +606,9 @@ func TestTableSubnets(t *testing.T) {
 	}
 }
 
-func TestTableSupernets(t *testing.T) {
-	tbl := new(Table[int])
+func TestTable_Supernets(t *testing.T) {
+	t.Parallel()
+	tbl := Table[int]{}
 	tbl.Insert(mpp("192.168.0.0/16"), 1)
 	tbl.Insert(mpp("192.168.1.0/24"), 2)
 	tbl.Insert(mpp("192.0.0.0/8"), 3)
@@ -287,8 +628,9 @@ func TestTableSupernets(t *testing.T) {
 	}
 }
 
-func TestTableOverlapsPrefix(t *testing.T) {
-	tbl := new(Table[int])
+func TestTable_OverlapsPrefix(t *testing.T) {
+	t.Parallel()
+	tbl := Table[int]{}
 	tbl.Insert(mpp("192.168.0.0/16"), 1)
 	tbl.Insert(mpp("10.0.0.0/8"), 2)
 
@@ -305,6 +647,7 @@ func TestTableOverlapsPrefix(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.prefix, func(t *testing.T) {
+			t.Parallel()
 			got := tbl.OverlapsPrefix(mpp(tt.prefix))
 			if got != tt.want {
 				t.Errorf("OverlapsPrefix(%s) = %v, want %v", tt.prefix, got, tt.want)
@@ -313,19 +656,20 @@ func TestTableOverlapsPrefix(t *testing.T) {
 	}
 }
 
-func TestTableOverlaps(t *testing.T) {
-	tbl1 := new(Table[int])
+func TestTable_Overlaps(t *testing.T) {
+	t.Parallel()
+	tbl1 := Table[int]{}
 	tbl1.Insert(mpp("192.168.0.0/16"), 1)
 	tbl1.Insert(mpp("10.0.0.0/8"), 2)
 
-	tbl2 := new(Table[int])
+	tbl2 := Table[int]{}
 	tbl2.Insert(mpp("192.168.1.0/24"), 3) // Overlaps with tbl1
 
 	if !tbl1.Overlaps(tbl2) {
 		t.Error("expected tables to overlap")
 	}
 
-	tbl3 := new(Table[int])
+	tbl3 := Table[int]{}
 	tbl3.Insert(mpp("172.16.0.0/12"), 4) // No overlap
 
 	if tbl1.Overlaps(tbl3) {
@@ -333,49 +677,12 @@ func TestTableOverlaps(t *testing.T) {
 	}
 }
 
-func TestTableAllSorted(t *testing.T) {
-	tbl := new(Table[int])
-	tbl.Insert(mpp("192.168.1.0/24"), 1)
-	tbl.Insert(mpp("10.0.0.0/8"), 2)
-	tbl.Insert(mpp("192.168.0.0/16"), 3)
-	tbl.Insert(mpp("2001:db8::/32"), 4)
-
-	sorted := tbl.AllSorted()
-
-	// Check IPv4 prefixes are sorted
-	if len(sorted) != 4 {
-		t.Errorf("expected 4 prefixes, got %d", len(sorted))
-	}
-
-	// Verify sorted order
-	for i := 1; i < len(sorted); i++ {
-		if cmpPrefix(sorted[i-1], sorted[i]) >= 0 {
-			t.Errorf("prefixes not sorted: %v should be before %v", sorted[i-1], sorted[i])
-		}
-	}
-}
-
-func TestTableSort(t *testing.T) {
-	tbl := new(Table[string])
-	tbl.Insert(mpp("192.168.1.0/24"), "c")
-	tbl.Insert(mpp("10.0.0.0/8"), "a")
-	tbl.Insert(mpp("192.168.0.0/16"), "b")
-
-	tbl.Sort()
-
-	// Verify in-place sorting
-	for i := 1; i < len(*tbl); i++ {
-		if cmpPrefix((*tbl)[i-1].Pfx, (*tbl)[i].Pfx) >= 0 {
-			t.Errorf("table not sorted at index %d: %v, %v", i, (*tbl)[i-1].Pfx, (*tbl)[i].Pfx)
-		}
-	}
-}
-
-func TestTableAll(t *testing.T) {
+func TestTable_All(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		tbl  Table[int]
-		want []TableItem[int]
+		want Table[int]
 	}{
 		{
 			name: "empty table",
@@ -384,46 +691,44 @@ func TestTableAll(t *testing.T) {
 		},
 		{
 			name: "single entry",
-			tbl: Table[int]{
-				{Pfx: mpp("192.168.1.0/24"), Val: 1},
-			},
-			want: []TableItem[int]{
-				{Pfx: mpp("192.168.1.0/24"), Val: 1},
-			},
+			tbl:  Table[int]{mpp("192.168.1.0/24"): 1},
+			want: Table[int]{mpp("192.168.1.0/24"): 1},
 		},
 		{
 			name: "multiple IPv4 and IPv6 entries",
 			tbl: Table[int]{
-				{Pfx: mpp("10.0.0.0/8"), Val: 10},
-				{Pfx: mpp("2001:db8::/32"), Val: 30},
-				{Pfx: mpp("192.168.1.0/24"), Val: 20},
+				mpp("10.0.0.0/8"):     10,
+				mpp("2001:db8::/32"):  30,
+				mpp("192.168.1.0/24"): 20,
 			},
-			want: []TableItem[int]{
-				{Pfx: mpp("10.0.0.0/8"), Val: 10},
-				{Pfx: mpp("2001:db8::/32"), Val: 30},
-				{Pfx: mpp("192.168.1.0/24"), Val: 20},
+			want: Table[int]{
+				mpp("10.0.0.0/8"):     10,
+				mpp("2001:db8::/32"):  30,
+				mpp("192.168.1.0/24"): 20,
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var got []TableItem[int]
+			t.Parallel()
 			for pfx, val := range tt.tbl.All() {
-				got = append(got, TableItem[int]{Pfx: pfx, Val: val})
-			}
-
-			if !slices.Equal(got, tt.want) {
-				t.Errorf("All() = %v, want %v", got, tt.want)
+				wantVal, ok := tt.want[pfx]
+				if !ok {
+					t.Errorf("All(): not ok, missing val %v", val)
+				} else if val != wantVal {
+					t.Errorf("All(): want: %v, got: %v", wantVal, val)
+				}
 			}
 		})
 	}
 
 	t.Run("early break", func(t *testing.T) {
+		t.Parallel()
 		tbl := Table[int]{
-			{Pfx: mpp("10.0.0.0/8"), Val: 1},
-			{Pfx: mpp("192.168.1.0/24"), Val: 2},
-			{Pfx: mpp("172.16.0.0/12"), Val: 3},
+			mpp("10.0.0.0/8"):     1,
+			mpp("192.168.1.0/24"): 2,
+			mpp("172.16.0.0/12"):  3,
 		}
 
 		var count int
@@ -440,12 +745,13 @@ func TestTableAll(t *testing.T) {
 	})
 }
 
-func TestTableEmpty(t *testing.T) {
-	tbl := new(Table[int])
+func TestTable_Empty(t *testing.T) {
+	t.Parallel()
+	tbl := Table[int]{}
 
 	// Test operations on empty table
-	if len(tbl.AllSorted()) != 0 {
-		t.Error("expected empty AllSorted result")
+	if len(tbl.FlatSorted()) != 0 {
+		t.Error("expected empty SortedItems result")
 	}
 
 	if _, ok := tbl.Get(mpp("192.168.1.0/24")); ok {
@@ -461,21 +767,9 @@ func TestTableEmpty(t *testing.T) {
 	}
 }
 
-func TestTableItemString(t *testing.T) {
-	item := TableItem[int]{
-		Pfx: mpp("192.168.1.0/24"),
-		Val: 42,
-	}
-
-	str := item.String()
-	expected := "(192.168.1.0/24, 42)"
-	if str != expected {
-		t.Errorf("String() = %q, want %q", str, expected)
-	}
-}
-
-func TestTableIPv6(t *testing.T) {
-	tbl := new(Table[string])
+func TestTable_IPv6(t *testing.T) {
+	t.Parallel()
+	tbl := Table[string]{}
 	tbl.Insert(mpp("2001:db8::/32"), "ipv6")
 	tbl.Insert(mpp("2001:db8:1::/48"), "specific")
 
@@ -492,7 +786,8 @@ func TestTableIPv6(t *testing.T) {
 	}
 }
 
-func TestCmpPrefix(t *testing.T) {
+func Test_CmpPrefix(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		a    string
 		b    string
@@ -522,26 +817,27 @@ func TestCmpPrefix(t *testing.T) {
 	}
 }
 
-func TestTableMixedIPVersions(t *testing.T) {
-	tbl := new(Table[int])
+func TestTable_MixedIPVersions(t *testing.T) {
+	t.Parallel()
+	tbl := Table[int]{}
 	tbl.Insert(mpp("192.168.1.0/24"), 4)
 	tbl.Insert(mpp("2001:db8::/32"), 6)
 
-	sorted := tbl.AllSorted()
+	sorted := tbl.FlatSorted()
 	if len(sorted) != 2 {
 		t.Errorf("expected 2 prefixes, got %d", len(sorted))
 	}
 
 	// IPv4 should come before IPv6 in sorted order
-	if !sorted[0].Addr().Is4() {
+	if !sorted[0].Pfx.Addr().Is4() {
 		t.Error("expected IPv4 prefix first in sorted order")
 	}
-	if !sorted[1].Addr().Is6() {
+	if !sorted[1].Pfx.Addr().Is6() {
 		t.Error("expected IPv6 prefix second in sorted order")
 	}
 }
 
-func TestTableAggregate(t *testing.T) {
+func TestTable_Aggregate(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -556,47 +852,47 @@ func TestTableAggregate(t *testing.T) {
 		},
 		{
 			name: "single",
-			in:   Table[any]{{Pfx: mpp("10.0.0.0/8")}},
-			want: Table[any]{{Pfx: mpp("10.0.0.0/8")}},
+			in:   Table[any]{mpp("10.0.0.0/8"): nil},
+			want: Table[any]{mpp("10.0.0.0/8"): nil},
 		},
 		{
 			name: "containment",
 			in: Table[any]{
-				{Pfx: mpp("10.1.0.0/16")},
-				{Pfx: mpp("10.0.0.0/8")},
-				{Pfx: mpp("10.1.1.0/24")},
+				mpp("10.1.0.0/16"): nil,
+				mpp("10.0.0.0/8"):  nil,
+				mpp("10.1.1.0/24"): nil,
 			},
-			want: Table[any]{{Pfx: mpp("10.0.0.0/8")}},
+			want: Table[any]{mpp("10.0.0.0/8"): nil},
 		},
 		{
 			name: "adjacency single merge",
 			in: Table[any]{
-				{Pfx: mpp("192.168.0.0/25")},
-				{Pfx: mpp("192.168.0.128/25")},
+				mpp("192.168.0.0/25"):   nil,
+				mpp("192.168.0.128/25"): nil,
 			},
-			want: Table[any]{{Pfx: mpp("192.168.0.0/24")}},
+			want: Table[any]{mpp("192.168.0.0/24"): nil},
 		},
 		{
 			name: "cascading merge",
 			in: Table[any]{
-				{Pfx: mpp("10.0.0.0/26")},
-				{Pfx: mpp("10.0.0.64/26")},
-				{Pfx: mpp("10.0.0.128/26")},
-				{Pfx: mpp("10.0.0.192/26")},
+				mpp("10.0.0.0/26"):   nil,
+				mpp("10.0.0.64/26"):  nil,
+				mpp("10.0.0.128/26"): nil,
+				mpp("10.0.0.192/26"): nil,
 			},
-			want: Table[any]{{Pfx: mpp("10.0.0.0/24")}},
+			want: Table[any]{mpp("10.0.0.0/24"): nil},
 		},
 		{
 			name: "mixed v4 and v6",
 			in: Table[any]{
-				{Pfx: mpp("2001:db8::/33")},
-				{Pfx: mpp("10.0.0.0/25")},
-				{Pfx: mpp("2001:db8:8000::/33")},
-				{Pfx: mpp("10.0.0.128/25")},
+				mpp("2001:db8::/33"):      nil,
+				mpp("10.0.0.0/25"):        nil,
+				mpp("2001:db8:8000::/33"): nil,
+				mpp("10.0.0.128/25"):      nil,
 			},
 			want: Table[any]{
-				{Pfx: mpp("10.0.0.0/24")},
-				{Pfx: mpp("2001:db8::/32")},
+				mpp("10.0.0.0/24"):   nil,
+				mpp("2001:db8::/32"): nil,
 			},
 		},
 	}
@@ -608,7 +904,8 @@ func TestTableAggregate(t *testing.T) {
 			tbl := tt.in
 			tbl.Aggregate()
 
-			if !slices.EqualFunc(tbl, tt.want, func(a, b TableItem[any]) bool { return a.Pfx == b.Pfx }) {
+			// don't check the values
+			if !tbl.Equal(tt.want) {
 				t.Errorf("got %v, want %v", tbl, tt.want)
 			}
 		})
