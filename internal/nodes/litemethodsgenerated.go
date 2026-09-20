@@ -585,7 +585,7 @@ func (n *LiteNode[V]) Get(pfx netip.Prefix) (val V, exists bool) {
 // is done via a bitset operation that maps the traversal path from the given index
 // toward its possible ancestors.
 func (n *LiteNode[V]) Contains(idx uint8) bool {
-	return n.Prefixes.Intersects(&lpm.LookupTbl[idx])
+	return n.Prefixes.Overlaps(&lpm.LookupTbl[idx])
 }
 
 // Modify performs an in-place modification of a prefix using the provided callback function.
@@ -1790,11 +1790,11 @@ func (n *LiteNode[V]) EachSubnet(octets []byte, depth int, is4 bool, pfxIdx uint
 
 	var tmp bitset.BitSet256
 
-	// Intersect node entries against precomputed allot tables for pfxIdx.
-	tmp = n.Prefixes.Intersection(&allot.PfxRoutesLookupTbl[pfxIdx])
+	// bitset & node entries against precomputed allot tables for pfxIdx.
+	tmp = n.Prefixes.And(&allot.PfxRoutesLookupTbl[pfxIdx])
 	allCoveredIndices := tmp.AppendBits(make([]uint8, 0, tmp.OnesCount()))
 
-	tmp = n.Children.Intersection(&allot.FringeRoutesLookupTbl[pfxIdx])
+	tmp = n.Children.And(&allot.FringeRoutesLookupTbl[pfxIdx])
 	allCoveredChildAddrs := tmp.AppendBits(make([]uint8, 0, tmp.OnesCount()))
 
 	// Sort covered prefix indices into canonical CIDR order.
@@ -2110,7 +2110,7 @@ func (n *LiteNode[V]) Overlaps(o *LiteNode[V], depth int) bool {
 	}
 
 	// stop condition, no child with identical octet in n and o
-	if !n.Children.Intersects(&o.Children.BitSet256) {
+	if !n.Children.Overlaps(&o.Children.BitSet256) {
 		return false
 	}
 
@@ -2124,7 +2124,7 @@ func (n *LiteNode[V]) Overlaps(o *LiteNode[V], depth int) bool {
 // of the n-prefixes is contained in o, or vice versa.
 func (n *LiteNode[V]) OverlapsRoutes(o *LiteNode[V]) bool {
 	// some prefixes are identical, trivial overlap
-	if n.Prefixes.Intersects(&o.Prefixes.BitSet256) {
+	if n.Prefixes.Overlaps(&o.Prefixes.BitSet256) {
 		return true
 	}
 
@@ -2212,7 +2212,7 @@ func (n *LiteNode[V]) OverlapsChildrenIn(o *LiteNode[V]) bool {
 
 	// use allot table with prefixes as bitsets, bitsets are precalculated.
 	for idx := range n.Prefixes.All() {
-		if o.Children.Intersects(&allot.FringeRoutesLookupTbl[idx]) {
+		if o.Children.Overlaps(&allot.FringeRoutesLookupTbl[idx]) {
 			return true
 		}
 	}
@@ -2228,7 +2228,7 @@ func (n *LiteNode[V]) OverlapsChildrenIn(o *LiteNode[V]) bool {
 // node/leaf/fringe combinations.
 func (n *LiteNode[V]) OverlapsSameChildren(o *LiteNode[V], depth int) bool {
 	// intersect the child bitsets from n with o
-	commonChildren := n.Children.Intersection(&o.Children.BitSet256)
+	commonChildren := n.Children.And(&o.Children.BitSet256)
 
 	for addr, ok := commonChildren.NextSet(0); ok; {
 		nChild := n.MustGetChild(addr)
@@ -2327,12 +2327,12 @@ func (n *LiteNode[V]) OverlapsIdx(idx uint8) bool {
 	}
 
 	// 2. Test if prefix overlaps any route in this node
-	if n.Prefixes.Intersects(&allot.PfxRoutesLookupTbl[idx]) {
+	if n.Prefixes.Overlaps(&allot.PfxRoutesLookupTbl[idx]) {
 		return true
 	}
 
 	// 3. Test if prefix overlaps any child in this node
-	return n.Children.Intersects(&allot.FringeRoutesLookupTbl[idx])
+	return n.Children.Overlaps(&allot.FringeRoutesLookupTbl[idx])
 }
 
 // OverlapsTwoChildren handles all 3x3 combinations of

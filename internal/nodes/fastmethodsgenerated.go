@@ -629,7 +629,7 @@ func (n *FastNode[V]) Get(pfx netip.Prefix) (val V, exists bool) {
 // is done via a bitset operation that maps the traversal path from the given index
 // toward its possible ancestors.
 func (n *FastNode[V]) Contains(idx uint8) bool {
-	return n.Prefixes.Intersects(&lpm.LookupTbl[idx])
+	return n.Prefixes.Overlaps(&lpm.LookupTbl[idx])
 }
 
 // LookupIdx performs a longest-prefix match (LPM) lookup for the given index (idx)
@@ -644,7 +644,7 @@ func (n *FastNode[V]) Contains(idx uint8) bool {
 // using a bitset-based operation with a precomputed backtracking pattern specific to idx.
 func (n *FastNode[V]) LookupIdx(idx uint8) (top uint8, val V, ok bool) {
 	// top is the idx of the longest-prefix-match
-	if top, ok = n.Prefixes.IntersectionTop(&lpm.LookupTbl[idx]); ok {
+	if top, ok = n.Prefixes.AndTop(&lpm.LookupTbl[idx]); ok {
 		return top, n.MustGetPrefix(top), true
 	}
 	return top, val, ok
@@ -1875,11 +1875,11 @@ func (n *FastNode[V]) EachSubnet(octets []byte, depth int, is4 bool, pfxIdx uint
 
 	var tmp bitset.BitSet256
 
-	// Intersect node entries against precomputed allot tables for pfxIdx.
-	tmp = n.Prefixes.Intersection(&allot.PfxRoutesLookupTbl[pfxIdx])
+	// bitset & node entries against precomputed allot tables for pfxIdx.
+	tmp = n.Prefixes.And(&allot.PfxRoutesLookupTbl[pfxIdx])
 	allCoveredIndices := tmp.AppendBits(make([]uint8, 0, tmp.OnesCount()))
 
-	tmp = n.Children.Intersection(&allot.FringeRoutesLookupTbl[pfxIdx])
+	tmp = n.Children.And(&allot.FringeRoutesLookupTbl[pfxIdx])
 	allCoveredChildAddrs := tmp.AppendBits(make([]uint8, 0, tmp.OnesCount()))
 
 	// Sort covered prefix indices into canonical CIDR order.
@@ -2195,7 +2195,7 @@ func (n *FastNode[V]) Overlaps(o *FastNode[V], depth int) bool {
 	}
 
 	// stop condition, no child with identical octet in n and o
-	if !n.Children.Intersects(&o.Children.BitSet256) {
+	if !n.Children.Overlaps(&o.Children.BitSet256) {
 		return false
 	}
 
@@ -2209,7 +2209,7 @@ func (n *FastNode[V]) Overlaps(o *FastNode[V], depth int) bool {
 // of the n-prefixes is contained in o, or vice versa.
 func (n *FastNode[V]) OverlapsRoutes(o *FastNode[V]) bool {
 	// some prefixes are identical, trivial overlap
-	if n.Prefixes.Intersects(&o.Prefixes.BitSet256) {
+	if n.Prefixes.Overlaps(&o.Prefixes.BitSet256) {
 		return true
 	}
 
@@ -2297,7 +2297,7 @@ func (n *FastNode[V]) OverlapsChildrenIn(o *FastNode[V]) bool {
 
 	// use allot table with prefixes as bitsets, bitsets are precalculated.
 	for idx := range n.Prefixes.All() {
-		if o.Children.Intersects(&allot.FringeRoutesLookupTbl[idx]) {
+		if o.Children.Overlaps(&allot.FringeRoutesLookupTbl[idx]) {
 			return true
 		}
 	}
@@ -2313,7 +2313,7 @@ func (n *FastNode[V]) OverlapsChildrenIn(o *FastNode[V]) bool {
 // node/leaf/fringe combinations.
 func (n *FastNode[V]) OverlapsSameChildren(o *FastNode[V], depth int) bool {
 	// intersect the child bitsets from n with o
-	commonChildren := n.Children.Intersection(&o.Children.BitSet256)
+	commonChildren := n.Children.And(&o.Children.BitSet256)
 
 	for addr, ok := commonChildren.NextSet(0); ok; {
 		nChild := n.MustGetChild(addr)
@@ -2412,12 +2412,12 @@ func (n *FastNode[V]) OverlapsIdx(idx uint8) bool {
 	}
 
 	// 2. Test if prefix overlaps any route in this node
-	if n.Prefixes.Intersects(&allot.PfxRoutesLookupTbl[idx]) {
+	if n.Prefixes.Overlaps(&allot.PfxRoutesLookupTbl[idx]) {
 		return true
 	}
 
 	// 3. Test if prefix overlaps any child in this node
-	return n.Children.Intersects(&allot.FringeRoutesLookupTbl[idx])
+	return n.Children.Overlaps(&allot.FringeRoutesLookupTbl[idx])
 }
 
 // OverlapsTwoChildren handles all 3x3 combinations of

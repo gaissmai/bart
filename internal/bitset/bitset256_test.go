@@ -58,19 +58,19 @@ func TestZeroValue(t *testing.T) {
 
 	b = BitSet256{}
 	c := BitSet256{}
-	b.Union(&c)
+	b.Or(&c)
 
 	b = BitSet256{}
 	c = BitSet256{}
-	b = b.Intersection(&c)
+	b = b.And(&c)
 
 	b = BitSet256{}
 	c = BitSet256{}
-	b.Intersects(&c)
+	b.Overlaps(&c)
 
 	b = BitSet256{}
 	c = BitSet256{}
-	b.IntersectionTop(&c)
+	b.AndTop(&c)
 }
 
 func TestSetClearTest(t *testing.T) {
@@ -784,88 +784,258 @@ func TestOnesCount(t *testing.T) {
 	}
 }
 
-func TestUnion(t *testing.T) {
+func TestOr(t *testing.T) {
 	t.Parallel()
 
-	var a BitSet256
-	var b BitSet256
-
-	for i := uint8(1); i < 100; i += 2 {
-		a.Set(i)
-		b.Set(i - 1)
+	zero := BitSet256{0, 0, 0, 0}
+	full := BitSet256{
+		0xFFFF_FFFF_FFFF_FFFF,
+		0xFFFF_FFFF_FFFF_FFFF,
+		0xFFFF_FFFF_FFFF_FFFF,
+		0xFFFF_FFFF_FFFF_FFFF,
 	}
 
-	for i := uint8(100); i < 200; i++ {
-		b.Set(i)
+	tests := []struct {
+		name string
+		b    BitSet256
+		c    BitSet256
+		want BitSet256
+	}{
+		{
+			name: "zero values",
+			b:    zero,
+			c:    zero,
+			want: zero,
+		},
+		{
+			name: "identity with zero (b | 0 == b)",
+			b:    BitSet256{1, 2, 3, 4},
+			c:    zero,
+			want: BitSet256{1, 2, 3, 4},
+		},
+		{
+			name: "identity with zero (0 | c == c)",
+			b:    zero,
+			c:    BitSet256{1, 2, 3, 4},
+			want: BitSet256{1, 2, 3, 4},
+		},
+		{
+			name: "idempotency (b | b == b)",
+			b:    BitSet256{0xAA, 0xBB, 0xCC, 0xDD},
+			c:    BitSet256{0xAA, 0xBB, 0xCC, 0xDD},
+			want: BitSet256{0xAA, 0xBB, 0xCC, 0xDD},
+		},
+		{
+			name: "disjoint words OR",
+			b:    BitSet256{0xF000_0000_0000_0000, 0x0, 0x00FF_0000_0000_0000, 0x0},
+			c:    BitSet256{0x0F00_0000_0000_0000, 0x0, 0x0000_FF00_0000_0000, 0x0},
+			want: BitSet256{0xFF00_0000_0000_0000, 0x0, 0x00FF_FF00_0000_0000, 0x0},
+		},
+		{
+			name: "union with full set resulting in full set",
+			b:    BitSet256{0x1234, 0x5678, 0x9ABC, 0xDEF0},
+			c:    full,
+			want: full,
+		},
+		{
+			name: "interleaved bit patterns",
+			b:    BitSet256{0xAAAA_AAAA_AAAA_AAAA, 0x5555_5555_5555_5555, 0xAAAA_AAAA_AAAA_AAAA, 0x5555_5555_5555_5555},
+			c:    BitSet256{0x5555_5555_5555_5555, 0xAAAA_AAAA_AAAA_AAAA, 0x5555_5555_5555_5555, 0xAAAA_AAAA_AAAA_AAAA},
+			want: full,
+		},
 	}
 
-	c := a
-	c.Union(&b)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	d := b
-	d.Union(&a)
+			// Test b.Or(c)
+			got := tt.b.Or(&tt.c)
+			if got != tt.want {
+				t.Errorf("got %v, want %v", got, tt.want)
+			}
 
-	if c.OnesCount() != 200 {
-		t.Errorf("Union should have 200 bits set, but had %d", c.OnesCount())
-	}
-	if d.OnesCount() != 200 {
-		t.Errorf("Union should have 200 bits set, but had %d", d.OnesCount())
+			// Test commutativity: b | c == c | b
+			gotCommutative := tt.c.Or(&tt.b)
+			if gotCommutative != tt.want {
+				t.Errorf("commutativity check failed: got %v, want %v", gotCommutative, tt.want)
+			}
+		})
 	}
 }
 
-func TestInplaceIntersection(t *testing.T) {
+func TestAnd(t *testing.T) {
 	t.Parallel()
-	var a BitSet256
-	var b BitSet256
-	for i := uint8(1); i < 100; i += 2 {
-		a.Set(i)
-		b.Set(i - 1)
-		b.Set(i)
-	}
-	for i := uint8(100); i < 200; i++ {
-		b.Set(i)
+
+	zero := BitSet256{0, 0, 0, 0}
+	full := BitSet256{
+		0xFFFF_FFFF_FFFF_FFFF,
+		0xFFFF_FFFF_FFFF_FFFF,
+		0xFFFF_FFFF_FFFF_FFFF,
+		0xFFFF_FFFF_FFFF_FFFF,
 	}
 
-	c := a
-	c = c.Intersection(&b)
-
-	d := b
-	d = d.Intersection(&a)
-	if c.OnesCount() != 50 {
-		t.Errorf("Intersection should have 50 bits set, but had %d", c.OnesCount())
+	tests := []struct {
+		name string
+		b    BitSet256
+		c    BitSet256
+		want BitSet256
+	}{
+		{
+			name: "zero values",
+			b:    zero,
+			c:    zero,
+			want: zero,
+		},
+		{
+			name: "annihilation with zero (b & 0 == 0)",
+			b:    BitSet256{1, 2, 3, 4},
+			c:    zero,
+			want: zero,
+		},
+		{
+			name: "annihilation with zero (0 & c == 0)",
+			b:    zero,
+			c:    BitSet256{1, 2, 3, 4},
+			want: zero,
+		},
+		{
+			name: "identity with full set (b & full == b)",
+			b:    BitSet256{0x1234, 0x5678, 0x9ABC, 0xDEF0},
+			c:    full,
+			want: BitSet256{0x1234, 0x5678, 0x9ABC, 0xDEF0},
+		},
+		{
+			name: "idempotency (b & b == b)",
+			b:    BitSet256{0xAA, 0xBB, 0xCC, 0xDD},
+			c:    BitSet256{0xAA, 0xBB, 0xCC, 0xDD},
+			want: BitSet256{0xAA, 0xBB, 0xCC, 0xDD},
+		},
+		{
+			name: "disjoint sets resulting in zero",
+			b:    BitSet256{0xF000_0000_0000_0000, 0x0, 0x00FF_0000_0000_0000, 0x0},
+			c:    BitSet256{0x0F00_0000_0000_0000, 0x0, 0x0000_FF00_0000_0000, 0x0},
+			want: zero,
+		},
+		{
+			name: "partial bit overlap across words",
+			b:    BitSet256{0xFF00_FF00_FF00_FF00, 0x00FF_00FF_00FF_00FF, 0xF0F0_F0F0_F0F0_F0F0, 0x0F0F_0F0F_0F0F_0F0F},
+			c:    BitSet256{0xF000_F000_F000_F000, 0x00F0_00F0_00F0_00F0, 0xFF00_FF00_FF00_FF00, 0xFF00_FF00_FF00_FF00},
+			want: BitSet256{0xF000_F000_F000_F000, 0x00F0_00F0_00F0_00F0, 0xF000_F000_F000_F000, 0x0F00_0F00_0F00_0F00},
+		},
 	}
-	if d.OnesCount() != 50 {
-		t.Errorf("Intersection should have 50 bits set, but had %d", d.OnesCount())
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Test b.And(c)
+			got := tt.b.And(&tt.c)
+			if got != tt.want {
+				t.Errorf("got %v, want %v", got, tt.want)
+			}
+
+			// Test commutativity: b & c == c & b
+			gotCommutative := tt.c.And(&tt.b)
+			if gotCommutative != tt.want {
+				t.Errorf("commutativity check failed: got %v, want %v", gotCommutative, tt.want)
+			}
+		})
 	}
 }
 
-func TestIntersectsAny(t *testing.T) {
+func TestOverlaps(t *testing.T) {
 	t.Parallel()
-	var a BitSet256
-	var b BitSet256
 
-	for i := uint8(1); i < 100; i++ {
-		a.Set(i)
-	}
-	for i := uint8(100); i < 200; i++ {
-		b.Set(i)
-	}
-
-	want := false
-	got := a.Intersects(&b)
-	if want != got {
-		t.Errorf("Intersection should be %v, but got: %v", want, got)
+	zero := BitSet256{0, 0, 0, 0}
+	full := BitSet256{
+		0xFFFF_FFFF_FFFF_FFFF,
+		0xFFFF_FFFF_FFFF_FFFF,
+		0xFFFF_FFFF_FFFF_FFFF,
+		0xFFFF_FFFF_FFFF_FFFF,
 	}
 
-	b = a
-	want = true
-	got = a.Intersects(&b)
-	if want != got {
-		t.Errorf("Intersection should be %v, but got: %v", want, got)
+	tests := []struct {
+		name string
+		b    BitSet256
+		c    BitSet256
+		want bool
+	}{
+		{
+			name: "both zero values",
+			b:    zero,
+			c:    zero,
+			want: false,
+		},
+		{
+			name: "receiver zero against populated set",
+			b:    zero,
+			c:    BitSet256{1, 0, 0, 0},
+			want: false,
+		},
+		{
+			name: "disjoint sets (no common set bits)",
+			b:    BitSet256{0xAAAA_AAAA_AAAA_AAAA, 0x5555_5555_5555_5555, 0xAAAA_AAAA_AAAA_AAAA, 0x5555_5555_5555_5555},
+			c:    BitSet256{0x5555_5555_5555_5555, 0xAAAA_AAAA_AAAA_AAAA, 0x5555_5555_5555_5555, 0xAAAA_AAAA_AAAA_AAAA},
+			want: false,
+		},
+		{
+			name: "full set intersection",
+			b:    BitSet256{1, 0, 0, 0},
+			c:    full,
+			want: true,
+		},
+		{
+			name: "single bit match in word 0",
+			b:    BitSet256{1, 0, 0, 0},
+			c:    BitSet256{1, 0, 0, 0},
+			want: true,
+		},
+		{
+			name: "single bit match in word 1",
+			b:    BitSet256{0, 1 << 31, 0, 0},
+			c:    BitSet256{0, 1 << 31, 0, 0},
+			want: true,
+		},
+		{
+			name: "single bit match in word 2",
+			b:    BitSet256{0, 0, 1 << 63, 0},
+			c:    BitSet256{0, 0, 1 << 63, 0},
+			want: true,
+		},
+		{
+			name: "single bit match in word 3",
+			b:    BitSet256{0, 0, 0, 1},
+			c:    BitSet256{0, 0, 0, 1},
+			want: true,
+		},
+		{
+			name: "identical non-zero sets",
+			b:    BitSet256{0x1234, 0x5678, 0x9ABC, 0xDEF0},
+			c:    BitSet256{0x1234, 0x5678, 0x9ABC, 0xDEF0},
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := tt.b.Overlaps(&tt.c)
+			if got != tt.want {
+				t.Errorf("got %v, want %v", got, tt.want)
+			}
+
+			// Test symmetry
+			gotSymmetric := tt.c.Overlaps(&tt.b)
+			if gotSymmetric != tt.want {
+				t.Errorf("symmetry check failed: got %v, want %v", gotSymmetric, tt.want)
+			}
+		})
 	}
 }
 
-func TestIntersectionTop(t *testing.T) {
+func TestAndTop(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
 		name    string
@@ -933,65 +1103,94 @@ func TestIntersectionTop(t *testing.T) {
 			b.Set(v)
 		}
 
-		gotIdx, gotOk := a.IntersectionTop(&b)
+		gotIdx, gotOk := a.AndTop(&b)
 		if gotOk != tc.wantOk {
-			t.Errorf("IntersectionTop, %s: got ok %v, want %v", tc.name, gotOk, tc.wantOk)
+			t.Errorf("AndTop, %s: got ok %v, want %v", tc.name, gotOk, tc.wantOk)
 		}
 		if gotIdx != tc.wantIdx {
-			t.Errorf("IntersectionTop, %s: got idx %d, want %d", tc.name, gotIdx, tc.wantIdx)
+			t.Errorf("AndTop, %s: got idx %d, want %d", tc.name, gotIdx, tc.wantIdx)
 		}
 
 		// Commutative check
-		gotIdx2, gotOk2 := b.IntersectionTop(&a)
+		gotIdx2, gotOk2 := b.AndTop(&a)
 		if gotOk2 != tc.wantOk {
-			t.Errorf("IntersectionTop (commutative), %s: got ok %v, want %v", tc.name, gotOk2, tc.wantOk)
+			t.Errorf("AndTop (commutative), %s: got ok %v, want %v", tc.name, gotOk2, tc.wantOk)
 		}
 		if gotIdx2 != tc.wantIdx {
-			t.Errorf("IntersectionTop (commutative), %s: got idx %d, want %d", tc.name, gotIdx2, tc.wantIdx)
+			t.Errorf("AndTop (commutative), %s: got idx %d, want %d", tc.name, gotIdx2, tc.wantIdx)
 		}
 	}
 }
 
 func TestXor(t *testing.T) {
+	t.Parallel()
+
+	zero := BitSet256{0, 0, 0, 0}
+	full := BitSet256{
+		0xFFFF_FFFF_FFFF_FFFF,
+		0xFFFF_FFFF_FFFF_FFFF,
+		0xFFFF_FFFF_FFFF_FFFF,
+		0xFFFF_FFFF_FFFF_FFFF,
+	}
+
 	tests := []struct {
-		name     string
-		initial  BitSet256
-		other    BitSet256
-		expected BitSet256
+		name string
+		b    BitSet256
+		c    BitSet256
+		want BitSet256
 	}{
 		{
-			name:     "XOR with zero set yields original",
-			initial:  BitSet256{1, 2, 3, 4},
-			other:    BitSet256{0, 0, 0, 0},
-			expected: BitSet256{1, 2, 3, 4},
+			name: "zero values",
+			b:    zero,
+			c:    zero,
+			want: zero,
 		},
 		{
-			name:     "XOR with self yields zero",
-			initial:  BitSet256{0xDEAD, 0xBEEF, 0x1234, 0x5678},
-			other:    BitSet256{0xDEAD, 0xBEEF, 0x1234, 0x5678},
-			expected: BitSet256{0, 0, 0, 0},
+			name: "identity with zero (b ^ 0 == b)",
+			b:    BitSet256{1, 2, 3, 4},
+			c:    zero,
+			want: BitSet256{1, 2, 3, 4},
 		},
 		{
-			name:     "XOR bit toggle logic",
-			initial:  BitSet256{0b1100, 0, 0, 0},
-			other:    BitSet256{0b1010, 0, 0, 0},
-			expected: BitSet256{0b0110, 0, 0, 0},
+			name: "self-inversion / annihilation (b ^ b == 0)",
+			b:    BitSet256{0x1234, 0x5678, 0x9ABC, 0xDEF0},
+			c:    BitSet256{0x1234, 0x5678, 0x9ABC, 0xDEF0},
+			want: zero,
 		},
 		{
-			name:     "XOR across all 256 bits",
-			initial:  BitSet256{1, 2, 3, 4},
-			other:    BitSet256{4, 3, 2, 1},
-			expected: BitSet256{1 ^ 4, 2 ^ 3, 3 ^ 2, 4 ^ 1},
+			name: "complement with full set (b ^ full == ^b)",
+			b:    BitSet256{0x0000_0000_0000_0000, 0xFFFF_FFFF_FFFF_FFFF, 0xAAAA_AAAA_AAAA_AAAA, 0x5555_5555_5555_5555},
+			c:    full,
+			want: BitSet256{0xFFFF_FFFF_FFFF_FFFF, 0x0000_0000_0000_0000, 0x5555_5555_5555_5555, 0xAAAA_AAAA_AAAA_AAAA},
+		},
+		{
+			name: "disjoint words XOR",
+			b:    BitSet256{0xF000_0000_0000_0000, 0x0, 0x00FF_0000_0000_0000, 0x0},
+			c:    BitSet256{0x0F00_0000_0000_0000, 0x0, 0x0000_FF00_0000_0000, 0x0},
+			want: BitSet256{0xFF00_0000_0000_0000, 0x0, 0x00FF_FF00_0000_0000, 0x0},
+		},
+		{
+			name: "overlapping bit toggle",
+			b:    BitSet256{0xFF00_FF00_FF00_FF00, 0x00FF_00FF_00FF_00FF, 0xF0F0_F0F0_F0F0_F0F0, 0x0F0F_0F0F_0F0F_0F0F},
+			c:    BitSet256{0xF000_F000_F000_F000, 0x00F0_00F0_00F0_00F0, 0xFF00_FF00_FF00_FF00, 0xFF00_FF00_FF00_FF00},
+			want: BitSet256{0x0F00_0F00_0F00_0F00, 0x000F_000F_000F_000F, 0x0FF0_0FF0_0FF0_0FF0, 0xF00F_F00F_F00F_F00F},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			b := tt.initial
-			b.Xor(&tt.other)
+			t.Parallel()
 
-			if b != tt.expected {
-				t.Errorf("Xor() = %v, want %v", b, tt.expected)
+			// Test b.Xor(c)
+			got := tt.b.Xor(&tt.c)
+			if got != tt.want {
+				t.Errorf("got %v, want %v", got, tt.want)
+			}
+
+			// Test commutativity: b ^ c == c ^ b
+			gotCommutative := tt.c.Xor(&tt.b)
+			if gotCommutative != tt.want {
+				t.Errorf("commutativity check failed: got %v, want %v", gotCommutative, tt.want)
 			}
 		})
 	}
@@ -1207,7 +1406,7 @@ func BenchmarkLastSet(b *testing.B) {
 	})
 }
 
-func BenchmarkIntersectionTop(b *testing.B) {
+func BenchmarkAndTop(b *testing.B) {
 	b.Run("Sparse", func(b *testing.B) {
 		aa := []BitSet256{
 			{1, 0, 0, 0},
@@ -1218,7 +1417,7 @@ func BenchmarkIntersectionTop(b *testing.B) {
 
 		var i uint8
 		for b.Loop() {
-			aa[i&3].IntersectionTop(&aa[i&3])
+			aa[i&3].AndTop(&aa[i&3])
 			i++
 		}
 	})
@@ -1233,13 +1432,13 @@ func BenchmarkIntersectionTop(b *testing.B) {
 
 		var i uint8
 		for b.Loop() {
-			aa[i&3].IntersectionTop(&aa[i&3])
+			aa[i&3].AndTop(&aa[i&3])
 			i++
 		}
 	})
 }
 
-func BenchmarkIntersects(b *testing.B) {
+func BenchmarkOverlaps(b *testing.B) {
 	aa := randomBitSet256()
 	bb := []BitSet256{
 		randomBitSet256(),
@@ -1250,12 +1449,12 @@ func BenchmarkIntersects(b *testing.B) {
 
 	var i uint8
 	for b.Loop() {
-		aa.Intersects(&bb[i&3])
+		aa.Overlaps(&bb[i&3])
 		i++
 	}
 }
 
-func BenchmarkUnion(b *testing.B) {
+func BenchmarkOr(b *testing.B) {
 	aa := randomBitSet256()
 	bb := []BitSet256{
 		randomBitSet256(),
@@ -1266,12 +1465,12 @@ func BenchmarkUnion(b *testing.B) {
 
 	var i uint8
 	for b.Loop() {
-		aa.Union(&bb[i&3])
+		aa.Or(&bb[i&3])
 		i++
 	}
 }
 
-func BenchmarkIntersection(b *testing.B) {
+func BenchmarkAnd(b *testing.B) {
 	aa := randomBitSet256()
 	bb := []BitSet256{
 		randomBitSet256(),
@@ -1282,7 +1481,7 @@ func BenchmarkIntersection(b *testing.B) {
 
 	var i uint8
 	for b.Loop() {
-		aa.Intersection(&bb[i&3])
+		aa.And(&bb[i&3])
 		i++
 	}
 }
