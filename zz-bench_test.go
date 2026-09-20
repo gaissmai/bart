@@ -23,40 +23,32 @@ func BenchmarkFullFastMatch4(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
 		matchIP4 := tier1.matchIP4()
 
-		i := 0
-		for b.Loop() {
+		for i := 0; b.Loop(); i++ {
 			fast.Contains(matchIP4[i&mask])
-			i++
 		}
 	})
 
 	b.Run("Lookup", func(b *testing.B) {
 		matchIP4 := tier1.matchIP4()
 
-		i := 0
-		for b.Loop() {
+		for i := 0; b.Loop(); i++ {
 			fast.Lookup(matchIP4[i&mask])
-			i++
 		}
 	})
 
 	b.Run("LookupPrefix", func(b *testing.B) {
 		matchPfx4 := tier1.matchPfx4()
 
-		i := 0
-		for b.Loop() {
+		for i := 0; b.Loop(); i++ {
 			fast.LookupPrefix(matchPfx4[i&mask])
-			i++
 		}
 	})
 
 	b.Run("LookupPfxLPM", func(b *testing.B) {
 		matchPfx4 := tier1.matchPfx4()
 
-		i := 0
-		for b.Loop() {
+		for i := 0; b.Loop(); i++ {
 			fast.LookupPrefixLPM(matchPfx4[i&mask])
-			i++
 		}
 	})
 }
@@ -70,40 +62,32 @@ func BenchmarkFullFastMatch6(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
 		matchIP6 := tier1.matchIP6()
 
-		i := 0
-		for b.Loop() {
+		for i := 0; b.Loop(); i++ {
 			fast.Contains(matchIP6[i&mask])
-			i++
 		}
 	})
 
 	b.Run("Lookup", func(b *testing.B) {
 		matchIP6 := tier1.matchIP6()
 
-		i := 0
-		for b.Loop() {
+		for i := 0; b.Loop(); i++ {
 			fast.Lookup(matchIP6[i&mask])
-			i++
 		}
 	})
 
 	b.Run("LookupPrefix", func(b *testing.B) {
 		matchPfx6 := tier1.matchPfx6()
 
-		i := 0
-		for b.Loop() {
+		for i := 0; b.Loop(); i++ {
 			fast.LookupPrefix(matchPfx6[i&mask])
-			i++
 		}
 	})
 
 	b.Run("LookupPfxLPM", func(b *testing.B) {
 		matchPfx6 := tier1.matchPfx6()
 
-		i := 0
-		for b.Loop() {
+		for i := 0; b.Loop(); i++ {
 			fast.LookupPrefixLPM(matchPfx6[i&mask])
-			i++
 		}
 	})
 }
@@ -117,40 +101,32 @@ func BenchmarkFullFastMiss4(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
 		missIP4 := tier1.missIP4()
 
-		i := 0
-		for b.Loop() {
+		for i := 0; b.Loop(); i++ {
 			fast.Contains(missIP4[i&mask])
-			i++
 		}
 	})
 
 	b.Run("Lookup", func(b *testing.B) {
 		missIP4 := tier1.missIP4()
 
-		i := 0
-		for b.Loop() {
+		for i := 0; b.Loop(); i++ {
 			fast.Lookup(missIP4[i&mask])
-			i++
 		}
 	})
 
 	b.Run("LookupPrefix", func(b *testing.B) {
 		missPfx4 := tier1.missPfx4()
 
-		i := 0
-		for b.Loop() {
+		for i := 0; b.Loop(); i++ {
 			fast.LookupPrefix(missPfx4[i&mask])
-			i++
 		}
 	})
 
 	b.Run("LookupPfxLPM", func(b *testing.B) {
 		missPfx4 := tier1.missPfx4()
 
-		i := 0
-		for b.Loop() {
+		for i := 0; b.Loop(); i++ {
 			fast.LookupPrefixLPM(missPfx4[i&mask])
-			i++
 		}
 	})
 }
@@ -164,40 +140,32 @@ func BenchmarkFullFastMiss6(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
 		missIP6 := tier1.missIP6()
 
-		i := 0
-		for b.Loop() {
+		for i := 0; b.Loop(); i++ {
 			fast.Contains(missIP6[i&mask])
-			i++
 		}
 	})
 
 	b.Run("Lookup", func(b *testing.B) {
 		missIP6 := tier1.missIP6()
 
-		i := 0
-		for b.Loop() {
+		for i := 0; b.Loop(); i++ {
 			fast.Lookup(missIP6[i&mask])
-			i++
 		}
 	})
 
 	b.Run("LookupPrefix", func(b *testing.B) {
 		missPfx6 := tier1.missPfx6()
 
-		i := 0
-		for b.Loop() {
+		for i := 0; b.Loop(); i++ {
 			fast.LookupPrefix(missPfx6[i&mask])
-			i++
 		}
 	})
 
 	b.Run("LookupPfxLPM", func(b *testing.B) {
 		missPfx6 := tier1.missPfx6()
 
-		i := 0
-		for b.Loop() {
+		for i := 0; b.Loop(); i++ {
 			fast.LookupPrefixLPM(missPfx6[i&mask])
-			i++
 		}
 	})
 }
@@ -211,40 +179,32 @@ func BenchmarkFullBartMatch4(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
 		matchIP4 := tier1.matchIP4()
 
-		i := 0
-		for b.Loop() {
+		for i := 0; b.Loop(); i++ {
 			bart.Contains(matchIP4[i&mask])
-			i++
 		}
 	})
 
 	b.Run("Lookup", func(b *testing.B) {
 		matchIP4 := tier1.matchIP4()
 
-		i := 0
-		for b.Loop() {
+		for i := 0; b.Loop(); i++ {
 			bart.Lookup(matchIP4[i&mask])
-			i++
 		}
 	})
 
 	b.Run("LookupPrefix", func(b *testing.B) {
 		matchPfx4 := tier1.matchPfx4()
 
-		i := 0
-		for b.Loop() {
+		for i := 0; b.Loop(); i++ {
 			bart.LookupPrefix(matchPfx4[i&mask])
-			i++
 		}
 	})
 
 	b.Run("LookupPfxLPM", func(b *testing.B) {
 		matchPfx4 := tier1.matchPfx4()
 
-		i := 0
-		for b.Loop() {
+		for i := 0; b.Loop(); i++ {
 			bart.LookupPrefixLPM(matchPfx4[i&mask])
-			i++
 		}
 	})
 }
@@ -258,40 +218,32 @@ func BenchmarkFullBartMatch6(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
 		matchIP6 := tier1.matchIP6()
 
-		i := 0
-		for b.Loop() {
+		for i := 0; b.Loop(); i++ {
 			bart.Contains(matchIP6[i&mask])
-			i++
 		}
 	})
 
 	b.Run("Lookup", func(b *testing.B) {
 		matchIP6 := tier1.matchIP6()
 
-		i := 0
-		for b.Loop() {
+		for i := 0; b.Loop(); i++ {
 			bart.Lookup(matchIP6[i&mask])
-			i++
 		}
 	})
 
 	b.Run("LookupPrefix", func(b *testing.B) {
 		matchPfx6 := tier1.matchPfx6()
 
-		i := 0
-		for b.Loop() {
+		for i := 0; b.Loop(); i++ {
 			bart.LookupPrefix(matchPfx6[i&mask])
-			i++
 		}
 	})
 
 	b.Run("LookupPfxLPM", func(b *testing.B) {
 		matchPfx6 := tier1.matchPfx6()
 
-		i := 0
-		for b.Loop() {
+		for i := 0; b.Loop(); i++ {
 			bart.LookupPrefixLPM(matchPfx6[i&mask])
-			i++
 		}
 	})
 }
@@ -305,40 +257,32 @@ func BenchmarkFullBartMiss4(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
 		missIP4 := tier1.missIP4()
 
-		i := 0
-		for b.Loop() {
+		for i := 0; b.Loop(); i++ {
 			bart.Contains(missIP4[i&mask])
-			i++
 		}
 	})
 
 	b.Run("Lookup", func(b *testing.B) {
 		missIP4 := tier1.missIP4()
 
-		i := 0
-		for b.Loop() {
+		for i := 0; b.Loop(); i++ {
 			bart.Lookup(missIP4[i&mask])
-			i++
 		}
 	})
 
 	b.Run("LookupPrefix", func(b *testing.B) {
 		missPfx4 := tier1.missPfx4()
 
-		i := 0
-		for b.Loop() {
+		for i := 0; b.Loop(); i++ {
 			bart.LookupPrefix(missPfx4[i&mask])
-			i++
 		}
 	})
 
 	b.Run("LookupPfxLPM", func(b *testing.B) {
 		missPfx4 := tier1.missPfx4()
 
-		i := 0
-		for b.Loop() {
+		for i := 0; b.Loop(); i++ {
 			bart.LookupPrefixLPM(missPfx4[i&mask])
-			i++
 		}
 	})
 }
@@ -352,40 +296,32 @@ func BenchmarkFullBartMiss6(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
 		missIP6 := tier1.missIP6()
 
-		i := 0
-		for b.Loop() {
+		for i := 0; b.Loop(); i++ {
 			bart.Contains(missIP6[i&mask])
-			i++
 		}
 	})
 
 	b.Run("Lookup", func(b *testing.B) {
 		missIP6 := tier1.missIP6()
 
-		i := 0
-		for b.Loop() {
+		for i := 0; b.Loop(); i++ {
 			bart.Lookup(missIP6[i&mask])
-			i++
 		}
 	})
 
 	b.Run("LookupPrefix", func(b *testing.B) {
 		missPfx6 := tier1.missPfx6()
 
-		i := 0
-		for b.Loop() {
+		for i := 0; b.Loop(); i++ {
 			bart.LookupPrefix(missPfx6[i&mask])
-			i++
 		}
 	})
 
 	b.Run("LookupPfxLPM", func(b *testing.B) {
 		missPfx6 := tier1.missPfx6()
 
-		i := 0
-		for b.Loop() {
+		for i := 0; b.Loop(); i++ {
 			bart.LookupPrefixLPM(missPfx6[i&mask])
-			i++
 		}
 	})
 }

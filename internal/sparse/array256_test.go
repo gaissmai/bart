@@ -218,17 +218,17 @@ func BenchmarkGet(b *testing.B) {
 
 	b.Run("Get present", func(b *testing.B) {
 		for b.Loop() {
-			_, _ = a.Get(10)
+			a.Get(10)
 		}
 	})
 	b.Run("Get absent", func(b *testing.B) {
 		for b.Loop() {
-			_, _ = a.Get(11)
+			a.Get(11)
 		}
 	})
 	b.Run("MustGet", func(b *testing.B) {
 		for b.Loop() {
-			_ = a.MustGet(10)
+			a.MustGet(10)
 		}
 	})
 }
@@ -238,7 +238,7 @@ func BenchmarkInsertAt(b *testing.B) {
 		a := new(Array256[int])
 		a.InsertAt(100, 100)
 		for b.Loop() {
-			_, _ = a.InsertAt(100, 200)
+			a.InsertAt(100, 200)
 		}
 	})
 
@@ -247,7 +247,7 @@ func BenchmarkInsertAt(b *testing.B) {
 			for b.Loop() {
 				a := new(Array256[int])
 				for i := range size {
-					_, _ = a.InsertAt(uint8(i), i)
+					a.InsertAt(uint8(i), i)
 				}
 			}
 		})
@@ -260,7 +260,7 @@ func BenchmarkInsertAndDeleteAt(b *testing.B) {
 			for b.Loop() {
 				a := new(Array256[int])
 				for i := range size {
-					_, _ = a.InsertAt(uint8(i), i)
+					a.InsertAt(uint8(i), i)
 				}
 				for i := range size {
 					_, _ = a.DeleteAt(uint8(i))

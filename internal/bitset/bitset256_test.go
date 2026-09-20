@@ -1071,37 +1071,29 @@ func BenchmarkIsEmpty(b *testing.B) {
 		randomBitSet256(),
 	}
 
-	var i uint8
-	for b.Loop() {
+	for i := uint8(0); b.Loop(); i++ {
 		aa[i&3].IsEmpty()
-		i++
 	}
 }
 
 func BenchmarkSet(b *testing.B) {
 	bs := randomBitSet256()
-	var bit uint8
-	for b.Loop() {
-		bs.Set(bit)
-		bit++
+	for i := uint8(0); b.Loop(); i++ {
+		bs.Set(i)
 	}
 }
 
 func BenchmarkTest(b *testing.B) {
 	bs := randomBitSet256()
-	var bit uint8
-	for b.Loop() {
-		_ = bs.Test(bit)
-		bit++
+	for i := uint8(0); b.Loop(); i++ {
+		_ = bs.Test(i)
 	}
 }
 
 func BenchmarkClear(b *testing.B) {
 	bs := randomBitSet256()
-	var bit uint8
-	for b.Loop() {
-		bs.Clear(bit)
-		bit++
+	for i := uint8(0); b.Loop(); i++ {
+		bs.Clear(i)
 	}
 }
 
@@ -1113,10 +1105,8 @@ func BenchmarkOnesCount(b *testing.B) {
 		randomBitSet256(),
 	}
 
-	var i uint8
-	for b.Loop() {
+	for i := uint8(0); b.Loop(); i++ {
 		aa[i&3].OnesCount()
-		i++
 	}
 }
 
@@ -1128,10 +1118,8 @@ func BenchmarkRank(b *testing.B) {
 		randomBitSet256(),
 	}
 
-	var i uint8
-	for b.Loop() {
+	for i := uint8(0); b.Loop(); i++ {
 		aa[i&3].Rank(i)
-		i++
 	}
 }
 
@@ -1144,10 +1132,8 @@ func BenchmarkFirstSet(b *testing.B) {
 			{0, 0, 0, 1},
 		}
 
-		var i uint8
-		for b.Loop() {
+		for i := uint8(0); b.Loop(); i++ {
 			aa[i&3].FirstSet()
-			i++
 		}
 	})
 
@@ -1159,10 +1145,8 @@ func BenchmarkFirstSet(b *testing.B) {
 			randomBitSet256(),
 		}
 
-		var i uint8
-		for b.Loop() {
+		for i := uint8(0); b.Loop(); i++ {
 			aa[i&3].FirstSet()
-			i++
 		}
 	})
 }
@@ -1176,10 +1160,8 @@ func BenchmarkNextSet(b *testing.B) {
 			{0, 0, 0, 1},
 		}
 
-		var i uint8
-		for b.Loop() {
+		for i := uint8(0); b.Loop(); i++ {
 			aa[i&3].NextSet(i)
-			i++
 		}
 	})
 
@@ -1191,10 +1173,8 @@ func BenchmarkNextSet(b *testing.B) {
 			randomBitSet256(),
 		}
 
-		var i uint8
-		for b.Loop() {
+		for i := uint8(0); b.Loop(); i++ {
 			aa[i&3].NextSet(i)
-			i++
 		}
 	})
 }
@@ -1208,10 +1188,8 @@ func BenchmarkLastSet(b *testing.B) {
 			{1, 0, 0, 0},
 		}
 
-		var i uint8
-		for b.Loop() {
+		for i := uint8(0); b.Loop(); i++ {
 			aa[i&3].LastSet()
-			i++
 		}
 	})
 
@@ -1223,10 +1201,8 @@ func BenchmarkLastSet(b *testing.B) {
 			randomBitSet256(),
 		}
 
-		var i uint8
-		for b.Loop() {
+		for i := uint8(0); b.Loop(); i++ {
 			aa[i&3].LastSet()
-			i++
 		}
 	})
 }
