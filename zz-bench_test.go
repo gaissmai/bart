@@ -432,7 +432,7 @@ var (
 		mpp("255.255.255.255/32"), // matching prefix
 	}
 
-	worstCaseProbeIP6  = mpa("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")
+	worstCaseProbeIP6  = mpa("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff%eno1")
 	worstCaseProbePfx6 = mpp("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff/128")
 
 	ipv6DefaultRoute = mpp("::/0")
@@ -479,6 +479,9 @@ func BenchmarkBartWorstCaseMatch4(b *testing.B) {
 		for _, p := range worstCasePfxsIP4 {
 			tbl.Insert(p, nil)
 		}
+		if ok := tbl.Contains(worstCaseProbeIP4); !ok {
+			b.Fatalf("expexted Contains() == true, got: %v", ok)
+		}
 
 		for b.Loop() {
 			tbl.Contains(worstCaseProbeIP4)
@@ -492,6 +495,10 @@ func BenchmarkBartWorstCaseMatch4(b *testing.B) {
 		}
 		tbl.Insert(ipv4DefaultRoute, ipv4DefaultRoute.String())
 		tbl.Delete(worstCaseProbePfx4)
+
+		if _, ok := tbl.Lookup(worstCaseProbeIP4); !ok {
+			b.Fatalf("expexted Lookup() == true, got: %v", ok)
+		}
 
 		for b.Loop() {
 			tbl.Lookup(worstCaseProbeIP4)
@@ -532,6 +539,10 @@ func BenchmarkFastWorstCaseMatch4(b *testing.B) {
 			tbl.Insert(p, nil)
 		}
 
+		if ok := tbl.Contains(worstCaseProbeIP4); !ok {
+			b.Fatalf("expexted Contains() == true, got: %v", ok)
+		}
+
 		for b.Loop() {
 			tbl.Contains(worstCaseProbeIP4)
 		}
@@ -544,6 +555,10 @@ func BenchmarkFastWorstCaseMatch4(b *testing.B) {
 		}
 		tbl.Insert(ipv4DefaultRoute, ipv4DefaultRoute.String())
 		tbl.Delete(worstCaseProbePfx4)
+
+		if _, ok := tbl.Lookup(worstCaseProbeIP4); !ok {
+			b.Fatalf("expexted Lookup() == true, got: %v", ok)
+		}
 
 		for b.Loop() {
 			tbl.Lookup(worstCaseProbeIP4)
@@ -586,6 +601,10 @@ func BenchmarkBartWorstCaseMiss4(b *testing.B) {
 
 		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
 
+		if ok := tbl.Contains(worstCaseProbeIP4); ok {
+			b.Fatalf("expexted Contains() == false, got: %v", ok)
+		}
+
 		for b.Loop() {
 			tbl.Contains(worstCaseProbeIP4)
 		}
@@ -598,6 +617,10 @@ func BenchmarkBartWorstCaseMiss4(b *testing.B) {
 		}
 
 		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
+
+		if _, ok := tbl.Lookup(worstCaseProbeIP4); ok {
+			b.Fatalf("expexted Lookup() == false, got: %v", ok)
+		}
 
 		for b.Loop() {
 			tbl.Lookup(worstCaseProbeIP4)
@@ -640,6 +663,10 @@ func BenchmarkFastWorstCaseMiss4(b *testing.B) {
 
 		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
 
+		if ok := tbl.Contains(worstCaseProbeIP4); ok {
+			b.Fatalf("expexted Contains() == false, got: %v", ok)
+		}
+
 		for b.Loop() {
 			tbl.Contains(worstCaseProbeIP4)
 		}
@@ -652,6 +679,10 @@ func BenchmarkFastWorstCaseMiss4(b *testing.B) {
 		}
 
 		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
+
+		if _, ok := tbl.Lookup(worstCaseProbeIP4); ok {
+			b.Fatalf("expexted Lookup() == false, got: %v", ok)
+		}
 
 		for b.Loop() {
 			tbl.Lookup(worstCaseProbeIP4)
@@ -692,6 +723,10 @@ func BenchmarkBartWorstCaseMatch6(b *testing.B) {
 			tbl.Insert(p, nil)
 		}
 
+		if ok := tbl.Contains(worstCaseProbeIP6); !ok {
+			b.Fatalf("expexted Contains() == true, got: %v", ok)
+		}
+
 		for b.Loop() {
 			tbl.Contains(worstCaseProbeIP6)
 		}
@@ -704,6 +739,10 @@ func BenchmarkBartWorstCaseMatch6(b *testing.B) {
 		}
 		tbl.Insert(ipv6DefaultRoute, ipv6DefaultRoute.String())
 		tbl.Delete(worstCaseProbePfx6)
+
+		if _, ok := tbl.Lookup(worstCaseProbeIP6); !ok {
+			b.Fatalf("expexted Lookup() == true, got: %v", ok)
+		}
 
 		for b.Loop() {
 			tbl.Lookup(worstCaseProbeIP6)
@@ -744,6 +783,10 @@ func BenchmarkFastWorstCaseMatch6(b *testing.B) {
 			tbl.Insert(p, nil)
 		}
 
+		if ok := tbl.Contains(worstCaseProbeIP6); !ok {
+			b.Fatalf("expexted Contains() == true, got: %v", ok)
+		}
+
 		for b.Loop() {
 			tbl.Contains(worstCaseProbeIP6)
 		}
@@ -756,6 +799,10 @@ func BenchmarkFastWorstCaseMatch6(b *testing.B) {
 		}
 		tbl.Insert(ipv6DefaultRoute, ipv6DefaultRoute.String())
 		tbl.Delete(worstCaseProbePfx6)
+
+		if _, ok := tbl.Lookup(worstCaseProbeIP6); !ok {
+			b.Fatalf("expexted Lookup() == true, got: %v", ok)
+		}
 
 		for b.Loop() {
 			tbl.Lookup(worstCaseProbeIP6)
@@ -798,6 +845,10 @@ func BenchmarkBartWorstCaseMiss6(b *testing.B) {
 
 		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
 
+		if ok := tbl.Contains(worstCaseProbeIP6); ok {
+			b.Fatalf("expexted Contains() == false, got: %v", ok)
+		}
+
 		for b.Loop() {
 			tbl.Contains(worstCaseProbeIP6)
 		}
@@ -810,6 +861,10 @@ func BenchmarkBartWorstCaseMiss6(b *testing.B) {
 		}
 
 		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
+
+		if _, ok := tbl.Lookup(worstCaseProbeIP6); ok {
+			b.Fatalf("expexted Lookup() == false, got: %v", ok)
+		}
 
 		for b.Loop() {
 			tbl.Lookup(worstCaseProbeIP6)
@@ -852,6 +907,10 @@ func BenchmarkFastWorstCaseMiss6(b *testing.B) {
 
 		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
 
+		if ok := tbl.Contains(worstCaseProbeIP6); ok {
+			b.Fatalf("expexted Contains() == false, got: %v", ok)
+		}
+
 		for b.Loop() {
 			tbl.Contains(worstCaseProbeIP6)
 		}
@@ -864,6 +923,10 @@ func BenchmarkFastWorstCaseMiss6(b *testing.B) {
 		}
 
 		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
+
+		if _, ok := tbl.Lookup(worstCaseProbeIP6); ok {
+			b.Fatalf("expexted Lookup() == false, got: %v", ok)
+		}
 
 		for b.Loop() {
 			tbl.Lookup(worstCaseProbeIP6)
