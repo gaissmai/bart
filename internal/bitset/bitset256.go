@@ -16,26 +16,27 @@
 // when explicitly requested (via Bits()).
 package bitset
 
-// can inline (*BitSet256).AlignedPairs with cost 46
+// can inline (*BitSet256).AlignedPairs with cost 54
 // can inline (*BitSet256).All with cost 17
+// can inline (*BitSet256).AllEnumerate with cost 17
+// can inline (*BitSet256).And with cost 53
+// can inline (*BitSet256).AndTop with cost 67
 // can inline (*BitSet256).AppendBits with cost 31
 // can inline (*BitSet256).Bits with cost 66
 // can inline (*BitSet256).Clear with cost 12
 // can inline (*BitSet256).FirstSet with cost 79
-// can inline (*BitSet256).Intersects with cost 48
-// can inline (*BitSet256).Intersection with cost 53
-// can inline (*BitSet256).IntersectionTop with cost 67
 // can inline (*BitSet256).IsEmpty with cost 22
 // can inline (*BitSet256).LastSet with cost 75
 // can inline (*BitSet256).LeftShift with cost 60
 // can inline (*BitSet256).NextSet with cost 65
 // can inline (*BitSet256).OnesCount with cost 28
+// can inline (*BitSet256).Or with cost 53
+// can inline (*BitSet256).Overlaps with cost 48
 // can inline (*BitSet256).Rank with cost 52
 // can inline (*BitSet256).RightShift with cost 60
 // can inline (*BitSet256).Set with cost 12
 // can inline (*BitSet256).Test with cost 15
-// can inline (*BitSet256).Union with cost 36
-// can inline (*BitSet256).Xor with cost 36
+// can inline (*BitSet256).Xor with cost 53
 
 import (
 	"iter"
@@ -276,13 +277,13 @@ func (b *BitSet256) Bits() []uint8 {
 	return b.AppendBits(make([]uint8, 0, b.OnesCount()))
 }
 
-// IntersectionTop computes the intersection of the receiver with c
+// AndTop computes the intersection of the receiver with c
 // and returns the highest (top-most) set bit of the result.
 // If the intersection is non-empty, it returns the top bit index and true.
 // If the intersection is empty, ok is false and top is 0.
 //
 //nolint:gosec  // G115: integer overflow conversion int -> uint8
-func (b *BitSet256) IntersectionTop(c *BitSet256) (top uint8, ok bool) {
+func (b *BitSet256) AndTop(c *BitSet256) (top uint8, ok bool) {
 	// optimized by unrolling the first word check.
 	// This enables compiler inlining and is ~15% faster.
 	if w := b[3] & c[3]; w != 0 {
@@ -367,17 +368,18 @@ func (b *BitSet256) IsEmpty() bool {
 	return b[0]|b[1]|b[2]|b[3] == 0
 }
 
-// Intersects reports whether the receiver and c have at least one bit in common.
-func (b *BitSet256) Intersects(c *BitSet256) bool {
+// Overlaps reports whether the receiver and c have at least one bit in common.
+func (b *BitSet256) Overlaps(c *BitSet256) bool {
 	return b[0]&c[0] != 0 ||
 		b[1]&c[1] != 0 ||
 		b[2]&c[2] != 0 ||
 		b[3]&c[3] != 0
 }
 
-// Intersection returns a new BitSet256 containing only the bits
-// that are set in both the receiver and c (bitwise AND).
-func (b *BitSet256) Intersection(c *BitSet256) (bs BitSet256) {
+// And returns a new [BitSet256] representing the bitwise intersection (AND) of b and c.
+// It performs a component-wise bitwise AND operation across all words and leaves
+// the original receiver unchanged.
+func (b *BitSet256) And(c *BitSet256) (bs BitSet256) {
 	bs[0] = b[0] & c[0]
 	bs[1] = b[1] & c[1]
 	bs[2] = b[2] & c[2]
@@ -385,20 +387,26 @@ func (b *BitSet256) Intersection(c *BitSet256) (bs BitSet256) {
 	return
 }
 
-// Xor sets b to the bitwise XOR of b and c.
-func (b *BitSet256) Xor(c *BitSet256) {
-	b[0] ^= c[0]
-	b[1] ^= c[1]
-	b[2] ^= c[2]
-	b[3] ^= c[3]
+// Xor returns a new [BitSet256] representing the bitwise symmetric difference (XOR) of b and c.
+// It performs a component-wise bitwise XOR operation across all words and leaves
+// the original receiver unchanged.
+func (b *BitSet256) Xor(c *BitSet256) (bs BitSet256) {
+	bs[0] = b[0] ^ c[0]
+	bs[1] = b[1] ^ c[1]
+	bs[2] = b[2] ^ c[2]
+	bs[3] = b[3] ^ c[3]
+	return
 }
 
-// Union sets all bits in the receiver that are set in c (in-place bitwise OR).
-func (b *BitSet256) Union(c *BitSet256) {
-	b[0] |= c[0]
-	b[1] |= c[1]
-	b[2] |= c[2]
-	b[3] |= c[3]
+// Or returns a new [BitSet256] representing the bitwise union (OR) of b and c.
+// It performs a component-wise bitwise OR operation across all words and leaves
+// the original receiver unchanged.
+func (b *BitSet256) Or(c *BitSet256) (bs BitSet256) {
+	bs[0] = b[0] | c[0]
+	bs[1] = b[1] | c[1]
+	bs[2] = b[2] | c[2]
+	bs[3] = b[3] | c[3]
+	return
 }
 
 // OnesCount returns the population count, i.e. the number of set bits.

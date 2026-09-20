@@ -116,7 +116,7 @@ func (n *LiteNode[V]) DeleteChild(addr uint8) (exists bool) {
 // does not use an allotment-based approach. Instead, it performs CBT backtracking
 // using a bitset-based operation with a precomputed backtracking pattern specific to idx.
 func (n *LiteNode[V]) LookupIdx(idx uint8) (top uint8, _ V, ok bool) {
-	top, ok = n.Prefixes.IntersectionTop(&lpm.LookupTbl[idx])
+	top, ok = n.Prefixes.AndTop(&lpm.LookupTbl[idx])
 	return
 }
 
@@ -209,10 +209,10 @@ func (n *LiteNode[V]) AggregateRec(path StridePath, depth int, is4 bool) (modifi
 		}
 
 		// Find all prefixes covered by pfxIdx using the allotment lookup table
-		covered := n.Prefixes.Intersection(&allot.PfxRoutesLookupTbl[pfxIdx])
+		covered := n.Prefixes.And(&allot.PfxRoutesLookupTbl[pfxIdx])
 
 		// Clear all covered prefixes, including pfxIdx itself
-		n.Prefixes.Xor(&covered)
+		n.Prefixes.BitSet256 = n.Prefixes.Xor(&covered)
 
 		// Re-enable cleared pfxIdx
 		n.Prefixes.Set(pfxIdx)
@@ -235,8 +235,8 @@ func (n *LiteNode[V]) AggregateRec(path StridePath, depth int, is4 bool) (modifi
 	var batchAddrs bitset.BitSet256
 	for idx := range n.Prefixes.All() {
 		// Collect child addresses covered by the current prefix using the fringe lookup table
-		covered := n.Children.Intersection(&allot.FringeRoutesLookupTbl[idx])
-		batchAddrs.Union(&covered)
+		covered := n.Children.And(&allot.FringeRoutesLookupTbl[idx])
+		batchAddrs = batchAddrs.Or(&covered)
 	}
 
 	// Batch delete accumulated child nodes
