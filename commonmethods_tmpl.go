@@ -135,7 +135,12 @@ func (f *_TABLE_TYPE[V]) Contains(ip netip.Addr) bool {
 			return true
 
 		case *nodes.LeafNode[V]:
-			return kid.ContainsWithoutZone(ip, is4)
+			if !is4 {
+				// strip the zone unconditionally
+				// see https://github.com/gaissmai/bart/pull/418#issuecomment-5735613506
+				ip = netip.PrefixFrom(ip, 0).Addr()
+			}
+			return kid.Prefix.Contains(ip)
 		}
 	}
 
@@ -189,7 +194,12 @@ LOOP:
 			return kid.Value, true
 
 		case *nodes.LeafNode[V]:
-			if kid.ContainsWithoutZone(ip, is4) {
+			if !is4 {
+				// strip the zone unconditionally
+				// see https://github.com/gaissmai/bart/pull/418#issuecomment-5735613506
+				ip = netip.PrefixFrom(ip, 0).Addr()
+			}
+			if kid.Prefix.Contains(ip) {
 				return kid.Value, true
 			}
 			// reached a path compressed prefix, stop traversing
@@ -303,7 +313,7 @@ LOOP:
 
 		case *nodes.LeafNode[V]:
 			// reached a path compressed prefix, stop traversing
-			if kid.Prefix.Bits() > pfxLen || !kid.ContainsWithoutZone(ip, is4) {
+			if kid.Prefix.Bits() > pfxLen || !kid.Prefix.Contains(ip) {
 				break LOOP
 			}
 			return kid.Prefix, kid.Value, true

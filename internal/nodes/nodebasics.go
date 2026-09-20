@@ -140,15 +140,6 @@ type LeafNode[V any] struct {
 	Prefix netip.Prefix
 }
 
-func (n *LeafNode[V]) ContainsWithoutZone(ip netip.Addr, is4 bool) bool {
-	if !is4 {
-		// strip the zone unconditionally, but netip.Addr().WithZone("") isn't inlineable,
-		// see: https://github.com/gaissmai/bart/pull/418#issuecomment-5735613506
-		ip = netip.PrefixFrom(ip, 0).Addr()
-	}
-	return n.Prefix.Contains(ip)
-}
-
 // NewLeafNode creates a new leaf node with the specified prefix and value.
 func NewLeafNode[V any](pfx netip.Prefix, val V) *LeafNode[V] {
 	return &LeafNode[V]{Prefix: pfx, Value: val}
