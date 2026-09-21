@@ -47,11 +47,20 @@ func (t *Table[V]) sizeUpdate(is4 bool, delta int) {
 // against an allow/deny list, it is often sufficient and a few nanoseconds
 // faster than Lookup.
 //
-// Any zone identifier in ip is ignored and has no effect on the lookup result.
+// Any IPv6 zone identifier is stripped and has no effect on the lookup result.
 func (f *Table[V]) Contains(ip netip.Addr) bool {
 	// speed is top priority: no explicit test for ip.IsValid
 	// if ip is invalid, AsSlice() returns nil, Contains returns false.
 	is4 := ip.Is4()
+
+	// strip the zone unconditionally
+	if !is4 {
+		// netip.Addr.withoutZone  is not exported :-(
+		// netip.Addr.WithZone("") is not inlinable, so we have to resort to this clever trick.
+		// see https://github.com/gaissmai/bart/pull/418#issuecomment-5735613506
+		ip = netip.PrefixFrom(ip, 0).Addr()
+	}
+
 	n := f.rootNodeByVersion(is4)
 
 	for _, octet := range ip.AsSlice() {
@@ -76,11 +85,6 @@ func (f *Table[V]) Contains(ip netip.Addr) bool {
 			return true
 
 		case *nodes.LeafNode[V]:
-			if !is4 {
-				// strip the zone unconditionally
-				// see https://github.com/gaissmai/bart/pull/418#issuecomment-5735613506
-				ip = netip.PrefixFrom(ip, 0).Addr()
-			}
 			return kid.Prefix.Contains(ip)
 		}
 	}
@@ -95,12 +99,19 @@ func (f *Table[V]) Contains(ip netip.Addr) bool {
 // This is the fundamental operation for IP routing decisions, finding the
 // best matching route (the most specific longest prefix) for a destination address.
 //
-// Any zone identifier in ip is ignored and has no effect on the lookup result.
+// Any IPv6 zone identifier is stripped and has no effect on the lookup result.
 func (t *Table[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	is4 := ip.Is4()
 	octets := ip.AsSlice()
-
 	n := t.rootNodeByVersion(is4)
+
+	// strip the zone unconditionally
+	if !is4 {
+		// netip.Addr.withoutZone  is not exported :-(
+		// netip.Addr.WithZone("") is not inlinable, so we have to resort to this clever trick.
+		// see https://github.com/gaissmai/bart/pull/418#issuecomment-5735613506
+		ip = netip.PrefixFrom(ip, 0).Addr()
+	}
 
 	// stack of the traversed nodes for fast backtracking, if needed
 	stack := [nodes.MaxTreeDepth]*nodes.BartNode[V]{}
@@ -135,11 +146,6 @@ LOOP:
 			return kid.Value, true
 
 		case *nodes.LeafNode[V]:
-			if !is4 {
-				// strip the zone unconditionally
-				// see https://github.com/gaissmai/bart/pull/418#issuecomment-5735613506
-				ip = netip.PrefixFrom(ip, 0).Addr()
-			}
 			if kid.Prefix.Contains(ip) {
 				return kid.Value, true
 			}
