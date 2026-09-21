@@ -112,14 +112,6 @@ func (f *_TABLE_TYPE[V]) Contains(ip netip.Addr) bool {
 	// if ip is invalid, AsSlice() returns nil, Contains returns false.
 	is4 := ip.Is4()
 
-	// strip the zone unconditionally
-	if !is4 {
-		// netip.Addr.withoutZone  is not exported :-(
-		// netip.Addr.WithZone("") is not inlinable, so we have to resort to this clever trick.
-		// see https://github.com/gaissmai/bart/pull/418#issuecomment-5735613506
-		ip = netip.PrefixFrom(ip, 0).Addr()
-	}
-
 	n := f.rootNodeByVersion(is4)
 
 	for _, octet := range ip.AsSlice() {
@@ -144,6 +136,14 @@ func (f *_TABLE_TYPE[V]) Contains(ip netip.Addr) bool {
 			return true
 
 		case *nodes.LeafNode[V]:
+			// Strip IPv6 zone before netip.Prefix.Contains to prevent false returns.
+			if !is4 {
+				// but netip.Addr.withoutZone  is not exported :-(
+				// and netip.Addr.WithZone("") is not inlinable, so we have to resort to this clever trick:
+				// https://github.com/gaissmai/bart/pull/418#issuecomment-5735613506
+				ip = netip.PrefixFrom(ip, 0).Addr()
+			}
+
 			return kid.Prefix.Contains(ip)
 		}
 	}
@@ -163,14 +163,6 @@ func (t *_TABLE_TYPE[V]) Lookup(ip netip.Addr) (val V, ok bool) {
 	is4 := ip.Is4()
 	octets := ip.AsSlice()
 	n := t.rootNodeByVersion(is4)
-
-	// strip the zone unconditionally
-	if !is4 {
-		// netip.Addr.withoutZone  is not exported :-(
-		// netip.Addr.WithZone("") is not inlinable, so we have to resort to this clever trick.
-		// see https://github.com/gaissmai/bart/pull/418#issuecomment-5735613506
-		ip = netip.PrefixFrom(ip, 0).Addr()
-	}
 
 	// stack of the traversed nodes for fast backtracking, if needed
 	stack := [nodes.MaxTreeDepth]*nodes._NODE_TYPE[V]{}
@@ -205,6 +197,14 @@ LOOP:
 			return kid.Value, true
 
 		case *nodes.LeafNode[V]:
+			// Strip IPv6 zone before netip.Prefix.Contains to prevent false returns.
+			if !is4 {
+				// but netip.Addr.withoutZone  is not exported :-(
+				// and netip.Addr.WithZone("") is not inlinable, so we have to resort to this clever trick:
+				// https://github.com/gaissmai/bart/pull/418#issuecomment-5735613506
+				ip = netip.PrefixFrom(ip, 0).Addr()
+			}
+
 			if kid.Prefix.Contains(ip) {
 				return kid.Value, true
 			}
