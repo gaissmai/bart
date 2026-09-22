@@ -719,6 +719,11 @@ func TestTable_All(t *testing.T) {
 				} else if val != wantVal {
 					t.Errorf("All(): want: %v, got: %v", wantVal, val)
 				}
+				delete(tt.want, pfx)
+			}
+
+			if len(tt.want) != 0 {
+				t.Error("All(): not all items iterated")
 			}
 		})
 	}
