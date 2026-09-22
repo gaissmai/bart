@@ -1322,15 +1322,15 @@ func (n *_NODE_TYPE[V]) DirectItemsRec(parentIdx uint8, path StridePath, depth i
 	for idx, val := range n.AllIndices() {
 		// tricky part, skip self
 		// test with next possible lpm (idx>>1), it's a complete binary tree
-		nextIdx := idx >> 1
+		prevIdx := idx >> 1
 
 		// fast skip, lpm not possible
-		if nextIdx < parentIdx {
+		if prevIdx < parentIdx {
 			continue
 		}
 
 		// do a longest-prefix-match
-		lpm, _, _ := n.LookupIdx(nextIdx)
+		lpm, _, _ := n.LookupIdx(prevIdx)
 
 		// be aware, 0 is here a possible value for parentIdx and lpm (if not found)
 		if lpm == parentIdx {
