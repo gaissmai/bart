@@ -223,9 +223,10 @@ func (n *FastACLNode[V]) CloneFlat(_ func(V) V) *FastACLNode[V] {
 	c := new(FastACLNode[V])
 
 	// copy simple values
-	c.childRankCache = n.childRankCache
-	c.Prefixes = n.Prefixes
 	c.Fringes = n.Fringes
+	c.Prefixes = n.Prefixes
+	c.prefixCount = n.prefixCount
+	c.childRankCache = n.childRankCache
 
 	// sparse array
 	c.Children = *(n.Children.Copy())
