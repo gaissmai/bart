@@ -75,6 +75,61 @@ func TestTable_Equal(t *testing.T) {
 	}
 }
 
+type equalSlice []int
+
+func (v equalSlice) Equal(other equalSlice) bool {
+	return slices.Equal(v, other)
+}
+
+func TestTable_EqualCustom(t *testing.T) {
+	t.Parallel()
+
+	prefixA := mpp("192.168.1.0/24")
+	prefixB := mpp("10.0.0.0/8")
+
+	tests := []struct {
+		name string
+		ta   Table[equalSlice]
+		tb   Table[equalSlice]
+		want bool
+	}{
+		{
+			name: "equal non-comparable values",
+			ta:   Table[equalSlice]{prefixA: {1, 2, 3}},
+			tb:   Table[equalSlice]{prefixA: {1, 2, 3}},
+			want: true,
+		},
+		{
+			name: "different non-comparable values",
+			ta:   Table[equalSlice]{prefixA: {1, 2, 3}},
+			tb:   Table[equalSlice]{prefixA: {1, 2, 4}},
+			want: false,
+		},
+		{
+			name: "nil and empty slices are custom-equal",
+			ta: Table[equalSlice]{
+				prefixA: nil,
+				prefixB: {1, 2},
+			},
+			tb: Table[equalSlice]{
+				prefixA: {},
+				prefixB: {1, 2},
+			},
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := tt.ta.Equal(tt.tb); got != tt.want {
+				t.Errorf("Table.Equal() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestTable_FlatSorted(t *testing.T) {
 	t.Parallel()
 
