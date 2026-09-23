@@ -134,7 +134,7 @@ func CmpPrefix(a, b netip.Prefix) int {
 
 // LeafNode represents a path-compressed routing entry that stores both prefix and value.
 // Leaf nodes are used when a prefix doesn't align with trie stride boundaries
-// and needs to be stored as a compressed path to save memory.
+// and needs to be stored as a compressed path to save memory and lookup time.
 type LeafNode[V any] struct {
 	Value  V
 	Prefix netip.Prefix
@@ -143,6 +143,13 @@ type LeafNode[V any] struct {
 // NewLeafNode creates a new leaf node with the specified prefix and value.
 func NewLeafNode[V any](pfx netip.Prefix, val V) *LeafNode[V] {
 	return &LeafNode[V]{Prefix: pfx, Value: val}
+}
+
+// CIDRLeaf represents a path-compressed routing entry that stores the prefix.
+// Leaf nodes are used when a prefix doesn't align with trie stride boundaries
+// and needs to be stored as a compressed path to save memory and lookup time.
+type CIDRLeaf struct {
+	Prefix netip.Prefix
 }
 
 // FringeNode represents a path-compressed routing entry that stores only a value.
@@ -157,6 +164,9 @@ type FringeNode[V any] struct {
 func NewFringeNode[V any](val V) *FringeNode[V] {
 	return &FringeNode[V]{Value: val}
 }
+
+// TODO: delete it, only needed during refactoring.
+type FringeLeaf struct{}
 
 // IsFringe determines whether a prefix qualifies as a "FringeNode".
 // Only prefixes that are stride-aligned (i.e., /8, /16, ..., /128)
@@ -334,4 +344,16 @@ func (l *FringeNode[V]) CloneFringe(cloneFn func(V) V) *FringeNode[V] {
 		return &FringeNode[V]{Value: l.Value}
 	}
 	return &FringeNode[V]{Value: cloneFn(l.Value)}
+}
+
+// Len256 returns the number of decimal digits for a int (0 to 256).
+func Len256(n int) int {
+	switch {
+	case n < 10:
+		return 1
+	case n < 100:
+		return 2
+	default:
+		return 3
+	}
 }
