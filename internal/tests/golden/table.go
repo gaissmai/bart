@@ -70,9 +70,22 @@ func (t TableSlice[V]) SortKeys() []netip.Prefix {
 }
 
 // Equal reports whether ta and tb contain the exact same set of key-value pairs.
-// Values are compared using equality (==) via dynamic interface boxing.
+//
+// If V implements an `Equal(V) bool` method, its custom equality logic is used.
+// Otherwise, values are compared directly using the == operator.
+//
+// If V is not comparable at runtime (such as a slice or map without an Equal
+// method), a runtime panic will occur.
+//
+// Note: If V implements Equal(V) bool with a pointer receiver, the Equal
+// method should handle nil receivers gracefully.
 func (ta Table[V]) Equal(tb Table[V]) bool {
-	return maps.EqualFunc(ta, tb, func(v1, v2 V) bool { return any(v1) == any(v2) })
+	return maps.EqualFunc(ta, tb, func(v1, v2 V) bool {
+		if eq1, ok := any(v1).(interface{ Equal(V) bool }); ok {
+			return eq1.Equal(v2)
+		}
+		return any(v1) == any(v2)
+	})
 }
 
 // Insert adds or updates a prefix-value mapping in the table.
