@@ -8,6 +8,7 @@ import (
 	"io"
 	"iter"
 	"net/netip"
+	"strings"
 	"sync"
 
 	"github.com/gaissmai/bart/internal/art"
@@ -35,23 +36,19 @@ func (f *FastACL) rootNodeByVersion(is4 bool) *nodes.FastACLNode {
 	return &f.root6
 }
 
-func (t *FastACL) sizeUpdate(is4 bool, delta int) {
+func (f *FastACL) sizeUpdate(is4 bool, delta int) {
 	if is4 {
-		t.size4 += delta
+		f.size4 += delta
 		return
 	}
-	t.size6 += delta
+	f.size6 += delta
 }
 
 // Contains reports whether any stored prefix covers the given IP address.
 // It returns false for invalid IP addresses.
 //
 // This method performs longest-prefix matching and returns true if any prefix
-// in the routing table contains the IP address, regardless of the associated value.
-//
-// It does not return the value or prefix of the matching item, but as a test
-// against an allow/deny list, it is often sufficient and a few nanoseconds
-// faster than Lookup.
+// in the routing table contains the IP address.
 //
 // Any IPv6 zone identifier is stripped and has no effect on the lookup result.
 func (f *FastACL) Contains(ip netip.Addr) bool {
@@ -62,7 +59,7 @@ func (f *FastACL) Contains(ip netip.Addr) bool {
 	n := f.rootNodeByVersion(is4)
 
 	for _, octet := range ip.AsSlice() {
-		// for contains, any lpm match is good enough, no backtracking needed
+		// for contains, any lpm match is good enough, no lpm backtracking needed
 		if n.PrefixCount() != 0 && n.Contains(art.OctetToIdx(octet)) {
 			return true
 		}
@@ -79,7 +76,7 @@ func (f *FastACL) Contains(ip netip.Addr) bool {
 		kid := n.MustGetChild(octet)
 
 		// kid is leaf
-		if leaf, ok := kid.(*nodes.LeafNodeACL); ok {
+		if leaf, ok := kid.(*nodes.CIDRLeaf); ok {
 			// Strip IPv6 zone before netip.Prefix.Contains to prevent false returns.
 			if !is4 {
 				// but netip.Addr.withoutZone  is not exported :-(
@@ -106,8 +103,8 @@ func (f *FastACL) Contains(ip netip.Addr) bool {
 //
 // Returns the value and true if a matching prefix is found.
 // Returns zero value and false if no match exists.
-func (t *FastACL) LookupPrefix(pfx netip.Prefix) (ok bool) {
-	_, ok = t.lookupPrefixLPM(pfx, false)
+func (f *FastACL) LookupPrefix(pfx netip.Prefix) (ok bool) {
+	_, ok = f.lookupPrefixLPM(pfx, false)
 	return ok
 }
 
@@ -123,11 +120,11 @@ func (t *FastACL) LookupPrefix(pfx netip.Prefix) (ok bool) {
 //
 // Returns the matching prefix, its associated value, and true if found.
 // Returns zero values and false if no match exists.
-func (t *FastACL) LookupPrefixLPM(pfx netip.Prefix) (lpmPfx netip.Prefix, ok bool) {
-	return t.lookupPrefixLPM(pfx, true)
+func (f *FastACL) LookupPrefixLPM(pfx netip.Prefix) (lpmPfx netip.Prefix, ok bool) {
+	return f.lookupPrefixLPM(pfx, true)
 }
 
-func (t *FastACL) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpmPfx netip.Prefix, ok bool) {
+func (f *FastACL) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpmPfx netip.Prefix, ok bool) {
 	panic("TODO")
 
 	if !pfx.IsValid() {
@@ -143,7 +140,7 @@ func (t *FastACL) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpmPfx netip.
 	octets := ip.AsSlice()
 	strideCount, modBits := nodes.DivMod8(pfxLen)
 
-	n := t.rootNodeByVersion(is4)
+	n := f.rootNodeByVersion(is4)
 
 	// record path to leaf node
 	stack := [nodes.MaxTreeDepth]*nodes.FastACLNode{}
@@ -176,14 +173,14 @@ LOOP:
 			n = kid
 			continue LOOP // descend down to next trie level
 
-		case *nodes.LeafNodeACL:
+		case *nodes.CIDRLeaf:
 			// reached a path compressed prefix, stop traversing
 			if kid.Prefix.Bits() > pfxLen || !kid.Prefix.Contains(ip) {
 				break LOOP
 			}
 			return kid.Prefix, true
 
-		case *nodes.FringeNodeACL:
+		case *nodes.FringeLeaf:
 			// the bits of the fringe are defined by the depth
 			// maybe the LPM isn't needed, saves some cycles
 			fringeBits := (depth + 1) << 3
@@ -255,7 +252,7 @@ LOOP:
 //
 // The prefix is automatically canonicalized using pfx.Masked() to ensure
 // consistent behavior regardless of host bits in the input.
-func (t *FastACL) Insert(pfx netip.Prefix) {
+func (f *FastACL) Insert(pfx netip.Prefix) {
 	if !pfx.IsValid() {
 		return
 	}
@@ -264,14 +261,14 @@ func (t *FastACL) Insert(pfx netip.Prefix) {
 	pfx = pfx.Masked()
 
 	is4 := pfx.Addr().Is4()
-	n := t.rootNodeByVersion(is4)
+	n := f.rootNodeByVersion(is4)
 
 	if exists := n.Insert(pfx, 0); exists {
 		return
 	}
 
 	// true insert, update size
-	t.sizeUpdate(is4, 1)
+	f.sizeUpdate(is4, 1)
 }
 
 // Delete removes the exact prefix pfx from the table in-place.
@@ -280,7 +277,7 @@ func (t *FastACL) Insert(pfx netip.Prefix) {
 // removed. If pfx does not exist or pfx is invalid, the table is left unchanged.
 //
 // The prefix is canonicalized (Masked) before lookup.
-func (t *FastACL) Delete(pfx netip.Prefix) {
+func (f *FastACL) Delete(pfx netip.Prefix) {
 	if !pfx.IsValid() {
 		return
 	}
@@ -289,9 +286,9 @@ func (t *FastACL) Delete(pfx netip.Prefix) {
 	pfx = pfx.Masked()
 	is4 := pfx.Addr().Is4()
 
-	n := t.rootNodeByVersion(is4)
+	n := f.rootNodeByVersion(is4)
 	if exists := n.Delete(pfx); exists {
-		t.sizeUpdate(is4, -1)
+		f.sizeUpdate(is4, -1)
 	}
 }
 
@@ -306,7 +303,7 @@ func (t *FastACL) Delete(pfx netip.Prefix) {
 //
 // For longest-prefix-match (LPM) lookups, use Contains(ip), Lookup(ip),
 // LookupPrefix(pfx) or LookupPrefixLPM(pfx) instead.
-func (t *FastACL) Get(pfx netip.Prefix) (exists bool) {
+func (f *FastACL) Get(pfx netip.Prefix) (exists bool) {
 	if !pfx.IsValid() {
 		return exists
 	}
@@ -314,7 +311,7 @@ func (t *FastACL) Get(pfx netip.Prefix) (exists bool) {
 	pfx = pfx.Masked()
 
 	is4 := pfx.Addr().Is4()
-	n := t.rootNodeByVersion(is4)
+	n := f.rootNodeByVersion(is4)
 
 	return n.Get(pfx)
 }
@@ -339,7 +336,7 @@ func (t *FastACL) Get(pfx netip.Prefix) (exists bool) {
 //
 // The iteration can be stopped early by breaking from the range loop.
 // Returns an empty iterator if the prefix is invalid.
-func (t *FastACL) Supernets(pfx netip.Prefix) iter.Seq[netip.Prefix] {
+func (f *FastACL) Supernets(pfx netip.Prefix) iter.Seq[netip.Prefix] {
 	return func(yield func(netip.Prefix) bool) {
 		if !pfx.IsValid() {
 			return
@@ -349,7 +346,7 @@ func (t *FastACL) Supernets(pfx netip.Prefix) iter.Seq[netip.Prefix] {
 		pfx = pfx.Masked()
 
 		is4 := pfx.Addr().Is4()
-		n := t.rootNodeByVersion(is4)
+		n := f.rootNodeByVersion(is4)
 
 		n.Supernets(pfx, yield)
 	}
@@ -368,7 +365,7 @@ func (t *FastACL) Supernets(pfx netip.Prefix) iter.Seq[netip.Prefix] {
 //
 // The iteration can be stopped early by breaking from the range loop.
 // Returns an empty iterator if the prefix is invalid.
-func (t *FastACL) Subnets(pfx netip.Prefix) iter.Seq[netip.Prefix] {
+func (f *FastACL) Subnets(pfx netip.Prefix) iter.Seq[netip.Prefix] {
 	return func(yield func(netip.Prefix) bool) {
 		if !pfx.IsValid() {
 			return
@@ -377,9 +374,22 @@ func (t *FastACL) Subnets(pfx netip.Prefix) iter.Seq[netip.Prefix] {
 		pfx = pfx.Masked()
 		is4 := pfx.Addr().Is4()
 
-		n := t.rootNodeByVersion(is4)
+		n := f.rootNodeByVersion(is4)
 		n.Subnets(pfx, yield)
 	}
+}
+
+// Clone returns a deep copy of the ACL.
+func (f *FastACL) Clone() *FastACL {
+	c := new(FastACL)
+
+	c.root4 = *f.root4.CloneRec()
+	c.root6 = *f.root6.CloneRec()
+
+	c.size4 = f.size4
+	c.size6 = f.size6
+
+	return c
 }
 
 // OverlapsPrefix reports whether any prefix in the routing table overlaps with
@@ -393,7 +403,7 @@ func (t *FastACL) Subnets(pfx netip.Prefix) iter.Seq[netip.Prefix] {
 //
 // This is useful for containment tests, route validation, or policy checks using prefix
 // semantics without retrieving exact matches.
-func (t *FastACL) OverlapsPrefix(pfx netip.Prefix) bool {
+func (f *FastACL) OverlapsPrefix(pfx netip.Prefix) bool {
 	if !pfx.IsValid() {
 		return false
 	}
@@ -402,7 +412,7 @@ func (t *FastACL) OverlapsPrefix(pfx netip.Prefix) bool {
 	pfx = pfx.Masked()
 
 	is4 := pfx.Addr().Is4()
-	n := t.rootNodeByVersion(is4)
+	n := f.rootNodeByVersion(is4)
 
 	return n.OverlapsPrefixAtDepth(pfx, 0)
 }
@@ -419,40 +429,40 @@ func (t *FastACL) OverlapsPrefix(pfx netip.Prefix) bool {
 //
 // This is useful for conflict detection, policy enforcement,
 // or validating mutually exclusive routing domains.
-func (t *FastACL) Overlaps(o *FastACL) bool {
-	return t.Overlaps4(o) || t.Overlaps6(o)
+func (f *FastACL) Overlaps(o *FastACL) bool {
+	return f.Overlaps4(o) || f.Overlaps6(o)
 }
 
 // Overlaps4 is like [liteTable.Overlaps] but for the v4 routing table only.
-func (t *FastACL) Overlaps4(o *FastACL) bool {
-	if t.size4 == 0 || o.size4 == 0 {
+func (f *FastACL) Overlaps4(o *FastACL) bool {
+	if f.size4 == 0 || o.size4 == 0 {
 		return false
 	}
-	return t.root4.Overlaps(&o.root4, 0)
+	return f.root4.Overlaps(&o.root4, 0)
 }
 
 // Overlaps6 is like [liteTable.Overlaps] but for the v6 routing table only.
-func (t *FastACL) Overlaps6(o *FastACL) bool {
-	if t.size6 == 0 || o.size6 == 0 {
+func (f *FastACL) Overlaps6(o *FastACL) bool {
+	if f.size6 == 0 || o.size6 == 0 {
 		return false
 	}
-	return t.root6.Overlaps(&o.root6, 0)
+	return f.root6.Overlaps(&o.root6, 0)
 }
 
 // Aggregate compresses the table in-place by merging overlapping
 // and adjacent IP prefixes into their minimal covering CIDR blocks.
-func (l *FastACL) Aggregate() {
-	mod4 := l.root4.AggregateRec(nodes.StridePath{}, 0, true)
-	mod6 := l.root6.AggregateRec(nodes.StridePath{}, 0, false)
+func (f *FastACL) Aggregate() {
+	mod4 := f.root4.AggregateRec(nodes.StridePath{}, 0, true)
+	mod6 := f.root6.AggregateRec(nodes.StridePath{}, 0, false)
 
 	if mod4 != 0 {
-		stats := l.root4.StatsRec()
-		l.size4 = stats.Prefixes + stats.Leaves + stats.Fringes
+		stats := f.root4.StatsRec()
+		f.size4 = stats.Prefixes + stats.Leaves + stats.Fringes
 	}
 
 	if mod6 != 0 {
-		stats := l.root6.StatsRec()
-		l.size6 = stats.Prefixes + stats.Leaves + stats.Fringes
+		stats := f.root6.StatsRec()
+		f.size6 = stats.Prefixes + stats.Leaves + stats.Fringes
 	}
 }
 
@@ -468,30 +478,30 @@ func (l *FastACL) Aggregate() {
 //
 // ATTENTION: If V is not comparable at runtime (such as a slice or map without an `Equal`
 // method), a runtime panic will occur.
-func (t *FastACL) Equal(o *FastACL) bool {
-	if t.size4 != o.size4 || t.size6 != o.size6 {
+func (f *FastACL) Equal(o *FastACL) bool {
+	if f.size4 != o.size4 || f.size6 != o.size6 {
 		return false
 	}
-	if o == t {
+	if o == f {
 		return true
 	}
 
-	return t.root4.EqualRec(&o.root4) && t.root6.EqualRec(&o.root6)
+	return f.root4.EqualRec(&o.root4) && f.root6.EqualRec(&o.root6)
 }
 
 // Size returns the prefix count.
-func (t *FastACL) Size() int {
-	return t.size4 + t.size6
+func (f *FastACL) Size() int {
+	return f.size4 + f.size6
 }
 
 // Size4 returns the IPv4 prefix count.
-func (t *FastACL) Size4() int {
-	return t.size4
+func (f *FastACL) Size4() int {
+	return f.size4
 }
 
 // Size6 returns the IPv6 prefix count.
-func (t *FastACL) Size6() int {
-	return t.size6
+func (f *FastACL) Size6() int {
+	return f.size6
 }
 
 // All returns an iterator over all prefix–value pairs in the table.
@@ -502,46 +512,46 @@ func (t *FastACL) Size6() int {
 // IMPORTANT: Modifying the table during iteration is not allowed,
 // as this would interfere with the internal traversal and may corrupt or
 // prematurely terminate the iteration.
-func (t *FastACL) All() iter.Seq[netip.Prefix] {
+func (f *FastACL) All() iter.Seq[netip.Prefix] {
 	return func(yield func(netip.Prefix) bool) {
-		_ = t.root4.AllRec(stridePath{}, 0, true, yield) && t.root6.AllRec(stridePath{}, 0, false, yield)
+		_ = f.root4.AllRec(stridePath{}, 0, true, yield) && f.root6.AllRec(stridePath{}, 0, false, yield)
 	}
 }
 
 // All4 is like [liteTable.All] but only for the v4 routing table.
-func (t *FastACL) All4() iter.Seq[netip.Prefix] {
+func (f *FastACL) All4() iter.Seq[netip.Prefix] {
 	return func(yield func(netip.Prefix) bool) {
-		_ = t.root4.AllRec(stridePath{}, 0, true, yield)
+		_ = f.root4.AllRec(stridePath{}, 0, true, yield)
 	}
 }
 
 // All6 is like [liteTable.All] but only for the v6 routing table.
-func (t *FastACL) All6() iter.Seq[netip.Prefix] {
+func (f *FastACL) All6() iter.Seq[netip.Prefix] {
 	return func(yield func(netip.Prefix) bool) {
-		_ = t.root6.AllRec(stridePath{}, 0, false, yield)
+		_ = f.root6.AllRec(stridePath{}, 0, false, yield)
 	}
 }
 
 // AllSorted is like [liteTable.All] but the iteration is ordered in canonical
 // CIDR prefix sort order.
-func (t *FastACL) AllSorted() iter.Seq[netip.Prefix] {
+func (f *FastACL) AllSorted() iter.Seq[netip.Prefix] {
 	return func(yield func(netip.Prefix) bool) {
-		_ = t.root4.AllRecSorted(stridePath{}, 0, true, yield) &&
-			t.root6.AllRecSorted(stridePath{}, 0, false, yield)
+		_ = f.root4.AllRecSorted(stridePath{}, 0, true, yield) &&
+			f.root6.AllRecSorted(stridePath{}, 0, false, yield)
 	}
 }
 
 // AllSorted4 is like [liteTable.AllSorted] but only for the v4 routing table.
-func (t *FastACL) AllSorted4() iter.Seq[netip.Prefix] {
+func (f *FastACL) AllSorted4() iter.Seq[netip.Prefix] {
 	return func(yield func(netip.Prefix) bool) {
-		_ = t.root4.AllRecSorted(stridePath{}, 0, true, yield)
+		_ = f.root4.AllRecSorted(stridePath{}, 0, true, yield)
 	}
 }
 
 // AllSorted6 is like [liteTable.AllSorted] but only for the v6 routing table.
-func (t *FastACL) AllSorted6() iter.Seq[netip.Prefix] {
+func (f *FastACL) AllSorted6() iter.Seq[netip.Prefix] {
 	return func(yield func(netip.Prefix) bool) {
-		_ = t.root6.AllRecSorted(stridePath{}, 0, false, yield)
+		_ = f.root6.AllRecSorted(stridePath{}, 0, false, yield)
 	}
 }
 
@@ -567,18 +577,18 @@ func (t *FastACL) AllSorted6() iter.Seq[netip.Prefix] {
 //	   ├─ 2000::/3 (V)
 //	   │  └─ 2001:db8::/32 (V)
 //	   └─ fe80::/10 (V)
-func (t *FastACL) Fprint(w io.Writer) error {
-	if w == nil && t != nil {
+func (f *FastACL) Fprint(w io.Writer) error {
+	if w == nil && f != nil {
 		return fmt.Errorf("nil writer")
 	}
 
 	// v4
-	if err := t.fprint(w, true); err != nil {
+	if err := f.fprint(w, true); err != nil {
 		return err
 	}
 
 	// v6
-	if err := t.fprint(w, false); err != nil {
+	if err := f.fprint(w, false); err != nil {
 		return err
 	}
 
@@ -586,8 +596,8 @@ func (t *FastACL) Fprint(w io.Writer) error {
 }
 
 // fprint is the version dependent adapter to fprintRec.
-func (t *FastACL) fprint(w io.Writer, is4 bool) error {
-	n := t.rootNodeByVersion(is4)
+func (f *FastACL) fprint(w io.Writer, is4 bool) error {
+	n := f.rootNodeByVersion(is4)
 	if n.IsEmpty() {
 		return nil
 	}
@@ -607,22 +617,30 @@ func (t *FastACL) fprint(w io.Writer, is4 bool) error {
 }
 
 // dump the table structure and all the nodes to w.
-func (t *FastACL) dump(w io.Writer) {
-	if t.size4 > 0 {
-		stats := t.root4.StatsRec()
+func (f *FastACL) dump(w io.Writer) {
+	if f.size4 > 0 {
+		stats := f.root4.StatsRec()
 		fmt.Fprintln(w)
-		fmt.Fprintf(w, "### IPv4: size(%d), subnodes(%d), prefixes(%d), leaves(%d), fringes(%d)",
-			t.size4, stats.SubNodes, stats.Prefixes, stats.Leaves, stats.Fringes)
+		fmt.Fprintf(w, "### IPv4: size(%d), subnodes(%d), prefixes(%d), fringes(%d), leaves(%d)",
+			f.size4, stats.SubNodes, stats.Prefixes, stats.Fringes, stats.Leaves)
 
-		t.root4.DumpRec(w, stridePath{}, 0, true)
+		f.root4.DumpRec(w, stridePath{}, 0, true)
 	}
 
-	if t.size6 > 0 {
-		stats := t.root6.StatsRec()
+	if f.size6 > 0 {
+		stats := f.root6.StatsRec()
 		fmt.Fprintln(w)
-		fmt.Fprintf(w, "### IPv6: size(%d), subnodes(%d), prefixes(%d), leaves(%d), fringes(%d)",
-			t.size6, stats.SubNodes, stats.Prefixes, stats.Leaves, stats.Fringes)
+		fmt.Fprintf(w, "### IPv6: size(%d), subnodes(%d), prefixes(%d), fringes(%d), leaves(%d)",
+			f.size6, stats.SubNodes, stats.Prefixes, stats.Fringes, stats.Leaves)
 
-		t.root6.DumpRec(w, stridePath{}, 0, false)
+		f.root6.DumpRec(w, stridePath{}, 0, false)
 	}
+}
+
+// dumpString is just a wrapper for dump.
+func (f *FastACL) dumpString() string {
+	w := new(strings.Builder)
+	f.dump(w)
+
+	return w.String()
 }
