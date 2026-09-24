@@ -606,14 +606,11 @@ func (f *FastACL) fprint(w io.Writer, is4 bool) error {
 		return err
 	}
 
-	startParent := nodes.TrieItemACL{
-		Node: nil,
-		Idx:  0,
-		Path: stridePath{},
-		Is4:  is4,
+	startCtx := nodes.PathContext{
+		Is4: is4,
 	}
 
-	return n.FprintRec(w, startParent, "")
+	return n.FprintRec(w, startCtx, "")
 }
 
 // dump the table structure and all the nodes to w.

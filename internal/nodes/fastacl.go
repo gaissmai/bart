@@ -25,7 +25,7 @@ import (
 // overhead of managing the cache.
 // FastACLNode also uses a Fringes bitset. Fringes are not stored
 // in the Children sparse.Array256, since Fringes don't carry a payload
-// so this optimization for speed is possible TODO ...
+// so this optimization for speed is possible.
 type FastACLNode struct {
 	Prefixes bitset.BitSet256
 	Fringes  bitset.BitSet256
@@ -1111,154 +1111,6 @@ func (n *FastACLNode) StatsRec() (s StatsT) {
 	return s
 }
 
-// TrieItemACL, TODO
-type TrieItemACL struct {
-	// for traversing, Path/Depth/Idx is needed to get the CIDR back from the trie.
-	Node  any // BartNode, FastNode, LiteNode
-	Is4   bool
-	Path  StridePath
-	Depth int
-	Idx   uint8
-
-	// for printing
-	Cidr netip.Prefix
-}
-
-// FprintRec recursively prints a hierarchical CIDR tree representation
-// starting from this node to the provided writer. The output shows the
-// routing table structure in human-readable format for debugging and analysis.
-func (n *FastACLNode) FprintRec(w io.Writer, parent TrieItemACL, pad string) error {
-	panic("TODO")
-
-	// recursion stop condition
-	if n == nil || n.IsEmpty() {
-		return nil
-	}
-
-	// get direct covered childs for this parent ...
-	directItems := n.DirectItemsRec(parent.Idx, parent.Path, parent.Depth, parent.Is4)
-
-	// sort them by netip.Prefix, not by baseIndex
-	slices.SortFunc(directItems, func(a, b TrieItemACL) int {
-		return CmpPrefix(a.Cidr, b.Cidr)
-	})
-
-	// for all direct item under this node ...
-	for i, item := range directItems {
-		// symbols used in tree
-		glyph := "├─ "
-		space := "│  "
-
-		// ... treat last kid special
-		if i == len(directItems)-1 {
-			glyph = "└─ "
-			space = "   "
-		}
-
-		var err error
-		_, err = fmt.Fprintf(w, "%s%s\n", pad+glyph, item.Cidr)
-
-		if err != nil {
-			return err
-		}
-
-		// rec-descent with this item as parent
-		nextNode, _ := item.Node.(*FastACLNode)
-		if err = nextNode.FprintRec(w, item, pad+space); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// DirectItemsRec, returns the direct covered items by parent.
-// It's a complex recursive function, you have to know the data structure
-// by heart to understand this function!
-func (n *FastACLNode) DirectItemsRec(parentIdx uint8, path StridePath, depth int, is4 bool) (directItems []TrieItemACL) {
-	panic("TODO")
-
-	// recursion stop condition
-	if n == nil || n.IsEmpty() {
-		return nil
-	}
-
-	// prefixes:
-	// for all idx's (prefixes mapped by baseIndex) in this node
-	// do a longest-prefix-match
-	for idx := range n.Prefixes.All() {
-		// tricky part, skip self
-		// test with next possible lpm (idx>>1), it's a complete binary tree
-		nextIdx := idx >> 1
-
-		// fast skip, lpm not possible
-		if nextIdx < parentIdx {
-			continue
-		}
-
-		// do a longest-prefix-match
-		lpm, _ := n.LookupIdx(nextIdx)
-
-		// be aware, 0 is here a possible value for parentIdx and lpm (if not found)
-		if lpm == parentIdx {
-			// prefix is directly covered by parent
-
-			item := TrieItemACL{
-				Node:  n,
-				Is4:   is4,
-				Path:  path,
-				Depth: depth,
-				Idx:   idx,
-				// get the prefix back from trie
-				Cidr: CidrFromPath(path, depth, is4, idx),
-			}
-
-			directItems = append(directItems, item)
-		}
-	}
-
-	// children:
-	for addr, child := range n.AllChildren() {
-		hostIdx := art.OctetToIdx(addr)
-
-		// do a longest-prefix-match
-		lpm, _ := n.LookupIdx(hostIdx)
-
-		// be aware, 0 is here a possible value for parentIdx and lpm (if not found)
-		if lpm == parentIdx {
-			// child is directly covered by parent
-			switch kid := child.(type) {
-			case *FastACLNode: // traverse rec-descent, call with next child node,
-				// next trie level, set parentIdx to 0, adjust path and depth
-				path[depth] = addr
-				directItems = append(directItems, kid.DirectItemsRec(0, path, depth+1, is4)...)
-
-			case *CIDRLeaf: // path-compressed child, stops recursion for this child
-				item := TrieItemACL{
-					Node: nil,
-					Is4:  is4,
-					Cidr: kid.Prefix,
-				}
-				directItems = append(directItems, item)
-
-			case *FringeLeaf: // path-compressed fringe, stops recursion for this child
-				item := TrieItemACL{
-					Node: nil,
-					Is4:  is4,
-					// get the prefix back from trie
-					Cidr: CidrForFringe(path[:], depth, is4, addr),
-				}
-				directItems = append(directItems, item)
-
-			default:
-				panic("logic error, wrong node type")
-			}
-		}
-	}
-
-	return directItems
-}
-
 // AllRec recursively traverses the trie starting at the current node,
 // applying the provided yield function to every stored prefix and value.
 //
@@ -2079,4 +1931,272 @@ func (n *FastACLNode) OverlapsTwoChildren(nChild, oChild any, depth int) bool {
 	default:
 		panic("logic error, wrong node type combination")
 	}
+}
+
+// PathContext encapsulates the active traversal state, stride history,
+// and bit index required during recursive trie evaluation.
+//
+// It tracks path segments across stride boundaries while maintaining
+// the active CBT (Complete Binary Tree) index within local nodes.
+type PathContext struct {
+	Path  StridePath
+	Depth int
+	Idx   uint8
+	Is4   bool
+}
+
+// HierarchyItem represents a structural node or fringe boundary within
+// the longest-prefix match (LPM) containment tree.
+//
+// It decouples the visual output representation from the internal trie traversal state:
+//   - Cidr holds the reconstructed netip.Prefix for rendering.
+//   - NextNode points to downstream subtrees (*FastACLNode or *CIDRLeaf)
+//     or is nil if this item represents a terminal prefix.
+//   - NextCtx holds the pre-computed PathContext for the next recursion step.
+type HierarchyItem struct {
+	Cidr     netip.Prefix
+	NextNode any         // *FastACLNode or *CIDRLeaf (nil for terminal prefixes)
+	NextCtx  PathContext // Pre-computed context for downstream traversal
+}
+
+// IsDirectlyCoveredBy checks whether idx is directly covered by parentIdx
+// within this node's prefix table using CBT (Complete Binary Tree) ancestor tracking.
+//
+// To verify direct coverage, the method evaluates the longest-prefix match (LPM)
+// of idx's immediate parent rather than idx itself. Since a lookup at
+// idx would trivially match idx if present in n.Prefixes, shifting right
+// by 1 bit (idx >> 1) bypasses the candidate itself to query its enclosing scope.
+func (n *FastACLNode) IsDirectlyCoveredBy(idx, parentIdx uint8) bool {
+	// Calculate immediate parent index in the CBT
+	nextIdx := idx >> 1
+
+	// Fast path: LPM match is mathematically impossible if ancestor index is smaller
+	if nextIdx < parentIdx {
+		return false
+	}
+
+	// Perform longest prefix match lookup for ancestor verification
+	lpm, _ := n.LookupIdx(nextIdx)
+	return lpm == parentIdx
+}
+
+// FprintRec recursively traverses the FastACL trie starting at node n,
+// printing a formatted hierarchical ASCII tree of CIDRs to w.
+//
+// It collects, sorts, and prints immediate descendants for the current
+// traversal state before descending recursively into subtrees.
+func (n *FastACLNode) FprintRec(w io.Writer, ptx PathContext, pad string) error {
+	// Guard clause: avoid processing empty nodes
+	if n.IsEmpty() {
+		return nil
+	}
+
+	// Retrieve all immediate children under parent and sort canonical by prefix
+	directItems := n.DirectItems(ptx)
+	slices.SortFunc(directItems, func(a, b HierarchyItem) int {
+		return CmpPrefix(a.Cidr, b.Cidr)
+	})
+
+	lastIdx := len(directItems) - 1
+	for i, item := range directItems {
+		// Determine ASCII tree branch glyph based on position
+		glyph := "├─ "
+		space := "│  "
+		if i == lastIdx {
+			glyph = "└─ "
+			space = "   "
+		}
+
+		// Print formatted prefix entry
+		if _, err := fmt.Fprintf(w, "%s%s\n", pad+glyph, item.Cidr); err != nil {
+			return err
+		}
+
+		// Recurse into downstream nodes or leaves
+		if err := n.fprintNext(w, item, pad+space); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// fprintNext dispatches recursive tree printing using the pre-computed NextCtx.
+//
+// It routes execution to sub-nodes or terminal leaves without needing to
+// recalculate traversal path contexts or depth states.
+func (n *FastACLNode) fprintNext(w io.Writer, item HierarchyItem, pad string) error {
+	switch next := item.NextNode.(type) {
+	case *FastACLNode:
+		return next.FprintRec(w, item.NextCtx, pad)
+	case *CIDRLeaf:
+		return next.Fprint(w, pad)
+	default:
+		return nil
+	}
+}
+
+// Fprint renders a path-compressed terminal leaf under a fringe boundary.
+func (c *CIDRLeaf) Fprint(w io.Writer, pad string) error {
+	if c == nil {
+		return nil
+	}
+	_, err := fmt.Fprintf(w, "%s└─ %s\n", pad, c.Prefix)
+	return err
+}
+
+// DirectItems returns all immediate descendant hierarchy items directly covered by parent.
+//
+// It inspects both local CBT prefixes and stride boundaries (fringes/children)
+// to yield items directly beneath parent in the LPM hierarchy.
+func (n *FastACLNode) DirectItems(ptx PathContext) []HierarchyItem {
+	if n.IsEmpty() {
+		return nil
+	}
+
+	// Pre-allocate slice capacity based on node statistics to eliminate dynamic re-allocations
+	capacityHint := n.PrefixCount() + n.FringeCount() + n.ChildCount()
+	items := make([]HierarchyItem, 0, capacityHint)
+
+	// Collect matching elements across CBT prefixes and slot boundaries
+	items = n.collectDirectPrefixes(ptx, items)
+	items = n.collectDirectChildrenAndFringes(ptx, items)
+
+	return items
+}
+
+// collectDirectPrefixes gathers local CBT prefixes directly covered by ptx.Idx.
+//
+// Iterates through active local bitset prefixes, evaluating direct coverage
+// via IsDirectlyCoveredBy before constructing the output hierarchy item.
+func (n *FastACLNode) collectDirectPrefixes(ptx PathContext, dst []HierarchyItem) []HierarchyItem {
+	for idx := range n.Prefixes.All() {
+		if !n.IsDirectlyCoveredBy(idx, ptx.Idx) {
+			continue
+		}
+
+		// Preserve current path context, only update idx
+		nextCtx := ptx
+		nextCtx.Idx = idx
+
+		dst = append(dst, HierarchyItem{
+			NextNode: n, // nextNode is again this node
+			NextCtx:  nextCtx,
+			Cidr:     CidrFromPath(ptx.Path, ptx.Depth, ptx.Is4, idx),
+		})
+	}
+
+	return dst
+}
+
+// collectDirectChildrenAndFringes scans slot boundaries within node n (combining n.Children
+// and n.Fringes) to find subtrees, path-compressed terminal leaves, or fringe boundaries
+// directly covered by parent.
+//
+// Slots are converted to host indices (via art.OctetToIdx) and evaluated against ptx.Idx.
+// Matching slots are handed off to appendSlotItems to construct the respective HierarchyItem entries.
+//
+// Parameters:
+//   - ptx: The PathContext defining target scope, CBT index, and stride depth.
+//   - dst: The destination slice to accumulate matched items into, avoiding dynamic allocations.
+//
+// Returns the updated dst slice containing newly appended child and fringe items.
+func (n *FastACLNode) collectDirectChildrenAndFringes(ptx PathContext, dst []HierarchyItem) []HierarchyItem {
+	// Compute the bitwise union of active child slots and fringe slots.
+	// This allows iterating over all relevant 256-ary stride boundaries in a single pass.
+	allSlots := n.Children.Or(&n.Fringes)
+
+	// Iterate over all active octet/slot addresses set in the bitset.
+	for addr := range allSlots.All() {
+		// Step 3: Map the byte-sized slot address to its corresponding host index within the CBT.
+		hostIdx := art.OctetToIdx(addr)
+
+		// Verify if this entire stride slot is directly covered by ptx.Idx.
+		lpm, _ := n.LookupIdx(hostIdx)
+		if lpm != ptx.Idx {
+			continue
+		}
+
+		// Delegate item construction for the matching slot (fringe, child node, or leaf).
+		dst = n.appendSlotItems(ptx, addr, dst)
+	}
+
+	return dst
+}
+
+// appendSlotItems evaluates a single octet slot address (addr) within node n
+// and appends all directly covered hierarchy items to dst.
+//
+// A slot address represents a 256-ary branch boundary (e.g., /8, /16, /24 stride boundaries)
+// within the multi-bit trie. This method handles three distinct structural states:
+//
+//  1. Fringe present (with optional child):
+//     Constructs a HierarchyItem for the stride fringe. If a child node or leaf also resides
+//     at this slot, item.NextNode is populated and nextCtx is calculated (advancing depth,
+//     recording the path octet, and resetting the local CBT index to 0).
+//
+//  2. Child-only (*FastACLNode):
+//     Occurs when no explicit fringe boundary exists at this slot, but a deeper subtree exists.
+//     The method transparently hoists direct items from the child node upwards by delegating to
+//     kid.DirectItems(nextParent), preserving the continuous LPM containment tree.
+//
+//  3. Child-only (*CIDRLeaf):
+//     Appends a path-compressed terminal leaf representing a direct prefix match.
+func (n *FastACLNode) appendSlotItems(ptx PathContext, addr uint8, dst []HierarchyItem) []HierarchyItem {
+	// Query local bitsets to check if a fringe boundary or child pointer exists at slot addr.
+	hasFringe := n.Fringes.Test(addr)
+	hasChild := n.Children.Test(addr)
+
+	switch {
+	case hasFringe:
+		// Case 1: Stride boundary fringe exists.
+		item := HierarchyItem{
+			Cidr: CidrForFringe(ptx.Path[:], ptx.Depth, ptx.Is4, addr),
+		}
+
+		if hasChild {
+
+			// Step across the stride boundary:
+			// - Advance depth by 1.
+			// - Record current slot octet into path history.
+			// - Reset local CBT bit index (Idx) to 0 for downstream traversal.
+			nextPtx := ptx
+			nextPtx.Path[ptx.Depth] = addr
+			nextPtx.Depth++
+			nextPtx.Idx = 0
+
+			// Attach downstream child node or leaf under the fringe boundary.
+			item.NextNode = n.MustGetChild(addr)
+			item.NextCtx = nextPtx
+		}
+		return append(dst, item)
+
+	case hasChild:
+		// Case 2 & 3: No local fringe boundary exists; evaluate the child slot directly.
+		child := n.MustGetChild(addr)
+
+		switch kid := child.(type) {
+		case *FastACLNode:
+			// Case 2: Sub-node exists without a local fringe.
+			// prepare rec-descent traversal
+			nextPtx := ptx
+			nextPtx.Path[ptx.Depth] = addr
+			nextPtx.Depth++
+			nextPtx.Idx = 0
+
+			// Hoist direct items from the deeper sub-node into current scope.
+			return append(dst, kid.DirectItems(nextPtx)...)
+
+		case *CIDRLeaf:
+			// Case 3: Path-compressed terminal leaf under an un-fringed slot.
+			return append(dst, HierarchyItem{
+				Cidr: kid.Prefix,
+			})
+
+		default:
+			panic("fastacl: unknown child node type in trie slot")
+		}
+	}
+
+	return dst
 }
