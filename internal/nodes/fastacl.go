@@ -867,14 +867,14 @@ func (n *FastACLNode) EqualRec(o *FastACLNode) bool {
 // DumpRec recursively descends the trie rooted at n and writes a human-readable
 // representation of each visited node to w.
 //
-// It returns immediately if n is nil or empty. For each visited internal node
+// It returns immediately if n is empty. For each visited internal node
 // it calls dump to write the node's representation, then iterates its child
 // addresses and recurses into children of type *FastACLNode (internal subnodes).
 // The path slice and depth together represent the byte-wise path
 // from the root to the current node; depth is incremented for each recursion.
 // The is4 flag controls IPv4/IPv6 formatting used by dump.
 func (n *FastACLNode) DumpRec(w io.Writer, path StridePath, depth int, is4 bool) {
-	if n == nil || n.IsEmpty() {
+	if n.IsEmpty() {
 		return
 	}
 
@@ -911,7 +911,7 @@ func (n *FastACLNode) dump(w io.Writer, path StridePath, depth int, is4 bool) {
 
 		for idx := range n.Prefixes.All() {
 			pfx := CidrFromPath(path, depth, is4, idx)
-			fmt.Fprintf(w, " %d:{%s}", idx, pfx)
+			fmt.Fprintf(w, " [%d]➜{%s}", idx, pfx)
 		}
 
 		fmt.Fprintln(w)
@@ -923,90 +923,31 @@ func (n *FastACLNode) dump(w io.Writer, path StridePath, depth int, is4 bool) {
 
 		for addr := range n.Fringes.All() {
 			fringePfx := CidrForFringe(path[:], depth, is4, addr)
-			fmt.Fprintf(w, " %s:{%s}", addrFmt(addr, is4), fringePfx)
+			fmt.Fprintf(w, " [%s]➜{%s}", addrFmt(addr, is4), fringePfx)
 		}
 
 		fmt.Fprintln(w)
 	}
 
-	nodeAddrs := make([]uint8, 0, n.ChildCount())
-	leafAddrs := make([]uint8, 0, n.ChildCount())
+	// print the nodes and leafs
+	if n.ChildCount() != 0 {
+		fmt.Fprintf(w, "%s child(#%*d):", indent, width, n.ChildCount())
 
-	// the node has recursive child nodes or path-compressed leaves
-	for addr, child := range n.AllChildren() {
-		switch child.(type) {
-		case *FastACLNode:
-			nodeAddrs = append(nodeAddrs, addr)
-			continue
+		for addr, child := range n.AllChildren() {
+			switch child := child.(type) {
+			case *FastACLNode:
+				fmt.Fprintf(w, " [%s]↓", addrFmt(addr, is4))
 
-		case *CIDRLeaf:
-			leafAddrs = append(leafAddrs, addr)
+			case *CIDRLeaf:
+				fmt.Fprintf(w, " [%s]➜{%s}", addrFmt(addr, is4), child.Prefix)
 
-		default:
-			panic("logic error, wrong node type")
-		}
-	}
-
-	// print the leafs
-	if len(leafAddrs) > 0 {
-		fmt.Fprintf(w, "%s  leaf(#%*d):", indent, width, len(leafAddrs))
-
-		for _, addr := range leafAddrs {
-			leaf := n.MustGetChild(addr).(*CIDRLeaf)
-			fmt.Fprintf(w, " %s:{%s}", addrFmt(addr, is4), leaf.Prefix)
+			default:
+				panic("logic error, wrong node type")
+			}
 		}
 
 		fmt.Fprintln(w)
 	}
-
-	// print the nodes
-	if len(nodeAddrs) > 0 {
-		fmt.Fprintf(w, "%s  node(#%*d):", indent, width, len(nodeAddrs))
-
-		for _, addr := range nodeAddrs {
-			fmt.Fprintf(w, " %s", addrFmt(addr, is4))
-		}
-
-		fmt.Fprintln(w)
-	}
-}
-
-// DumpString traverses the trie to the node at the specified depth along the given
-// octet path and returns its string representation via Dump.
-//
-// If the path is invalid or encounters an unexpected node type during traversal,
-// it returns an error message string instead.
-//
-// Parameters:
-//   - octets: The path of octets to follow from the root
-//   - depth: Target depth to reach before dumping (0-based byte index)
-//   - is4: True for IPv4 formatting, false for IPv6
-//
-// Returns a formatted string representation of the target node or an error message.
-func (n *FastACLNode) DumpString(octets []uint8, depth int, is4 bool) string {
-	panic("TODO")
-
-	path := StridePath{}
-	copy(path[:], octets)
-
-	buf := new(strings.Builder)
-	for i := range depth {
-		anyKid, ok := n.GetChild(path[i])
-		if !ok {
-			return fmt.Sprintf("ERROR: kid for %v[%d] is NOT set in node\n", octets, i)
-		}
-
-		kid, ok := anyKid.(*FastACLNode)
-		if !ok {
-			return fmt.Sprintf("ERROR: kid for %v[%d] is NO %s\n", octets, i, "FastACLNode")
-		}
-
-		// traverse
-		n = kid
-	}
-
-	n.dump(buf, path, depth, is4)
-	return buf.String()
 }
 
 // hasType classifies the given node into one of the nodeType values.
@@ -1941,8 +1882,8 @@ func (n *FastACLNode) OverlapsTwoChildren(nChild, oChild any, depth int) bool {
 type PathContext struct {
 	Path  StridePath
 	Depth int
-	Idx   uint8
 	Is4   bool
+	Idx   uint8
 }
 
 // HierarchyItem represents a structural node or fringe boundary within
@@ -2021,10 +1962,7 @@ func (n *FastACLNode) FprintRec(w io.Writer, ptx PathContext, pad string) error 
 	return nil
 }
 
-// fprintNext dispatches recursive tree printing using the pre-computed NextCtx.
-//
-// It routes execution to sub-nodes or terminal leaves without needing to
-// recalculate traversal path contexts or depth states.
+// fprintNext dispatches recursive tree printing using the NextCtx.
 func (n *FastACLNode) fprintNext(w io.Writer, item HierarchyItem, pad string) error {
 	switch next := item.NextNode.(type) {
 	case *FastACLNode:
@@ -2157,17 +2095,17 @@ func (n *FastACLNode) appendSlotItems(ptx PathContext, addr uint8, dst []Hierarc
 		if hasChild {
 
 			// Step across the stride boundary:
-			// - Advance depth by 1.
 			// - Record current slot octet into path history.
+			// - Advance depth by 1.
 			// - Reset local CBT bit index (Idx) to 0 for downstream traversal.
-			nextPtx := ptx
-			nextPtx.Path[ptx.Depth] = addr
-			nextPtx.Depth++
-			nextPtx.Idx = 0
+			nextCtx := ptx
+			nextCtx.Path[ptx.Depth] = addr
+			nextCtx.Depth++
+			nextCtx.Idx = 0
 
 			// Attach downstream child node or leaf under the fringe boundary.
 			item.NextNode = n.MustGetChild(addr)
-			item.NextCtx = nextPtx
+			item.NextCtx = nextCtx
 		}
 		return append(dst, item)
 
