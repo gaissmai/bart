@@ -352,6 +352,7 @@ func (f *FastACL) Supernets(pfx netip.Prefix) iter.Seq[netip.Prefix] {
 	}
 }
 
+/* TODO PathContext
 // Subnets returns an iterator over all subnets of the given prefix
 // in natural CIDR sort order. This includes prefixes of the same length
 // (exact match) and longer (more specific) prefixes that are contained
@@ -378,6 +379,7 @@ func (f *FastACL) Subnets(pfx netip.Prefix) iter.Seq[netip.Prefix] {
 		n.Subnets(pfx, yield)
 	}
 }
+*/
 
 // Clone returns a deep copy of the ACL.
 func (f *FastACL) Clone() *FastACL {
@@ -552,22 +554,41 @@ func (f *FastACL) All6() iter.Seq[netip.Prefix] {
 // CIDR prefix sort order.
 func (f *FastACL) AllSorted() iter.Seq[netip.Prefix] {
 	return func(yield func(netip.Prefix) bool) {
-		_ = f.root4.AllRecSorted(stridePath{}, 0, true, yield) &&
-			f.root6.AllRecSorted(stridePath{}, 0, false, yield)
+		ptx4 := pathContext{
+			Depth: 0,
+			Is4:   true,
+		}
+		if !f.root4.AllRecSorted(ptx4, yield) {
+			return
+		}
+
+		ptx6 := pathContext{
+			Depth: 0,
+			Is4:   false,
+		}
+		f.root6.AllRecSorted(ptx6, yield)
 	}
 }
 
 // AllSorted4 is like [FastACL.AllSorted] but only for the v4 routing table.
 func (f *FastACL) AllSorted4() iter.Seq[netip.Prefix] {
 	return func(yield func(netip.Prefix) bool) {
-		_ = f.root4.AllRecSorted(stridePath{}, 0, true, yield)
+		ptx := pathContext{
+			Depth: 0,
+			Is4:   true,
+		}
+		f.root4.AllRecSorted(ptx, yield)
 	}
 }
 
 // AllSorted6 is like [FastACL.AllSorted] but only for the v6 routing table.
 func (f *FastACL) AllSorted6() iter.Seq[netip.Prefix] {
 	return func(yield func(netip.Prefix) bool) {
-		_ = f.root6.AllRecSorted(stridePath{}, 0, false, yield)
+		ptx := pathContext{
+			Depth: 0,
+			Is4:   false,
+		}
+		f.root6.AllRecSorted(ptx, yield)
 	}
 }
 
