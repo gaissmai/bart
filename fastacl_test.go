@@ -292,7 +292,7 @@ func TestFastACL_AllSorted(t *testing.T) {
 
 			// Insert prefixes with index as value
 			for _, prefixStr := range tc.prefixes {
-				pfx := netip.MustParsePrefix(prefixStr)
+				pfx := mpp(prefixStr)
 				tbl.Insert(pfx)
 			}
 
@@ -330,6 +330,144 @@ func TestFastACL_AllSorted(t *testing.T) {
 					t.Errorf("%s:Full actual order:   %v", tc.name, actualOrder)
 					break
 				}
+			}
+		})
+	}
+}
+
+// TestFastACL_All verifies iterator traversal behavior for All(), All4(), and All6(),
+// covering empty tables, combined dual-stack iteration, and early termination.
+func TestFastACL_All(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		initial   []string
+		testMode  string // "all", "all4", "all6"
+		stopAfter int    // stop yield after N elements (-1 for no early stop)
+		want      []string
+	}{
+		{
+			name:      "empty table iteration produces no prefixes",
+			initial:   nil,
+			testMode:  "all",
+			stopAfter: -1,
+			want:      nil,
+		},
+		{
+			name: "All4 iterates only IPv4 prefixes",
+			initial: []string{
+				"10.0.0.0/8",
+				"192.168.1.0/24",
+				"2001:db8::/32",
+			},
+			testMode:  "all4",
+			stopAfter: -1,
+			want: []string{
+				"10.0.0.0/8",
+				"192.168.1.0/24",
+			},
+		},
+		{
+			name: "All6 iterates only IPv6 prefixes",
+			initial: []string{
+				"10.0.0.0/8",
+				"2001:db8::/32",
+				"fe80::/10",
+			},
+			testMode:  "all6",
+			stopAfter: -1,
+			want: []string{
+				"2001:db8::/32",
+				"fe80::/10",
+			},
+		},
+		{
+			name: "All iterates both IPv4 and IPv6 prefixes",
+			initial: []string{
+				"10.0.0.0/8",
+				"192.168.1.0/24",
+				"2001:db8::/32",
+				"fe80::/10",
+			},
+			testMode:  "all",
+			stopAfter: -1,
+			want: []string{
+				"10.0.0.0/8",
+				"192.168.1.0/24",
+				"2001:db8::/32",
+				"fe80::/10",
+			},
+		},
+		{
+			name: "All early termination during IPv4 phase halts complete traversal",
+			initial: []string{
+				"10.0.0.0/8",
+				"192.168.1.0/24",
+				"2001:db8::/32",
+			},
+			testMode:  "all",
+			stopAfter: 1, // stop after 1st element (IPv4 stage)
+			want: []string{
+				"10.0.0.0/8",
+			},
+		},
+		{
+			name: "All early termination during IPv6 phase stops traversal",
+			initial: []string{
+				"10.0.0.0/8",
+				"2001:db8::/32",
+				"2001:db8:1::/48",
+			},
+			testMode:  "all",
+			stopAfter: 2, // stop after 2nd element (during IPv6 stage)
+			want: []string{
+				"10.0.0.0/8",
+				"2001:db8::/32",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var facl FastACL
+			for _, s := range tt.initial {
+				facl.Insert(mpp(s))
+			}
+
+			// Ensure invalid prefixes do not affect the table or iterator.
+			facl.Insert(netip.Prefix{})
+
+			var iter func(yield func(netip.Prefix) bool)
+			switch tt.testMode {
+			case "all":
+				iter = facl.All()
+			case "all4":
+				iter = facl.All4()
+			case "all6":
+				iter = facl.All6()
+			default:
+				t.Fatalf("unknown testMode: %s", tt.testMode)
+			}
+
+			var got []string
+			for pfx := range iter {
+				got = append(got, pfx.String())
+				if tt.stopAfter > 0 && len(got) == tt.stopAfter {
+					break // Triggers early termination (yield returns false)
+				}
+			}
+
+			// Iteration order is explicitly unspecified in godoc, sort for deterministic comparison.
+			slices.Sort(got)
+			want := slices.Clone(tt.want)
+			slices.Sort(want)
+
+			if !slices.Equal(got, want) {
+				t.Errorf("iterator mismatch:\ngot:  %v\nwant: %v", got, want)
 			}
 		})
 	}
