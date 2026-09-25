@@ -1130,7 +1130,7 @@ func (n *FastACLNode) AllRec(ptx PathContext, yield func(netip.Prefix) bool) boo
 //   - yield: callback function invoked for each prefix/value pair
 //
 // Returns false if yield function requests early termination.
-func (n *FastACLNode) AllRecSorted(path StridePath, depth int, is4 bool, yield func(netip.Prefix) bool) bool {
+func (n *FastACLNode) AllRecSorted(ptx PathContext, yield func(netip.Prefix) bool) bool {
 	allIndices := n.Prefixes.AppendBits(make([]uint8, 0, n.PrefixCount()))
 
 	fringeOrChild := n.Fringes.Or(&n.Children.BitSet256)
@@ -1141,13 +1141,13 @@ func (n *FastACLNode) AllRecSorted(path StridePath, depth int, is4 bool, yield f
 
 	// Helper to process and yield a prefix.
 	yieldPrefix := func(idx uint8) bool {
-		cidr := CidrFromPath(path[:], depth, is4, idx)
+		cidr := CidrFromPath(ptx.Path[:], ptx.Depth, ptx.Is4, idx)
 		return yield(cidr)
 	}
 
 	// Helper to process and yield a fringe.
 	yieldFringe := func(addr uint8) bool {
-		fringePfx := CidrForFringe(path[:], depth, is4, addr)
+		fringePfx := CidrForFringe(ptx.Path[:], ptx.Depth, ptx.Is4, addr)
 		return yield(fringePfx)
 	}
 
@@ -1155,8 +1155,11 @@ func (n *FastACLNode) AllRecSorted(path StridePath, depth int, is4 bool, yield f
 	yieldChild := func(addr uint8) bool {
 		switch kid := n.MustGetChild(addr).(type) {
 		case *FastACLNode:
-			path[depth] = addr
-			return kid.AllRecSorted(path, depth+1, is4, yield)
+			nextPtx := ptx
+			nextPtx.Path[ptx.Depth] = addr
+			nextPtx.Depth++
+
+			return kid.AllRecSorted(nextPtx, yield)
 
 		case *CIDRLeaf:
 			return yield(kid.Prefix)
@@ -1248,6 +1251,7 @@ func (n *FastACLNode) EachLookupPrefix(ip netip.Addr, depth int, pfxIdx uint8, y
 	return true
 }
 
+/* TODO PathContext
 // EachSubnet yields all routes and subtrees covered by pfxIdx within the current node
 // in canonical CIDR sort order.
 //
@@ -1332,6 +1336,7 @@ func (n *FastACLNode) EachSubnet(octets []byte, depth int, is4 bool, pfxIdx uint
 
 	return true
 }
+*/
 
 // Supernets yields all supernet prefixes of pfx that exist in the trie,
 // in reverse order (most-specific first, least-specific last).
@@ -1452,6 +1457,7 @@ LOOP:
 	}
 }
 
+/* TODO PathContext
 // Subnets yields all subnet prefixes covered by pfx that exist in the trie,
 // in CIDR sort order.
 //
@@ -1521,6 +1527,7 @@ func (n *FastACLNode) Subnets(pfx netip.Prefix, yield func(netip.Prefix) bool) {
 		}
 	}
 }
+*/
 
 // Overlaps recursively compares two trie nodes and returns true
 // if any of their prefixes or descendants overlap.
