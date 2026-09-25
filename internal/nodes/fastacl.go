@@ -372,7 +372,7 @@ func (n *FastACLNode) AggregateRec(path StridePath, depth int, is4 bool) (modifi
 			} else {
 				// Convert prefix back to LeafNode and promote
 				idx, _ := kid.Prefixes.FirstSet()
-				leafPrefix := CidrFromPath(path, depth+1, is4, idx)
+				leafPrefix := CidrFromPath(path[:], depth+1, is4, idx)
 				n.Children.Items[i] = &CIDRLeaf{leafPrefix}
 			}
 
@@ -690,7 +690,7 @@ func (n *FastACLNode) PurgeAndCompress(stack []*FastACLNode, octets []uint8, is4
 			// Reconstruct the prefix from the path for re-insertion.
 			path := StridePath{}
 			copy(path[:], octets)
-			pfx := CidrFromPath(path, depth+1, is4, idx)
+			pfx := CidrFromPath(path[:], depth+1, is4, idx)
 
 			parent.Insert(pfx, depth)
 		default:
@@ -910,7 +910,7 @@ func (n *FastACLNode) dump(w io.Writer, path StridePath, depth int, is4 bool) {
 		fmt.Fprintf(w, "%sprefix(#%*d):", indent, width, n.PrefixCount())
 
 		for idx := range n.Prefixes.All() {
-			pfx := CidrFromPath(path, depth, is4, idx)
+			pfx := CidrFromPath(path[:], depth, is4, idx)
 			fmt.Fprintf(w, " [%d]➜{%s}", idx, pfx)
 		}
 
@@ -1053,9 +1053,9 @@ func (n *FastACLNode) StatsRec() (s StatsT) {
 }
 
 // AllRec recursively traverses the trie starting at the current node,
-// applying the provided yield function to every stored prefix and value.
+// applying the provided yield function to every stored prefix.
 //
-// For each route entry (prefix and value), yield is invoked. If yield returns false,
+// For each route entry, yield is invoked. If yield returns false,
 // the traversal stops immediately, and false is propagated upwards,
 // enabling early termination.
 //
@@ -1066,50 +1066,49 @@ func (n *FastACLNode) StatsRec() (s StatsT) {
 //
 // The traversal order is not defined. This implementation favors simplicity
 // and runtime efficiency over consistency of iteration sequence.
-func (n *FastACLNode) AllRec(path StridePath, depth int, is4 bool, yield func(netip.Prefix) bool) bool {
-	panic("TODO")
+func (n *FastACLNode) AllRec(ptx PathContext, yield func(netip.Prefix) bool) bool {
+	if n.IsEmpty() {
+		return true
+	}
 
+	// 1. Direct local node prefixes
 	for idx := range n.Prefixes.All() {
-		cidr := CidrFromPath(path, depth, is4, idx)
-
-		// callback for this prefix and val
-		if !yield(cidr) {
-			// early exit
+		pfx := CidrFromPath(ptx.Path[:], ptx.Depth, ptx.Is4, idx)
+		if !yield(pfx) {
 			return false
 		}
 	}
 
-	// for all children (nodes and leaves) in this node do ...
-	i := 0
-	for addr := range n.Children.All() {
-		anyKid := n.Children.Items[i]
-		switch kid := anyKid.(type) {
+	// 2. Fringe prefixes at stride boundaries
+	for addr := range n.Fringes.All() {
+		pfx := CidrForFringe(ptx.Path[:], ptx.Depth, ptx.Is4, addr)
+		if !yield(pfx) {
+			return false
+		}
+	}
+
+	// 3. Child nodes and path-compressed leaves
+	for octet := range n.Children.All() {
+		child := n.MustGetChild(octet)
+
+		switch kid := child.(type) {
 		case *FastACLNode:
-			// rec-descent with this node
-			path[depth] = addr
-			if !kid.AllRec(path, depth+1, is4, yield) {
-				// early exit
+			nextPtx := ptx
+			nextPtx.Path[ptx.Depth] = octet
+			nextPtx.Depth++
+
+			if !kid.AllRec(nextPtx, yield) {
 				return false
 			}
+
 		case *CIDRLeaf:
-			// callback for this leaf
 			if !yield(kid.Prefix) {
-				// early exit
-				return false
-			}
-		case *FringeLeaf:
-			fringePfx := CidrForFringe(path[:], depth, is4, addr)
-			// callback for this fringe
-			if !yield(fringePfx) {
-				// early exit
 				return false
 			}
 
 		default:
 			panic("logic error, wrong node type")
 		}
-
-		i++
 	}
 
 	return true
@@ -1190,7 +1189,7 @@ func (n *FastACLNode) AllRecSorted(path StridePath, depth int, is4 bool, yield f
 		}
 
 		// Yield the local prefix for this index.
-		cidr := CidrFromPath(path, depth, is4, pfxIdx)
+		cidr := CidrFromPath(path[:], depth, is4, pfxIdx)
 		if !yield(cidr) {
 			return false
 		}
@@ -1307,7 +1306,7 @@ func (n *FastACLNode) EachSubnet(octets []byte, depth int, is4 bool, pfxIdx uint
 		}
 
 		// Yield the local prefix entry itself.
-		cidr := CidrFromPath(path, depth, is4, pfxIdx)
+		cidr := CidrFromPath(path[:], depth, is4, pfxIdx)
 		if !yield(cidr) {
 			return false
 		}
@@ -2020,7 +2019,7 @@ func (n *FastACLNode) collectDirectPrefixes(ptx PathContext, dst []HierarchyItem
 		dst = append(dst, HierarchyItem{
 			NextNode: n, // nextNode is again this node
 			NextCtx:  nextCtx,
-			Cidr:     CidrFromPath(ptx.Path, ptx.Depth, ptx.Is4, idx),
+			Cidr:     CidrFromPath(ptx.Path[:], ptx.Depth, ptx.Is4, idx),
 		})
 	}
 
