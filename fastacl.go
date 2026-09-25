@@ -504,31 +504,47 @@ func (f *FastACL) Size6() int {
 	return f.size6
 }
 
-// All returns an iterator over all prefix–value pairs in the table.
-//
-// The iteration order is unspecified and may vary between calls; for a stable order,
-// use [liteTable.AllSorted].
-//
-// IMPORTANT: Modifying the table during iteration is not allowed,
-// as this would interfere with the internal traversal and may corrupt or
-// prematurely terminate the iteration.
+// All returns an iterator over all canonical prefixes (both IPv4 and IPv6)
+// stored in the table. Iteration order is explicitly unspecified.
 func (f *FastACL) All() iter.Seq[netip.Prefix] {
 	return func(yield func(netip.Prefix) bool) {
-		_ = f.root4.AllRec(stridePath{}, 0, true, yield) && f.root6.AllRec(stridePath{}, 0, false, yield)
+		ptx4 := pathContext{
+			Depth: 0,
+			Is4:   true,
+		}
+		if !f.root4.AllRec(ptx4, yield) {
+			return
+		}
+
+		ptx6 := pathContext{
+			Depth: 0,
+			Is4:   false,
+		}
+		f.root6.AllRec(ptx6, yield)
 	}
 }
 
-// All4 is like [liteTable.All] but only for the v4 routing table.
+// All4 returns an iterator over all canonical IPv4 prefixes stored in the table.
+// Iteration order is explicitly unspecified.
 func (f *FastACL) All4() iter.Seq[netip.Prefix] {
 	return func(yield func(netip.Prefix) bool) {
-		_ = f.root4.AllRec(stridePath{}, 0, true, yield)
+		ptx := pathContext{
+			Depth: 0,
+			Is4:   true,
+		}
+		f.root4.AllRec(ptx, yield)
 	}
 }
 
-// All6 is like [liteTable.All] but only for the v6 routing table.
+// All6 returns an iterator over all canonical IPv6 prefixes stored in the table.
+// Iteration order is explicitly unspecified.
 func (f *FastACL) All6() iter.Seq[netip.Prefix] {
 	return func(yield func(netip.Prefix) bool) {
-		_ = f.root6.AllRec(stridePath{}, 0, false, yield)
+		ptx := pathContext{
+			Depth: 0,
+			Is4:   false,
+		}
+		f.root6.AllRec(ptx, yield)
 	}
 }
 

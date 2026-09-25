@@ -3,6 +3,7 @@ package nodes
 import (
 	"bytes"
 	"net/netip"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -1033,6 +1034,143 @@ func TestFastACLNode_Delete(t *testing.T) {
 				if got := buf.String(); got != wantStr {
 					t.Errorf("DumpRec() mismatch after Delete:\ngot:\n%s\nwant:\n%s", got, wantStr)
 				}
+			}
+		})
+	}
+}
+
+// TestFastACLNode_AllRec verifies recursive trie traversal and prefix reconstruction
+// across direct node prefixes, fringe entries, and path-compressed child leaves,
+// ensuring accurate early termination propagation via the yield callback.
+func TestFastACLNode_AllRec(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		nodeSetup func() *FastACLNode
+		ptx       PathContext
+		stopAfter int // stop yield after N elements (-1 for no early stop)
+		want      []string
+	}{
+		{
+			name: "Empty node produces no yields",
+			nodeSetup: func() *FastACLNode {
+				return &FastACLNode{}
+			},
+			ptx:       PathContext{Is4: true},
+			stopAfter: -1,
+			want:      nil,
+		},
+		{
+			name: "Node with prefixes, fringes, and compressed leaves (IPv4)",
+			nodeSetup: func() *FastACLNode {
+				n := &FastACLNode{}
+
+				// Insert direct prefix 0.0.0.0/0
+				n.Insert(mpp("0.0.0.0/0"), 0)
+
+				// Insert fringe route 10.0.0.0/8
+				n.Insert(mpp("10.0.0.0/8"), 0)
+
+				// Insert path-compressed leaf 192.168.1.0/24
+				n.Insert(mpp("192.168.1.0/24"), 0)
+
+				return n
+			},
+			ptx:       PathContext{Is4: true},
+			stopAfter: -1,
+			want: []string{
+				"0.0.0.0/0",
+				"10.0.0.0/8",
+				"192.168.1.0/24",
+			},
+		},
+		{
+			name: "Nested child subtrees with depth-based path reconstruction (IPv6)",
+			nodeSetup: func() *FastACLNode {
+				root := &FastACLNode{}
+				// Insert divergent IPv6 prefixes sharing the 2001:db8::/32 prefix path
+				root.Insert(mpp("2001:db8:1::/48"), 0)
+				root.Insert(mpp("2001:db8:2::/48"), 0)
+				return root
+			},
+			ptx:       PathContext{Is4: false},
+			stopAfter: -1,
+			want: []string{
+				"2001:db8:1::/48",
+				"2001:db8:2::/48",
+			},
+		},
+		{
+			name: "Early termination at direct prefix stage halts traversal",
+			nodeSetup: func() *FastACLNode {
+				n := &FastACLNode{}
+				n.Insert(mpp("10.0.0.0/8"), 0)
+				n.Insert(mpp("192.168.0.0/16"), 0)
+				return n
+			},
+			ptx:       PathContext{Is4: true},
+			stopAfter: 1,
+			want: []string{
+				"10.0.0.0/8",
+			},
+		},
+		{
+			name: "Early termination during child subtree descent propagates upward",
+			nodeSetup: func() *FastACLNode {
+				parent := &FastACLNode{}
+
+				// Root prefix
+				parent.Insert(mpp("0.0.0.0/0"), 0)
+
+				// Two nested prefixes forcing intermediate subnode creation
+				parent.Insert(mpp("10.1.1.0/24"), 0)
+				parent.Insert(mpp("10.1.2.0/24"), 0)
+
+				return parent
+			},
+			ptx:       PathContext{Is4: true},
+			stopAfter: 2, // stop after root prefix + 1st nested leaf
+			want: []string{
+				"0.0.0.0/0",
+				"10.1.1.0/24",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			node := tt.nodeSetup()
+
+			var got []string
+			count := 0
+
+			completed := node.AllRec(tt.ptx, func(pfx netip.Prefix) bool {
+				got = append(got, pfx.String())
+				count++
+				if tt.stopAfter > 0 && count == tt.stopAfter {
+					return false
+				}
+				return true
+			})
+
+			if tt.stopAfter > 0 && completed {
+				t.Error("AllRec() returned true, want false (early termination)")
+			}
+			if tt.stopAfter < 0 && !completed {
+				t.Error("AllRec() returned false, want true (complete traversal)")
+			}
+
+			// Sort results to ensure deterministic assertion regardless of map/bitset iteration order
+			slices.Sort(got)
+			want := slices.Clone(tt.want)
+			slices.Sort(want)
+
+			if !slices.Equal(got, want) {
+				t.Errorf("AllRec() prefix mismatch:\ngot:  %v\nwant: %v", got, want)
 			}
 		})
 	}

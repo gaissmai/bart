@@ -58,6 +58,10 @@ import (
 // internal/nodes. Aliased to keep the code readable.
 type stridePath = nodes.StridePath
 
+// pathContext is required in many places in the bart package and in
+// internal/nodes. Aliased to keep the code readable.
+type pathContext = nodes.PathContext
+
 // DumpListNode contains CIDR, Value and Subnets, representing the trie
 // in a sorted, recursive representation, especially useful for serialization.
 type DumpListNode[V any] struct {
