@@ -116,8 +116,8 @@ func TestFastACLNode_DirectItems(t *testing.T) {
 			},
 			wantCount: 2,
 			wantCidrs: []netip.Prefix{
-				netip.MustParsePrefix("0.0.0.0/1"),
-				netip.MustParsePrefix("128.0.0.0/1"),
+				mpp("0.0.0.0/1"),
+				mpp("128.0.0.0/1"),
 			},
 		},
 		{
@@ -136,8 +136,8 @@ func TestFastACLNode_DirectItems(t *testing.T) {
 			},
 			wantCount: 2,
 			wantCidrs: []netip.Prefix{
-				netip.MustParsePrefix("::/1"),
-				netip.MustParsePrefix("8000::/1"),
+				mpp("::/1"),
+				mpp("8000::/1"),
 			},
 		},
 		{
@@ -156,7 +156,7 @@ func TestFastACLNode_DirectItems(t *testing.T) {
 			},
 			wantCount: 1,
 			wantCidrs: []netip.Prefix{
-				netip.MustParsePrefix("2001:db8::/32"),
+				mpp("2001:db8::/32"),
 			},
 		},
 	}
@@ -251,8 +251,8 @@ func TestFastACLNode_FprintRec(t *testing.T) {
 				n.InsertPrefix(1) // 0.0.0.0/0
 
 				// Insert nested prefixes into trie
-				pfx1 := netip.MustParsePrefix("10.0.0.0/8")
-				pfx2 := netip.MustParsePrefix("10.1.0.0/16")
+				pfx1 := mpp("10.0.0.0/8")
+				pfx2 := mpp("10.1.0.0/16")
 				n.Insert(pfx1, 0)
 				n.Insert(pfx2, 0)
 
@@ -315,7 +315,7 @@ func TestIDRLeaf_Fprint(t *testing.T) {
 		{
 			name: "IPv4 leaf renders correct prefix and padding",
 			leaf: &CIDRLeaf{
-				Prefix: netip.MustParsePrefix("10.0.0.0/8"),
+				Prefix: mpp("10.0.0.0/8"),
 			},
 			pad:  "│  ",
 			want: "│  └─ 10.0.0.0/8\n",
@@ -323,7 +323,7 @@ func TestIDRLeaf_Fprint(t *testing.T) {
 		{
 			name: "IPv6 leaf renders correct prefix and padding",
 			leaf: &CIDRLeaf{
-				Prefix: netip.MustParsePrefix("2001:db8::/32"),
+				Prefix: mpp("2001:db8::/32"),
 			},
 			pad:  "│  ",
 			want: "│  └─ 2001:db8::/32\n",
@@ -365,13 +365,13 @@ func TestCIDRLeaf_FprintRec(t *testing.T) {
 			nodeSetup: func() *FastACLNode {
 				n := &FastACLNode{}
 
-				pfx := netip.MustParsePrefix("0.0.0.0/0")
+				pfx := mpp("0.0.0.0/0")
 				n.Insert(pfx, 0)
 
-				pfxFringe := netip.MustParsePrefix("10.0.0.0/8")
+				pfxFringe := mpp("10.0.0.0/8")
 				n.Insert(pfxFringe, 0)
 
-				pfxLeaf := netip.MustParsePrefix("10.0.0.0/17")
+				pfxLeaf := mpp("10.0.0.0/17")
 				n.Insert(pfxLeaf, 0)
 
 				return n
@@ -392,13 +392,13 @@ func TestCIDRLeaf_FprintRec(t *testing.T) {
 			nodeSetup: func() *FastACLNode {
 				n := &FastACLNode{}
 
-				pfx := netip.MustParsePrefix("::/0")
+				pfx := mpp("::/0")
 				n.Insert(pfx, 0)
 
-				pfxFringe := netip.MustParsePrefix("2001::/16")
+				pfxFringe := mpp("2001::/16")
 				n.Insert(pfxFringe, 0)
 
-				pfxLeaf := netip.MustParsePrefix("2001::/33")
+				pfxLeaf := mpp("2001::/33")
 				n.Insert(pfxLeaf, 0)
 
 				return n
@@ -437,6 +437,182 @@ func TestCIDRLeaf_FprintRec(t *testing.T) {
 			got := buf.String()
 			if got != wantStr {
 				t.Errorf("FprintRec() mismatch:\ngot:\n%s\nwant:\n%s", got, wantStr)
+			}
+		})
+	}
+}
+
+// TestFastACLNode_DumpRec verifies the recursive ASCII dump formatting of FastACLNode
+// structures across IPv4 and IPv6 topologies, covering empty nodes, local prefixes,
+// fringe entries, CIDR leaves, and nested child subtrees.
+func TestFastACLNode_DumpRec(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		nodeSetup func() *FastACLNode
+		path      StridePath
+		depth     int
+		is4       bool
+		want      []string
+	}{
+		{
+			name: "Empty node produces no dump output",
+			nodeSetup: func() *FastACLNode {
+				return &FastACLNode{}
+			},
+			path:  StridePath{},
+			depth: 0,
+			is4:   true,
+			want:  nil,
+		},
+		{
+			name: "IPv4 single root node with prefixes and fringes",
+			nodeSetup: func() *FastACLNode {
+				n := &FastACLNode{}
+
+				// Insert 0.0.0.0/0 at root depth 0
+				n.Insert(mpp("0.0.0.0/0"), 0)
+
+				// Insert fringe entry for 10.0.0.0/8 at root octet 10
+				n.InsertFringe(10)
+
+				return n
+			},
+			path:  StridePath{},
+			depth: 0,
+			is4:   true,
+			want: []string{
+				"",
+				"[STOP] depth:  0 path: [] / 0",
+				"prefix(#1): [1]➜{0.0.0.0/0}",
+				"fringe(#1): [10]➜{10.0.0.0/8}",
+			},
+		},
+		{
+			name: "IPv4 node with nested child FastACLNode and CIDRLeaf",
+			nodeSetup: func() *FastACLNode {
+				parent := &FastACLNode{}
+				child := &FastACLNode{}
+
+				// Root prefix 0.0.0.0/0 at depth 0
+				parent.Insert(mpp("0.0.0.0/0"), 0)
+
+				// Child prefix 10.0.0.0/8 inserted at depth 1 scope
+				child.Insert(mpp("10.0.0.0/8"), 1)
+				parent.InsertChild(10, child)
+
+				// Compressed leaf for 192.168.0.0/16 under octet 192
+				leaf := &CIDRLeaf{Prefix: mpp("192.168.0.0/16")}
+				parent.InsertChild(192, leaf)
+
+				return parent
+			},
+			path:  StridePath{},
+			depth: 0,
+			is4:   true,
+			want: []string{
+				"",
+				"[FULL] depth:  0 path: [] / 0",
+				"prefix(#1): [1]➜{0.0.0.0/0}",
+				" child(#2): [10]↓ [192]➜{192.168.0.0/16}",
+				"",
+				".[STOP] depth:  1 path: [10] / 8",
+				".prefix(#1): [1]➜{10.0.0.0/8}",
+			},
+		},
+		{
+			name: "IPv6 deep stride traversal node dump",
+			nodeSetup: func() *FastACLNode {
+				n := &FastACLNode{}
+
+				// Insert 2001:db8::/32 prefix at depth 4 scope
+				n.Insert(mpp("2001:db8::/32"), 4)
+
+				return n
+			},
+			path:  StridePath{0x20, 0x01, 0x0d, 0xb8},
+			depth: 4,
+			is4:   false,
+			want: []string{
+				"",
+				"....[STOP] depth:  4 path: [2001:0db8] / 32",
+				"....prefix(#1): [1]➜{2001:db8::/32}",
+			},
+		},
+		{
+			name: "IPv4 node with multiple prefixes and fringes",
+			nodeSetup: func() *FastACLNode {
+				n := &FastACLNode{}
+
+				// Insert 0.0.0.0/0 (idx 1) and 128.0.0.0/1 (idx 3 in CBT)
+				n.InsertPrefix(1)
+				n.InsertPrefix(3)
+
+				// Insert two fringe entries
+				n.InsertFringe(10)
+				n.InsertFringe(20)
+
+				return n
+			},
+			path:  StridePath{},
+			depth: 0,
+			is4:   true,
+			want: []string{
+				"",
+				"[STOP] depth:  0 path: [] / 0",
+				"prefix(#2): [1]➜{0.0.0.0/0} [3]➜{128.0.0.0/1}",
+				"fringe(#2): [10]➜{10.0.0.0/8} [20]➜{20.0.0.0/8}",
+			},
+		},
+		{
+			name: "IPv4 halfNode classification (SubNodes + Leaf, no local prefixes/fringes)",
+			nodeSetup: func() *FastACLNode {
+				parent := &FastACLNode{}
+				child := &FastACLNode{}
+
+				// SubNode under octet 10
+				child.Insert(mpp("10.0.0.0/8"), 1)
+				parent.InsertChild(10, child)
+
+				// CIDRLeaf under octet 192 (no local prefixes or fringes on parent)
+				leaf := &CIDRLeaf{Prefix: mpp("192.168.0.0/16")}
+				parent.InsertChild(192, leaf)
+
+				return parent
+			},
+			path:  StridePath{},
+			depth: 0,
+			is4:   true,
+			want: []string{
+				"",
+				"[HALF] depth:  0 path: [] / 0",
+				" child(#2): [10]↓ [192]➜{192.168.0.0/16}",
+				"",
+				".[STOP] depth:  1 path: [10] / 8",
+				".prefix(#1): [1]➜{10.0.0.0/8}",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			node := tt.nodeSetup()
+			var buf bytes.Buffer
+
+			node.DumpRec(&buf, tt.path, tt.depth, tt.is4)
+
+			var wantStr string
+			if len(tt.want) > 0 {
+				wantStr = strings.Join(tt.want, "\n") + "\n"
+			}
+
+			got := buf.String()
+			if got != wantStr {
+				t.Errorf("DumpRec() mismatch:\ngot:\n%s\nwant:\n%s", got, wantStr)
 			}
 		})
 	}
