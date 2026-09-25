@@ -617,3 +617,423 @@ func TestFastACLNode_DumpRec(t *testing.T) {
 		})
 	}
 }
+
+// TestFastACLNode_Insert verifies prefix insertion mechanics, including direct prefix
+// placement, fringe placement, path-compressed CIDRLeaf generation, update semantics,
+// structural collision resolution (leaf push-down), and visual tree structure via DumpRec.
+func TestFastACLNode_Insert(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		ops       []netip.Prefix
+		wantPfx   netip.Prefix
+		wantExist bool
+		wantDump  []string
+		verify    func(t *testing.T, root *FastACLNode)
+	}{
+		{
+			name: "IPv4 insert default route /0 at root",
+			ops: []netip.Prefix{
+				mpp("0.0.0.0/0"),
+			},
+			wantPfx:   mpp("0.0.0.0/0"),
+			wantExist: false,
+			wantDump: []string{
+				"",
+				"[STOP] depth:  0 path: [] / 0",
+				"prefix(#1): [1]➜{0.0.0.0/0}",
+			},
+			verify: func(t *testing.T, root *FastACLNode) {
+				t.Helper()
+				if root.PrefixCount() != 1 {
+					t.Errorf("got PrefixCount %d, want 1", root.PrefixCount())
+				}
+			},
+		},
+		{
+			name: "IPv4 insert update existing prefix returns true",
+			ops: []netip.Prefix{
+				mpp("10.0.0.0/8"),
+				mpp("10.0.0.0/8"),
+			},
+			wantPfx:   mpp("10.0.0.0/8"),
+			wantExist: true,
+			wantDump: []string{
+				"",
+				"[STOP] depth:  0 path: [] / 0",
+				"fringe(#1): [10]➜{10.0.0.0/8}",
+			},
+			verify: func(t *testing.T, root *FastACLNode) {
+				t.Helper()
+				if root.FringeCount() != 1 {
+					t.Errorf("got FringeCount %d, want 1", root.FringeCount())
+				}
+			},
+		},
+		{
+			name: "IPv4 insert path compressed leaf into empty child slot",
+			ops: []netip.Prefix{
+				mpp("192.168.1.0/24"),
+			},
+			wantPfx:   mpp("192.168.1.0/24"),
+			wantExist: false,
+			wantDump: []string{
+				"",
+				"[STOP] depth:  0 path: [] / 0",
+				" child(#1): [192]➜{192.168.1.0/24}",
+			},
+			verify: func(t *testing.T, root *FastACLNode) {
+				t.Helper()
+				child, ok := root.GetChild(192)
+				if !ok {
+					t.Fatal("expected child at octet 192")
+				}
+				leaf, ok := child.(*CIDRLeaf)
+				if !ok {
+					t.Fatalf("expected *CIDRLeaf, got %T", child)
+				}
+				if leaf.Prefix != mpp("192.168.1.0/24") {
+					t.Errorf("got leaf prefix %s, want 192.168.1.0/24", leaf.Prefix)
+				}
+			},
+		},
+		{
+			name: "IPv4 insert collision resolution pushes existing leaf down",
+			ops: []netip.Prefix{
+				mpp("10.1.1.0/24"),
+				mpp("10.1.2.0/24"),
+			},
+			wantPfx:   mpp("10.1.2.0/24"),
+			wantExist: false,
+			wantDump: []string{
+				"",
+				"[PATH] depth:  0 path: [] / 0",
+				" child(#1): [10]↓",
+				"",
+				".[PATH] depth:  1 path: [10] / 8",
+				". child(#1): [1]↓",
+				"",
+				"..[STOP] depth:  2 path: [10.1] / 16",
+				"..fringe(#2): [1]➜{10.1.1.0/24} [2]➜{10.1.2.0/24}",
+			},
+			verify: func(t *testing.T, root *FastACLNode) {
+				t.Helper()
+				child, ok := root.GetChild(10)
+				if !ok {
+					t.Fatal("expected child at octet 10")
+				}
+				subNode, ok := child.(*FastACLNode)
+				if !ok {
+					t.Fatalf("expected intermediate *FastACLNode, got %T", child)
+				}
+				if !subNode.Children.Test(1) {
+					t.Error("expected subnode child at octet 1 under root[10]")
+				}
+			},
+		},
+		{
+			name: "IPv6 insert deep stride traversal compressed leaf",
+			ops: []netip.Prefix{
+				mpp("2001:db8:85a3::/48"),
+			},
+			wantPfx:   mpp("2001:db8:85a3::/48"),
+			wantExist: false,
+			wantDump: []string{
+				"",
+				"[STOP] depth:  0 path: [] / 0",
+				" child(#1): [0x20]➜{2001:db8:85a3::/48}",
+			},
+			verify: func(t *testing.T, root *FastACLNode) {
+				t.Helper()
+				child, ok := root.GetChild(0x20)
+				if !ok {
+					t.Fatal("expected child at octet 0x20")
+				}
+				if _, ok := child.(*CIDRLeaf); !ok {
+					t.Fatalf("expected *CIDRLeaf at root, got %T", child)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			root := &FastACLNode{}
+			var lastExists bool
+
+			for _, pfx := range tt.ops {
+				lastExists = root.Insert(pfx, 0)
+			}
+
+			if lastExists != tt.wantExist {
+				t.Errorf("Insert(%s) exist flag = %v, want %v", tt.wantPfx, lastExists, tt.wantExist)
+			}
+
+			if tt.verify != nil {
+				tt.verify(t, root)
+			}
+
+			if len(tt.wantDump) > 0 {
+				var buf bytes.Buffer
+				is4 := tt.wantPfx.Addr().Is4()
+				root.DumpRec(&buf, StridePath{}, 0, is4)
+
+				wantStr := strings.Join(tt.wantDump, "\n") + "\n"
+				if got := buf.String(); got != wantStr {
+					t.Errorf("DumpRec() mismatch after Insert:\ngot:\n%s\nwant:\n%s", got, wantStr)
+				}
+			}
+		})
+	}
+}
+
+// TestFastACLNode_Delete verifies single and multi-prefix deletion operations across all
+// internal node types (Prefixes, Fringes, CIDRLeaves) and verifies bottom-up path
+// re-compression (PurgeAndCompress) using DumpRec output matching.
+func TestFastACLNode_Delete(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		initial   []netip.Prefix
+		deletePfx []netip.Prefix
+		wantExist bool
+		wantDump  []string
+		verify    func(t *testing.T, root *FastACLNode)
+	}{
+		{
+			name: "IPv4 delete root default prefix /0",
+			initial: []netip.Prefix{
+				mpp("0.0.0.0/0"),
+			},
+			deletePfx: []netip.Prefix{
+				mpp("0.0.0.0/0"),
+			},
+			wantExist: true,
+			wantDump:  nil,
+			verify: func(t *testing.T, root *FastACLNode) {
+				t.Helper()
+				if !root.IsEmpty() {
+					t.Error("expected root node to be empty after deletion")
+				}
+			},
+		},
+		{
+			name: "IPv4 delete non-existent prefix returns false",
+			initial: []netip.Prefix{
+				mpp("10.0.0.0/8"),
+			},
+			deletePfx: []netip.Prefix{
+				mpp("192.168.0.0/16"),
+			},
+			wantExist: false,
+			wantDump: []string{
+				"",
+				"[STOP] depth:  0 path: [] / 0",
+				"fringe(#1): [10]➜{10.0.0.0/8}",
+			},
+			verify: func(t *testing.T, root *FastACLNode) {
+				t.Helper()
+				if root.IsEmpty() {
+					t.Error("root node should not be empty")
+				}
+			},
+		},
+		{
+			name: "IPv4 delete fringe prefix /8",
+			initial: []netip.Prefix{
+				mpp("10.0.0.0/8"),
+			},
+			deletePfx: []netip.Prefix{
+				mpp("10.0.0.0/8"),
+			},
+			wantExist: true,
+			wantDump:  nil,
+			verify: func(t *testing.T, root *FastACLNode) {
+				t.Helper()
+				if root.FringeCount() != 0 {
+					t.Errorf("got FringeCount %d, want 0", root.FringeCount())
+				}
+			},
+		},
+		{
+			name: "IPv4 delete compressed leaf",
+			initial: []netip.Prefix{
+				mpp("192.168.1.0/24"),
+			},
+			deletePfx: []netip.Prefix{
+				mpp("192.168.1.0/24"),
+			},
+			wantExist: true,
+			wantDump:  nil,
+			verify: func(t *testing.T, root *FastACLNode) {
+				t.Helper()
+				if root.ChildCount() != 0 {
+					t.Errorf("got ChildCount %d, want 0", root.ChildCount())
+				}
+			},
+		},
+		{
+			name: "IPv4 delete multiple prefixes sequentially",
+			initial: []netip.Prefix{
+				mpp("10.0.0.0/8"),
+				mpp("192.168.1.0/24"),
+				mpp("172.16.0.0/12"),
+			},
+			deletePfx: []netip.Prefix{
+				mpp("10.0.0.0/8"),
+				mpp("192.168.1.0/24"),
+			},
+			wantExist: true,
+			wantDump: []string{
+				"",
+				"[STOP] depth:  0 path: [] / 0",
+				" child(#1): [172]➜{172.16.0.0/12}",
+			},
+			verify: func(t *testing.T, root *FastACLNode) {
+				t.Helper()
+				if root.FringeCount() != 0 {
+					t.Errorf("got FringeCount %d, want 0", root.FringeCount())
+				}
+				if root.ChildCount() != 1 {
+					t.Errorf("got ChildCount %d, want 1", root.ChildCount())
+				}
+			},
+		},
+		{
+			name: "IPv4 delete triggers bottom-up path re-compression",
+			initial: []netip.Prefix{
+				mpp("10.1.1.0/24"),
+				mpp("10.1.2.0/24"),
+			},
+			deletePfx: []netip.Prefix{
+				mpp("10.1.2.0/24"),
+			},
+			wantExist: true,
+			wantDump: []string{
+				"",
+				"[STOP] depth:  0 path: [] / 0",
+				" child(#1): [10]➜{10.1.1.0/24}",
+			},
+			verify: func(t *testing.T, root *FastACLNode) {
+				t.Helper()
+				child, ok := root.GetChild(10)
+				if !ok {
+					t.Fatal("expected compressed leaf child at octet 10")
+				}
+				leaf, ok := child.(*CIDRLeaf)
+				if !ok {
+					t.Fatalf("expected intermediate node to be re-compressed to *CIDRLeaf, got %T", child)
+				}
+				if leaf.Prefix != mpp("10.1.1.0/24") {
+					t.Errorf("got elevated leaf prefix %s, want 10.1.1.0/24", leaf.Prefix)
+				}
+			},
+		},
+		{
+			name: "IPv6 delete compressed leaf with path purging",
+			initial: []netip.Prefix{
+				mpp("2001:db8::1/128"),
+			},
+			deletePfx: []netip.Prefix{
+				mpp("2001:db8::1/128"),
+			},
+			wantExist: true,
+			wantDump:  nil,
+			verify: func(t *testing.T, root *FastACLNode) {
+				t.Helper()
+				if !root.IsEmpty() {
+					t.Error("expected root node to be completely purged after deleting single IPv6 entry")
+				}
+			},
+		},
+		{
+			name: "IPv6 delete adjacent /128 collapses deep intermediate path to single leaf",
+			initial: []netip.Prefix{
+				mpp("2001:db8::1/128"),
+				mpp("2001:db8::2/128"),
+			},
+			deletePfx: []netip.Prefix{
+				mpp("2001:db8::2/128"),
+			},
+			wantExist: true,
+			wantDump: []string{
+				"",
+				"[STOP] depth:  0 path: [] / 0",
+				" child(#1): [0x20]➜{2001:db8::1/128}",
+			},
+			verify: func(t *testing.T, root *FastACLNode) {
+				t.Helper()
+
+				// Root must contain exactly one child at octet 0x20 (first octet of 2001:db8::1).
+				if root.ChildCount() != 1 {
+					t.Fatalf("got root ChildCount %d, want 1", root.ChildCount())
+				}
+
+				child, ok := root.GetChild(0x20)
+				if !ok {
+					t.Fatal("expected child at octet 0x20")
+				}
+
+				// Verify all intermediate nodes were purged and elevated to a single path-compressed *CIDRLeaf.
+				leaf, ok := child.(*CIDRLeaf)
+				if !ok {
+					t.Fatalf("expected path to collapse back into *CIDRLeaf, got %T", child)
+				}
+
+				if leaf.Prefix != mpp("2001:db8::1/128") {
+					t.Errorf("got elevated leaf prefix %s, want 2001:db8::1/128", leaf.Prefix)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			root := &FastACLNode{}
+			for _, pfx := range tt.initial {
+				root.Insert(pfx, 0)
+			}
+
+			var anyExisted bool
+			for _, pfx := range tt.deletePfx {
+				if root.Delete(pfx) {
+					anyExisted = true
+				}
+			}
+
+			if anyExisted != tt.wantExist {
+				t.Errorf("Delete(%v) exist flag = %v, want %v", tt.deletePfx, anyExisted, tt.wantExist)
+			}
+
+			if tt.verify != nil {
+				tt.verify(t, root)
+			}
+
+			if len(tt.wantDump) > 0 || tt.wantDump == nil {
+				var buf bytes.Buffer
+				is4 := true
+				if len(tt.deletePfx) > 0 {
+					is4 = tt.deletePfx[0].Addr().Is4()
+				}
+				root.DumpRec(&buf, StridePath{}, 0, is4)
+
+				var wantStr string
+				if len(tt.wantDump) > 0 {
+					wantStr = strings.Join(tt.wantDump, "\n") + "\n"
+				}
+
+				if got := buf.String(); got != wantStr {
+					t.Errorf("DumpRec() mismatch after Delete:\ngot:\n%s\nwant:\n%s", got, wantStr)
+				}
+			}
+		})
+	}
+}
