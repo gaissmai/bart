@@ -4,6 +4,7 @@ package bart
 // SPDX-License-Identifier: MIT
 
 import (
+	"iter"
 	"math/rand/v2"
 	"net/netip"
 	"slices"
@@ -320,7 +321,6 @@ func TestFastACL_All(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -364,111 +364,163 @@ func TestFastACL_All(t *testing.T) {
 	}
 }
 
+// TestFastACL_AllSorted verifies the public iterator methods AllSorted, AllSorted4,
+// and AllSorted6 for canonical CIDR prefix-sorted traversal and early termination handling.
 func TestFastACL_AllSorted(t *testing.T) {
 	t.Parallel()
 
-	// Test cases with known CIDR sort order
-	testCases := []struct {
-		name     string
-		prefixes []string
-		expected []string // Expected order after sorting
+	tests := []struct {
+		name      string
+		initial   []netip.Prefix
+		mode      string // "all", "v4", "v6"
+		stopAfter int    // if > 0, stop after yielding stopAfter items
+		want      []netip.Prefix
 	}{
 		{
-			name: "Mixed IPv4 addresses and prefix lengths",
-			prefixes: []string{
-				"10.0.0.0/16",
-				"10.0.0.0/8",
-				"192.168.1.0/24",
-				"10.0.0.0/24",
-				"172.16.0.0/12",
+			name:      "Empty FastACL produces empty sequence for AllSorted",
+			initial:   nil,
+			mode:      "all",
+			stopAfter: 0,
+			want:      nil,
+		},
+		{
+			name: "AllSorted4 returns IPv4 prefixes in strictly sorted CIDR order",
+			initial: []netip.Prefix{
+				mpp("192.168.1.0/24"),
+				mpp("10.0.0.0/8"),
+				mpp("0.0.0.0/0"),
+				mpp("10.0.0.0/16"),
+				mpp("2001:db8::/32"), // IPv6 ignored by AllSorted4
 			},
-			expected: []string{
-				"10.0.0.0/8",     // Same address, shorter prefix first
-				"10.0.0.0/16",    // Same address, longer prefix
-				"10.0.0.0/24",    // Same address, longest prefix
-				"172.16.0.0/12",  // Next address
-				"192.168.1.0/24", // Highest address
+			mode: "v4",
+			want: []netip.Prefix{
+				mpp("0.0.0.0/0"),
+				mpp("10.0.0.0/8"),
+				mpp("10.0.0.0/16"),
+				mpp("192.168.1.0/24"),
 			},
 		},
 		{
-			name: "Mixed IPv6 addresses and prefix lengths",
-			prefixes: []string{
-				"2001:db8::/32",
-				"2001:db8::/64",
-				"2000::/16",
-				"2001:db8:1::/48",
+			name: "AllSorted6 returns IPv6 prefixes in strictly sorted CIDR order",
+			initial: []netip.Prefix{
+				mpp("fe80::/10"),
+				mpp("2001:db8:1::/48"),
+				mpp("2001:db8::/32"),
+				mpp("10.0.0.0/8"), // IPv4 ignored by AllSorted6
 			},
-			expected: []string{
-				"2000::/16",       // Lowest address
-				"2001:db8::/32",   // Same address, shorter prefix first
-				"2001:db8::/64",   // Same address, longer prefix
-				"2001:db8:1::/48", // Higher address
+			mode: "v6",
+			want: []netip.Prefix{
+				mpp("2001:db8::/32"),
+				mpp("2001:db8:1::/48"),
+				mpp("fe80::/10"),
 			},
 		},
 		{
-			name: "Mixed IPv4 and IPv6",
-			prefixes: []string{
-				"192.168.1.0/24",
-				"2001:db8::/32",
-				"10.0.0.0/8",
-				"::1/128",
+			name: "AllSorted yields all IPv4 prefixes followed by all IPv6 prefixes",
+			initial: []netip.Prefix{
+				mpp("2001:db8::/32"),
+				mpp("192.168.0.0/16"),
+				mpp("10.0.0.0/8"),
+				mpp("fe80::/10"),
 			},
-			expected: []string{
-				"10.0.0.0/8",     // IPv4 addresses come first (lower in comparison)
-				"192.168.1.0/24", // Next IPv4 address
-				"::1/128",        // IPv6 addresses after IPv4
-				"2001:db8::/32",  // Higher IPv6 address
+			mode: "all",
+			want: []netip.Prefix{
+				mpp("10.0.0.0/8"),
+				mpp("192.168.0.0/16"),
+				mpp("2001:db8::/32"),
+				mpp("fe80::/10"),
+			},
+		},
+		{
+			name: "AllSorted early termination during IPv4 phase halts entire iteration",
+			initial: []netip.Prefix{
+				mpp("10.0.0.0/8"),
+				mpp("192.168.0.0/16"),
+				mpp("2001:db8::/32"),
+			},
+			mode:      "all",
+			stopAfter: 1,
+			want: []netip.Prefix{
+				mpp("10.0.0.0/8"),
+			},
+		},
+		{
+			name: "AllSorted early termination during IPv6 phase halts iteration",
+			initial: []netip.Prefix{
+				mpp("10.0.0.0/8"),
+				mpp("2001:db8::/32"),
+				mpp("fe80::/10"),
+			},
+			mode:      "all",
+			stopAfter: 2,
+			want: []netip.Prefix{
+				mpp("10.0.0.0/8"),
+				mpp("2001:db8::/32"),
 			},
 		},
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			tbl := new(FastACL)
-
-			// Insert prefixes with index as value
-			for _, prefixStr := range tc.prefixes {
-				pfx := mpp(prefixStr)
-				tbl.Insert(pfx)
+			var acl FastACL
+			for _, pfx := range tt.initial {
+				acl.Insert(pfx)
 			}
 
-			// Collect sorted results
-			var actualOrder []string
-			for pfx := range tbl.AllSorted() {
-				actualOrder = append(actualOrder, pfx.String())
+			var seq iter.Seq[netip.Prefix]
+			switch tt.mode {
+			case "all":
+				seq = acl.AllSorted()
+			case "v4":
+				seq = acl.AllSorted4()
+			case "v6":
+				seq = acl.AllSorted6()
+			default:
+				t.Fatalf("unsupported mode: %s", tt.mode)
 			}
 
-			// Verify the order matches expected
-			if len(actualOrder) != len(tc.expected) {
-				t.Fatalf("%s: Expected %d results, got %d", tc.name, len(tc.expected), len(actualOrder))
-			}
-
-			// Collect sorted 4 results
-			var actual4Order []string
-			for pfx := range tbl.AllSorted4() {
-				actual4Order = append(actual4Order, pfx.String())
-			}
-
-			// Collect sorted 6 results
-			var actual6Order []string
-			for pfx := range tbl.AllSorted6() {
-				actual6Order = append(actual6Order, pfx.String())
-			}
-
-			if !slices.Equal(slices.Concat(actual4Order, actual6Order), actualOrder) {
-				t.Fatalf("%s: Prefixes: AllSorted4 + AllSorted6 != AllSorted", tc.name)
-			}
-
-			for i, expected := range tc.expected {
-				if actualOrder[i] != expected {
-					t.Errorf("%s:At position %d: expected %s, got %s", tc.name, i, expected, actualOrder[i])
-					t.Errorf("%s:Full expected order: %v", tc.name, tc.expected)
-					t.Errorf("%s:Full actual order:   %v", tc.name, actualOrder)
-					break
+			var got []netip.Prefix
+			count := 0
+			seq(func(pfx netip.Prefix) bool {
+				got = append(got, pfx)
+				count++
+				if tt.stopAfter > 0 && count >= tt.stopAfter {
+					return false
 				}
+				return true
+			})
+
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("AllSorted sequence mismatch:\ngot:  %v\nwant: %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestFastACL_AllSortedCompare(t *testing.T) {
+	t.Parallel()
+
+	n := workLoadN()
+	prng := rand.New(rand.NewPCG(42, 42))
+
+	for range 3 {
+		pfxs := random.RealWorldPrefixes(prng, n)
+
+		gold := new(golden.Table[any])
+		tbl := new(FastACL)
+
+		for _, pfx := range pfxs {
+			gold.Insert(pfx, nil)
+			tbl.Insert(pfx)
+		}
+
+		goldFlat := gold.FlatSorted()
+		tblSorted := slices.Collect(tbl.AllSorted())
+
+		if !slices.Equal(goldFlat.SortKeys(), tblSorted) {
+			t.Fatal("expected Equal")
+		}
 	}
 }

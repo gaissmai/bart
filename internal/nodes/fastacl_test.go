@@ -64,7 +64,6 @@ func TestFastACLNode_IsDirectlyCoveredBy(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -163,7 +162,6 @@ func TestFastACLNode_DirectItems(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -272,7 +270,6 @@ func TestFastACLNode_FprintRec(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -332,7 +329,6 @@ func TestIDRLeaf_Fprint(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -418,7 +414,6 @@ func TestCIDRLeaf_FprintRec(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -597,7 +592,6 @@ func TestFastACLNode_DumpRec(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -759,7 +753,6 @@ func TestFastACLNode_Insert(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -994,7 +987,6 @@ func TestFastACLNode_Delete(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1139,7 +1131,6 @@ func TestFastACLNode_AllRec(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1171,6 +1162,154 @@ func TestFastACLNode_AllRec(t *testing.T) {
 
 			if !slices.Equal(got, want) {
 				t.Errorf("AllRec() prefix mismatch:\ngot:  %v\nwant: %v", got, want)
+			}
+		})
+	}
+}
+
+// TestFastACLNode_AllRecSorted verifies that trie traversal via AllRecSorted yields
+// all contained prefixes strictly in canonical CIDR prefix-sorted order, handling
+// interleaving of local prefixes, fringes, and child subtrees, as well as early termination.
+func TestFastACLNode_AllRecSorted(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		nodeSetup func() *FastACLNode
+		ptx       PathContext
+		stopAfter int // if > 0, yield returns false after yielding stopAfter items
+		want      []netip.Prefix
+	}{
+		{
+			name: "Empty node yields no prefixes",
+			nodeSetup: func() *FastACLNode {
+				return &FastACLNode{}
+			},
+			ptx: PathContext{
+				Depth: 0,
+				Is4:   true,
+			},
+			stopAfter: 0,
+			want:      nil,
+		},
+		{
+			name: "IPv4 local prefixes sorted in canonical CIDR rank order",
+			nodeSetup: func() *FastACLNode {
+				n := &FastACLNode{}
+				// Insert prefixes out of canonical order: /1 (128.0.0.0/1), /0 (0.0.0.0/0), /1 (0.0.0.0/1)
+				n.Insert(mpp("128.0.0.0/1"), 0)
+				n.Insert(mpp("0.0.0.0/0"), 0)
+				n.Insert(mpp("0.0.0.0/1"), 0)
+				return n
+			},
+			ptx: PathContext{
+				Depth: 0,
+				Is4:   true,
+			},
+			want: []netip.Prefix{
+				mpp("0.0.0.0/0"),
+				mpp("0.0.0.0/1"),
+				mpp("128.0.0.0/1"),
+			},
+		},
+		{
+			name: "IPv4 interleaved local prefixes, fringes, and nested child subtrees",
+			nodeSetup: func() *FastACLNode {
+				parent := &FastACLNode{}
+				child10 := &FastACLNode{}
+
+				// Root level default route
+				parent.Insert(mpp("0.0.0.0/0"), 0)
+
+				// Fringe at byte 20 (20.0.0.0/8)
+				_ = parent.InsertFringe(20)
+
+				// Child subtree at byte 10 (10.0.0.0/8) with its own nested prefix
+				child10.Insert(mpp("10.1.0.0/16"), 1)
+				parent.InsertChild(10, child10)
+
+				// Leaf entry at byte 192 (192.168.0.0/16)
+				leaf := &CIDRLeaf{Prefix: mpp("192.168.0.0/16")}
+				parent.InsertChild(192, leaf)
+
+				return parent
+			},
+			ptx: PathContext{
+				Depth: 0,
+				Is4:   true,
+			},
+			want: []netip.Prefix{
+				mpp("0.0.0.0/0"),
+				mpp("10.1.0.0/16"),
+				mpp("20.0.0.0/8"),
+				mpp("192.168.0.0/16"),
+			},
+		},
+		{
+			name: "IPv6 sorted traversal with deep stride path context",
+			nodeSetup: func() *FastACLNode {
+				n := &FastACLNode{}
+				// Pass depth = 4 to match the node's scope context in ptx
+				n.Insert(mpp("2001:db8:8000::/33"), 4)
+				n.Insert(mpp("2001:db8::/32"), 4)
+				n.Insert(mpp("2001:db8::/33"), 4)
+				return n
+			},
+			ptx: PathContext{
+				Path:  StridePath{0x20, 0x01, 0x0d, 0xb8},
+				Depth: 4,
+				Is4:   false,
+			},
+			want: []netip.Prefix{
+				mpp("2001:db8::/32"),
+				mpp("2001:db8::/33"),
+				mpp("2001:db8:8000::/33"),
+			},
+		},
+		{
+			name: "Early termination stops iteration after requested limit",
+			nodeSetup: func() *FastACLNode {
+				n := &FastACLNode{}
+				n.Insert(mpp("0.0.0.0/0"), 0)
+				n.Insert(mpp("0.0.0.0/1"), 0)
+				n.Insert(mpp("128.0.0.0/1"), 0)
+				return n
+			},
+			ptx: PathContext{
+				Depth: 0,
+				Is4:   true,
+			},
+			stopAfter: 2,
+			want: []netip.Prefix{
+				mpp("0.0.0.0/0"),
+				mpp("0.0.0.0/1"),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			node := tt.nodeSetup()
+			var got []netip.Prefix
+
+			count := 0
+			completed := node.AllRecSorted(tt.ptx, func(pfx netip.Prefix) bool {
+				got = append(got, pfx)
+				count++
+				if tt.stopAfter > 0 && count >= tt.stopAfter {
+					return false
+				}
+				return true
+			})
+
+			if tt.stopAfter > 0 && completed {
+				t.Errorf("AllRecSorted() expected early termination (false), got true")
+			}
+
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("AllRecSorted() prefix sequence mismatch:\ngot:  %v\nwant: %v", got, tt.want)
 			}
 		})
 	}
