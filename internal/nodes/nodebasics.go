@@ -198,8 +198,11 @@ func CmpIndexRank(aIdx, bIdx uint8) int {
 //   - idx: The base index from the prefix table
 //
 // Returns the reconstructed netip.Prefix.
-func CidrFromPath(path StridePath, depth int, is4 bool, idx uint8) netip.Prefix {
+func CidrFromPath(octets []byte, depth int, is4 bool, idx uint8) netip.Prefix {
 	depth &= DepthMask // BCE
+
+	var path StridePath
+	copy(path[:], octets)
 
 	// retrieve the last octet and pfxLen
 	octet, pfxLen := art.IdxToPfx(idx)
