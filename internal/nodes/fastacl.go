@@ -1115,42 +1115,43 @@ func (n *FastACLNode) AllRec(ptx PathContext, yield func(netip.Prefix) bool) boo
 }
 
 // AllRecSorted recursively traverses the trie in prefix-sorted order and applies
-// the given yield function to each stored prefix and value.
+// the given yield function to each stored prefix.
 //
 // Unlike AllRec, this implementation ensures that route entries are visited in
-// canonical prefix sort order. To achieve this,
-// both the prefixes and children of the current node are gathered, sorted,
-// and then interleaved during traversal based on logical octet positioning.
-//
-// The function first sorts relevant entries by their prefix index and address value,
-// using a comparison function that ranks prefixes according to their mask length and position.
-// Then it walks the trie, always yielding child entries that fall before the current prefix,
-// followed by the prefix itself. Remaining children are processed once all prefixes have been visited.
-//
-// Prefixes are reconstructed on-the-fly from the traversal path, and iteration includes all child types:
-// inner nodes (recursive descent), leaf nodes, and fringe (compressed) prefixes.
+// canonical prefix sort order. To achieve this, the prefixes, fringes and children
+// of the current node are gathered, prefixes are sorted, and then interleaved
+// during traversal based on logical octet positioning.
 //
 // The order is stable and predictable, making the function suitable for use cases
 // like table exports, comparisons or serialization.
 //
 // Parameters:
-//   - path: the current traversal path through the trie
-//   - depth: current depth in the trie (0-based)
-//   - is4: true for IPv4 processing, false for IPv6
+//   - TODO
 //   - yield: callback function invoked for each prefix/value pair
 //
 // Returns false if yield function requests early termination.
 func (n *FastACLNode) AllRecSorted(path StridePath, depth int, is4 bool, yield func(netip.Prefix) bool) bool {
-	panic("TODO")
-
 	allIndices := n.Prefixes.AppendBits(make([]uint8, 0, n.PrefixCount()))
-	// allFringeAddrs := n.Fringes.AppendBits(make([]uint8, 0, n.FringeCount()))
-	allChildAddrs := n.Children.AppendBits(make([]uint8, 0, n.ChildCount()))
+
+	fringeOrChild := n.Fringes.Or(&n.Children.BitSet256)
+	allAddrs := fringeOrChild.AppendBits(make([]uint8, 0, fringeOrChild.OnesCount()))
 
 	// Sort local prefix indices into canonical CIDR rank order.
 	slices.SortFunc(allIndices, CmpIndexRank)
 
-	// Helper to process and yield any child node type (inner node, leaf, or fringe).
+	// Helper to process and yield a prefix.
+	yieldPrefix := func(idx uint8) bool {
+		cidr := CidrFromPath(path[:], depth, is4, idx)
+		return yield(cidr)
+	}
+
+	// Helper to process and yield a fringe.
+	yieldFringe := func(addr uint8) bool {
+		fringePfx := CidrForFringe(path[:], depth, is4, addr)
+		return yield(fringePfx)
+	}
+
+	// Helper to process and yield any child node type.
 	yieldChild := func(addr uint8) bool {
 		switch kid := n.MustGetChild(addr).(type) {
 		case *FastACLNode:
@@ -1160,46 +1161,56 @@ func (n *FastACLNode) AllRecSorted(path StridePath, depth int, is4 bool, yield f
 		case *CIDRLeaf:
 			return yield(kid.Prefix)
 
-		case *FringeLeaf:
-			fringePfx := CidrForFringe(path[:], depth, is4, addr)
-			return yield(fringePfx)
-
 		default:
 			panic("logic error: unknown child node type")
 		}
 	}
 
-	childCursor := 0
+	addrCursor := 0
 
-	// Interleave local prefixes and child subtrees in CIDR rank order.
+	// Interleave local prefixes, fringes and child subtrees in CIDR rank order.
 	for _, pfxIdx := range allIndices {
 		pfxOctet, _ := art.IdxToPfx(pfxIdx)
 
 		// Yield all child subtrees whose base address precedes the current prefix octet.
-		for childCursor < len(allChildAddrs) {
-			childAddr := allChildAddrs[childCursor]
-			if childAddr >= pfxOctet {
+		for ; addrCursor < len(allAddrs); addrCursor++ {
+			addr := allAddrs[addrCursor]
+			if addr >= pfxOctet {
 				break
 			}
 
-			if !yieldChild(childAddr) {
-				return false
+			if n.Fringes.Test(addr) {
+				if !yieldFringe(addr) {
+					return false
+				}
 			}
-			childCursor++
+
+			if n.Children.Test(addr) {
+				if !yieldChild(addr) {
+					return false
+				}
+			}
 		}
 
-		// Yield the local prefix for this index.
-		cidr := CidrFromPath(path[:], depth, is4, pfxIdx)
-		if !yield(cidr) {
+		if !yieldPrefix(pfxIdx) {
 			return false
 		}
 	}
 
 	// Yield remaining child subtrees strictly positioned after all local prefixes.
-	for _, addr := range allChildAddrs[childCursor:] {
-		if !yieldChild(addr) {
-			return false
+	for _, addr := range allAddrs[addrCursor:] {
+		if n.Fringes.Test(addr) {
+			if !yieldFringe(addr) {
+				return false
+			}
 		}
+
+		if n.Children.Test(addr) {
+			if !yieldChild(addr) {
+				return false
+			}
+		}
+
 	}
 
 	return true
