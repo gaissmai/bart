@@ -548,7 +548,7 @@ func (f *FastACL) All6() iter.Seq[netip.Prefix] {
 	}
 }
 
-// AllSorted is like [liteTable.All] but the iteration is ordered in canonical
+// AllSorted is like [FastACL.All] but the iteration is ordered in canonical
 // CIDR prefix sort order.
 func (f *FastACL) AllSorted() iter.Seq[netip.Prefix] {
 	return func(yield func(netip.Prefix) bool) {
@@ -557,14 +557,14 @@ func (f *FastACL) AllSorted() iter.Seq[netip.Prefix] {
 	}
 }
 
-// AllSorted4 is like [liteTable.AllSorted] but only for the v4 routing table.
+// AllSorted4 is like [FastACL.AllSorted] but only for the v4 routing table.
 func (f *FastACL) AllSorted4() iter.Seq[netip.Prefix] {
 	return func(yield func(netip.Prefix) bool) {
 		_ = f.root4.AllRecSorted(stridePath{}, 0, true, yield)
 	}
 }
 
-// AllSorted6 is like [liteTable.AllSorted] but only for the v6 routing table.
+// AllSorted6 is like [FastACL.AllSorted] but only for the v6 routing table.
 func (f *FastACL) AllSorted6() iter.Seq[netip.Prefix] {
 	return func(yield func(netip.Prefix) bool) {
 		_ = f.root6.AllRecSorted(stridePath{}, 0, false, yield)
