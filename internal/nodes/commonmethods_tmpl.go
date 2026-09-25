@@ -387,9 +387,7 @@ func (n *_NODE_TYPE[V]) PurgeAndCompress(stack []*_NODE_TYPE[V], octets []uint8,
 			val := n.MustGetPrefix(idx)
 
 			// Reconstruct the prefix from the path for re-insertion.
-			path := StridePath{}
-			copy(path[:], octets)
-			pfx := CidrFromPath(path, depth+1, is4, idx)
+			pfx := CidrFromPath(octets, depth+1, is4, idx)
 
 			parent.Insert(pfx, val, depth)
 		default:
@@ -1010,7 +1008,7 @@ func (n *_NODE_TYPE[V]) dump(w io.Writer, path StridePath, depth int, is4 bool) 
 		fmt.Fprintf(w, "%sprefxs(#%d):", indent, nPfxCount)
 
 		for _, idx := range allIndices {
-			pfx := CidrFromPath(path, depth, is4, idx)
+			pfx := CidrFromPath(path[:], depth, is4, idx)
 			fmt.Fprintf(w, " %s", pfx)
 		}
 
@@ -1343,7 +1341,7 @@ func (n *_NODE_TYPE[V]) DirectItemsRec(parentIdx uint8, path StridePath, depth i
 				Depth: depth,
 				Idx:   idx,
 				// get the prefix back from trie
-				Cidr: CidrFromPath(path, depth, is4, idx),
+				Cidr: CidrFromPath(path[:], depth, is4, idx),
 				Val:  val,
 			}
 
@@ -1732,7 +1730,7 @@ func (n *_NODE_TYPE[V]) handleMatrixPersist(cloneFn func(V) V, thisExists bool, 
 // and runtime efficiency over consistency of iteration sequence.
 func (n *_NODE_TYPE[V]) AllRec(path StridePath, depth int, is4 bool, yield func(netip.Prefix, V) bool) bool {
 	for idx := range n.Prefixes.All() {
-		cidr := CidrFromPath(path, depth, is4, idx)
+		cidr := CidrFromPath(path[:], depth, is4, idx)
 		val := n.MustGetPrefix(idx)
 
 		// callback for this prefix and val
@@ -1850,7 +1848,7 @@ func (n *_NODE_TYPE[V]) AllRecSorted(path StridePath, depth int, is4 bool, yield
 		}
 
 		// Yield the local prefix for this index.
-		cidr := CidrFromPath(path, depth, is4, pfxIdx)
+		cidr := CidrFromPath(path[:], depth, is4, pfxIdx)
 		if !yield(cidr, n.MustGetPrefix(pfxIdx)) {
 			return false
 		}
@@ -1965,7 +1963,7 @@ func (n *_NODE_TYPE[V]) EachSubnet(octets []byte, depth int, is4 bool, pfxIdx ui
 		}
 
 		// Yield the local prefix entry itself.
-		cidr := CidrFromPath(path, depth, is4, pfxIdx)
+		cidr := CidrFromPath(path[:], depth, is4, pfxIdx)
 		if !yield(cidr, n.MustGetPrefix(pfxIdx)) {
 			return false
 		}

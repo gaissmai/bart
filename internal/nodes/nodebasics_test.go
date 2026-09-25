@@ -249,7 +249,7 @@ func TestCidrFromPath(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			result := CidrFromPath(tt.path, tt.depth, tt.is4, tt.idx)
+			result := CidrFromPath(tt.path[:], tt.depth, tt.is4, tt.idx)
 			if result.String() != tt.expected {
 				octet, pfxLen := art.IdxToPfx(tt.idx)
 				t.Errorf("Test %s: cidrFromPath() = %v, want %v (idx %d maps to octet=%d, pfxLen=%d)",
@@ -463,8 +463,8 @@ func TestCidrFromPathEdgeCases(t *testing.T) {
 		// Test that depth masking works correctly (depth & depthMask)
 		path := StridePath{192, 168, 1, 0}
 		// depth 32 should be masked to 0 (32 & 15 = 0)
-		result := CidrFromPath(path, 32, true, 3) // idx 3 = (128, 1)
-		expected := "128.0.0.0/1"                 // depth masked to 0, overwrites path[0] with 128
+		result := CidrFromPath(path[:], 32, true, 3) // idx 3 = (128, 1)
+		expected := "128.0.0.0/1"                    // depth masked to 0, overwrites path[0] with 128
 		if result.String() != expected {
 			t.Errorf("Expected %s with masked depth, got %s", expected, result.String())
 		}
@@ -474,8 +474,8 @@ func TestCidrFromPathEdgeCases(t *testing.T) {
 		t.Parallel()
 		path := StridePath{0x20, 0x01, 0x0d, 0xb8}
 		// depth 48 should be masked to 0 (48 & 15 = 0)
-		result := CidrFromPath(path, 48, false, 7) // idx 7 = (192, 2)
-		expected := "c000::/2"                     // depth masked to 0, overwrites path[0] with 192
+		result := CidrFromPath(path[:], 48, false, 7) // idx 7 = (192, 2)
+		expected := "c000::/2"                        // depth masked to 0, overwrites path[0] with 192
 		if result.String() != expected {
 			t.Errorf("Expected %s with masked depth, got %s", expected, result.String())
 		}
@@ -484,7 +484,7 @@ func TestCidrFromPathEdgeCases(t *testing.T) {
 	t.Run("Zero path", func(t *testing.T) {
 		t.Parallel()
 		var path StridePath // all zeros
-		result := CidrFromPath(path, 0, true, 1)
+		result := CidrFromPath(path[:], 0, true, 1)
 		expected := "0.0.0.0/0"
 		if result.String() != expected {
 			t.Errorf("cidrFromPath() = %v, want %v", result, expected)
@@ -495,7 +495,7 @@ func TestCidrFromPathEdgeCases(t *testing.T) {
 		t.Parallel()
 		// Test that bytes after depth are cleared
 		path := StridePath{10, 20, 30, 40, 50, 60, 70, 80, 90}
-		result := CidrFromPath(path, 2, true, 15) // depth 2, idx 15 = (224, 3)
+		result := CidrFromPath(path[:], 2, true, 15) // depth 2, idx 15 = (224, 3)
 		// Should result in 10.20.224.0/19 (depth*8 + 3 bits from idx 15)
 		expected := "10.20.224.0/19"
 		if result.String() != expected {
@@ -584,7 +584,7 @@ func TestARTIndexSpecialCases(t *testing.T) {
 
 			// Test in cidrFromPath
 			var path StridePath
-			result := CidrFromPath(path, 0, true, test.idx)
+			result := CidrFromPath(path[:], 0, true, test.idx)
 			expectedBits := int(test.expectedBits)
 			if result.Bits() != expectedBits {
 				t.Errorf("cidrFromPath with idx %d should have %d bits, got %d",
@@ -599,14 +599,14 @@ func BenchmarkCidrFromPath(b *testing.B) {
 	b.Run("IPv4", func(b *testing.B) {
 		path := StridePath{192, 168, 1, 100}
 		for b.Loop() {
-			_ = CidrFromPath(path, 3, true, 255)
+			_ = CidrFromPath(path[:], 3, true, 255)
 		}
 	})
 
 	b.Run("IPv6", func(b *testing.B) {
 		path := StridePath{0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01}
 		for b.Loop() {
-			_ = CidrFromPath(path, 15, false, 255)
+			_ = CidrFromPath(path[:], 15, false, 255)
 		}
 	})
 }
@@ -667,7 +667,7 @@ func TestIntegration(t *testing.T) {
 
 			// Verify that we can use this in cidrFromPath
 			var path StridePath
-			result := CidrFromPath(path, 0, true, idx)
+			result := CidrFromPath(path[:], 0, true, idx)
 
 			// The prefix length should be pfxLen
 			if result.Bits() != int(pfxLen) {

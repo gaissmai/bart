@@ -280,7 +280,7 @@ func (n *LiteNode[V]) AggregateRec(path StridePath, depth int, is4 bool) (modifi
 			} else {
 				// Convert prefix back to LeafNode and promote
 				idx, _ := kid.Prefixes.FirstSet()
-				leafPrefix := CidrFromPath(path, depth+1, is4, idx)
+				leafPrefix := CidrFromPath(path[:], depth+1, is4, idx)
 				n.Children.Items[i] = NewLeafNode(leafPrefix, zero)
 			}
 
