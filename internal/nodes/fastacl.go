@@ -238,41 +238,38 @@ func (n *FastACLNode) CloneRec() *FastACLNode {
 
 // AggregateRec compresses the FastACLNode in-place by pruning redundant subnets,
 // removing child nodes covered by parent prefixes, recursively compressing child
-// nodes with promotion of eligible single-entry children to FringeNode or LeafNode
-// instances, and merging adjacent sibling prefixes or fringe nodes.
+// subtrees, promoting single-entry children to higher-level entries, and
+// merging adjacent sibling prefixes or fringe nodes.
 //
 // The aggregation process executes the following steps in order:
 //
-//  1. Default Route Purge: If the node contains a default route (index 1), all
-//     other prefixes and children in the subtree are pruned immediately.
+//  1. Default Route Purge: If the node contains a default route (CBT index 1), all
+//     other local prefixes, fringes, and child nodes in the subtree are pruned immediately.
 //
-//  2. Prefix Subsumption: Removes more-specific prefixes fully covered by a
-//     broader supernet prefix within the same node's bitset.
+//  2. Prefix Subsumption: Removes more-specific local prefixes that are fully covered
+//     by a broader supernet prefix within the same node's CBT bitset.
 //
-//  3. Child Subsumption: Deletes child nodes that are fully covered
-//     by an existing prefix in the current node.
+//  3. Child and Fringe Subsumption: Deletes child nodes and fringe entries that are fully
+//     covered by an existing local prefix or fringe in the current node.
 //
-//  4. Recursive Descent: Recursively calls AggregateRec on child node instances.
-//     After the recursive call returns, if a child node has been compressed down to
-//     a single entry (a prefix or a child node), it is promoted in-place in the
-//     parent's child array:
-//     - A single default prefix (index 1) is promoted to a FringeNode.
-//     - Any other single prefix is promoted to a LeafNode with its reconstructed CIDR.
-//     - A single child *LeafNode is promoted directly.
-//     - A single child *FringeNode is reconstructed into a LeafNode and promoted.
+//  4. Recursive Descent & Promotion: Recursively calls AggregateRec on child nodes.
+//     Upon return, if a child node has been compressed down to a single total entry,
+//     it is promoted in-place at the parent node:
+//     - A single local prefix is converted to a CIDR prefix and re-inserted at parent depth.
+//     - A single fringe entry is reconstructed as a CIDR prefix and re-inserted at parent depth.
+//     - A single grandchild *CIDRLeaf is promoted directly into the parent's child slot.
 //
-//  5. Fringe Merging: Collapses pairs of adjacent FringeNode children into
-//     a single supernet prefix inserted into the current node's bitset.
+//  5. Fringe Merging: Collapses aligned pairs of adjacent fringe entries (covering a /7 block)
+//     into a single supernet prefix inserted into the current node's bitset.
 //
-//  6. Prefix Merging: Repeatedly combines pairs of adjacent sibling prefixes
-//     into their higher-level supernet prefix until no more merges are possible.
+//  6. Prefix Merging: Repeatedly combines aligned pairs of adjacent sibling prefixes
+//     into their parent supernet prefix in the CBT bitset until no further merges are possible.
 //
-// Returns modified, the number of structural mutation operations performed
-// during the aggregation pass. Note that pruning an entire child node counts
-// as a single mutation event, regardless of how many nested prefixes it contained.
-func (n *FastACLNode) AggregateRec(path StridePath, depth int, is4 bool) (modified int) {
+// Returns modified, the number of structural mutation operations performed during
+// the aggregation pass.
+func (n *FastACLNode) AggregateRec(ptx PathContext) (modified int) {
 	// #########################################################################################
-	// 1. Default Route Purge: If node has default route, purge all prefixes and children.
+	// 1. Default Route Purge: If node has default route, purge all prefixes, fringes, and children.
 	if n.Prefixes.Test(1) {
 		*n = FastACLNode{}
 
@@ -284,151 +281,173 @@ func (n *FastACLNode) AggregateRec(path StridePath, depth int, is4 bool) (modifi
 
 	// #########################################################################################
 	// 2. Prefix Subsumption: Remove subnets in the bitset that are fully covered by a supernet.
-	oldPfxCount := n.prefixCount
-	var pfxIdx uint8
 	var ok bool
+	var pfxIdx uint8
+	var changed bool
 	for {
 		// Find the next set prefix index, starting search at bit 0
 		if pfxIdx, ok = n.Prefixes.NextSet(pfxIdx); !ok {
 			break
 		}
 
-		// The last prefix only overlaps with itself
+		// The last prefix index (255) has no potential subnets below it
 		if pfxIdx == 255 {
 			break
 		}
 
 		// Find all prefixes covered by pfxIdx using the allotment lookup table
+		// including pfxIdx itself.
 		covered := n.Prefixes.And(&allot.PfxRoutesLookupTbl[pfxIdx])
+		if covered.OnesCount() > 1 {
+			// Clear all covered prefixes, including pfxIdx itself
+			n.Prefixes = n.Prefixes.Xor(&covered)
 
-		// Clear all covered prefixes, including pfxIdx itself
-		n.Prefixes = n.Prefixes.Xor(&covered)
+			// Re-enable cleared pfxIdx
+			n.Prefixes.Set(pfxIdx)
 
-		// Re-enable cleared pfxIdx
-		n.Prefixes.Set(pfxIdx)
+			// Track structural mutation
+			changed = true
+		}
 
 		// Advance index to search for the next prefix
 		pfxIdx++
 	}
-	// Recalculate prefix count after deletions
-	//nolint:gosec // G115: integer overflow conversion int -> uint16
-	n.prefixCount = uint16(n.Prefixes.OnesCount())
 
-	// Track number of subsumed prefixes removed
-	modified += int(oldPfxCount - n.prefixCount)
+	// Recalculate prefix count after modifications
+	if changed {
+		// Track structural mutation
+		modified++
+
+		//nolint:gosec // G115: integer overflow conversion int -> uint16
+		n.prefixCount = uint16(n.Prefixes.OnesCount())
+	}
 
 	// ###########################################################################
-	// 3. Child Subsumption: Remove child nodes covered by any prefix in this node.
+	// 3. Child and Fringe Subsumption: Remove fringe and child nodes covered by any
+	// remaining local prefix or fringe in this node.
 	//
-	// We first accumulate all matching child addresses into a BitSet256 and delete
-	// them in a second pass.
-	var batchAddrs bitset.BitSet256
+	// We first accumulate all matching addresses into BitSet256 masks and delete
+	// them in batch.
+	var batchFringeAddrs bitset.BitSet256
+	var batchChildAddrs bitset.BitSet256
+
 	for idx := range n.Prefixes.All() {
-		// Collect child addresses covered by the current prefix using the fringe lookup table
-		covered := n.Children.And(&allot.FringeRoutesLookupTbl[idx])
-		batchAddrs = batchAddrs.Or(&covered)
+		// Collect fringe and child addresses covered by the current prefix
+		// using the fringe lookup table
+		coveredFringeAddrs := n.Fringes.And(&allot.FringeRoutesLookupTbl[idx])
+		coveredChildAddrs := n.Children.And(&allot.FringeRoutesLookupTbl[idx])
+
+		// Accumulate covered addresses
+		batchFringeAddrs = batchFringeAddrs.Or(&coveredFringeAddrs)
+		batchChildAddrs = batchChildAddrs.Or(&coveredChildAddrs)
 	}
 
-	// Batch delete accumulated child nodes
-	oldChildCount := n.ChildCount()
-	for addr := range batchAddrs.All() {
+	// Batch delete fringe entries covered by local prefixes
+	for addr := range batchFringeAddrs.All() {
+		n.DeleteFringe(addr)
+		modified++
+	}
+
+	// Batch delete child nodes covered by local prefixes
+	for addr := range batchChildAddrs.All() {
 		n.DeleteChild(addr)
+		modified++
 	}
 
-	// Track total number of subsumed children removed
-	modified += oldChildCount - n.ChildCount()
+	// Delete child nodes directly covered by remaining fringes
+	for addr := range n.Fringes.All() {
+		if exists := n.DeleteChild(addr); exists {
+			modified++
+		}
+	}
 
 	// #########################################################
 	// 4. Recursive Descent: Top-down compression of child nodes
-	for i, addr := range n.Children.AllEnumerate() {
-		anyKid := n.Children.Items[i]
-
+	for addr := range n.Children.All() {
+		anyKid := n.MustGetChild(addr)
 		kid, ok := anyKid.(*FastACLNode)
-		// Leaf or Fringe, skip over
+		// Skip compressed leaf nodes (*CIDRLeaf)
 		if !ok {
 			continue
 		}
 
-		// Recurse down
-		path[depth] = addr
-		modified += kid.AggregateRec(path, depth+1, is4)
+		// Recurse down with updated path context
+		nextPtx := ptx
+		nextPtx.Path[ptx.Depth] = addr
+		nextPtx.Depth++
 
+		modified += kid.AggregateRec(nextPtx)
+
+		// #############################################################
+		// After the recursive call returns, attempt to promote single-entry children
 		pfxCount := kid.PrefixCount()
+		fringeCount := kid.FringeCount()
 		childCount := kid.ChildCount()
 
-		// Nothing to promote if combined entry count is 2 or more
-		if pfxCount+childCount >= 2 {
+		// Nothing to promote if combined entry count exceeds 1
+		if pfxCount+fringeCount+childCount > 1 {
 			continue
 		}
 
-		// Promote single-entry child nodes to lower-overhead structures
+		// Promote single-entry child nodes to lower-overhead structures at the parent level.
+		// Note: nextPtx provides the child's context (depth = ptx.Depth + 1) for CIDR reconstruction,
+		// while ptx.Depth represents the current parent node level for insertion.
 		switch {
 		case pfxCount == 1:
-			// Promote single prefix to FringeNode or LeafNode
-			if kid.Prefixes.Test(1) {
-				n.Children.Items[i] = nil /* a fringe */
-			} else {
-				// Convert prefix back to LeafNode and promote
-				idx, _ := kid.Prefixes.FirstSet()
-				leafPrefix := CidrFromPath(path[:], depth+1, is4, idx)
-				n.Children.Items[i] = &CIDRLeaf{leafPrefix}
-			}
+			// Restore CIDR from single local prefix and re-insert at current parent depth
+			idx, _ := kid.Prefixes.FirstSet()
+			cidr := CidrFromPath(nextPtx.Path[:], nextPtx.Depth, nextPtx.Is4, idx)
+			n.DeleteChild(addr)
+			n.Insert(cidr, ptx.Depth)
+
+		case fringeCount == 1:
+			// Restore CIDR from single fringe entry and re-insert at current parent depth
+			fringeByte, _ := kid.Fringes.FirstSet()
+			cidr := CidrForFringe(nextPtx.Path[:], nextPtx.Depth, nextPtx.Is4, fringeByte)
+			n.DeleteChild(addr)
+			n.Insert(cidr, ptx.Depth)
 
 		case childCount == 1:
-			// Promote single grandchild to parent's child slot
+			// Directly access the underlying slice without bitset traversal operations.
+			// Since there is exactly one child node, it is guaranteed to be the first
+			// and only item in the slice.
 			switch grandKid := kid.Children.Items[0].(type) {
 			case *FastACLNode:
-				// Intermediate path node, leave as is
+				// Intermediate path node with multi-level depth, leave structural hierarchy intact
 				continue
 
 			case *CIDRLeaf:
-				// Promote LeafNode directly
-				n.Children.Items[i] = grandKid
-
-			case *FringeLeaf:
-				// Convert FringeNode back to LeafNode and promote
-				fringeByte, _ := kid.Children.FirstSet()
-				fringePrefix := CidrForFringe(path[:], depth+1, is4, fringeByte)
-				n.Children.Items[i] = &CIDRLeaf{fringePrefix}
+				// Promote single grandchild leaf directly into parent's child slot
+				n.InsertChild(addr, grandKid)
 			}
 		}
 	}
 
 	// #############################################################################
-	// 5. Fringe Merging: Collapse adjacent FringeNode pairs into a supernet prefix.
-
-	// Only aligned pairs are aggregation candidates
-	alignedPairs := n.Children.AlignedPairs()
+	// 5. Fringe Merging: Collapse aligned fringe pairs (/8 siblings) into a /7 supernet prefix.
+	alignedPairs := n.Fringes.AlignedPairs()
 	for addr := range alignedPairs.All() {
-		// addr, addr+1 is an aligned pair
-		anyKid := n.MustGetChild(addr)
-		if _, ok := anyKid.(*FringeLeaf); !ok {
-			continue
-		}
-		anyKid = n.MustGetChild(addr + 1)
-		if _, ok := anyKid.(*FringeLeaf); !ok {
-			continue
-		}
-
-		// The aligned child pair are fringes; promote them as prefix: addr/7
+		// Promote aligned fringe pair (addr and addr+1) to a /7 prefix index
 		n.InsertPrefix(art.PfxToIdx(addr, 7))
-		n.DeleteChild(addr)
-		n.DeleteChild(addr + 1)
+
+		// Delete the aligned fringe pair.
+		n.DeleteFringe(addr)
+		n.DeleteFringe(addr + 1)
 
 		modified++
 	}
 
 	// #############################################################
-	// 6. Prefix Merging: Merge adjacent prefixes within the bitset.
-	for { // Repeat in multiple passes to handle cascading merges
+	// 6. Prefix Merging: Repeatedly merge aligned sibling prefixes within the CBT bitset.
+	for { // Loop until cascading merges complete
 		more := false
 
 		alignedPairs := n.Prefixes.AlignedPairs()
 		for idx := range alignedPairs.All() {
-			// Insert supernet
+			// Insert parent supernet index (idx >> 1 in CBT)
 			n.InsertPrefix(idx >> 1)
 
-			// Delete subnets
+			// Delete left and right sibling subnets
 			n.DeletePrefix(idx)
 			n.DeletePrefix(idx + 1)
 

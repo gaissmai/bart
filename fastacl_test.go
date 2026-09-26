@@ -524,3 +524,332 @@ func TestFastACL_AllSortedCompare(t *testing.T) {
 		}
 	}
 }
+
+func TestFastACL_Aggregate(t *testing.T) {
+	tests := []struct {
+		name  string
+		input []string
+		want  []string
+	}{
+		{
+			name: "empty",
+		},
+		{
+			name:  "duplicate canonical prefix",
+			input: []string{"192.0.2.0/24", "192.0.2.0/24"},
+			want:  []string{"192.0.2.0/24"},
+		},
+		{
+			name:  "prefix subsumption",
+			input: []string{"10.1.2.0/24", "10.1.0.0/16", "10.0.0.0/8"},
+			want:  []string{"10.0.0.0/8"},
+		},
+		{
+			name:  "child subsumption",
+			input: []string{"192.0.2.1/32", "192.0.2.128/25", "192.0.2.0/24"},
+			want:  []string{"192.0.2.0/24"},
+		},
+		{
+			name:  "ipv4 adjacent prefixes",
+			input: []string{"192.0.2.0/25", "192.0.2.128/25"},
+			want:  []string{"192.0.2.0/24"},
+		},
+		{
+			name: "ipv4 recursive leaf merging",
+			input: []string{
+				"192.0.2.0/32",
+				"192.0.2.1/32",
+				"192.0.2.2/32",
+				"192.0.2.3/32",
+			},
+			want: []string{"192.0.2.0/30"},
+		},
+		{
+			name: "Promote each child after recursive aggregation",
+			input: []string{
+				"10.0.0.0/25",
+				"10.0.0.128/25",
+				"10.0.1.0/24",
+			},
+			want: []string{"10.0.0.0/23"},
+		},
+		{
+			name: "ipv4 recursive fringe merging",
+			input: []string{
+				"8.0.0.0/8",
+				"9.0.0.0/8",
+				"10.0.0.0/8",
+				"11.0.0.0/8",
+			},
+			want: []string{"8.0.0.0/6"},
+		},
+		{
+			name:  "non siblings remain separate",
+			input: []string{"10.0.0.0/8", "12.0.0.0/8"},
+			want:  []string{"10.0.0.0/8", "12.0.0.0/8"},
+		},
+		{
+			name:  "different prefix lengths remain separate",
+			input: []string{"192.0.2.0/25", "192.0.2.128/26"},
+			want:  []string{"192.0.2.0/25", "192.0.2.128/26"},
+		},
+		{
+			name:  "ipv6 adjacent prefixes",
+			input: []string{"2001:db8::/65", "2001:db8:0:0:8000::/65"},
+			want:  []string{"2001:db8::/64"},
+		},
+		{
+			name: "ipv6 recursive leaf merging",
+			input: []string{
+				"2001:db8::/128",
+				"2001:db8::1/128",
+				"2001:db8::2/128",
+				"2001:db8::3/128",
+			},
+			want: []string{"2001:db8::/126"},
+		},
+		{
+			name:  "default routes subsume their family",
+			input: []string{"0.0.0.0/0", "10.0.0.0/8", "128.0.0.0/1", "::/0", "2001:db8::/32"},
+			want:  []string{"0.0.0.0/0", "::/0"},
+		},
+		{
+			name:  "both address families",
+			input: []string{"192.0.2.0/25", "192.0.2.128/25", "2001:db8::/65", "2001:db8:0:0:8000::/65"},
+			want:  []string{"192.0.2.0/24", "2001:db8::/64"},
+		},
+
+		// more corner cases
+		{
+			name:  "adjacent leaf siblings ipv4",
+			input: []string{"10.0.0.0/24", "10.0.1.0/24"},
+			want:  []string{"10.0.0.0/23"},
+		},
+		{
+			name:  "adjacent non-byte-aligned siblings ipv4",
+			input: []string{"10.0.0.0/25", "10.0.0.128/25"},
+			want:  []string{"10.0.0.0/24"},
+		},
+		{
+			name:  "adjacent siblings ipv6",
+			input: []string{"2001:db8::/53", "2001:db8:0:0800::/53"},
+			want:  []string{"2001:db8::/52"},
+		},
+		{
+			name:  "zero address fringe pair ipv4",
+			input: []string{"0.0.0.0/8", "1.0.0.0/8"},
+			want:  []string{"0.0.0.0/7"},
+		},
+		{
+			name:  "zero address fringe pair ipv6",
+			input: []string{"::/8", "100::/8"},
+			want:  []string{"::/7"},
+		},
+		{
+			name: "covered child with multiple routes",
+			input: []string{
+				"10.0.0.0/8",
+				"10.1.0.0/17",
+				"10.1.128.0/17",
+				"10.2.0.0/17",
+				"10.2.128.0/17",
+			},
+			want: []string{"10.0.0.0/8"},
+		},
+		{
+			name: "cascading prefix merges",
+			input: []string{
+				"0.0.0.0/5",
+				"8.0.0.0/5",
+				"16.0.0.0/5",
+				"24.0.0.0/5",
+			},
+			want: []string{"0.0.0.0/3"},
+		},
+		{
+			name:  "partial sibling set",
+			input: []string{"0.0.0.0/8", "1.0.0.0/8", "2.0.0.0/8"},
+			want:  []string{"0.0.0.0/7", "2.0.0.0/8"},
+		},
+		{
+			name:  "non-adjacent prefixes remain separate",
+			input: []string{"10.0.0.0/24", "10.0.2.0/24"},
+			want:  []string{"10.0.0.0/24", "10.0.2.0/24"},
+		},
+		{
+			name:  "single prefix",
+			input: []string{"192.0.2.1/32"},
+			want:  []string{"192.0.2.1/32"},
+		},
+		{
+			name:  "default route per family",
+			input: []string{"0.0.0.0/0", "10.0.0.0/8", "::/0", "2001:db8::/32"},
+			want:  []string{"0.0.0.0/0", "::/0"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			facl := new(FastACL)
+			for _, prefix := range parseAndCollect(test.input) {
+				facl.Insert(prefix)
+			}
+
+			facl.Aggregate()
+
+			want := parseAndCollect(test.want)
+			got := slices.Collect(facl.AllSorted())
+			if !slices.Equal(got, want) {
+				t.Fatalf("%s: Aggregate(), got: %v, want: %v", test.name, got, want)
+			}
+
+			want4, want6 := 0, 0
+			for _, prefix := range want {
+				if prefix.Addr().Is4() {
+					want4++
+				} else {
+					want6++
+				}
+			}
+			if facl.Size() != len(want) || facl.Size4() != want4 || facl.Size6() != want6 {
+				t.Fatalf("%s: sizes, got: (%d, %d, %d), want: (%d, %d, %d)",
+					test.name, facl.Size(), facl.Size4(), facl.Size6(), len(want), want4, want6)
+			}
+
+			first := slices.Collect(facl.AllSorted())
+			facl.Aggregate()
+			second := slices.Collect(facl.AllSorted())
+			if !slices.Equal(second, first) {
+				t.Fatalf("%s: Aggregate() is not idempotent: first %v, second %v", test.name, first, second)
+			}
+		})
+	}
+}
+
+func TestFastACL_AggregatePreservesMembership(t *testing.T) {
+	tests := []struct {
+		name   string
+		input  []string
+		probes []string
+	}{
+		{
+			name:  "ipv4 boundaries",
+			input: []string{"192.0.2.0/25", "192.0.2.128/25"},
+			probes: []string{
+				"192.0.1.255",
+				"192.0.2.0",
+				"192.0.2.127",
+				"192.0.2.128",
+				"192.0.2.255",
+				"192.0.3.0",
+			},
+		},
+		{
+			name:  "ipv6 boundaries",
+			input: []string{"2001:db8::/65", "2001:db8:0:0:8000::/65"},
+			probes: []string{
+				"2001:db7:ffff:ffff:ffff:ffff:ffff:ffff",
+				"2001:db8::",
+				"2001:db8:0:0:ffff:ffff:ffff:ffff",
+				"2001:db9::",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			before := new(FastACL)
+			for _, prefix := range parseAndCollect(test.input) {
+				before.Insert(prefix)
+			}
+
+			after := before.Clone()
+			after.Aggregate()
+
+			for _, address := range test.probes {
+				ip := netip.MustParseAddr(address)
+
+				beforeContains := before.Contains(ip)
+				afterContains := after.Contains(ip)
+
+				if afterContains != beforeContains {
+					t.Errorf("Contains(%s) changed from %v to %v", address, beforeContains, afterContains)
+				}
+			}
+		})
+	}
+}
+
+func TestFastACL_AggregateCompare(t *testing.T) {
+	t.Parallel()
+	n := workLoadN()
+
+	for i := range 50 {
+		t.Run("subtest", func(t *testing.T) {
+			t.Parallel()
+
+			prng := rand.New(rand.NewPCG(uint64(n), uint64(i)))
+			pfxs := random.RealWorldPrefixes(prng, n)
+
+			gold := new(golden.Table[any])
+			facl := new(FastACL)
+
+			for _, pfx := range pfxs {
+				gold.Insert(pfx, nil)
+				facl.Insert(pfx)
+			}
+
+			gold.Aggregate()
+			facl.Aggregate()
+
+			goldSorted := gold.FlatSorted().SortKeys()
+			faclSorted := slices.Collect(facl.AllSorted())
+
+			if !slices.Equal(goldSorted, faclSorted) {
+				t.Fatal("Aggregate(): tables are different!")
+			}
+		})
+	}
+}
+
+func TestFastACL_AggregateStructuralCompare(t *testing.T) {
+	t.Parallel()
+	n := workLoadN()
+
+	for i := range 50 {
+		t.Run("subtest", func(t *testing.T) {
+			t.Parallel()
+
+			prng := rand.New(rand.NewPCG(uint64(n), uint64(i)))
+			pfxs := random.RealWorldPrefixes(prng, n)
+
+			gold := new(golden.Table[any])
+			facl1 := new(FastACL)
+			facl2 := new(FastACL)
+
+			for _, pfx := range pfxs {
+				gold.Insert(pfx, nil)
+				facl1.Insert(pfx)
+			}
+
+			gold.Aggregate()
+			facl1.Aggregate()
+
+			// build facl2 with aggregated prefixes
+			for pfx := range gold.All() {
+				facl2.Insert(pfx)
+			}
+
+			facl1Sorted := slices.Collect(facl1.AllSorted())
+			facl2Sorted := slices.Collect(facl2.AllSorted())
+
+			if !slices.Equal(facl1Sorted, facl2Sorted) {
+				t.Fatal("Aggregate(): the tables have different prefixes!")
+			}
+
+			if facl1.dumpString() != facl2.dumpString() {
+				t.Fatal("Aggregate(): the tables have mismatched internal structures!")
+			}
+		})
+	}
+}
