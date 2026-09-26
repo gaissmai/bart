@@ -190,11 +190,10 @@ func CmpIndexRank(aIdx, bIdx uint8) int {
 	aOctet, aBits := art.IdxToPfx(aIdx)
 	bOctet, bBits := art.IdxToPfx(bIdx)
 
-	// cmp the prefixes, first by address and then by bits
-	if aOctet == bOctet {
-		return cmp.Compare(aBits, bBits)
+	if cmpOctet := cmp.Compare(aOctet, bOctet); cmpOctet != 0 {
+		return cmpOctet
 	}
-	return cmp.Compare(aOctet, bOctet)
+	return cmp.Compare(aBits, bBits)
 }
 
 // CidrFromPath reconstructs a CIDR prefix from a stride path, depth, and index.
