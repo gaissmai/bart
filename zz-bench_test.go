@@ -5,6 +5,7 @@ package bart
 
 import (
 	"fmt"
+	"maps"
 	"math/rand/v2"
 	"net/netip"
 	"testing"
@@ -13,7 +14,131 @@ import (
 	"github.com/gaissmai/bart/internal/tests/random"
 )
 
-func BenchmarkFullFastMatch4(b *testing.B) {
+func BenchmarkFastACL_FullMatch4(b *testing.B) {
+	facl := new(FastACL)
+	for _, pfx := range tier1.routes4() {
+		facl.Insert(pfx)
+	}
+
+	b.Run("Contains", func(b *testing.B) {
+		matchIP4 := tier1.matchIP4()
+
+		for i := 0; b.Loop(); i++ {
+			facl.Contains(matchIP4[i&mask])
+		}
+	})
+
+	b.Run("LookupPrefix", func(b *testing.B) {
+		matchPfx4 := tier1.matchPfx4()
+
+		for i := 0; b.Loop(); i++ {
+			facl.LookupPrefix(matchPfx4[i&mask])
+		}
+	})
+
+	b.Run("LookupPfxLPM", func(b *testing.B) {
+		matchPfx4 := tier1.matchPfx4()
+
+		for i := 0; b.Loop(); i++ {
+			facl.LookupPrefixLPM(matchPfx4[i&mask])
+		}
+	})
+}
+
+func BenchmarkFastACL_FullMatch6(b *testing.B) {
+	facl := new(FastACL)
+	for _, pfx := range tier1.routes6() {
+		facl.Insert(pfx)
+	}
+
+	b.Run("Contains", func(b *testing.B) {
+		matchIP6 := tier1.matchIP6()
+
+		for i := 0; b.Loop(); i++ {
+			facl.Contains(matchIP6[i&mask])
+		}
+	})
+
+	b.Run("LookupPrefix", func(b *testing.B) {
+		matchPfx6 := tier1.matchPfx6()
+
+		for i := 0; b.Loop(); i++ {
+			facl.LookupPrefix(matchPfx6[i&mask])
+		}
+	})
+
+	b.Run("LookupPfxLPM", func(b *testing.B) {
+		matchPfx6 := tier1.matchPfx6()
+
+		for i := 0; b.Loop(); i++ {
+			facl.LookupPrefixLPM(matchPfx6[i&mask])
+		}
+	})
+}
+
+func BenchmarkFastACL_FullMiss4(b *testing.B) {
+	facl := new(FastACL)
+	for _, pfx := range tier1.routes4() {
+		facl.Insert(pfx)
+	}
+
+	b.Run("Contains", func(b *testing.B) {
+		missIP4 := tier1.missIP4()
+
+		for i := 0; b.Loop(); i++ {
+			facl.Contains(missIP4[i&mask])
+		}
+	})
+
+	b.Run("LookupPrefix", func(b *testing.B) {
+		missPfx4 := tier1.missPfx4()
+
+		for i := 0; b.Loop(); i++ {
+			facl.LookupPrefix(missPfx4[i&mask])
+		}
+	})
+
+	b.Run("LookupPfxLPM", func(b *testing.B) {
+		missPfx4 := tier1.missPfx4()
+
+		for i := 0; b.Loop(); i++ {
+			facl.LookupPrefixLPM(missPfx4[i&mask])
+		}
+	})
+}
+
+func BenchmarkFastACL_FullMiss6(b *testing.B) {
+	facl := new(FastACL)
+	for _, pfx := range tier1.routes6() {
+		facl.Insert(pfx)
+	}
+
+	b.Run("Contains", func(b *testing.B) {
+		missIP6 := tier1.missIP6()
+
+		for i := 0; b.Loop(); i++ {
+			facl.Contains(missIP6[i&mask])
+		}
+	})
+
+	b.Run("LookupPrefix", func(b *testing.B) {
+		missPfx6 := tier1.missPfx6()
+
+		for i := 0; b.Loop(); i++ {
+			facl.LookupPrefix(missPfx6[i&mask])
+		}
+	})
+
+	b.Run("LookupPfxLPM", func(b *testing.B) {
+		missPfx6 := tier1.missPfx6()
+
+		for i := 0; b.Loop(); i++ {
+			facl.LookupPrefixLPM(missPfx6[i&mask])
+		}
+	})
+}
+
+func BenchmarkFast_FullMatch4(b *testing.B) {
 	fast := new(Fast[bool])
 	for _, pfx := range tier1.routes4() {
 		fast.Insert(pfx, true)
@@ -52,7 +177,7 @@ func BenchmarkFullFastMatch4(b *testing.B) {
 	})
 }
 
-func BenchmarkFullFastMatch6(b *testing.B) {
+func BenchmarkFast_FullMatch6(b *testing.B) {
 	fast := new(Fast[bool])
 	for _, pfx := range tier1.routes6() {
 		fast.Insert(pfx, true)
@@ -91,7 +216,7 @@ func BenchmarkFullFastMatch6(b *testing.B) {
 	})
 }
 
-func BenchmarkFullFastMiss4(b *testing.B) {
+func BenchmarkFast_FullMiss4(b *testing.B) {
 	fast := new(Fast[bool])
 	for _, pfx := range tier1.routes4() {
 		fast.Insert(pfx, true)
@@ -130,7 +255,7 @@ func BenchmarkFullFastMiss4(b *testing.B) {
 	})
 }
 
-func BenchmarkFullFastMiss6(b *testing.B) {
+func BenchmarkFast_FullMiss6(b *testing.B) {
 	fast := new(Fast[bool])
 	for _, pfx := range tier1.routes6() {
 		fast.Insert(pfx, true)
@@ -169,7 +294,7 @@ func BenchmarkFullFastMiss6(b *testing.B) {
 	})
 }
 
-func BenchmarkFullBartMatch4(b *testing.B) {
+func BenchmarkTable_FullMatch4(b *testing.B) {
 	bart := new(Table[bool])
 	for _, pfx := range tier1.routes4() {
 		bart.Insert(pfx, true)
@@ -208,7 +333,7 @@ func BenchmarkFullBartMatch4(b *testing.B) {
 	})
 }
 
-func BenchmarkFullBartMatch6(b *testing.B) {
+func BenchmarkTable_FullMatch6(b *testing.B) {
 	bart := new(Table[bool])
 	for _, pfx := range tier1.routes6() {
 		bart.Insert(pfx, true)
@@ -247,7 +372,7 @@ func BenchmarkFullBartMatch6(b *testing.B) {
 	})
 }
 
-func BenchmarkFullBartMiss4(b *testing.B) {
+func BenchmarkTable_FullMiss4(b *testing.B) {
 	bart := new(Table[bool])
 	for _, pfx := range tier1.routes4() {
 		bart.Insert(pfx, true)
@@ -286,7 +411,7 @@ func BenchmarkFullBartMiss4(b *testing.B) {
 	})
 }
 
-func BenchmarkFullBartMiss6(b *testing.B) {
+func BenchmarkTable_FullMiss6(b *testing.B) {
 	bart := new(Table[bool])
 	for _, pfx := range tier1.routes6() {
 		bart.Insert(pfx, true)
@@ -325,7 +450,7 @@ func BenchmarkFullBartMiss6(b *testing.B) {
 	})
 }
 
-func BenchmarkTableOverlaps4(b *testing.B) {
+func BenchmarkTable_Overlaps4(b *testing.B) {
 	lt := new(Table[any])
 
 	for _, route := range tier1.routes4() {
@@ -347,7 +472,7 @@ func BenchmarkTableOverlaps4(b *testing.B) {
 	}
 }
 
-func BenchmarkTableOverlaps6(b *testing.B) {
+func BenchmarkTable_Overlaps6(b *testing.B) {
 	lt := new(Table[any])
 
 	for _, route := range tier1.routes6() {
@@ -369,7 +494,7 @@ func BenchmarkTableOverlaps6(b *testing.B) {
 	}
 }
 
-func BenchmarkFastOverlaps4(b *testing.B) {
+func BenchmarkFast_Overlaps4(b *testing.B) {
 	lt := new(Fast[any])
 
 	for _, route := range tier1.routes4() {
@@ -391,7 +516,7 @@ func BenchmarkFastOverlaps4(b *testing.B) {
 	}
 }
 
-func BenchmarkFastOverlaps6(b *testing.B) {
+func BenchmarkFast_Overlaps6(b *testing.B) {
 	lt := new(Fast[any])
 
 	for _, route := range tier1.routes6() {
@@ -472,7 +597,7 @@ var (
 	}
 )
 
-func BenchmarkBartWorstCaseMatch4(b *testing.B) {
+func BenchmarkTable_WorstCaseMatch4(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
 		tbl := new(Table[any])
 		for _, p := range worstCasePfxsIP4 {
@@ -531,7 +656,7 @@ func BenchmarkBartWorstCaseMatch4(b *testing.B) {
 	})
 }
 
-func BenchmarkFastWorstCaseMatch4(b *testing.B) {
+func BenchmarkFast_WorstCaseMatch4(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
 		tbl := new(Fast[any])
 		for _, p := range worstCasePfxsIP4 {
@@ -591,7 +716,7 @@ func BenchmarkFastWorstCaseMatch4(b *testing.B) {
 	})
 }
 
-func BenchmarkBartWorstCaseMiss4(b *testing.B) {
+func BenchmarkTable_WorstCaseMiss4(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
 		tbl := new(Table[any])
 		for _, p := range worstCasePfxsIP4 {
@@ -653,7 +778,7 @@ func BenchmarkBartWorstCaseMiss4(b *testing.B) {
 	})
 }
 
-func BenchmarkFastWorstCaseMiss4(b *testing.B) {
+func BenchmarkFast_WorstCaseMiss4(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
 		tbl := new(Fast[any])
 		for _, p := range worstCasePfxsIP4 {
@@ -715,7 +840,7 @@ func BenchmarkFastWorstCaseMiss4(b *testing.B) {
 	})
 }
 
-func BenchmarkBartWorstCaseMatch6(b *testing.B) {
+func BenchmarkTable_WorstCaseMatch6(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
 		tbl := new(Table[any])
 		for _, p := range worstCasePfxsIP6 {
@@ -775,7 +900,7 @@ func BenchmarkBartWorstCaseMatch6(b *testing.B) {
 	})
 }
 
-func BenchmarkFastWorstCaseMatch6(b *testing.B) {
+func BenchmarkFast_WorstCaseMatch6(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
 		tbl := new(Fast[any])
 		for _, p := range worstCasePfxsIP6 {
@@ -835,7 +960,7 @@ func BenchmarkFastWorstCaseMatch6(b *testing.B) {
 	})
 }
 
-func BenchmarkBartWorstCaseMiss6(b *testing.B) {
+func BenchmarkTable_WorstCaseMiss6(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
 		tbl := new(Table[any])
 		for _, p := range worstCasePfxsIP6 {
@@ -897,7 +1022,7 @@ func BenchmarkBartWorstCaseMiss6(b *testing.B) {
 	})
 }
 
-func BenchmarkFastWorstCaseMiss6(b *testing.B) {
+func BenchmarkFast_WorstCaseMiss6(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
 		tbl := new(Fast[any])
 		for _, p := range worstCasePfxsIP6 {
@@ -959,20 +1084,37 @@ func BenchmarkFastWorstCaseMiss6(b *testing.B) {
 	})
 }
 
-func BenchmarkAggregateTier1(b *testing.B) {
+func BenchmarkTable_Aggregate_Tier1(b *testing.B) {
 	routes := append(tier1.routes4(), tier1.routes6()...)
+	lite := new(Lite)
+	facl := new(FastACL)
+	gold := golden.Table[any]{}
+
+	for _, pfx := range routes {
+		lite.Insert(pfx)
+		facl.Insert(pfx)
+		gold.Insert(pfx, nil)
+	}
 
 	b.Run("Lite.Aggregate", func(b *testing.B) {
 		for b.Loop() {
 			// Heavy setup phase
 			b.StopTimer()
-			lite := new(Lite)
-			for _, pfx := range routes {
-				lite.Insert(pfx)
-			}
+			clone := lite.Clone()
 			b.StartTimer()
 
-			lite.Aggregate()
+			clone.Aggregate()
+		}
+	})
+
+	b.Run("FastACL.Aggregate", func(b *testing.B) {
+		for b.Loop() {
+			// Heavy setup phase
+			b.StopTimer()
+			clone := facl.Clone()
+			b.StartTimer()
+
+			clone.Aggregate()
 		}
 	})
 
@@ -980,13 +1122,10 @@ func BenchmarkAggregateTier1(b *testing.B) {
 		for b.Loop() {
 			// Heavy setup phase
 			b.StopTimer()
-			gold := golden.Table[any]{}
-			for _, pfx := range routes {
-				gold.Insert(pfx, nil)
-			}
+			clone := maps.Clone(gold)
 			b.StartTimer()
 
-			gold.Aggregate()
+			clone.Aggregate()
 		}
 	})
 }
