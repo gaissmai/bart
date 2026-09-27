@@ -35,7 +35,7 @@ func TestFastACL_NilReceiver(t *testing.T) {
 		mustPanic(t, "Insert", func() { tbl1.Insert(pfx4) })
 		mustPanic(t, "Delete", func() { tbl1.Delete(pfx4) })
 		mustPanic(t, "Contains", func() { tbl1.Contains(ip4) })
-		mustPanic(t, "LookupPrefix", func() { tbl1.LookupPrefix(pfx4) })
+		mustPanic(t, "LookupPrefix", func() { tbl1.ContainsPrefix(pfx4) })
 		mustPanic(t, "LookupPrefixLPM", func() { tbl1.LookupPrefixLPM(pfx4) })
 		mustPanic(t, "Aggregate", func() { tbl1.Aggregate() })
 		mustPanic(t, "Clone", func() { tbl1.Clone() })
@@ -79,7 +79,7 @@ func TestFastACL_Invalid(t *testing.T) {
 	noPanic(t, "Fprint", func() { tbl1.Fprint(nil) })
 	noPanic(t, "Get", func() { tbl1.Get(zeroPfx) })
 	noPanic(t, "Insert", func() { tbl1.Insert(zeroPfx) })
-	noPanic(t, "LookupPrefix", func() { tbl1.LookupPrefix(zeroPfx) })
+	noPanic(t, "LookupPrefix", func() { tbl1.ContainsPrefix(zeroPfx) })
 	noPanic(t, "LookupPrefixLPM", func() { tbl1.LookupPrefixLPM(zeroPfx) })
 	noPanic(t, "Overlaps", func() { tbl1.Overlaps(tbl2) })
 	noPanic(t, "Overlaps4", func() { tbl1.Overlaps4(tbl2) })
@@ -255,7 +255,7 @@ func TestFastACL_LookupPrefix_Unmasked(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		got := facl.LookupPrefix(tc.probe)
+		got := facl.ContainsPrefix(tc.probe)
 		if got != tc.wantOk {
 			t.Errorf("LookupPrefix non canonical prefix (%s), got: %v, want: %v", tc.probe, got, tc.wantOk)
 		}
@@ -270,7 +270,7 @@ func TestFastACL_LookupPrefix_Unmasked(t *testing.T) {
 	}
 }
 
-func TestFastACL_LookupPrefix_Compare(t *testing.T) {
+func TestFastACL_ContainsPrefix_Compare(t *testing.T) {
 	// Create large route tables repeatedly, and compare Table's
 	// behavior to a naive and slow but correct implementation.
 	t.Parallel()
@@ -291,10 +291,10 @@ func TestFastACL_LookupPrefix_Compare(t *testing.T) {
 		pfx := random.Prefix(prng)
 
 		_, goldOK := gold.LookupPrefix(pfx)
-		tblOK := facl.LookupPrefix(pfx)
+		faclOK := facl.ContainsPrefix(pfx)
 
-		if goldOK != tblOK {
-			t.Fatalf("LookupPrefix(%q) = (_, %v), want (_, %v)", pfx, tblOK, goldOK)
+		if goldOK != faclOK {
+			t.Fatalf("ContainsPrefix(%q) = %v, want %v", pfx, faclOK, goldOK)
 		}
 	}
 }
