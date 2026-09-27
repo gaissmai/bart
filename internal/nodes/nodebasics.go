@@ -275,6 +275,57 @@ func CidrForFringe(octets []byte, depth int, is4 bool, fringeByte uint8) netip.P
 	return netip.PrefixFrom(ip, bits)
 }
 
+// PrefixCIDR reconstructs a canonical netip.Prefix for a local CBT prefix index
+// stored in the PathContext's Slot field.
+func PrefixCIDR(ptx PathContext) netip.Prefix {
+	return CIDRFromContext(ptx, true)
+}
+
+// FringeCIDR reconstructs a canonical netip.Prefix for a stride-aligned fringe entry
+// stored in the PathContext's Slot field.
+func FringeCIDR(ptx PathContext) netip.Prefix {
+	return CIDRFromContext(ptx, false)
+}
+
+// CIDRFromContext reconstructs a canonical netip.Prefix from the provided PathContext.
+//
+// If isPrefix is true, ptx.Slot is treated as a 1-based CBT prefix index (1..255)
+// and translated to its corresponding octet and prefix length within the current stride.
+// If isPrefix is false, ptx.Slot is treated as a 0-based fringe octet address (0..255)
+// aligned on stride boundaries (/8, /16, /24, etc.).
+//
+// The operation modifies a local stack copy of PathContext in-place, zeroing non-canonical
+// trailing bytes, and returns a netip.Prefix without incurring heap allocations.
+func CIDRFromContext(ptx PathContext, isPrefix bool) netip.Prefix {
+	// Default bit length calculation for stride-aligned fringe entries (/8, /16, /24, etc.).
+	bits := (ptx.Depth + 1) << 3
+
+	if isPrefix {
+		// Retrieve the last octet byte and prefix length inside the stride from CBT index.
+		octet, pfxLen := art.IdxToPfx(ptx.Slot)
+
+		ptx.Slot = octet
+		bits = ptx.Depth<<3 + int(pfxLen)
+	}
+
+	// Set byte in path at current depth with last octet.
+	ptx.Path[ptx.Depth] = ptx.Slot
+
+	// Canonicalize: clear non-canonical trailing octets.
+	clear(ptx.Path[ptx.Depth+1:])
+
+	// Reconstruct netip.Addr directly from array values without heap allocation.
+	var ip netip.Addr
+	if ptx.Is4 {
+		ip = netip.AddrFrom4([4]byte(ptx.Path[:4]))
+	} else {
+		ip = netip.AddrFrom16(ptx.Path)
+	}
+
+	// PrefixFrom does not allocate and assumes host bits are zeroed.
+	return netip.PrefixFrom(ip, bits)
+}
+
 // DivMod8 returns the count of full 8‑bit strides (bits/8)
 // and the remaining bits in the final stride (bits%8) for pfxLen.
 //
