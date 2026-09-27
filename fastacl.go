@@ -12,7 +12,6 @@ import (
 	"sync"
 
 	"github.com/gaissmai/bart/internal/art"
-	"github.com/gaissmai/bart/internal/lpm"
 	"github.com/gaissmai/bart/internal/nodes"
 )
 
@@ -101,8 +100,7 @@ func (f *FastACL) Contains(ip netip.Addr) bool {
 // This is functionally identical to LookupPrefixLPM but returns only the
 // associated value, not the matching prefix itself.
 //
-// Returns the value and true if a matching prefix is found.
-// Returns zero value and false if no match exists.
+// Returns true if a matching prefix is found.
 func (f *FastACL) LookupPrefix(pfx netip.Prefix) (ok bool) {
 	_, ok = f.lookupPrefixLPM(pfx, false)
 	return ok
@@ -118,15 +116,12 @@ func (f *FastACL) LookupPrefix(pfx netip.Prefix) (ok bool) {
 // This method is slower than LookupPrefix and should only be used if the
 // matching lpm entry is also required for other reasons.
 //
-// Returns the matching prefix, its associated value, and true if found.
-// Returns zero values and false if no match exists.
+// Returns the matching prefix, and true if found.
 func (f *FastACL) LookupPrefixLPM(pfx netip.Prefix) (lpmPfx netip.Prefix, ok bool) {
 	return f.lookupPrefixLPM(pfx, true)
 }
 
 func (f *FastACL) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpmPfx netip.Prefix, ok bool) {
-	panic("TODO")
-
 	if !pfx.IsValid() {
 		return lpmPfx, ok
 	}
@@ -167,7 +162,7 @@ LOOP:
 		}
 		kid := n.MustGetChild(octet)
 
-		// kid is node or leaf or fringe at octet
+		// kid is node or leaf at octet
 		switch kid := kid.(type) {
 		case *nodes.FastACLNode:
 			n = kid
@@ -179,24 +174,6 @@ LOOP:
 				break LOOP
 			}
 			return kid.Prefix, true
-
-		case *nodes.FringeLeaf:
-			// the bits of the fringe are defined by the depth
-			// maybe the LPM isn't needed, saves some cycles
-			fringeBits := (depth + 1) << 3
-			if fringeBits > pfxLen {
-				break LOOP
-			}
-
-			// the LPM isn't needed, saves some cycles
-			if !withLPM {
-				return netip.Prefix{}, true
-			}
-
-			// get the LPM prefix back from ip and depth
-			// it's a fringe, bits are always /8, /16, /24, ...
-			fringePfx, _ := ip.Prefix((depth + 1) << 3)
-			return fringePfx, true
 		}
 	}
 
@@ -205,33 +182,51 @@ LOOP:
 		depth &= nodes.DepthMask // BCE
 
 		n = stack[depth]
+		octet = octets[depth]
+
+		// ##############################################
+		// 1. Test for fringe match, always /8 in within node
+
+		// the bits of the fringe are defined by the depth
+		// it's a fringe, bits are always at n x /8
+		fringeBits := (depth + 1) << 3
+		if fringeBits <= pfxLen && n.Fringes.Test(octet) {
+			// called from LookupPrefix
+			if !withLPM {
+				return netip.Prefix{}, true
+			}
+
+			// called from LookupPrefixLPM
+			// get the LPM prefix back from ip and depth
+			fringePfx, _ := ip.Prefix(fringeBits)
+			return fringePfx, true
+		}
+
+		// ##############################################
+		// 2. Test for prefix match, max /7 within node
 
 		// longest prefix match, skip if node has no prefixes
 		if n.PrefixCount() == 0 {
 			continue
 		}
 
-		var idx uint8
-		octet = octets[depth]
-
 		// only the final stride may have a different prefix len
 		// all others are just host routes
+		var idx uint8
 		if depth == strideCount {
 			idx = art.PfxToIdx(octet, modBits)
 		} else {
 			idx = art.OctetToIdx(octet)
 		}
 
-		// manually inlined: lookupIdx(idx)
 		var topIdx uint8
-		if topIdx, ok = n.Prefixes.AndTop(&lpm.LookupTbl[idx]); ok {
+		if topIdx, ok = n.LookupIdx(idx); ok {
 			// called from LookupPrefix
 			if !withLPM {
 				return netip.Prefix{}, ok
 			}
 
 			// called from LookupPrefixLPM
-
 			// get the bits from depth and top idx
 			pfxBits := int(art.PfxBits(depth, topIdx))
 

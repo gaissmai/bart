@@ -35,8 +35,8 @@ func TestFastACL_NilReceiver(t *testing.T) {
 		mustPanic(t, "Insert", func() { tbl1.Insert(pfx4) })
 		mustPanic(t, "Delete", func() { tbl1.Delete(pfx4) })
 		mustPanic(t, "Contains", func() { tbl1.Contains(ip4) })
-		// TODO mustPanic(t, "LookupPrefix", func() { tbl1.LookupPrefix(pfx4) })
-		// TODO mustPanic(t, "LookupPrefixLPM", func() { tbl1.LookupPrefixLPM(pfx4) })
+		mustPanic(t, "LookupPrefix", func() { tbl1.LookupPrefix(pfx4) })
+		mustPanic(t, "LookupPrefixLPM", func() { tbl1.LookupPrefixLPM(pfx4) })
 		mustPanic(t, "Aggregate", func() { tbl1.Aggregate() })
 		mustPanic(t, "Clone", func() { tbl1.Clone() })
 		mustPanic(t, "Overlaps", func() { tbl1.Overlaps(nil) })
@@ -79,8 +79,8 @@ func TestFastACL_Invalid(t *testing.T) {
 	noPanic(t, "Fprint", func() { tbl1.Fprint(nil) })
 	noPanic(t, "Get", func() { tbl1.Get(zeroPfx) })
 	noPanic(t, "Insert", func() { tbl1.Insert(zeroPfx) })
-	// TODO noPanic(t, "LookupPrefix", func() { tbl1.LookupPrefix(zeroPfx) })
-	// TODO noPanic(t, "LookupPrefixLPM", func() { tbl1.LookupPrefixLPM(zeroPfx) })
+	noPanic(t, "LookupPrefix", func() { tbl1.LookupPrefix(zeroPfx) })
+	noPanic(t, "LookupPrefixLPM", func() { tbl1.LookupPrefixLPM(zeroPfx) })
 	noPanic(t, "Overlaps", func() { tbl1.Overlaps(tbl2) })
 	noPanic(t, "Overlaps4", func() { tbl1.Overlaps4(tbl2) })
 	noPanic(t, "Overlaps6", func() { tbl1.Overlaps6(tbl2) })
@@ -92,7 +92,7 @@ func TestFastACL_Invalid(t *testing.T) {
 	noPanic(t, "Supernets", func() { tbl1.Supernets(zeroPfx) })
 }
 
-func TestFastACL_ContainsCompare(t *testing.T) {
+func TestFastACL_Contains_Compare(t *testing.T) {
 	// Create large route tables repeatedly, and compare Table's
 	// behavior to a naive and slow but correct implementation.
 	t.Parallel()
@@ -122,7 +122,7 @@ func TestFastACL_ContainsCompare(t *testing.T) {
 	}
 }
 
-func TestFastACL_ZonedContains(t *testing.T) {
+func TestFastACL_Contains_Zoned(t *testing.T) {
 	t.Parallel()
 
 	check := func(t *testing.T, table *FastACL, ip netip.Addr, wantOK bool) {
@@ -192,7 +192,148 @@ func TestFastACL_ZonedContains(t *testing.T) {
 	}
 }
 
-func TestFastACL_InsertShuffled(t *testing.T) {
+func TestFastACL_LookupPrefix_Unmasked(t *testing.T) {
+	// test that the pfx must not be masked on input for LookupPrefix
+	t.Parallel()
+
+	facl := new(FastACL)
+	facl.Insert(mpp("10.20.30.0/24"))
+	facl.Insert(mpp("2001:db8::/32"))
+
+	// not normalized pfxs
+	tests := []struct {
+		probe   netip.Prefix
+		wantLPM netip.Prefix
+		wantOk  bool
+	}{
+		{
+			probe:   netip.MustParsePrefix("10.20.30.40/0"),
+			wantLPM: netip.Prefix{},
+			wantOk:  false,
+		},
+		{
+			probe:   netip.MustParsePrefix("10.20.30.40/23"),
+			wantLPM: netip.Prefix{},
+			wantOk:  false,
+		},
+		{
+			probe:   netip.MustParsePrefix("10.20.30.40/24"),
+			wantLPM: mpp("10.20.30.0/24"),
+			wantOk:  true,
+		},
+		{
+			probe:   netip.MustParsePrefix("10.20.30.40/25"),
+			wantLPM: mpp("10.20.30.0/24"),
+			wantOk:  true,
+		},
+		{
+			probe:   mpp("10.20.30.40/32"),
+			wantLPM: mpp("10.20.30.0/24"),
+			wantOk:  true,
+		},
+		// IPv6 counterparts
+		{
+			probe:   netip.MustParsePrefix("2001:db8::1/0"),
+			wantLPM: netip.Prefix{},
+			wantOk:  false,
+		},
+		{
+			probe:   netip.MustParsePrefix("2001:db8::1/31"),
+			wantLPM: netip.Prefix{},
+			wantOk:  false,
+		},
+		{
+			probe:   netip.MustParsePrefix("2001:db8::1/32"),
+			wantLPM: mpp("2001:db8::/32"),
+			wantOk:  true,
+		},
+		{
+			probe:   netip.MustParsePrefix("2001:db8::1/64"),
+			wantLPM: mpp("2001:db8::/32"),
+			wantOk:  true,
+		},
+	}
+
+	for _, tc := range tests {
+		got := facl.LookupPrefix(tc.probe)
+		if got != tc.wantOk {
+			t.Errorf("LookupPrefix non canonical prefix (%s), got: %v, want: %v", tc.probe, got, tc.wantOk)
+		}
+
+		lpm, got := facl.LookupPrefixLPM(tc.probe)
+		if got != tc.wantOk {
+			t.Errorf("LookupPrefixLPM non canonical prefix (%s), got: %v, want: %v", tc.probe, got, tc.wantOk)
+		}
+		if lpm != tc.wantLPM {
+			t.Errorf("LookupPrefixLPM non canonical prefix (%s), got: %v, want: %v", tc.probe, lpm, tc.wantLPM)
+		}
+	}
+}
+
+func TestFastACL_LookupPrefix_Compare(t *testing.T) {
+	// Create large route tables repeatedly, and compare Table's
+	// behavior to a naive and slow but correct implementation.
+	t.Parallel()
+
+	n := workLoadN()
+
+	prng := rand.New(rand.NewPCG(42, 42))
+	pfxs := random.RealWorldPrefixes(prng, n)
+
+	gold := new(golden.Table[any])
+	facl := new(FastACL)
+	for _, pfx := range pfxs {
+		gold.Insert(pfx, nil)
+		facl.Insert(pfx)
+	}
+
+	for range n {
+		pfx := random.Prefix(prng)
+
+		_, goldOK := gold.LookupPrefix(pfx)
+		tblOK := facl.LookupPrefix(pfx)
+
+		if goldOK != tblOK {
+			t.Fatalf("LookupPrefix(%q) = (_, %v), want (_, %v)", pfx, tblOK, goldOK)
+		}
+	}
+}
+
+func TestFastACL_LookupPrefixLPM_Compare(t *testing.T) {
+	// Create large route tables repeatedly, and compare Table's
+	// behavior to a naive and slow but correct implementation.
+	t.Parallel()
+
+	n := workLoadN()
+
+	prng := rand.New(rand.NewPCG(42, 42))
+	pfxs := random.RealWorldPrefixes(prng, n)
+
+	gold := new(golden.Table[any])
+	facl := new(FastACL)
+	for _, pfx := range pfxs {
+		gold.Insert(pfx, nil)
+		facl.Insert(pfx)
+	}
+
+	for range n {
+		pfx := random.Prefix(prng)
+
+		goldLPM, _, goldOK := gold.LookupPrefixLPM(pfx)
+		tblLPM, tblOK := facl.LookupPrefixLPM(pfx)
+
+		if goldOK != tblOK {
+			t.Fatalf("LookupPrefixLPM(%q) = (_, %v), want (_, %v)", pfx, tblOK, goldOK)
+		}
+
+		if goldLPM != tblLPM {
+			t.Fatalf("LookupPrefixLPM(%q) = ( %v, _), want ( %v, _)", pfx, tblLPM, goldLPM)
+		}
+
+	}
+}
+
+func TestFastACL_Insert_Shuffled(t *testing.T) {
 	// The order in which you insert prefixes into a route table
 	// should not matter, as long as you're inserting the same set of
 	// routes.
@@ -499,7 +640,7 @@ func TestFastACL_AllSorted(t *testing.T) {
 	}
 }
 
-func TestFastACL_AllSortedCompare(t *testing.T) {
+func TestFastACL_AllSorted_Compare(t *testing.T) {
 	t.Parallel()
 
 	n := workLoadN()
@@ -726,7 +867,7 @@ func TestFastACL_Aggregate(t *testing.T) {
 	}
 }
 
-func TestFastACL_AggregatePreservesMembership(t *testing.T) {
+func TestFastACL_Aggregate_PreservesMembership(t *testing.T) {
 	tests := []struct {
 		name   string
 		input  []string
@@ -780,7 +921,7 @@ func TestFastACL_AggregatePreservesMembership(t *testing.T) {
 	}
 }
 
-func TestFastACL_AggregateCompare(t *testing.T) {
+func TestFastACL_Aggregate_Compare(t *testing.T) {
 	t.Parallel()
 	n := workLoadN()
 
@@ -812,7 +953,7 @@ func TestFastACL_AggregateCompare(t *testing.T) {
 	}
 }
 
-func TestFastACL_AggregateStructuralCompare(t *testing.T) {
+func TestFastACL_Aggregate_StructuralCompare(t *testing.T) {
 	t.Parallel()
 	n := workLoadN()
 
