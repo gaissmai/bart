@@ -95,7 +95,7 @@ func TestFastACLNode_DirectItems(t *testing.T) {
 			},
 			ptx: PathContext{
 				Depth: 0,
-				Idx:   0,
+				Slot:  0,
 				Is4:   true,
 			},
 			wantCount: 0,
@@ -111,7 +111,7 @@ func TestFastACLNode_DirectItems(t *testing.T) {
 			},
 			ptx: PathContext{
 				Depth: 0,
-				Idx:   1, // Direct descendants covered by root (CBT index 1)
+				Slot:  1, // Direct descendants covered by root (CBT index 1)
 				Is4:   true,
 			},
 			wantCount: 2,
@@ -131,7 +131,7 @@ func TestFastACLNode_DirectItems(t *testing.T) {
 			},
 			ptx: PathContext{
 				Depth: 0,
-				Idx:   1, // Direct descendants covered by root (CBT index 1)
+				Slot:  1, // Direct descendants covered by root (CBT index 1)
 				Is4:   false,
 			},
 			wantCount: 2,
@@ -151,7 +151,7 @@ func TestFastACLNode_DirectItems(t *testing.T) {
 			ptx: PathContext{
 				Path:  StridePath{0x20, 0x01, 0x0d, 0xb8}, // 2001:db8::
 				Depth: 4,
-				Idx:   0,
+				Slot:  0,
 				Is4:   false,
 			},
 			wantCount: 1,
@@ -173,8 +173,8 @@ func TestFastACLNode_DirectItems(t *testing.T) {
 			}
 
 			for i, wantPrefix := range tt.wantCidrs {
-				if got[i].Cidr != wantPrefix {
-					t.Errorf("DirectItems()[%d].Cidr = %s; want %s", i, got[i].Cidr, wantPrefix)
+				if got[i].CIDR != wantPrefix {
+					t.Errorf("DirectItems()[%d].Cidr = %s; want %s", i, got[i].CIDR, wantPrefix)
 				}
 			}
 		})
@@ -199,7 +199,7 @@ func TestFastACLNode_FprintRec(t *testing.T) {
 			},
 			ptx: PathContext{
 				Depth: 0,
-				Idx:   0,
+				Slot:  0,
 				Is4:   true,
 			},
 			want: nil,
@@ -216,7 +216,7 @@ func TestFastACLNode_FprintRec(t *testing.T) {
 			},
 			ptx: PathContext{
 				Depth: 0,
-				Idx:   1, // Root scope (0.0.0.0/0)
+				Slot:  1, // Root scope (0.0.0.0/0)
 				Is4:   true,
 			},
 			want: []string{
@@ -235,7 +235,7 @@ func TestFastACLNode_FprintRec(t *testing.T) {
 			},
 			ptx: PathContext{
 				Depth: 0,
-				Idx:   1, // Root scope (::/0)
+				Slot:  1, // Root scope (::/0)
 				Is4:   false,
 			},
 			want: []string{
@@ -259,7 +259,7 @@ func TestFastACLNode_FprintRec(t *testing.T) {
 			},
 			ptx: PathContext{
 				Depth: 0,
-				Idx:   1,
+				Slot:  1,
 				Is4:   true,
 			},
 			want: []string{
@@ -375,7 +375,7 @@ func TestCIDRLeaf_FprintRec(t *testing.T) {
 			},
 			ptx: PathContext{
 				Depth: 0,
-				Idx:   0, // Global root evaluation scope
+				Slot:  0, // Global root evaluation scope
 				Is4:   true,
 			},
 			want: []string{
@@ -402,7 +402,7 @@ func TestCIDRLeaf_FprintRec(t *testing.T) {
 			},
 			ptx: PathContext{
 				Depth: 0,
-				Idx:   0, // Global root evaluation scope
+				Slot:  0, // Global root evaluation scope
 				Is4:   false,
 			},
 			want: []string{
