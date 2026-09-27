@@ -28,11 +28,11 @@ func BenchmarkFastACL_FullMatch4(b *testing.B) {
 		}
 	})
 
-	b.Run("LookupPrefix", func(b *testing.B) {
+	b.Run("ContainsPrefix", func(b *testing.B) {
 		matchPfx4 := tier1.matchPfx4()
 
 		for i := 0; b.Loop(); i++ {
-			facl.LookupPrefix(matchPfx4[i&mask])
+			facl.ContainsPrefix(matchPfx4[i&mask])
 		}
 	})
 
@@ -59,11 +59,11 @@ func BenchmarkFastACL_FullMatch6(b *testing.B) {
 		}
 	})
 
-	b.Run("LookupPrefix", func(b *testing.B) {
+	b.Run("ContainsPrefix", func(b *testing.B) {
 		matchPfx6 := tier1.matchPfx6()
 
 		for i := 0; b.Loop(); i++ {
-			facl.LookupPrefix(matchPfx6[i&mask])
+			facl.ContainsPrefix(matchPfx6[i&mask])
 		}
 	})
 
@@ -90,11 +90,11 @@ func BenchmarkFastACL_FullMiss4(b *testing.B) {
 		}
 	})
 
-	b.Run("LookupPrefix", func(b *testing.B) {
+	b.Run("ContainsPrefix", func(b *testing.B) {
 		missPfx4 := tier1.missPfx4()
 
 		for i := 0; b.Loop(); i++ {
-			facl.LookupPrefix(missPfx4[i&mask])
+			facl.ContainsPrefix(missPfx4[i&mask])
 		}
 	})
 
@@ -121,11 +121,11 @@ func BenchmarkFastACL_FullMiss6(b *testing.B) {
 		}
 	})
 
-	b.Run("LookupPrefix", func(b *testing.B) {
+	b.Run("ContainsPrefix", func(b *testing.B) {
 		missPfx6 := tier1.missPfx6()
 
 		for i := 0; b.Loop(); i++ {
-			facl.LookupPrefix(missPfx6[i&mask])
+			facl.ContainsPrefix(missPfx6[i&mask])
 		}
 	})
 

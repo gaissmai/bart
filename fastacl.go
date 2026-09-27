@@ -43,133 +43,196 @@ func (f *FastACL) sizeUpdate(is4 bool, delta int) {
 	f.size6 += delta
 }
 
-// Contains reports whether any stored prefix covers the given IP address.
-// It returns false for invalid IP addresses.
-//
-// This method performs longest-prefix matching and returns true if any prefix
-// in the routing table contains the IP address.
+// Contains reports whether any stored prefix in the FastACL table covers the given IP address.
+// An invalid netip.Addr returns false.
 //
 // Any IPv6 zone identifier is stripped and has no effect on the lookup result.
 func (f *FastACL) Contains(ip netip.Addr) bool {
-	// speed is top priority: no explicit test for ip.IsValid
-	// if ip is invalid, AsSlice() returns nil, Contains returns false.
+	// Speed is top priority: skip explicit ip.IsValid() call.
+	// For an invalid netip.Addr{}, ip.AsSlice() returns nil, causing the loop
+	// to immediately exit and return false.
 	is4 := ip.Is4()
 
 	n := f.rootNodeByVersion(is4)
 
 	for _, octet := range ip.AsSlice() {
-		// for contains, any lpm match is good enough, no lpm backtracking needed
+		// Short-circuit: any matching local prefix in this node is sufficient
 		if n.PrefixCount() != 0 && n.Contains(art.OctetToIdx(octet)) {
 			return true
 		}
 
-		// for contains, any matching fringe is good enough
+		// Short-circuit: any matching fringe in this node is sufficient
 		if n.Fringes.Test(octet) {
 			return true
 		}
 
-		// stop traversing?
+		// Stop traversal if no child or leaf exists for the current octet
 		if !n.Children.Test(octet) {
 			return false
 		}
 		kid := n.MustGetChild(octet)
 
-		// kid is leaf
+		// Terminal leaf node encountered
 		if leaf, ok := kid.(*nodes.CIDRLeaf); ok {
-			// Strip IPv6 zone before netip.Prefix.Contains to prevent false returns.
+			// Strip IPv6 zone only when evaluating leaf.Prefix.Contains.
+			// Deferred to this branch so short-circuiting hits do not pay the stripping penalty.
+			//
+			// but netip.Addr.withoutZone  is not exported :-(
+			// and netip.Addr.WithZone("") is not inlinable, so we have to resort to this clever trick:
+			// https://github.com/gaissmai/bart/pull/418#issuecomment-5735613506
 			if !is4 {
-				// but netip.Addr.withoutZone  is not exported :-(
-				// and netip.Addr.WithZone("") is not inlinable, so we have to resort to this clever trick:
-				// https://github.com/gaissmai/bart/pull/418#issuecomment-5735613506
 				ip = netip.PrefixFrom(ip, 0).Addr()
 			}
 			return leaf.Prefix.Contains(ip)
 		}
 
-		// kid is node!
+		// Internal trie node: descend to next level
 		n = kid.(*nodes.FastACLNode)
 	}
 
 	return false
 }
 
-// LookupPrefix performs a longest prefix match lookup for any address within
-// the given prefix. It finds the most specific routing table entry that would
-// match any address in the provided prefix range.
+// ContainsPrefix reports whether pfx is covered by any prefix present in the FastACL table.
 //
-// This is functionally identical to LookupPrefixLPM but returns only the
-// associated value, not the matching prefix itself.
+// A prefix is covered if an identical prefix or a broader enclosing supernet exists
+// in the trie. Non-canonical prefixes are automatically normalized using pfx.Masked().
 //
-// Returns true if a matching prefix is found.
-func (f *FastACL) LookupPrefix(pfx netip.Prefix) (ok bool) {
-	_, ok = f.lookupPrefixLPM(pfx, false)
-	return ok
+// It returns false if pfx is invalid or if no covering prefix exists in the table.
+func (f *FastACL) ContainsPrefix(pfx netip.Prefix) bool {
+	// Guard against uninitialized or invalid prefixes early.
+	if !pfx.IsValid() {
+		return false
+	}
+
+	// Canonicalize input prefix to ensure host bits are zeroed.
+	pfx = pfx.Masked()
+	pfxLen := pfx.Bits()
+	ip := pfx.Addr()
+	is4 := ip.Is4()
+	octets := ip.AsSlice()
+
+	// Calculate full 8-bit byte strides and remaining bit count for the probe prefix length.
+	strideCount, modBits := nodes.DivMod8(pfxLen)
+
+	// Fetch root node for IPv4 or IPv6 address family.
+	n := f.rootNodeByVersion(is4)
+
+	// Traverse the trie top-down across byte strides up to the probe's target depth.
+	for depth := range strideCount + 1 {
+		octet := octets[depth]
+
+		// 1. Check for covering local prefixes within the current stride node.
+		if n.PrefixCount() != 0 {
+			// Intermediate strides evaluate full 8-bit host routes;
+			// only the terminal stride uses the remaining bit count (modBits).
+			var idx uint8
+			if depth == strideCount {
+				idx = art.PfxToIdx(octet, modBits)
+			} else {
+				idx = art.OctetToIdx(octet)
+			}
+
+			// Check if any local prefix covers the target index in the Complete Binary Tree (CBT).
+			if n.Contains(idx) {
+				return true
+			}
+		}
+
+		// 2. Check for a stride-aligned fringe boundary matching at /8, /16, /24, etc.
+		fringeBits := (depth + 1) << 3
+		// Verify that the fringe's prefix length is broader/equal and encloses
+		// the target prefix.
+		if fringeBits <= pfxLen && n.Fringes.Test(octet) {
+			return true
+		}
+
+		// 3. Early termination: stop traversal if no child node or leaf exists at the target octet slot.
+		if !n.Children.Test(octet) {
+			return false
+		}
+
+		// Retrieve child node or path-compressed leaf at the current octet slot.
+		kid := n.MustGetChild(octet)
+
+		switch kid := kid.(type) {
+		case *nodes.FastACLNode:
+			// Recurse into deeper trie level.
+			n = kid
+			continue
+
+		case *nodes.CIDRLeaf:
+			// Terminal path-compressed leaf reached: verify that the leaf's prefix length
+			// is broader/equal and encloses the target prefix.
+			if kid.Prefix.Bits() > pfxLen {
+				return false
+			}
+			return kid.Prefix.Contains(ip)
+		}
+	}
+
+	return false
 }
 
-// LookupPrefixLPM performs a longest prefix match lookup for any address within
-// the given prefix. It finds the most specific routing table entry that would
-// match any address in the provided prefix range.
+// LookupPrefixLPM performs a longest-prefix-match lookup for any route covering
+// the given prefix range. It searches the trie for the most specific prefix
+// that encloses pfx.
 //
-// This is functionally identical to LookupPrefix but additionally returns the
-// matching LPM prefix itself along with the value.
+// Non-canonical prefixes are automatically normalized using pfx.Masked().
 //
-// This method is slower than LookupPrefix and should only be used if the
-// matching lpm entry is also required for other reasons.
-//
-// Returns the matching prefix, and true if found.
+// Returns the matching prefix and true if a covering prefix is found.
+// Returns an invalid netip.Prefix{} and false if no match exists or if pfx is invalid.
 func (f *FastACL) LookupPrefixLPM(pfx netip.Prefix) (lpmPfx netip.Prefix, ok bool) {
-	return f.lookupPrefixLPM(pfx, true)
-}
-
-func (f *FastACL) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpmPfx netip.Prefix, ok bool) {
+	// Guard against uninitialized or invalid prefixes early.
 	if !pfx.IsValid() {
 		return lpmPfx, ok
 	}
 
-	// canonicalize the prefix
+	// Canonicalize input prefix to ensure host bits are zeroed.
 	pfx = pfx.Masked()
 
 	ip := pfx.Addr()
 	pfxLen := pfx.Bits()
 	is4 := ip.Is4()
 	octets := ip.AsSlice()
+
+	// Calculate full 8-bit byte strides and remaining bit count for the probe prefix length.
 	strideCount, modBits := nodes.DivMod8(pfxLen)
 
+	// Fetch root node for IPv4 or IPv6 address family.
 	n := f.rootNodeByVersion(is4)
 
-	// record path to leaf node
+	// Fixed-size stack on the frame to store path nodes for backtracking.
 	stack := [nodes.MaxTreeDepth]*nodes.FastACLNode{}
 
 	var depth int
 	var octet byte
 
+	// Top-down traversal: Descend as deep as possible along the octet path.
 LOOP:
-	// find the last node on the octets path in the trie,
-	for depth, octet = range octets {
-		depth &= nodes.DepthMask // BCE
+	for depth = range strideCount + 1 {
+		depth &= nodes.DepthMask // BCE: Hint compiler that depth stays within bounds
 
-		// stepped one past the last stride of interest; back up to last and break
-		if depth > strideCount {
-			depth--
-			break
-		}
-		// push current node on stack
+		octet = octets[depth]
+
+		// Record current node on the traversal stack for backtracking
 		stack[depth] = n
 
-		// go down in tight loop to leaf node
+		// Early exit from descent if no child or leaf exists at the target octet slot.
 		if !n.Children.Test(octet) {
 			break LOOP
 		}
 		kid := n.MustGetChild(octet)
 
-		// kid is node or leaf at octet
 		switch kid := kid.(type) {
 		case *nodes.FastACLNode:
+			// Descend deeper into next trie level
 			n = kid
-			continue LOOP // descend down to next trie level
+			continue LOOP
 
 		case *nodes.CIDRLeaf:
-			// reached a path compressed prefix, stop traversing
+			// Terminal path-compressed leaf reached: verify that the leaf's prefix length
+			// is broader/equal and encloses the target prefix/IP range.
 			if kid.Prefix.Bits() > pfxLen || !kid.Prefix.Contains(ip) {
 				break LOOP
 			}
@@ -177,41 +240,32 @@ LOOP:
 		}
 	}
 
-	// start backtracking, unwind the stack
+	// Backtracking phase: Unwind the stack bottom-up to locate the longest matching prefix.
 	for ; depth >= 0; depth-- {
-		depth &= nodes.DepthMask // BCE
+		depth &= nodes.DepthMask // BCE: Hint compiler that depth stays within bounds
 
 		n = stack[depth]
 		octet = octets[depth]
 
-		// ##############################################
-		// 1. Test for fringe match, always /8 in within node
-
-		// the bits of the fringe are defined by the depth
-		// it's a fringe, bits are always at n x /8
+		// #############################################################################
+		// 1. Check for a stride-aligned fringe boundary matching at /8, /16, /24, etc.
+		//
+		// Verify that the fringe's prefix length is broader/equal and encloses the target prefix.
 		fringeBits := (depth + 1) << 3
 		if fringeBits <= pfxLen && n.Fringes.Test(octet) {
-			// called from LookupPrefix
-			if !withLPM {
-				return netip.Prefix{}, true
-			}
-
-			// called from LookupPrefixLPM
-			// get the LPM prefix back from ip and depth
+			// Reconstruct the stride-aligned prefix from the IP address and fringe bit length.
 			fringePfx, _ := ip.Prefix(fringeBits)
 			return fringePfx, true
 		}
 
-		// ##############################################
-		// 2. Test for prefix match, max /7 within node
-
-		// longest prefix match, skip if node has no prefixes
+		// #############################################################################
+		// 2. Check for local prefixes within the current CBT node.
 		if n.PrefixCount() == 0 {
 			continue
 		}
 
-		// only the final stride may have a different prefix len
-		// all others are just host routes
+		// Intermediate strides evaluate full 8-bit host routes;
+		// only the terminal stride uses the remaining bit count (modBits).
 		var idx uint8
 		if depth == strideCount {
 			idx = art.PfxToIdx(octet, modBits)
@@ -221,18 +275,11 @@ LOOP:
 
 		var topIdx uint8
 		if topIdx, ok = n.LookupIdx(idx); ok {
-			// called from LookupPrefix
-			if !withLPM {
-				return netip.Prefix{}, ok
-			}
-
-			// called from LookupPrefixLPM
-			// get the bits from depth and top idx
+			// Reconstruct bit length from current depth and CBT top index
 			pfxBits := int(art.PfxBits(depth, topIdx))
 
-			// calculate the lpmPfx from incoming ip and new mask
-			// netip.Addr.Prefix canonicalizes. Invariant: art.PfxBits(depth, topIdx)
-			// yields a valid mask (v4: 0..32, v6: 0..128), so error is impossible.
+			// Reconstruct canonical prefix from IP address and calculated bit length.
+			// Invariant: art.PfxBits returns valid ranges (v4: 0..32, v6: 0..128).
 			lpmPfx, _ = ip.Prefix(pfxBits)
 			return lpmPfx, ok
 		}
