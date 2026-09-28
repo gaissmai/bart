@@ -138,6 +138,130 @@ func BenchmarkFastACL_FullMiss6(b *testing.B) {
 	})
 }
 
+func BenchmarkLite_FullMatch4(b *testing.B) {
+	lite := new(Lite)
+	for _, pfx := range tier1.routes4() {
+		lite.Insert(pfx)
+	}
+
+	b.Run("Contains", func(b *testing.B) {
+		matchIP4 := tier1.matchIP4()
+
+		for i := 0; b.Loop(); i++ {
+			lite.Contains(matchIP4[i&mask])
+		}
+	})
+
+	b.Run("LookupPrefix", func(b *testing.B) {
+		matchPfx4 := tier1.matchPfx4()
+
+		for i := 0; b.Loop(); i++ {
+			lite.LookupPrefix(matchPfx4[i&mask])
+		}
+	})
+
+	b.Run("LookupPfxLPM", func(b *testing.B) {
+		matchPfx4 := tier1.matchPfx4()
+
+		for i := 0; b.Loop(); i++ {
+			lite.LookupPrefixLPM(matchPfx4[i&mask])
+		}
+	})
+}
+
+func BenchmarkLite_FullMatch6(b *testing.B) {
+	lite := new(Lite)
+	for _, pfx := range tier1.routes6() {
+		lite.Insert(pfx)
+	}
+
+	b.Run("Contains", func(b *testing.B) {
+		matchIP6 := tier1.matchIP6()
+
+		for i := 0; b.Loop(); i++ {
+			lite.Contains(matchIP6[i&mask])
+		}
+	})
+
+	b.Run("LookupPrefix", func(b *testing.B) {
+		matchPfx6 := tier1.matchPfx6()
+
+		for i := 0; b.Loop(); i++ {
+			lite.LookupPrefix(matchPfx6[i&mask])
+		}
+	})
+
+	b.Run("LookupPfxLPM", func(b *testing.B) {
+		matchPfx6 := tier1.matchPfx6()
+
+		for i := 0; b.Loop(); i++ {
+			lite.LookupPrefixLPM(matchPfx6[i&mask])
+		}
+	})
+}
+
+func BenchmarkLite_FullMiss4(b *testing.B) {
+	lite := new(Lite)
+	for _, pfx := range tier1.routes4() {
+		lite.Insert(pfx)
+	}
+
+	b.Run("Contains", func(b *testing.B) {
+		missIP4 := tier1.missIP4()
+
+		for i := 0; b.Loop(); i++ {
+			lite.Contains(missIP4[i&mask])
+		}
+	})
+
+	b.Run("LookupPrefix", func(b *testing.B) {
+		missPfx4 := tier1.missPfx4()
+
+		for i := 0; b.Loop(); i++ {
+			lite.LookupPrefix(missPfx4[i&mask])
+		}
+	})
+
+	b.Run("LookupPfxLPM", func(b *testing.B) {
+		missPfx4 := tier1.missPfx4()
+
+		for i := 0; b.Loop(); i++ {
+			lite.LookupPrefixLPM(missPfx4[i&mask])
+		}
+	})
+}
+
+func BenchmarkLite_FullMiss6(b *testing.B) {
+	lite := new(Lite)
+	for _, pfx := range tier1.routes6() {
+		lite.Insert(pfx)
+	}
+
+	b.Run("Contains", func(b *testing.B) {
+		missIP6 := tier1.missIP6()
+
+		for i := 0; b.Loop(); i++ {
+			lite.Contains(missIP6[i&mask])
+		}
+	})
+
+	b.Run("LookupPrefix", func(b *testing.B) {
+		missPfx6 := tier1.missPfx6()
+
+		for i := 0; b.Loop(); i++ {
+			lite.LookupPrefix(missPfx6[i&mask])
+		}
+	})
+
+	b.Run("LookupPfxLPM", func(b *testing.B) {
+		missPfx6 := tier1.missPfx6()
+
+		for i := 0; b.Loop(); i++ {
+			lite.LookupPrefixLPM(missPfx6[i&mask])
+		}
+	})
+}
+
 func BenchmarkFast_FullMatch4(b *testing.B) {
 	fast := new(Fast[bool])
 	for _, pfx := range tier1.routes4() {
