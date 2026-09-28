@@ -1154,32 +1154,48 @@ func (n *FastACLNode) yieldChild(ptx PathContext, yield func(netip.Prefix) bool)
 	return false
 }
 
-// EachLookupPrefix performs a hierarchical lookup of all matching prefixes
-// in the current node’s 8-bit stride-based prefix table.
+// YieldSupernets performs a hierarchical lookup of all matching supernets
+// within the current node's 8-bit stride-based table.
 //
-// The function walks up the trie-internal complete binary tree (CBT),
-// testing each possible prefix length mask (in decreasing order of specificity),
-// and invokes the yield function for every matching entry.
+// It evaluates both stride-aligned fringe entries and configured prefixes:
+//  1. Fringe Check: If the target octet matches a fringe bit in [FastACLNode.Fringes],
+//     the enclosing stride boundary prefix (e.g., /8, /16, /24) is reconstructed and yielded first
+//     provided its length does not exceed pfxLen.
+//  2. Prefix Check: Set bits in [FastACLNode.Prefixes] are intersected with a precomputed complete
+//     binary tree (CBT) ancestor mask. Matching prefixes are yielded in descending specificity
+//     order (longest to shortest prefix length).
 //
-// The given idx refers to the position for this stride's prefix and is used
-// to derive a backtracking path through the CBT by repeatedly halving the index.
-// At each step, if a prefix exists in the table, its corresponding CIDR is
-// reconstructed and yielded. If yield returns false, traversal stops early.
+// Returns false if the yield callback requested an early exit.
 //
-// This function is intended for internal use during supernet traversal and
-// does not descend the trie further.
-func (n *FastACLNode) EachLookupPrefix(ip netip.Addr, depth int, pfxIdx uint8, yield func(netip.Prefix) bool) (ok bool) {
-	panic("TODO")
+// Requirement: The caller MUST provide a canonicalized prefix pfx (i.e. pfx == pfx.Masked()).
+func (n *FastACLNode) YieldSupernets(pfx netip.Prefix, depth int, octet byte, pfxIdx uint8, yield func(netip.Prefix) bool) (ok bool) {
+	ip := pfx.Addr()
+	pfxLen := pfx.Bits()
 
-	for ; pfxIdx > 0; pfxIdx >>= 1 {
-		if n.Prefixes.Test(pfxIdx) {
-			// get the CIDR back
-			_, pfxLen := art.IdxToPfx(pfxIdx)
-			cidr, _ := ip.Prefix(depth<<3 + int(pfxLen))
+	if n.Fringes.Test(octet) {
+		// Reconstruct the stride boundary prefix (e.g., /8, /16, /24).
+		fringePfx, _ := ip.Prefix((depth + 1) << 3)
 
-			if !yield(cidr) {
+		// Ignore fringe if its prefix length is more specific than the query target.
+		if fringePfx.Bits() <= pfxLen {
+			if !yield(fringePfx) {
 				return false
 			}
+		}
+	}
+
+	// Intersect configured prefixes with precomputed CBT ancestor mask.
+	coverage := n.Prefixes.And(&lpm.LookupTbl[pfxIdx])
+
+	// Iterate over matching bit indices in reverse order (longest to shortest prefix).
+	for covIdx := range coverage.AllBackward() {
+
+		// Reconstruct stride-relative length and combine with current depth offset.
+		_, pfxLen := art.IdxToPfx(covIdx)
+		cidr, _ := ip.Prefix(depth<<3 + int(pfxLen))
+
+		if !yield(cidr) {
+			return false
 		}
 	}
 
@@ -1263,120 +1279,82 @@ func (n *FastACLNode) EachSubnet(ptx PathContext, yield func(netip.Prefix) bool)
 	*/
 }
 
-// Supernets yields all supernet prefixes of pfx that exist in the trie,
-// in reverse order (most-specific first, least-specific last).
+// Supernets traverses the trie to yield all matching supernet prefixes covering pfx.
 //
-// It traverses upward from the given prefix toward the root, collecting
-// matching prefixes along the path. The traversal uses a stack to yield
-// results in reverse order, so that more-specific supernets appear before
-// less-specific ones.
+// Traversal is performed in two phases:
+//  1. Descent Phase: Downward traversal along the octet path to locate the deepest matching node,
+//     pushing visited internal nodes onto a fixed-size stack. If a compressed path leaf (*CIDRLeaf)
+//     is encountered and covers pfx, its prefix is yielded immediately (most specific match).
+//  2. Backtracking Phase: Unwinding the stack bottom-up, calling [FastACLNode.YieldSupernets]
+//     at each step to yield stride-aligned fringe prefixes and node-internal prefixes in descending length order.
 //
-// The function handles all node types (internal nodes, leaves, and fringes)
-// and stops early if the yield callback returns false.
+// Iteration halts immediately if the yield callback returns false.
 //
-// Parameters:
-//   - pfx: The prefix for which to find supernets
-//   - yield: Callback function invoked for each supernet prefix/value pair
-//
-// The yield function receives prefix/value pairs and returns false to stop
-// the iteration early.
+// Requirement: The caller MUST provide a canonicalized prefix pfx (i.e. pfx == pfx.Masked()).
 func (n *FastACLNode) Supernets(pfx netip.Prefix, yield func(netip.Prefix) bool) {
-	panic("TODO")
-
 	ip := pfx.Addr()
 	pfxLen := pfx.Bits()
-	is4 := ip.Is4()
 	octets := ip.AsSlice()
 	strideCount, modBits := DivMod8(pfxLen)
 
-	// stack of the traversed nodes for reverse ordering of supernets
+	// Fixed-size stack tracking traversed nodes for reverse (bottom-up) iteration.
 	stack := [MaxTreeDepth]*FastACLNode{}
 
-	// run variable, used after for loop
+	// Loop tracking variables preserved for the unwinding phase.
 	var depth int
 	var octet byte
 
-	// find last node along this octet path
+	// Phase 1: Descend down the trie along the octet path.
 LOOP:
-	for depth, octet = range octets {
-		// stepped one past the last stride of interest; back up to last and exit
-		if depth > strideCount {
-			depth--
-			break
-		}
-		// push current node on stack
+	for depth, octet = range octets[:strideCount+1] {
+		// Push current node onto stack before descending.
 		stack[depth] = n
 
-		// descend down the trie
+		// Stop descent if no child pointer exists for this octet.
 		if !n.Children.Test(octet) {
 			break LOOP
 		}
 		kid := n.MustGetChild(octet)
 
-		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
 		case *FastACLNode:
 			n = kid
-			continue LOOP // descend down to next trie level
+			continue LOOP // Descend to next trie level.
 
 		case *CIDRLeaf:
+			// Ignore leaf if its prefix length is more specific than the query target.
 			if kid.prefix.Bits() > pfx.Bits() {
 				break LOOP
 			}
 
-			if kid.prefix.Overlaps(pfx) {
+			// Yield leaf prefix if it covers the target IP.
+			if kid.prefix.Contains(ip) {
 				if !yield(kid.prefix) {
-					// early exit
 					return
 				}
 			}
-			// end of trie along this octets path
+
+			// End traversal along this path.
 			break LOOP
-
-		case *FringeLeaf:
-			fringePfx := CidrForFringe(octets, depth, is4, octet)
-			if fringePfx.Bits() > pfx.Bits() {
-				break LOOP
-			}
-
-			if fringePfx.Overlaps(pfx) {
-				if !yield(fringePfx) {
-					// early exit
-					return
-				}
-			}
-			// end of trie along this octets path
-			break LOOP
-
-		default:
-			panic("logic error, wrong node type")
 		}
 	}
 
-	// start backtracking, unwind the stack
+	// Phase 2: Backtrack bottom-up, unwinding the node stack.
 	for ; depth >= 0; depth-- {
 		n = stack[depth]
 
-		// only the lastOctet may have a different prefix len
-		// all others are just host routes
-		var idx uint8
+		// Derive the prefix index within the node's 8-bit complete binary tree (CBT).
+		// Only the terminal stride uses modBits; preceding strides cover full 8-bit octets.
+		var pfxIdx uint8
 		octet = octets[depth]
-		// Last “octet” from prefix
-		// Note: For /32 and /128, depth never reaches strideCount (4/16),
 		if depth == strideCount {
-			idx = art.PfxToIdx(octet, modBits)
+			pfxIdx = art.PfxToIdx(octet, modBits)
 		} else {
-			idx = art.OctetToIdx(octet)
+			pfxIdx = art.OctetToIdx(octet)
 		}
 
-		// micro benchmarking, skip if there is no match
-		if !n.Contains(idx) {
-			continue
-		}
-
-		// yield all the matching prefixes, not just the lpm
-		if !n.EachLookupPrefix(ip, depth, idx, yield) {
-			// early exit
+		// Yield matching node-internal prefixes in descending specificity.
+		if !n.YieldSupernets(pfx, depth, octet, pfxIdx, yield) {
 			return
 		}
 	}
