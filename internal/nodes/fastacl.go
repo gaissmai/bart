@@ -1012,7 +1012,7 @@ func (n *FastACLNode) AllRec(ptx PathContext, yield func(netip.Prefix) bool) boo
 	// 1. Direct local node prefixes
 	for idx := range n.Prefixes.All() {
 		ptx.Slot = idx
-		if !yield(PrefixCIDR(ptx)) {
+		if !n.yieldPrefix(ptx, yield) {
 			return false
 		}
 	}
@@ -1020,32 +1020,16 @@ func (n *FastACLNode) AllRec(ptx PathContext, yield func(netip.Prefix) bool) boo
 	// 2. Fringe prefixes at stride boundaries
 	for addr := range n.Fringes.All() {
 		ptx.Slot = addr
-		if !yield(FringeCIDR(ptx)) {
+		if !n.yieldFringe(ptx, yield) {
 			return false
 		}
 	}
 
 	// 3. Child nodes and path-compressed leaves
-	for octet := range n.Children.All() {
-		child := n.MustGetChild(octet)
-
-		switch kid := child.(type) {
-		case *FastACLNode:
-			nextPtx := ptx
-			nextPtx.Path[ptx.Depth] = octet
-			nextPtx.Depth++
-
-			if !kid.AllRec(nextPtx, yield) {
-				return false
-			}
-
-		case *CIDRLeaf:
-			if !yield(kid.prefix) {
-				return false
-			}
-
-		default:
-			panic("logic error, wrong node type")
+	for addr := range n.Children.All() {
+		ptx.Slot = addr
+		if !n.yieldChildRec(ptx, yield) {
+			return false
 		}
 	}
 
@@ -1129,7 +1113,7 @@ func (n *FastACLNode) yieldAddr(ptx PathContext, yield func(netip.Prefix) bool) 
 	}
 
 	if n.Children.Test(ptx.Slot) {
-		if !n.yieldChild(ptx, yield) {
+		if !n.yieldChildRecSorted(ptx, yield) {
 			return false
 		}
 	}
@@ -1137,8 +1121,26 @@ func (n *FastACLNode) yieldAddr(ptx PathContext, yield func(netip.Prefix) bool) 
 	return true
 }
 
-// yieldChild traverses subtrees or yields path-compressed leaf prefixes at the specified byte address.
-func (n *FastACLNode) yieldChild(ptx PathContext, yield func(netip.Prefix) bool) bool {
+// yieldChildRec traverses subtrees or yields path-compressed leaf prefixes at the specified byte address.
+func (n *FastACLNode) yieldChildRec(ptx PathContext, yield func(netip.Prefix) bool) bool {
+	switch kid := n.MustGetChild(ptx.Slot).(type) {
+	case *FastACLNode:
+		nextPtx := ptx
+		nextPtx.Path[ptx.Depth] = ptx.Slot
+		nextPtx.Depth++
+
+		return kid.AllRec(nextPtx, yield)
+
+	case *CIDRLeaf:
+		return yield(kid.prefix)
+	}
+
+	return false
+}
+
+// yieldChildRecSorted traverses subtrees or yields path-compressed leaf prefixes in CIDR sort order
+// at the specified byte address.
+func (n *FastACLNode) yieldChildRecSorted(ptx PathContext, yield func(netip.Prefix) bool) bool {
 	switch kid := n.MustGetChild(ptx.Slot).(type) {
 	case *FastACLNode:
 		nextPtx := ptx
@@ -1202,7 +1204,7 @@ func (n *FastACLNode) YieldSupernets(pfx netip.Prefix, depth int, octet byte, pf
 	return true
 }
 
-// EachSubnet yields all routes and subtrees covered by pfxIdx within the current node
+// YieldSubnets yields all routes and subtrees covered by pfxIdx within the current node
 // in canonical CIDR sort order.
 //
 // It intersects the node's prefixes and child subtrees with precomputed lookup
@@ -1213,7 +1215,7 @@ func (n *FastACLNode) YieldSupernets(pfx netip.Prefix, depth int, octet byte, pf
 // to guarantee deterministic ordering across stride boundaries.
 //
 // Expects the node to be at the path location specified by octets/depth.
-func (n *FastACLNode) EachSubnet(ptx PathContext, yield func(netip.Prefix) bool) bool {
+func (n *FastACLNode) YieldSubnets(ptx PathContext, yield func(netip.Prefix) bool) bool {
 	return false
 	/*
 
@@ -1313,7 +1315,7 @@ func (n *FastACLNode) Subnets(pfx netip.Prefix, yield func(netip.Prefix) bool) {
 		if depth == strideCount {
 			idx := art.PfxToIdx(octet, modBits)
 			ptx := NewPathContext(octets, depth, idx, is4)
-			n.EachSubnet(ptx, yield)
+			n.YieldSubnets(ptx, yield)
 			return
 		}
 
