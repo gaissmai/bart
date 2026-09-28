@@ -1864,32 +1864,31 @@ func (n *_NODE_TYPE[V]) AllRecSorted(path StridePath, depth int, is4 bool, yield
 	return true
 }
 
-// EachLookupPrefix performs a hierarchical lookup of all matching prefixes
-// in the current node’s 8-bit stride-based prefix table.
+// EachLookupPrefix iterates over all matching prefixes stored at the current node's
+// stride level for the given CBT search index (pfxIdx), in decreasing order of specificity.
 //
-// The function walks up the trie-internal complete binary tree (CBT),
-// testing each possible prefix length mask (in decreasing order of specificity),
-// and invokes the yield function for every matching entry.
+// It masks the node's prefix bitset with lpm.LookupTbl[pfxIdx] to identify all matching ancestor
+// prefixes in a single bitwise operation, then traverses them in reverse order via AllBackward().
+// For each match, it reconstructs the corresponding netip.Prefix and invokes yield.
 //
-// The given idx refers to the position for this stride's prefix and is used
-// to derive a backtracking path through the CBT by repeatedly halving the index.
-// At each step, if a prefix exists in the table, its corresponding CIDR is
-// reconstructed and yielded. If yield returns false, traversal stops early.
+// Returns true if all matching prefixes were processed, or false if yield returned false early.
 //
-// This function is intended for internal use during supernet traversal and
-// does not descend the trie further.
+// Note: This method evaluates local CBT prefixes within the current 8-bit stride only
+// and does not descend into child nodes.
 func (n *_NODE_TYPE[V]) EachLookupPrefix(ip netip.Addr, depth int, pfxIdx uint8, yield func(netip.Prefix, V) bool) (ok bool) {
-	for ; pfxIdx > 0; pfxIdx >>= 1 {
-		if n.Prefixes.Test(pfxIdx) {
-			val := n.MustGetPrefix(pfxIdx)
+	// Intersect set prefixes with the precomputed CBT ancestor lookup mask.
+	coverage := n.Prefixes.And(&lpm.LookupTbl[pfxIdx])
 
-			// get the CIDR back
-			_, pfxLen := art.IdxToPfx(pfxIdx)
-			cidr, _ := ip.Prefix(depth<<3 + int(pfxLen))
+	// Iterate over matching bit indices in descending order (longest to shortest prefix).
+	for covIdx := range coverage.AllBackward() {
+		val := n.MustGetPrefix(covIdx)
 
-			if !yield(cidr, val) {
-				return false
-			}
+		// Reconstruct the stride-relative prefix length and combine with the current depth.
+		_, pfxLen := art.IdxToPfx(covIdx)
+		cidr, _ := ip.Prefix(depth<<3 + int(pfxLen))
+
+		if !yield(cidr, val) {
+			return false
 		}
 	}
 
