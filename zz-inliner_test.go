@@ -27,6 +27,12 @@ func TestInlineBitSet256Functions(t *testing.T) {
 
 	// List of functions expected to be inlined
 	funcs := []string{
+		"bitset.(*BitSet256).All",
+		"bitset.(*BitSet256).AllBackward",
+		"bitset.(*BitSet256).AllEnumerate",
+		"bitset.(*BitSet256).AppendBits",
+		"bitset.(*BitSet256).Bits",
+
 		"bitset.(*BitSet256).Set",
 		"bitset.(*BitSet256).Clear",
 		"bitset.(*BitSet256).Test",
@@ -42,8 +48,8 @@ func TestInlineBitSet256Functions(t *testing.T) {
 		"bitset.(*BitSet256).AndTop",
 		"bitset.(*BitSet256).Overlaps",
 		//
-		"bitset.(*BitSet256).OnesCount",
 		"bitset.(*BitSet256).Rank",
+		"bitset.(*BitSet256).OnesCount",
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
