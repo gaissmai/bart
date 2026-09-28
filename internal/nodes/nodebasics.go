@@ -145,13 +145,6 @@ func NewLeafNode[V any](pfx netip.Prefix, val V) *LeafNode[V] {
 	return &LeafNode[V]{Prefix: pfx, Value: val}
 }
 
-// CIDRLeaf represents a path-compressed routing entry that stores the prefix.
-// Leaf nodes are used when a prefix doesn't align with trie stride boundaries
-// and needs to be stored as a compressed path to save memory and lookup time.
-type CIDRLeaf struct {
-	Prefix netip.Prefix
-}
-
 // FringeNode represents a path-compressed routing entry that stores only a value.
 // The prefix is implicitly defined by the node's position in the trie.
 // Fringe nodes are used for prefixes that align exactly with stride boundaries
