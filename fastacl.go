@@ -270,10 +270,10 @@ LOOP:
 	for depth = range strideCount + 1 {
 		depth &= nodes.DepthMask // BCE: Hint compiler that depth stays within bounds
 
-		octet = octets[depth]
-
 		// Record current node on the traversal stack for backtracking
 		stack[depth] = n
+
+		octet = octets[depth]
 
 		// Early exit from descent if no child or leaf exists at the target octet slot.
 		if !n.Children.Test(octet) {
