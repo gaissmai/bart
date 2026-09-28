@@ -140,7 +140,7 @@ func (f *FastACL) Contains(ip netip.Addr) bool {
 			if !is4 {
 				ip = netip.PrefixFrom(ip, 0).Addr()
 			}
-			return leaf.Prefix.Contains(ip)
+			return leaf.Prefix().Contains(ip)
 		}
 
 		// Internal trie node: descend to next level
@@ -221,10 +221,10 @@ func (f *FastACL) ContainsPrefix(pfx netip.Prefix) bool {
 		case *nodes.CIDRLeaf:
 			// Terminal path-compressed leaf reached: verify that the leaf's prefix length
 			// is broader/equal and encloses the target prefix.
-			if kid.Prefix.Bits() > pfxLen {
+			if kid.Prefix().Bits() > pfxLen {
 				return false
 			}
-			return kid.Prefix.Contains(ip)
+			return kid.Prefix().Contains(ip)
 		}
 	}
 
@@ -290,10 +290,10 @@ LOOP:
 		case *nodes.CIDRLeaf:
 			// Terminal path-compressed leaf reached: verify that the leaf's prefix length
 			// is broader/equal and encloses the target prefix/IP range.
-			if kid.Prefix.Bits() > pfxLen || !kid.Prefix.Contains(ip) {
+			if kid.Prefix().Bits() > pfxLen || !kid.Prefix().Contains(ip) {
 				break LOOP
 			}
-			return kid.Prefix, true
+			return kid.Prefix(), true
 		}
 	}
 
