@@ -61,11 +61,27 @@ func (n *FastACLNode) IsEmpty() bool {
 	return n.PrefixCount()+n.ChildCount()+n.FringeCount() == 0
 }
 
-// CIDRLeaf represents a path-compressed routing entry that stores the prefix.
-// Leaf nodes are used when a prefix doesn't align with trie stride boundaries
-// and needs to be stored as a compressed path to save memory and lookup time.
+// CIDRLeaf represents an immutable, path-compressed routing entry that stores a prefix.
+// Immutability & Reference Sharing:
+// Instances of CIDRLeaf are treated as strictly immutable after creation. The internal
+// netip.Prefix must not be modified after construction.
+//
+// Consequently, *CIDRLeaf pointers can be safely shared across table and node clones
+// (e.g., during CloneFlat and CloneRec) without additional heap allocations, mutexes,
+// or risk of data races.
 type CIDRLeaf struct {
-	Prefix netip.Prefix
+	// prefix is unexported to prevent mutation after instantiation.
+	prefix netip.Prefix
+}
+
+// NewCIDRLeaf returns a new immutable *CIDRLeaf initialized with the given prefix.
+func NewCIDRLeaf(pfx netip.Prefix) *CIDRLeaf {
+	return &CIDRLeaf{prefix: pfx}
+}
+
+// Prefix returns the canonical netip.Prefix encapsulated by this leaf.
+func (l *CIDRLeaf) Prefix() netip.Prefix {
+	return l.prefix
 }
 
 // InsertPrefix adds a routing entry at the specified index.
@@ -540,7 +556,7 @@ func (n *FastACLNode) Insert(pfx netip.Prefix, depth int) (exists bool) {
 
 		// 3. Unoccupied child slot: path-compress remaining strides into a CIDRLeaf.
 		if !n.Children.Test(octet) {
-			return n.InsertChild(octet, &CIDRLeaf{Prefix: pfx})
+			return n.InsertChild(octet, &CIDRLeaf{prefix: pfx})
 		}
 
 		// Retrieve existing child node or path-compressed leaf at current octet slot.
@@ -554,14 +570,14 @@ func (n *FastACLNode) Insert(pfx netip.Prefix, depth int) (exists bool) {
 		case *CIDRLeaf:
 			// 4. Collision resolution with an existing path-compressed leaf.
 			// Verify exact prefix match.
-			if kid.Prefix == pfx {
+			if kid.prefix == pfx {
 				return true
 			}
 
 			// Path divergence: allocate intermediate node, push existing leaf down,
 			// swap child slot, and descend into the new node to insert pfx.
 			newNode := new(FastACLNode)
-			newNode.Insert(kid.Prefix, depth+1)
+			newNode.Insert(kid.prefix, depth+1)
 
 			n.InsertChild(octet, newNode)
 			n = newNode
@@ -635,7 +651,7 @@ func (n *FastACLNode) Delete(pfx netip.Prefix) (exists bool) {
 
 		case *CIDRLeaf:
 			// 4. Path-compressed leaf encountered: verify exact prefix match.
-			if kid.Prefix != pfx {
+			if kid.prefix != pfx {
 				return false
 			}
 
@@ -686,7 +702,7 @@ func (n *FastACLNode) PurgeAndCompress(stack []*FastACLNode, octets []uint8, is4
 			// Elevate the single path-compressed CIDRLeaf to the parent level.
 			leaf := anyKid.(*CIDRLeaf)
 			parent.DeleteChild(octet)
-			parent.Insert(leaf.Prefix, depth)
+			parent.Insert(leaf.prefix, depth)
 
 		case fringeCount == 1:
 			// Elevate the single fringe entry to the parent level as a path-compressed leaf.
@@ -774,7 +790,7 @@ func (n *FastACLNode) EqualRec(o *FastACLNode) bool {
 			}
 
 			// compare prefixes
-			if nKid.Prefix != oKid.Prefix {
+			if nKid.prefix != oKid.prefix {
 				return false
 			}
 
@@ -861,7 +877,7 @@ func (n *FastACLNode) dump(w io.Writer, path StridePath, depth int, is4 bool) {
 				fmt.Fprintf(w, " [%s]↓", addrFmt(addr, is4))
 
 			case *CIDRLeaf:
-				fmt.Fprintf(w, " [%s]➜{%s}", addrFmt(addr, is4), child.Prefix)
+				fmt.Fprintf(w, " [%s]➜{%s}", addrFmt(addr, is4), child.prefix)
 
 			default:
 				panic("logic error, wrong node type")
@@ -1024,7 +1040,7 @@ func (n *FastACLNode) AllRec(ptx PathContext, yield func(netip.Prefix) bool) boo
 			}
 
 		case *CIDRLeaf:
-			if !yield(kid.Prefix) {
+			if !yield(kid.prefix) {
 				return false
 			}
 
@@ -1132,7 +1148,7 @@ func (n *FastACLNode) yieldChild(ptx PathContext, yield func(netip.Prefix) bool)
 		return kid.AllRecSorted(nextPtx, yield)
 
 	case *CIDRLeaf:
-		return yield(kid.Prefix)
+		return yield(kid.prefix)
 	}
 
 	return false
@@ -1304,12 +1320,12 @@ LOOP:
 			continue LOOP // descend down to next trie level
 
 		case *CIDRLeaf:
-			if kid.Prefix.Bits() > pfx.Bits() {
+			if kid.prefix.Bits() > pfx.Bits() {
 				break LOOP
 			}
 
-			if kid.Prefix.Overlaps(pfx) {
-				if !yield(kid.Prefix) {
+			if kid.prefix.Overlaps(pfx) {
+				if !yield(kid.prefix) {
 					// early exit
 					return
 				}
@@ -1416,8 +1432,8 @@ func (n *FastACLNode) Subnets(pfx netip.Prefix, yield func(netip.Prefix) bool) {
 			continue // descend down to next trie level
 
 		case *CIDRLeaf:
-			if pfx.Bits() <= kid.Prefix.Bits() && pfx.Overlaps(kid.Prefix) {
-				yield(kid.Prefix)
+			if pfx.Bits() <= kid.prefix.Bits() && pfx.Overlaps(kid.prefix) {
+				yield(kid.prefix)
 			}
 			return // immediate return
 
@@ -1702,7 +1718,7 @@ func (n *FastACLNode) OverlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
 			continue
 
 		case *CIDRLeaf:
-			return kid.Prefix.Overlaps(pfx)
+			return kid.prefix.Overlaps(pfx)
 
 		case *FringeLeaf:
 			return true
@@ -1778,15 +1794,15 @@ func (n *FastACLNode) OverlapsTwoChildren(nChild, oChild any, depth int) bool {
 	case nIsNode && oIsNode:
 		return nNode.Overlaps(oNode, depth)
 	case nIsNode && oIsLeaf:
-		return nNode.OverlapsPrefixAtDepth(oLeaf.Prefix, depth)
+		return nNode.OverlapsPrefixAtDepth(oLeaf.prefix, depth)
 	case nIsNode && oIsFringe:
 		return true
 
 	// LEAF cases
 	case nIsLeaf && oIsNode:
-		return oNode.OverlapsPrefixAtDepth(nLeaf.Prefix, depth)
+		return oNode.OverlapsPrefixAtDepth(nLeaf.prefix, depth)
 	case nIsLeaf && oIsLeaf:
-		return oLeaf.Prefix.Overlaps(nLeaf.Prefix)
+		return oLeaf.prefix.Overlaps(nLeaf.prefix)
 	case nIsLeaf && oIsFringe:
 		return true
 
@@ -1925,7 +1941,7 @@ func (c *CIDRLeaf) Fprint(w io.Writer, pad string) error {
 	if c == nil {
 		return nil
 	}
-	_, err := fmt.Fprintf(w, "%s└─ %s\n", pad, c.Prefix)
+	_, err := fmt.Fprintf(w, "%s└─ %s\n", pad, c.prefix)
 	return err
 }
 
@@ -2075,7 +2091,7 @@ func (n *FastACLNode) appendSlotItems(ptx PathContext, dst []HierarchyItem) []Hi
 		case *CIDRLeaf:
 			// Case 3: Path-compressed terminal leaf under an un-fringed slot.
 			return append(dst, HierarchyItem{
-				CIDR: kid.Prefix,
+				CIDR: kid.prefix,
 			})
 
 		default:

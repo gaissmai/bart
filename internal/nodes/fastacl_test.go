@@ -313,7 +313,7 @@ func TestIDRLeaf_Fprint(t *testing.T) {
 		{
 			name: "IPv4 leaf renders correct prefix and padding",
 			leaf: &CIDRLeaf{
-				Prefix: mpp("10.0.0.0/8"),
+				prefix: mpp("10.0.0.0/8"),
 			},
 			pad:  "│  ",
 			want: "│  └─ 10.0.0.0/8\n",
@@ -321,7 +321,7 @@ func TestIDRLeaf_Fprint(t *testing.T) {
 		{
 			name: "IPv6 leaf renders correct prefix and padding",
 			leaf: &CIDRLeaf{
-				Prefix: mpp("2001:db8::/32"),
+				prefix: mpp("2001:db8::/32"),
 			},
 			pad:  "│  ",
 			want: "│  └─ 2001:db8::/32\n",
@@ -499,7 +499,7 @@ func TestFastACLNode_DumpRec(t *testing.T) {
 				parent.InsertChild(10, child)
 
 				// Compressed leaf for 192.168.0.0/16 under octet 192
-				leaf := &CIDRLeaf{Prefix: mpp("192.168.0.0/16")}
+				leaf := &CIDRLeaf{prefix: mpp("192.168.0.0/16")}
 				parent.InsertChild(192, leaf)
 
 				return parent
@@ -572,7 +572,7 @@ func TestFastACLNode_DumpRec(t *testing.T) {
 				parent.InsertChild(10, child)
 
 				// CIDRLeaf under octet 192 (no local prefixes or fringes on parent)
-				leaf := &CIDRLeaf{Prefix: mpp("192.168.0.0/16")}
+				leaf := &CIDRLeaf{prefix: mpp("192.168.0.0/16")}
 				parent.InsertChild(192, leaf)
 
 				return parent
@@ -688,8 +688,8 @@ func TestFastACLNode_Insert(t *testing.T) {
 				if !ok {
 					t.Fatalf("expected *CIDRLeaf, got %T", child)
 				}
-				if leaf.Prefix != mpp("192.168.1.0/24") {
-					t.Errorf("got leaf prefix %s, want 192.168.1.0/24", leaf.Prefix)
+				if leaf.prefix != mpp("192.168.1.0/24") {
+					t.Errorf("got leaf prefix %s, want 192.168.1.0/24", leaf.prefix)
 				}
 			},
 		},
@@ -923,8 +923,8 @@ func TestFastACLNode_Delete(t *testing.T) {
 				if !ok {
 					t.Fatalf("expected intermediate node to be re-compressed to *CIDRLeaf, got %T", child)
 				}
-				if leaf.Prefix != mpp("10.1.1.0/24") {
-					t.Errorf("got elevated leaf prefix %s, want 10.1.1.0/24", leaf.Prefix)
+				if leaf.prefix != mpp("10.1.1.0/24") {
+					t.Errorf("got elevated leaf prefix %s, want 10.1.1.0/24", leaf.prefix)
 				}
 			},
 		},
@@ -979,8 +979,8 @@ func TestFastACLNode_Delete(t *testing.T) {
 					t.Fatalf("expected path to collapse back into *CIDRLeaf, got %T", child)
 				}
 
-				if leaf.Prefix != mpp("2001:db8::1/128") {
-					t.Errorf("got elevated leaf prefix %s, want 2001:db8::1/128", leaf.Prefix)
+				if leaf.prefix != mpp("2001:db8::1/128") {
+					t.Errorf("got elevated leaf prefix %s, want 2001:db8::1/128", leaf.prefix)
 				}
 			},
 		},
@@ -1229,7 +1229,7 @@ func TestFastACLNode_AllRecSorted(t *testing.T) {
 				parent.InsertChild(10, child10)
 
 				// Leaf entry at byte 192 (192.168.0.0/16)
-				leaf := &CIDRLeaf{Prefix: mpp("192.168.0.0/16")}
+				leaf := &CIDRLeaf{prefix: mpp("192.168.0.0/16")}
 				parent.InsertChild(192, leaf)
 
 				return parent
