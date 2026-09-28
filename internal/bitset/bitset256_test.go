@@ -452,6 +452,105 @@ func TestAll(t *testing.T) {
 	}
 }
 
+// TestAllBackward verifies that AllBackward iterates over all set bits
+// in strictly descending order, correctly handling edge cases such as empty bitsets,
+// single-bit sets, multi-word bitsets across uint64 boundaries, clears, and early iteration breaks.
+func TestAllBackward(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name     string
+		set      []uint8
+		del      []uint8
+		wantData []uint8
+	}{
+		{
+			name:     "null",
+			set:      []uint8{},
+			del:      []uint8{},
+			wantData: []uint8{},
+		},
+		{
+			name:     "zero",
+			set:      []uint8{0},
+			del:      []uint8{},
+			wantData: []uint8{0}, // bit #0 is set
+		},
+		{
+			name:     "1,5",
+			set:      []uint8{1, 5},
+			del:      []uint8{},
+			wantData: []uint8{5, 1}, // strictly descending order
+		},
+		{
+			name:     "many",
+			set:      []uint8{1, 65, 130, 190, 250},
+			del:      []uint8{},
+			wantData: []uint8{250, 190, 130, 65, 1}, // strictly descending across all uint64 words
+		},
+		{
+			name:     "special, last return",
+			set:      []uint8{1},
+			del:      []uint8{1}, // delete without compact
+			wantData: []uint8{},
+		},
+		{
+			name:     "boundaries, first and last bits",
+			set:      []uint8{0, 63, 64, 127, 128, 191, 192, 255},
+			del:      []uint8{},
+			wantData: []uint8{255, 192, 191, 128, 127, 64, 63, 0},
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			var b BitSet256
+			for _, u := range tc.set {
+				b.Set(u)
+			}
+
+			for _, u := range tc.del {
+				b.Clear(u)
+			}
+
+			gotData := slices.Collect(b.AllBackward())
+
+			if !slices.Equal(gotData, tc.wantData) {
+				t.Errorf("AllBackward() mismatch for %s:\ngot:  %v\nwant: %v",
+					tc.name, gotData, tc.wantData)
+			}
+		})
+	}
+}
+
+// TestAllBackward_EarlyBreak verifies that breaking early out of the AllBackward
+// iterator correctly terminates traversal without processing remaining bits.
+func TestAllBackward_EarlyBreak(t *testing.T) {
+	t.Parallel()
+
+	var b BitSet256
+	bitsToSet := []uint8{10, 50, 100, 200}
+	for _, u := range bitsToSet {
+		b.Set(u)
+	}
+
+	var got []uint8
+	for bit := range b.AllBackward() {
+		got = append(got, bit)
+		if bit == 100 {
+			break // Stop iteration after encountering bit 100
+		}
+	}
+
+	want := []uint8{200, 100}
+	if !slices.Equal(got, want) {
+		t.Errorf("AllBackward() early break mismatch:\ngot:  %v\nwant: %v", got, want)
+	}
+}
+
 // Helper to generate consecutive uint8 slices
 func makeSequence(start, length uint8) []uint8 {
 	seq := make([]uint8, length)
@@ -1542,6 +1641,45 @@ func BenchmarkAll(b *testing.B) {
 	})
 }
 
+func BenchmarkAllBackward(b *testing.B) {
+	var sink uint8
+
+	b.Run("Sparse", func(b *testing.B) {
+		aa := []BitSet256{
+			{0, 0, 0, 1},
+			{0, 0, 0, 1},
+			{0, 0, 0, 1},
+			{0, 0, 0, 1},
+		}
+
+		var i uint8
+		for b.Loop() {
+			for bit := range aa[i&3].AllBackward() {
+				sink = bit
+			}
+			i++
+		}
+		sinkSliceUint8 = append(sinkSliceUint8, sink)
+	})
+
+	b.Run("Dense", func(b *testing.B) {
+		aa := []BitSet256{
+			randomBitSet256(),
+			randomBitSet256(),
+			randomBitSet256(),
+			randomBitSet256(),
+		}
+
+		var i uint8
+		for b.Loop() {
+			for bit := range aa[i&3].AllBackward() {
+				sink = bit
+			}
+			i++
+		}
+		sinkSliceUint8 = append(sinkSliceUint8, sink)
+	})
+}
 func BenchmarkAppendBits(b *testing.B) {
 	b.Run("Sparse", func(b *testing.B) {
 		aa := []BitSet256{
