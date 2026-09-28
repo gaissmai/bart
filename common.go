@@ -45,6 +45,7 @@
 package bart
 
 import (
+	"iter"
 	"net/netip"
 
 	"github.com/gaissmai/bart/internal/nodes"
@@ -53,6 +54,9 @@ import (
 	// without this silent import the BitSet256 functions are not inlined
 	_ "github.com/gaissmai/bart/internal/bitset"
 )
+
+// emptySeq is a shared, zero-allocation no-op iterator for invalid or empty inputs.
+var emptySeq iter.Seq[netip.Prefix] = func(yield func(netip.Prefix) bool) {}
 
 // stridePath is required in many places in the bart package and in
 // internal/nodes. Aliased to keep the code readable.
