@@ -31,7 +31,6 @@ func TestFastACL_NilReceiver(t *testing.T) {
 		mustPanic(t, "Size4", func() { tbl1.Size4() })
 		mustPanic(t, "Size6", func() { tbl1.Size6() })
 
-		mustPanic(t, "Get", func() { tbl1.Get(pfx4) })
 		mustPanic(t, "Insert", func() { tbl1.Insert(pfx4) })
 		mustPanic(t, "Delete", func() { tbl1.Delete(pfx4) })
 		mustPanic(t, "Contains", func() { tbl1.Contains(ip4) })
@@ -77,7 +76,6 @@ func TestFastACL_Invalid(t *testing.T) {
 	noPanic(t, "Delete", func() { tbl1.Delete(zeroPfx) })
 	noPanic(t, "Equal", func() { tbl1.Equal(tbl2) })
 	noPanic(t, "Fprint", func() { tbl1.Fprint(nil) })
-	noPanic(t, "Get", func() { tbl1.Get(zeroPfx) })
 	noPanic(t, "Insert", func() { tbl1.Insert(zeroPfx) })
 	noPanic(t, "LookupPrefix", func() { tbl1.ContainsPrefix(zeroPfx) })
 	noPanic(t, "LookupPrefixLPM", func() { tbl1.LookupPrefixLPM(zeroPfx) })
