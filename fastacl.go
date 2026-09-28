@@ -15,19 +15,26 @@ import (
 	"github.com/gaissmai/bart/internal/nodes"
 )
 
+// FastACL provides a high-performance routing table and Access Control List (ACL)
+// evaluation structure for IPv4 and IPv6 prefixes.
+//
+// It maintains distinct trie root nodes and prefix counters for IPv4 and IPv6 address
+// families to eliminate runtime protocol branching and enable zero-allocation lookups.
 type FastACL struct {
-	// used by -copylocks checker from `go vet`.
+	// _ enforces copy-protection via 'go vet' -copylocks without incurring memory overhead.
 	_ [0]sync.Mutex
 
+	// Root nodes for IPv4 and IPv6 tries.
 	root4 nodes.FastACLNode
 	root6 nodes.FastACLNode
 
-	// the number of prefixes in the routing table
+	// Total count of active prefixes stored per address family.
 	size4 int
 	size6 int
 }
 
-// rootNodeByVersion, root node getter for ip version.
+// rootNodeByVersion returns a pointer to the root node corresponding to the
+// specified address family (IPv4 if is4 is true, IPv6 if false).
 func (f *FastACL) rootNodeByVersion(is4 bool) *nodes.FastACLNode {
 	if is4 {
 		return &f.root4
@@ -35,12 +42,62 @@ func (f *FastACL) rootNodeByVersion(is4 bool) *nodes.FastACLNode {
 	return &f.root6
 }
 
+// sizeUpdate adjusts the prefix count for the specified address family by delta.
 func (f *FastACL) sizeUpdate(is4 bool, delta int) {
 	if is4 {
 		f.size4 += delta
 		return
 	}
 	f.size6 += delta
+}
+
+// Insert adds a prefix to the FastACL table.
+//
+// Operation is idempotent: inserting an existing prefix is a no-op that preserves
+// the table state and leaves the size counter unchanged. Non-canonical prefixes
+// are automatically normalized using pfx.Masked(). Invalid or uninitialized
+// prefixes are silently ignored.
+func (f *FastACL) Insert(pfx netip.Prefix) {
+	if !pfx.IsValid() {
+		return
+	}
+
+	// Canonicalize prefix to ensure host bits are zeroed.
+	pfx = pfx.Masked()
+
+	is4 := pfx.Addr().Is4()
+	n := f.rootNodeByVersion(is4)
+
+	// If the prefix already exists, avoid updating size counters.
+	if exists := n.Insert(pfx, 0); exists {
+		return
+	}
+
+	// Update the prefix count for the corresponding address family.
+	f.sizeUpdate(is4, 1)
+}
+
+// Delete removes a prefix from the FastACL table.
+//
+// Operation is idempotent: attempting to delete a prefix that does not exist in
+// the table is a no-op that leaves table state and size counters unchanged.
+// Non-canonical prefixes are automatically normalized using pfx.Masked().
+// Invalid or uninitialized prefixes are silently ignored.
+func (f *FastACL) Delete(pfx netip.Prefix) {
+	if !pfx.IsValid() {
+		return
+	}
+
+	// Canonicalize prefix to ensure host bits are zeroed.
+	pfx = pfx.Masked()
+	is4 := pfx.Addr().Is4()
+
+	n := f.rootNodeByVersion(is4)
+
+	// If the prefix existed and was removed, decrement the corresponding address family counter.
+	if exists := n.Delete(pfx); exists {
+		f.sizeUpdate(is4, -1)
+	}
 }
 
 // Contains reports whether any stored prefix in the FastACL table covers the given IP address.
@@ -288,76 +345,6 @@ LOOP:
 	return lpmPfx, ok
 }
 
-// Insert adds or updates a prefix-value pair in the routing table.
-// If the prefix already exists, its value is updated; otherwise a new entry is created.
-// Invalid prefixes are silently ignored.
-//
-// The prefix is automatically canonicalized using pfx.Masked() to ensure
-// consistent behavior regardless of host bits in the input.
-func (f *FastACL) Insert(pfx netip.Prefix) {
-	if !pfx.IsValid() {
-		return
-	}
-
-	// canonicalize prefix
-	pfx = pfx.Masked()
-
-	is4 := pfx.Addr().Is4()
-	n := f.rootNodeByVersion(is4)
-
-	if exists := n.Insert(pfx, 0); exists {
-		return
-	}
-
-	// true insert, update size
-	f.sizeUpdate(is4, 1)
-}
-
-// Delete removes the exact prefix pfx from the table in-place.
-//
-// This is an exact-match operation (no LPM). If pfx exists, the entry is
-// removed. If pfx does not exist or pfx is invalid, the table is left unchanged.
-//
-// The prefix is canonicalized (Masked) before lookup.
-func (f *FastACL) Delete(pfx netip.Prefix) {
-	if !pfx.IsValid() {
-		return
-	}
-
-	// canonicalize prefix
-	pfx = pfx.Masked()
-	is4 := pfx.Addr().Is4()
-
-	n := f.rootNodeByVersion(is4)
-	if exists := n.Delete(pfx); exists {
-		f.sizeUpdate(is4, -1)
-	}
-}
-
-// Get performs an exact-prefix lookup and returns whether the exact
-// prefix exists. The prefix is canonicalized (Masked) before lookup.
-//
-// This is an exact-match operation (no LPM). The prefix must match exactly
-// in both address and prefix length to be found. If pfx exists, the
-// associated value (zero value for Lite) and found=true is returned.
-// If pfx does not exist or pfx is invalid, the zero value for V and
-// exists=false is returned.
-//
-// For longest-prefix-match (LPM) lookups, use Contains(ip), Lookup(ip),
-// LookupPrefix(pfx) or LookupPrefixLPM(pfx) instead.
-func (f *FastACL) Get(pfx netip.Prefix) (exists bool) {
-	if !pfx.IsValid() {
-		return exists
-	}
-	// canonicalize prefix
-	pfx = pfx.Masked()
-
-	is4 := pfx.Addr().Is4()
-	n := f.rootNodeByVersion(is4)
-
-	return n.Get(pfx)
-}
-
 // Supernets returns an iterator over all supernet routes that cover the given prefix pfx.
 //
 // The traversal searches both exact-length and shorter (less specific) prefixes that
@@ -394,7 +381,6 @@ func (f *FastACL) Supernets(pfx netip.Prefix) iter.Seq[netip.Prefix] {
 	}
 }
 
-/* TODO PathContext
 // Subnets returns an iterator over all subnets of the given prefix
 // in natural CIDR sort order. This includes prefixes of the same length
 // (exact match) and longer (more specific) prefixes that are contained
@@ -421,9 +407,12 @@ func (f *FastACL) Subnets(pfx netip.Prefix) iter.Seq[netip.Prefix] {
 		n.Subnets(pfx, yield)
 	}
 }
-*/
 
-// Clone returns a deep copy of the ACL.
+// Clone returns a deep copy of the FastACL table.
+//
+// The cloned table is completely decoupled from the original receiver instance.
+// Subsequent mutations (insertions or deletions) on either instance will not
+// affect the other.
 func (f *FastACL) Clone() *FastACL {
 	c := new(FastACL)
 
