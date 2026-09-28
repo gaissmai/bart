@@ -366,11 +366,85 @@ func (f *FastACL) Supernets(pfx netip.Prefix) iter.Seq[netip.Prefix] {
 	// avoiding the 'moved to heap: pfx' allocation.
 	canonicalPfx := pfx.Masked()
 
+	// Traversal is performed in two phases:
+	//  1. Descent Phase: Downward traversal along the octet path to locate the deepest matching node,
+	//     pushing visited internal nodes onto a fixed-size stack. If a compressed path leaf (*CIDRLeaf)
+	//     is encountered and covers pfx, its prefix is yielded immediately (most specific match).
+	//  2. Backtracking Phase: Unwinding the stack bottom-up, calling [FastACLNode.YieldSupernets]
+	//     at each step to yield stride-aligned fringe prefixes and node-internal prefixes in descending length order.
+	//
+	// Iteration halts immediately if the yield callback returns false.
 	return func(yield func(netip.Prefix) bool) {
-		is4 := canonicalPfx.Addr().Is4()
+		pfx := canonicalPfx
+		is4 := pfx.Addr().Is4()
 		n := f.rootNodeByVersion(is4)
 
-		n.Supernets(canonicalPfx, yield)
+		ip := pfx.Addr()
+		pfxLen := pfx.Bits()
+		octets := ip.AsSlice()
+		strideCount, modBits := nodes.DivMod8(pfxLen)
+
+		// Fixed-size stack tracking traversed nodes for reverse (bottom-up) iteration.
+		stack := [nodes.MaxTreeDepth]*nodes.FastACLNode{}
+
+		// Loop tracking variables preserved for the unwinding phase.
+		var depth int
+		var octet byte
+
+		// Phase 1: Descend down the trie along the octet path.
+	LOOP:
+		for depth, octet = range octets[:strideCount+1] {
+			// Push current node onto stack before descending.
+			stack[depth] = n
+
+			// Stop descent if no child pointer exists for this octet.
+			if !n.Children.Test(octet) {
+				break LOOP
+			}
+			kid := n.MustGetChild(octet)
+
+			switch kid := kid.(type) {
+			case *nodes.FastACLNode:
+				n = kid
+				continue LOOP // Descend to next trie level.
+
+			case *nodes.CIDRLeaf:
+				// Ignore leaf if its prefix length is more specific than the query target.
+				if kid.Prefix().Bits() > pfx.Bits() {
+					break LOOP
+				}
+
+				// Yield leaf prefix if it covers the target IP.
+				if kid.Prefix().Contains(ip) {
+					if !yield(kid.Prefix()) {
+						return
+					}
+				}
+
+				// End traversal along this path.
+				break LOOP
+			}
+		}
+
+		// Phase 2: Backtrack bottom-up, unwinding the node stack.
+		for ; depth >= 0; depth-- {
+			n = stack[depth]
+
+			// Derive the prefix index within the node's 8-bit complete binary tree (CBT).
+			// Only the terminal stride uses modBits; preceding strides cover full 8-bit octets.
+			var pfxIdx uint8
+			octet = octets[depth]
+			if depth == strideCount {
+				pfxIdx = art.PfxToIdx(octet, modBits)
+			} else {
+				pfxIdx = art.OctetToIdx(octet)
+			}
+
+			// Yield matching node-internal prefixes in descending specificity.
+			if !n.YieldSupernets(pfx, depth, octet, pfxIdx, yield) {
+				return
+			}
+		}
 	}
 }
 
@@ -379,21 +453,21 @@ func (f *FastACL) Supernets(pfx netip.Prefix) iter.Seq[netip.Prefix] {
 // (exact match) and longer (more specific) prefixes that are contained
 // within the given prefix.
 //
-// Example:
-//
-//	for sub, val := range table.Subnets(netip.MustParsePrefix("10.0.0.0/8")) {
-//	    fmt.Println("Covered:", sub, "->", val)
-//	}
-//
 // The iteration can be stopped early by breaking from the range loop.
 // Returns an empty iterator if the prefix is invalid.
 func (f *FastACL) Subnets(pfx netip.Prefix) iter.Seq[netip.Prefix] {
-	return func(yield func(netip.Prefix) bool) {
-		if !pfx.IsValid() {
-			return
-		}
+	// Guard clause: Early exit before any processing or closure allocation logic.
+	if !pfx.IsValid() {
+		return emptySeq
+	}
 
-		pfx = pfx.Masked()
+	// Canonicalize prefix into a NEW variable.
+	// This enables the compiler to capture canonicalPfx by value instead of by ref,
+	// avoiding the 'moved to heap: pfx' allocation.
+	canonicalPfx := pfx.Masked()
+
+	return func(yield func(netip.Prefix) bool) {
+		pfx := canonicalPfx
 		is4 := pfx.Addr().Is4()
 
 		n := f.rootNodeByVersion(is4)
