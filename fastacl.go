@@ -33,9 +33,6 @@ type FastACL struct {
 	size6 int
 }
 
-// emptySeq is a shared, zero-allocation no-op iterator for invalid or empty inputs.
-var emptySeq iter.Seq[netip.Prefix] = func(yield func(netip.Prefix) bool) {}
-
 // rootNodeByVersion returns a pointer to the root node corresponding to the
 // specified address family (IPv4 if is4 is true, IPv6 if false).
 func (f *FastACL) rootNodeByVersion(is4 bool) *nodes.FastACLNode {
