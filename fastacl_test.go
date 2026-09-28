@@ -992,3 +992,220 @@ func TestFastACL_Aggregate_StructuralCompare(t *testing.T) {
 		})
 	}
 }
+
+func TestFastACL_Supernets(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		query    string
+		inserts  []netip.Prefix
+		want     []netip.Prefix
+		wantExit bool // Test early break in yield callback via range break
+	}{
+		{
+			name:    "invalid prefix query",
+			query:   "invalid",
+			inserts: []netip.Prefix{mpp("10.0.0.0/8")},
+			want:    nil,
+		},
+		{
+			name:    "empty table",
+			query:   "10.0.0.0/16",
+			inserts: nil,
+			want:    nil,
+		},
+		{
+			name:    "exact match only",
+			query:   "10.1.2.0/24",
+			inserts: []netip.Prefix{mpp("10.1.2.0/24")},
+			want:    []netip.Prefix{mpp("10.1.2.0/24")},
+		},
+		{
+			name:    "uncanonical query normalization",
+			query:   "10.1.2.255/24", // Host bits set
+			inserts: []netip.Prefix{mpp("10.0.0.0/8"), mpp("10.1.2.0/24")},
+			want:    []netip.Prefix{mpp("10.1.2.0/24"), mpp("10.0.0.0/8")},
+		},
+		{
+			name:  "exact match and ascending supernets",
+			query: "10.1.2.128/25",
+			inserts: []netip.Prefix{
+				mpp("0.0.0.0/0"),
+				mpp("10.0.0.0/8"),
+				mpp("10.1.0.0/16"),
+				mpp("10.1.2.0/24"),
+				mpp("10.1.2.128/25"),
+			},
+			want: []netip.Prefix{
+				mpp("10.1.2.128/25"),
+				mpp("10.1.2.0/24"),
+				mpp("10.1.0.0/16"),
+				mpp("10.0.0.0/8"),
+				mpp("0.0.0.0/0"),
+			},
+		},
+		{
+			name:  "disjoint branches - skip non-matching siblings",
+			query: "10.1.2.0/24",
+			inserts: []netip.Prefix{
+				mpp("10.0.0.0/8"),
+				mpp("10.2.0.0/16"),    // Divergent stride
+				mpp("10.1.2.0/24"),    // Target match
+				mpp("10.1.3.0/24"),    // Divergent sibling
+				mpp("192.168.0.0/16"), // Completely separate tree
+			},
+			want: []netip.Prefix{
+				mpp("10.1.2.0/24"),
+				mpp("10.0.0.0/8"),
+			},
+		},
+		{
+			name:  "stride boundary fringes (/8, /16, /24)",
+			query: "10.1.2.4/30",
+			inserts: []netip.Prefix{
+				mpp("10.0.0.0/8"),  // Stride 1 fringe
+				mpp("10.1.0.0/16"), // Stride 2 fringe
+				mpp("10.1.2.0/24"), // Stride 3 fringe
+			},
+			want: []netip.Prefix{
+				mpp("10.1.2.0/24"),
+				mpp("10.1.0.0/16"),
+				mpp("10.0.0.0/8"),
+			},
+		},
+		{
+			name:  "cbt internal node prefixes within same stride",
+			query: "10.1.2.0/27",
+			inserts: []netip.Prefix{
+				mpp("10.1.2.0/24"),
+				mpp("10.1.2.0/25"),
+				mpp("10.1.2.0/26"),
+				mpp("10.1.2.0/27"),
+			},
+			want: []netip.Prefix{
+				mpp("10.1.2.0/27"),
+				mpp("10.1.2.0/26"),
+				mpp("10.1.2.0/25"),
+				mpp("10.1.2.0/24"),
+			},
+		},
+		{
+			name:  "path-compressed cidr leaf match first",
+			query: "10.1.2.128/28",
+			inserts: []netip.Prefix{
+				mpp("10.0.0.0/8"),
+				mpp("10.1.2.128/28"), // Unbranched path compression -> CIDRLeaf
+			},
+			want: []netip.Prefix{
+				mpp("10.1.2.128/28"), // Leaf yielded first in Phase 1
+				mpp("10.0.0.0/8"),    // Root supernet yielded during Phase 2 stack unwinding
+			},
+		},
+		{
+			name:  "path-compressed leaf skipped if query is broader than leaf",
+			query: "10.1.2.0/24", // Query is broader (/24) than leaf (/28)
+			inserts: []netip.Prefix{
+				mpp("10.0.0.0/8"),
+				mpp("10.1.2.128/28"), // Specific leaf in trie
+			},
+			want: []netip.Prefix{
+				mpp("10.0.0.0/8"), // Should not yield /28 because it's a subnet, not a supernet
+			},
+		},
+		{
+			name:  "ipv6 deep nested supernets",
+			query: "2001:db8:85a3:8a2e:370::/80",
+			inserts: []netip.Prefix{
+				mpp("::/0"),
+				mpp("2001:db8::/32"),
+				mpp("2001:db8:85a3::/48"),
+				mpp("2001:db8:85a3:8a2e::/64"),
+				mpp("2001:db8:85a3:8a2e:370::/80"),
+			},
+			want: []netip.Prefix{
+				mpp("2001:db8:85a3:8a2e:370::/80"),
+				mpp("2001:db8:85a3:8a2e::/64"),
+				mpp("2001:db8:85a3::/48"),
+				mpp("2001:db8::/32"),
+				mpp("::/0"),
+			},
+		},
+		{
+			name:  "early exit on yield false",
+			query: "10.1.2.0/24",
+			inserts: []netip.Prefix{
+				mpp("10.0.0.0/8"),
+				mpp("10.1.0.0/16"),
+				mpp("10.1.2.0/24"),
+			},
+			wantExit: true,
+			want: []netip.Prefix{
+				mpp("10.1.2.0/24"), // Should stop after first yield via break
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			tbl := new(FastACL)
+			for _, pfx := range tc.inserts {
+				tbl.Insert(pfx)
+			}
+
+			queryPfx, err := netip.ParsePrefix(tc.query)
+			if err != nil && tc.query != "invalid" {
+				t.Fatalf("unexpected test setup parse error for query %q: %v", tc.query, err)
+			}
+
+			var got []netip.Prefix
+
+			if tc.wantExit {
+				// Verify early termination semantics using native range-over-func with break.
+				for pfx := range tbl.Supernets(queryPfx) {
+					got = append(got, pfx)
+					break // Stop iteration immediately after receiving the first result.
+				}
+			} else {
+				// Collect all yielded netip.Prefix values directly from the iterator.
+				got = slices.Collect(tbl.Supernets(queryPfx))
+			}
+
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("Supernets(%q) mismatch:\ngot:  %v\nwant: %v", tc.query, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestFastACL_Supernets_Compare(t *testing.T) {
+	t.Parallel()
+	n := workLoadN()
+
+	prng := rand.New(rand.NewPCG(42, 42))
+
+	pfxs := random.RealWorldPrefixes(prng, n)
+
+	gold := new(golden.Table[any])
+	facl := new(FastACL)
+
+	for _, pfx := range pfxs {
+		gold.Insert(pfx, nil)
+		facl.Insert(pfx)
+	}
+
+	for _, pfx := range random.RealWorldPrefixes(prng, n) {
+		t.Run("subtest", func(t *testing.T) {
+			t.Parallel()
+			goldGot := gold.Supernets(pfx)
+			faclGot := slices.Collect(facl.Supernets(pfx))
+
+			if !slices.Equal(goldGot, faclGot) {
+				t.Fatalf("Supernets(%q) = %v, want %v", pfx, faclGot, goldGot)
+			}
+		})
+	}
+}
