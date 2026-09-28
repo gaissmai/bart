@@ -193,7 +193,47 @@ func (n *FastACLNode) Lookup(idx uint8) (ok bool) {
 	return
 }
 
-// CloneFlat returns a shallow copy of the current node.
+// CloneRec performs a recursive deep copy of the FastACLNode and all its trie descendants.
+//
+// Value-based structures (bitsets, caches, CIDRLeaf entries) are cloned directly,
+// while child FastACLNode instances in the sparse array are recursively duplicated
+// to ensure complete structural isolation.
+//
+// Returns a new FastACLNode instance containing a deep clone of the receiver subtree.
+func (n *FastACLNode) CloneRec() *FastACLNode {
+	if n == nil {
+		return nil
+	}
+
+	// Perform a flat clone of the current node's local storage and scalar fields.
+	c := n.CloneFlat()
+
+	// Recursively deep-copy all intermediate child nodes.
+	for i, kidAny := range c.Children.Items {
+		if kid, ok := kidAny.(*FastACLNode); ok {
+			c.Children.Items[i] = kid.CloneRec()
+		}
+	}
+
+	return c
+}
+
+// CloneFlat returns a shallow copy of the FastACLNode.
+//
+// All scalar fields, bitsets (Fringes, Prefixes), population counts, lookup
+// rank caches, and the sparse array slice header (via Children.Copy()) are duplicated
+// by value.
+//
+// Shallow Copy Semantics:
+// The internal Children slice is duplicated, but its element pointers (*CIDRLeaf and
+// *FastACLNode) remain shared references to the original child instances.
+//
+//   - Pointers to immutable *CIDRLeaf instances (netip.Prefix) require no further processing and can
+//     be safely shared across table clones without heap re-allocations.
+//   - Pointers to mutable *FastACLNode instances are subsequently replaced with deep
+//     copies by the calling CloneRec method to ensure complete structural isolation.
+//
+// Returns nil if the receiver node is nil.
 func (n *FastACLNode) CloneFlat() *FastACLNode {
 	if n == nil {
 		return nil
@@ -201,37 +241,15 @@ func (n *FastACLNode) CloneFlat() *FastACLNode {
 
 	c := new(FastACLNode)
 
-	// copy simple values
+	// Copy scalar bitsets and lookup metadata by value.
 	c.Fringes = n.Fringes
 	c.Prefixes = n.Prefixes
 	c.prefixCount = n.prefixCount
 	c.childRankCache = n.childRankCache
 
-	// sparse array
+	// Duplicate sparse array layout and internal slice storage.
+	// Element pointers (*CIDRLeaf and *FastACLNode) are shallow-copied into the new slice.
 	c.Children = *(n.Children.Copy())
-
-	// no values to copy
-	return c
-}
-
-// CloneRec performs a recursive deep copy of the node and all its descendants.
-//
-// Returns a new instance of FastACLNode which is a complete deep clone of the
-// receiver node with all descendants.
-func (n *FastACLNode) CloneRec() *FastACLNode {
-	if n == nil {
-		return nil
-	}
-
-	// Perform a flat clone of the current node.
-	c := n.CloneFlat()
-
-	// Recursively clone all child nodes of type *FastACLNode
-	for i, kidAny := range c.Children.Items {
-		if kid, ok := kidAny.(*FastACLNode); ok {
-			c.Children.Items[i] = kid.CloneRec()
-		}
-	}
 
 	return c
 }
@@ -463,77 +481,6 @@ func (n *FastACLNode) AggregateRec(ptx PathContext) (modified int) {
 	return modified
 }
 
-// Get retrieves the value associated with the given network prefix.
-// Traversal descends through the trie using the prefix's octets.
-//
-// The lookup handles path compression transparently:
-//   - If the path matches an internal node at the target stride, the value is retrieved
-//     from the node's prefix table.
-//   - If the path leads to a compressed LeafNode or FringeNode, the function verifies
-//     the prefix match before returning the value.
-//
-// Parameters:
-//   - pfx: The network prefix to look up (must be in canonical form).
-//
-// Returns:
-//   - exists: True if the prefix was found, false otherwise.
-func (n *FastACLNode) Get(pfx netip.Prefix) (exists bool) {
-	panic("TODO")
-
-	// The prefix must be provided in canonical (masked) form for correct trie traversal.
-	ip := pfx.Addr()
-	pfxLen := pfx.Bits()
-	octets := ip.AsSlice()
-	strideCount, modBits := DivMod8(pfxLen)
-
-	// Traverse the trie octet by octet based on the prefix path.
-	for depth, octet := range octets {
-		// At the target stride boundary, the prefix is expected in this node's
-		// prefix table.
-		if depth == strideCount {
-			return n.Prefixes.Test(art.PfxToIdx(octet, modBits))
-		}
-
-		// If no child exists at this path, the prefix is not in the trie.
-		kidAny, ok := n.GetChild(octet)
-		if !ok {
-			return false
-		}
-
-		// Identify the node type at this path segment.
-		switch kid := kidAny.(type) {
-		case *FastACLNode:
-			// Standard intermediate node: descend to the next level.
-			n = kid
-
-		case *FringeLeaf:
-			// Reached a path-compressed FringeNode.
-			// Verify if the prefix qualifies as a fringe at this depth to return a match.
-			if IsFringe(depth, pfxLen) {
-				return true
-			}
-			return false
-
-		case *CIDRLeaf:
-			// Reached a path-compressed LeafNode.
-			// Check if the stored prefix matches the lookup prefix exactly.
-			if kid.Prefix == pfx {
-				return true
-			}
-			return false
-
-		default:
-			panic("logic error, wrong node type")
-		}
-	}
-
-	panic("unreachable")
-}
-
-// #################################################################
-// TODO: generate some methods for fastacl
-// #################################################################
-
 // ChildCount returns the number of slots used in this node.
 func (n *FastACLNode) ChildCount() int {
 	return n.Children.Len()
@@ -551,261 +498,209 @@ func (n *FastACLNode) AllChildren() iter.Seq2[uint8, any] {
 	}
 }
 
-// Insert adds or updates a network prefix and its associated value in the trie.
-// Traversal begins at the specified byte depth.
+// Insert inserts a prefix into the trie starting at the specified stride depth.
 //
-// The trie utilizes path compression to conserve memory. A prefix is inserted:
-//   - Uncompressed into a node's prefix table at depth == strideCount.
-//   - As a path-compressed FringeNode if it qualifies as fringe [IsFringe].
-//   - As a path-compressed LeafNode otherwise.
+// It traverses the trie top-down across 8-bit octet strides. It stores terminal
+// prefixes in local Complete Binary Tree (CBT) prefix tables or stride-aligned
+// fringe bitsets. Unbranched subtrees are path-compressed into CIDRLeaf nodes.
 //
-// When a new prefix collides with an existing compressed node (Leaf or Fringe),
-// Insert resolves the collision by creating a new intermediate node, pushing
-// the existing entry down to the next level, and continuing traversal.
+// If a path collision occurs with an existing CIDRLeaf, the leaf is expanded
+// into an intermediate FastACLNode and pushed down the trie.
 //
-// Parameters:
-//   - pfx: The network prefix to insert (must be in canonical/masked form).
-//   - val: The value to associate with the prefix.
-//   - depth: The current depth in the trie (0-based byte index).
+// Returns true if the prefix was already present in the trie, or false if it was
+// newly inserted.
 //
-// Returns true if an existing prefix was updated, false if a new insertion occurred.
+// Note: pfx must be provided in canonical (masked) form.
 func (n *FastACLNode) Insert(pfx netip.Prefix, depth int) (exists bool) {
-	ip := pfx.Addr() // the pfx must be in canonical form
+	ip := pfx.Addr()
 	pfxLen := pfx.Bits()
 	octets := ip.AsSlice()
 	strideCount, modBits := DivMod8(pfxLen)
 
-	// Traverse the prefix's octets. Each depth corresponds to an 8-bit stride.
-	// We descend through the trie until we either reach the final stride (depth == strideCount)
-	// or find an empty child slot where we can path-compress the remaining strides.
+	// Traverse octets starting at the provided stride depth.
 	for ; depth < len(octets); depth++ {
 		octet := octets[depth]
 
-		// The current depth matches the prefix's stride count, meaning this is the final
-		// node for this prefix. We insert it directly into this node's prefix table.
+		// 1. Terminal stride reached: insert directly into local CBT prefix table.
 		if depth == strideCount {
 			return n.InsertPrefix(art.PfxToIdx(octet, modBits))
 		}
 
-		// If the prefix is perfectly aligned with the next stride boundary (e.g., /16 at depth 1),
-		// it acts as a default route for everything below it. We store it as a FringeNode.
+		// 2. Stride-aligned boundary match (/8, /16, /24, etc.): insert into fringe bitset.
 		if IsFringe(depth, pfxLen) {
 			return n.InsertFringe(octet)
 		}
 
-		// No child exists at this octet path.
-		// We path-compress the rest of the prefix as leaf into the child slot at octet.
+		// 3. Unoccupied child slot: path-compress remaining strides into a CIDRLeaf.
 		if !n.Children.Test(octet) {
-			return n.InsertChild(octet, &CIDRLeaf{pfx})
+			return n.InsertChild(octet, &CIDRLeaf{Prefix: pfx})
 		}
 
-		// A child already exists at this octet path. Retrieve it to either continue
-		// our descent along the strides or resolve a structural collision with a compressed node.
+		// Retrieve existing child node or path-compressed leaf at current octet slot.
 		kid := n.MustGetChild(octet)
 
 		switch kid := kid.(type) {
 		case *FastACLNode:
-			// Standard intermediate node: descend to the next trie level.
+			// Descend deeper into next trie level.
 			n = kid
 
 		case *CIDRLeaf:
-			// Collision with an existing path-compressed LeafNode.
+			// 4. Collision resolution with an existing path-compressed leaf.
+			// Verify exact prefix match.
 			if kid.Prefix == pfx {
 				return true
 			}
 
-			// Collision resolution: the paths diverge.
-			// 1. Create a new intermediate node.
-			// 2. Push the existing leaf down into this new node.
-			// 3. Replace the current child slot with the new node.
-			// 4. Descend into the new node to continue inserting 'pfx'.
+			// Path divergence: allocate intermediate node, push existing leaf down,
+			// swap child slot, and descend into the new node to insert pfx.
 			newNode := new(FastACLNode)
 			newNode.Insert(kid.Prefix, depth+1)
 
 			n.InsertChild(octet, newNode)
 			n = newNode
-
-		default:
-			panic("logic error, wrong node type")
 		}
 	}
 
-	panic("unreachable")
+	panic("unreachable: trie depth exceeded address bounds")
 }
 
-// PurgeAndCompress performs bottom-up trie maintenance to restore path compression
-// after a deletion. It unwinds the provided stack of parent nodes, identifying
-// nodes that have become sparse (i.e., containing only a single prefix or fringe
-// or a single child node) and prunes them by promoting the underlying entries to
-// the parent level.
+// Delete removes a prefix from the trie rooted at node n.
 //
-// This ensures the trie remains memory-efficient by collapsing redundant intermediate
-// nodes back into path-compressed CIDRLeafs whenever possible.
+// It traverses the trie top-down across 8-bit octet strides to locate the target
+// prefix in local CBT prefix bitsets, fringe bitsets, or path-compressed CIDRLeaf nodes.
 //
-// Parameters:
-//   - stack: Array of parent nodes to process during bottom-up unwinding.
-//   - octets: The full path of octets leading to the current node.
-//   - is4: True for IPv4 processing, false for IPv6.
-func (n *FastACLNode) PurgeAndCompress(stack []*FastACLNode, octets []uint8, is4 bool) {
-	// Iterate backwards through the ancestor stack to prune nodes from the bottom up.
-	for depth, parent := range slices.Backward(stack) {
-		octet := octets[depth]
-
-		// Check if the current node is redundant.
-		// A node may be redundant if it contains exactly one entry (either a prefix or
-		// or a fringe or a compressed CIDRLeaf).
-		pfxCount := n.PrefixCount()
-		fringeCount := n.FringeCount()
-		childCount := n.ChildCount()
-
-		// If it contains more than one entry, it is always structurally significant and cannot be pruned.
-		if pfxCount+fringeCount+childCount > 1 {
-			return
-		}
-
-		switch {
-		case childCount == 1:
-
-			// The node has exactly one child.
-			anyKid := n.Children.Items[0]
-
-			// If the child is an intermediate path node; the tree structure is required
-			// at this level. Compression cannot proceed further up.
-			if _, ok := anyKid.(*FastACLNode); ok {
-				return
-			}
-
-			// The child must be a compressed LeafNode. Prune the current node
-			// and re-insert the leaf into the parent to elevate it.
-			leaf := anyKid.(*CIDRLeaf)
-			parent.DeleteChild(octet)
-
-			parent.Insert(leaf.Prefix, depth)
-
-		case fringeCount == 1:
-			// The node has exactly one fringe. Prune the node and elevate the
-			// fringe to the parent level as a leaf.
-			parent.DeleteChild(octet)
-
-			// Reconstruct the full prefix for the fringe, as path compression
-			// requires the entire CIDR path, not just the remainder.
-			// depth is the parent's depth, so we offset by 1 for the kid's position.
-			ptx := PathContext{
-				Depth: depth + 1,
-				Is4:   is4,
-			}
-			copy(ptx.Path[:], octets)
-			ptx.Slot, _ = n.Fringes.FirstSet()
-
-			parent.Insert(FringeCIDR(ptx), depth)
-
-		case pfxCount == 1:
-			// The node has exactly one prefix. Prune the node and elevate the
-			// prefix to the parent level as a leaf/fringe.
-			parent.DeleteChild(octet)
-
-			// Retrieve the single prefix stored in this node.
-			idx, _ := n.Prefixes.FirstSet()
-
-			// Reconstruct the prefix from the path for re-insertion.
-			path := StridePath{}
-			copy(path[:], octets)
-			pfx := CidrFromPath(path[:], depth+1, is4, idx)
-
-			parent.Insert(pfx, depth)
-		default:
-			panic("unreachable")
-		}
-
-		// Move up to the next parent in the stack to continue pruning.
-		n = parent
-	}
-}
-
-// Delete removes the prefix from the trie rooted at n and returns true if the
-// prefix existed, false if it was not found. The prefix must be in canonical
-// (masked) form.
+// Upon successful deletion, it invokes PurgeAndCompress using the accumulated
+// ancestor stack to prune redundant intermediate nodes and restore optimal path compression.
 //
-// The trie uses path compression, so a prefix may be stored in one of three ways:
-//   - In the current node's prefix bitset when the prefix length aligns exactly
-//     with the stride boundary at this depth (depth == strideCount).
-//   - In the current node's fringe bistet for stride-aligned prefixes
-//     (e.g. /8, /16, /24) at depth == strideCount-1.
-//   - As a path-compressed CIDRLeaf in a child slot for prefixes otherwise.
+// Returns true if the prefix existed and was removed, or false if it was not found.
 //
-// After a successful deletion, PurgeAndCompress walks the ancestor stack to prune
-// now-empty nodes and restore path compression upward.
+// Note: pfx must be provided in canonical (masked) form.
 func (n *FastACLNode) Delete(pfx netip.Prefix) (exists bool) {
-	ip := pfx.Addr() // pfx must be in canonical (masked) form
+	ip := pfx.Addr()
 	pfxLen := pfx.Bits()
 	is4 := ip.Is4()
 	octets := ip.AsSlice()
 	strideCount, modBits := DivMod8(pfxLen)
 
-	// Record ancestor nodes as we descend; PurgeAndCompress uses this stack to
-	// walk back up and clean up empty or re-compressible nodes after deletion.
+	// Record ancestor nodes during descent; PurgeAndCompress uses this stack to
+	// walk back up and prune empty or re-compressible nodes post-deletion.
 	stack := [MaxTreeDepth]*FastACLNode{}
 
 	for depth, octet := range octets {
-		depth &= DepthMask // BCE hint; keep Delete on the fast path
+		depth &= DepthMask // BCE hint: bounds check elimination for fast-path traversal.
 
-		stack[depth] = n // record current node before descending
+		stack[depth] = n // Record current parent node before descending.
 
-		// At the stride boundary, the prefix is stored directly in this node's
-		// prefix table.
+		// 1. Terminal stride boundary reached: delete directly from local CBT prefix table.
 		if depth == strideCount {
 			if exists = n.DeletePrefix(art.PfxToIdx(octet, modBits)); !exists {
 				return false
 			}
 
-			// prune now-empty nodes and re-compress the path upwards
+			// Prune empty nodes and re-compress path upwards.
 			n.PurgeAndCompress(stack[:depth], octets, is4)
 			return true
 		}
 
-		// If the prefix is perfectly aligned with the next stride boundary (e.g., /16 at depth 1),
-		// it acts as a default route for everything below it. We store it as a FringeNode.
+		// 2. Stride-aligned boundary match (/8, /16, /24, etc.): delete from fringe bitset.
 		if IsFringe(depth, pfxLen) {
 			if exists := n.DeleteFringe(octet); !exists {
 				return false
 			}
 
-			// prune now-empty nodes and re-compress the path upwards
+			// Prune empty nodes and re-compress path upwards.
 			n.PurgeAndCompress(stack[:depth], octets, is4)
 			return true
 		}
 
-		// no child node exists at this octet; the prefix is not in the trie
+		// 3. Early termination: no child node or leaf exists at the target octet slot.
 		if !n.Children.Test(octet) {
 			return false
 		}
 
-		// A child node exists at this octet path, retrieve it.
+		// Retrieve child node or path-compressed leaf at current octet slot.
 		kid := n.MustGetChild(octet)
 
 		switch kid := kid.(type) {
 		case *FastACLNode:
-			n = kid // descend to the next trie level
+			// Descend deeper into next trie level.
+			n = kid
 
 		case *CIDRLeaf:
-			// A LeafNode holds exactly one path-compressed prefix.
-			// Compare using the canonical (masked) form for an exact match.
+			// 4. Path-compressed leaf encountered: verify exact prefix match.
 			if kid.Prefix != pfx {
 				return false
 			}
 
 			n.DeleteChild(octet)
 
-			// prune now-empty nodes and re-compress the path upwards
+			// Prune empty nodes and re-compress path upwards.
 			n.PurgeAndCompress(stack[:depth], octets, is4)
 			return true
-
-		default:
-			panic("logic error, wrong node type")
 		}
 	}
 
-	panic("unreachable")
+	panic("unreachable: trie depth exceeded address bounds")
+}
+
+// PurgeAndCompress performs bottom-up structural trie optimization to restore path compression
+// following a prefix deletion.
+//
+// It unwinds the provided stack of parent nodes using slices.Backward, evaluating nodes
+// that have become sparse (containing at most one entry across prefixes, fringes, and children).
+// Redundant sparse nodes are pruned from their parent slot and elevated into path-compressed
+// CIDRLeaf representations at higher trie levels.
+func (n *FastACLNode) PurgeAndCompress(stack []*FastACLNode, octets []uint8, is4 bool) {
+	// Unwind parent ancestor stack bottom-up to collapse redundant path nodes.
+	for depth, parent := range slices.Backward(stack) {
+		pfxCount := n.PrefixCount()
+		fringeCount := n.FringeCount()
+		childCount := n.ChildCount()
+
+		// A node with more than one total entry is structurally required and cannot be pruned.
+		if pfxCount+fringeCount+childCount > 1 {
+			return
+		}
+
+		octet := octets[depth]
+
+		switch {
+		case childCount == 1:
+			// Directly access the underlying slice without bitset traversal operations.
+			// Since there is exactly one child node, it is guaranteed to be the first
+			// and only item in the slice.
+			anyKid := n.Children.Items[0]
+
+			// If the child is an intermediate node, path compression cannot proceed higher.
+			if _, ok := anyKid.(*FastACLNode); ok {
+				return
+			}
+
+			// Elevate the single path-compressed CIDRLeaf to the parent level.
+			leaf := anyKid.(*CIDRLeaf)
+			parent.DeleteChild(octet)
+			parent.Insert(leaf.Prefix, depth)
+
+		case fringeCount == 1:
+			// Elevate the single fringe entry to the parent level as a path-compressed leaf.
+			addr, _ := n.Fringes.FirstSet()
+			ptx := NewPathContext(octets, depth+1, addr, is4)
+
+			parent.DeleteChild(octet)
+			parent.Insert(FringeCIDR(ptx), depth)
+
+		case pfxCount == 1:
+			// Elevate the single CBT local prefix to the parent level as a path-compressed leaf.
+			idx, _ := n.Prefixes.FirstSet()
+			ptx := NewPathContext(octets, depth+1, idx, is4)
+
+			parent.DeleteChild(octet)
+			parent.Insert(PrefixCIDR(ptx), depth)
+		}
+
+		// Advance upwards to continue structural pruning at the next parent level.
+		n = parent
+	}
 }
 
 // Contains returns true if an index (idx) has any matching longest-prefix
@@ -1231,10 +1126,9 @@ func (n *FastACLNode) yieldChild(ptx PathContext, yield func(netip.Prefix) bool)
 
 	case *CIDRLeaf:
 		return yield(kid.Prefix)
-
-	default:
-		panic("logic error: unknown child node type")
 	}
+
+	return false
 }
 
 // EachLookupPrefix performs a hierarchical lookup of all matching prefixes
@@ -1269,7 +1163,6 @@ func (n *FastACLNode) EachLookupPrefix(ip netip.Addr, depth int, pfxIdx uint8, y
 	return true
 }
 
-/* TODO PathContext
 // EachSubnet yields all routes and subtrees covered by pfxIdx within the current node
 // in canonical CIDR sort order.
 //
@@ -1281,80 +1174,71 @@ func (n *FastACLNode) EachLookupPrefix(ip netip.Addr, depth int, pfxIdx uint8, y
 // to guarantee deterministic ordering across stride boundaries.
 //
 // Expects the node to be at the path location specified by octets/depth.
-func (n *FastACLNode) EachSubnet(octets []byte, depth int, is4 bool, pfxIdx uint8, yield func(netip.Prefix) bool) bool {
-	panic("TODO")
+func (n *FastACLNode) EachSubnet(ptx PathContext, yield func(netip.Prefix) bool) bool {
+	return false
+	/*
 
-	// octets as array, needed below more than once
-	var path StridePath
-	copy(path[:], octets)
+		var tmp bitset.BitSet256
 
-	var tmp bitset.BitSet256
+		// bitset & node entries against precomputed allot tables for pfxIdx.
+		tmp = n.Prefixes.And(&allot.PfxRoutesLookupTbl[pfxIdx])
+		allCoveredIndices := tmp.AppendBits(make([]uint8, 0, tmp.OnesCount()))
 
-	// bitset & node entries against precomputed allot tables for pfxIdx.
-	tmp = n.Prefixes.And(&allot.PfxRoutesLookupTbl[pfxIdx])
-	allCoveredIndices := tmp.AppendBits(make([]uint8, 0, tmp.OnesCount()))
+		tmp = n.Children.And(&allot.FringeRoutesLookupTbl[pfxIdx])
+		allCoveredChildAddrs := tmp.AppendBits(make([]uint8, 0, tmp.OnesCount()))
 
-	tmp = n.Children.And(&allot.FringeRoutesLookupTbl[pfxIdx])
-	allCoveredChildAddrs := tmp.AppendBits(make([]uint8, 0, tmp.OnesCount()))
+		// Sort covered prefix indices into canonical CIDR order.
+		slices.SortFunc(allCoveredIndices, CmpIndexRank)
 
-	// Sort covered prefix indices into canonical CIDR order.
-	slices.SortFunc(allCoveredIndices, CmpIndexRank)
+		// Helper to process and yield child entries (nodes, leaves, or fringes).
+		yieldChild := func(addr uint8) bool {
+			switch kid := n.MustGetChild(addr).(type) {
+			case *FastACLNode:
+				nextPtx := ptx
+				nextPtx.Path[ptx.Depth] = addr
+				nextPtx.Depth++
+				return kid.AllRecSorted(ptx, yield)
 
-	// Helper to process and yield child entries (nodes, leaves, or fringes).
-	yieldChild := func(addr uint8) bool {
-		switch kid := n.MustGetChild(addr).(type) {
-		case *FastACLNode:
-			path[depth] = addr
-			return kid.AllRecSorted(path, depth+1, is4, yield)
-
-		case *CIDRLeaf:
-			return yield(kid.Prefix)
-
-		case *FringeLeaf:
-			fringePfx := CidrForFringe(path[:], depth, is4, addr)
-			return yield(fringePfx)
-
-		default:
-			panic("logic error: unknown child node type")
+			case *CIDRLeaf:
+				return yield(kid.Prefix)
 		}
-	}
 
-	addrCursor := 0
+		addrCursor := 0
 
-	// Interleave local prefixes and child subtrees in CIDR rank order.
-	for _, pfxIdx := range allCoveredIndices {
-		pfxOctet, _ := art.IdxToPfx(pfxIdx)
+		// Interleave local prefixes and child subtrees in CIDR rank order.
+		for _, pfxIdx := range allCoveredIndices {
+			pfxOctet, _ := art.IdxToPfx(pfxIdx)
 
-		// Yield all child subtrees whose base address falls before the current prefix scope.
-		for j := addrCursor; j < len(allCoveredChildAddrs); j++ {
-			addr := allCoveredChildAddrs[j]
-			if addr >= pfxOctet {
-				break
+			// Yield all child subtrees whose base address falls before the current prefix scope.
+			for j := addrCursor; j < len(allCoveredChildAddrs); j++ {
+				addr := allCoveredChildAddrs[j]
+				if addr >= pfxOctet {
+					break
+				}
+
+				if !yieldChild(addr) {
+					return false
+				}
+				addrCursor++
 			}
 
+			// Yield the local prefix entry itself.
+			cidr := CidrFromPath(path[:], depth, is4, pfxIdx)
+			if !yield(cidr) {
+				return false
+			}
+		}
+
+		// Yield remaining child subtrees strictly after all local prefixes.
+		for _, addr := range allCoveredChildAddrs[addrCursor:] {
 			if !yieldChild(addr) {
 				return false
 			}
-			addrCursor++
 		}
 
-		// Yield the local prefix entry itself.
-		cidr := CidrFromPath(path[:], depth, is4, pfxIdx)
-		if !yield(cidr) {
-			return false
-		}
-	}
-
-	// Yield remaining child subtrees strictly after all local prefixes.
-	for _, addr := range allCoveredChildAddrs[addrCursor:] {
-		if !yieldChild(addr) {
-			return false
-		}
-	}
-
-	return true
+		return true
+	*/
 }
-*/
 
 // Supernets yields all supernet prefixes of pfx that exist in the trie,
 // in reverse order (most-specific first, least-specific last).
@@ -1475,7 +1359,6 @@ LOOP:
 	}
 }
 
-/* TODO PathContext
 // Subnets yields all subnet prefixes covered by pfx that exist in the trie,
 // in CIDR sort order.
 //
@@ -1509,7 +1392,8 @@ func (n *FastACLNode) Subnets(pfx netip.Prefix, yield func(netip.Prefix) bool) {
 		// so those are handled below via the fringe/leaf path.
 		if depth == strideCount {
 			idx := art.PfxToIdx(octet, modBits)
-			n.EachSubnet(octets, depth, is4, idx, yield)
+			ptx := NewPathContext(octets, depth, idx, is4)
+			n.EachSubnet(ptx, yield)
 			return
 		}
 
@@ -1545,7 +1429,6 @@ func (n *FastACLNode) Subnets(pfx netip.Prefix, yield func(netip.Prefix) bool) {
 		}
 	}
 }
-*/
 
 // Overlaps recursively compares two trie nodes and returns true
 // if any of their prefixes or descendants overlap.
@@ -1928,6 +1811,18 @@ type PathContext struct {
 
 	// Is4 indicates whether the context evaluates an IPv4 (true) or IPv6 (false) address space.
 	Is4 bool
+}
+
+func NewPathContext(octets []byte, depth int, slot uint8, is4 bool) PathContext {
+	ptx := PathContext{
+		Depth: depth,
+		Slot:  slot,
+		Is4:   is4,
+	}
+	if octets != nil {
+		copy(ptx.Path[:], octets)
+	}
+	return ptx
 }
 
 // HierarchyItem represents a structural node or fringe boundary within
