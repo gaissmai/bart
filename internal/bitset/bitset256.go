@@ -18,7 +18,11 @@ package bitset
 
 // can inline (*BitSet256).AlignedPairs with cost 54
 // can inline (*BitSet256).All with cost 17
+// can inline (*BitSet256).All.func1 with cost 52
+// can inline (*BitSet256).AllBackward with cost 17
+// can inline (*BitSet256).AllBackward.func1 with cost 77
 // can inline (*BitSet256).AllEnumerate with cost 17
+// can inline (*BitSet256).AllEnumerate.func1 with cost 60
 // can inline (*BitSet256).And with cost 53
 // can inline (*BitSet256).AndTop with cost 67
 // can inline (*BitSet256).AppendBits with cost 31
@@ -212,6 +216,31 @@ func (b *BitSet256) All() iter.Seq[uint8] {
 					return
 				}
 				word &= word - 1
+			}
+		}
+	}
+}
+
+// AllBackward returns an iterator over the indices of all set bits in the BitSet256
+// in strictly descending order.
+//
+// Note on Dense BitSets:
+// While iter.Seq provides clean iterator semantics and supports early breaking,
+// calling yield() in a dense iteration loop introduces slight state-machine
+// and yield-inlining overhead compared to batch operations.
+//
+//nolint:gosec // G115: integer overflow conversion int -> uint
+func (b *BitSet256) AllBackward() iter.Seq[uint8] {
+	return func(yield func(uint8) bool) {
+		for wIdx := len(b) - 1; wIdx >= 0; wIdx-- {
+			word := b[wIdx]
+			for word != 0 {
+				msb := 63 - bits.LeadingZeros64(word)
+				bitIdx := uint8(wIdx<<6 + msb)
+				if !yield(bitIdx) {
+					return
+				}
+				word &^= uint64(1) << msb
 			}
 		}
 	}
