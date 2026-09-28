@@ -33,6 +33,9 @@ type FastACL struct {
 	size6 int
 }
 
+// emptySeq is a shared, zero-allocation no-op iterator for invalid or empty inputs.
+var emptySeq iter.Seq[netip.Prefix] = func(yield func(netip.Prefix) bool) {}
+
 // rootNodeByVersion returns a pointer to the root node corresponding to the
 // specified address family (IPv4 if is4 is true, IPv6 if false).
 func (f *FastACL) rootNodeByVersion(is4 bool) *nodes.FastACLNode {
@@ -345,39 +348,32 @@ LOOP:
 	return lpmPfx, ok
 }
 
-// Supernets returns an iterator over all supernet routes that cover the given prefix pfx.
+// Supernets returns an iterator over all enclosing supernet prefixes in the FastACL table
+// that cover the given target prefix range pfx.
 //
-// The traversal searches both exact-length and shorter (less specific) prefixes that
-// include pfx. Starting from the most specific position in the trie,
-// it walks upward through parent nodes and yields any matching entries found at each level.
+// The iteration yields matching routes in reverse CIDR order:
+//  1. An exact match for pfx itself (if present in the table).
+//  2. Enclosing supernet routes ascending from the most specific match (longest prefix match)
+//     up to the most general enclosing route (root level /0).
 //
-// The iteration order is reverse-CIDR: from longest prefix match (LPM) towards
-// least-specific routes.
-//
-// This can be used to enumerate all covering supernet routes in routing-based
-// policy engines, diagnostics tools, or fallback resolution logic.
-//
-// Example:
-//
-//	for supernet, val := range table.Supernets(netip.MustParsePrefix("192.0.2.128/25")) {
-//	    fmt.Println("Covered by:", supernet, "->", val)
-//	}
-//
-// The iteration can be stopped early by breaking from the range loop.
-// Returns an empty iterator if the prefix is invalid.
+// Non-canonical inputs are automatically normalized. If pfx is invalid (!pfx.IsValid()),
+// an empty sequence is returned immediately without executing yield.
 func (f *FastACL) Supernets(pfx netip.Prefix) iter.Seq[netip.Prefix] {
+	// Guard clause: Early exit before any processing or closure allocation logic.
+	if !pfx.IsValid() {
+		return emptySeq
+	}
+
+	// Canonicalize prefix into a NEW variable.
+	// This enables the compiler to capture canonicalPfx by value instead of by ref,
+	// avoiding the 'moved to heap: pfx' allocation.
+	canonicalPfx := pfx.Masked()
+
 	return func(yield func(netip.Prefix) bool) {
-		if !pfx.IsValid() {
-			return
-		}
-
-		// canonicalize the prefix
-		pfx = pfx.Masked()
-
-		is4 := pfx.Addr().Is4()
+		is4 := canonicalPfx.Addr().Is4()
 		n := f.rootNodeByVersion(is4)
 
-		n.Supernets(pfx, yield)
+		n.Supernets(canonicalPfx, yield)
 	}
 }
 
