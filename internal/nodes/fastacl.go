@@ -61,6 +61,13 @@ func (n *FastACLNode) IsEmpty() bool {
 	return n.PrefixCount()+n.ChildCount()+n.FringeCount() == 0
 }
 
+// CIDRLeaf represents a path-compressed routing entry that stores the prefix.
+// Leaf nodes are used when a prefix doesn't align with trie stride boundaries
+// and needs to be stored as a compressed path to save memory and lookup time.
+type CIDRLeaf struct {
+	Prefix netip.Prefix
+}
+
 // InsertPrefix adds a routing entry at the specified index.
 // It returns true if a prefix already existed at that index,
 // false if this is a new insertion.
