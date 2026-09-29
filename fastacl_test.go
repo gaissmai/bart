@@ -52,7 +52,7 @@ func TestFastACL_NilReceiver(t *testing.T) {
 		mustPanicRangeOverFunc[any](t, "AllSorted", tbl1.AllSorted)
 		mustPanicRangeOverFunc[any](t, "AllSorted4", tbl1.AllSorted4)
 		mustPanicRangeOverFunc[any](t, "AllSorted6", tbl1.AllSorted6)
-		// TODO mustPanicRangeOverFunc[any](t, "Subnets", tbl1.Subnets)
+		mustPanicRangeOverFunc[any](t, "Subnets", tbl1.Subnets)
 		mustPanicRangeOverFunc[any](t, "Supernets", tbl1.Supernets)
 	})
 }
@@ -86,7 +86,7 @@ func TestFastACL_Invalid(t *testing.T) {
 	noPanic(t, "Size", func() { tbl1.Size() })
 	noPanic(t, "Size4", func() { tbl1.Size4() })
 	noPanic(t, "Size6", func() { tbl1.Size6() })
-	// TODO noPanic(t, "Subnets", func() { tbl1.Subnets(zeroPfx) })
+	noPanic(t, "Subnets", func() { tbl1.Subnets(zeroPfx) })
 	noPanic(t, "Supernets", func() { tbl1.Supernets(zeroPfx) })
 }
 
@@ -101,21 +101,21 @@ func TestFastACL_Contains_Compare(t *testing.T) {
 	pfxs := random.RealWorldPrefixes(prng, n)
 
 	gold := new(golden.Table[int])
-	tbl := new(FastACL)
+	facl := new(FastACL)
 
 	for i, p := range pfxs {
 		gold.Insert(p, i)
-		tbl.Insert(p)
+		facl.Insert(p)
 	}
 
 	for range n {
 		ip := random.IP(prng)
 
 		_, goldOK := gold.Lookup(ip)
-		tblOK := tbl.Contains(ip)
+		faclOK := facl.Contains(ip)
 
-		if goldOK != tblOK {
-			t.Fatalf("Contains(%q) = %v, want %v", ip, tblOK, goldOK)
+		if goldOK != faclOK {
+			t.Fatalf("Contains(%q) = %v, want %v", ip, faclOK, goldOK)
 		}
 	}
 }
@@ -140,11 +140,6 @@ func TestFastACL_Contains_Zoned(t *testing.T) {
 				}
 			})
 		}
-	}
-
-	type route struct {
-		cidr  string
-		value string
 	}
 
 	tests := []struct {
@@ -180,12 +175,12 @@ func TestFastACL_Contains_Zoned(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			table := new(FastACL)
+			facl := new(FastACL)
 			for _, pfxStr := range tt.pfxs {
-				table.Insert(mpp(pfxStr))
+				facl.Insert(mpp(pfxStr))
 			}
 
-			check(t, table, mpa(tt.probe), tt.wantOK)
+			check(t, facl, mpa(tt.probe), tt.wantOK)
 		})
 	}
 }
@@ -346,21 +341,21 @@ func TestFastACL_Insert_Shuffled(t *testing.T) {
 		pfxs2 := slices.Clone(pfxs)
 		prng.Shuffle(len(pfxs2), func(i, j int) { pfxs2[i], pfxs2[j] = pfxs2[j], pfxs2[i] })
 
-		tbl1 := new(FastACL)
-		tbl2 := new(FastACL)
+		facl1 := new(FastACL)
+		facl2 := new(FastACL)
 
 		for _, pfx := range pfxs {
-			tbl1.Insert(pfx)
-			tbl1.Insert(pfx) // idempotent
+			facl1.Insert(pfx)
+			facl1.Insert(pfx) // idempotent
 		}
 		for _, pfx := range pfxs2 {
-			tbl2.Insert(pfx) // idempotent
+			facl2.Insert(pfx) // idempotent
 		}
 
-		if tbl1.dumpString() != tbl2.dumpString() {
+		if facl1.dumpString() != facl2.dumpString() {
 			t.Fatal("tbl1 and tbl2 have different dumpString representation")
 		}
-		if !tbl1.Equal(tbl2) {
+		if !facl1.Equal(facl2) {
 			t.Fatal("expected Equal")
 		}
 	}
@@ -603,19 +598,19 @@ func TestFastACL_AllSorted(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			var acl FastACL
+			var facl FastACL
 			for _, pfx := range tt.initial {
-				acl.Insert(pfx)
+				facl.Insert(pfx)
 			}
 
 			var seq iter.Seq[netip.Prefix]
 			switch tt.mode {
 			case "all":
-				seq = acl.AllSorted()
+				seq = facl.AllSorted()
 			case "v4":
-				seq = acl.AllSorted4()
+				seq = facl.AllSorted4()
 			case "v6":
-				seq = acl.AllSorted6()
+				seq = facl.AllSorted6()
 			default:
 				t.Fatalf("unsupported mode: %s", tt.mode)
 			}
@@ -648,15 +643,15 @@ func TestFastACL_AllSorted_Compare(t *testing.T) {
 		pfxs := random.RealWorldPrefixes(prng, n)
 
 		gold := new(golden.Table[any])
-		tbl := new(FastACL)
+		facl := new(FastACL)
 
 		for _, pfx := range pfxs {
 			gold.Insert(pfx, nil)
-			tbl.Insert(pfx)
+			facl.Insert(pfx)
 		}
 
 		goldFlat := gold.FlatSorted()
-		tblSorted := slices.Collect(tbl.AllSorted())
+		tblSorted := slices.Collect(facl.AllSorted())
 
 		if !slices.Equal(goldFlat.SortKeys(), tblSorted) {
 			t.Fatal("expected Equal")
@@ -1147,7 +1142,6 @@ func TestFastACL_Supernets(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1205,6 +1199,153 @@ func TestFastACL_Supernets_Compare(t *testing.T) {
 
 			if !slices.Equal(goldGot, faclGot) {
 				t.Fatalf("Supernets(%q) = %v, want %v", pfx, faclGot, goldGot)
+			}
+		})
+	}
+}
+
+func TestFastACL_Subnets(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		routes   []string // Prefixes to insert into FastACL
+		query    string   // Target prefix passed to Subnets()
+		want     []string // Expected subnets in natural CIDR sort order
+		maxYield int      // If > 0, stop range iteration early after N items
+	}{
+		{
+			name:   "invalid target prefix yields nothing",
+			routes: []string{"10.0.0.0/8"},
+			query:  "invalid-pfx",
+			want:   nil,
+		},
+		{
+			name:   "empty ACL yields nothing",
+			routes: nil,
+			query:  "10.0.0.0/8",
+			want:   nil,
+		},
+		{
+			name:   "exact match single prefix",
+			routes: []string{"10.0.0.0/8"},
+			query:  "10.0.0.0/8",
+			want:   []string{"10.0.0.0/8"},
+		},
+		{
+			name:   "unmasked prefix query is normalized automatically",
+			routes: []string{"10.1.2.0/24"},
+			query:  "10.1.2.255/24", // Normalized to 10.1.2.0/24
+			want:   []string{"10.1.2.0/24"},
+		},
+		{
+			name: "IPv4 nested subnets in canonical CIDR order",
+			routes: []string{
+				"10.0.0.0/8",
+				"10.1.0.0/16",
+				"10.1.1.0/24",
+				"10.1.2.0/24",
+				"10.2.0.0/16",
+				"192.168.0.0/16",
+			},
+			query: "10.0.0.0/8",
+			want: []string{
+				"10.0.0.0/8",
+				"10.1.0.0/16",
+				"10.1.1.0/24",
+				"10.1.2.0/24",
+				"10.2.0.0/16",
+			},
+		},
+		{
+			name:   "pruning non-matching sibling subtrees",
+			routes: []string{"10.1.0.0/16", "10.1.1.0/24", "10.2.0.0/16"},
+			query:  "10.1.0.0/16",
+			want: []string{
+				"10.1.0.0/16",
+				"10.1.1.0/24",
+			},
+		},
+		{
+			name: "IPv6 subnets across stride boundaries",
+			routes: []string{
+				"2001:db8::/32",
+				"2001:db8:1000::/36",
+				"2001:db8:1000::/48",
+				"2001:db8:2000::/36",
+				"2001:dc0::/32",
+			},
+			query: "2001:db8::/32",
+			want: []string{
+				"2001:db8::/32",
+				"2001:db8:1000::/36",
+				"2001:db8:1000::/48",
+				"2001:db8:2000::/36",
+			},
+		},
+		{
+			name:     "early iteration break",
+			routes:   []string{"10.0.0.0/8", "10.1.0.0/16", "10.1.1.0/24", "10.2.0.0/16"},
+			query:    "10.0.0.0/8",
+			want:     []string{"10.0.0.0/8", "10.1.0.0/16"},
+			maxYield: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			facl := new(FastACL)
+			for _, r := range tt.routes {
+				pfx := mpp(r)
+				facl.Insert(pfx)
+			}
+
+			var target netip.Prefix
+			if tt.query != "invalid-pfx" {
+				target = netip.MustParsePrefix(tt.query)
+			}
+
+			var got []string
+			for pfx := range facl.Subnets(target) {
+				got = append(got, pfx.String())
+				if tt.maxYield > 0 && len(got) == tt.maxYield {
+					break
+				}
+			}
+
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("Subnets(%q) mismatch:\n  got:  %v\n  want: %v", tt.query, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFastACL_Subnets_Compare(t *testing.T) {
+	t.Parallel()
+	n := workLoadN()
+	prng := rand.New(rand.NewPCG(42, 42))
+
+	pfxs := random.RealWorldPrefixes(prng, n)
+
+	gold := new(golden.Table[any])
+	facl := new(FastACL)
+
+	for _, pfx := range pfxs {
+		gold.Insert(pfx, nil)
+		facl.Insert(pfx)
+	}
+
+	for _, pfx := range random.RealWorldPrefixes(prng, n) {
+		t.Run("subtest", func(t *testing.T) {
+			t.Parallel()
+
+			goldGot := gold.Subnets(pfx)
+			faclGot := slices.Collect(facl.Subnets(pfx))
+
+			if !slices.Equal(goldGot, faclGot) {
+				t.Fatalf("Subnets(%q) = %v, want %v", pfx, faclGot, goldGot)
 			}
 		})
 	}
