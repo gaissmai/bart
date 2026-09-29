@@ -358,7 +358,7 @@ LOOP:
 func (f *FastACL) Supernets(pfx netip.Prefix) iter.Seq[netip.Prefix] {
 	// Guard clause: Early exit before any processing or closure allocation logic.
 	if !pfx.IsValid() {
-		return emptySeq
+		return nodes.EmptySeq
 	}
 
 	// Canonicalize prefix into a NEW variable.
@@ -458,7 +458,7 @@ func (f *FastACL) Supernets(pfx netip.Prefix) iter.Seq[netip.Prefix] {
 func (f *FastACL) Subnets(pfx netip.Prefix) iter.Seq[netip.Prefix] {
 	// Guard clause: Early exit before any processing or closure allocation logic.
 	if !pfx.IsValid() {
-		return emptySeq
+		return nodes.EmptySeq
 	}
 
 	// Canonicalize prefix into a NEW variable.
