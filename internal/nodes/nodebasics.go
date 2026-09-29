@@ -15,6 +15,8 @@ import (
 )
 
 // EmptySeq is a shared, zero-allocation no-op iterator for invalid or empty inputs.
+//
+//nolint:gochecknoglobals
 var EmptySeq iter.Seq[netip.Prefix] = func(yield func(netip.Prefix) bool) {}
 
 // strideLen represents the byte stride length for the multibit trie.
