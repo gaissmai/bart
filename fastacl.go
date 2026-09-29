@@ -450,10 +450,10 @@ func (f *FastACL) Supernets(pfx netip.Prefix) iter.Seq[netip.Prefix] {
 
 // Subnets returns an iterator over all subnets of the given prefix
 // in natural CIDR sort order. This includes prefixes of the same length
-// (exact match) and longer (more specific) prefixes that are contained
+// (exact match) and longer (more specific) prefixes contained
 // within the given prefix.
 //
-// The iteration can be stopped early by breaking from the range loop.
+// Iteration can be stopped early by breaking from the range loop.
 // Returns an empty iterator if the prefix is invalid.
 func (f *FastACL) Subnets(pfx netip.Prefix) iter.Seq[netip.Prefix] {
 	// Guard clause: Early exit before any processing or closure allocation logic.
@@ -469,9 +469,52 @@ func (f *FastACL) Subnets(pfx netip.Prefix) iter.Seq[netip.Prefix] {
 	return func(yield func(netip.Prefix) bool) {
 		pfx := canonicalPfx
 		is4 := pfx.Addr().Is4()
-
 		n := f.rootNodeByVersion(is4)
-		n.Subnets(pfx, yield)
+
+		ip := pfx.Addr()
+		pfxLen := pfx.Bits()
+		octets := ip.AsSlice()
+		strideCount, modBits := nodes.DivMod8(pfxLen)
+
+		// Traverse trie levels according to byte stride depth.
+		for depth, octet := range octets {
+
+			// Reached the target trie level matching the prefix length.
+			if depth == strideCount {
+				idx := art.PfxToIdx(octet, modBits)
+				ptx := nodes.NewPathContext(octets, depth, idx, is4)
+				n.YieldSubnets(ptx, yield)
+				return
+			}
+
+			// Yield matching fringe prefixes at intermediate levels if present.
+			if nodes.IsFringe(depth, pfxLen) && n.Fringes.Test(octet) {
+				ptx := nodes.NewPathContext(octets, depth, octet, is4)
+				if !n.YieldFringe(ptx, yield) {
+					return
+				}
+			}
+
+			// Branch traversal terminates if child byte bucket is empty.
+			if !n.Children.Test(octet) {
+				return
+			}
+			kid := n.MustGetChild(octet)
+
+			// Descend deeper or evaluate leaf termination.
+			switch kid := kid.(type) {
+			case *nodes.FastACLNode:
+				n = kid
+				continue // Descend down to next trie level.
+
+			case *nodes.CIDRLeaf:
+				// Evaluate leaf containment. No subnets exist below a leaf, so iteration terminates immediately.
+				if pfx.Bits() <= kid.Prefix().Bits() && pfx.Overlaps(kid.Prefix()) {
+					yield(kid.Prefix())
+				}
+				return // Terminal leaf reached; discontinue trie descent.
+			}
+		}
 	}
 }
 
