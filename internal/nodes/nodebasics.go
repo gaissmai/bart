@@ -6,12 +6,16 @@ package nodes
 import (
 	"cmp"
 	"fmt"
+	"iter"
 	"net/netip"
 	"strconv"
 	"strings"
 
 	"github.com/gaissmai/bart/internal/art"
 )
+
+// EmptySeq is a shared, zero-allocation no-op iterator for invalid or empty inputs.
+var EmptySeq iter.Seq[netip.Prefix] = func(yield func(netip.Prefix) bool) {}
 
 // strideLen represents the byte stride length for the multibit trie.
 // Each stride processes 8 bits (1 byte) at a time.
