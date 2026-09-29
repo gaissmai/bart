@@ -176,8 +176,13 @@ func (f *FastACL) ContainsPrefix(pfx netip.Prefix) bool {
 	n := f.rootNodeByVersion(is4)
 
 	// Traverse the trie top-down across byte strides up to the probe's target depth.
-	for depth := range min(len(octets), strideCount+1) {
-		octet := octets[depth]
+	for depth, octet := range octets {
+		depth &= nodes.DepthMask // BCE
+
+		// stepped one past the last stride of interest
+		if depth > strideCount {
+			return false
+		}
 
 		// 1. Check for covering local prefixes within the current stride node.
 		if n.PrefixCount() != 0 {
@@ -267,13 +272,18 @@ func (f *FastACL) LookupPrefixLPM(pfx netip.Prefix) (lpmPfx netip.Prefix, ok boo
 
 	// Top-down traversal: Descend as deep as possible along the octet path.
 LOOP:
-	for depth := range min(len(octets), strideCount+1) {
-		depth &= nodes.DepthMask // BCE: Hint compiler that depth stays within bounds
+	// find the last node on the octets path in the trie,
+	for depth, octet = range octets {
+		depth &= nodes.DepthMask // BCE
+
+		// stepped one past the last stride of interest; back up to last and break
+		if depth > strideCount {
+			depth--
+			break
+		}
 
 		// Record current node on the traversal stack for backtracking
 		stack[depth] = n
-
-		octet = octets[depth]
 
 		// Early exit from descent if no child or leaf exists at the target octet slot.
 		if !n.Children.Test(octet) {
