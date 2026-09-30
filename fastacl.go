@@ -545,6 +545,33 @@ func (f *FastACL) Clone() *FastACL {
 	return c
 }
 
+// Union merges another routing table into the receiver table, modifying it in-place.
+//
+// It panics if the receiver table f is nil, or if the argument o is nil.
+// If o is empty or points to the exact same table instance as f, Union returns immediately.
+func (f *FastACL) Union(o *FastACL) {
+	// Guard: Panic early if the receiver is nil.
+	_ = f.size4
+
+	// Guard: Early return if the source table is empty (nil argument panics on o.size4 access).
+	if o.size4 == 0 && o.size6 == 0 {
+		return
+	}
+
+	// Guard: Merging a table into itself is a no-op.
+	if o == f {
+		return
+	}
+
+	// Recursively merge IPv4 and IPv6 trees and obtain duplicate prefix counts.
+	dup4 := f.root4.UnionRec(&o.root4, 0)
+	dup6 := f.root6.UnionRec(&o.root6, 0)
+
+	// Adjust internal size counters based on unique new prefixes added.
+	f.size4 += o.size4 - dup4
+	f.size6 += o.size6 - dup6
+}
+
 // OverlapsPrefix reports whether any prefix in the routing table overlaps with
 // the given prefix. Two prefixes overlap if they share any IP addresses.
 //

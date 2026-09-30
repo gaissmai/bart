@@ -1270,6 +1270,206 @@ func (n *FastACLNode) YieldSubnets(ptx PathContext, yield func(netip.Prefix) boo
 	return true
 }
 
+// UnionRec recursively merges another node o into the receiver node n in-place.
+//
+// The depth parameter represents the current 8-bit stride depth in the trie.
+// Bitwise operations are used to merge local prefixes and fringe boundaries.
+// Existing children are merged using handleMatrix, while missing children from o
+// are directly linked into n.
+//
+// Returns the total number of duplicate prefixes overwritten during the subtree merge.
+func (n *FastACLNode) UnionRec(o *FastACLNode, depth int) (duplicates int) {
+	// 1. Calculate duplicate local prefixes and apply bitwise OR merge.
+	dupBits := n.Prefixes.And(&o.Prefixes)
+	duplicates += dupBits.OnesCount()
+
+	// Bitwise union merge for local prefixes; update prefixCount cache
+	n.Prefixes = n.Prefixes.Or(&o.Prefixes)
+	n.prefixCount = uint16(n.Prefixes.OnesCount())
+
+	// 2. Calculate duplicate fringe boundaries and apply bitwise OR merge.
+	dupBits = n.Fringes.And(&o.Fringes)
+	duplicates += dupBits.OnesCount()
+
+	// Bitwise union merge for fringes; no fringe count cache to update
+	n.Fringes = n.Fringes.Or(&o.Fringes)
+
+	// 3. Iterate through all child pointers in the source node o.
+	for i, addr := range o.Children.AllEnumerate() {
+		otherChild := o.Children.Items[i]
+
+		thisChild, thisExists := n.GetChild(addr)
+		if !thisExists {
+			// Fast path: If the slot is empty in n, directly insert the child pointer from o.
+			n.InsertChild(addr, otherChild)
+			continue
+		}
+
+		// Slot collision: Resolve combination matrix using handleMatrix.
+		duplicates += n.handleMatrix(thisChild, otherChild, addr, depth)
+	}
+
+	return duplicates
+}
+
+// handleMatrix handles the four possible structural combinations when unioning
+// two colliding child entries at a specific stride byte address and depth.
+//
+// Matrix of combinations:
+//   - node + node: Recursive descent via UnionRec.
+//   - node + leaf: Direct leaf insertion into the existing node.
+//   - leaf + node: Creates a new internal node, pushes the existing leaf down, and recurses.
+//   - leaf + leaf: Direct equality check (overwrites duplicate) or pushes both leaves into a new node.
+//
+// Returns the number of duplicate prefixes detected (1 if duplicate, 0 otherwise).
+func (n *FastACLNode) handleMatrix(thisChild, otherChild any, addr uint8, depth int) int {
+	// Perform type assertions upfront to reduce line noise and branch complexity.
+	var (
+		thisNode, thisIsNode = thisChild.(*FastACLNode)
+		thisLeaf, thisIsLeaf = thisChild.(*CIDRLeaf)
+
+		otherNode, otherIsNode = otherChild.(*FastACLNode)
+		otherLeaf, otherIsLeaf = otherChild.(*CIDRLeaf)
+	)
+
+	// Case 1: Special case for leaf + leaf collision with identical prefix.
+	if thisIsLeaf && otherIsLeaf && thisLeaf.prefix == otherLeaf.prefix {
+		return 1
+	}
+
+	// Case 2: thisChild is already a full node; no new allocation needed at this level.
+	if thisIsNode {
+		switch {
+		case otherIsNode:
+			return thisNode.UnionRec(otherNode, depth+1)
+		case otherIsLeaf:
+			if thisNode.Insert(otherLeaf.prefix, depth+1) {
+				return 1
+			}
+			return 0
+		}
+	}
+
+	// Case 3: thisChild is a leaf; allocate a new internal node to push thisChild down.
+	nc := new(FastACLNode)
+	nc.Insert(thisLeaf.prefix, depth+1)
+
+	// Replace the existing leaf child with the newly created node.
+	n.InsertChild(addr, nc)
+
+	// Process otherChild into the newly allocated internal node.
+	switch {
+	case otherIsNode:
+		return nc.UnionRec(otherNode, depth+1)
+	case otherIsLeaf:
+		if nc.Insert(otherLeaf.prefix, depth+1) {
+			return 1
+		}
+		return 0
+	}
+
+	return 0
+}
+
+/*
+// UnionRec recursively merges another node o into the receiver node n.
+//
+// Returns the number of duplicate prefixes that were overwritten during merging.
+func (n *FastACLNode) UnionRec(o *FastACLNode, depth int) (duplicates int) {
+	dupBits := n.Prefixes.And(&o.Prefixes)
+	duplicates += dupBits.OnesCount()
+
+	n.Prefixes = n.Prefixes.Or(&o.Prefixes)
+	n.prefixCount = uint16(n.Prefixes.OnesCount())
+
+	dupBits = n.Fringes.And(&o.Fringes)
+	duplicates += dupBits.OnesCount()
+
+	n.Fringes = n.Fringes.Or(&o.Fringes)
+	// no extra fringeCount tracked
+
+	// for all child addrs in other node do ...
+	for i, addr := range o.Children.AllEnumerate() {
+		otherChild := o.Children.Items[i]
+
+		thisChild, thisExists := n.GetChild(addr)
+		if !thisExists {
+			// just insert other child at this empty slot
+			n.InsertChild(addr, otherChild)
+			continue
+		}
+
+		// Use helper function to handle all 2x2 combinations
+		duplicates += n.handleMatrix(thisChild, otherChild, addr, depth)
+	}
+
+	return duplicates
+}
+
+// handleMatrix, 4 possible combinations to union this child and other child
+//
+//	THIS,   OTHER:
+//	--------------
+//	node,   node    <-- union rec-descent with node
+//	node,   leaf    <-- insert leaf at depth+1
+//
+//	leaf,   node    <-- insert new node, push this leaf down, union rec-descent
+//	leaf,   leaf    <-- insert new node, push both leaves down (!first check equality)
+func (n *FastACLNode) handleMatrix(thisChild, otherChild any, addr uint8, depth int) int {
+	// Do ALL type assertions upfront - reduces line noise
+	var (
+		thisNode, thisIsNode = thisChild.(*FastACLNode)
+		thisLeaf, thisIsLeaf = thisChild.(*CIDRLeaf)
+
+		otherNode, otherIsNode = otherChild.(*FastACLNode)
+		otherLeaf, otherIsLeaf = otherChild.(*CIDRLeaf)
+	)
+
+	// Case 1: Special cases that DON'T need a new node
+
+	// Special case: leaf + leaf with same prefix -> just overwrite value
+	if thisIsLeaf && otherIsLeaf && thisLeaf.prefix == otherLeaf.prefix {
+		return 1
+	}
+
+	// Case 2: thisChild is already a node - insert into it, no new node needed
+	if thisIsNode {
+		switch {
+		case otherIsNode:
+			return thisNode.UnionRec(otherNode, depth+1)
+		case otherIsLeaf:
+			if thisNode.Insert(otherLeaf.prefix, depth+1) {
+				return 1
+			}
+			return 0
+		}
+	}
+
+	// Case 3: All remaining cases need a new node
+	// (thisChild is leaf or fringe, and we didn't hit the special cases above)
+
+	// Push existing child down into new node
+	nc := new(FastACLNode)
+	nc.Insert(thisLeaf.prefix, depth+1)
+
+	// Replace child with new node
+	n.InsertChild(addr, nc)
+
+	// Now handle other child
+	switch {
+	case otherIsNode:
+		return nc.UnionRec(otherNode, depth+1)
+	case otherIsLeaf:
+		if nc.Insert(otherLeaf.prefix, depth+1) {
+			return 1
+		}
+		return 0
+	}
+
+	return 0
+}
+*/
+
 // Overlaps recursively compares two trie nodes and returns true
 // if any of their prefixes or descendants overlap.
 //
