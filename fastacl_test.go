@@ -651,9 +651,9 @@ func TestFastACL_AllSorted_Compare(t *testing.T) {
 		}
 
 		goldFlat := gold.FlatSorted()
-		tblSorted := slices.Collect(facl.AllSorted())
+		faclSorted := slices.Collect(facl.AllSorted())
 
-		if !slices.Equal(goldFlat.SortKeys(), tblSorted) {
+		if !slices.Equal(goldFlat.SortKeys(), faclSorted) {
 			t.Fatal("expected Equal")
 		}
 	}
@@ -1348,5 +1348,128 @@ func TestFastACL_Subnets_Compare(t *testing.T) {
 				t.Fatalf("Subnets(%q) = %v, want %v", pfx, faclGot, goldGot)
 			}
 		})
+	}
+}
+
+func TestFastACL_Union(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		base      []string
+		other     []string
+		wantSize4 int
+		wantSize6 int
+	}{
+		{
+			name:      "union disjoint IPv4 prefixes",
+			base:      []string{"192.168.1.0/24", "10.0.0.0/8"},
+			other:     []string{"172.16.0.0/12", "192.168.2.0/24"},
+			wantSize4: 4,
+			wantSize6: 0,
+		},
+		{
+			name:      "union overlapping and duplicate IPv4 prefixes",
+			base:      []string{"192.168.0.0/16", "10.0.0.0/24"},
+			other:     []string{"192.168.1.0/24", "10.0.0.0/24"}, // 10.0.0.0/24 is duplicate
+			wantSize4: 3,                                         // /16, /24, /24
+			wantSize6: 0,
+		},
+		{
+			name:      "union disjoint IPv6 prefixes",
+			base:      []string{"2001:db8::/32"},
+			other:     []string{"fe80::/10", "2001:db8:1::/48"},
+			wantSize4: 0,
+			wantSize6: 3,
+		},
+		{
+			name:      "union dual-stack mixed prefixes",
+			base:      []string{"192.168.1.0/24", "2001:db8::/32"},
+			other:     []string{"10.0.0.0/8", "fe80::/10"},
+			wantSize4: 2,
+			wantSize6: 2,
+		},
+		{
+			name:      "union empty other table into non-empty base",
+			base:      []string{"192.168.1.0/24"},
+			other:     []string{},
+			wantSize4: 1,
+			wantSize6: 0,
+		},
+		{
+			name:      "union empty base with non empty other table",
+			base:      []string{},
+			other:     []string{"192.168.1.0/24"},
+			wantSize4: 1,
+			wantSize6: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Initialize base FastACL table
+			facl := new(FastACL)
+			for _, pfxStr := range tt.base {
+				facl.Insert(mpp(pfxStr))
+			}
+
+			// Initialize other FastACL table
+			other := new(FastACL)
+			for _, pfxStr := range tt.other {
+				other.Insert(mpp(pfxStr))
+			}
+
+			// Execute Union operation
+			facl.Union(other)
+
+			// Verify final sizes match expectations
+			if got := facl.Size4(); got != tt.wantSize4 {
+				t.Errorf("FastACL.Union() Size4 = %v, want %v", got, tt.wantSize4)
+			}
+			if got := facl.Size6(); got != tt.wantSize6 {
+				t.Errorf("FastACL.Union() Size6 = %v, want %v", got, tt.wantSize6)
+			}
+		})
+	}
+}
+
+func TestFastACL_Union_Compare(t *testing.T) {
+	t.Parallel()
+	n := workLoadN()
+	prng := rand.New(rand.NewPCG(42, 42))
+
+	for range 3 {
+		pfxs := random.RealWorldPrefixes(prng, n)
+
+		gold := new(golden.Table[any])
+		facl := new(FastACL)
+
+		for _, pfx := range pfxs {
+			gold.Insert(pfx, nil)
+			facl.Insert(pfx)
+		}
+
+		pfxs2 := random.RealWorldPrefixes(prng, n)
+
+		gold2 := new(golden.Table[any])
+		facl2 := new(FastACL)
+
+		for _, pfx := range pfxs2 {
+			gold2.Insert(pfx, nil)
+			facl2.Insert(pfx)
+		}
+
+		gold.Union(*gold2)
+		facl.Union(facl2)
+
+		goldFlat := gold.FlatSorted()
+		faclSorted := slices.Collect(facl.AllSorted())
+
+		if !slices.Equal(goldFlat.SortKeys(), faclSorted) {
+			t.Fatal("expected Equal")
+		}
 	}
 }
