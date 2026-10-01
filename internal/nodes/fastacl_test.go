@@ -582,7 +582,7 @@ func TestFastACLNode_DumpRec(t *testing.T) {
 			is4:   true,
 			want: []string{
 				"",
-				"[HALF] depth:  0 path: [] / 0",
+				"[FULL] depth:  0 path: [] / 0",
 				" child(#2): [10]↓ [192]➜{192.168.0.0/16}",
 				"",
 				".[STOP] depth:  1 path: [10] / 8",
