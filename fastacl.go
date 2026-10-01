@@ -800,7 +800,7 @@ func (f *FastACL) dump(w io.Writer) {
 		fmt.Fprintf(w, "### IPv4: size(%d), subnodes(%d), prefixes(%d), fringes(%d), leaves(%d)",
 			f.size4, stats.SubNodes, stats.Prefixes, stats.Fringes, stats.Leaves)
 
-		f.root4.DumpRec(w, stridePath{}, 0, true)
+		f.root4.DumpRec(w, pathContext{Is4: true})
 	}
 
 	if f.size6 > 0 {
@@ -809,7 +809,7 @@ func (f *FastACL) dump(w io.Writer) {
 		fmt.Fprintf(w, "### IPv6: size(%d), subnodes(%d), prefixes(%d), fringes(%d), leaves(%d)",
 			f.size6, stats.SubNodes, stats.Prefixes, stats.Fringes, stats.Leaves)
 
-		f.root6.DumpRec(w, stridePath{}, 0, false)
+		f.root6.DumpRec(w, pathContext{Is4: false})
 	}
 }
 

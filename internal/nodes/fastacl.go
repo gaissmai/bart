@@ -811,19 +811,22 @@ func (n *FastACLNode) EqualRec(o *FastACLNode) bool {
 // The path slice and depth together represent the byte-wise path
 // from the root to the current node; depth is incremented for each recursion.
 // The is4 flag controls IPv4/IPv6 formatting used by dump.
-func (n *FastACLNode) DumpRec(w io.Writer, path StridePath, depth int, is4 bool) {
+func (n *FastACLNode) DumpRec(w io.Writer, ptx PathContext) {
 	if n.IsEmpty() {
 		return
 	}
 
-	// dump this node
-	n.dump(w, path, depth, is4)
+	// write this node' content
+	n.dump(w, ptx)
 
 	// node may have children, rec-descent down
 	for addr, child := range n.AllChildren() {
 		if kid, ok := child.(*FastACLNode); ok {
-			path[depth] = addr
-			kid.DumpRec(w, path, depth+1, is4)
+			nextPtx := ptx
+			nextPtx.Path[ptx.Depth] = addr
+			nextPtx.Depth++
+
+			kid.DumpRec(w, nextPtx)
 		}
 	}
 }
@@ -832,13 +835,13 @@ func (n *FastACLNode) DumpRec(w io.Writer, path StridePath, depth int, is4 bool)
 // It prints the node type, depth, formatted path (IPv4 vs IPv6 controlled by `is4`),
 // and bit count, followed by any stored prefixes (and their values when applicable),
 // the set of child octets, and any path-compressed leaves or fringe entries.
-func (n *FastACLNode) dump(w io.Writer, path StridePath, depth int, is4 bool) {
-	bits := depth * strideLen
-	indent := strings.Repeat(".", depth)
+func (n *FastACLNode) dump(w io.Writer, ptx PathContext) {
+	bits := ptx.Depth * strideLen
+	indent := strings.Repeat(".", ptx.Depth)
 
 	// node type with depth and octet path and bits.
 	fmt.Fprintf(w, "\n%s[%s] depth:  %d path: [%s] / %d\n",
-		indent, n.hasType(), depth, ipStridePath(path, depth, is4), bits)
+		indent, n.hasType(), ptx.Depth, ipStridePath(ptx.Path, ptx.Depth, ptx.Is4), bits)
 
 	// format width for %*d
 	width := Len256(max(n.PrefixCount(), n.FringeCount(), n.ChildCount()))
@@ -848,7 +851,8 @@ func (n *FastACLNode) dump(w io.Writer, path StridePath, depth int, is4 bool) {
 		fmt.Fprintf(w, "%sprefix(#%*d):", indent, width, n.PrefixCount())
 
 		for idx := range n.Prefixes.All() {
-			pfx := CidrFromPath(path[:], depth, is4, idx)
+			ptx.Slot = idx
+			pfx := CIDRFromContext(ptx, true)
 			fmt.Fprintf(w, " [%d]➜{%s}", idx, pfx)
 		}
 
@@ -860,8 +864,9 @@ func (n *FastACLNode) dump(w io.Writer, path StridePath, depth int, is4 bool) {
 		fmt.Fprintf(w, "%sfringe(#%*d):", indent, width, n.FringeCount())
 
 		for addr := range n.Fringes.All() {
-			fringePfx := CidrForFringe(path[:], depth, is4, addr)
-			fmt.Fprintf(w, " [%s]➜{%s}", addrFmt(addr, is4), fringePfx)
+			ptx.Slot = addr
+			fringePfx := CIDRFromContext(ptx, false)
+			fmt.Fprintf(w, " [%s]➜{%s}", addrFmt(addr, ptx.Is4), fringePfx)
 		}
 
 		fmt.Fprintln(w)
@@ -874,10 +879,10 @@ func (n *FastACLNode) dump(w io.Writer, path StridePath, depth int, is4 bool) {
 		for addr, child := range n.AllChildren() {
 			switch child := child.(type) {
 			case *FastACLNode:
-				fmt.Fprintf(w, " [%s]↓", addrFmt(addr, is4))
+				fmt.Fprintf(w, " [%s]↓", addrFmt(addr, ptx.Is4))
 
 			case *CIDRLeaf:
-				fmt.Fprintf(w, " [%s]➜{%s}", addrFmt(addr, is4), child.prefix)
+				fmt.Fprintf(w, " [%s]➜{%s}", addrFmt(addr, ptx.Is4), child.prefix)
 
 			default:
 				panic("logic error, wrong node type")
