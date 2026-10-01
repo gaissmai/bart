@@ -9,6 +9,7 @@ import (
 	"iter"
 	"net/netip"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/gaissmai/bart/internal/allot"
@@ -841,7 +842,7 @@ func (n *FastACLNode) dump(w io.Writer, ptx PathContext) {
 
 	// node type with depth and octet path and bits.
 	fmt.Fprintf(w, "\n%s[%s] depth:  %d path: [%s] / %d\n",
-		indent, n.hasType(), ptx.Depth, ipStridePath(ptx.Path, ptx.Depth, ptx.Is4), bits)
+		indent, n.hasType(), ptx.Depth, ptx, bits)
 
 	// format width for %*d
 	width := Len256(max(n.PrefixCount(), n.FringeCount(), n.ChildCount()))
@@ -1850,6 +1851,36 @@ func NewPathContext(octets []byte, depth int, slot uint8, is4 bool) PathContext 
 		copy(ptx.Path[:], octets)
 	}
 	return ptx
+}
+
+// String, different formats for IPv4 and IPv6, dotted decimal or hex.
+//
+//	127.0.0
+//	2001:0d
+func (ptx PathContext) String() string {
+	buf := new(strings.Builder)
+
+	if ptx.Is4 {
+		for i, b := range ptx.Path[:ptx.Depth] {
+			if i != 0 {
+				buf.WriteString(".")
+			}
+
+			buf.WriteString(strconv.Itoa(int(b)))
+		}
+
+		return buf.String()
+	}
+
+	for i, b := range ptx.Path[:ptx.Depth] {
+		if i != 0 && i%2 == 0 {
+			buf.WriteString(":")
+		}
+
+		fmt.Fprintf(buf, "%02x", b)
+	}
+
+	return buf.String()
 }
 
 // HierarchyItem represents a structural node or fringe boundary within
