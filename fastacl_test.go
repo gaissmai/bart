@@ -1472,3 +1472,102 @@ func TestFastACL_Union_Compare(t *testing.T) {
 		}
 	}
 }
+
+func TestFastACL_OverlapsPrefix(t *testing.T) {
+	t.Parallel()
+
+	type probe struct {
+		pfx  netip.Prefix
+		want bool
+	}
+
+	type probes []probe
+	type pfxs []netip.Prefix
+
+	type test struct {
+		name   string
+		insert pfxs
+		probes probes
+	}
+
+	tests := []test{
+		{
+			name:   "empty table",
+			insert: nil,
+			probes: probes{{mpp("0.0.0.0/0"), false}, {mpp("::/0"), false}},
+		},
+		{
+			name:   "default route I",
+			insert: pfxs{mpp("10.0.0.0/9"), mpp("2001:db8::/32")},
+			probes: probes{{mpp("0.0.0.0/0"), true}, {mpp("::/0"), true}},
+		},
+		{
+			name:   "default route II",
+			insert: pfxs{mpp("0.0.0.0/0"), mpp("::/0")},
+			probes: probes{{mpp("10.0.0.0/9"), true}, {mpp("2001:db8::/32"), true}},
+		},
+		{
+			name:   "single IP I",
+			insert: pfxs{mpp("10.0.0.0/7"), mpp("2001::/16")},
+			probes: probes{{mpp("10.1.2.3/32"), true}, {mpp("2001:db8:affe::cafe/128"), true}},
+		},
+		{
+			name:   "single IP II",
+			insert: pfxs{mpp("10.1.2.3/32"), mpp("2001:db8:affe::cafe/128")},
+			probes: probes{{mpp("10.0.0.0/7"), true}, {mpp("2001::/16"), true}},
+		},
+		{
+			name:   "same IP",
+			insert: pfxs{mpp("10.1.2.3/32"), mpp("2001:db8:affe::cafe/128")},
+			probes: probes{{mpp("10.1.2.3/32"), true}, {mpp("2001:db8:affe::cafe/128"), true}},
+		},
+		{
+			name:   "full expanded path",
+			insert: pfxs{mpp("10.1.2.3/32"), mpp("10.1.2.4/32")},
+			probes: probes{{mpp("10.1.2.3/32"), true}, {mpp("10.1.2.5/32"), false}},
+		},
+	}
+
+	for _, tt := range tests {
+		facl := new(FastACL)
+		for _, pfx := range tt.insert {
+			facl.Insert(pfx)
+		}
+
+		for _, probe := range tt.probes {
+			got := facl.OverlapsPrefix(probe.pfx)
+			if got != probe.want {
+				t.Errorf("[%s] OverlapsPrefix(%v) = %v, want %v", tt.name, probe.pfx, got, probe.want)
+			}
+		}
+	}
+}
+
+func TestFastACL_OverlapsPrefix_Compare(t *testing.T) {
+	// Create large route tables repeatedly, and compare Table's
+	// behavior to a naive and slow but correct implementation.
+	t.Parallel()
+
+	n := workLoadN()
+
+	prng := rand.New(rand.NewPCG(42, 42))
+	pfxs := random.RealWorldPrefixes(prng, n)
+
+	gold := new(golden.Table[any])
+	facl := new(FastACL)
+	for _, pfx := range pfxs {
+		gold.Insert(pfx, nil)
+		facl.Insert(pfx)
+	}
+
+	for range n {
+		pfx := random.Prefix(prng)
+
+		goldOK := gold.OverlapsPrefix(pfx)
+		faclOK := facl.OverlapsPrefix(pfx)
+
+		if goldOK != faclOK {
+			t.Fatalf("OverlapsPrefix(%q) = %v, want %v", pfx, faclOK, goldOK)
+		}
+	}
+}

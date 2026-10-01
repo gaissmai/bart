@@ -1679,19 +1679,9 @@ func (n *FastACLNode) OverlapsSameChildren(o *FastACLNode, depth int) bool {
 	return false
 }
 
-// OverlapsPrefixAtDepth returns true if any route in the subtree rooted at this node
-// overlaps with the given pfx, starting the comparison at the specified depth.
-//
-// This function supports structural overlap detection even in compressed or sparse
-// paths within the trie, including fringe and leaf nodes. Matching is directional:
-// it returns true if a route fully covers pfx, or if pfx covers an existing route.
-//
-// At each step, it checks for visible prefixes and children that may intersect the
-// target prefix via stride-based longest-prefix test. The walk terminates early as
-// soon as a structural overlap is found.
-//
-// This function underlies the top-level OverlapsPrefix behavior and handles details of
-// trie traversal across varying prefix lengths and compression levels.
+// OverlapsPrefixAtDepth recursively traverses the trie starting from the current
+// node at the specified depth to determine whether any stored prefix, fringe, or
+// leaf overlaps with the given prefix.
 func (n *FastACLNode) OverlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
 	ip := pfx.Addr()
 	pfxLen := pfx.Bits()
@@ -1699,71 +1689,81 @@ func (n *FastACLNode) OverlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
 	strideCount, modBits := DivMod8(pfxLen)
 
 	for ; depth < len(octets); depth++ {
-		if depth > strideCount {
-			break
-		}
-
 		octet := octets[depth]
 
-		// full octet path in node trie, check overlap with last prefix octet
-		if depth == strideCount {
-			return n.OverlapsIdx(art.PfxToIdx(octet, modBits))
+		// Terminate traversal if the current depth exceeds the target prefix stride count.
+		if depth > strideCount {
+			return false
 		}
 
-		// test if any route overlaps prefix´ so far
-		// no best match needed, forward tests without backtracking
-		if n.PrefixCount() != 0 && n.Contains(art.OctetToIdx(octet)) {
+		// Reached the target trie level matching the prefix length; evaluate index overlap.
+		if depth == strideCount {
+			idx := art.PfxToIdx(octet, modBits)
+			return n.OverlapsIdx(idx)
+		}
+
+		// Test if any prefix overlaps the prefix traversed so far;
+		// no best match needed, forward tests without backtracking.
+		idx := art.OctetToIdx(octet)
+		if n.PrefixCount() != 0 && n.Contains(idx) {
 			return true
 		}
 
+		// Test if any fringe overlaps the prefix traversed so far;
+		if n.Fringes.Test(octet) {
+			return true
+		}
+
+		// Terminate early if the child bitset indicates no matching path exists.
 		if !n.Children.Test(octet) {
 			return false
 		}
 
-		// next child, node or leaf
+		// Descend into the next child node or leaf element based on dynamic type.
 		switch kid := n.MustGetChild(octet).(type) {
 		case *FastACLNode:
 			n = kid
 			continue
 
+		// Evaluate direct prefix overlap when a compressed leaf node is reached.
 		case *CIDRLeaf:
 			return kid.prefix.Overlaps(pfx)
-
-		case *FringeLeaf:
-			return true
-
-		default:
-			panic("logic error, wrong node type")
 		}
 	}
 
-	panic("unreachable: " + pfx.String())
+	return false
 }
 
 // OverlapsIdx returns true if the given prefix index overlaps with any entry in this node.
 //
-// The overlap detection considers three categories:
+// The overlap detection considers four categories:
 //
 //  1. Whether any stored prefix in this node covers the requested prefix (LPM test)
-//  2. Whether the requested prefix covers any stored route in the node
-//  3. Whether the requested prefix overlaps with any fringe or child entry
+//  2. Whether the requested prefix covers any stored route in the node (allot test)
+//  3. Whether the requested prefix overlaps with any fringe (allot test)
+//  4. Whether the requested prefix overlaps with any child entry (allot test)
 //
 // Internally, it leverages precomputed bitsets from the allotment model,
 // using fast bitwise set intersections instead of explicit range comparisons.
 // This enables high-performance overlap checks on a single stride level
 // without descending further into the trie.
 func (n *FastACLNode) OverlapsIdx(idx uint8) bool {
-	// 1. Test if any route in this node overlaps prefix?
+	// 1. Test if any route in this node covers or matches the requested prefix index.
 	if n.Contains(idx) {
 		return true
 	}
 
-	// 2. Test if prefix overlaps any route in this node
+	// 2. Test if the requested prefix covers any route stored in this node.
 	if n.Prefixes.Overlaps(&allot.PfxRoutesLookupTbl[idx]) {
 		return true
 	}
 
-	// 3. Test if prefix overlaps any child in this node
+	// 3. Test if the requested prefix overlaps with any fringe entry in this node.
+	if n.Fringes.Overlaps(&allot.FringeRoutesLookupTbl[idx]) {
+		return true
+	}
+
+	// 4. Test if the requested prefix overlaps with any child set entry in this node.
 	return n.Children.Overlaps(&allot.FringeRoutesLookupTbl[idx])
 }
 
