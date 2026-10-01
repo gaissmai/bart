@@ -447,9 +447,7 @@ func TestFastACLNode_DumpRec(t *testing.T) {
 	tests := []struct {
 		name      string
 		nodeSetup func() *FastACLNode
-		path      StridePath
-		depth     int
-		is4       bool
+		pathCtx   PathContext
 		want      []string
 	}{
 		{
@@ -457,10 +455,8 @@ func TestFastACLNode_DumpRec(t *testing.T) {
 			nodeSetup: func() *FastACLNode {
 				return &FastACLNode{}
 			},
-			path:  StridePath{},
-			depth: 0,
-			is4:   true,
-			want:  nil,
+			pathCtx: PathContext{Is4: true},
+			want:    nil,
 		},
 		{
 			name: "IPv4 single root node with prefixes and fringes",
@@ -475,9 +471,7 @@ func TestFastACLNode_DumpRec(t *testing.T) {
 
 				return n
 			},
-			path:  StridePath{},
-			depth: 0,
-			is4:   true,
+			pathCtx: PathContext{Is4: true},
 			want: []string{
 				"",
 				"[STOP] depth:  0 path: [] / 0",
@@ -504,9 +498,7 @@ func TestFastACLNode_DumpRec(t *testing.T) {
 
 				return parent
 			},
-			path:  StridePath{},
-			depth: 0,
-			is4:   true,
+			pathCtx: PathContext{Is4: true},
 			want: []string{
 				"",
 				"[FULL] depth:  0 path: [] / 0",
@@ -527,9 +519,11 @@ func TestFastACLNode_DumpRec(t *testing.T) {
 
 				return n
 			},
-			path:  StridePath{0x20, 0x01, 0x0d, 0xb8},
-			depth: 4,
-			is4:   false,
+			pathCtx: PathContext{
+				Path:  StridePath{0x20, 0x01, 0x0d, 0xb8}, // 2001:db8::
+				Depth: 4,
+				Is4:   false,
+			},
 			want: []string{
 				"",
 				"....[STOP] depth:  4 path: [2001:0db8] / 32",
@@ -551,9 +545,7 @@ func TestFastACLNode_DumpRec(t *testing.T) {
 
 				return n
 			},
-			path:  StridePath{},
-			depth: 0,
-			is4:   true,
+			pathCtx: PathContext{Is4: true},
 			want: []string{
 				"",
 				"[STOP] depth:  0 path: [] / 0",
@@ -577,9 +569,7 @@ func TestFastACLNode_DumpRec(t *testing.T) {
 
 				return parent
 			},
-			path:  StridePath{},
-			depth: 0,
-			is4:   true,
+			pathCtx: PathContext{Is4: true},
 			want: []string{
 				"",
 				"[FULL] depth:  0 path: [] / 0",
@@ -598,7 +588,7 @@ func TestFastACLNode_DumpRec(t *testing.T) {
 			node := tt.nodeSetup()
 			var buf bytes.Buffer
 
-			node.DumpRec(&buf, tt.path, tt.depth, tt.is4)
+			node.DumpRec(&buf, tt.pathCtx)
 
 			var wantStr string
 			if len(tt.want) > 0 {
@@ -774,7 +764,7 @@ func TestFastACLNode_Insert(t *testing.T) {
 			if len(tt.wantDump) > 0 {
 				var buf bytes.Buffer
 				is4 := tt.wantPfx.Addr().Is4()
-				root.DumpRec(&buf, StridePath{}, 0, is4)
+				root.DumpRec(&buf, PathContext{Is4: is4})
 
 				wantStr := strings.Join(tt.wantDump, "\n") + "\n"
 				if got := buf.String(); got != wantStr {
@@ -1016,7 +1006,7 @@ func TestFastACLNode_Delete(t *testing.T) {
 				if len(tt.deletePfx) > 0 {
 					is4 = tt.deletePfx[0].Addr().Is4()
 				}
-				root.DumpRec(&buf, StridePath{}, 0, is4)
+				root.DumpRec(&buf, PathContext{Is4: is4})
 
 				var wantStr string
 				if len(tt.wantDump) > 0 {
