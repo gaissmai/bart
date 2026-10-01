@@ -852,7 +852,7 @@ func (n *FastACLNode) dump(w io.Writer, ptx PathContext) {
 
 		for idx := range n.Prefixes.All() {
 			ptx.Slot = idx
-			pfx := CIDRFromContext(ptx, true)
+			pfx := PrefixCIDR(ptx)
 			fmt.Fprintf(w, " [%d]➜{%s}", idx, pfx)
 		}
 
@@ -865,7 +865,7 @@ func (n *FastACLNode) dump(w io.Writer, ptx PathContext) {
 
 		for addr := range n.Fringes.All() {
 			ptx.Slot = addr
-			fringePfx := CIDRFromContext(ptx, false)
+			fringePfx := FringeCIDR(ptx)
 			fmt.Fprintf(w, " [%s]➜{%s}", addrFmt(addr, ptx.Is4), fringePfx)
 		}
 
@@ -1986,7 +1986,7 @@ func (n *FastACLNode) collectDirectPrefixes(ptx PathContext, dst []HierarchyItem
 		dst = append(dst, HierarchyItem{
 			NextNode: n, // nextNode is again this node
 			NextCtx:  nextCtx,
-			CIDR:     CidrFromPath(ptx.Path[:], ptx.Depth, ptx.Is4, idx),
+			CIDR:     PrefixCIDR(nextCtx),
 		})
 	}
 
