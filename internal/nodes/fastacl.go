@@ -893,11 +893,9 @@ func (n *FastACLNode) dump(w io.Writer, path StridePath, depth int, is4 bool) {
 // It inspects immediate statistics (prefix count, child count, node, leaf and
 // fringe counts) for the node and returns:
 //   - nullNode: no prefixes and no children
-//   - stopNode: has children but no subnodes (nodes == 0)
-//   - halfNode: contains at least one leaf or fringe and also has subnodes, but
-//     no prefixes
-//   - fullNode: has prefixes and also has subnodes
-//   - pathNode: has subnodes only (no prefixes, leaves, or fringes)
+//   - stopNode: no subnodes (nodes == 0)
+//   - pathNode: has subnodes only (no prefixes, leaves or fringes)
+//   - fullNode: has prefixes or fringes and also has subnodes
 //
 // The order of these checks is significant to ensure the correct classification.
 func (n *FastACLNode) hasType() nodeType {
@@ -911,15 +909,10 @@ func (n *FastACLNode) hasType() nodeType {
 	switch {
 	case s.SubNodes == 0:
 		return stopNode
-	case (s.Leaves > 0 || s.Fringes > 0) && s.SubNodes > 0 && s.Prefixes == 0 && s.Fringes == 0:
-		return halfNode
-	case (s.Prefixes > 0 || s.Leaves > 0 || s.Fringes > 0) && s.SubNodes > 0:
-		return fullNode
-	case (s.Prefixes == 0 && s.Leaves == 0 && s.Fringes == 0) && s.SubNodes > 0:
+	case s.Prefixes == 0 && s.Leaves == 0 && s.Fringes == 0:
 		return pathNode
 	default:
-		panic(fmt.Sprintf("UNREACHABLE: pfx: %d, fringe: %d, chld: %d, node: %d, leaf: %d",
-			s.Prefixes, s.Fringes, s.Children, s.SubNodes, s.Leaves))
+		return fullNode
 	}
 }
 
@@ -1283,8 +1276,11 @@ func (n *FastACLNode) UnionRec(o *FastACLNode, depth int) (duplicates int) {
 	dupBits := n.Prefixes.And(&o.Prefixes)
 	duplicates += dupBits.OnesCount()
 
-	// Bitwise union merge for local prefixes; update prefixCount cache
+	// Bitwise union merge for local prefixes and ...
 	n.Prefixes = n.Prefixes.Or(&o.Prefixes)
+
+	// ... update prefix count cache
+	//nolint:gosec // G115: integer overflow conversion int -> uint16
 	n.prefixCount = uint16(n.Prefixes.OnesCount())
 
 	// 2. Calculate duplicate fringe boundaries and apply bitwise OR merge.
