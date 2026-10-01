@@ -584,16 +584,19 @@ func (f *FastACL) Union(o *FastACL) {
 // This is useful for containment tests, route validation, or policy checks using prefix
 // semantics without retrieving exact matches.
 func (f *FastACL) OverlapsPrefix(pfx netip.Prefix) bool {
+	// Guard clause: reject invalid prefix inputs immediately.
 	if !pfx.IsValid() {
 		return false
 	}
 
-	// canonicalize the prefix
+	// Canonicalize the prefix to ensure standard mask alignment.
 	pfx = pfx.Masked()
 
+	// Determine address family and retrieve the corresponding root node.
 	is4 := pfx.Addr().Is4()
 	n := f.rootNodeByVersion(is4)
 
+	// Delegate the core recursive traversal to the root node.
 	return n.OverlapsPrefixAtDepth(pfx, 0)
 }
 
