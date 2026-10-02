@@ -662,6 +662,50 @@ func BenchmarkFast_Overlaps6(b *testing.B) {
 	}
 }
 
+func BenchmarkFastACL_Overlaps4(b *testing.B) {
+	lt := new(FastACL)
+
+	for _, route := range tier1.routes4() {
+		lt.Insert(route)
+	}
+
+	for i := 1; i <= 1<<20; i *= 2 {
+		prng := rand.New(rand.NewPCG(42, 42))
+		lt2 := new(FastACL)
+		for _, pfx := range random.RealWorldPrefixes4(prng, i) {
+			lt2.Insert(pfx)
+		}
+
+		b.Run(fmt.Sprintf("With_%4d", i), func(b *testing.B) {
+			for b.Loop() {
+				lt.Overlaps4(lt2)
+			}
+		})
+	}
+}
+
+func BenchmarkFastACL_Overlaps6(b *testing.B) {
+	lt := new(FastACL)
+
+	for _, route := range tier1.routes6() {
+		lt.Insert(route)
+	}
+
+	for i := 1; i <= 1<<20; i *= 2 {
+		prng := rand.New(rand.NewPCG(42, 42))
+		lt2 := new(FastACL)
+		for _, pfx := range random.RealWorldPrefixes6(prng, i) {
+			lt2.Insert(pfx)
+		}
+
+		b.Run(fmt.Sprintf("With_%4d", i), func(b *testing.B) {
+			for b.Loop() {
+				lt.Overlaps6(lt2)
+			}
+		})
+	}
+}
+
 // worstcase benchmarks
 
 var (

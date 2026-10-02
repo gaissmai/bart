@@ -14,6 +14,22 @@ import (
 	"github.com/gaissmai/bart/internal/tests/random"
 )
 
+// buildFastACL is a test helper that constructs and populates a FastACL from CIDR strings.
+func buildFastACL(t *testing.T, cidrs []string) *FastACL {
+	t.Helper()
+
+	f := new(FastACL)
+	for _, cidr := range cidrs {
+		pfx, err := netip.ParsePrefix(cidr)
+		if err != nil {
+			t.Fatalf("failed to parse CIDR %q: %v", cidr, err)
+		}
+		f.Insert(pfx)
+	}
+
+	return f
+}
+
 func TestFastACL_NilReceiver(t *testing.T) {
 	t.Parallel()
 
@@ -918,7 +934,7 @@ func TestFastACL_Aggregate_Compare(t *testing.T) {
 	t.Parallel()
 	n := workLoadN()
 
-	for i := range 50 {
+	for i := range n {
 		t.Run("subtest", func(t *testing.T) {
 			t.Parallel()
 
@@ -1569,5 +1585,213 @@ func TestFastACL_OverlapsPrefix_Compare(t *testing.T) {
 		if goldOK != faclOK {
 			t.Fatalf("OverlapsPrefix(%q) = %v, want %v", pfx, faclOK, goldOK)
 		}
+	}
+}
+
+func TestFastACL_Overlaps(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		routes1   []string
+		routes2   []string
+		wantTotal bool
+		wantV4    bool
+		wantV6    bool
+	}{
+		{
+			name:      "both empty tables",
+			routes1:   nil,
+			routes2:   nil,
+			wantTotal: false,
+			wantV4:    false,
+			wantV6:    false,
+		},
+		{
+			name:      "receiver empty",
+			routes1:   nil,
+			routes2:   []string{"10.0.0.0/8", "2001:db8::/32"},
+			wantTotal: false,
+			wantV4:    false,
+			wantV6:    false,
+		},
+		{
+			name:      "other empty",
+			routes1:   []string{"10.0.0.0/8", "2001:db8::/32"},
+			routes2:   nil,
+			wantTotal: false,
+			wantV4:    false,
+			wantV6:    false,
+		},
+		{
+			name:      "disjoint IPv4 and IPv6",
+			routes1:   []string{"10.0.0.0/16", "2001:db8:1::/48"},
+			routes2:   []string{"10.1.0.0/16", "2001:db8:2::/48"},
+			wantTotal: false,
+			wantV4:    false,
+			wantV6:    false,
+		},
+		{
+			name:      "exact match IPv4",
+			routes1:   []string{"192.168.1.0/24"},
+			routes2:   []string{"192.168.1.0/24"},
+			wantTotal: true,
+			wantV4:    true,
+			wantV6:    false,
+		},
+		{
+			name:      "exact match IPv6",
+			routes1:   []string{"fe80::/10"},
+			routes2:   []string{"fe80::/10"},
+			wantTotal: true,
+			wantV4:    false,
+			wantV6:    true,
+		},
+		{
+			name:      "IPv4 subnet overlap (receiver contains other)",
+			routes1:   []string{"10.0.0.0/8"},
+			routes2:   []string{"10.1.2.0/24"},
+			wantTotal: true,
+			wantV4:    true,
+			wantV6:    false,
+		},
+		{
+			name:      "IPv4 supernet overlap (other contains receiver)",
+			routes1:   []string{"172.16.10.0/24"},
+			routes2:   []string{"172.16.0.0/12"},
+			wantTotal: true,
+			wantV4:    true,
+			wantV6:    false,
+		},
+		{
+			name:      "IPv6 subnet overlap (receiver contains other)",
+			routes1:   []string{"2001:db8::/32"},
+			routes2:   []string{"2001:db8:abcd::/48"},
+			wantTotal: true,
+			wantV4:    false,
+			wantV6:    true,
+		},
+		{
+			name:      "IPv6 supernet overlap (other contains receiver)",
+			routes1:   []string{"2001:db8:ffff::/48"},
+			routes2:   []string{"2001:db8::/32"},
+			wantTotal: true,
+			wantV4:    false,
+			wantV6:    true,
+		},
+		{
+			name:      "mixed dual-stack: only IPv4 overlaps",
+			routes1:   []string{"10.0.0.0/16", "2001:db8:1::/48"},
+			routes2:   []string{"10.0.1.0/24", "2001:db8:2::/48"},
+			wantTotal: true,
+			wantV4:    true,
+			wantV6:    false,
+		},
+		{
+			name:      "mixed dual-stack: only IPv6 overlaps",
+			routes1:   []string{"10.0.0.0/16", "2001:db8::/32"},
+			routes2:   []string{"10.1.0.0/16", "2001:db8:1234::/48"},
+			wantTotal: true,
+			wantV4:    false,
+			wantV6:    true,
+		},
+		{
+			name:      "mixed dual-stack: both IPv4 and IPv6 overlap",
+			routes1:   []string{"10.0.0.0/8", "2001:db8::/32"},
+			routes2:   []string{"10.1.0.0/16", "2001:db8:abcd::/48"},
+			wantTotal: true,
+			wantV4:    true,
+			wantV6:    true,
+		},
+		{
+			name:      "default route IPv4 (/0) overlap",
+			routes1:   []string{"0.0.0.0/0"},
+			routes2:   []string{"192.168.0.1/32"},
+			wantTotal: true,
+			wantV4:    true,
+			wantV6:    false,
+		},
+		{
+			name:      "default route IPv6 (/0) overlap",
+			routes1:   []string{"::/0"},
+			routes2:   []string{"2001:db8::1/128"},
+			wantTotal: true,
+			wantV4:    false,
+			wantV6:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			facl1 := buildFastACL(t, tt.routes1)
+			facl2 := buildFastACL(t, tt.routes2)
+
+			if got := facl1.Overlaps(facl2); got != tt.wantTotal {
+				t.Errorf("FastACL.Overlaps() = %v, want %v", got, tt.wantTotal)
+			}
+
+			if got := facl1.Overlaps4(facl2); got != tt.wantV4 {
+				t.Errorf("FastACL.Overlaps4() = %v, want %v", got, tt.wantV4)
+			}
+
+			if got := facl1.Overlaps6(facl2); got != tt.wantV6 {
+				t.Errorf("FastACL.Overlaps6() = %v, want %v", got, tt.wantV6)
+			}
+
+			// Verify bidirectionality (facl2.Overlaps(facl1) must yield the exact same result)
+			if got := facl2.Overlaps(facl1); got != tt.wantTotal {
+				t.Errorf("FastACL.Overlaps() bidirectional = %v, want %v", got, tt.wantTotal)
+			}
+
+			if got := facl2.Overlaps4(facl1); got != tt.wantV4 {
+				t.Errorf("FastACL.Overlaps4() bidirectional = %v, want %v", got, tt.wantV4)
+			}
+
+			if got := facl2.Overlaps6(facl1); got != tt.wantV6 {
+				t.Errorf("FastACL.Overlaps6() bidirectional = %v, want %v", got, tt.wantV6)
+			}
+		})
+	}
+}
+
+func TestFastACL_Compare(t *testing.T) {
+	t.Parallel()
+
+	n := workLoadN()
+	prng := rand.New(rand.NewPCG(42, 42))
+
+	for range 10 {
+		t.Run("subtest", func(t *testing.T) {
+			t.Parallel()
+
+			pfxs := random.RealWorldPrefixes(prng, n)
+
+			gold1 := new(golden.Table[any])
+			facl1 := new(FastACL)
+
+			for _, pfx := range pfxs {
+				gold1.Insert(pfx, nil)
+				facl1.Insert(pfx)
+			}
+
+			pfxs2 := random.RealWorldPrefixes(prng, n)
+
+			gold2 := new(golden.Table[any])
+			facl2 := new(FastACL)
+
+			for _, pfx := range pfxs2 {
+				gold2.Insert(pfx, nil)
+				facl2.Insert(pfx)
+			}
+
+			goldGot := gold1.Overlaps(*gold2)
+			faclGot := facl1.Overlaps(facl2)
+
+			if goldGot != faclGot {
+				t.Fatal("Overlaps is different")
+			}
+		})
 	}
 }
