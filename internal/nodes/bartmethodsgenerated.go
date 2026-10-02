@@ -2200,60 +2200,31 @@ func (n *BartNode[V]) Overlaps(o *BartNode[V], depth int) bool {
 	return n.OverlapsSameChildren(o, depth)
 }
 
-// OverlapsRoutes compares the prefix sets of two nodes (n and o).
+// OverlapsRoutes reports whether any prefix in node n overlaps with any prefix in node o.
 //
-// It first checks for direct bitset intersection (identical indices),
-// then walks both prefix sets using the Contains method to detect if any
-// of the n-prefixes is contained in o, or vice versa.
+// It first performs an O(1) bitset intersection check for identical prefixes.
+// If none match, it optimizes traversal by iterating over the smaller prefix set
+// and leveraging precomputed lookup tables (allot.PfxRoutesLookupTbl) alongside
+// hierarchical containments to detect containment or overlapping ranges.
 func (n *BartNode[V]) OverlapsRoutes(o *BartNode[V]) bool {
 	// some prefixes are identical, trivial overlap
 	if n.Prefixes.Overlaps(&o.Prefixes.BitSet256) {
 		return true
 	}
 
-	// get the lowest idx (biggest prefix)
-	nFirstIdx, _ := n.Prefixes.FirstSet()
-	oFirstIdx, _ := o.Prefixes.FirstSet()
+	// Optimize the traversal loop by always iterating over the smaller prefix set.
+	if o.PrefixCount() < n.PrefixCount() {
+		n, o = o, n
+	}
 
-	// start with other min value
-	nIdx := oFirstIdx
-	oIdx := nFirstIdx
-
-	nOK := true
-	oOK := true
-
-	// zip, range over n and o together to help chance on its way
-	for nOK || oOK {
-		if nOK {
-			// does any route in o overlap this prefix from n
-			if nIdx, nOK = n.Prefixes.NextSet(nIdx); nOK {
-				if o.Contains(nIdx) {
-					return true
-				}
-
-				if nIdx == 255 {
-					// stop, don't overflow uint8!
-					nOK = false
-				} else {
-					nIdx++
-				}
-			}
+	// Check each prefix in n against o's prefixes via lpm and allot lookup tables
+	for nIdx := range n.Prefixes.All() {
+		if o.Prefixes.Overlaps(&lpm.LookupTbl[nIdx]) {
+			return true
 		}
 
-		if oOK {
-			// does any route in n overlap this prefix from o
-			if oIdx, oOK = o.Prefixes.NextSet(oIdx); oOK {
-				if n.Contains(oIdx) {
-					return true
-				}
-
-				if oIdx == 255 {
-					// stop, don't overflow uint8!
-					oOK = false
-				} else {
-					oIdx++
-				}
-			}
+		if o.Prefixes.Overlaps(&allot.PfxRoutesLookupTbl[nIdx]) {
+			return true
 		}
 	}
 
@@ -2263,40 +2234,26 @@ func (n *BartNode[V]) OverlapsRoutes(o *BartNode[V]) bool {
 // OverlapsChildrenIn checks whether the prefixes in node n
 // overlap with any children (by address range) in node o.
 //
-// Uses bitset intersection or manual iteration heuristically,
-// depending on prefix and child count.
-//
 // Bitset-based matching uses precomputed coverage tables
 // to avoid per-address looping. This is critical for high fan-out nodes.
 func (n *BartNode[V]) OverlapsChildrenIn(o *BartNode[V]) bool {
 	pfxCount := n.PrefixCount()
 	childCount := o.ChildCount()
 
-	// heuristic: 15 is the crossover point where bitset operations become
-	// more efficient than iteration, determined by micro benchmarks on typical
-	// routing table distributions
-	const overlapsRangeCutoff = 15
-
-	doRange := childCount < overlapsRangeCutoff || pfxCount > overlapsRangeCutoff
-
-	// do range over, not so many children and maybe too many prefixes for other algo below
-	if doRange {
+	// Choose the smaller iteration space to minimize lookup overhead.
+	if childCount < pfxCount {
+		// Iterate over child addresses and check if n contains them.
 		for addr := range o.Children.All() {
 			if n.Contains(art.OctetToIdx(addr)) {
 				return true
 			}
 		}
-		return false
-	}
-
-	// do bitset intersection, alloted route table with child octets
-	// maybe too many children for range-over or not so many prefixes to
-	// build the alloted routing table from them
-
-	// use allot table with prefixes as bitsets, bitsets are precalculated.
-	for idx := range n.Prefixes.All() {
-		if o.Children.Overlaps(&allot.FringeRoutesLookupTbl[idx]) {
-			return true
+	} else {
+		// Iterate over prefixes and check intersection against precomputed fringe routes.
+		for idx := range n.Prefixes.All() {
+			if o.Children.Overlaps(&allot.FringeRoutesLookupTbl[idx]) {
+				return true
+			}
 		}
 	}
 
