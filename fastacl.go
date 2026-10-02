@@ -616,20 +616,22 @@ func (f *FastACL) Overlaps(o *FastACL) bool {
 	return f.Overlaps4(o) || f.Overlaps6(o)
 }
 
-// Overlaps4 is like [liteTable.Overlaps] but for the v4 routing table only.
+// Overlaps4 reports whether the IPv4 routing table of the receiver overlaps
+// with the IPv4 routing table of the other FastACL instance.
 func (f *FastACL) Overlaps4(o *FastACL) bool {
 	if f.size4 == 0 || o.size4 == 0 {
 		return false
 	}
-	return f.root4.Overlaps(&o.root4, 0)
+	return f.root4.OverlapsRec(&o.root4, 0)
 }
 
-// Overlaps6 is like [liteTable.Overlaps] but for the v6 routing table only.
+// Overlaps6 reports whether the IPv6 routing table of the receiver overlaps
+// with the IPv6 routing table of the other FastACL instance.
 func (f *FastACL) Overlaps6(o *FastACL) bool {
 	if f.size6 == 0 || o.size6 == 0 {
 		return false
 	}
-	return f.root6.Overlaps(&o.root6, 0)
+	return f.root6.OverlapsRec(&o.root6, 0)
 }
 
 // Aggregate compresses the table in-place by merging overlapping

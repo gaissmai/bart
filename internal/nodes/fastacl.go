@@ -1373,279 +1373,134 @@ func (n *FastACLNode) handleMatrix(thisChild, otherChild any, addr uint8, depth 
 	return 0
 }
 
-/*
-// UnionRec recursively merges another node o into the receiver node n.
+// OverlapsRec recursively compares two trie nodes and returns true
+// if any of their prefixes, fringes, or descendants overlap.
 //
-// Returns the number of duplicate prefixes that were overwritten during merging.
-func (n *FastACLNode) UnionRec(o *FastACLNode, depth int) (duplicates int) {
-	dupBits := n.Prefixes.And(&o.Prefixes)
-	duplicates += dupBits.OnesCount()
-
-	n.Prefixes = n.Prefixes.Or(&o.Prefixes)
-	n.prefixCount = uint16(n.Prefixes.OnesCount())
-
-	dupBits = n.Fringes.And(&o.Fringes)
-	duplicates += dupBits.OnesCount()
-
-	n.Fringes = n.Fringes.Or(&o.Fringes)
-	// no extra fringeCount tracked
-
-	// for all child addrs in other node do ...
-	for i, addr := range o.Children.AllEnumerate() {
-		otherChild := o.Children.Items[i]
-
-		thisChild, thisExists := n.GetChild(addr)
-		if !thisExists {
-			// just insert other child at this empty slot
-			n.InsertChild(addr, otherChild)
-			continue
-		}
-
-		// Use helper function to handle all 2x2 combinations
-		duplicates += n.handleMatrix(thisChild, otherChild, addr, depth)
-	}
-
-	return duplicates
-}
-
-// handleMatrix, 4 possible combinations to union this child and other child
+// The implementation executes checks in order of increasing evaluation cost:
+//  1. Direct bitset intersection on fringe entries.
+//  2. Cross-domain fringe-to-child bitset intersections.
+//  3. Symmetric prefix-to-prefix route set comparisons.
+//  4. Prefix-to-fringe/child overlap evaluations.
+//  5. Recursive descent into shared child octets.
 //
-//	THIS,   OTHER:
-//	--------------
-//	node,   node    <-- union rec-descent with node
-//	node,   leaf    <-- insert leaf at depth+1
-//
-//	leaf,   node    <-- insert new node, push this leaf down, union rec-descent
-//	leaf,   leaf    <-- insert new node, push both leaves down (!first check equality)
-func (n *FastACLNode) handleMatrix(thisChild, otherChild any, addr uint8, depth int) int {
-	// Do ALL type assertions upfront - reduces line noise
-	var (
-		thisNode, thisIsNode = thisChild.(*FastACLNode)
-		thisLeaf, thisIsLeaf = thisChild.(*CIDRLeaf)
-
-		otherNode, otherIsNode = otherChild.(*FastACLNode)
-		otherLeaf, otherIsLeaf = otherChild.(*CIDRLeaf)
-	)
-
-	// Case 1: Special cases that DON'T need a new node
-
-	// Special case: leaf + leaf with same prefix -> just overwrite value
-	if thisIsLeaf && otherIsLeaf && thisLeaf.prefix == otherLeaf.prefix {
-		return 1
-	}
-
-	// Case 2: thisChild is already a node - insert into it, no new node needed
-	if thisIsNode {
-		switch {
-		case otherIsNode:
-			return thisNode.UnionRec(otherNode, depth+1)
-		case otherIsLeaf:
-			if thisNode.Insert(otherLeaf.prefix, depth+1) {
-				return 1
-			}
-			return 0
-		}
-	}
-
-	// Case 3: All remaining cases need a new node
-	// (thisChild is leaf or fringe, and we didn't hit the special cases above)
-
-	// Push existing child down into new node
-	nc := new(FastACLNode)
-	nc.Insert(thisLeaf.prefix, depth+1)
-
-	// Replace child with new node
-	n.InsertChild(addr, nc)
-
-	// Now handle other child
-	switch {
-	case otherIsNode:
-		return nc.UnionRec(otherNode, depth+1)
-	case otherIsLeaf:
-		if nc.Insert(otherLeaf.prefix, depth+1) {
-			return 1
-		}
-		return 0
-	}
-
-	return 0
-}
-*/
-
-// Overlaps recursively compares two trie nodes and returns true
-// if any of their prefixes or descendants overlap.
-//
-// The implementation checks for:
-// 1. Direct overlapping prefixes on this node level
-// 2. Prefixes in one node overlapping with children in the other
-// 3. Matching child addresses in both nodes, which are recursively compared
-//
-// All 12 possible type combinations for child entries (node, leaf, fringe) are supported.
-//
-// The function is optimized for early exit on first match and uses heuristics to
-// choose between set-based and loop-based matching for performance.
-func (n *FastACLNode) Overlaps(o *FastACLNode, depth int) bool {
+// Optimized for early exit on the first detected overlap using precomputed bitsets.
+func (n *FastACLNode) OverlapsRec(o *FastACLNode, depth int) bool {
 	nPfxCount := n.PrefixCount()
 	oPfxCount := o.PrefixCount()
+
+	nFringeCount := n.FringeCount()
+	oFringeCount := o.FringeCount()
 
 	nChildCount := n.ChildCount()
 	oChildCount := o.ChildCount()
 
-	// ##############################
-	// 1. Test if any routes overlaps
-	// ##############################
+	// 1. Test if any fringes overlap directly between both nodes.
+	if n.Fringes.Overlaps(&o.Fringes) {
+		return true
+	}
 
-	// full cross check
+	// 2. Test if n's fringes overlap with o's child address bitset.
+	if n.Fringes.Overlaps(&o.Children.BitSet256) {
+		return true
+	}
+
+	// 2b. Test if o's fringes overlap with n's child address bitset.
+	if o.Fringes.Overlaps(&n.Children.BitSet256) {
+		return true
+	}
+
+	// 3. Test if any routes overlap across both nodes' prefix sets.
 	if nPfxCount > 0 && oPfxCount > 0 {
 		if n.OverlapsRoutes(o) {
 			return true
 		}
 	}
 
-	// ####################################
-	// 2. Test if routes overlaps any child
-	// ####################################
-
-	// swap nodes to help chance on its way,
-	// if the first call to expensive overlapsChildrenIn() is already true,
-	// if both orders are false it doesn't help either
-	if nChildCount > oChildCount {
-		n, o = o, n
-
-		nPfxCount = n.PrefixCount()
-		oPfxCount = o.PrefixCount()
-
-		nChildCount = n.ChildCount()
-		oChildCount = o.ChildCount()
-	}
-
-	if nPfxCount > 0 && oChildCount > 0 {
-		if n.OverlapsChildrenIn(o) {
+	// 4a. Test if n's prefixes overlap with o's fringes or children.
+	if nPfxCount > 0 && (oFringeCount+oChildCount) > 0 {
+		if n.OverlapsFringeOrChildIn(o) {
 			return true
 		}
 	}
 
-	// symmetric reverse
-	if oPfxCount > 0 && nChildCount > 0 {
-		if o.OverlapsChildrenIn(n) {
+	// 4b. Symmetric reverse: test if o's prefixes overlap with n's fringes or children.
+	if oPfxCount > 0 && (nFringeCount+nChildCount) > 0 {
+		if o.OverlapsFringeOrChildIn(n) {
 			return true
 		}
 	}
 
-	// ############################################
-	// 3. children with same octet in nodes n and o
-	// ############################################
-
-	// stop condition, n or o have no children
+	// 5a. Guard clause: terminate early if either node lacks children.
 	if nChildCount == 0 || oChildCount == 0 {
 		return false
 	}
 
-	// stop condition, no child with identical octet in n and o
-	if !n.Children.Overlaps(&o.Children.BitSet256) {
+	// 5b. Guard clause: terminate early if no child octets are shared between nodes.
+	inCommon := n.Children.And(&o.Children.BitSet256)
+	if inCommon.IsEmpty() {
 		return false
 	}
 
-	return n.OverlapsSameChildren(o, depth)
+	// 5c. Recursively evaluate all shared child nodes/leaves.
+	return n.OverlapsSameChildren(o, inCommon, depth)
 }
 
-// OverlapsRoutes compares the prefix sets of two nodes (n and o).
+// OverlapsRoutes reports whether any prefix in node n overlaps with any prefix in node o.
 //
-// It first checks for direct bitset intersection (identical indices),
-// then walks both prefix sets using the Contains method to detect if any
-// of the n-prefixes is contained in o, or vice versa.
+// It first performs an O(1) bitset intersection check for identical prefix indices.
+// If none match, it optimizes traversal by dynamically evaluating the smaller prefix set
+// and leveraging LPM and allotment lookup tables.
 func (n *FastACLNode) OverlapsRoutes(o *FastACLNode) bool {
-	// some prefixes are identical, trivial overlap
+	// Some prefixes are identical, representing a direct and trivial overlap.
 	if n.Prefixes.Overlaps(&o.Prefixes) {
 		return true
 	}
 
-	// get the lowest idx (biggest prefix)
-	nFirstIdx, _ := n.Prefixes.FirstSet()
-	oFirstIdx, _ := o.Prefixes.FirstSet()
+	// Optimize the traversal loop by always iterating over the smaller prefix set.
+	if o.PrefixCount() < n.PrefixCount() {
+		n, o = o, n
+	}
 
-	// start with other min value
-	nIdx := oFirstIdx
-	oIdx := nFirstIdx
-
-	nOK := true
-	oOK := true
-
-	// zip, range over n and o together to help chance on its way
-	for nOK || oOK {
-		if nOK {
-			// does any route in o overlap this prefix from n
-			if nIdx, nOK = n.Prefixes.NextSet(nIdx); nOK {
-				if o.Contains(nIdx) {
-					return true
-				}
-
-				if nIdx == 255 {
-					// stop, don't overflow uint8!
-					nOK = false
-				} else {
-					nIdx++
-				}
-			}
+	// Check each prefix in n against o's prefixes via LPM and allotment lookup tables.
+	for nIdx := range n.Prefixes.All() {
+		if o.Prefixes.Overlaps(&lpm.LookupTbl[nIdx]) {
+			return true
 		}
 
-		if oOK {
-			// does any route in n overlap this prefix from o
-			if oIdx, oOK = o.Prefixes.NextSet(oIdx); oOK {
-				if n.Contains(oIdx) {
-					return true
-				}
-
-				if oIdx == 255 {
-					// stop, don't overflow uint8!
-					oOK = false
-				} else {
-					oIdx++
-				}
-			}
+		if o.Prefixes.Overlaps(&allot.PfxRoutesLookupTbl[nIdx]) {
+			return true
 		}
 	}
 
 	return false
 }
 
-// OverlapsChildrenIn checks whether the prefixes in node n
-// overlap with any children (by address range) in node o.
+// OverlapsFringeOrChildIn reports whether the prefixes in node n
+// overlap with any fringe or child address ranges in node o.
 //
-// Uses bitset intersection or manual iteration heuristically,
-// depending on prefix and child count.
-//
-// Bitset-based matching uses precomputed coverage tables
-// to avoid per-address looping. This is critical for high fan-out nodes.
-func (n *FastACLNode) OverlapsChildrenIn(o *FastACLNode) bool {
-	pfxCount := n.PrefixCount()
-	childCount := o.ChildCount()
+// It selects the optimal evaluation strategy based on cardinality ratios:
+//   - If the combined fringe/child bitset count is smaller than the prefix count,
+//     it iterates over address octets and checks LPM containment.
+//   - Otherwise, it iterates over n's prefix set and uses precomputed fringe
+//     route lookup tables for fast bitset intersection.
+func (n *FastACLNode) OverlapsFringeOrChildIn(o *FastACLNode) bool {
+	oFringeOrChild := o.Fringes.Or(&o.Children.BitSet256)
 
-	// heuristic: 15 is the crossover point where bitset operations become
-	// more efficient than iteration, determined by micro benchmarks on typical
-	// routing table distributions
-	const overlapsRangeCutoff = 15
-
-	doRange := childCount < overlapsRangeCutoff || pfxCount > overlapsRangeCutoff
-
-	// do range over, not so many children and maybe too many prefixes for other algo below
-	if doRange {
-		for addr := range o.Children.All() {
-			if n.Contains(art.OctetToIdx(addr)) {
+	// Choose the smaller iteration space to minimize lookup overhead.
+	if oFringeOrChild.OnesCount() < n.PrefixCount() {
+		// Iterate over active address octets and check LPM containment.
+		for addr := range oFringeOrChild.All() {
+			idx := art.OctetToIdx(addr)
+			if n.Prefixes.Overlaps(&lpm.LookupTbl[idx]) {
 				return true
 			}
 		}
-		return false
-	}
-
-	// do bitset intersection, alloted route table with child octets
-	// maybe too many children for range-over or not so many prefixes to
-	// build the alloted routing table from them
-
-	// use allot table with prefixes as bitsets, bitsets are precalculated.
-	for idx := range n.Prefixes.All() {
-		if o.Children.Overlaps(&allot.FringeRoutesLookupTbl[idx]) {
-			return true
+	} else {
+		// Iterate over prefix indices and intersect against precomputed fringe routes.
+		for idx := range n.Prefixes.All() {
+			if oFringeOrChild.Overlaps(&allot.FringeRoutesLookupTbl[idx]) {
+				return true
+			}
 		}
 	}
 
@@ -1656,26 +1511,47 @@ func (n *FastACLNode) OverlapsChildrenIn(o *FastACLNode) bool {
 // between node n and node o recursively.
 //
 // For each shared address, the corresponding child nodes (of any type)
-// are compared using FastACLNodeOverlapsTwoChildren, which handles all
-// node/leaf/fringe combinations.
-func (n *FastACLNode) OverlapsSameChildren(o *FastACLNode, depth int) bool {
-	// intersect the child bitsets from n with o
-	commonChildren := n.Children.And(&o.Children.BitSet256)
-
-	for addr, ok := commonChildren.NextSet(0); ok; {
+// are compared using OverlapsTwoChildren, which handles all
+// node/leaf combinations.
+func (n *FastACLNode) OverlapsSameChildren(o *FastACLNode, inCommon bitset.BitSet256, depth int) bool {
+	for addr := range inCommon.All() {
 		nChild := n.MustGetChild(addr)
 		oChild := o.MustGetChild(addr)
 
 		if n.OverlapsTwoChildren(nChild, oChild, depth+1) {
 			return true
 		}
-
-		if addr == 255 {
-			break // Prevent uint8 overflow
-		}
-
-		addr, ok = commonChildren.NextSet(addr + 1)
 	}
+
+	return false
+}
+
+// OverlapsTwoChildren handles all 2x2 combinations of child node kinds
+// (node and leaf) to evaluate recursive overlaps:
+//
+//	node, node  --> recursive trie descent (Overlaps)
+//	node, leaf  --> prefix-to-node evaluation (OverlapsPrefixAtDepth)
+//	leaf, node  --> node-to-prefix evaluation (OverlapsPrefixAtDepth)
+//	leaf, leaf  --> direct netip.Prefix.Overlaps check
+func (n *FastACLNode) OverlapsTwoChildren(nChild, oChild any, depth int) bool {
+	nNode, nIsNode := nChild.(*FastACLNode)
+	nLeaf, nIsLeaf := nChild.(*CIDRLeaf)
+
+	oNode, oIsNode := oChild.(*FastACLNode)
+	oLeaf, oIsLeaf := oChild.(*CIDRLeaf)
+
+	// Handle all 4 type combinations using a switch statement.
+	switch {
+	case nIsNode && oIsNode:
+		return nNode.OverlapsRec(oNode, depth)
+	case nIsNode && oIsLeaf:
+		return nNode.OverlapsPrefixAtDepth(oLeaf.prefix, depth)
+	case nIsLeaf && oIsNode:
+		return oNode.OverlapsPrefixAtDepth(nLeaf.prefix, depth)
+	case nIsLeaf && oIsLeaf:
+		return nLeaf.prefix.Overlaps(oLeaf.prefix)
+	}
+
 	return false
 }
 
@@ -1703,13 +1579,13 @@ func (n *FastACLNode) OverlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
 		}
 
 		// Test if any prefix overlaps the prefix traversed so far;
-		// no best match needed, forward tests without backtracking.
+		// forward tests without backtracking.
 		idx := art.OctetToIdx(octet)
 		if n.PrefixCount() != 0 && n.Contains(idx) {
 			return true
 		}
 
-		// Test if any fringe overlaps the prefix traversed so far;
+		// Test if any fringe overlaps the prefix traversed so far.
 		if n.Fringes.Test(octet) {
 			return true
 		}
@@ -1734,19 +1610,16 @@ func (n *FastACLNode) OverlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
 	return false
 }
 
-// OverlapsIdx returns true if the given prefix index overlaps with any entry in this node.
+// OverlapsIdx reports whether the given prefix index overlaps with any entry in this node.
 //
-// The overlap detection considers four categories:
-//
-//  1. Whether any stored prefix in this node covers the requested prefix (LPM test)
-//  2. Whether the requested prefix covers any stored route in the node (allot test)
-//  3. Whether the requested prefix overlaps with any fringe (allot test)
-//  4. Whether the requested prefix overlaps with any child entry (allot test)
+// The overlap detection evaluates four categories:
+//  1. Whether any stored prefix in this node covers or matches the requested prefix index (LPM test).
+//  2. Whether the requested prefix covers any stored route in the node (allot test).
+//  3. Whether the requested prefix overlaps with any fringe entry (allot test).
+//  4. Whether the requested prefix overlaps with any child set entry (allot test).
 //
 // Internally, it leverages precomputed bitsets from the allotment model,
 // using fast bitwise set intersections instead of explicit range comparisons.
-// This enables high-performance overlap checks on a single stride level
-// without descending further into the trie.
 func (n *FastACLNode) OverlapsIdx(idx uint8) bool {
 	// 1. Test if any route in this node covers or matches the requested prefix index.
 	if n.Contains(idx) {
@@ -1765,59 +1638,6 @@ func (n *FastACLNode) OverlapsIdx(idx uint8) bool {
 
 	// 4. Test if the requested prefix overlaps with any child set entry in this node.
 	return n.Children.Overlaps(&allot.FringeRoutesLookupTbl[idx])
-}
-
-// OverlapsTwoChildren handles all 3x3 combinations of
-// node kinds (node, leaf, fringe).
-//
-//	3x3 possible different combinations for n and o
-//
-//	node, node    --> overlaps rec descent
-//	node, leaf    --> overlapsPrefixAtDepth
-//	node, fringe  --> true
-//
-//	leaf, node    --> overlapsPrefixAtDepth
-//	leaf, leaf    --> netip.Prefix.Overlaps
-//	leaf, fringe  --> true
-//
-//	fringe, node    --> true
-//	fringe, leaf    --> true
-//	fringe, fringe  --> true
-func (n *FastACLNode) OverlapsTwoChildren(nChild, oChild any, depth int) bool {
-	// child type detection
-	nNode, nIsNode := nChild.(*FastACLNode)
-	nLeaf, nIsLeaf := nChild.(*CIDRLeaf)
-	_, nIsFringe := nChild.(*FringeLeaf)
-
-	oNode, oIsNode := oChild.(*FastACLNode)
-	oLeaf, oIsLeaf := oChild.(*CIDRLeaf)
-	_, oIsFringe := oChild.(*FringeLeaf)
-
-	// Handle all 9 combinations with a single expression
-	switch {
-	// NODE cases
-	case nIsNode && oIsNode:
-		return nNode.Overlaps(oNode, depth)
-	case nIsNode && oIsLeaf:
-		return nNode.OverlapsPrefixAtDepth(oLeaf.prefix, depth)
-	case nIsNode && oIsFringe:
-		return true
-
-	// LEAF cases
-	case nIsLeaf && oIsNode:
-		return oNode.OverlapsPrefixAtDepth(nLeaf.prefix, depth)
-	case nIsLeaf && oIsLeaf:
-		return oLeaf.prefix.Overlaps(nLeaf.prefix)
-	case nIsLeaf && oIsFringe:
-		return true
-
-	// FRINGE cases
-	case nIsFringe:
-		return true // fringe overlaps with everything
-
-	default:
-		panic("logic error, wrong node type combination")
-	}
 }
 
 // PathContext encapsulates the active traversal state, stride history,
