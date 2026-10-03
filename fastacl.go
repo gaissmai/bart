@@ -403,8 +403,15 @@ func (f *FastACL) Supernets(pfx netip.Prefix) iter.Seq[netip.Prefix] {
 
 		// Phase 1: Descend down the trie along the octet path.
 	LOOP:
-		for depth, octet = range octets[:strideCount+1] {
-			// Push current node onto stack before descending.
+		// find the last node on the octets path in the trie,
+		for depth, octet = range octets {
+			// stepped one past the last stride of interest; back up to last and break
+			if depth > strideCount {
+				depth--
+				break
+			}
+
+			// push current node on stack
 			stack[depth] = n
 
 			// Stop descent if no child pointer exists for this octet.
