@@ -438,14 +438,14 @@ func (n *FastACLNode) AggregateRec(ptx PathContext) (modified int) {
 		case pfxCount == 1:
 			// Restore CIDR from single local prefix and re-insert at current parent depth
 			nextPtx.Slot, _ = kid.Prefixes.FirstSet()
-			cidr := PrefixCIDR(nextPtx)
+			cidr := nextPtx.PrefixCIDR()
 			n.DeleteChild(addr)
 			n.Insert(cidr, ptx.Depth)
 
 		case fringeCount == 1:
 			// Restore CIDR from single fringe entry and re-insert at current parent depth
 			nextPtx.Slot, _ = kid.Fringes.FirstSet()
-			cidr := FringeCIDR(nextPtx)
+			cidr := nextPtx.FringeCIDR()
 			n.DeleteChild(addr)
 			n.Insert(cidr, ptx.Depth)
 
@@ -711,7 +711,7 @@ func (n *FastACLNode) PurgeAndCompress(stack []*FastACLNode, octets []uint8, is4
 			ptx := NewPathContext(octets, depth+1, addr, is4)
 
 			parent.DeleteChild(octet)
-			parent.Insert(FringeCIDR(ptx), depth)
+			parent.Insert(ptx.FringeCIDR(), depth)
 
 		case pfxCount == 1:
 			// Elevate the single CBT local prefix to the parent level as a path-compressed leaf.
@@ -719,7 +719,7 @@ func (n *FastACLNode) PurgeAndCompress(stack []*FastACLNode, octets []uint8, is4
 			ptx := NewPathContext(octets, depth+1, idx, is4)
 
 			parent.DeleteChild(octet)
-			parent.Insert(PrefixCIDR(ptx), depth)
+			parent.Insert(ptx.PrefixCIDR(), depth)
 		}
 
 		// Advance upwards to continue structural pruning at the next parent level.
@@ -853,8 +853,7 @@ func (n *FastACLNode) dump(w io.Writer, ptx PathContext) {
 
 		for idx := range n.Prefixes.All() {
 			ptx.Slot = idx
-			pfx := PrefixCIDR(ptx)
-			fmt.Fprintf(w, " [%d]➜{%s}", idx, pfx)
+			fmt.Fprintf(w, " [%d]➜{%s}", idx, ptx.PrefixCIDR())
 		}
 
 		fmt.Fprintln(w)
@@ -866,8 +865,7 @@ func (n *FastACLNode) dump(w io.Writer, ptx PathContext) {
 
 		for addr := range n.Fringes.All() {
 			ptx.Slot = addr
-			fringePfx := FringeCIDR(ptx)
-			fmt.Fprintf(w, " [%s]➜{%s}", addrFmt(addr, ptx.Is4), fringePfx)
+			fmt.Fprintf(w, " [%s]➜{%s}", addrFmt(addr, ptx.Is4), ptx.FringeCIDR())
 		}
 
 		fmt.Fprintln(w)
@@ -1011,7 +1009,7 @@ func (n *FastACLNode) AllRec(ptx PathContext, yield func(netip.Prefix) bool) boo
 	// 1. Direct local node prefixes
 	for idx := range n.Prefixes.All() {
 		ptx.Slot = idx
-		if !n.yieldPrefix(ptx, yield) {
+		if !yield(ptx.PrefixCIDR()) {
 			return false
 		}
 	}
@@ -1019,7 +1017,7 @@ func (n *FastACLNode) AllRec(ptx PathContext, yield func(netip.Prefix) bool) boo
 	// 2. Fringe prefixes at stride boundaries
 	for addr := range n.Fringes.All() {
 		ptx.Slot = addr
-		if !n.YieldFringe(ptx, yield) {
+		if !yield(ptx.FringeCIDR()) {
 			return false
 		}
 	}
@@ -1077,7 +1075,7 @@ func (n *FastACLNode) AllRecSorted(ptx PathContext, yield func(netip.Prefix) boo
 
 		// Yield the local prefix once all preceding addrs have been traversed.
 		ptx.Slot = pfxIdx
-		if !n.yieldPrefix(ptx, yield) {
+		if !yield(ptx.PrefixCIDR()) {
 			return false
 		}
 	}
@@ -1093,20 +1091,10 @@ func (n *FastACLNode) AllRecSorted(ptx PathContext, yield func(netip.Prefix) boo
 	return true
 }
 
-// YieldFringe reconstructs and yields a fringe prefix from its byte address.
-func (n *FastACLNode) YieldFringe(ptx PathContext, yield func(netip.Prefix) bool) bool {
-	return yield(FringeCIDR(ptx))
-}
-
-// yieldPrefix reconstructs and yields a local prefix from its CBT index.
-func (n *FastACLNode) yieldPrefix(ptx PathContext, yield func(netip.Prefix) bool) bool {
-	return yield(PrefixCIDR(ptx))
-}
-
 // yieldAddr yields fringe entries and child subtrees positioned at the specified byte address.
 func (n *FastACLNode) yieldAddr(ptx PathContext, yield func(netip.Prefix) bool) bool {
 	if n.Fringes.Test(ptx.Slot) {
-		if !n.YieldFringe(ptx, yield) {
+		if !yield(ptx.FringeCIDR()) {
 			return false
 		}
 	}
@@ -1253,7 +1241,7 @@ func (n *FastACLNode) YieldSubnets(ptx PathContext, yield func(netip.Prefix) boo
 
 		// Yield the local prefix once all preceding addrs have been traversed.
 		ptx.Slot = pfxIdx
-		if !n.yieldPrefix(ptx, yield) {
+		if !yield(ptx.PrefixCIDR()) {
 			return false
 		}
 	}
@@ -1673,6 +1661,46 @@ func NewPathContext(octets []byte, depth int, slot uint8, is4 bool) PathContext 
 	return ptx
 }
 
+func (ptx PathContext) FringeCIDR() netip.Prefix {
+	isPrefix := false
+	return ptx.asCIDR(isPrefix)
+}
+
+func (ptx PathContext) PrefixCIDR() netip.Prefix {
+	isPrefix := true
+	return ptx.asCIDR(isPrefix)
+}
+
+func (ptx PathContext) asCIDR(isPrefix bool) netip.Prefix {
+	// Default bit length calculation for stride-aligned fringe entries (/8, /16, /24, etc.).
+	bits := (ptx.Depth + 1) << 3
+
+	if isPrefix {
+		// Retrieve the last octet byte and prefix length inside the stride from CBT index.
+		octet, pfxLen := art.IdxToPfx(ptx.Slot)
+
+		ptx.Slot = octet
+		bits = ptx.Depth<<3 + int(pfxLen)
+	}
+
+	// Set byte in path at current depth with last octet.
+	ptx.Path[ptx.Depth] = ptx.Slot
+
+	// Canonicalize: clear non-canonical trailing octets.
+	clear(ptx.Path[ptx.Depth+1:])
+
+	// Reconstruct netip.Addr directly from array values without heap allocation.
+	var ip netip.Addr
+	if ptx.Is4 {
+		ip = netip.AddrFrom4([4]byte(ptx.Path[:4]))
+	} else {
+		ip = netip.AddrFrom16(ptx.Path)
+	}
+
+	// PrefixFrom does not allocate and assumes host bits are zeroed.
+	return netip.PrefixFrom(ip, bits)
+}
+
 // String, different formats for IPv4 and IPv6, dotted decimal or hex.
 //
 //	127.0.0
@@ -1837,7 +1865,7 @@ func (n *FastACLNode) collectDirectPrefixes(ptx PathContext, dst []HierarchyItem
 		dst = append(dst, HierarchyItem{
 			NextNode: n, // nextNode is again this node
 			NextCtx:  nextCtx,
-			CIDR:     PrefixCIDR(nextCtx),
+			CIDR:     nextCtx.PrefixCIDR(),
 		})
 	}
 
@@ -1910,7 +1938,7 @@ func (n *FastACLNode) appendSlotItems(ptx PathContext, dst []HierarchyItem) []Hi
 	switch {
 	case hasFringe:
 		// Case 1: Stride boundary fringe exists.
-		item := HierarchyItem{CIDR: FringeCIDR(ptx)}
+		item := HierarchyItem{CIDR: ptx.FringeCIDR()}
 
 		if hasChild {
 
