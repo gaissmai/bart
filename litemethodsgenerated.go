@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	"github.com/gaissmai/bart/internal/art"
+	"github.com/gaissmai/bart/internal/fastnetip"
 	"github.com/gaissmai/bart/internal/lpm"
 	"github.com/gaissmai/bart/internal/nodes"
 	"github.com/gaissmai/bart/internal/value"
@@ -77,15 +78,10 @@ func (f *liteTable[V]) Contains(ip netip.Addr) bool {
 			return true
 
 		case *nodes.LeafNode[V]:
-			// Strip IPv6 zone before netip.Prefix.Contains to prevent false returns.
-			if !is4 {
-				// but netip.Addr.withoutZone  is not exported :-(
-				// and netip.Addr.WithZone("") is not inlinable, so we have to resort to this clever trick:
-				// https://github.com/gaissmai/bart/pull/418#issuecomment-5735613506
-				ip = netip.PrefixFrom(ip, 0).Addr()
+			if is4 {
+				return fastnetip.Contains4(&kid.Prefix, &ip)
 			}
-
-			return kid.Prefix.Contains(ip)
+			return fastnetip.Contains6(&kid.Prefix, &ip)
 		}
 	}
 
@@ -138,17 +134,16 @@ LOOP:
 			return kid.Value, true
 
 		case *nodes.LeafNode[V]:
-			// Strip IPv6 zone before netip.Prefix.Contains to prevent false returns.
-			if !is4 {
-				// but netip.Addr.withoutZone  is not exported :-(
-				// and netip.Addr.WithZone("") is not inlinable, so we have to resort to this clever trick:
-				// https://github.com/gaissmai/bart/pull/418#issuecomment-5735613506
-				ip = netip.PrefixFrom(ip, 0).Addr()
+			if is4 {
+				if fastnetip.Contains4(&kid.Prefix, &ip) {
+					return kid.Value, true
+				}
+			} else {
+				if fastnetip.Contains6(&kid.Prefix, &ip) {
+					return kid.Value, true
+				}
 			}
 
-			if kid.Prefix.Contains(ip) {
-				return kid.Value, true
-			}
 			// reached a path compressed prefix, stop traversing
 			break LOOP
 		}
@@ -260,10 +255,20 @@ LOOP:
 
 		case *nodes.LeafNode[V]:
 			// reached a path compressed prefix, stop traversing
-			if kid.Prefix.Bits() > pfxLen || !kid.Prefix.Contains(ip) {
+			if kid.Prefix.Bits() > pfxLen {
 				break LOOP
 			}
-			return kid.Prefix, kid.Value, true
+
+			if is4 {
+				if fastnetip.Contains4(&kid.Prefix, &ip) {
+					return kid.Prefix, kid.Value, true
+				}
+			} else {
+				if fastnetip.Contains6(&kid.Prefix, &ip) {
+					return kid.Prefix, kid.Value, true
+				}
+			}
+			break LOOP
 
 		case *nodes.FringeNode[V]:
 			// the bits of the fringe are defined by the depth
