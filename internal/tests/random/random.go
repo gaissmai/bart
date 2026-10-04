@@ -53,7 +53,11 @@ func IP6(prng *rand.Rand) netip.Addr {
 		//nolint:gosec // G115: integer overflow conversion uint -> byte
 		b[i] = byte(prng.UintN(256))
 	}
-	return netip.AddrFrom16(b)
+	ipv6 := netip.AddrFrom16(b)
+	if prng.IntN(2) == 1 {
+		return ipv6
+	}
+	return ipv6.WithZone("foo")
 }
 
 func IP(prng *rand.Rand) netip.Addr {
