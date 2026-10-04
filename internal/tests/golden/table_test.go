@@ -535,12 +535,46 @@ func TestTable_Union(t *testing.T) {
 	}
 }
 
+func TestTable_Contains(t *testing.T) {
+	t.Parallel()
+	tbl := Table[any]{}
+	tbl.Insert(mpp("192.168.0.0/16"), nil)
+	tbl.Insert(mpp("192.168.1.0/24"), nil)
+	tbl.Insert(mpp("10.0.0.0/8"), nil)
+	tbl.Insert(mpp("2001:db8::/32"), nil)
+
+	tests := []struct {
+		ip     string
+		wantOk bool
+	}{
+		{"192.168.1.5", true},
+		{"192.168.2.5", true},
+		{"10.5.6.7", true},
+		{"172.16.0.1", false},
+		{"2001:db8::1", true},
+		{"2001:db8::1%eth1", true},
+		{"fe80::1", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.ip, func(t *testing.T) {
+			t.Parallel()
+			ok := tbl.Contains(mpa(tt.ip))
+
+			if ok != tt.wantOk {
+				t.Errorf("Lookup(%s) = %v, want %v", tt.ip, ok, tt.wantOk)
+			}
+		})
+	}
+}
+
 func TestTable_Lookup(t *testing.T) {
 	t.Parallel()
 	tbl := Table[string]{}
 	tbl.Insert(mpp("192.168.0.0/16"), "large")
 	tbl.Insert(mpp("192.168.1.0/24"), "specific")
 	tbl.Insert(mpp("10.0.0.0/8"), "ten")
+	tbl.Insert(mpp("2001:db8::/32"), "v6")
 
 	tests := []struct {
 		ip      string
@@ -551,16 +585,19 @@ func TestTable_Lookup(t *testing.T) {
 		{"192.168.2.5", "large", true},    // Less specific match
 		{"10.5.6.7", "ten", true},         // Match /8
 		{"172.16.0.1", "", false},         // No match
-		{"2001:db8::1", "", false},        // IPv6, no match
+		{"2001:db8::1", "v6", true},       // IPv6
+		{"2001:db8::1%eth1", "v6", true},  // IPv6, zone identifier
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.ip, func(t *testing.T) {
 			t.Parallel()
 			val, ok := tbl.Lookup(mpa(tt.ip))
+
 			if ok != tt.wantOk || val != tt.wantVal {
 				t.Errorf("Lookup(%s) = (%v, %v), want (%v, %v)", tt.ip, val, ok, tt.wantVal, tt.wantOk)
 			}
+
 		})
 	}
 }
