@@ -211,12 +211,6 @@ func (n *FastACLNode) LookupIdx(idx uint8) (top uint8, ok bool) {
 	return n.Prefixes.AndTop(&lpm.LookupTbl[idx])
 }
 
-// Lookup is just a simple wrapper for LookupIdx.
-func (n *FastACLNode) Lookup(idx uint8) (ok bool) {
-	_, ok = n.LookupIdx(idx)
-	return
-}
-
 // CloneRec performs a recursive deep copy of the FastACLNode and all its trie descendants.
 //
 // Value-based structures (bitsets, caches, CIDRLeaf entries) are cloned directly,
