@@ -129,8 +129,14 @@ func (f *FastACL) Contains(ip netip.Addr) bool {
 		}
 		kid := n.MustGetChild(octet)
 
-		// Terminal leaf node encountered
-		if leaf, ok := kid.(*nodes.CIDRLeaf); ok {
+		switch kid := kid.(type) {
+		case *nodes.FastACLNode:
+			// descend down to next trie level
+			n = kid
+			continue
+
+		case *nodes.CIDRLeaf:
+
 			// Strip IPv6 zone only when evaluating leaf.Prefix.Contains.
 			// Deferred to this branch so short-circuiting hits do not pay the stripping penalty.
 			//
@@ -140,11 +146,8 @@ func (f *FastACL) Contains(ip netip.Addr) bool {
 			if !is4 {
 				ip = netip.PrefixFrom(ip, 0).Addr()
 			}
-			return leaf.Prefix().Contains(ip)
+			return kid.Prefix().Contains(ip)
 		}
-
-		// Internal trie node: descend to next level
-		n = kid.(*nodes.FastACLNode)
 	}
 
 	return false
@@ -219,7 +222,7 @@ func (f *FastACL) ContainsPrefix(pfx netip.Prefix) bool {
 
 		switch kid := kid.(type) {
 		case *nodes.FastACLNode:
-			// Recurse into deeper trie level.
+			// descend down to next trie level
 			n = kid
 			continue
 
@@ -229,6 +232,7 @@ func (f *FastACL) ContainsPrefix(pfx netip.Prefix) bool {
 			if kid.Prefix().Bits() > pfxLen {
 				return false
 			}
+			// no zone stripping needed, a netip.Prefix has no zone
 			return kid.Prefix().Contains(ip)
 		}
 	}
@@ -271,15 +275,15 @@ func (f *FastACL) LookupPrefixLPM(pfx netip.Prefix) (lpmPfx netip.Prefix, ok boo
 	var octet byte
 
 	// Top-down traversal: Descend as deep as possible along the octet path.
-LOOP:
 	// find the last node on the octets path in the trie,
+LOOP:
 	for depth, octet = range octets {
 		depth &= nodes.DepthMask // BCE
 
 		// stepped one past the last stride of interest; back up to last and break
 		if depth > strideCount {
 			depth--
-			break
+			break LOOP
 		}
 
 		// Record current node on the traversal stack for backtracking
@@ -292,8 +296,8 @@ LOOP:
 		kid := n.MustGetChild(octet)
 
 		switch kid := kid.(type) {
+		// descend down to next trie level
 		case *nodes.FastACLNode:
-			// Descend deeper into next trie level
 			n = kid
 			continue LOOP
 
