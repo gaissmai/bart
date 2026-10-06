@@ -39,7 +39,7 @@ func TestContains4(t *testing.T) {
 			pfx := netip.MustParsePrefix(tt.prefix)
 			ip := netip.MustParseAddr(tt.ip)
 
-			got := Contains4(&pfx, &ip)
+			got := Contains4(pfx, ip)
 			if got != tt.expected {
 				t.Errorf("Contains4(%s, %s) = %v; want %v", tt.prefix, tt.ip, got, tt.expected)
 			}
@@ -85,7 +85,7 @@ func TestContains6(t *testing.T) {
 			pfx := netip.MustParsePrefix(tt.prefix)
 			ip := netip.MustParseAddr(tt.ip)
 
-			got := Contains6(&pfx, &ip)
+			got := Contains6(pfx, ip)
 			if got != tt.expected {
 				t.Errorf("Contains6(%s, %s) = %v; want %v", tt.prefix, tt.ip, got, tt.expected)
 			}
@@ -126,7 +126,7 @@ func BenchmarkContains4_Unsafe(b *testing.B) {
 	i := 0
 	for b.Loop() {
 		ip := ips4[i&3]
-		_ = Contains4(&pfx4, &ip)
+		_ = Contains4(pfx4, ip)
 		i++
 	}
 }
@@ -139,7 +139,7 @@ func BenchmarkContains6_Unsafe(b *testing.B) {
 	i := 0
 	for b.Loop() {
 		ip := ips6[i&3]
-		_ = Contains6(&pfx6, &ip)
+		_ = Contains6(pfx6, ip)
 		i++
 	}
 }

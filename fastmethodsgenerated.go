@@ -79,9 +79,9 @@ func (f *Fast[V]) Contains(ip netip.Addr) bool {
 
 		case *nodes.LeafNode[V]:
 			if is4 {
-				return fastnetip.Contains4(&kid.Prefix, &ip)
+				return fastnetip.Contains4(kid.Prefix, ip)
 			}
-			return fastnetip.Contains6(&kid.Prefix, &ip)
+			return fastnetip.Contains6(kid.Prefix, ip)
 		}
 	}
 
@@ -135,11 +135,11 @@ LOOP:
 
 		case *nodes.LeafNode[V]:
 			if is4 {
-				if fastnetip.Contains4(&kid.Prefix, &ip) {
+				if fastnetip.Contains4(kid.Prefix, ip) {
 					return kid.Value, true
 				}
 			} else {
-				if fastnetip.Contains6(&kid.Prefix, &ip) {
+				if fastnetip.Contains6(kid.Prefix, ip) {
 					return kid.Value, true
 				}
 			}
@@ -260,11 +260,11 @@ LOOP:
 			}
 
 			if is4 {
-				if fastnetip.Contains4(&kid.Prefix, &ip) {
+				if fastnetip.Contains4(kid.Prefix, ip) {
 					return kid.Prefix, kid.Value, true
 				}
 			} else {
-				if fastnetip.Contains6(&kid.Prefix, &ip) {
+				if fastnetip.Contains6(kid.Prefix, ip) {
 					return kid.Prefix, kid.Value, true
 				}
 			}
