@@ -1415,10 +1415,8 @@ func BenchmarkAndTop(b *testing.B) {
 			{1, 0, 0, 0},
 		}
 
-		var i uint8
-		for b.Loop() {
-			aa[i&3].AndTop(&aa[i&3])
-			i++
+		for i := uint8(0); b.Loop(); i++ {
+			aa[i&3].Overlaps(&aa[(i+1)&3])
 		}
 	})
 
@@ -1430,10 +1428,8 @@ func BenchmarkAndTop(b *testing.B) {
 			randomBitSet256(),
 		}
 
-		var i uint8
-		for b.Loop() {
-			aa[i&3].AndTop(&aa[i&3])
-			i++
+		for i := uint8(0); b.Loop(); i++ {
+			aa[i&3].AndTop(&aa[(i+1)&3])
 		}
 	})
 }
@@ -1463,10 +1459,8 @@ func BenchmarkOr(b *testing.B) {
 		randomBitSet256(),
 	}
 
-	var i uint8
-	for b.Loop() {
+	for i := uint8(0); b.Loop(); i++ {
 		aa.Or(&bb[i&3])
-		i++
 	}
 }
 
@@ -1479,10 +1473,8 @@ func BenchmarkAnd(b *testing.B) {
 		randomBitSet256(),
 	}
 
-	var i uint8
-	for b.Loop() {
+	for i := uint8(0); b.Loop(); i++ {
 		aa.And(&bb[i&3])
-		i++
 	}
 }
 
@@ -1495,10 +1487,8 @@ func BenchmarkXor(b *testing.B) {
 		randomBitSet256(),
 	}
 
-	var i uint8
-	for b.Loop() {
+	for i := uint8(0); b.Loop(); i++ {
 		aa.Xor(&bb[i&3])
-		i++
 	}
 }
 
@@ -1513,12 +1503,10 @@ func BenchmarkAll(b *testing.B) {
 			{0, 0, 0, 1},
 		}
 
-		var i uint8
-		for b.Loop() {
+		for i := uint8(0); b.Loop(); i++ {
 			for bit := range aa[i&3].All() {
 				sink = bit
 			}
-			i++
 		}
 		sinkSliceUint8 = append(sinkSliceUint8, sink)
 	})
@@ -1531,12 +1519,10 @@ func BenchmarkAll(b *testing.B) {
 			randomBitSet256(),
 		}
 
-		var i uint8
-		for b.Loop() {
+		for i := uint8(0); b.Loop(); i++ {
 			for bit := range aa[i&3].All() {
 				sink = bit
 			}
-			i++
 		}
 		sinkSliceUint8 = append(sinkSliceUint8, sink)
 	})
@@ -1569,10 +1555,8 @@ func BenchmarkAppendBits(b *testing.B) {
 		}
 
 		buf := make([]uint8, 0, 256)
-		var i uint8
-		for b.Loop() {
+		for i := uint8(0); b.Loop(); i++ {
 			buf = aa[i&3].AppendBits(buf[:0])
-			i++
 		}
 		copy(sinkSliceUint8, buf)
 	})
@@ -1589,10 +1573,8 @@ func BenchmarkBits(b *testing.B) {
 			{0, 0, 0, 1},
 		}
 
-		var i uint8
-		for b.Loop() {
+		for i := uint8(0); b.Loop(); i++ {
 			sink = aa[i&3].Bits()
-			i++
 		}
 		copy(sinkSliceUint8, sink)
 	})
@@ -1605,10 +1587,8 @@ func BenchmarkBits(b *testing.B) {
 			randomBitSet256(),
 		}
 
-		var i uint8
-		for b.Loop() {
+		for i := uint8(0); b.Loop(); i++ {
 			sink = aa[i&3].Bits()
-			i++
 		}
 		copy(sinkSliceUint8, sink)
 	})
@@ -1622,10 +1602,8 @@ func BenchmarkRightShift(b *testing.B) {
 		randomBitSet256(),
 	}
 
-	var i uint8
-	for b.Loop() {
+	for i := uint8(0); b.Loop(); i++ {
 		aa[i&3].RightShift()
-		i++
 	}
 }
 
@@ -1637,10 +1615,8 @@ func BenchmarkLeftShift(b *testing.B) {
 		randomBitSet256(),
 	}
 
-	var i uint8
-	for b.Loop() {
+	for i := uint8(0); b.Loop(); i++ {
 		aa[i&3].LeftShift()
-		i++
 	}
 }
 
@@ -1654,10 +1630,8 @@ func BenchmarkAlignedPairs(b *testing.B) {
 		randomBitSet256(),
 	}
 
-	var i uint8
-	for b.Loop() {
+	for i := uint8(0); b.Loop(); i++ {
 		sink = aa[i&3].AlignedPairs()
-		i++
 	}
 
 	sinkBitSet256 = sink

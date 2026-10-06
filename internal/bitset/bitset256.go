@@ -31,7 +31,7 @@ package bitset
 // can inline (*BitSet256).NextSet with cost 65
 // can inline (*BitSet256).OnesCount with cost 28
 // can inline (*BitSet256).Or with cost 53
-// can inline (*BitSet256).Overlaps with cost 48
+// can inline (*BitSet256).Overlaps with cost 42
 // can inline (*BitSet256).Rank with cost 52
 // can inline (*BitSet256).RightShift with cost 60
 // can inline (*BitSet256).Set with cost 12
@@ -100,7 +100,7 @@ func (b *BitSet256) Test(bit uint8) (ok bool) {
 // branch misprediction and maximizing instruction throughput. This technique
 // is especially effective for bitsets with known, fixed word count.
 //
-//nolint:gosec  // G115: integer overflow conversion int -> uint
+//nolint:gosec  // G115: integer overflow conversion int -> uint8
 func (b *BitSet256) FirstSet() (first uint8, ok bool) {
 	// optimized for pipelining, can still inline with cost 79
 	x0 := bits.TrailingZeros64(b[0])
@@ -141,7 +141,7 @@ func (b *BitSet256) FirstSet() (first uint8, ok bool) {
 //	b.NextSet(6)   -> 130, true
 //	b.NextSet(200) ->   0, false
 //
-//nolint:gosec  // G115: integer overflow conversion int -> uint
+//nolint:gosec  // G115: integer overflow conversion int -> uint8
 func (b *BitSet256) NextSet(bit uint8) (next uint8, ok bool) {
 	wIdx := int(bit >> 6)
 
@@ -174,7 +174,7 @@ func (b *BitSet256) NextSet(bit uint8) (next uint8, ok bool) {
 //	bs.Set(214)
 //	index, ok := bs.LastSet()  // index == 214, ok == true
 //
-//nolint:gosec  // G115: integer overflow conversion int -> uint
+//nolint:gosec  // G115: integer overflow conversion int -> uint8
 func (b *BitSet256) LastSet() (last uint8, ok bool) {
 	// optimized by unrolling the loop.
 	// This enables compiler inlining and is ~20% faster.
@@ -202,7 +202,7 @@ func (b *BitSet256) LastSet() (last uint8, ok bool) {
 // and yield-inlining overhead compared to batch writes. For maximum throughput
 // in dense bitsets, consider using AppendBits with a pre-allocated slice buffer.
 //
-//nolint:gosec // G115: integer overflow conversion int -> uint
+//nolint:gosec // G115: integer overflow conversion int -> uint8
 func (b *BitSet256) All() iter.Seq[uint8] {
 	return func(yield func(uint8) bool) {
 		for wIdx, word := range b {
@@ -222,7 +222,7 @@ func (b *BitSet256) All() iter.Seq[uint8] {
 //
 // See [BitSet256.All] for performance considerations on dense bitsets.
 //
-//nolint:gosec // G115: integer overflow conversion int -> uint
+//nolint:gosec // G115: integer overflow conversion int -> uint8
 func (b *BitSet256) AllEnumerate() iter.Seq2[uint8, uint8] {
 	return func(yield func(uint8, uint8) bool) {
 		var i uint8
@@ -252,7 +252,7 @@ func (b *BitSet256) AllEnumerate() iter.Seq2[uint8, uint8] {
 // If capacity is exceeded, standard slice growth rules apply and a new backing array
 // will be allocated.
 //
-//nolint:gosec // G115: integer overflow conversion int -> uint
+//nolint:gosec // G115: integer overflow conversion int -> uint8
 func (b *BitSet256) AppendBits(buf []uint8) []uint8 {
 	for wIdx, word := range b {
 		for word != 0 {
@@ -267,11 +267,11 @@ func (b *BitSet256) AppendBits(buf []uint8) []uint8 {
 // in strictly ascending order as uint8 values.
 //
 // Performance Considerations:
-// Unlike [AppendBits], this method allocates backing storage on the heap.
+// Unlike [BitSet256.AppendBits], this method allocates backing storage on the heap.
 // It is designed for convenience when caller lifecycle management across stack
 // boundaries is required.
 //
-// For high-throughput or allocation-free processing in hot paths, prefer [AppendBits].
+// For high-throughput or allocation-free processing in hot paths, prefer [BitSet256.AppendBits].
 func (b *BitSet256) Bits() []uint8 {
 	// Directly allocate heap slice with exact capacity to avoid re-allocations in append.
 	return b.AppendBits(make([]uint8, 0, b.OnesCount()))
@@ -370,10 +370,7 @@ func (b *BitSet256) IsEmpty() bool {
 
 // Overlaps reports whether the receiver and c have at least one bit in common.
 func (b *BitSet256) Overlaps(c *BitSet256) bool {
-	return b[0]&c[0] != 0 ||
-		b[1]&c[1] != 0 ||
-		b[2]&c[2] != 0 ||
-		b[3]&c[3] != 0
+	return (b[0]&c[0] | b[1]&c[1] | b[2]&c[2] | b[3]&c[3]) != 0
 }
 
 // And returns a new [BitSet256] representing the bitwise intersection (AND) of b and c.
