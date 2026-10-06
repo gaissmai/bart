@@ -9,15 +9,6 @@ import (
 	"github.com/gaissmai/bart/internal/tests/golden"
 )
 
-// randomBytes generates a byte slice of the specified length n
-// filled with pseudo-random data using the provided *rand.Rand instance.
-func randomBytes(prng *rand.Rand, buf []byte) []byte {
-	for i := range len(buf) {
-		buf[i] = byte(prng.UintN(256))
-	}
-	return buf
-}
-
 // extractPfxs4 extracts as many valid IPv4 netip.Prefix values as possible
 // from a raw, randomized byte slice.
 func extractPfxs4(data []byte) []netip.Prefix {
@@ -405,6 +396,58 @@ func FuzzFastACL_Clone_Differential(f *testing.F) {
 		clone.Delete(probe)
 		if clone.Equal(facl) {
 			t.Fatal("Equal after delete: Clone()")
+		}
+	})
+}
+
+func FuzzFastACL_Equal(f *testing.F) {
+	const maxData = 4096
+	// Seed corpus
+	f.Add(seedPfx4, seedPfx6)
+
+	f.Fuzz(func(t *testing.T, pfx4Data, pfx6Data []byte) {
+		t.Parallel()
+
+		// Clamp payload if it exceeds the threshold.
+		if len(pfx4Data) > maxData {
+			pfx4Data = pfx4Data[:maxData]
+		}
+		if len(pfx6Data) > maxData {
+			pfx6Data = pfx6Data[:maxData]
+		}
+
+		pfxs4 := extractPfxs4(pfx4Data)
+		pfxs6 := extractPfxs6(pfx6Data)
+
+		facl := new(FastACL)
+
+		pfxs := slices.Concat(pfxs4, pfxs6)
+		if len(pfxs) == 0 {
+			return
+		}
+
+		for _, p := range pfxs {
+			facl.Insert(p)
+		}
+
+		pfxs4 = slices.Collect(facl.All4())
+		pfxs6 = slices.Collect(facl.All6())
+
+		facl1 := new(FastACL)
+		facl2 := new(FastACL)
+
+		mid4 := len(pfxs4) / 2
+		mid6 := len(pfxs6) / 2
+
+		for _, pfx := range slices.Concat(pfxs4[:mid4], pfxs6[:mid6]) {
+			facl1.Insert(pfx)
+		}
+		for _, pfx := range slices.Concat(pfxs4[mid4:], pfxs6[mid6:]) {
+			facl2.Insert(pfx)
+		}
+
+		if facl1.Equal(facl2) {
+			t.Fatal("Equal after separating pfxs")
 		}
 	})
 }
