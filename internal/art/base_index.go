@@ -6,10 +6,9 @@
 //
 //	can inline OctetToIdx with cost 6
 //	can inline PfxToIdx with cost 10
-//	can inline NetMask with cost 13
 //	can inline PfxBits with cost 21
-//	can inline IdxToPfx with cost 39
-//	can inline IdxToRange with cost 71
+//	can inline IdxToPfx with cost 29
+//	can inline IdxToRange with cost 47
 package art
 
 import "math/bits"
@@ -112,37 +111,27 @@ func PfxBits(depth int, idx uint8) uint8 {
 //     first, last := IdxToRange(13)  // 160, 191
 //
 // Internally, this function decodes (octet, prefixLength) via IdxToPfx,
-// then computes the broadcast address (last octet) by masking all bits below the prefix length.
+// then computes the broadcast address (last octet) by filling all bits
+// below the prefix length.
 func IdxToRange(idx uint8) (first, last uint8) {
 	// Decode the prefix base (octet) and length (number of fixed bits)
 	first, pfxLen := IdxToPfx(idx)
 
 	// Compute the "broadcast" value by filling trailing (host) bits with 1s.
 	// This gives the maximum octet value that still matches the prefix.
-	last = first | ^NetMask(pfxLen)
+	last = first | netMask[pfxLen]
 
 	return first, last
 }
 
-// NetMask returns an 8-bit left-aligned network mask for the given number of prefix bits.
-//
-// For example:
-//
-//	bits = 0  -> 0b00000000
-//	bits = 1  -> 0b10000000
-//	bits = 2  -> 0b11000000
-//	bits = 3  -> 0b11100000
-//	...
-//	bits = 8 -> 0b11111111
-//
-// This mask is used to extract or identify the fixed (prefix) portion of an octet.
-// The rightmost (8 - bits) bits are cleared (set to zero), and the upper 'bits' are set to 1.
-func NetMask(bits uint8) uint8 {
-	if bits > 8 {
-		panic("NetMask: invalid bits > 8")
-	}
-
-	// Use a full 8-bit mask and shift left to clear trailing (host) bits.
-	// Shifts 0..8 on a uint8 are well-defined; safe for bits in [0..8].
-	return ^uint8(0) << (8 - bits)
+var netMask = [9]byte{
+	0b11111111,
+	0b01111111,
+	0b00111111,
+	0b00011111,
+	0b00001111,
+	0b00000111,
+	0b00000011,
+	0b00000001,
+	0b00000000,
 }
