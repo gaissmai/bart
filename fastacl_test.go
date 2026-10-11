@@ -4,10 +4,12 @@ package bart
 // SPDX-License-Identifier: MIT
 
 import (
+	"encoding/json"
 	"iter"
 	"math/rand/v2"
 	"net/netip"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/gaissmai/bart/internal/tests/golden"
@@ -61,6 +63,8 @@ func TestFastACL_NilReceiver(t *testing.T) {
 		mustPanic(t, "OverlapsPrefix", func() { tbl1.OverlapsPrefix(pfx6) })
 		mustPanic(t, "Equal", func() { tbl1.Equal(nil) })
 		mustPanic(t, "Fprint", func() { tbl1.Fprint(nil) })
+		mustPanic(t, "DumpList4", func() { tbl1.DumpList4() })
+		mustPanic(t, "DumpList6", func() { tbl1.DumpList6() })
 
 		mustPanicRangeOverFunc[any](t, "All", tbl1.All)
 		mustPanicRangeOverFunc[any](t, "All4", tbl1.All4)
@@ -1791,6 +1795,129 @@ func TestFastACL_Compare(t *testing.T) {
 
 			if goldGot != faclGot {
 				t.Fatal("Overlaps is different")
+			}
+		})
+	}
+}
+
+func TestTestFastACL_DumpList(t *testing.T) {
+	t.Parallel()
+
+	normalizeWhitespace := func(s string) string {
+		fields := strings.Fields(s)
+		return strings.Join(fields, "")
+	}
+
+	tests := []struct {
+		name         string
+		is4          bool
+		prefixes     []string
+		expectedJSON string
+	}{
+		{
+			name:         "Empty IPv4 Table",
+			is4:          true,
+			prefixes:     nil,
+			expectedJSON: "[]",
+		},
+		{
+			name:     "Single IPv4 Prefix",
+			is4:      true,
+			prefixes: []string{"192.168.1.0/24"},
+			expectedJSON: `
+			[
+				{
+					"cidr": "192.168.1.0/24"
+				}
+			]`,
+		},
+		{
+			name:     "Nested IPv4 Prefixes",
+			is4:      true,
+			prefixes: []string{"10.0.0.0/8", "10.1.0.0/16", "10.1.1.0/24"},
+			expectedJSON: `
+			[
+				{
+					"cidr": "10.0.0.0/8",
+					"subnets": [
+						{
+							"cidr": "10.1.0.0/16",
+							"subnets": [
+								{
+									"cidr": "10.1.1.0/24"
+								}
+							]
+						}
+					]
+				}
+			]`,
+		},
+		{
+			name:         "Empty IPv6 Table",
+			is4:          false,
+			prefixes:     nil,
+			expectedJSON: "[]",
+		},
+		{
+			name:     "Single IPv6 Prefix",
+			is4:      false,
+			prefixes: []string{"2001:db8::/32"},
+			expectedJSON: `
+			[
+				{
+					"cidr": "2001:db8::/32"
+				}
+			]`,
+		},
+		{
+			name:     "Nested IPv6 Prefixes",
+			is4:      false,
+			prefixes: []string{"2001:db8::/32", "2001:db8::/48", "2001:db8::/64"},
+			expectedJSON: `
+			[
+				{
+					"cidr": "2001:db8::/32",
+					"subnets": [
+						{
+							"cidr": "2001:db8::/48",
+							"subnets": [
+								{
+									"cidr": "2001:db8::/64"
+								}
+							]
+						}
+					]
+				}
+			]`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			f := new(FastACL)
+			for _, s := range tt.prefixes {
+				f.Insert(mpp(s))
+			}
+
+			var got []DumpListNode[any]
+			if tt.is4 {
+				got = f.DumpList4()
+			} else {
+				got = f.DumpList6()
+			}
+
+			gotJSON, err := json.MarshalIndent(got, "", "  ")
+			if err != nil {
+				t.Fatalf("failed to marshal got to JSON: %v", err)
+			}
+
+			gotStr := normalizeWhitespace(string(gotJSON))
+			wantStr := normalizeWhitespace(tt.expectedJSON)
+
+			if gotStr != wantStr {
+				t.Errorf("\nGot JSON:\n%s\n\nWant JSON:\n%s", gotStr, wantStr)
 			}
 		})
 	}

@@ -6,6 +6,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/gaissmai/bart/internal/nodes"
 	"github.com/gaissmai/bart/internal/tests/golden"
 )
 
@@ -450,4 +451,103 @@ func FuzzFastACL_Equal(f *testing.F) {
 			t.Fatal("Equal after separating pfxs")
 		}
 	})
+}
+
+// FuzzFastACL_DumpList fuzzes DumpList4 and DumpList6 using structured byte payloads
+// and verifies structural invariants on the resulting dump trees.
+func FuzzFastACL_DumpList(f *testing.F) {
+	const maxData = 512
+	f.Add(seedPfx4, seedPfx6)
+
+	f.Fuzz(func(t *testing.T, pfx4Data, pfx6Data []byte) {
+		t.Parallel()
+
+		if len(pfx4Data) > maxData {
+			pfx4Data = pfx4Data[:maxData]
+		}
+		if len(pfx6Data) > maxData {
+			pfx6Data = pfx6Data[:maxData]
+		}
+
+		pfxs4 := extractPfxs4(pfx4Data)
+		pfxs6 := extractPfxs6(pfx6Data)
+
+		f4 := new(FastACL)
+		f6 := new(FastACL)
+		for _, pfx := range pfxs4 {
+			f4.Insert(pfx)
+		}
+		for _, pfx := range pfxs6 {
+			f6.Insert(pfx)
+		}
+
+		list4 := f4.DumpList4()
+		gotNodes4 := verifyDumpListInvariants(t, list4, true)
+		if gotNodes4 != f4.Size4() {
+			t.Fatalf("mismatch in number of nodes, expected %d, got %d", f4.Size4(), gotNodes4)
+		}
+
+		list6 := f6.DumpList6()
+		gotNodes6 := verifyDumpListInvariants(t, list6, false)
+		if gotNodes6 != f6.Size6() {
+			t.Fatalf("mismatch in number of nodes, expected %d, got %d", f6.Size6(), gotNodes6)
+		}
+
+	})
+}
+
+// verifyDumpListInvariants recursively checks structural correctness of the dump tree.
+func verifyDumpListInvariants(t *testing.T, listNodes []DumpListNode[any], is4 bool) int {
+	t.Helper()
+
+	var count int
+	var prevCIDR netip.Prefix
+
+	for i, node := range listNodes {
+		count++
+		if !node.CIDR.IsValid() {
+			t.Fatalf("dumped node contains invalid prefix at index %d", i)
+		}
+		if is4 && !node.CIDR.Addr().Is4() {
+			t.Fatalf("DumpList4 returned non-IPv4 prefix: %v", node.CIDR)
+		}
+		if !is4 && !node.CIDR.Addr().Is6() {
+			t.Fatalf("DumpList6 returned non-IPv6 prefix: %v", node.CIDR)
+		}
+
+		if i > 0 {
+			if nodes.CmpPrefix(prevCIDR, node.CIDR) >= 0 {
+				t.Fatalf("unsorted siblings detected: %v followed by %v", prevCIDR, node.CIDR)
+			}
+
+			if prevCIDR.Overlaps(node.CIDR) {
+				t.Fatalf("overlapping siblings detected: %v overlaps %v", prevCIDR, node.CIDR)
+			}
+		}
+		prevCIDR = node.CIDR
+
+		if len(node.Subnets) > 0 {
+			for _, sub := range node.Subnets {
+				if sub.CIDR.Bits() <= node.CIDR.Bits() {
+					t.Fatalf("invalid hierarchy: child %v is not more specific than parent %v", sub.CIDR, node.CIDR)
+				}
+
+				if nodes.CmpPrefix(node.CIDR, sub.CIDR) >= 0 {
+					t.Fatalf("child must compare after parent: %v >= %v", node.CIDR, sub.CIDR)
+				}
+
+				if !node.CIDR.Overlaps(sub.CIDR) {
+					t.Fatalf("parent and child must overlap: %v !overlaps %v", node.CIDR, sub.CIDR)
+				}
+
+				if !node.CIDR.Contains(sub.CIDR.Addr()) {
+					t.Fatalf("parent must contain child: %v !cobtains %v", node.CIDR, sub.CIDR.Addr())
+				}
+			}
+
+			count += verifyDumpListInvariants(t, node.Subnets, is4)
+		}
+	}
+
+	return count
 }
