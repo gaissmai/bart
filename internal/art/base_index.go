@@ -124,6 +124,7 @@ func IdxToRange(idx uint8) (first, last uint8) {
 	return first, last
 }
 
+//nolint:gochecknoglobals
 var netMask = [9]byte{
 	0b11111111,
 	0b01111111,
