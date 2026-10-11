@@ -113,13 +113,13 @@ func (f *FastACL) Contains(ip netip.Addr) bool {
 	n := f.rootNodeByVersion(is4)
 
 	for _, octet := range ip.AsSlice() {
-		// Short-circuit: any matching local prefix in this node is sufficient
-		if n.PrefixCount() != 0 && n.Contains(art.OctetToIdx(octet)) {
+		// Short-circuit: any matching fringe in this node is sufficient
+		if n.Fringes.Test(octet) {
 			return true
 		}
 
-		// Short-circuit: any matching fringe in this node is sufficient
-		if n.Fringes.Test(octet) {
+		// Short-circuit: any matching local prefix in this node is sufficient
+		if n.PrefixCount() != 0 && n.Contains(art.OctetToIdx(octet)) {
 			return true
 		}
 
@@ -187,7 +187,15 @@ func (f *FastACL) ContainsPrefix(pfx netip.Prefix) bool {
 			return false
 		}
 
-		// 1. Check for covering local prefixes within the current stride node.
+		// 1. Check for a stride-aligned fringe boundary matching at /8, /16, /24, etc.
+		fringeBits := (depth + 1) << 3
+		// Verify that the fringe's prefix length is broader/equal and encloses
+		// the target prefix.
+		if fringeBits <= pfxLen && n.Fringes.Test(octet) {
+			return true
+		}
+
+		// 2. Check for covering local prefixes within the current stride node.
 		if n.PrefixCount() != 0 {
 			// Intermediate strides evaluate full 8-bit host routes;
 			// only the terminal stride uses the remaining bit count (modBits).
@@ -202,14 +210,6 @@ func (f *FastACL) ContainsPrefix(pfx netip.Prefix) bool {
 			if n.Contains(idx) {
 				return true
 			}
-		}
-
-		// 2. Check for a stride-aligned fringe boundary matching at /8, /16, /24, etc.
-		fringeBits := (depth + 1) << 3
-		// Verify that the fringe's prefix length is broader/equal and encloses
-		// the target prefix.
-		if fringeBits <= pfxLen && n.Fringes.Test(octet) {
-			return true
 		}
 
 		// 3. Early termination: stop traversal if no child node or leaf exists at the target octet slot.
