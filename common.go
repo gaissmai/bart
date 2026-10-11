@@ -62,6 +62,6 @@ type stridePath = nodes.StridePath
 // in a sorted, recursive representation, especially useful for serialization.
 type DumpListNode[V any] struct {
 	CIDR    netip.Prefix      `json:"cidr"`
-	Value   V                 `json:"value"`
+	Value   V                 `json:"value,omitempty"`
 	Subnets []DumpListNode[V] `json:"subnets,omitempty"`
 }

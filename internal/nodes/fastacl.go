@@ -1829,7 +1829,7 @@ func (c *CIDRLeaf) Fprint(w io.Writer, pad string) error {
 // DirectItems returns all immediate descendant hierarchy items directly covered by parent.
 //
 // It inspects both local CBT prefixes and stride boundaries (fringes/children)
-// to yield items directly beneath parent in the LPM hierarchy.
+// to find items directly beneath parent in the LPM hierarchy.
 func (n *FastACLNode) DirectItems(ptx PathContext) []HierarchyItem {
 	if n.IsEmpty() {
 		return nil

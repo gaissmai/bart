@@ -8,6 +8,7 @@ import (
 	"io"
 	"iter"
 	"net/netip"
+	"slices"
 	"strings"
 	"sync"
 
@@ -754,6 +755,50 @@ func (f *FastACL) AllSorted6() iter.Seq[netip.Prefix] {
 	return func(yield func(netip.Prefix) bool) {
 		f.root6.AllRecSorted(nodes.PathContext{Is4: false}, yield)
 	}
+}
+
+// DumpList4 dumps the ipv4 tree into a list of roots and their subnets.
+// It can be used to analyze the tree or build the text or JSON serialization.
+func (f *FastACL) DumpList4() []DumpListNode[any] {
+	return f.dumpListRec(&f.root4, nodes.PathContext{Is4: true})
+}
+
+// DumpList6 dumps the ipv6 tree into a list of roots and their subnets.
+// It can be used to analyze the tree or build custom JSON representation.
+func (f *FastACL) DumpList6() []DumpListNode[any] {
+	return f.dumpListRec(&f.root6, nodes.PathContext{Is4: false})
+}
+
+// dumpListRec, build the data structure rec-descent.
+func (f *FastACL) dumpListRec(anyNode any, ptx nodes.PathContext) []DumpListNode[any] {
+	// Guard clause: avoid processing empty nodes
+	if anyNode == nil {
+		return nil
+	}
+
+	switch n := anyNode.(type) {
+	case *nodes.FastACLNode:
+		directItems := n.DirectItems(ptx)
+		slices.SortFunc(directItems, func(a, b nodes.HierarchyItem) int {
+			return nodes.CmpPrefix(a.CIDR, b.CIDR)
+		})
+
+		dumpNodes := make([]DumpListNode[any], 0, len(directItems))
+		for _, item := range directItems {
+			dumpNodes = append(dumpNodes, DumpListNode[any]{
+				CIDR:    item.CIDR,
+				Subnets: f.dumpListRec(item.NextNode, item.NextCtx),
+			})
+		}
+		return dumpNodes
+
+	case *nodes.CIDRLeaf:
+		return []DumpListNode[any]{{CIDR: n.Prefix()}}
+
+	default:
+		return nil
+	}
+
 }
 
 // Fprint writes a hierarchical tree diagram of the ordered CIDRs
