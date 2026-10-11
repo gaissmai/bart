@@ -1157,9 +1157,9 @@ func (n *FastACLNode) YieldSupernets(pfxLen int, ptx PathContext, yield func(net
 	//  1. Fringe Check: If the target octet matches a fringe bit.
 	if n.Fringes.Test(octet) {
 		// Reconstruct fringe CIDR
-		newPtx := ptx
-		newPtx.Slot = octet
-		fringePfx := newPtx.FringeCIDR()
+		fringePtx := ptx
+		fringePtx.Slot = octet
+		fringePfx := fringePtx.FringeCIDR()
 
 		// Verify that the fringe's prefix length is broader/equal and encloses
 		// the target prefix.
@@ -1177,9 +1177,9 @@ func (n *FastACLNode) YieldSupernets(pfxLen int, ptx PathContext, yield func(net
 	for covIdx := range coverage.AllBackward() {
 
 		// Reconstruct prefix CIDR
-		newPtx := ptx
-		newPtx.Slot = covIdx
-		cidr := newPtx.PrefixCIDR()
+		prefixPtx := ptx
+		prefixPtx.Slot = covIdx
+		cidr := prefixPtx.PrefixCIDR()
 
 		if !yield(cidr) {
 			return false

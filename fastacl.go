@@ -650,8 +650,8 @@ func (f *FastACL) Overlaps6(o *FastACL) bool {
 // Aggregate compresses the table in-place by merging overlapping
 // and adjacent IP prefixes into their minimal covering CIDR blocks.
 func (f *FastACL) Aggregate() {
-	mod4 := f.root4.AggregateRec(pathContext{Is4: true})
-	mod6 := f.root6.AggregateRec(pathContext{Is4: false})
+	mod4 := f.root4.AggregateRec(nodes.PathContext{Is4: true})
+	mod6 := f.root6.AggregateRec(nodes.PathContext{Is4: false})
 
 	if mod4 != 0 {
 		stats := f.root4.StatsRec()
@@ -706,11 +706,11 @@ func (f *FastACL) Size6() int {
 // stored in the table. Iteration order is explicitly unspecified.
 func (f *FastACL) All() iter.Seq[netip.Prefix] {
 	return func(yield func(netip.Prefix) bool) {
-		if !f.root4.AllRec(pathContext{Is4: true}, yield) {
+		if !f.root4.AllRec(nodes.PathContext{Is4: true}, yield) {
 			return
 		}
 
-		f.root6.AllRec(pathContext{Is4: false}, yield)
+		f.root6.AllRec(nodes.PathContext{Is4: false}, yield)
 	}
 }
 
@@ -718,7 +718,7 @@ func (f *FastACL) All() iter.Seq[netip.Prefix] {
 // Iteration order is explicitly unspecified.
 func (f *FastACL) All4() iter.Seq[netip.Prefix] {
 	return func(yield func(netip.Prefix) bool) {
-		f.root4.AllRec(pathContext{Is4: true}, yield)
+		f.root4.AllRec(nodes.PathContext{Is4: true}, yield)
 	}
 }
 
@@ -726,7 +726,7 @@ func (f *FastACL) All4() iter.Seq[netip.Prefix] {
 // Iteration order is explicitly unspecified.
 func (f *FastACL) All6() iter.Seq[netip.Prefix] {
 	return func(yield func(netip.Prefix) bool) {
-		f.root6.AllRec(pathContext{Is4: false}, yield)
+		f.root6.AllRec(nodes.PathContext{Is4: false}, yield)
 	}
 }
 
@@ -734,25 +734,25 @@ func (f *FastACL) All6() iter.Seq[netip.Prefix] {
 // CIDR prefix sort order.
 func (f *FastACL) AllSorted() iter.Seq[netip.Prefix] {
 	return func(yield func(netip.Prefix) bool) {
-		if !f.root4.AllRecSorted(pathContext{Is4: true}, yield) {
+		if !f.root4.AllRecSorted(nodes.PathContext{Is4: true}, yield) {
 			return
 		}
 
-		f.root6.AllRecSorted(pathContext{Is4: false}, yield)
+		f.root6.AllRecSorted(nodes.PathContext{Is4: false}, yield)
 	}
 }
 
 // AllSorted4 is like [FastACL.AllSorted] but only for the v4 routing table.
 func (f *FastACL) AllSorted4() iter.Seq[netip.Prefix] {
 	return func(yield func(netip.Prefix) bool) {
-		f.root4.AllRecSorted(pathContext{Is4: true}, yield)
+		f.root4.AllRecSorted(nodes.PathContext{Is4: true}, yield)
 	}
 }
 
 // AllSorted6 is like [FastACL.AllSorted] but only for the v6 routing table.
 func (f *FastACL) AllSorted6() iter.Seq[netip.Prefix] {
 	return func(yield func(netip.Prefix) bool) {
-		f.root6.AllRecSorted(pathContext{Is4: false}, yield)
+		f.root6.AllRecSorted(nodes.PathContext{Is4: false}, yield)
 	}
 }
 
@@ -807,7 +807,7 @@ func (f *FastACL) fprint(w io.Writer, is4 bool) error {
 		return err
 	}
 
-	return n.FprintRec(w, pathContext{Is4: is4}, "")
+	return n.FprintRec(w, nodes.PathContext{Is4: is4}, "")
 }
 
 // dump the table structure and all the nodes to w.
@@ -818,7 +818,7 @@ func (f *FastACL) dump(w io.Writer) {
 		fmt.Fprintf(w, "### IPv4: size(%d), subnodes(%d), prefixes(%d), fringes(%d), leaves(%d)",
 			f.size4, stats.SubNodes, stats.Prefixes, stats.Fringes, stats.Leaves)
 
-		f.root4.DumpRec(w, pathContext{Is4: true})
+		f.root4.DumpRec(w, nodes.PathContext{Is4: true})
 	}
 
 	if f.size6 > 0 {
@@ -827,7 +827,7 @@ func (f *FastACL) dump(w io.Writer) {
 		fmt.Fprintf(w, "### IPv6: size(%d), subnodes(%d), prefixes(%d), fringes(%d), leaves(%d)",
 			f.size6, stats.SubNodes, stats.Prefixes, stats.Fringes, stats.Leaves)
 
-		f.root6.DumpRec(w, pathContext{Is4: false})
+		f.root6.DumpRec(w, nodes.PathContext{Is4: false})
 	}
 }
 
