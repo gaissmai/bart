@@ -1151,15 +1151,18 @@ func (n *FastACLNode) yieldChildRecSorted(ptx PathContext, yield func(netip.Pref
 // Returns false if the yield callback requested an early exit.
 //
 // Requirement: The caller MUST provide a canonicalized prefix pfx (i.e. pfx == pfx.Masked()).
-func (n *FastACLNode) YieldSupernets(pfx netip.Prefix, depth int, octet byte, pfxIdx uint8, yield func(netip.Prefix) bool) (ok bool) {
-	ip := pfx.Addr()
-	pfxLen := pfx.Bits()
+func (n *FastACLNode) YieldSupernets(pfxLen int, ptx PathContext, yield func(netip.Prefix) bool) (ok bool) {
+	octet := ptx.Path[ptx.Depth]
 
+	//  1. Fringe Check: If the target octet matches a fringe bit.
 	if n.Fringes.Test(octet) {
-		// Reconstruct the stride boundary prefix (e.g., /8, /16, /24).
-		fringePfx, _ := ip.Prefix((depth + 1) << 3)
+		// Reconstruct fringe CIDR
+		newPtx := ptx
+		newPtx.Slot = octet
+		fringePfx := newPtx.FringeCIDR()
 
-		// Ignore fringe if its prefix length is more specific than the query target.
+		// Verify that the fringe's prefix length is broader/equal and encloses
+		// the target prefix.
 		if fringePfx.Bits() <= pfxLen {
 			if !yield(fringePfx) {
 				return false
@@ -1167,15 +1170,16 @@ func (n *FastACLNode) YieldSupernets(pfx netip.Prefix, depth int, octet byte, pf
 		}
 	}
 
-	// Intersect configured prefixes with precomputed CBT ancestor mask.
-	coverage := n.Prefixes.And(&lpm.LookupTbl[pfxIdx])
+	// Intersect prefixes with precomputed CBT ancestor mask.
+	coverage := n.Prefixes.And(&lpm.LookupTbl[ptx.Slot])
 
 	// Iterate over matching bit indices in reverse order (longest to shortest prefix).
 	for covIdx := range coverage.AllBackward() {
 
-		// Reconstruct stride-relative length and combine with current depth offset.
-		_, pfxLen := art.IdxToPfx(covIdx)
-		cidr, _ := ip.Prefix(depth<<3 + int(pfxLen))
+		// Reconstruct prefix CIDR
+		newPtx := ptx
+		newPtx.Slot = covIdx
+		cidr := newPtx.PrefixCIDR()
 
 		if !yield(cidr) {
 			return false
@@ -1668,17 +1672,17 @@ func (ptx PathContext) PrefixCIDR() netip.Prefix {
 func (ptx PathContext) asCIDR(isPrefix bool) netip.Prefix {
 	// Default bit length calculation for stride-aligned fringe entries (/8, /16, /24, etc.).
 	bits := (ptx.Depth + 1) << 3
+	octet := ptx.Slot
 
 	if isPrefix {
+		var pfxLen uint8
 		// Retrieve the last octet byte and prefix length inside the stride from CBT index.
-		octet, pfxLen := art.IdxToPfx(ptx.Slot)
-
-		ptx.Slot = octet
+		octet, pfxLen = art.IdxToPfx(ptx.Slot)
 		bits = ptx.Depth<<3 + int(pfxLen)
 	}
 
 	// Set byte in path at current depth with last octet.
-	ptx.Path[ptx.Depth] = ptx.Slot
+	ptx.Path[ptx.Depth] = octet
 
 	// Canonicalize: clear non-canonical trailing octets.
 	clear(ptx.Path[ptx.Depth+1:])

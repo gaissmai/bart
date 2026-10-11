@@ -461,8 +461,10 @@ func (f *FastACL) Supernets(pfx netip.Prefix) iter.Seq[netip.Prefix] {
 				pfxIdx = art.OctetToIdx(octet)
 			}
 
+			ptx := nodes.NewPathContext(octets, depth, pfxIdx, is4)
+
 			// Yield matching node-internal prefixes in descending specificity.
-			if !n.YieldSupernets(pfx, depth, octet, pfxIdx, yield) {
+			if !n.YieldSupernets(pfxLen, ptx, yield) {
 				return
 			}
 		}
