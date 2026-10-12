@@ -511,7 +511,7 @@ func (f *FastACL) Subnets(pfx netip.Prefix) iter.Seq[netip.Prefix] {
 				return
 			}
 
-			// Yield matching fringe prefixes at intermediate levels if present.
+			// Yield matching fringe prefixes if present.
 			if nodes.IsFringe(depth, pfxLen) && n.Fringes.Test(octet) {
 				ptx := nodes.NewPathContext(octets, depth, octet, is4)
 				if !yield(ptx.FringeCIDR()) {
