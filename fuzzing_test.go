@@ -551,3 +551,53 @@ func verifyDumpListInvariants(t *testing.T, listNodes []DumpListNode[any], is4 b
 
 	return count
 }
+
+// FuzzFastACL_Has fuzz-tests the exact-prefix lookup implementation of FastACL
+// for both IPv4 and IPv6 prefixes, ensuring correctness and absence of panics.
+func FuzzFastACL_Has(f *testing.F) {
+	const maxData = 512
+	f.Add(seedPfx4, seedPfx6)
+
+	f.Fuzz(func(t *testing.T, pfx4Data, pfx6Data []byte) {
+		t.Parallel()
+
+		// Limit payload size to keep fuzzing iterations fast and efficient.
+		if len(pfx4Data) > maxData {
+			pfx4Data = pfx4Data[:maxData]
+		}
+		if len(pfx6Data) > maxData {
+			pfx6Data = pfx6Data[:maxData]
+		}
+
+		// Extract valid prefix slices from randomized bytes.
+		pfxs4 := extractPfxs4(pfx4Data)
+		pfxs6 := extractPfxs6(pfx6Data)
+
+		f4 := new(FastACL)
+		f6 := new(FastACL)
+
+		// Insert all extracted IPv4 prefixes.
+		for _, pfx := range pfxs4 {
+			f4.Insert(pfx)
+		}
+
+		// Insert all extracted IPv6 prefixes.
+		for _, pfx := range pfxs6 {
+			f6.Insert(pfx)
+		}
+
+		// Invariant: Every successfully inserted IPv4 prefix must be found by Has.
+		for _, pfx := range pfxs4 {
+			if !f4.Has(pfx) {
+				t.Errorf("IPv4 prefix %v was inserted but not found by Has", pfx)
+			}
+		}
+
+		// Invariant: Every successfully inserted IPv6 prefix must be found by Has.
+		for _, pfx := range pfxs6 {
+			if !f6.Has(pfx) {
+				t.Errorf("IPv6 prefix %v was inserted but not found by Has", pfx)
+			}
+		}
+	})
+}

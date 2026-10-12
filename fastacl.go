@@ -101,6 +101,66 @@ func (f *FastACL) Delete(pfx netip.Prefix) {
 	}
 }
 
+// Has performs an exact-prefix lookup and returns whether the prefix exists.
+// The prefix is automatically normalized using pfx.Masked().
+// Invalid prefixes always return false.
+func (f *FastACL) Has(pfx netip.Prefix) bool {
+	// Guard clause: reject invalid prefixes immediately.
+	if !pfx.IsValid() {
+		return false
+	}
+
+	// Canonicalize the prefix (zero out host bits) and extract its length.
+	pfx = pfx.Masked()
+	pfxLen := pfx.Bits()
+
+	// Determine the byte-level stride depth and remaining mod bits for the prefix length.
+	strideCount, modBits := nodes.DivMod8(pfxLen)
+
+	// Extract the IP address and select the appropriate root node (IPv4 vs IPv6).
+	ip := pfx.Addr()
+	n := f.rootNodeByVersion(ip.Is4())
+
+	// Traverse the IP address bytes (octets) down the trie structure.
+	for depth, octet := range ip.AsSlice() {
+		// Check if we have reached the exact stride depth where the fringe is stored.
+		if depth == strideCount-1 && modBits == 0 { // IsFringe()
+			if n.Fringes.Test(octet) {
+				return true
+			}
+		}
+
+		// Check if we have reached the exact stride depth where the prefix is stored.
+		if depth == strideCount {
+			if n.Prefixes.Test(art.PfxToIdx(octet, modBits)) {
+				return true
+			}
+		}
+
+		// Stop traversal if no child or leaf exists for the current octet.
+		if !n.Children.Test(octet) {
+			return false
+		}
+		kid := n.MustGetChild(octet)
+
+		// Type switch on the child node to either descend further or check a leaf node.
+		switch kid := kid.(type) {
+		case *nodes.FastACLNode:
+			// descend down to next trie level
+			n = kid
+
+		case *nodes.CIDRLeaf:
+			// If we hit a CIDR leaf, verify if it matches the target prefix exactly.
+			if kid.Prefix() == pfx {
+				return true
+			}
+			return false
+		}
+	}
+
+	return false
+}
+
 // Contains reports whether any stored prefix in the FastACL table covers the given IP address.
 // An invalid netip.Addr returns false.
 //

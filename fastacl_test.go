@@ -1922,3 +1922,83 @@ func TestTestFastACL_DumpList(t *testing.T) {
 		})
 	}
 }
+
+func TestFastACL_Has(t *testing.T) {
+	t.Parallel()
+
+	f := new(FastACL)
+	f.Insert(mpp("192.0.0.0/8"))
+	f.Insert(mpp("192.168.0.0/18"))
+	f.Insert(mpp("192.168.1.0/24"))
+	f.Insert(mpp("2001::/16"))
+	f.Insert(mpp("2001:db8::/32"))
+	f.Insert(mpp("2001:db8::/48"))
+
+	tests := []struct {
+		name string
+		pfx  netip.Prefix
+		want bool
+	}{
+		{
+			name: "Invalid Prefix",
+			pfx:  netip.Prefix{},
+			want: false,
+		},
+		{
+			name: "Exact Match IPv4 - Absent",
+			pfx:  mpp("0.0.0.0/0"),
+			want: false,
+		},
+		{
+			name: "Exact Match IPv4 - Present",
+			pfx:  mpp("192.168.1.0/24"),
+			want: true,
+		},
+		{
+			name: "Exact Match IPv4 - Absent",
+			pfx:  mpp("192.168.0.0/17"),
+			want: false,
+		},
+		{
+			name: "Exact Match IPv4 - Unmasked Prefix Auto-Canonicalized",
+			pfx:  netip.PrefixFrom(mpa("192.168.1.5"), 24),
+			want: true,
+		},
+		{
+			name: "Exact Match IPv4 - Absent",
+			pfx:  mpp("10.0.0.0/16"),
+			want: false,
+		},
+		{
+			name: "Exact Match IPv6 - Absent",
+			pfx:  mpp("::/0"),
+			want: false,
+		},
+		{
+			name: "Exact Match IPv6 - Present",
+			pfx:  mpp("2001:db8::/32"),
+			want: true,
+		},
+		{
+			name: "Exact Match IPv6 - Absent",
+			pfx:  mpp("2001:db8::/33"),
+			want: false,
+		},
+		{
+			name: "Exact Match IPv6 - Absent",
+			pfx:  mpp("fe80::/64"),
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := f.Has(tt.pfx)
+			if got != tt.want {
+				t.Errorf("FastACL.Has(%v) = %v, want %v", tt.pfx, got, tt.want)
+			}
+		})
+	}
+}
