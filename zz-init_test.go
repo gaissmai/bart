@@ -17,7 +17,7 @@ import (
 // location of the full tier1 routing info
 const (
 	prefixFile = "./internal/tests/testdata/prefixes.txt.gz"
-	n          = 1024
+	n          = 8
 	mask       = n - 1
 )
 
