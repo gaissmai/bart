@@ -20,6 +20,11 @@ type FastNode[V any] struct {
 	prefixCount    uint16
 }
 
+// PrefixCount returns the number of prefixes stored in this node.
+func (n *FastNode[V]) PrefixCount() int {
+	return int(n.prefixCount)
+}
+
 // InsertPrefix adds a routing entry at the specified index.
 // It returns true if a prefix already existed at that index,
 // false if this is a new insertion.

@@ -35,11 +35,6 @@ func (n *BartNode[V]) ChildCount() int {
 	return n.Children.Len()
 }
 
-// PrefixCount returns the number of prefixes stored in this node.
-func (n *BartNode[V]) PrefixCount() int {
-	return n.Prefixes.Len()
-}
-
 // GetPrefix retrieves the value associated with the prefix at the given index.
 // Returns the value and true if found, or zero value and false if not present.
 func (n *BartNode[V]) GetPrefix(idx uint8) (val V, exists bool) {

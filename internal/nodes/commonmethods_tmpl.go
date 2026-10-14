@@ -60,11 +60,6 @@ func (n *_NODE_TYPE[V]) ChildCount() int {
 
 // ### GENERATE SKIP_LITE START ###
 
-// PrefixCount returns the number of prefixes stored in this node.
-func (n *_NODE_TYPE[V]) PrefixCount() int {
-	return n.Prefixes.Len()
-}
-
 // GetPrefix retrieves the value associated with the prefix at the given index.
 // Returns the value and true if found, or zero value and false if not present.
 func (n *_NODE_TYPE[V]) GetPrefix(idx uint8) (val V, exists bool) {

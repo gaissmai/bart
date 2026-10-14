@@ -33,22 +33,32 @@ import (
 // are automatically split into regular BartNodes when a more specific prefix
 // is inserted that requires further branching.
 type BartNode[V any] struct {
-	Prefixes sparse.Array256[V]
-	Children sparse.Array256[any]
+	Prefixes    sparse.Array256[V]
+	Children    sparse.Array256[any]
+	prefixCount uint16
+}
+
+// PrefixCount returns the number of prefixes stored in this node.
+func (n *BartNode[V]) PrefixCount() int {
+	return int(n.prefixCount)
 }
 
 // InsertPrefix adds or updates a routing entry at the specified index with the given value.
 // It returns true if a prefix already existed at that index (indicating an update),
 // false if this is a new insertion.
 func (n *BartNode[V]) InsertPrefix(idx uint8, val V) (exists bool) {
-	_, exists = n.Prefixes.InsertAt(idx, val)
-	return
+	if _, exists = n.Prefixes.InsertAt(idx, val); !exists {
+		n.prefixCount++
+	}
+	return exists
 }
 
 // DeletePrefix removes the prefix at the specified index.
 // Returns true if the prefix existed, otherwise false.
 func (n *BartNode[V]) DeletePrefix(idx uint8) (exists bool) {
-	_, exists = n.Prefixes.DeleteAt(idx)
+	if _, exists = n.Prefixes.DeleteAt(idx); exists {
+		n.prefixCount--
+	}
 	return exists
 }
 
@@ -98,6 +108,7 @@ func (n *BartNode[V]) CloneFlat(cloneFn func(V) V) *BartNode[V] {
 
 	// copy ...
 	c.Prefixes = *(n.Prefixes.Copy())
+	c.prefixCount = n.prefixCount
 
 	// ... and clone the values
 	if cloneFn != nil {
