@@ -52,21 +52,6 @@ func (n *BartNode[V]) MustGetPrefix(idx uint8) (val V) {
 	return n.Prefixes.MustGet(idx)
 }
 
-// InsertPrefix adds or updates a routing entry at the specified index with the given value.
-// It returns true if a prefix already existed at that index (indicating an update),
-// false if this is a new insertion.
-func (n *BartNode[V]) InsertPrefix(idx uint8, val V) (exists bool) {
-	_, exists = n.Prefixes.InsertAt(idx, val)
-	return
-}
-
-// DeletePrefix removes the prefix at the specified index.
-// Returns true if the prefix existed, otherwise false.
-func (n *BartNode[V]) DeletePrefix(idx uint8) (exists bool) {
-	_, exists = n.Prefixes.DeleteAt(idx)
-	return exists
-}
-
 // AllIndices returns an iterator over all prefix entries.
 // Each iteration yields the prefix index (uint8) and its associated value (V).
 func (n *BartNode[V]) AllIndices() iter.Seq2[uint8, V] {

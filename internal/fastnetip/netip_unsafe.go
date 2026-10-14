@@ -27,13 +27,14 @@ type uint128 struct {
 
 // Addr mirrors the memory layout of net/netip.Addr.
 type Addr struct {
-	addr uint128
-	z    unsafe.Pointer // Mirrors unique.Handle[addrDetail]
+	ip uint128
+	z  unsafe.Pointer // Mirrors unique.Handle[addrDetail]
 }
 
 // Prefix mirrors the memory layout of net/netip.Prefix.
 type Prefix struct {
-	ip          Addr
+	ip          uint128
+	_           unsafe.Pointer
 	bitsPlusOne uint8
 }
 
@@ -43,23 +44,23 @@ type Prefix struct {
 // optimizations, family, validity, and zone checks are bypassed for speed.
 //
 //nolint:gosec // G115: integer overflow conversion uint64 -> uint32
-func Contains4(pfx netip.Prefix, ip netip.Addr) bool {
-	ip4 := (*Addr)(unsafe.Pointer(&ip))
-	p := (*Prefix)(unsafe.Pointer(&pfx))
+func Contains4(pfx4 netip.Prefix, ip4 netip.Addr) bool {
+	addr := (*Addr)(unsafe.Pointer(&ip4))
+	pfx := (*Prefix)(unsafe.Pointer(&pfx4))
 
-	bits := p.bitsPlusOne - 1
-	return uint32((ip4.addr.lo^p.ip.addr.lo)>>((32-bits)&63)) == 0
+	bits := pfx.bitsPlusOne - 1
+	return uint32((addr.ip.lo^pfx.ip.lo)>>((32-bits)&63)) == 0
 }
 
 // Contains6 reports whether pfx contains ip.
 //
 // Both pfx and ip must be valid IPv6 instances. When compiled with unsafe
 // optimizations, family, validity, and zone checks are bypassed for speed.
-func Contains6(pfx netip.Prefix, ip6 netip.Addr) bool {
-	ip := (*Addr)(unsafe.Pointer(&ip6))
-	p := (*Prefix)(unsafe.Pointer(&pfx))
-	bits := int(p.bitsPlusOne - 1)
-	return ip.addr.xor(p.ip.addr).and(mask6[bits]).isZero()
+func Contains6(pfx6 netip.Prefix, ip6 netip.Addr) bool {
+	addr := (*Addr)(unsafe.Pointer(&ip6))
+	pfx := (*Prefix)(unsafe.Pointer(&pfx6))
+	bits := int(pfx.bitsPlusOne - 1)
+	return addr.ip.xor(pfx.ip).and(mask6[bits]).isZero()
 }
 
 // ##################################################################################
@@ -86,6 +87,8 @@ func (u uint128) xor(v uint128) uint128 {
 }
 
 // mask6 is a precalculated to keep Contains6 inlined
+//
+//nolint:gochecknoglobals
 var mask6 = [129]uint128{
 	0:   {0x0000000000000000, 0x0000000000000000},
 	1:   {0x8000000000000000, 0x0000000000000000},

@@ -37,6 +37,21 @@ type BartNode[V any] struct {
 	Children sparse.Array256[any]
 }
 
+// InsertPrefix adds or updates a routing entry at the specified index with the given value.
+// It returns true if a prefix already existed at that index (indicating an update),
+// false if this is a new insertion.
+func (n *BartNode[V]) InsertPrefix(idx uint8, val V) (exists bool) {
+	_, exists = n.Prefixes.InsertAt(idx, val)
+	return
+}
+
+// DeletePrefix removes the prefix at the specified index.
+// Returns true if the prefix existed, otherwise false.
+func (n *BartNode[V]) DeletePrefix(idx uint8) (exists bool) {
+	_, exists = n.Prefixes.DeleteAt(idx)
+	return exists
+}
+
 // InsertChild adds a child node at the specified address (0-255).
 // The child can be a *BartNode[V], *LeafNode[V], or *FringeNode[V].
 // Returns true if a child already existed at that address.

@@ -17,6 +17,26 @@ type FastNode[V any] struct {
 	Children sparse.Array256[any]
 	// map addr to slice idx (aka rank)
 	childRankCache [256]uint8
+	prefixCount    uint16
+}
+
+// InsertPrefix adds a routing entry at the specified index.
+// It returns true if a prefix already existed at that index,
+// false if this is a new insertion.
+func (n *FastNode[V]) InsertPrefix(idx uint8, val V) (exists bool) {
+	if _, exists = n.Prefixes.InsertAt(idx, val); !exists {
+		n.prefixCount++
+	}
+	return exists
+}
+
+// DeletePrefix removes the prefix at the specified index.
+// Returns true if the prefix existed, and false otherwise.
+func (n *FastNode[V]) DeletePrefix(idx uint8) (exists bool) {
+	if _, exists = n.Prefixes.DeleteAt(idx); exists {
+		n.prefixCount--
+	}
+	return exists
 }
 
 // InsertChild adds a child node at the specified address (0-255).
@@ -103,6 +123,7 @@ func (n *FastNode[V]) CloneFlat(cloneFn func(V) V) *FastNode[V] {
 
 	// copy ...
 	c.Prefixes = *(n.Prefixes.Copy())
+	c.prefixCount = n.prefixCount
 
 	// ... and clone the values
 	if cloneFn != nil {
