@@ -25,17 +25,17 @@ type uint128 struct {
 	lo uint64
 }
 
-// Addr mirrors the memory layout of net/netip.Addr.
-type Addr struct {
-	ip uint128
-	z  unsafe.Pointer // Mirrors unique.Handle[addrDetail]
+// addr mirrors the memory layout of net/netip.addr.
+type addr struct {
+	as2Uint64 uint128
+	_         uintptr
 }
 
-// Prefix mirrors the memory layout of net/netip.Prefix.
-type Prefix struct {
-	ip          uint128
-	_           unsafe.Pointer
-	bitsPlusOne uint8
+// prefix mirrors the memory layout of net/netip.prefix.
+type prefix struct {
+	as2Uint64 uint128
+	_         uintptr
+	_         uint8
 }
 
 // Contains4 reports whether pfx contains ip.
@@ -45,11 +45,21 @@ type Prefix struct {
 //
 //nolint:gosec // G115: integer overflow conversion uint64 -> uint32
 func Contains4(pfx4 netip.Prefix, ip4 netip.Addr) bool {
-	addr := (*Addr)(unsafe.Pointer(&ip4))
-	pfx := (*Prefix)(unsafe.Pointer(&pfx4))
+	ip := (*addr)(unsafe.Pointer(&ip4))
+	pfx := (*prefix)(unsafe.Pointer(&pfx4))
+	bits := pfx4.Bits()
 
-	bits := pfx.bitsPlusOne - 1
-	return uint32((addr.ip.lo^pfx.ip.lo)>>((32-bits)&63)) == 0
+	// code and comment from netip.Prefix.Contains
+	//
+	// xor the IP addresses together; mismatched bits are now ones.
+	// Shift away the number of bits we don't care about.
+	// Shifts in Go are more efficient if the compiler can prove
+	// that the shift amount is smaller than the width of the shifted type (64 here).
+	// We know that bits is in the range 0..32;
+	// the compiler doesn't know that, so mask with 63 to help it.
+	// Now truncate to uint32, because this is IPv4.
+	// If all the bits we care about are equal, the result will be zero.
+	return uint32((ip.as2Uint64.lo^pfx.as2Uint64.lo)>>((32-bits)&63)) == 0
 }
 
 // Contains6 reports whether pfx contains ip.
@@ -57,10 +67,14 @@ func Contains4(pfx4 netip.Prefix, ip4 netip.Addr) bool {
 // Both pfx and ip must be valid IPv6 instances. When compiled with unsafe
 // optimizations, family, validity, and zone checks are bypassed for speed.
 func Contains6(pfx6 netip.Prefix, ip6 netip.Addr) bool {
-	addr := (*Addr)(unsafe.Pointer(&ip6))
-	pfx := (*Prefix)(unsafe.Pointer(&pfx6))
-	bits := int(pfx.bitsPlusOne - 1)
-	return addr.ip.xor(pfx.ip).and(mask6[bits]).isZero()
+	ip := (*addr)(unsafe.Pointer(&ip6))
+	pfx := (*prefix)(unsafe.Pointer(&pfx6))
+	bits := pfx6.Bits()
+
+	// xor the 128bit addresses together.
+	// Mask away the bits we don't care about.
+	// If all the bits we care about are equal, the result will be zero.
+	return ip.as2Uint64.xor(pfx.as2Uint64).and(mask6[bits]).isZero()
 }
 
 // ##################################################################################
