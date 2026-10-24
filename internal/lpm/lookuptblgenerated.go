@@ -20,7 +20,7 @@ import "github.com/gaissmai/bart/internal/bitset"
 // Usage:
 //
 //	func (n *bartNode[V]) contains(idx uint8) bool {
-//		return n.prefixes.Intersects(&lpm.LookupTbl[idx])
+//		return n.Prefixes.Overlaps(&lpm.LookupTbl[idx])
 //	}
 //
 // instead of a sequence of single bitset tests:
