@@ -9,8 +9,8 @@ import "github.com/gaissmai/bart/internal/bitset"
 
 // PfxRoutesLookupTbl is a lookup table of BitSet256 entries.
 //
-// It maps a baseIndex (1..255) to a bitset that contains all more
-// specific baseIndices that are covered by the prefix at that index.
+// It maps a baseIndex (1..255) to a bitset that contains all
+// the index itself and all more specific indices.
 //
 // The idea:
 //
