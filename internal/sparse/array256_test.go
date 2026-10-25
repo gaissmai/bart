@@ -4,268 +4,422 @@
 package sparse
 
 import (
-	"fmt"
+	"math/bits"
 	"math/rand/v2"
 	"slices"
 	"testing"
 )
 
-func TestNewArray(t *testing.T) {
-	t.Parallel()
-	a := new(Array256[uint8])
+// #####################################################
+//  helpers
+// #####################################################
 
-	if c := a.Len(); c != 0 {
-		t.Errorf("Len, expected 0, got %d", c)
+// valueFor derives the payload from the index, so that the index-to-item
+// mapping can be verified without a second table.
+func valueFor(i uint8) int { return int(i) + 1000 }
+
+// seq returns the indices from (inclusive) to to (exclusive).
+func seq(from, to int) []uint8 {
+	s := make([]uint8, 0, to-from)
+	for i := from; i < to; i++ {
+		s = append(s, uint8(i))
 	}
+	return s
 }
 
-func TestSparseArrayLen(t *testing.T) {
-	t.Parallel()
-	a := new(Array256[uint8])
-
-	var i uint8
-	for i = range 255 {
-		a.InsertAt(i, i)
+// stride returns every step-th index in [0..255], starting at 0.
+func stride(step int) []uint8 {
+	var s []uint8
+	for i := 0; i < 256; i += step {
+		s = append(s, uint8(i))
 	}
-	a.InsertAt(255, 255)
-	a.InsertAt(255, 255)
-	a.InsertAt(255, 255)
-	if c := a.Len(); c != 256 {
-		t.Errorf("Len, expected 256, got %d", c)
-	}
-
-	for i = range 128 {
-		a.DeleteAt(i)
-	}
-	if c := a.Len(); c != 128 {
-		t.Errorf("Len, expected 128, got %d", c)
-	}
+	return s
 }
 
-func TestSparseArrayGet(t *testing.T) {
-	t.Parallel()
-	a := new(Array256[uint8])
-
-	var i uint8
-	for i = range 255 {
-		a.InsertAt(i, i)
-	}
-	a.InsertAt(255, 255)
-
-	for range 100 {
-		i := uint8(rand.UintN(100))
-		v, ok := a.Get(i)
-		if !ok {
-			t.Errorf("Get, expected true, got %v", ok)
-		}
-		if v != i {
-			t.Errorf("Get, expected %d, got %d", i, v)
-		}
-
-		v = a.MustGet(i)
-		if v != i {
-			t.Errorf("MustGet, expected %d, got %d", i, v)
-		}
-	}
-
-	a.DeleteAt(0)
-	a.DeleteAt(0)
-	a.DeleteAt(0)
-	_, ok := a.Get(0)
-	if ok {
-		t.Errorf("Get, expected false, got %v", ok)
-	}
+// reversed returns a reversed copy of s.
+func reversed(s []uint8) []uint8 {
+	r := slices.Clone(s)
+	slices.Reverse(r)
+	return r
 }
 
-func TestSparseArraySetPanic(t *testing.T) {
-	t.Parallel()
-	defer func() {
-		if r := recover(); r == nil {
-			t.Errorf("Set, expected panic")
-		}
-	}()
-
+// newArray builds an Array256 by inserting the indices in the given order.
+func newArray(idxs ...uint8) *Array256[int] {
 	a := new(Array256[int])
-
-	// must panic
-	a.Set(0)
+	for _, i := range idxs {
+		a.InsertAt(i, valueFor(i))
+	}
+	return a
 }
 
-func TestSparseArrayClearPanic(t *testing.T) {
+// modelOf is the reference model for newArray(idxs...).
+func modelOf(idxs ...uint8) map[uint8]int {
+	m := make(map[uint8]int, len(idxs))
+	for _, i := range idxs {
+		m[i] = valueFor(i)
+	}
+	return m
+}
+
+func firstAbsent(m map[uint8]int) (uint8, bool) {
+	for i := range 256 {
+		if _, ok := m[uint8(i)]; !ok {
+			return uint8(i), true
+		}
+	}
+	return 0, false
+}
+
+func firstPresent(m map[uint8]int) (uint8, bool) {
+	for i := range 256 {
+		if _, ok := m[uint8(i)]; ok {
+			return uint8(i), true
+		}
+	}
+	return 0, false
+}
+
+// checkInvariants verifies the coupling between bitset, rank cache and Items.
+func checkInvariants[T any](t *testing.T, a *Array256[T]) {
+	t.Helper()
+
+	if got, want := len(a.Items), a.OnesCount(); got != want {
+		t.Fatalf("len(Items) = %d, want OnesCount() = %d", got, want)
+	}
+
+	var wantCum [4]uint8
+	sum := 0
+	for w := range 4 {
+		wantCum[w] = uint8(sum)
+		sum += bits.OnesCount64(a.BitSet256[w])
+	}
+
+	if a.cum != wantCum {
+		t.Fatalf("cum = %v, want %v", a.cum, wantCum)
+	}
+}
+
+// assertMatches verifies the Array256 against the reference model:
+// invariants, item order, Get for all 256 indices.
+func assertMatches(t *testing.T, a *Array256[int], want map[uint8]int) {
+	t.Helper()
+
+	checkInvariants(t, a)
+
+	idxs := make([]uint8, 0, len(want))
+	for i := range want {
+		idxs = append(idxs, i)
+	}
+	slices.Sort(idxs)
+
+	if len(a.Items) != len(idxs) {
+		t.Fatalf("len(Items) = %d, want %d", len(a.Items), len(idxs))
+	}
+
+	for pos, i := range idxs {
+		if a.Items[pos] != want[i] {
+			t.Fatalf("Items[%d] = %d, want %d (index %d)", pos, a.Items[pos], want[i], i)
+		}
+	}
+
+	for i := range 256 {
+		idx := uint8(i)
+		wantVal, wantOK := want[idx]
+
+		gotVal, gotOK := a.Get(idx)
+		if gotOK != wantOK || gotVal != wantVal {
+			t.Fatalf("Get(%d) = (%d, %v), want (%d, %v)", idx, gotVal, gotOK, wantVal, wantOK)
+		}
+	}
+}
+
+// indexSets are the shared inputs for the read-only tests.
+var indexSets = []struct {
+	name string
+	idxs []uint8
+}{
+	{"empty", nil},
+	{"single first", []uint8{0}},
+	{"single last", []uint8{255}},
+	{"one per word", []uint8{10, 70, 130, 200}},
+	{"first of each word", []uint8{0, 64, 128, 192}},
+	{"last of each word", []uint8{63, 127, 191, 255}},
+	{"word boundaries", []uint8{0, 63, 64, 127, 128, 191, 192, 255}},
+	{"unsorted insertion order", []uint8{200, 3, 129, 64, 63, 255, 0, 128}},
+	{"dense first word", seq(0, 64)},
+	{"dense second word", seq(64, 128)},
+	{"dense last word", seq(192, 256)},
+	{"every third bit", stride(3)},
+	{"full", seq(0, 256)},
+}
+
+// #####################################################
+//  tests
+// #####################################################
+
+func TestRank0(t *testing.T) {
 	t.Parallel()
-	defer func() {
-		if r := recover(); r == nil {
-			t.Errorf("Clear, expected panic")
-		}
-	}()
 
-	a := new(Array256[int])
+	for _, tt := range indexSets {
+		t.Run(tt.name, func(t *testing.T) {
+			a := newArray(tt.idxs...)
+			checkInvariants(t, a)
 
-	// must panic
-	a.Clear(0)
-}
+			sorted := slices.Clone(tt.idxs)
+			slices.Sort(sorted)
+			sorted = slices.Compact(sorted)
 
-func TestSparseArrayMustGetPanic(t *testing.T) {
-	t.Parallel()
-	defer func() {
-		r := recover()
-		if r == nil {
-			t.Errorf("MustGet, expected panic")
-		}
-	}()
+			for i := range 256 {
+				idx := uint8(i)
 
-	a := new(Array256[uint8])
+				// for a set bit this is its position in Items,
+				// for a clear bit it is the insertion position
+				want, _ := slices.BinarySearch(sorted, idx)
 
-	var i uint8
-	for i = 5; i <= 10; i++ {
-		a.InsertAt(i, i)
-	}
-
-	// must panic for unset index
-	a.MustGet(0)
-}
-
-func TestSparseArrayCopy(t *testing.T) {
-	type testCase struct {
-		name  string
-		setup func() *Array256[int]
-	}
-
-	tests := []testCase{
-		{
-			name: "Copy of nil returns nil",
-			setup: func() *Array256[int] {
-				return nil
-			},
-		},
-		{
-			name: "Copy of empty Array256",
-			setup: func() *Array256[int] {
-				return &Array256[int]{}
-			},
-		},
-		{
-			name: "Copy after InsertAt few elements",
-			setup: func() *Array256[int] {
-				a := &Array256[int]{}
-				a.InsertAt(10, 100)
-				a.InsertAt(20, 200)
-				a.InsertAt(30, 300)
-				return a
-			},
-		},
-		{
-			name: "Copy after Insert and Delete",
-			setup: func() *Array256[int] {
-				a := &Array256[int]{}
-				a.InsertAt(1, 11)
-				a.InsertAt(2, 22)
-				a.DeleteAt(1)
-				a.InsertAt(3, 33)
-				return a
-			},
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			original := tc.setup()
-			aCopy := original.Copy()
-
-			if original == nil {
-				if aCopy != nil {
-					t.Errorf("Copy of nil should be nil, got %v", aCopy)
-				}
-				return
-			}
-
-			if aCopy == original {
-				t.Error("Copy() returned same pointer as original, want distinct copy")
-			}
-
-			if aCopy.BitSet256 != original.BitSet256 {
-				t.Errorf("BitSet256 not copied properly. got=%v, want=%v", aCopy.BitSet256, original.BitSet256)
-			}
-
-			if !slices.Equal(aCopy.Items, original.Items) {
-				t.Errorf("Items slice not copied properly. got=%v, want=%v", aCopy.Items, original.Items)
-			}
-
-			if len(original.Items) > 0 && len(aCopy.Items) > 0 {
-				if &aCopy.Items[0] == &original.Items[0] {
-					t.Error("Items backing array not copied, pointers are equal")
-				}
-			}
-
-			// mutate copy and ensure original is unchanged
-			if len(aCopy.Items) > 0 {
-				old := aCopy.Items[0]
-				aCopy.Items[0] = old + 1
-				if original.Items[0] == aCopy.Items[0] {
-					t.Error("Copy mutation leaked into original")
-				}
-				aCopy.Items[0] = old
-			}
-		})
-	}
-}
-
-func BenchmarkGet(b *testing.B) {
-	a := new(Array256[int])
-	for i := range uint8(10) {
-		a.InsertAt(i*2, int(i))
-	}
-
-	b.Run("Get present", func(b *testing.B) {
-		for b.Loop() {
-			a.Get(10)
-		}
-	})
-	b.Run("Get absent", func(b *testing.B) {
-		for b.Loop() {
-			a.Get(11)
-		}
-	})
-	b.Run("MustGet", func(b *testing.B) {
-		for b.Loop() {
-			a.MustGet(10)
-		}
-	})
-}
-
-func BenchmarkInsertAt(b *testing.B) {
-	b.Run("Overwrite", func(b *testing.B) {
-		a := new(Array256[int])
-		a.InsertAt(100, 100)
-		for b.Loop() {
-			a.InsertAt(100, 200)
-		}
-	})
-
-	for _, size := range []int{1, 2, 4, 8, 16, 32, 64, 128, 256} {
-		b.Run(fmt.Sprintf("Insert new %d", size), func(b *testing.B) {
-			for b.Loop() {
-				a := new(Array256[int])
-				for i := range size {
-					a.InsertAt(uint8(i), i)
+				if got := a.rank0(idx); got != want {
+					t.Errorf("rank0(%d) = %d, want %d", idx, got, want)
 				}
 			}
 		})
 	}
 }
 
-func BenchmarkInsertAndDeleteAt(b *testing.B) {
-	for _, size := range []int{1, 2, 4, 8, 16, 32, 64, 128, 256} {
-		b.Run(fmt.Sprintf("Insert and Delete all %d", size), func(b *testing.B) {
-			for b.Loop() {
-				a := new(Array256[int])
-				for i := range size {
-					a.InsertAt(uint8(i), i)
+func TestGetMustGet(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range indexSets {
+		t.Run(tt.name, func(t *testing.T) {
+			a := newArray(tt.idxs...)
+			want := modelOf(tt.idxs...)
+
+			for i := range 256 {
+				idx := uint8(i)
+				wantVal, wantOK := want[idx]
+
+				gotVal, gotOK := a.Get(idx)
+				if gotOK != wantOK || gotVal != wantVal {
+					t.Errorf("Get(%d) = (%d, %v), want (%d, %v)", idx, gotVal, gotOK, wantVal, wantOK)
 				}
-				for i := range size {
-					_, _ = a.DeleteAt(uint8(i))
+
+				if wantOK {
+					if got := a.MustGet(idx); got != wantVal {
+						t.Errorf("MustGet(%d) = %d, want %d", idx, got, wantVal)
+					}
 				}
 			}
+		})
+	}
+}
+
+func TestInsertAt(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		idxs []uint8 // insertion order, duplicates overwrite
+	}{
+		{"ascending", []uint8{1, 2, 3, 4}},
+		{"descending", []uint8{200, 100, 50, 0}},
+		{"duplicates overwrite", []uint8{5, 5, 5}},
+		{"overwrite in the middle", []uint8{10, 20, 30, 20}},
+		{"across word boundaries", []uint8{255, 0, 64, 63, 128, 127, 192, 191}},
+		{"interleaved words", []uint8{0, 64, 1, 65, 128, 129, 192, 193}},
+		{"fill first word backwards", reversed(seq(0, 64))},
+		{"fill everything ascending", seq(0, 256)},
+		{"fill everything descending", reversed(seq(0, 256))},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := new(Array256[int])
+			want := make(map[uint8]int)
+
+			for step, i := range tt.idxs {
+				val := valueFor(i) + step // distinct per step, overwrites become visible
+
+				_, wantExists := want[i]
+				want[i] = val
+
+				if got := a.InsertAt(i, val); got != wantExists {
+					t.Fatalf("step %d: InsertAt(%d) exists = %v, want %v", step, i, got, wantExists)
+				}
+
+				assertMatches(t, a, want)
+			}
+		})
+	}
+}
+
+func TestDeleteAt(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		initial []uint8
+		deletes []uint8
+	}{
+		{"absent from empty", nil, []uint8{7}},
+		{"absent from non-empty", []uint8{1, 2, 3}, []uint8{0, 4, 255}},
+		{"delete first", []uint8{10, 20, 30}, []uint8{10}},
+		{"delete middle", []uint8{10, 20, 30}, []uint8{20}},
+		{"delete last", []uint8{10, 20, 30}, []uint8{30}},
+		{"delete twice", []uint8{5, 6}, []uint8{5, 5}},
+		{"delete all ascending", []uint8{1, 2, 3}, []uint8{1, 2, 3}},
+		{"delete all descending", []uint8{1, 2, 3}, []uint8{3, 2, 1}},
+		{
+			"word boundaries",
+			[]uint8{0, 63, 64, 127, 128, 191, 192, 255},
+			[]uint8{64, 255, 0, 191, 127, 63},
+		},
+		{"drain full ascending", seq(0, 256), seq(0, 256)},
+		{"drain full descending", seq(0, 256), reversed(seq(0, 256))},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := newArray(tt.initial...)
+			want := modelOf(tt.initial...)
+			assertMatches(t, a, want) // sanity check of the starting point
+
+			for step, i := range tt.deletes {
+				wantVal, wantExists := want[i]
+				delete(want, i)
+
+				gotVal, gotExists := a.DeleteAt(i)
+				if gotExists != wantExists || gotVal != wantVal {
+					t.Fatalf("step %d: DeleteAt(%d) = (%d, %v), want (%d, %v)",
+						step, i, gotVal, gotExists, wantVal, wantExists)
+				}
+
+				assertMatches(t, a, want)
+			}
+		})
+	}
+}
+
+func TestCopy(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil receiver", func(t *testing.T) {
+		var a *Array256[int]
+		if got := a.Copy(); got != nil {
+			t.Errorf("Copy() of nil = %v, want nil", got)
+		}
+	})
+
+	for _, tt := range indexSets {
+		t.Run(tt.name, func(t *testing.T) {
+			orig := newArray(tt.idxs...)
+			origWant := modelOf(tt.idxs...)
+
+			cp := orig.Copy()
+			assertMatches(t, cp, origWant)
+
+			// mutate the copy only
+			cpWant := modelOf(tt.idxs...)
+
+			if extra, ok := firstAbsent(origWant); ok {
+				cp.InsertAt(extra, valueFor(extra))
+				cpWant[extra] = valueFor(extra)
+			}
+
+			if first, ok := firstPresent(origWant); ok {
+				cp.DeleteAt(first)
+				delete(cpWant, first)
+			}
+
+			assertMatches(t, cp, cpWant)
+			assertMatches(t, orig, origWant) // the original must be untouched
+		})
+	}
+}
+
+func TestForbiddenMutators(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		fn   func(*Array256[int])
+	}{
+		{"Set", func(a *Array256[int]) { a.Set(1) }},
+		{"Clear", func(a *Array256[int]) { a.Clear(1) }},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := newArray(1, 2, 3)
+
+			func() {
+				defer func() {
+					if recover() == nil {
+						t.Errorf("%s must panic", tt.name)
+					}
+				}()
+				tt.fn(a)
+			}()
+
+			// the state must be unchanged after the panic
+			assertMatches(t, a, modelOf(1, 2, 3))
+		})
+	}
+}
+
+// TestRandomOps is a differential test against a map as reference model.
+func TestRandomOps(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		seed      uint64
+		ops       int
+		span      int // indices are drawn from [0..span)
+		insertPct int // probability of an insert in percent, otherwise delete
+	}{
+		{"balanced full range", 1, 5000, 256, 50},
+		{"insert heavy full range", 2, 5000, 256, 85},
+		{"delete heavy full range", 3, 5000, 256, 15},
+		{"single word", 4, 3000, 64, 50},
+		{"crossing the first word boundary", 5, 3000, 130, 60},
+		{"tiny range, many collisions", 6, 3000, 8, 50},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			prng := rand.New(rand.NewPCG(tt.seed, tt.seed))
+
+			a := new(Array256[int])
+			want := make(map[uint8]int)
+
+			for op := range tt.ops {
+				i := uint8(prng.IntN(tt.span))
+
+				if prng.IntN(100) < tt.insertPct {
+					val := prng.IntN(1 << 20)
+					_, wantExists := want[i]
+					want[i] = val
+
+					if got := a.InsertAt(i, val); got != wantExists {
+						t.Fatalf("op %d: InsertAt(%d) exists = %v, want %v", op, i, got, wantExists)
+					}
+				} else {
+					wantVal, wantExists := want[i]
+					delete(want, i)
+
+					gotVal, gotExists := a.DeleteAt(i)
+					if gotExists != wantExists || gotVal != wantVal {
+						t.Fatalf("op %d: DeleteAt(%d) = (%d, %v), want (%d, %v)",
+							op, i, gotVal, gotExists, wantVal, wantExists)
+					}
+				}
+
+				// cheap check after every operation, full comparison now and then
+				checkInvariants(t, a)
+				if op%97 == 0 {
+					assertMatches(t, a, want)
+				}
+			}
+
+			assertMatches(t, a, want)
 		})
 	}
 }

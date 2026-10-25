@@ -45,9 +45,6 @@ func TestZeroValue(t *testing.T) {
 	b.OnesCount()
 
 	b = BitSet256{}
-	b.Rank(100)
-
-	b = BitSet256{}
 	b.Test(42)
 
 	b = BitSet256{}
@@ -699,76 +696,6 @@ func TestAlignedPairs(t *testing.T) {
 	}
 }
 
-func TestShifts(t *testing.T) {
-	tests := []struct {
-		name      string
-		input     BitSet256
-		wantRight BitSet256
-		wantLeft  BitSet256
-	}{
-		{
-			name:      "Empty bitset",
-			input:     BitSet256{0, 0, 0, 0},
-			wantRight: BitSet256{0, 0, 0, 0},
-			wantLeft:  BitSet256{0, 0, 0, 0},
-		},
-		{
-			name:      "Single bit at position 0 (LSB of word 0)",
-			input:     BitSet256{1, 0, 0, 0},
-			wantRight: BitSet256{0, 0, 0, 0},
-			wantLeft:  BitSet256{2, 0, 0, 0},
-		},
-		{
-			name:      "Cross word boundary 0 -> 1 (bit 63 shifted left to bit 64)",
-			input:     BitSet256{1 << 63, 0, 0, 0},
-			wantRight: BitSet256{1 << 62, 0, 0, 0},
-			wantLeft:  BitSet256{0, 1, 0, 0},
-		},
-		{
-			name:      "Cross word boundary 1 -> 0 (bit 64 shifted right to bit 63)",
-			input:     BitSet256{0, 1, 0, 0},
-			wantRight: BitSet256{1 << 63, 0, 0, 0},
-			wantLeft:  BitSet256{0, 2, 0, 0},
-		},
-		{
-			name:      "Cross word boundary 3 -> 2 (bit 192 shifted right to bit 191)",
-			input:     BitSet256{0, 0, 0, 1},
-			wantRight: BitSet256{0, 0, 1 << 63, 0},
-			wantLeft:  BitSet256{0, 0, 0, 2},
-		},
-		{
-			name:      "Single bit at position 255 (MSB of word 3)",
-			input:     BitSet256{0, 0, 0, 1 << 63},
-			wantRight: BitSet256{0, 0, 0, 1 << 62},
-			wantLeft:  BitSet256{0, 0, 0, 0}, // Shifts out into nothingness
-		},
-		{
-			name:      "All bits set",
-			input:     BitSet256{^uint64(0), ^uint64(0), ^uint64(0), ^uint64(0)},
-			wantRight: BitSet256{^uint64(0), ^uint64(0), ^uint64(0), ^uint64(0) >> 1},
-			wantLeft:  BitSet256{^uint64(1), ^uint64(0), ^uint64(0), ^uint64(0)},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run("RightShift/"+tt.name, func(t *testing.T) {
-			got := tt.input
-			got.RightShift()
-			if got != tt.wantRight {
-				t.Errorf("RightShift() = %v, want %v", got, tt.wantRight)
-			}
-		})
-
-		t.Run("LeftShift/"+tt.name, func(t *testing.T) {
-			got := tt.input
-			got.LeftShift()
-			if got != tt.wantLeft {
-				t.Errorf("LeftShift() = %v, want %v", got, tt.wantLeft)
-			}
-		})
-	}
-}
-
 // test setting every 3rd bit, just in case something odd is happening
 func TestOnesCount(t *testing.T) {
 	t.Parallel()
@@ -1196,72 +1123,6 @@ func TestXor(t *testing.T) {
 	}
 }
 
-func TestRank(t *testing.T) {
-	t.Parallel()
-	u := []uint8{0, 3, 5, 7, 11, 62, 63, 64, 70, 150, 255}
-
-	tests := []struct {
-		idx  uint8
-		want int
-	}{
-		{
-			idx:  0,
-			want: 1,
-		},
-		{
-			idx:  1,
-			want: 1,
-		},
-		{
-			idx:  2,
-			want: 1,
-		},
-		{
-			idx:  3,
-			want: 2,
-		},
-		{
-			idx:  4,
-			want: 2,
-		},
-		{
-			idx:  62,
-			want: 6,
-		},
-		{
-			idx:  63,
-			want: 7,
-		},
-		{
-			idx:  64,
-			want: 8,
-		},
-		{
-			idx:  150,
-			want: 10,
-		},
-		{
-			idx:  254,
-			want: 10,
-		},
-		{
-			idx:  255,
-			want: 11,
-		},
-	}
-
-	var b BitSet256
-	for _, v := range u {
-		b.Set(v)
-	}
-
-	for _, tc := range tests {
-		if got := b.Rank(tc.idx); got != tc.want {
-			t.Errorf("Rank(%d): want: %d, got: %d", tc.idx, tc.want, got)
-		}
-	}
-}
-
 func BenchmarkIsEmpty(b *testing.B) {
 	aa := []BitSet256{
 		randomBitSet256(),
@@ -1306,19 +1167,6 @@ func BenchmarkOnesCount(b *testing.B) {
 
 	for i := uint8(0); b.Loop(); i++ {
 		aa[i&3].OnesCount()
-	}
-}
-
-func BenchmarkRank(b *testing.B) {
-	aa := []BitSet256{
-		randomBitSet256(),
-		randomBitSet256(),
-		randomBitSet256(),
-		randomBitSet256(),
-	}
-
-	for i := uint8(0); b.Loop(); i++ {
-		aa[i&3].Rank(i)
 	}
 }
 
@@ -1592,32 +1440,6 @@ func BenchmarkBits(b *testing.B) {
 		}
 		copy(sinkSliceUint8, sink)
 	})
-}
-
-func BenchmarkRightShift(b *testing.B) {
-	aa := []BitSet256{
-		randomBitSet256(),
-		randomBitSet256(),
-		randomBitSet256(),
-		randomBitSet256(),
-	}
-
-	for i := uint8(0); b.Loop(); i++ {
-		aa[i&3].RightShift()
-	}
-}
-
-func BenchmarkLeftShift(b *testing.B) {
-	aa := []BitSet256{
-		randomBitSet256(),
-		randomBitSet256(),
-		randomBitSet256(),
-		randomBitSet256(),
-	}
-
-	for i := uint8(0); b.Loop(); i++ {
-		aa[i&3].LeftShift()
-	}
 }
 
 func BenchmarkAlignedPairs(b *testing.B) {
