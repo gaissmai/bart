@@ -27,19 +27,15 @@ using a fast mapping function derived from Donald E. Knuth’s
 **Allotment Routing Table** (ART) algorithm, to map the possible prefixes
 at each level into a complete binary tree.
 
-BART implements three different routing tables, each optimized for specific
+BART implements two different routing tables, each optimized for specific
 use cases:
 - **bart.Lite**
 - **bart.Table**
-- **bart.Fast**
 
 For **bart.Table** this binary tree is represented with popcount‑compressed
 sparse arrays for **level compression**.
 Combined with a **novel path and fringe compression**, this design reduces
 memory consumption by nearly two orders of magnitude compared to classical ART.
-
-For **bart.Fast**, an additional 256 bytes per node are used to
-achieve faster level traversal in the multibit trie.
 
 **bart.Lite** is a special form of **bart.Table**, but without a payload, and therefore
 has the lowest memory overhead while maintaining the same lookup times.
@@ -52,8 +48,8 @@ has the lowest memory overhead while maintaining the same lookup times.
 package main
 
 import (
+  "fmt"
   "net/netip"
-
   "github.com/gaissmai/bart"
 )
 
@@ -77,67 +73,17 @@ func main() {
 
   for _, ip := range testIPs {
     if allowList.Contains(ip) {
-      fmt.Printf("✅ %s is allowed\n", ip)
+      fmt.Printf("%s is allowed\n", ip)
     } else {
-      fmt.Printf("❌ %s is denied\n", ip)
-    }
-  }
-
-  // Exact-prefix checks with Get (not longest-prefix match)
-  exactPrefixes := []netip.Prefix{
-    p("192.168.0.0/16"),  // exists exactly
-    p("192.168.1.0/24"),  // doesn't exist (would be covered by /16, but not stored exactly)
-    p("10.0.0.0/24"),     // exists exactly
-    p("10.0.0.0/16"),     // doesn't exist (only /24 is stored)
-  }
-
-  fmt.Println("\nExact-prefix checks:")
-  for _, pfx := range exactPrefixes {
-    if allowList.Get(pfx) {
-      fmt.Printf("✅ Exact prefix %s exists in table\n", pfx)
-    } else {
-      fmt.Printf("❌ Exact prefix %s not found in table\n", pfx)
+      fmt.Printf("%s is denied\n", ip)
     }
   }
 }
 ```
 
-## Comparison
- 
- | Aspect | Table | Lite | Fast |
- |--------|-------------|-------------|-------------|
- | **Per-level Speed** | ⚡ **O(1)** | ⚡ **O(1)** | 🚀 **O(1), ~25% faster** |
- | **Overall Lookup** | O(trie_depth) | O(trie_depth) | O(trie_depth) |
- | **IPv4 Performance** | ~3 level traversals | ~3 level traversals | ~3 level traversals |
- | **IPv6 Performance** | ~6 level traversals | ~6 level traversals | ~6 level traversals |
- | **IPv6 vs IPv4** | ~2× slower | ~2× slower | ~2× slower |
- | **Memory** | efficient | very efficient | less efficient |
- | **Update** | very fast | best | fast |
-
-A more detailed description can be found in [NODETYPES.md](NODETYPES.md).
-
-## When to Use Each Type
-
-### 🎯 **bart.Table[V]** - The Balanced Choice                                                                        
-- **Recommended** for most routing table use cases
-- Near-optimal per-level performance with excellent memory efficiency
-- Very fast updates (insert/delete)
-- Perfect balance for both IPv4 and IPv6 routing tables (use it for RIB)
- 
-### 🪶 **bart.Lite** - The Minimalist
-- **Specialized** for prefix-only operations, no payload
-- Same per-level performance as *bart.Table[V]* but ~35% less memory
-- Optimal updates (insert/delete), ~25% faster than *bart.Table[V]*
-- Ideal for IPv4/IPv6 allowlists and set-based operations (use it for ACL)
- 
-### 🚀 **bart.Fast[V]** - The Lookup Performance Champion
-- **~25% faster** when memory constraints allow
-- Fast updates (insert/delete), ~50% slower than *bart.Table[V]*
-- Best choice for lookup-intensive applications (use it for FIB)
-
 ## Bitset Efficiency
 
-The BART algorithm is based on fixed-size bit vectors and precomputed lookup tables.
+The BART algorithm is based on a fixed-size (256) bit vector and precomputed lookup tables.
 Lookups are executed entirely with fast, cache-resident bitmask operations, which
 modern CPUs accelerate using specialized instructions such as POPCNT, LZCNT, and TZCNT.
 
@@ -151,17 +97,8 @@ GOAMD64=v3 go build
 # On ARM64, Go auto-selects CPU instructions.
 
 ```
-Critical loops over these fixed-size bitsets can be unrolled for additional speed,
+Loops over these fixed-size bitsets are unrolled for additional speed,
 ensuring predictable memory access and efficient use of CPU pipelines.
-
-```go
-func (b *BitSet256) popcnt() (cnt int) {
-  return bits.OnesCount64(b[0]) +
-      bits.OnesCount64(b[1]) +
-      bits.OnesCount64(b[2]) +
-      bits.OnesCount64(b[3])
-}
-```
 
 ## Concurrency model
 
@@ -176,7 +113,6 @@ provides clear advantages for any routing daemon.
 But as always, it depends on the specific use case.
 
 See the concurrent tests for concrete examples of this pattern:
-- [ExampleFast](example_fast_concurrent_test.go)
 - [ExampleLite](example_lite_concurrent_test.go)
 - [ExampleTable](example_table_concurrent_test.go)
 
@@ -193,9 +129,9 @@ heap allocations on a modern CPU.
 BART has a rich API for CRUD, lookup, comparison, iteration,
 serialization and persistence.
 
-**Table** and **Fast** expose the identical API, while **Lite** deviates from
-the common API since it carries no payload. Additionally, **Lite** provides
-specialized methods like `Aggregate` to compact ACL prefixes in-place.
+**Lite** deviates from the common API since it carries no payload.
+Additionally, **Lite** provides specialized methods like `Aggregate`
+to compact ACL prefixes in-place.
 
 ```go
 import "github.com/gaissmai/bart"
@@ -259,21 +195,19 @@ func (t *Table[V]) DumpList6() []DumpListNode[V]
 Please see the extensive [benchmarks](https://github.com/gaissmai/iprbench)
 comparing `bart` with other IP routing table implementations.
 
-Just a teaser, `Fast.Lookup` against the Tier1 full
+Just a teaser, `Lite.Contains` against the Tier1 full
 Internet routing table with random IP address probes:
 
 ```text
-$ GOAMD64=v3 go test -run=xxx -bench=FullFastM/Lookup$ -cpu=1
+$ GOAMD64=v3 go test -run=^$ -bench=FullLite/Contains$ -cpu=1
 goos: linux
 goarch: amd64
 pkg: github.com/gaissmai/bart
-cpu: AMD Ryzen 7 PRO 4750U with Radeon Graphics
-BenchmarkFullFastMatch4/Lookup         	36917803	        31.57 ns/op
-BenchmarkFullFastMatch6/Lookup         	24484578	        48.67 ns/op
-BenchmarkFullFastMiss4/Lookup          	46067090	        24.90 ns/op
-BenchmarkFullFastMiss6/Lookup          	30606994	        38.88 ns/op
-PASS
-ok  	github.com/gaissmai/bart	6.466s
+cpu: AMD EPYC 9275F 24-Core Processor
+BenchmarkFullLiteMatch4/Contains         	134873065	         8.933 ns/op
+BenchmarkFullLiteMatch6/Contains         	82965392	        14.14 ns/op
+BenchmarkFullLiteMiss4/Contains          	120155722	         9.998 ns/op
+BenchmarkFullLiteMiss6/Contains          	93057260	        12.56 ns/op
 ```
 
 ## Compatibility Guarantees
@@ -283,6 +217,30 @@ backward compatibility to help improve the API as he learns which initial design
 to be revisited to better support the use cases that the library solves for.
 
 These occurrences are expected to be rare in frequency and the API is already quite stable.
+
+### Deprecated: `bart.Fast`
+
+`bart.Fast` is deprecated and no longer a separate table type. Every node now
+carries a compact rank cache in its sparse arrays, which makes the additional
+256 bytes per node of `bart.Fast` obsolete. `bart.Table` has the identical API.
+
+`bart.Fast` remains as a type alias for `bart.Table`, so existing code keeps
+compiling:
+
+```go
+// Deprecated: use Table.
+type Fast[V any] = Table[V]
+```
+
+With Go 1.26 or later, `go fix` migrates your code automatically:
+
+```text
+go get github.com/gaissmai/bart@latest
+go fix -diff ./...   # preview the changes
+go fix ./...         # apply them
+```
+
+The alias will be removed in a future release.
 
 ## Contribution
 

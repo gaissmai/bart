@@ -20,6 +20,11 @@ import (
 	"github.com/gaissmai/bart/internal/value"
 )
 
+// ChildCount returns the number of slots used in this node.
+func (n *BartNode[V]) ChildCount() int {
+	return len(n.Children.Items)
+}
+
 // IsEmpty returns true if the node contains no routing entries (prefixes)
 // and no child nodes. Empty nodes are candidates for compression or removal
 // during trie optimization.
@@ -30,49 +35,38 @@ func (n *BartNode[V]) IsEmpty() bool {
 	return n.PrefixCount() == 0 && n.ChildCount() == 0
 }
 
-// ChildCount returns the number of slots used in this node.
-func (n *BartNode[V]) ChildCount() int {
-	return n.Children.Len()
+// InsertChild adds a child node at the specified address (0-255).
+// The child can be a *BartNode[V], *LeafNode[V], or *FringeNode[V].
+// Returns true if a child already existed at that address.
+func (n *BartNode[V]) InsertChild(addr uint8, child any) (exists bool) {
+	return n.Children.InsertAt(addr, child)
 }
 
-// PrefixCount returns the number of prefixes stored in this node.
-func (n *BartNode[V]) PrefixCount() int {
-	return n.Prefixes.Len()
+// GetChild retrieves the child node at the specified address.
+// Returns the child and true if found, or nil and false if not present.
+func (n *BartNode[V]) GetChild(addr uint8) (any, bool) {
+	return n.Children.Get(addr)
 }
 
-// GetPrefix retrieves the value associated with the prefix at the given index.
-// Returns the value and true if found, or zero value and false if not present.
-func (n *BartNode[V]) GetPrefix(idx uint8) (val V, exists bool) {
-	return n.Prefixes.Get(idx)
+// MustGetChild retrieves the child at the specified address, panicking if not found.
+// This method should only be used when the caller is certain the child exists.
+func (n *BartNode[V]) MustGetChild(addr uint8) any {
+	return n.Children.MustGet(addr)
 }
 
-// MustGetPrefix retrieves the value at the specified index, panicking if not found.
-// This method should only be used when the caller is certain the index exists.
-func (n *BartNode[V]) MustGetPrefix(idx uint8) (val V) {
-	return n.Prefixes.MustGet(idx)
-}
-
-// InsertPrefix adds or updates a routing entry at the specified index with the given value.
-// It returns true if a prefix already existed at that index (indicating an update),
-// false if this is a new insertion.
-func (n *BartNode[V]) InsertPrefix(idx uint8, val V) (exists bool) {
-	_, exists = n.Prefixes.InsertAt(idx, val)
+// DeleteChild removes the child node at the specified address.
+// This operation is idempotent - removing a non-existent child is safe.
+func (n *BartNode[V]) DeleteChild(addr uint8) (exists bool) {
+	_, exists = n.Children.DeleteAt(addr)
 	return
-}
-
-// DeletePrefix removes the prefix at the specified index.
-// Returns true if the prefix existed, otherwise false.
-func (n *BartNode[V]) DeletePrefix(idx uint8) (exists bool) {
-	_, exists = n.Prefixes.DeleteAt(idx)
-	return exists
 }
 
 // AllIndices returns an iterator over all prefix entries.
 // Each iteration yields the prefix index (uint8) and its associated value (V).
 func (n *BartNode[V]) AllIndices() iter.Seq2[uint8, V] {
 	return func(yield func(uint8, V) bool) {
-		for i, idx := range n.Prefixes.AllEnumerate() {
-			if !yield(idx, n.Prefixes.Items[i]) {
+		for idx := range n.Prefixes.All() {
+			if !yield(idx, n.MustGetPrefix(idx)) {
 				return
 			}
 		}

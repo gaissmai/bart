@@ -7,21 +7,27 @@ package allot
 
 import "github.com/gaissmai/bart/internal/bitset"
 
-// PfxRoutesLookupTbl is a lookup table of BitSet256 entries.
+// PfxRoutesLookupTbl is a lookup table of BitSet256 entries for the route allotment.
 //
-// It maps a baseIndex (1..255) to a bitset that contains all
-// the index itself and all more specific indices.
+// It maps a baseIndex idx (1..255) to a bitset that contains idx itself and all
+// its descendants in the complete binary tree of the stride, i.e. all more
+// specific indices up to /7.
 //
 // The idea:
 //
 //	If prefix P has baseIndex idx, then P covers all prefixes in the subtree
-//	rooted at idx. This table enumerates and encodes those indices.
+//	rooted at idx, including P itself. This table enumerates and encodes
+//	those indices.
 //
-// The table is split:
-//   - PfxRoutesLookupTbl holds prefixes up to /7
-//   - FringeRoutesLookupTbl holds /8 prefixes
+// The subtree of idx has up to 512 bits and is split into two tables of
+// 256 bits each:
+//   - PfxRoutesLookupTbl holds the part with the indices 1..255, the prefixes up to /7
+//   - FringeRoutesLookupTbl holds the part with the indices 256..511, the /8 prefixes
 //
-// This structure allows for very fast set inclusion checks using simple bitwise AND.
+// This structure allows for very fast coverage queries using a simple bitwise AND,
+// e.g. the prefixes of a node covered by idx are node.Prefixes AND PfxRoutesLookupTbl[idx].
+//
+// Index 0 is not a valid baseIndex, its entry is empty.
 //
 //nolint:gochecknoglobals // Precomputed read‑only table used in hot paths.
 var PfxRoutesLookupTbl = [256]bitset.BitSet256{
@@ -283,8 +289,16 @@ var PfxRoutesLookupTbl = [256]bitset.BitSet256{
 	/* idx: 255 */ {0x0, 0x0, 0x0, 0x8000000000000000}, // [255]
 }
 
-// FringeRoutesLookupTbl, the second 256 Bits, see also the PfxRoutesLookupTbl for the first 256 Bits
-// we split 512 bits into 2×256 to leverage BitSet256 optimizations.
+// FringeRoutesLookupTbl is the second half of the subtree bitsets, see
+// PfxRoutesLookupTbl for the first half. The 512 bits of a subtree are split
+// into 2×256 bits to leverage the BitSet256 optimizations.
+//
+// It maps a baseIndex idx (1..255) to a bitset that contains the /8 level of
+// the subtree of idx. The index 256+n is stored as bit n, so the bits are the
+// octets, i.e. the child addresses, covered by the prefix idx. For example,
+// the prefix 0b101/3 with idx=13 covers the octets 160..191.
+//
+// The idx itself is never a member of this table.
 //
 //nolint:gochecknoglobals // Precomputed read‑only table used in hot paths.
 var FringeRoutesLookupTbl = [256]bitset.BitSet256{

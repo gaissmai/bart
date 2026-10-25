@@ -13,163 +13,7 @@ import (
 	"github.com/gaissmai/bart/internal/tests/random"
 )
 
-func BenchmarkFullFastMatch4(b *testing.B) {
-	fast := new(Fast[bool])
-	for _, pfx := range tier1.routes4() {
-		fast.Insert(pfx, true)
-	}
-
-	b.Run("Contains", func(b *testing.B) {
-		matchIP4 := tier1.matchIP4()
-
-		for i := 0; b.Loop(); i++ {
-			fast.Contains(matchIP4[i&mask])
-		}
-	})
-
-	b.Run("Lookup", func(b *testing.B) {
-		matchIP4 := tier1.matchIP4()
-
-		for i := 0; b.Loop(); i++ {
-			fast.Lookup(matchIP4[i&mask])
-		}
-	})
-
-	b.Run("LookupPrefix", func(b *testing.B) {
-		matchPfx4 := tier1.matchPfx4()
-
-		for i := 0; b.Loop(); i++ {
-			fast.LookupPrefix(matchPfx4[i&mask])
-		}
-	})
-
-	b.Run("LookupPfxLPM", func(b *testing.B) {
-		matchPfx4 := tier1.matchPfx4()
-
-		for i := 0; b.Loop(); i++ {
-			fast.LookupPrefixLPM(matchPfx4[i&mask])
-		}
-	})
-}
-
-func BenchmarkFullFastMatch6(b *testing.B) {
-	fast := new(Fast[bool])
-	for _, pfx := range tier1.routes6() {
-		fast.Insert(pfx, true)
-	}
-
-	b.Run("Contains", func(b *testing.B) {
-		matchIP6 := tier1.matchIP6()
-
-		for i := 0; b.Loop(); i++ {
-			fast.Contains(matchIP6[i&mask])
-		}
-	})
-
-	b.Run("Lookup", func(b *testing.B) {
-		matchIP6 := tier1.matchIP6()
-
-		for i := 0; b.Loop(); i++ {
-			fast.Lookup(matchIP6[i&mask])
-		}
-	})
-
-	b.Run("LookupPrefix", func(b *testing.B) {
-		matchPfx6 := tier1.matchPfx6()
-
-		for i := 0; b.Loop(); i++ {
-			fast.LookupPrefix(matchPfx6[i&mask])
-		}
-	})
-
-	b.Run("LookupPfxLPM", func(b *testing.B) {
-		matchPfx6 := tier1.matchPfx6()
-
-		for i := 0; b.Loop(); i++ {
-			fast.LookupPrefixLPM(matchPfx6[i&mask])
-		}
-	})
-}
-
-func BenchmarkFullFastMiss4(b *testing.B) {
-	fast := new(Fast[bool])
-	for _, pfx := range tier1.routes4() {
-		fast.Insert(pfx, true)
-	}
-
-	b.Run("Contains", func(b *testing.B) {
-		missIP4 := tier1.missIP4()
-
-		for i := 0; b.Loop(); i++ {
-			fast.Contains(missIP4[i&mask])
-		}
-	})
-
-	b.Run("Lookup", func(b *testing.B) {
-		missIP4 := tier1.missIP4()
-
-		for i := 0; b.Loop(); i++ {
-			fast.Lookup(missIP4[i&mask])
-		}
-	})
-
-	b.Run("LookupPrefix", func(b *testing.B) {
-		missPfx4 := tier1.missPfx4()
-
-		for i := 0; b.Loop(); i++ {
-			fast.LookupPrefix(missPfx4[i&mask])
-		}
-	})
-
-	b.Run("LookupPfxLPM", func(b *testing.B) {
-		missPfx4 := tier1.missPfx4()
-
-		for i := 0; b.Loop(); i++ {
-			fast.LookupPrefixLPM(missPfx4[i&mask])
-		}
-	})
-}
-
-func BenchmarkFullFastMiss6(b *testing.B) {
-	fast := new(Fast[bool])
-	for _, pfx := range tier1.routes6() {
-		fast.Insert(pfx, true)
-	}
-
-	b.Run("Contains", func(b *testing.B) {
-		missIP6 := tier1.missIP6()
-
-		for i := 0; b.Loop(); i++ {
-			fast.Contains(missIP6[i&mask])
-		}
-	})
-
-	b.Run("Lookup", func(b *testing.B) {
-		missIP6 := tier1.missIP6()
-
-		for i := 0; b.Loop(); i++ {
-			fast.Lookup(missIP6[i&mask])
-		}
-	})
-
-	b.Run("LookupPrefix", func(b *testing.B) {
-		missPfx6 := tier1.missPfx6()
-
-		for i := 0; b.Loop(); i++ {
-			fast.LookupPrefix(missPfx6[i&mask])
-		}
-	})
-
-	b.Run("LookupPfxLPM", func(b *testing.B) {
-		missPfx6 := tier1.missPfx6()
-
-		for i := 0; b.Loop(); i++ {
-			fast.LookupPrefixLPM(missPfx6[i&mask])
-		}
-	})
-}
-
-func BenchmarkFullBartMatch4(b *testing.B) {
+func BenchmarkFullTableMatch4(b *testing.B) {
 	bart := new(Table[bool])
 	for _, pfx := range tier1.routes4() {
 		bart.Insert(pfx, true)
@@ -208,7 +52,7 @@ func BenchmarkFullBartMatch4(b *testing.B) {
 	})
 }
 
-func BenchmarkFullBartMatch6(b *testing.B) {
+func BenchmarkFullTableMatch6(b *testing.B) {
 	bart := new(Table[bool])
 	for _, pfx := range tier1.routes6() {
 		bart.Insert(pfx, true)
@@ -247,7 +91,7 @@ func BenchmarkFullBartMatch6(b *testing.B) {
 	})
 }
 
-func BenchmarkFullBartMiss4(b *testing.B) {
+func BenchmarkFullTableMiss4(b *testing.B) {
 	bart := new(Table[bool])
 	for _, pfx := range tier1.routes4() {
 		bart.Insert(pfx, true)
@@ -286,10 +130,166 @@ func BenchmarkFullBartMiss4(b *testing.B) {
 	})
 }
 
-func BenchmarkFullBartMiss6(b *testing.B) {
+func BenchmarkFullTableMiss6(b *testing.B) {
 	bart := new(Table[bool])
 	for _, pfx := range tier1.routes6() {
 		bart.Insert(pfx, true)
+	}
+
+	b.Run("Contains", func(b *testing.B) {
+		missIP6 := tier1.missIP6()
+
+		for i := 0; b.Loop(); i++ {
+			bart.Contains(missIP6[i&mask])
+		}
+	})
+
+	b.Run("Lookup", func(b *testing.B) {
+		missIP6 := tier1.missIP6()
+
+		for i := 0; b.Loop(); i++ {
+			bart.Lookup(missIP6[i&mask])
+		}
+	})
+
+	b.Run("LookupPrefix", func(b *testing.B) {
+		missPfx6 := tier1.missPfx6()
+
+		for i := 0; b.Loop(); i++ {
+			bart.LookupPrefix(missPfx6[i&mask])
+		}
+	})
+
+	b.Run("LookupPfxLPM", func(b *testing.B) {
+		missPfx6 := tier1.missPfx6()
+
+		for i := 0; b.Loop(); i++ {
+			bart.LookupPrefixLPM(missPfx6[i&mask])
+		}
+	})
+}
+
+func BenchmarkFullLiteMatch4(b *testing.B) {
+	bart := new(Lite)
+	for _, pfx := range tier1.routes4() {
+		bart.Insert(pfx)
+	}
+
+	b.Run("Contains", func(b *testing.B) {
+		matchIP4 := tier1.matchIP4()
+
+		for i := 0; b.Loop(); i++ {
+			bart.Contains(matchIP4[i&mask])
+		}
+	})
+
+	b.Run("Lookup", func(b *testing.B) {
+		matchIP4 := tier1.matchIP4()
+
+		for i := 0; b.Loop(); i++ {
+			bart.Lookup(matchIP4[i&mask])
+		}
+	})
+
+	b.Run("LookupPrefix", func(b *testing.B) {
+		matchPfx4 := tier1.matchPfx4()
+
+		for i := 0; b.Loop(); i++ {
+			bart.LookupPrefix(matchPfx4[i&mask])
+		}
+	})
+
+	b.Run("LookupPfxLPM", func(b *testing.B) {
+		matchPfx4 := tier1.matchPfx4()
+
+		for i := 0; b.Loop(); i++ {
+			bart.LookupPrefixLPM(matchPfx4[i&mask])
+		}
+	})
+}
+
+func BenchmarkFullLiteMatch6(b *testing.B) {
+	bart := new(Lite)
+	for _, pfx := range tier1.routes6() {
+		bart.Insert(pfx)
+	}
+
+	b.Run("Contains", func(b *testing.B) {
+		matchIP6 := tier1.matchIP6()
+
+		for i := 0; b.Loop(); i++ {
+			bart.Contains(matchIP6[i&mask])
+		}
+	})
+
+	b.Run("Lookup", func(b *testing.B) {
+		matchIP6 := tier1.matchIP6()
+
+		for i := 0; b.Loop(); i++ {
+			bart.Lookup(matchIP6[i&mask])
+		}
+	})
+
+	b.Run("LookupPrefix", func(b *testing.B) {
+		matchPfx6 := tier1.matchPfx6()
+
+		for i := 0; b.Loop(); i++ {
+			bart.LookupPrefix(matchPfx6[i&mask])
+		}
+	})
+
+	b.Run("LookupPfxLPM", func(b *testing.B) {
+		matchPfx6 := tier1.matchPfx6()
+
+		for i := 0; b.Loop(); i++ {
+			bart.LookupPrefixLPM(matchPfx6[i&mask])
+		}
+	})
+}
+
+func BenchmarkFullLiteMiss4(b *testing.B) {
+	bart := new(Lite)
+	for _, pfx := range tier1.routes4() {
+		bart.Insert(pfx)
+	}
+
+	b.Run("Contains", func(b *testing.B) {
+		missIP4 := tier1.missIP4()
+
+		for i := 0; b.Loop(); i++ {
+			bart.Contains(missIP4[i&mask])
+		}
+	})
+
+	b.Run("Lookup", func(b *testing.B) {
+		missIP4 := tier1.missIP4()
+
+		for i := 0; b.Loop(); i++ {
+			bart.Lookup(missIP4[i&mask])
+		}
+	})
+
+	b.Run("LookupPrefix", func(b *testing.B) {
+		missPfx4 := tier1.missPfx4()
+
+		for i := 0; b.Loop(); i++ {
+			bart.LookupPrefix(missPfx4[i&mask])
+		}
+	})
+
+	b.Run("LookupPfxLPM", func(b *testing.B) {
+		missPfx4 := tier1.missPfx4()
+
+		for i := 0; b.Loop(); i++ {
+			bart.LookupPrefixLPM(missPfx4[i&mask])
+		}
+	})
+}
+
+func BenchmarkFullLiteMiss6(b *testing.B) {
+	bart := new(Lite)
+	for _, pfx := range tier1.routes6() {
+		bart.Insert(pfx)
 	}
 
 	b.Run("Contains", func(b *testing.B) {
@@ -369,50 +369,6 @@ func BenchmarkTableOverlaps6(b *testing.B) {
 	}
 }
 
-func BenchmarkFastOverlaps4(b *testing.B) {
-	lt := new(Fast[any])
-
-	for _, route := range tier1.routes4() {
-		lt.Insert(route, nil)
-	}
-
-	for i := 1; i <= 1<<20; i *= 2 {
-		prng := rand.New(rand.NewPCG(42, 42))
-		lt2 := new(Fast[any])
-		for _, pfx := range random.RealWorldPrefixes4(prng, i) {
-			lt2.Insert(pfx, nil)
-		}
-
-		b.Run(fmt.Sprintf("With_%4d", i), func(b *testing.B) {
-			for b.Loop() {
-				lt.Overlaps4(lt2)
-			}
-		})
-	}
-}
-
-func BenchmarkFastOverlaps6(b *testing.B) {
-	lt := new(Fast[any])
-
-	for _, route := range tier1.routes6() {
-		lt.Insert(route, nil)
-	}
-
-	for i := 1; i <= 1<<20; i *= 2 {
-		prng := rand.New(rand.NewPCG(42, 42))
-		lt2 := new(Fast[any])
-		for _, pfx := range random.RealWorldPrefixes6(prng, i) {
-			lt2.Insert(pfx, nil)
-		}
-
-		b.Run(fmt.Sprintf("With_%4d", i), func(b *testing.B) {
-			for b.Loop() {
-				lt.Overlaps6(lt2)
-			}
-		})
-	}
-}
-
 // worstcase benchmarks
 
 var (
@@ -472,7 +428,7 @@ var (
 	}
 )
 
-func BenchmarkBartWorstCaseMatch4(b *testing.B) {
+func BenchmarkTableWorstCaseMatch4(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
 		tbl := new(Table[any])
 		for _, p := range worstCasePfxsIP4 {
@@ -531,67 +487,7 @@ func BenchmarkBartWorstCaseMatch4(b *testing.B) {
 	})
 }
 
-func BenchmarkFastWorstCaseMatch4(b *testing.B) {
-	b.Run("Contains", func(b *testing.B) {
-		tbl := new(Fast[any])
-		for _, p := range worstCasePfxsIP4 {
-			tbl.Insert(p, nil)
-		}
-
-		if ok := tbl.Contains(worstCaseProbeIP4); !ok {
-			b.Fatalf("expexted Contains() == true, got: %v", ok)
-		}
-
-		for b.Loop() {
-			tbl.Contains(worstCaseProbeIP4)
-		}
-	})
-
-	b.Run("Lookup", func(b *testing.B) {
-		tbl := new(Fast[any])
-		for _, p := range worstCasePfxsIP4 {
-			tbl.Insert(p, nil)
-		}
-		tbl.Insert(ipv4DefaultRoute, ipv4DefaultRoute.String())
-		tbl.Delete(worstCaseProbePfx4)
-
-		if _, ok := tbl.Lookup(worstCaseProbeIP4); !ok {
-			b.Fatalf("expexted Lookup() == true, got: %v", ok)
-		}
-
-		for b.Loop() {
-			tbl.Lookup(worstCaseProbeIP4)
-		}
-	})
-
-	b.Run("LookupPrefix", func(b *testing.B) {
-		tbl := new(Fast[any])
-		for _, p := range worstCasePfxsIP4 {
-			tbl.Insert(p, nil)
-		}
-		tbl.Insert(ipv4DefaultRoute, ipv4DefaultRoute.String())
-		tbl.Delete(worstCaseProbePfx4)
-
-		for b.Loop() {
-			tbl.LookupPrefix(worstCaseProbePfx4)
-		}
-	})
-
-	b.Run("LookupPrefixLPM", func(b *testing.B) {
-		tbl := new(Fast[any])
-		for _, p := range worstCasePfxsIP4 {
-			tbl.Insert(p, nil)
-		}
-		tbl.Insert(ipv4DefaultRoute, ipv4DefaultRoute.String())
-		tbl.Delete(worstCaseProbePfx4)
-
-		for b.Loop() {
-			tbl.LookupPrefixLPM(worstCaseProbePfx4)
-		}
-	})
-}
-
-func BenchmarkBartWorstCaseMiss4(b *testing.B) {
+func BenchmarkTableWorstCaseMiss4(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
 		tbl := new(Table[any])
 		for _, p := range worstCasePfxsIP4 {
@@ -653,69 +549,7 @@ func BenchmarkBartWorstCaseMiss4(b *testing.B) {
 	})
 }
 
-func BenchmarkFastWorstCaseMiss4(b *testing.B) {
-	b.Run("Contains", func(b *testing.B) {
-		tbl := new(Fast[any])
-		for _, p := range worstCasePfxsIP4 {
-			tbl.Insert(p, nil)
-		}
-
-		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
-
-		if ok := tbl.Contains(worstCaseProbeIP4); ok {
-			b.Fatalf("expexted Contains() == false, got: %v", ok)
-		}
-
-		for b.Loop() {
-			tbl.Contains(worstCaseProbeIP4)
-		}
-	})
-
-	b.Run("Lookup", func(b *testing.B) {
-		tbl := new(Fast[any])
-		for _, p := range worstCasePfxsIP4 {
-			tbl.Insert(p, nil)
-		}
-
-		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
-
-		if _, ok := tbl.Lookup(worstCaseProbeIP4); ok {
-			b.Fatalf("expexted Lookup() == false, got: %v", ok)
-		}
-
-		for b.Loop() {
-			tbl.Lookup(worstCaseProbeIP4)
-		}
-	})
-
-	b.Run("LookupPrefix", func(b *testing.B) {
-		tbl := new(Fast[any])
-		for _, p := range worstCasePfxsIP4 {
-			tbl.Insert(p, nil)
-		}
-
-		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
-
-		for b.Loop() {
-			tbl.LookupPrefix(worstCaseProbePfx4)
-		}
-	})
-
-	b.Run("LookupPrefixLPM", func(b *testing.B) {
-		tbl := new(Fast[any])
-		for _, p := range worstCasePfxsIP4 {
-			tbl.Insert(p, nil)
-		}
-
-		tbl.Delete(worstCaseProbePfx4) // delete matching prefix
-
-		for b.Loop() {
-			tbl.LookupPrefixLPM(worstCaseProbePfx4)
-		}
-	})
-}
-
-func BenchmarkBartWorstCaseMatch6(b *testing.B) {
+func BenchmarkTableWorstCaseMatch6(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
 		tbl := new(Table[any])
 		for _, p := range worstCasePfxsIP6 {
@@ -775,67 +609,7 @@ func BenchmarkBartWorstCaseMatch6(b *testing.B) {
 	})
 }
 
-func BenchmarkFastWorstCaseMatch6(b *testing.B) {
-	b.Run("Contains", func(b *testing.B) {
-		tbl := new(Fast[any])
-		for _, p := range worstCasePfxsIP6 {
-			tbl.Insert(p, nil)
-		}
-
-		if ok := tbl.Contains(worstCaseProbeIP6); !ok {
-			b.Fatalf("expexted Contains() == true, got: %v", ok)
-		}
-
-		for b.Loop() {
-			tbl.Contains(worstCaseProbeIP6)
-		}
-	})
-
-	b.Run("Lookup", func(b *testing.B) {
-		tbl := new(Fast[any])
-		for _, p := range worstCasePfxsIP6 {
-			tbl.Insert(p, nil)
-		}
-		tbl.Insert(ipv6DefaultRoute, ipv6DefaultRoute.String())
-		tbl.Delete(worstCaseProbePfx6)
-
-		if _, ok := tbl.Lookup(worstCaseProbeIP6); !ok {
-			b.Fatalf("expexted Lookup() == true, got: %v", ok)
-		}
-
-		for b.Loop() {
-			tbl.Lookup(worstCaseProbeIP6)
-		}
-	})
-
-	b.Run("LookupPrefix", func(b *testing.B) {
-		tbl := new(Fast[any])
-		for _, p := range worstCasePfxsIP6 {
-			tbl.Insert(p, nil)
-		}
-		tbl.Insert(ipv6DefaultRoute, ipv6DefaultRoute.String())
-		tbl.Delete(worstCaseProbePfx6)
-
-		for b.Loop() {
-			tbl.LookupPrefix(worstCaseProbePfx6)
-		}
-	})
-
-	b.Run("LookupPrefixLPM", func(b *testing.B) {
-		tbl := new(Fast[any])
-		for _, p := range worstCasePfxsIP6 {
-			tbl.Insert(p, nil)
-		}
-		tbl.Insert(ipv6DefaultRoute, ipv6DefaultRoute.String())
-		tbl.Delete(worstCaseProbePfx6)
-
-		for b.Loop() {
-			tbl.LookupPrefixLPM(worstCaseProbePfx6)
-		}
-	})
-}
-
-func BenchmarkBartWorstCaseMiss6(b *testing.B) {
+func BenchmarkTableWorstCaseMiss6(b *testing.B) {
 	b.Run("Contains", func(b *testing.B) {
 		tbl := new(Table[any])
 		for _, p := range worstCasePfxsIP6 {
@@ -885,68 +659,6 @@ func BenchmarkBartWorstCaseMiss6(b *testing.B) {
 
 	b.Run("LookupPrefixLPM", func(b *testing.B) {
 		tbl := new(Table[any])
-		for _, p := range worstCasePfxsIP6 {
-			tbl.Insert(p, nil)
-		}
-
-		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
-
-		for b.Loop() {
-			tbl.LookupPrefixLPM(worstCaseProbePfx6)
-		}
-	})
-}
-
-func BenchmarkFastWorstCaseMiss6(b *testing.B) {
-	b.Run("Contains", func(b *testing.B) {
-		tbl := new(Fast[any])
-		for _, p := range worstCasePfxsIP6 {
-			tbl.Insert(p, nil)
-		}
-
-		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
-
-		if ok := tbl.Contains(worstCaseProbeIP6); ok {
-			b.Fatalf("expexted Contains() == false, got: %v", ok)
-		}
-
-		for b.Loop() {
-			tbl.Contains(worstCaseProbeIP6)
-		}
-	})
-
-	b.Run("Lookup", func(b *testing.B) {
-		tbl := new(Fast[any])
-		for _, p := range worstCasePfxsIP6 {
-			tbl.Insert(p, nil)
-		}
-
-		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
-
-		if _, ok := tbl.Lookup(worstCaseProbeIP6); ok {
-			b.Fatalf("expexted Lookup() == false, got: %v", ok)
-		}
-
-		for b.Loop() {
-			tbl.Lookup(worstCaseProbeIP6)
-		}
-	})
-
-	b.Run("LookupPrefix", func(b *testing.B) {
-		tbl := new(Fast[any])
-		for _, p := range worstCasePfxsIP6 {
-			tbl.Insert(p, nil)
-		}
-
-		tbl.Delete(worstCaseProbePfx6) // delete matching prefix
-
-		for b.Loop() {
-			tbl.LookupPrefix(worstCaseProbePfx6)
-		}
-	})
-
-	b.Run("LookupPrefixLPM", func(b *testing.B) {
-		tbl := new(Fast[any])
 		for _, p := range worstCasePfxsIP6 {
 			tbl.Insert(p, nil)
 		}

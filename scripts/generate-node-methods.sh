@@ -23,7 +23,7 @@ if grep -q "TODO" "${template_file}"; then
 fi
 
 # Node types to generate
-readonly NODE_TYPES=("BartNode" "LiteNode" "FastNode")
+readonly NODE_TYPES=("BartNode" "LiteNode")
 
 # for goimports, see below
 generated_files=()
@@ -43,7 +43,7 @@ for nodeType in "${NODE_TYPES[@]}"; do
         # Delete all lines between the markers (inclusive) for LiteNode
         lite_filter+=(-e '/GENERATE SKIP_LITE START/,/GENERATE SKIP_LITE END/d')
     else
-        # For Table/Fast nodes, keep the enclosed code and remove only the marker comment lines
+        # For Table nodes, keep the enclosed code and remove only the marker comment lines
         lite_filter+=(-e '/GENERATE SKIP_LITE/d')
     fi
 

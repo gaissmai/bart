@@ -28,20 +28,23 @@ import (
 )
 
 type _NODE_TYPE[V any] struct {
-	Prefixes struct{ bitset.BitSet256 }
-	Children struct{ bitset.BitSet256 }
+	Prefixes bitset.BitSet256
+	Children bitset.BitSet256
 }
 
-func (n *_NODE_TYPE[V]) PrefixCount() (_ int)                   { return }
-func (n *_NODE_TYPE[V]) ChildCount() (_ int)                    { return }
-func (n *_NODE_TYPE[V]) GetChild(uint8) (_ any, _ bool)         { return }
-func (n *_NODE_TYPE[V]) MustGetChild(uint8) (_ any)             { return }
-func (n *_NODE_TYPE[V]) InsertChild(uint8, any) (_ bool)        { return }
-func (n *_NODE_TYPE[V]) DeleteChild(uint8) (_ bool)             { return }
-func (n *_NODE_TYPE[V]) CloneRec(func(V) V) (_ *_NODE_TYPE[V])  { return }
-func (n *_NODE_TYPE[V]) CloneFlat(func(V) V) (_ *_NODE_TYPE[V]) { return }
+func (n *_NODE_TYPE[V]) PrefixCount() int                   { return }
+func (n *_NODE_TYPE[V]) InsertPrefix(uint8, V) bool         { return }
+func (n *_NODE_TYPE[V]) DeletePrefix(uint8) bool            { return }
+func (n *_NODE_TYPE[V]) GetPrefix(uint8) (V, bool)          { return }
+func (n *_NODE_TYPE[V]) MustGetPrefix(uint8) V              { return }
+func (n *_NODE_TYPE[V]) CloneFlat(func(V) V) *_NODE_TYPE[V] { return }
 
 // ### GENERATE DELETE END ###
+
+// ChildCount returns the number of slots used in this node.
+func (n *_NODE_TYPE[V]) ChildCount() int {
+	return len(n.Children.Items)
+}
 
 // IsEmpty returns true if the node contains no routing entries (prefixes)
 // and no child nodes. Empty nodes are candidates for compression or removal
@@ -53,58 +56,43 @@ func (n *_NODE_TYPE[V]) IsEmpty() bool {
 	return n.PrefixCount() == 0 && n.ChildCount() == 0
 }
 
-// ChildCount returns the number of slots used in this node.
-func (n *_NODE_TYPE[V]) ChildCount() int {
-	return n.Children.Len()
+// InsertChild adds a child node at the specified address (0-255).
+// The child can be a *BartNode[V], *LeafNode[V], or *FringeNode[V].
+// Returns true if a child already existed at that address.
+func (n *_NODE_TYPE[V]) InsertChild(addr uint8, child any) (exists bool) {
+	return n.Children.InsertAt(addr, child)
 }
 
-// ### GENERATE SKIP_LITE START ###
-
-// PrefixCount returns the number of prefixes stored in this node.
-func (n *_NODE_TYPE[V]) PrefixCount() int {
-	return n.Prefixes.Len()
+// GetChild retrieves the child node at the specified address.
+// Returns the child and true if found, or nil and false if not present.
+func (n *_NODE_TYPE[V]) GetChild(addr uint8) (any, bool) {
+	return n.Children.Get(addr)
 }
 
-// GetPrefix retrieves the value associated with the prefix at the given index.
-// Returns the value and true if found, or zero value and false if not present.
-func (n *_NODE_TYPE[V]) GetPrefix(idx uint8) (val V, exists bool) {
-	return n.Prefixes.Get(idx)
+// MustGetChild retrieves the child at the specified address, panicking if not found.
+// This method should only be used when the caller is certain the child exists.
+func (n *_NODE_TYPE[V]) MustGetChild(addr uint8) any {
+	return n.Children.MustGet(addr)
 }
 
-// MustGetPrefix retrieves the value at the specified index, panicking if not found.
-// This method should only be used when the caller is certain the index exists.
-func (n *_NODE_TYPE[V]) MustGetPrefix(idx uint8) (val V) {
-	return n.Prefixes.MustGet(idx)
-}
-
-// InsertPrefix adds or updates a routing entry at the specified index with the given value.
-// It returns true if a prefix already existed at that index (indicating an update),
-// false if this is a new insertion.
-func (n *_NODE_TYPE[V]) InsertPrefix(idx uint8, val V) (exists bool) {
-	_, exists = n.Prefixes.InsertAt(idx, val)
+// DeleteChild removes the child node at the specified address.
+// This operation is idempotent - removing a non-existent child is safe.
+func (n *_NODE_TYPE[V]) DeleteChild(addr uint8) (exists bool) {
+	_, exists = n.Children.DeleteAt(addr)
 	return
-}
-
-// DeletePrefix removes the prefix at the specified index.
-// Returns true if the prefix existed, otherwise false.
-func (n *_NODE_TYPE[V]) DeletePrefix(idx uint8) (exists bool) {
-	_, exists = n.Prefixes.DeleteAt(idx)
-	return exists
 }
 
 // AllIndices returns an iterator over all prefix entries.
 // Each iteration yields the prefix index (uint8) and its associated value (V).
 func (n *_NODE_TYPE[V]) AllIndices() iter.Seq2[uint8, V] {
 	return func(yield func(uint8, V) bool) {
-		for i, idx := range n.Prefixes.AllEnumerate() {
-			if !yield(idx, n.Prefixes.Items[i]) {
+		for idx := range n.Prefixes.All() {
+			if !yield(idx, n.MustGetPrefix(idx)) {
 				return
 			}
 		}
 	}
 }
-
-// ### GENERATE SKIP_LITE END ###
 
 // AllChildren returns an iterator over all child nodes.
 // Each iteration yields the child's address (uint8) and the child node (any).
@@ -657,8 +645,6 @@ func (n *_NODE_TYPE[V]) Contains(idx uint8) bool {
 	return n.Prefixes.Overlaps(&lpm.LookupTbl[idx])
 }
 
-// ### GENERATE SKIP_LITE START ###
-
 // LookupIdx performs a longest-prefix match (LPM) lookup for the given index (idx)
 // within the 8-bit stride-based prefix table at this trie depth.
 //
@@ -682,8 +668,6 @@ func (n *_NODE_TYPE[V]) Lookup(idx uint8) (val V, ok bool) {
 	_, val, ok = n.LookupIdx(idx)
 	return val, ok
 }
-
-// ### GENERATE SKIP_LITE END ###
 
 // Modify performs an in-place modification of a prefix using the provided callback function.
 // The callback receives the current value (if found) and existence flag, and returns

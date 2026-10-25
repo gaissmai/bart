@@ -40,17 +40,12 @@ type _TABLE_TYPE[V any] struct {
 func (n *_NODE_TYPE[V]) IsEmpty() (_ bool)                                               { return }
 func (n *_NODE_TYPE[V]) StatsRec() (_ nodes.StatsT)                                      { return }
 func (n *_NODE_TYPE[V]) PrefixCount() (_ int)                                            { return }
-func (n *_NODE_TYPE[V]) ChildCount() (_ int)                                             { return }
-func (n *_NODE_TYPE[V]) GetPrefix(uint8) (_ V, _ bool)                                   { return }
-func (n *_NODE_TYPE[V]) GetChild(uint8) (_ any, _ bool)                                  { return }
 func (n *_NODE_TYPE[V]) MustGetPrefix(uint8) (_ V)                                       { return }
-func (n *_NODE_TYPE[V]) MustGetChild(uint8) (_ any)                                      { return }
 func (n *_NODE_TYPE[V]) Insert(netip.Prefix, V, int) (_ bool)                            { return }
 func (n *_NODE_TYPE[V]) Modify(netip.Prefix, func(V, bool) (V, bool)) (_ int)            { return }
 func (n *_NODE_TYPE[V]) Delete(netip.Prefix) (_ bool)                                    { return }
 func (n *_NODE_TYPE[V]) InsertPersist(nodes.CloneFunc[V], netip.Prefix, V, int) (_ bool) { return }
 func (n *_NODE_TYPE[V]) DeletePersist(nodes.CloneFunc[V], netip.Prefix) (_ bool)         { return }
-func (n *_NODE_TYPE[V]) Get(netip.Prefix) (_ V, _ bool)                                  { return }
 func (n *_NODE_TYPE[V]) OverlapsPrefixAtDepth(netip.Prefix, int) (_ bool)                { return }
 func (n *_NODE_TYPE[V]) Overlaps(*_NODE_TYPE[V], int) (_ bool)                           { return }
 func (n *_NODE_TYPE[V]) UnionRec(nodes.CloneFunc[V], *_NODE_TYPE[V], int) (_ int)        { return }
@@ -58,13 +53,7 @@ func (n *_NODE_TYPE[V]) UnionRecPersist(nodes.CloneFunc[V], *_NODE_TYPE[V], int)
 func (n *_NODE_TYPE[V]) EqualRec(*_NODE_TYPE[V]) (_ bool)                                { return }
 func (n *_NODE_TYPE[V]) CloneRec(nodes.CloneFunc[V]) (_ *_NODE_TYPE[V])                  { return }
 func (n *_NODE_TYPE[V]) CloneFlat(nodes.CloneFunc[V]) (_ *_NODE_TYPE[V])                 { return }
-func (n *_NODE_TYPE[V]) GetChildAddrs(*[256]uint8) (_ []uint8)                           { return }
-func (n *_NODE_TYPE[V]) GetIndices(*[256]uint8) (_ []uint8)                              { return }
-func (n *_NODE_TYPE[V]) AllChildren() (_ iter.Seq2[uint8, any])                          { return }
-func (n *_NODE_TYPE[V]) AllIndices() (_ iter.Seq2[uint8, V])                             { return }
 func (n *_NODE_TYPE[V]) Contains(uint8) (_ bool)                                         { return }
-func (n *_NODE_TYPE[V]) Lookup(uint8) (_ V, _ bool)                                      { return }
-func (n *_NODE_TYPE[V]) LookupIdx(uint8) (_ uint8, _ V, _ bool)                          { return }
 func (n *_NODE_TYPE[V]) Supernets(netip.Prefix, func(netip.Prefix, V) bool)              { return }
 func (n *_NODE_TYPE[V]) Subnets(netip.Prefix, func(netip.Prefix, V) bool)                { return }
 func (n *_NODE_TYPE[V]) DumpRec(io.Writer, stridePath, int, bool)                        { return }
@@ -99,10 +88,7 @@ func (t *_TABLE_TYPE[V]) sizeUpdate(is4 bool, delta int) {
 // Contains reports whether any stored prefix covers the given IP address.
 // It returns false for invalid IP addresses.
 //
-// This method performs longest-prefix matching and returns true if any prefix
-// in the routing table contains the IP address, regardless of the associated value.
-//
-// It does not return the value or prefix of the matching item, but as a test
+// It does not return the value or prefix of the match, but as a test
 // against an allow/deny list, it is often sufficient and a few nanoseconds
 // faster than Lookup.
 //
@@ -120,11 +106,11 @@ func (f *_TABLE_TYPE[V]) Contains(ip netip.Addr) bool {
 			return true
 		}
 
+		kid, found := n.Children.Get(octet)
 		// stop traversing?
-		if !n.Children.Test(octet) {
+		if !found {
 			return false
 		}
-		kid := n.MustGetChild(octet)
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
@@ -180,11 +166,10 @@ LOOP:
 		stack[depth] = n
 
 		// go down in tight loop to last octet
-		if !n.Children.Test(octet) {
-			// no more nodes below octet
+		kid, found := n.Children.Get(octet)
+		if !found {
 			break LOOP
 		}
-		kid := n.MustGetChild(octet)
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
@@ -305,11 +290,11 @@ LOOP:
 		// push current node on stack
 		stack[depth] = n
 
-		// go down in tight loop to leaf node
-		if !n.Children.Test(octet) {
+		// go down in tight loop to last octet
+		kid, found := n.Children.Get(octet)
+		if !found {
 			break LOOP
 		}
-		kid := n.MustGetChild(octet)
 
 		// kid is node or leaf or fringe at octet
 		switch kid := kid.(type) {
@@ -1070,7 +1055,7 @@ func (t *_TABLE_TYPE[V]) DumpList6() []DumpListNode[V] {
 }
 
 // dumpListRec, build the data structure rec-descent with the help of directItemsRec.
-// anyNode is nodes.BartNode, nodes.FastNode or nodes.LiteNode
+// anyNode is nodes.BartNode or nodes.LiteNode
 func (t *_TABLE_TYPE[V]) dumpListRec(anyNode any, parentIdx uint8, path stridePath, depth int, is4 bool) []DumpListNode[V] {
 	// recursion stop condition
 	if anyNode == nil {
