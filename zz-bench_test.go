@@ -169,17 +169,19 @@ func BenchmarkFullTableMiss6(b *testing.B) {
 	})
 }
 
+// ####################################################
+
 func BenchmarkFullLiteMatch4(b *testing.B) {
-	bart := new(Lite)
+	lite := new(Lite)
 	for _, pfx := range tier1.routes4() {
-		bart.Insert(pfx)
+		lite.Insert(pfx)
 	}
 
 	b.Run("Contains", func(b *testing.B) {
 		matchIP4 := tier1.matchIP4()
 
 		for i := 0; b.Loop(); i++ {
-			bart.Contains(matchIP4[i&mask])
+			lite.Contains(matchIP4[i&mask])
 		}
 	})
 
@@ -187,7 +189,7 @@ func BenchmarkFullLiteMatch4(b *testing.B) {
 		matchIP4 := tier1.matchIP4()
 
 		for i := 0; b.Loop(); i++ {
-			bart.Lookup(matchIP4[i&mask])
+			lite.Lookup(matchIP4[i&mask])
 		}
 	})
 
@@ -195,7 +197,7 @@ func BenchmarkFullLiteMatch4(b *testing.B) {
 		matchPfx4 := tier1.matchPfx4()
 
 		for i := 0; b.Loop(); i++ {
-			bart.LookupPrefix(matchPfx4[i&mask])
+			lite.LookupPrefix(matchPfx4[i&mask])
 		}
 	})
 
@@ -203,22 +205,22 @@ func BenchmarkFullLiteMatch4(b *testing.B) {
 		matchPfx4 := tier1.matchPfx4()
 
 		for i := 0; b.Loop(); i++ {
-			bart.LookupPrefixLPM(matchPfx4[i&mask])
+			lite.LookupPrefixLPM(matchPfx4[i&mask])
 		}
 	})
 }
 
 func BenchmarkFullLiteMatch6(b *testing.B) {
-	bart := new(Lite)
+	lite := new(Lite)
 	for _, pfx := range tier1.routes6() {
-		bart.Insert(pfx)
+		lite.Insert(pfx)
 	}
 
 	b.Run("Contains", func(b *testing.B) {
 		matchIP6 := tier1.matchIP6()
 
 		for i := 0; b.Loop(); i++ {
-			bart.Contains(matchIP6[i&mask])
+			lite.Contains(matchIP6[i&mask])
 		}
 	})
 
@@ -226,7 +228,7 @@ func BenchmarkFullLiteMatch6(b *testing.B) {
 		matchIP6 := tier1.matchIP6()
 
 		for i := 0; b.Loop(); i++ {
-			bart.Lookup(matchIP6[i&mask])
+			lite.Lookup(matchIP6[i&mask])
 		}
 	})
 
@@ -234,7 +236,7 @@ func BenchmarkFullLiteMatch6(b *testing.B) {
 		matchPfx6 := tier1.matchPfx6()
 
 		for i := 0; b.Loop(); i++ {
-			bart.LookupPrefix(matchPfx6[i&mask])
+			lite.LookupPrefix(matchPfx6[i&mask])
 		}
 	})
 
@@ -242,22 +244,22 @@ func BenchmarkFullLiteMatch6(b *testing.B) {
 		matchPfx6 := tier1.matchPfx6()
 
 		for i := 0; b.Loop(); i++ {
-			bart.LookupPrefixLPM(matchPfx6[i&mask])
+			lite.LookupPrefixLPM(matchPfx6[i&mask])
 		}
 	})
 }
 
 func BenchmarkFullLiteMiss4(b *testing.B) {
-	bart := new(Lite)
+	lite := new(Lite)
 	for _, pfx := range tier1.routes4() {
-		bart.Insert(pfx)
+		lite.Insert(pfx)
 	}
 
 	b.Run("Contains", func(b *testing.B) {
 		missIP4 := tier1.missIP4()
 
 		for i := 0; b.Loop(); i++ {
-			bart.Contains(missIP4[i&mask])
+			lite.Contains(missIP4[i&mask])
 		}
 	})
 
@@ -265,7 +267,7 @@ func BenchmarkFullLiteMiss4(b *testing.B) {
 		missIP4 := tier1.missIP4()
 
 		for i := 0; b.Loop(); i++ {
-			bart.Lookup(missIP4[i&mask])
+			lite.Lookup(missIP4[i&mask])
 		}
 	})
 
@@ -273,7 +275,7 @@ func BenchmarkFullLiteMiss4(b *testing.B) {
 		missPfx4 := tier1.missPfx4()
 
 		for i := 0; b.Loop(); i++ {
-			bart.LookupPrefix(missPfx4[i&mask])
+			lite.LookupPrefix(missPfx4[i&mask])
 		}
 	})
 
@@ -281,22 +283,22 @@ func BenchmarkFullLiteMiss4(b *testing.B) {
 		missPfx4 := tier1.missPfx4()
 
 		for i := 0; b.Loop(); i++ {
-			bart.LookupPrefixLPM(missPfx4[i&mask])
+			lite.LookupPrefixLPM(missPfx4[i&mask])
 		}
 	})
 }
 
 func BenchmarkFullLiteMiss6(b *testing.B) {
-	bart := new(Lite)
+	lite := new(Lite)
 	for _, pfx := range tier1.routes6() {
-		bart.Insert(pfx)
+		lite.Insert(pfx)
 	}
 
 	b.Run("Contains", func(b *testing.B) {
 		missIP6 := tier1.missIP6()
 
 		for i := 0; b.Loop(); i++ {
-			bart.Contains(missIP6[i&mask])
+			lite.Contains(missIP6[i&mask])
 		}
 	})
 
@@ -304,7 +306,7 @@ func BenchmarkFullLiteMiss6(b *testing.B) {
 		missIP6 := tier1.missIP6()
 
 		for i := 0; b.Loop(); i++ {
-			bart.Lookup(missIP6[i&mask])
+			lite.Lookup(missIP6[i&mask])
 		}
 	})
 
@@ -312,7 +314,7 @@ func BenchmarkFullLiteMiss6(b *testing.B) {
 		missPfx6 := tier1.missPfx6()
 
 		for i := 0; b.Loop(); i++ {
-			bart.LookupPrefix(missPfx6[i&mask])
+			lite.LookupPrefix(missPfx6[i&mask])
 		}
 	})
 
@@ -320,10 +322,106 @@ func BenchmarkFullLiteMiss6(b *testing.B) {
 		missPfx6 := tier1.missPfx6()
 
 		for i := 0; b.Loop(); i++ {
-			bart.LookupPrefixLPM(missPfx6[i&mask])
+			lite.LookupPrefixLPM(missPfx6[i&mask])
 		}
 	})
 }
+
+// ####################################################
+
+func BenchmarkFullFastACLMatch4(b *testing.B) {
+	facl := new(FastACL)
+	for _, pfx := range tier1.routes4() {
+		facl.Insert(pfx)
+	}
+
+	b.Run("Contains", func(b *testing.B) {
+		matchIP4 := tier1.matchIP4()
+
+		for i := 0; b.Loop(); i++ {
+			facl.Contains(matchIP4[i&mask])
+		}
+	})
+
+	b.Run("LookupPfxLPM", func(b *testing.B) {
+		matchPfx4 := tier1.matchPfx4()
+
+		for i := 0; b.Loop(); i++ {
+			facl.LookupPrefixLPM(matchPfx4[i&mask])
+		}
+	})
+}
+
+func BenchmarkFullFastACLMatch6(b *testing.B) {
+	facl := new(FastACL)
+	for _, pfx := range tier1.routes6() {
+		facl.Insert(pfx)
+	}
+
+	b.Run("Contains", func(b *testing.B) {
+		matchIP6 := tier1.matchIP6()
+
+		for i := 0; b.Loop(); i++ {
+			facl.Contains(matchIP6[i&mask])
+		}
+	})
+
+	b.Run("LookupPfxLPM", func(b *testing.B) {
+		matchPfx6 := tier1.matchPfx6()
+
+		for i := 0; b.Loop(); i++ {
+			facl.LookupPrefixLPM(matchPfx6[i&mask])
+		}
+	})
+}
+
+func BenchmarkFullFastACLMiss4(b *testing.B) {
+	facl := new(FastACL)
+	for _, pfx := range tier1.routes4() {
+		facl.Insert(pfx)
+	}
+
+	b.Run("Contains", func(b *testing.B) {
+		missIP4 := tier1.missIP4()
+
+		for i := 0; b.Loop(); i++ {
+			facl.Contains(missIP4[i&mask])
+		}
+	})
+
+	b.Run("LookupPfxLPM", func(b *testing.B) {
+		missPfx4 := tier1.missPfx4()
+
+		for i := 0; b.Loop(); i++ {
+			facl.LookupPrefixLPM(missPfx4[i&mask])
+		}
+	})
+}
+
+func BenchmarkFullFastACLMiss6(b *testing.B) {
+	facl := new(FastACL)
+	for _, pfx := range tier1.routes6() {
+		facl.Insert(pfx)
+	}
+
+	b.Run("Contains", func(b *testing.B) {
+		missIP6 := tier1.missIP6()
+
+		for i := 0; b.Loop(); i++ {
+			facl.Contains(missIP6[i&mask])
+		}
+	})
+
+	b.Run("LookupPfxLPM", func(b *testing.B) {
+		missPfx6 := tier1.missPfx6()
+
+		for i := 0; b.Loop(); i++ {
+			facl.LookupPrefixLPM(missPfx6[i&mask])
+		}
+	})
+}
+
+// ####################################################
 
 func BenchmarkTableOverlaps4(b *testing.B) {
 	lt := new(Table[any])

@@ -4,15 +4,33 @@ package bart
 // SPDX-License-Identifier: MIT
 
 import (
+	"encoding/json"
 	"iter"
 	"math/rand/v2"
 	"net/netip"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/gaissmai/bart/internal/tests/golden"
 	"github.com/gaissmai/bart/internal/tests/random"
 )
+
+// buildFastACL is a test helper that constructs and populates a FastACL from CIDR strings.
+func buildFastACL(t *testing.T, cidrs []string) *FastACL {
+	t.Helper()
+
+	f := new(FastACL)
+	for _, cidr := range cidrs {
+		pfx, err := netip.ParsePrefix(cidr)
+		if err != nil {
+			t.Fatalf("failed to parse CIDR %q: %v", cidr, err)
+		}
+		f.Insert(pfx)
+	}
+
+	return f
+}
 
 func TestFastACL_NilReceiver(t *testing.T) {
 	t.Parallel()
@@ -45,6 +63,8 @@ func TestFastACL_NilReceiver(t *testing.T) {
 		mustPanic(t, "OverlapsPrefix", func() { tbl1.OverlapsPrefix(pfx6) })
 		mustPanic(t, "Equal", func() { tbl1.Equal(nil) })
 		mustPanic(t, "Fprint", func() { tbl1.Fprint(nil) })
+		mustPanic(t, "DumpList4", func() { tbl1.DumpList4() })
+		mustPanic(t, "DumpList6", func() { tbl1.DumpList6() })
 
 		mustPanicRangeOverFunc[any](t, "All", tbl1.All)
 		mustPanicRangeOverFunc[any](t, "All4", tbl1.All4)
@@ -52,7 +72,7 @@ func TestFastACL_NilReceiver(t *testing.T) {
 		mustPanicRangeOverFunc[any](t, "AllSorted", tbl1.AllSorted)
 		mustPanicRangeOverFunc[any](t, "AllSorted4", tbl1.AllSorted4)
 		mustPanicRangeOverFunc[any](t, "AllSorted6", tbl1.AllSorted6)
-		// TODO mustPanicRangeOverFunc[any](t, "Subnets", tbl1.Subnets)
+		mustPanicRangeOverFunc[any](t, "Subnets", tbl1.Subnets)
 		mustPanicRangeOverFunc[any](t, "Supernets", tbl1.Supernets)
 	})
 }
@@ -86,7 +106,7 @@ func TestFastACL_Invalid(t *testing.T) {
 	noPanic(t, "Size", func() { tbl1.Size() })
 	noPanic(t, "Size4", func() { tbl1.Size4() })
 	noPanic(t, "Size6", func() { tbl1.Size6() })
-	// TODO noPanic(t, "Subnets", func() { tbl1.Subnets(zeroPfx) })
+	noPanic(t, "Subnets", func() { tbl1.Subnets(zeroPfx) })
 	noPanic(t, "Supernets", func() { tbl1.Supernets(zeroPfx) })
 }
 
@@ -101,21 +121,21 @@ func TestFastACL_Contains_Compare(t *testing.T) {
 	pfxs := random.RealWorldPrefixes(prng, n)
 
 	gold := new(golden.Table[int])
-	tbl := new(FastACL)
+	facl := new(FastACL)
 
 	for i, p := range pfxs {
 		gold.Insert(p, i)
-		tbl.Insert(p)
+		facl.Insert(p)
 	}
 
 	for range n {
 		ip := random.IP(prng)
 
 		_, goldOK := gold.Lookup(ip)
-		tblOK := tbl.Contains(ip)
+		faclOK := facl.Contains(ip)
 
-		if goldOK != tblOK {
-			t.Fatalf("Contains(%q) = %v, want %v", ip, tblOK, goldOK)
+		if goldOK != faclOK {
+			t.Fatalf("Contains(%q) = %v, want %v", ip, faclOK, goldOK)
 		}
 	}
 }
@@ -140,11 +160,6 @@ func TestFastACL_Contains_Zoned(t *testing.T) {
 				}
 			})
 		}
-	}
-
-	type route struct {
-		cidr  string
-		value string
 	}
 
 	tests := []struct {
@@ -180,12 +195,12 @@ func TestFastACL_Contains_Zoned(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			table := new(FastACL)
+			facl := new(FastACL)
 			for _, pfxStr := range tt.pfxs {
-				table.Insert(mpp(pfxStr))
+				facl.Insert(mpp(pfxStr))
 			}
 
-			check(t, table, mpa(tt.probe), tt.wantOK)
+			check(t, facl, mpa(tt.probe), tt.wantOK)
 		})
 	}
 }
@@ -346,21 +361,21 @@ func TestFastACL_Insert_Shuffled(t *testing.T) {
 		pfxs2 := slices.Clone(pfxs)
 		prng.Shuffle(len(pfxs2), func(i, j int) { pfxs2[i], pfxs2[j] = pfxs2[j], pfxs2[i] })
 
-		tbl1 := new(FastACL)
-		tbl2 := new(FastACL)
+		facl1 := new(FastACL)
+		facl2 := new(FastACL)
 
 		for _, pfx := range pfxs {
-			tbl1.Insert(pfx)
-			tbl1.Insert(pfx) // idempotent
+			facl1.Insert(pfx)
+			facl1.Insert(pfx) // idempotent
 		}
 		for _, pfx := range pfxs2 {
-			tbl2.Insert(pfx) // idempotent
+			facl2.Insert(pfx) // idempotent
 		}
 
-		if tbl1.dumpString() != tbl2.dumpString() {
+		if facl1.dumpString() != facl2.dumpString() {
 			t.Fatal("tbl1 and tbl2 have different dumpString representation")
 		}
-		if !tbl1.Equal(tbl2) {
+		if !facl1.Equal(facl2) {
 			t.Fatal("expected Equal")
 		}
 	}
@@ -603,19 +618,19 @@ func TestFastACL_AllSorted(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			var acl FastACL
+			var facl FastACL
 			for _, pfx := range tt.initial {
-				acl.Insert(pfx)
+				facl.Insert(pfx)
 			}
 
 			var seq iter.Seq[netip.Prefix]
 			switch tt.mode {
 			case "all":
-				seq = acl.AllSorted()
+				seq = facl.AllSorted()
 			case "v4":
-				seq = acl.AllSorted4()
+				seq = facl.AllSorted4()
 			case "v6":
-				seq = acl.AllSorted6()
+				seq = facl.AllSorted6()
 			default:
 				t.Fatalf("unsupported mode: %s", tt.mode)
 			}
@@ -648,17 +663,17 @@ func TestFastACL_AllSorted_Compare(t *testing.T) {
 		pfxs := random.RealWorldPrefixes(prng, n)
 
 		gold := new(golden.Table[any])
-		tbl := new(FastACL)
+		facl := new(FastACL)
 
 		for _, pfx := range pfxs {
 			gold.Insert(pfx, nil)
-			tbl.Insert(pfx)
+			facl.Insert(pfx)
 		}
 
 		goldFlat := gold.FlatSorted()
-		tblSorted := slices.Collect(tbl.AllSorted())
+		faclSorted := slices.Collect(facl.AllSorted())
 
-		if !slices.Equal(goldFlat.SortKeys(), tblSorted) {
+		if !slices.Equal(goldFlat.SortKeys(), faclSorted) {
 			t.Fatal("expected Equal")
 		}
 	}
@@ -923,7 +938,7 @@ func TestFastACL_Aggregate_Compare(t *testing.T) {
 	t.Parallel()
 	n := workLoadN()
 
-	for i := range 50 {
+	for i := range n {
 		t.Run("subtest", func(t *testing.T) {
 			t.Parallel()
 
@@ -988,6 +1003,1001 @@ func TestFastACL_Aggregate_StructuralCompare(t *testing.T) {
 
 			if facl1.dumpString() != facl2.dumpString() {
 				t.Fatal("Aggregate(): the tables have mismatched internal structures!")
+			}
+		})
+	}
+}
+
+func TestFastACL_Supernets(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		query    string
+		inserts  []netip.Prefix
+		want     []netip.Prefix
+		wantExit bool // Test early break in yield callback via range break
+	}{
+		{
+			name:    "invalid prefix query",
+			query:   "invalid",
+			inserts: []netip.Prefix{mpp("10.0.0.0/8")},
+			want:    nil,
+		},
+		{
+			name:    "empty table",
+			query:   "10.0.0.0/16",
+			inserts: nil,
+			want:    nil,
+		},
+		{
+			name:    "exact match only",
+			query:   "10.1.2.0/24",
+			inserts: []netip.Prefix{mpp("10.1.2.0/24")},
+			want:    []netip.Prefix{mpp("10.1.2.0/24")},
+		},
+		{
+			name:    "uncanonical query normalization",
+			query:   "10.1.2.255/24", // Host bits set
+			inserts: []netip.Prefix{mpp("10.0.0.0/8"), mpp("10.1.2.0/24")},
+			want:    []netip.Prefix{mpp("10.1.2.0/24"), mpp("10.0.0.0/8")},
+		},
+		{
+			name:  "exact match and ascending supernets",
+			query: "10.1.2.128/25",
+			inserts: []netip.Prefix{
+				mpp("0.0.0.0/0"),
+				mpp("10.0.0.0/8"),
+				mpp("10.1.0.0/16"),
+				mpp("10.1.2.0/24"),
+				mpp("10.1.2.128/25"),
+			},
+			want: []netip.Prefix{
+				mpp("10.1.2.128/25"),
+				mpp("10.1.2.0/24"),
+				mpp("10.1.0.0/16"),
+				mpp("10.0.0.0/8"),
+				mpp("0.0.0.0/0"),
+			},
+		},
+		{
+			name:  "disjoint branches - skip non-matching siblings",
+			query: "10.1.2.0/24",
+			inserts: []netip.Prefix{
+				mpp("10.0.0.0/8"),
+				mpp("10.2.0.0/16"),    // Divergent stride
+				mpp("10.1.2.0/24"),    // Target match
+				mpp("10.1.3.0/24"),    // Divergent sibling
+				mpp("192.168.0.0/16"), // Completely separate tree
+			},
+			want: []netip.Prefix{
+				mpp("10.1.2.0/24"),
+				mpp("10.0.0.0/8"),
+			},
+		},
+		{
+			name:  "stride boundary fringes (/8, /16, /24)",
+			query: "10.1.2.4/30",
+			inserts: []netip.Prefix{
+				mpp("10.0.0.0/8"),  // Stride 1 fringe
+				mpp("10.1.0.0/16"), // Stride 2 fringe
+				mpp("10.1.2.0/24"), // Stride 3 fringe
+			},
+			want: []netip.Prefix{
+				mpp("10.1.2.0/24"),
+				mpp("10.1.0.0/16"),
+				mpp("10.0.0.0/8"),
+			},
+		},
+		{
+			name:  "cbt internal node prefixes within same stride",
+			query: "10.1.2.0/27",
+			inserts: []netip.Prefix{
+				mpp("10.1.2.0/24"),
+				mpp("10.1.2.0/25"),
+				mpp("10.1.2.0/26"),
+				mpp("10.1.2.0/27"),
+			},
+			want: []netip.Prefix{
+				mpp("10.1.2.0/27"),
+				mpp("10.1.2.0/26"),
+				mpp("10.1.2.0/25"),
+				mpp("10.1.2.0/24"),
+			},
+		},
+		{
+			name:  "path-compressed cidr leaf match first",
+			query: "10.1.2.128/28",
+			inserts: []netip.Prefix{
+				mpp("10.0.0.0/8"),
+				mpp("10.1.2.128/28"), // Unbranched path compression -> CIDRLeaf
+			},
+			want: []netip.Prefix{
+				mpp("10.1.2.128/28"), // Leaf yielded first in Phase 1
+				mpp("10.0.0.0/8"),    // Root supernet yielded during Phase 2 stack unwinding
+			},
+		},
+		{
+			name:  "path-compressed leaf skipped if query is broader than leaf",
+			query: "10.1.2.0/24", // Query is broader (/24) than leaf (/28)
+			inserts: []netip.Prefix{
+				mpp("10.0.0.0/8"),
+				mpp("10.1.2.128/28"), // Specific leaf in trie
+			},
+			want: []netip.Prefix{
+				mpp("10.0.0.0/8"), // Should not yield /28 because it's a subnet, not a supernet
+			},
+		},
+		{
+			name:  "ipv6 deep nested supernets",
+			query: "2001:db8:85a3:8a2e:370::/80",
+			inserts: []netip.Prefix{
+				mpp("::/0"),
+				mpp("2001:db8::/32"),
+				mpp("2001:db8:85a3::/48"),
+				mpp("2001:db8:85a3:8a2e::/64"),
+				mpp("2001:db8:85a3:8a2e:370::/80"),
+			},
+			want: []netip.Prefix{
+				mpp("2001:db8:85a3:8a2e:370::/80"),
+				mpp("2001:db8:85a3:8a2e::/64"),
+				mpp("2001:db8:85a3::/48"),
+				mpp("2001:db8::/32"),
+				mpp("::/0"),
+			},
+		},
+		{
+			name:  "early exit on yield false",
+			query: "10.1.2.0/24",
+			inserts: []netip.Prefix{
+				mpp("10.0.0.0/8"),
+				mpp("10.1.0.0/16"),
+				mpp("10.1.2.0/24"),
+			},
+			wantExit: true,
+			want: []netip.Prefix{
+				mpp("10.1.2.0/24"), // Should stop after first yield via break
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			tbl := new(FastACL)
+			for _, pfx := range tc.inserts {
+				tbl.Insert(pfx)
+			}
+
+			queryPfx, err := netip.ParsePrefix(tc.query)
+			if err != nil && tc.query != "invalid" {
+				t.Fatalf("unexpected test setup parse error for query %q: %v", tc.query, err)
+			}
+
+			var got []netip.Prefix
+
+			if tc.wantExit {
+				// Verify early termination semantics using native range-over-func with break.
+				for pfx := range tbl.Supernets(queryPfx) {
+					got = append(got, pfx)
+					break // Stop iteration immediately after receiving the first result.
+				}
+			} else {
+				// Collect all yielded netip.Prefix values directly from the iterator.
+				got = slices.Collect(tbl.Supernets(queryPfx))
+			}
+
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("Supernets(%q) mismatch:\ngot:  %v\nwant: %v", tc.query, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestFastACL_Supernets_Compare(t *testing.T) {
+	t.Parallel()
+	n := workLoadN()
+
+	prng := rand.New(rand.NewPCG(42, 42))
+
+	pfxs := random.RealWorldPrefixes(prng, n)
+
+	gold := new(golden.Table[any])
+	facl := new(FastACL)
+
+	for _, pfx := range pfxs {
+		gold.Insert(pfx, nil)
+		facl.Insert(pfx)
+	}
+
+	for _, pfx := range random.RealWorldPrefixes(prng, n) {
+		t.Run("subtest", func(t *testing.T) {
+			t.Parallel()
+			goldGot := gold.Supernets(pfx)
+			faclGot := slices.Collect(facl.Supernets(pfx))
+
+			if !slices.Equal(goldGot, faclGot) {
+				t.Fatalf("Supernets(%q) = %v, want %v", pfx, faclGot, goldGot)
+			}
+		})
+	}
+}
+
+func TestFastACL_Subnets(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		routes   []string // Prefixes to insert into FastACL
+		query    string   // Target prefix passed to Subnets()
+		want     []string // Expected subnets in natural CIDR sort order
+		maxYield int      // If > 0, stop range iteration early after N items
+	}{
+		{
+			name:   "invalid target prefix yields nothing",
+			routes: []string{"10.0.0.0/8"},
+			query:  "invalid-pfx",
+			want:   nil,
+		},
+		{
+			name:   "empty ACL yields nothing",
+			routes: nil,
+			query:  "10.0.0.0/8",
+			want:   nil,
+		},
+		{
+			name:   "exact match single prefix",
+			routes: []string{"10.0.0.0/8"},
+			query:  "10.0.0.0/8",
+			want:   []string{"10.0.0.0/8"},
+		},
+		{
+			name:   "unmasked prefix query is normalized automatically",
+			routes: []string{"10.1.2.0/24"},
+			query:  "10.1.2.255/24", // Normalized to 10.1.2.0/24
+			want:   []string{"10.1.2.0/24"},
+		},
+		{
+			name: "IPv4 nested subnets in canonical CIDR order",
+			routes: []string{
+				"10.0.0.0/8",
+				"10.1.0.0/16",
+				"10.1.1.0/24",
+				"10.1.2.0/24",
+				"10.2.0.0/16",
+				"192.168.0.0/16",
+			},
+			query: "10.0.0.0/8",
+			want: []string{
+				"10.0.0.0/8",
+				"10.1.0.0/16",
+				"10.1.1.0/24",
+				"10.1.2.0/24",
+				"10.2.0.0/16",
+			},
+		},
+		{
+			name:   "pruning non-matching sibling subtrees",
+			routes: []string{"10.1.0.0/16", "10.1.1.0/24", "10.2.0.0/16"},
+			query:  "10.1.0.0/16",
+			want: []string{
+				"10.1.0.0/16",
+				"10.1.1.0/24",
+			},
+		},
+		{
+			name: "IPv6 subnets across stride boundaries",
+			routes: []string{
+				"2001:db8::/32",
+				"2001:db8:1000::/36",
+				"2001:db8:1000::/48",
+				"2001:db8:2000::/36",
+				"2001:dc0::/32",
+			},
+			query: "2001:db8::/32",
+			want: []string{
+				"2001:db8::/32",
+				"2001:db8:1000::/36",
+				"2001:db8:1000::/48",
+				"2001:db8:2000::/36",
+			},
+		},
+		{
+			name:     "early iteration break",
+			routes:   []string{"10.0.0.0/8", "10.1.0.0/16", "10.1.1.0/24", "10.2.0.0/16"},
+			query:    "10.0.0.0/8",
+			want:     []string{"10.0.0.0/8", "10.1.0.0/16"},
+			maxYield: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			facl := new(FastACL)
+			for _, r := range tt.routes {
+				pfx := mpp(r)
+				facl.Insert(pfx)
+			}
+
+			var target netip.Prefix
+			if tt.query != "invalid-pfx" {
+				target = netip.MustParsePrefix(tt.query)
+			}
+
+			var got []string
+			for pfx := range facl.Subnets(target) {
+				got = append(got, pfx.String())
+				if tt.maxYield > 0 && len(got) == tt.maxYield {
+					break
+				}
+			}
+
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("Subnets(%q) mismatch:\n  got:  %v\n  want: %v", tt.query, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFastACL_Subnets_Compare(t *testing.T) {
+	t.Parallel()
+	n := workLoadN()
+	prng := rand.New(rand.NewPCG(42, 42))
+
+	pfxs := random.RealWorldPrefixes(prng, n)
+
+	gold := new(golden.Table[any])
+	facl := new(FastACL)
+
+	for _, pfx := range pfxs {
+		gold.Insert(pfx, nil)
+		facl.Insert(pfx)
+	}
+
+	for _, pfx := range random.RealWorldPrefixes(prng, n) {
+		t.Run("subtest", func(t *testing.T) {
+			t.Parallel()
+
+			goldGot := gold.Subnets(pfx)
+			faclGot := slices.Collect(facl.Subnets(pfx))
+
+			if !slices.Equal(goldGot, faclGot) {
+				t.Fatalf("Subnets(%q) = %v, want %v", pfx, faclGot, goldGot)
+			}
+		})
+	}
+}
+
+func TestFastACL_Union(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		base      []string
+		other     []string
+		wantSize4 int
+		wantSize6 int
+	}{
+		{
+			name:      "union disjoint IPv4 prefixes",
+			base:      []string{"192.168.1.0/24", "10.0.0.0/8"},
+			other:     []string{"172.16.0.0/12", "192.168.2.0/24"},
+			wantSize4: 4,
+			wantSize6: 0,
+		},
+		{
+			name:      "union overlapping and duplicate IPv4 prefixes",
+			base:      []string{"192.168.0.0/16", "10.0.0.0/24"},
+			other:     []string{"192.168.1.0/24", "10.0.0.0/24"}, // 10.0.0.0/24 is duplicate
+			wantSize4: 3,                                         // /16, /24, /24
+			wantSize6: 0,
+		},
+		{
+			name:      "union disjoint IPv6 prefixes",
+			base:      []string{"2001:db8::/32"},
+			other:     []string{"fe80::/10", "2001:db8:1::/48"},
+			wantSize4: 0,
+			wantSize6: 3,
+		},
+		{
+			name:      "union dual-stack mixed prefixes",
+			base:      []string{"192.168.1.0/24", "2001:db8::/32"},
+			other:     []string{"10.0.0.0/8", "fe80::/10"},
+			wantSize4: 2,
+			wantSize6: 2,
+		},
+		{
+			name:      "union empty other table into non-empty base",
+			base:      []string{"192.168.1.0/24"},
+			other:     []string{},
+			wantSize4: 1,
+			wantSize6: 0,
+		},
+		{
+			name:      "union empty base with non empty other table",
+			base:      []string{},
+			other:     []string{"192.168.1.0/24"},
+			wantSize4: 1,
+			wantSize6: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Initialize base FastACL table
+			facl := new(FastACL)
+			for _, pfxStr := range tt.base {
+				facl.Insert(mpp(pfxStr))
+			}
+
+			// Initialize other FastACL table
+			other := new(FastACL)
+			for _, pfxStr := range tt.other {
+				other.Insert(mpp(pfxStr))
+			}
+
+			// Execute Union operation
+			facl.Union(other)
+
+			// Verify final sizes match expectations
+			if got := facl.Size4(); got != tt.wantSize4 {
+				t.Errorf("FastACL.Union() Size4 = %v, want %v", got, tt.wantSize4)
+			}
+			if got := facl.Size6(); got != tt.wantSize6 {
+				t.Errorf("FastACL.Union() Size6 = %v, want %v", got, tt.wantSize6)
+			}
+		})
+	}
+}
+
+func TestFastACL_Union_Compare(t *testing.T) {
+	t.Parallel()
+	n := workLoadN()
+	prng := rand.New(rand.NewPCG(42, 42))
+
+	for range 3 {
+		pfxs := random.RealWorldPrefixes(prng, n)
+
+		gold := new(golden.Table[any])
+		facl := new(FastACL)
+
+		for _, pfx := range pfxs {
+			gold.Insert(pfx, nil)
+			facl.Insert(pfx)
+		}
+
+		pfxs2 := random.RealWorldPrefixes(prng, n)
+
+		gold2 := new(golden.Table[any])
+		facl2 := new(FastACL)
+
+		for _, pfx := range pfxs2 {
+			gold2.Insert(pfx, nil)
+			facl2.Insert(pfx)
+		}
+
+		gold.Union(*gold2)
+		facl.Union(facl2)
+
+		goldFlat := gold.FlatSorted()
+		faclSorted := slices.Collect(facl.AllSorted())
+
+		if !slices.Equal(goldFlat.SortKeys(), faclSorted) {
+			t.Fatal("expected Equal")
+		}
+	}
+}
+
+func TestFastACL_OverlapsPrefix(t *testing.T) {
+	t.Parallel()
+
+	type probe struct {
+		pfx  netip.Prefix
+		want bool
+	}
+
+	type probes []probe
+	type pfxs []netip.Prefix
+
+	type test struct {
+		name   string
+		insert pfxs
+		probes probes
+	}
+
+	tests := []test{
+		{
+			name:   "empty table",
+			insert: nil,
+			probes: probes{{mpp("0.0.0.0/0"), false}, {mpp("::/0"), false}},
+		},
+		{
+			name:   "default route I",
+			insert: pfxs{mpp("10.0.0.0/9"), mpp("2001:db8::/32")},
+			probes: probes{{mpp("0.0.0.0/0"), true}, {mpp("::/0"), true}},
+		},
+		{
+			name:   "default route II",
+			insert: pfxs{mpp("0.0.0.0/0"), mpp("::/0")},
+			probes: probes{{mpp("10.0.0.0/9"), true}, {mpp("2001:db8::/32"), true}},
+		},
+		{
+			name:   "single IP I",
+			insert: pfxs{mpp("10.0.0.0/7"), mpp("2001::/16")},
+			probes: probes{{mpp("10.1.2.3/32"), true}, {mpp("2001:db8:affe::cafe/128"), true}},
+		},
+		{
+			name:   "single IP II",
+			insert: pfxs{mpp("10.1.2.3/32"), mpp("2001:db8:affe::cafe/128")},
+			probes: probes{{mpp("10.0.0.0/7"), true}, {mpp("2001::/16"), true}},
+		},
+		{
+			name:   "same IP",
+			insert: pfxs{mpp("10.1.2.3/32"), mpp("2001:db8:affe::cafe/128")},
+			probes: probes{{mpp("10.1.2.3/32"), true}, {mpp("2001:db8:affe::cafe/128"), true}},
+		},
+		{
+			name:   "full expanded path",
+			insert: pfxs{mpp("10.1.2.3/32"), mpp("10.1.2.4/32")},
+			probes: probes{{mpp("10.1.2.3/32"), true}, {mpp("10.1.2.5/32"), false}},
+		},
+	}
+
+	for _, tt := range tests {
+		facl := new(FastACL)
+		for _, pfx := range tt.insert {
+			facl.Insert(pfx)
+		}
+
+		for _, probe := range tt.probes {
+			got := facl.OverlapsPrefix(probe.pfx)
+			if got != probe.want {
+				t.Errorf("[%s] OverlapsPrefix(%v) = %v, want %v", tt.name, probe.pfx, got, probe.want)
+			}
+		}
+	}
+}
+
+func TestFastACL_OverlapsPrefix_Compare(t *testing.T) {
+	// Create large route tables repeatedly, and compare Table's
+	// behavior to a naive and slow but correct implementation.
+	t.Parallel()
+
+	n := workLoadN()
+
+	prng := rand.New(rand.NewPCG(42, 42))
+	pfxs := random.RealWorldPrefixes(prng, n)
+
+	gold := new(golden.Table[any])
+	facl := new(FastACL)
+	for _, pfx := range pfxs {
+		gold.Insert(pfx, nil)
+		facl.Insert(pfx)
+	}
+
+	for range n {
+		pfx := random.Prefix(prng)
+
+		goldOK := gold.OverlapsPrefix(pfx)
+		faclOK := facl.OverlapsPrefix(pfx)
+
+		if goldOK != faclOK {
+			t.Fatalf("OverlapsPrefix(%q) = %v, want %v", pfx, faclOK, goldOK)
+		}
+	}
+}
+
+func TestFastACL_Overlaps(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		routes1   []string
+		routes2   []string
+		wantTotal bool
+		wantV4    bool
+		wantV6    bool
+	}{
+		{
+			name:      "both empty tables",
+			routes1:   nil,
+			routes2:   nil,
+			wantTotal: false,
+			wantV4:    false,
+			wantV6:    false,
+		},
+		{
+			name:      "receiver empty",
+			routes1:   nil,
+			routes2:   []string{"10.0.0.0/8", "2001:db8::/32"},
+			wantTotal: false,
+			wantV4:    false,
+			wantV6:    false,
+		},
+		{
+			name:      "other empty",
+			routes1:   []string{"10.0.0.0/8", "2001:db8::/32"},
+			routes2:   nil,
+			wantTotal: false,
+			wantV4:    false,
+			wantV6:    false,
+		},
+		{
+			name:      "disjoint IPv4 and IPv6",
+			routes1:   []string{"10.0.0.0/16", "2001:db8:1::/48"},
+			routes2:   []string{"10.1.0.0/16", "2001:db8:2::/48"},
+			wantTotal: false,
+			wantV4:    false,
+			wantV6:    false,
+		},
+		{
+			name:      "exact match IPv4",
+			routes1:   []string{"192.168.1.0/24"},
+			routes2:   []string{"192.168.1.0/24"},
+			wantTotal: true,
+			wantV4:    true,
+			wantV6:    false,
+		},
+		{
+			name:      "exact match IPv6",
+			routes1:   []string{"fe80::/10"},
+			routes2:   []string{"fe80::/10"},
+			wantTotal: true,
+			wantV4:    false,
+			wantV6:    true,
+		},
+		{
+			name:      "IPv4 subnet overlap (receiver contains other)",
+			routes1:   []string{"10.0.0.0/8"},
+			routes2:   []string{"10.1.2.0/24"},
+			wantTotal: true,
+			wantV4:    true,
+			wantV6:    false,
+		},
+		{
+			name:      "IPv4 supernet overlap (other contains receiver)",
+			routes1:   []string{"172.16.10.0/24"},
+			routes2:   []string{"172.16.0.0/12"},
+			wantTotal: true,
+			wantV4:    true,
+			wantV6:    false,
+		},
+		{
+			name:      "IPv6 subnet overlap (receiver contains other)",
+			routes1:   []string{"2001:db8::/32"},
+			routes2:   []string{"2001:db8:abcd::/48"},
+			wantTotal: true,
+			wantV4:    false,
+			wantV6:    true,
+		},
+		{
+			name:      "IPv6 supernet overlap (other contains receiver)",
+			routes1:   []string{"2001:db8:ffff::/48"},
+			routes2:   []string{"2001:db8::/32"},
+			wantTotal: true,
+			wantV4:    false,
+			wantV6:    true,
+		},
+		{
+			name:      "mixed dual-stack: only IPv4 overlaps",
+			routes1:   []string{"10.0.0.0/16", "2001:db8:1::/48"},
+			routes2:   []string{"10.0.1.0/24", "2001:db8:2::/48"},
+			wantTotal: true,
+			wantV4:    true,
+			wantV6:    false,
+		},
+		{
+			name:      "mixed dual-stack: only IPv6 overlaps",
+			routes1:   []string{"10.0.0.0/16", "2001:db8::/32"},
+			routes2:   []string{"10.1.0.0/16", "2001:db8:1234::/48"},
+			wantTotal: true,
+			wantV4:    false,
+			wantV6:    true,
+		},
+		{
+			name:      "mixed dual-stack: both IPv4 and IPv6 overlap",
+			routes1:   []string{"10.0.0.0/8", "2001:db8::/32"},
+			routes2:   []string{"10.1.0.0/16", "2001:db8:abcd::/48"},
+			wantTotal: true,
+			wantV4:    true,
+			wantV6:    true,
+		},
+		{
+			name:      "default route IPv4 (/0) overlap",
+			routes1:   []string{"0.0.0.0/0"},
+			routes2:   []string{"192.168.0.1/32"},
+			wantTotal: true,
+			wantV4:    true,
+			wantV6:    false,
+		},
+		{
+			name:      "default route IPv6 (/0) overlap",
+			routes1:   []string{"::/0"},
+			routes2:   []string{"2001:db8::1/128"},
+			wantTotal: true,
+			wantV4:    false,
+			wantV6:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			facl1 := buildFastACL(t, tt.routes1)
+			facl2 := buildFastACL(t, tt.routes2)
+
+			if got := facl1.Overlaps(facl2); got != tt.wantTotal {
+				t.Errorf("FastACL.Overlaps() = %v, want %v", got, tt.wantTotal)
+			}
+
+			if got := facl1.Overlaps4(facl2); got != tt.wantV4 {
+				t.Errorf("FastACL.Overlaps4() = %v, want %v", got, tt.wantV4)
+			}
+
+			if got := facl1.Overlaps6(facl2); got != tt.wantV6 {
+				t.Errorf("FastACL.Overlaps6() = %v, want %v", got, tt.wantV6)
+			}
+
+			// Verify bidirectionality (facl2.Overlaps(facl1) must yield the exact same result)
+			if got := facl2.Overlaps(facl1); got != tt.wantTotal {
+				t.Errorf("FastACL.Overlaps() bidirectional = %v, want %v", got, tt.wantTotal)
+			}
+
+			if got := facl2.Overlaps4(facl1); got != tt.wantV4 {
+				t.Errorf("FastACL.Overlaps4() bidirectional = %v, want %v", got, tt.wantV4)
+			}
+
+			if got := facl2.Overlaps6(facl1); got != tt.wantV6 {
+				t.Errorf("FastACL.Overlaps6() bidirectional = %v, want %v", got, tt.wantV6)
+			}
+		})
+	}
+}
+
+func TestFastACL_Compare(t *testing.T) {
+	t.Parallel()
+
+	n := workLoadN()
+	prng := rand.New(rand.NewPCG(42, 42))
+
+	for range 10 {
+		t.Run("subtest", func(t *testing.T) {
+			t.Parallel()
+
+			pfxs := random.RealWorldPrefixes(prng, n)
+
+			gold1 := new(golden.Table[any])
+			facl1 := new(FastACL)
+
+			for _, pfx := range pfxs {
+				gold1.Insert(pfx, nil)
+				facl1.Insert(pfx)
+			}
+
+			pfxs2 := random.RealWorldPrefixes(prng, n)
+
+			gold2 := new(golden.Table[any])
+			facl2 := new(FastACL)
+
+			for _, pfx := range pfxs2 {
+				gold2.Insert(pfx, nil)
+				facl2.Insert(pfx)
+			}
+
+			goldGot := gold1.Overlaps(*gold2)
+			faclGot := facl1.Overlaps(facl2)
+
+			if goldGot != faclGot {
+				t.Fatal("Overlaps is different")
+			}
+		})
+	}
+}
+
+func TestTestFastACL_DumpList(t *testing.T) {
+	t.Parallel()
+
+	normalizeWhitespace := func(s string) string {
+		fields := strings.Fields(s)
+		return strings.Join(fields, "")
+	}
+
+	tests := []struct {
+		name         string
+		is4          bool
+		prefixes     []string
+		expectedJSON string
+	}{
+		{
+			name:         "Empty IPv4 Table",
+			is4:          true,
+			prefixes:     nil,
+			expectedJSON: "[]",
+		},
+		{
+			name:     "Single IPv4 Prefix",
+			is4:      true,
+			prefixes: []string{"192.168.1.0/24"},
+			expectedJSON: `
+			[
+				{
+					"cidr": "192.168.1.0/24"
+				}
+			]`,
+		},
+		{
+			name:     "Nested IPv4 Prefixes",
+			is4:      true,
+			prefixes: []string{"10.0.0.0/8", "10.1.0.0/16", "10.1.1.0/24"},
+			expectedJSON: `
+			[
+				{
+					"cidr": "10.0.0.0/8",
+					"subnets": [
+						{
+							"cidr": "10.1.0.0/16",
+							"subnets": [
+								{
+									"cidr": "10.1.1.0/24"
+								}
+							]
+						}
+					]
+				}
+			]`,
+		},
+		{
+			name:         "Empty IPv6 Table",
+			is4:          false,
+			prefixes:     nil,
+			expectedJSON: "[]",
+		},
+		{
+			name:     "Single IPv6 Prefix",
+			is4:      false,
+			prefixes: []string{"2001:db8::/32"},
+			expectedJSON: `
+			[
+				{
+					"cidr": "2001:db8::/32"
+				}
+			]`,
+		},
+		{
+			name:     "Nested IPv6 Prefixes",
+			is4:      false,
+			prefixes: []string{"2001:db8::/32", "2001:db8::/48", "2001:db8::/64"},
+			expectedJSON: `
+			[
+				{
+					"cidr": "2001:db8::/32",
+					"subnets": [
+						{
+							"cidr": "2001:db8::/48",
+							"subnets": [
+								{
+									"cidr": "2001:db8::/64"
+								}
+							]
+						}
+					]
+				}
+			]`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			f := new(FastACL)
+			for _, s := range tt.prefixes {
+				f.Insert(mpp(s))
+			}
+
+			var got []DumpListNode[any]
+			if tt.is4 {
+				got = f.DumpList4()
+			} else {
+				got = f.DumpList6()
+			}
+
+			gotJSON, err := json.MarshalIndent(got, "", "  ")
+			if err != nil {
+				t.Fatalf("failed to marshal got to JSON: %v", err)
+			}
+
+			gotStr := normalizeWhitespace(string(gotJSON))
+			wantStr := normalizeWhitespace(tt.expectedJSON)
+
+			if gotStr != wantStr {
+				t.Errorf("\nGot JSON:\n%s\n\nWant JSON:\n%s", gotStr, wantStr)
+			}
+		})
+	}
+}
+
+func TestFastACL_Has(t *testing.T) {
+	t.Parallel()
+
+	f := new(FastACL)
+	f.Insert(mpp("192.0.0.0/8"))
+	f.Insert(mpp("192.168.0.0/18"))
+	f.Insert(mpp("192.168.1.0/24"))
+	f.Insert(mpp("2001::/16"))
+	f.Insert(mpp("2001:db8::/32"))
+	f.Insert(mpp("2001:db8::/48"))
+
+	tests := []struct {
+		name string
+		pfx  netip.Prefix
+		want bool
+	}{
+		{
+			name: "Invalid Prefix",
+			pfx:  netip.Prefix{},
+			want: false,
+		},
+		{
+			name: "Exact Match IPv4 - Absent",
+			pfx:  mpp("0.0.0.0/0"),
+			want: false,
+		},
+		{
+			name: "Exact Match IPv4 - Present",
+			pfx:  mpp("192.168.1.0/24"),
+			want: true,
+		},
+		{
+			name: "Exact Match IPv4 - Absent",
+			pfx:  mpp("192.168.0.0/17"),
+			want: false,
+		},
+		{
+			name: "Exact Match IPv4 - Unmasked Prefix Auto-Canonicalized",
+			pfx:  netip.PrefixFrom(mpa("192.168.1.5"), 24),
+			want: true,
+		},
+		{
+			name: "Exact Match IPv4 - Absent",
+			pfx:  mpp("10.0.0.0/16"),
+			want: false,
+		},
+		{
+			name: "Exact Match IPv6 - Absent",
+			pfx:  mpp("::/0"),
+			want: false,
+		},
+		{
+			name: "Exact Match IPv6 - Present",
+			pfx:  mpp("2001:db8::/32"),
+			want: true,
+		},
+		{
+			name: "Exact Match IPv6 - Absent",
+			pfx:  mpp("2001:db8::/33"),
+			want: false,
+		},
+		{
+			name: "Exact Match IPv6 - Absent",
+			pfx:  mpp("fe80::/64"),
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := f.Has(tt.pfx)
+			if got != tt.want {
+				t.Errorf("FastACL.Has(%v) = %v, want %v", tt.pfx, got, tt.want)
 			}
 		})
 	}

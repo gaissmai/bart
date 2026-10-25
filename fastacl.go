@@ -8,6 +8,7 @@ import (
 	"io"
 	"iter"
 	"net/netip"
+	"slices"
 	"strings"
 	"sync"
 
@@ -100,6 +101,66 @@ func (f *FastACL) Delete(pfx netip.Prefix) {
 	}
 }
 
+// Has performs an exact-prefix lookup and returns whether the prefix exists.
+// The prefix is automatically normalized using pfx.Masked().
+// Invalid prefixes always return false.
+func (f *FastACL) Has(pfx netip.Prefix) bool {
+	// Guard clause: reject invalid prefixes immediately.
+	if !pfx.IsValid() {
+		return false
+	}
+
+	// Canonicalize the prefix (zero out host bits) and extract its length.
+	pfx = pfx.Masked()
+	pfxLen := pfx.Bits()
+
+	// Determine the byte-level stride depth and remaining mod bits for the prefix length.
+	strideCount, modBits := nodes.DivMod8(pfxLen)
+
+	// Extract the IP address and select the appropriate root node (IPv4 vs IPv6).
+	ip := pfx.Addr()
+	n := f.rootNodeByVersion(ip.Is4())
+
+	// Traverse the IP address bytes (octets) down the trie structure.
+	for depth, octet := range ip.AsSlice() {
+		// Check if we have reached the exact stride depth where the fringe is stored.
+		if depth == strideCount-1 && modBits == 0 { // IsFringe()
+			if n.Fringes.Test(octet) {
+				return true
+			}
+		}
+
+		// Check if we have reached the exact stride depth where the prefix is stored.
+		if depth == strideCount {
+			if n.Prefixes.Test(art.PfxToIdx(octet, modBits)) {
+				return true
+			}
+		}
+
+		// Stop traversal if no child or leaf exists for the current octet.
+		if !n.Children.Test(octet) {
+			return false
+		}
+		kid := n.MustGetChild(octet)
+
+		// Type switch on the child node to either descend further or check a leaf node.
+		switch kid := kid.(type) {
+		case *nodes.FastACLNode:
+			// descend down to next trie level
+			n = kid
+
+		case *nodes.CIDRLeaf:
+			// If we hit a CIDR leaf, verify if it matches the target prefix exactly.
+			if kid.Prefix() == pfx {
+				return true
+			}
+			return false
+		}
+	}
+
+	return false
+}
+
 // Contains reports whether any stored prefix in the FastACL table covers the given IP address.
 // An invalid netip.Addr returns false.
 //
@@ -113,13 +174,13 @@ func (f *FastACL) Contains(ip netip.Addr) bool {
 	n := f.rootNodeByVersion(is4)
 
 	for _, octet := range ip.AsSlice() {
-		// Short-circuit: any matching local prefix in this node is sufficient
-		if n.PrefixCount() != 0 && n.Contains(art.OctetToIdx(octet)) {
+		// Short-circuit: any matching fringe in this node is sufficient
+		if n.Fringes.Test(octet) {
 			return true
 		}
 
-		// Short-circuit: any matching fringe in this node is sufficient
-		if n.Fringes.Test(octet) {
+		// Short-circuit: any matching local prefix in this node is sufficient
+		if n.PrefixCount() != 0 && n.Contains(art.OctetToIdx(octet)) {
 			return true
 		}
 
@@ -129,8 +190,14 @@ func (f *FastACL) Contains(ip netip.Addr) bool {
 		}
 		kid := n.MustGetChild(octet)
 
-		// Terminal leaf node encountered
-		if leaf, ok := kid.(*nodes.CIDRLeaf); ok {
+		switch kid := kid.(type) {
+		case *nodes.FastACLNode:
+			// descend down to next trie level
+			n = kid
+			continue
+
+		case *nodes.CIDRLeaf:
+
 			// Strip IPv6 zone only when evaluating leaf.Prefix.Contains.
 			// Deferred to this branch so short-circuiting hits do not pay the stripping penalty.
 			//
@@ -140,11 +207,8 @@ func (f *FastACL) Contains(ip netip.Addr) bool {
 			if !is4 {
 				ip = netip.PrefixFrom(ip, 0).Addr()
 			}
-			return leaf.Prefix().Contains(ip)
+			return kid.Prefix().Contains(ip)
 		}
-
-		// Internal trie node: descend to next level
-		n = kid.(*nodes.FastACLNode)
 	}
 
 	return false
@@ -176,10 +240,23 @@ func (f *FastACL) ContainsPrefix(pfx netip.Prefix) bool {
 	n := f.rootNodeByVersion(is4)
 
 	// Traverse the trie top-down across byte strides up to the probe's target depth.
-	for depth := range strideCount + 1 {
-		octet := octets[depth]
+	for depth, octet := range octets {
+		depth &= nodes.DepthMask // BCE
 
-		// 1. Check for covering local prefixes within the current stride node.
+		// stepped one past the last stride of interest
+		if depth > strideCount {
+			return false
+		}
+
+		// 1. Check for a stride-aligned fringe boundary matching at /8, /16, /24, etc.
+		fringeBits := (depth + 1) << 3
+		// Verify that the fringe's prefix length is broader/equal and encloses
+		// the target prefix.
+		if fringeBits <= pfxLen && n.Fringes.Test(octet) {
+			return true
+		}
+
+		// 2. Check for covering local prefixes within the current stride node.
 		if n.PrefixCount() != 0 {
 			// Intermediate strides evaluate full 8-bit host routes;
 			// only the terminal stride uses the remaining bit count (modBits).
@@ -196,14 +273,6 @@ func (f *FastACL) ContainsPrefix(pfx netip.Prefix) bool {
 			}
 		}
 
-		// 2. Check for a stride-aligned fringe boundary matching at /8, /16, /24, etc.
-		fringeBits := (depth + 1) << 3
-		// Verify that the fringe's prefix length is broader/equal and encloses
-		// the target prefix.
-		if fringeBits <= pfxLen && n.Fringes.Test(octet) {
-			return true
-		}
-
 		// 3. Early termination: stop traversal if no child node or leaf exists at the target octet slot.
 		if !n.Children.Test(octet) {
 			return false
@@ -214,7 +283,7 @@ func (f *FastACL) ContainsPrefix(pfx netip.Prefix) bool {
 
 		switch kid := kid.(type) {
 		case *nodes.FastACLNode:
-			// Recurse into deeper trie level.
+			// descend down to next trie level
 			n = kid
 			continue
 
@@ -224,6 +293,7 @@ func (f *FastACL) ContainsPrefix(pfx netip.Prefix) bool {
 			if kid.Prefix().Bits() > pfxLen {
 				return false
 			}
+			// no zone stripping needed, a netip.Prefix has no zone
 			return kid.Prefix().Contains(ip)
 		}
 	}
@@ -266,14 +336,19 @@ func (f *FastACL) LookupPrefixLPM(pfx netip.Prefix) (lpmPfx netip.Prefix, ok boo
 	var octet byte
 
 	// Top-down traversal: Descend as deep as possible along the octet path.
+	// find the last node on the octets path in the trie,
 LOOP:
-	for depth = range strideCount + 1 {
-		depth &= nodes.DepthMask // BCE: Hint compiler that depth stays within bounds
+	for depth, octet = range octets {
+		depth &= nodes.DepthMask // BCE
+
+		// stepped one past the last stride of interest; back up to last and break
+		if depth > strideCount {
+			depth--
+			break LOOP
+		}
 
 		// Record current node on the traversal stack for backtracking
 		stack[depth] = n
-
-		octet = octets[depth]
 
 		// Early exit from descent if no child or leaf exists at the target octet slot.
 		if !n.Children.Test(octet) {
@@ -282,8 +357,8 @@ LOOP:
 		kid := n.MustGetChild(octet)
 
 		switch kid := kid.(type) {
+		// descend down to next trie level
 		case *nodes.FastACLNode:
-			// Descend deeper into next trie level
 			n = kid
 			continue LOOP
 
@@ -345,66 +420,185 @@ LOOP:
 	return lpmPfx, ok
 }
 
-// Supernets returns an iterator over all supernet routes that cover the given prefix pfx.
+// Supernets returns an iterator over all enclosing supernet prefixes in the FastACL table
+// that cover the given target prefix range pfx.
 //
-// The traversal searches both exact-length and shorter (less specific) prefixes that
-// include pfx. Starting from the most specific position in the trie,
-// it walks upward through parent nodes and yields any matching entries found at each level.
+// The iteration yields matching routes in reverse CIDR order:
+//  1. An exact match for pfx itself (if present in the table).
+//  2. Enclosing supernet routes ascending from the most specific match (longest prefix match)
+//     up to the most general enclosing route (root level /0).
 //
-// The iteration order is reverse-CIDR: from longest prefix match (LPM) towards
-// least-specific routes.
-//
-// This can be used to enumerate all covering supernet routes in routing-based
-// policy engines, diagnostics tools, or fallback resolution logic.
-//
-// Example:
-//
-//	for supernet, val := range table.Supernets(netip.MustParsePrefix("192.0.2.128/25")) {
-//	    fmt.Println("Covered by:", supernet, "->", val)
-//	}
-//
-// The iteration can be stopped early by breaking from the range loop.
-// Returns an empty iterator if the prefix is invalid.
+// Non-canonical inputs are automatically normalized. If pfx is invalid (!pfx.IsValid()),
+// an empty sequence is returned immediately without executing yield.
 func (f *FastACL) Supernets(pfx netip.Prefix) iter.Seq[netip.Prefix] {
+	// Guard clause: Early exit before any processing or closure allocation logic.
+	if !pfx.IsValid() {
+		return nodes.EmptySeq
+	}
+
+	// Canonicalize prefix into a NEW variable.
+	// This enables the compiler to capture canonicalPfx by value instead of by ref,
+	// avoiding the 'moved to heap: pfx' allocation.
+	canonicalPfx := pfx.Masked()
+
+	// Traversal is performed in two phases:
+	//  1. Descent Phase: Downward traversal along the octet path to locate the deepest matching node,
+	//     pushing visited internal nodes onto a fixed-size stack. If a compressed path leaf (*CIDRLeaf)
+	//     is encountered and covers pfx, its prefix is yielded immediately (most specific match).
+	//  2. Backtracking Phase: Unwinding the stack bottom-up, calling [FastACLNode.YieldSupernets]
+	//     at each step to yield stride-aligned fringe prefixes and node-internal prefixes in descending length order.
+	//
+	// Iteration halts immediately if the yield callback returns false.
 	return func(yield func(netip.Prefix) bool) {
-		if !pfx.IsValid() {
-			return
-		}
-
-		// canonicalize the prefix
-		pfx = pfx.Masked()
-
+		pfx := canonicalPfx
 		is4 := pfx.Addr().Is4()
 		n := f.rootNodeByVersion(is4)
 
-		n.Supernets(pfx, yield)
+		ip := pfx.Addr()
+		pfxLen := pfx.Bits()
+		octets := ip.AsSlice()
+		strideCount, modBits := nodes.DivMod8(pfxLen)
+
+		// Fixed-size stack tracking traversed nodes for reverse (bottom-up) iteration.
+		stack := [nodes.MaxTreeDepth]*nodes.FastACLNode{}
+
+		// Loop tracking variables preserved for the unwinding phase.
+		var depth int
+		var octet byte
+
+		// Phase 1: Descend down the trie along the octet path.
+	LOOP:
+		// find the last node on the octets path in the trie,
+		for depth, octet = range octets {
+			// stepped one past the last stride of interest; back up to last and break
+			if depth > strideCount {
+				depth--
+				break
+			}
+
+			// push current node on stack
+			stack[depth] = n
+
+			// Stop descent if no child pointer exists for this octet.
+			if !n.Children.Test(octet) {
+				break LOOP
+			}
+			kid := n.MustGetChild(octet)
+
+			switch kid := kid.(type) {
+			case *nodes.FastACLNode:
+				n = kid
+				continue LOOP // Descend to next trie level.
+
+			case *nodes.CIDRLeaf:
+				// Ignore leaf if its prefix length is more specific than the query target.
+				if kid.Prefix().Bits() > pfx.Bits() {
+					break LOOP
+				}
+
+				// Yield leaf prefix if it covers the target IP.
+				if kid.Prefix().Contains(ip) {
+					if !yield(kid.Prefix()) {
+						return
+					}
+				}
+
+				// End traversal along this path.
+				break LOOP
+			}
+		}
+
+		// Phase 2: Backtrack bottom-up, unwinding the node stack.
+		for ; depth >= 0; depth-- {
+			n = stack[depth]
+
+			// Derive the prefix index within the node's 8-bit complete binary tree (CBT).
+			// Only the terminal stride uses modBits; preceding strides cover full 8-bit octets.
+			var pfxIdx uint8
+			octet = octets[depth]
+			if depth == strideCount {
+				pfxIdx = art.PfxToIdx(octet, modBits)
+			} else {
+				pfxIdx = art.OctetToIdx(octet)
+			}
+
+			ptx := nodes.NewPathContext(octets, depth, pfxIdx, is4)
+
+			// Yield matching node-internal prefixes in descending specificity.
+			if !n.YieldSupernets(pfxLen, ptx, yield) {
+				return
+			}
+		}
 	}
 }
 
 // Subnets returns an iterator over all subnets of the given prefix
 // in natural CIDR sort order. This includes prefixes of the same length
-// (exact match) and longer (more specific) prefixes that are contained
+// (exact match) and longer (more specific) prefixes contained
 // within the given prefix.
 //
-// Example:
-//
-//	for sub, val := range table.Subnets(netip.MustParsePrefix("10.0.0.0/8")) {
-//	    fmt.Println("Covered:", sub, "->", val)
-//	}
-//
-// The iteration can be stopped early by breaking from the range loop.
+// Iteration can be stopped early by breaking from the range loop.
 // Returns an empty iterator if the prefix is invalid.
 func (f *FastACL) Subnets(pfx netip.Prefix) iter.Seq[netip.Prefix] {
+	// Guard clause: Early exit before any processing or closure allocation logic.
+	if !pfx.IsValid() {
+		return nodes.EmptySeq
+	}
+
+	// Canonicalize prefix into a NEW variable.
+	// This enables the compiler to capture canonicalPfx by value instead of by ref,
+	// avoiding the 'moved to heap: pfx' allocation.
+	canonicalPfx := pfx.Masked()
+
 	return func(yield func(netip.Prefix) bool) {
-		if !pfx.IsValid() {
-			return
-		}
-
-		pfx = pfx.Masked()
+		pfx := canonicalPfx
 		is4 := pfx.Addr().Is4()
-
 		n := f.rootNodeByVersion(is4)
-		n.Subnets(pfx, yield)
+
+		ip := pfx.Addr()
+		pfxLen := pfx.Bits()
+		octets := ip.AsSlice()
+		strideCount, modBits := nodes.DivMod8(pfxLen)
+
+		// Traverse trie levels according to byte stride depth.
+		for depth, octet := range octets {
+
+			// Reached the target trie level matching the prefix length.
+			if depth == strideCount {
+				idx := art.PfxToIdx(octet, modBits)
+				ptx := nodes.NewPathContext(octets, depth, idx, is4)
+				n.YieldSubnets(ptx, yield)
+				return
+			}
+
+			// Yield matching fringe prefixes if present.
+			if nodes.IsFringe(depth, pfxLen) && n.Fringes.Test(octet) {
+				ptx := nodes.NewPathContext(octets, depth, octet, is4)
+				if !yield(ptx.FringeCIDR()) {
+					return
+				}
+			}
+
+			// Branch traversal terminates if child byte bucket is empty.
+			if !n.Children.Test(octet) {
+				return
+			}
+			kid := n.MustGetChild(octet)
+
+			// Descend deeper or evaluate leaf termination.
+			switch kid := kid.(type) {
+			case *nodes.FastACLNode:
+				n = kid
+				continue // Descend down to next trie level.
+
+			case *nodes.CIDRLeaf:
+				// Evaluate leaf containment. No subnets exist below a leaf, so iteration terminates immediately.
+				if pfx.Bits() <= kid.Prefix().Bits() && pfx.Overlaps(kid.Prefix()) {
+					yield(kid.Prefix())
+				}
+				return // Terminal leaf reached; discontinue trie descent.
+			}
+		}
 	}
 }
 
@@ -425,6 +619,33 @@ func (f *FastACL) Clone() *FastACL {
 	return c
 }
 
+// Union merges another routing table into the receiver table, modifying it in-place.
+//
+// It panics if the receiver table f is nil, or if the argument o is nil.
+// If o is empty or points to the exact same table instance as f, Union returns immediately.
+func (f *FastACL) Union(o *FastACL) {
+	// Guard: Panic early if the receiver is nil.
+	_ = f.size4
+
+	// Guard: Early return if the source table is empty (nil argument panics on o.size4 access).
+	if o.size4 == 0 && o.size6 == 0 {
+		return
+	}
+
+	// Guard: Merging a table into itself is a no-op.
+	if o == f {
+		return
+	}
+
+	// Recursively merge IPv4 and IPv6 trees and obtain duplicate prefix counts.
+	dup4 := f.root4.UnionRec(&o.root4, 0)
+	dup6 := f.root6.UnionRec(&o.root6, 0)
+
+	// Adjust internal size counters based on unique new prefixes added.
+	f.size4 += o.size4 - dup4
+	f.size6 += o.size6 - dup6
+}
+
 // OverlapsPrefix reports whether any prefix in the routing table overlaps with
 // the given prefix. Two prefixes overlap if they share any IP addresses.
 //
@@ -437,16 +658,19 @@ func (f *FastACL) Clone() *FastACL {
 // This is useful for containment tests, route validation, or policy checks using prefix
 // semantics without retrieving exact matches.
 func (f *FastACL) OverlapsPrefix(pfx netip.Prefix) bool {
+	// Guard clause: reject invalid prefix inputs immediately.
 	if !pfx.IsValid() {
 		return false
 	}
 
-	// canonicalize the prefix
+	// Canonicalize the prefix to ensure standard mask alignment.
 	pfx = pfx.Masked()
 
+	// Determine address family and retrieve the corresponding root node.
 	is4 := pfx.Addr().Is4()
 	n := f.rootNodeByVersion(is4)
 
+	// Delegate the core recursive traversal to the root node.
 	return n.OverlapsPrefixAtDepth(pfx, 0)
 }
 
@@ -466,27 +690,29 @@ func (f *FastACL) Overlaps(o *FastACL) bool {
 	return f.Overlaps4(o) || f.Overlaps6(o)
 }
 
-// Overlaps4 is like [liteTable.Overlaps] but for the v4 routing table only.
+// Overlaps4 reports whether the IPv4 routing table of the receiver overlaps
+// with the IPv4 routing table of the other FastACL instance.
 func (f *FastACL) Overlaps4(o *FastACL) bool {
 	if f.size4 == 0 || o.size4 == 0 {
 		return false
 	}
-	return f.root4.Overlaps(&o.root4, 0)
+	return f.root4.OverlapsRec(&o.root4, 0)
 }
 
-// Overlaps6 is like [liteTable.Overlaps] but for the v6 routing table only.
+// Overlaps6 reports whether the IPv6 routing table of the receiver overlaps
+// with the IPv6 routing table of the other FastACL instance.
 func (f *FastACL) Overlaps6(o *FastACL) bool {
 	if f.size6 == 0 || o.size6 == 0 {
 		return false
 	}
-	return f.root6.Overlaps(&o.root6, 0)
+	return f.root6.OverlapsRec(&o.root6, 0)
 }
 
 // Aggregate compresses the table in-place by merging overlapping
 // and adjacent IP prefixes into their minimal covering CIDR blocks.
 func (f *FastACL) Aggregate() {
-	mod4 := f.root4.AggregateRec(pathContext{Is4: true})
-	mod6 := f.root6.AggregateRec(pathContext{Is4: false})
+	mod4 := f.root4.AggregateRec(nodes.PathContext{Is4: true})
+	mod6 := f.root6.AggregateRec(nodes.PathContext{Is4: false})
 
 	if mod4 != 0 {
 		stats := f.root4.StatsRec()
@@ -541,11 +767,11 @@ func (f *FastACL) Size6() int {
 // stored in the table. Iteration order is explicitly unspecified.
 func (f *FastACL) All() iter.Seq[netip.Prefix] {
 	return func(yield func(netip.Prefix) bool) {
-		if !f.root4.AllRec(pathContext{Is4: true}, yield) {
+		if !f.root4.AllRec(nodes.PathContext{Is4: true}, yield) {
 			return
 		}
 
-		f.root6.AllRec(pathContext{Is4: false}, yield)
+		f.root6.AllRec(nodes.PathContext{Is4: false}, yield)
 	}
 }
 
@@ -553,7 +779,7 @@ func (f *FastACL) All() iter.Seq[netip.Prefix] {
 // Iteration order is explicitly unspecified.
 func (f *FastACL) All4() iter.Seq[netip.Prefix] {
 	return func(yield func(netip.Prefix) bool) {
-		f.root4.AllRec(pathContext{Is4: true}, yield)
+		f.root4.AllRec(nodes.PathContext{Is4: true}, yield)
 	}
 }
 
@@ -561,7 +787,7 @@ func (f *FastACL) All4() iter.Seq[netip.Prefix] {
 // Iteration order is explicitly unspecified.
 func (f *FastACL) All6() iter.Seq[netip.Prefix] {
 	return func(yield func(netip.Prefix) bool) {
-		f.root6.AllRec(pathContext{Is4: false}, yield)
+		f.root6.AllRec(nodes.PathContext{Is4: false}, yield)
 	}
 }
 
@@ -569,26 +795,70 @@ func (f *FastACL) All6() iter.Seq[netip.Prefix] {
 // CIDR prefix sort order.
 func (f *FastACL) AllSorted() iter.Seq[netip.Prefix] {
 	return func(yield func(netip.Prefix) bool) {
-		if !f.root4.AllRecSorted(pathContext{Is4: true}, yield) {
+		if !f.root4.AllRecSorted(nodes.PathContext{Is4: true}, yield) {
 			return
 		}
 
-		f.root6.AllRecSorted(pathContext{Is4: false}, yield)
+		f.root6.AllRecSorted(nodes.PathContext{Is4: false}, yield)
 	}
 }
 
 // AllSorted4 is like [FastACL.AllSorted] but only for the v4 routing table.
 func (f *FastACL) AllSorted4() iter.Seq[netip.Prefix] {
 	return func(yield func(netip.Prefix) bool) {
-		f.root4.AllRecSorted(pathContext{Is4: true}, yield)
+		f.root4.AllRecSorted(nodes.PathContext{Is4: true}, yield)
 	}
 }
 
 // AllSorted6 is like [FastACL.AllSorted] but only for the v6 routing table.
 func (f *FastACL) AllSorted6() iter.Seq[netip.Prefix] {
 	return func(yield func(netip.Prefix) bool) {
-		f.root6.AllRecSorted(pathContext{Is4: false}, yield)
+		f.root6.AllRecSorted(nodes.PathContext{Is4: false}, yield)
 	}
+}
+
+// DumpList4 dumps the ipv4 tree into a list of roots and their subnets.
+// It can be used to analyze the tree or build the text or JSON serialization.
+func (f *FastACL) DumpList4() []DumpListNode[any] {
+	return f.dumpListRec(&f.root4, nodes.PathContext{Is4: true})
+}
+
+// DumpList6 dumps the ipv6 tree into a list of roots and their subnets.
+// It can be used to analyze the tree or build custom JSON representation.
+func (f *FastACL) DumpList6() []DumpListNode[any] {
+	return f.dumpListRec(&f.root6, nodes.PathContext{Is4: false})
+}
+
+// dumpListRec, build the data structure rec-descent.
+func (f *FastACL) dumpListRec(anyNode any, ptx nodes.PathContext) []DumpListNode[any] {
+	// Guard clause: avoid processing empty nodes
+	if anyNode == nil {
+		return nil
+	}
+
+	switch n := anyNode.(type) {
+	case *nodes.FastACLNode:
+		directItems := n.DirectItems(ptx)
+		slices.SortFunc(directItems, func(a, b nodes.HierarchyItem) int {
+			return nodes.CmpPrefix(a.CIDR, b.CIDR)
+		})
+
+		dumpNodes := make([]DumpListNode[any], 0, len(directItems))
+		for _, item := range directItems {
+			dumpNodes = append(dumpNodes, DumpListNode[any]{
+				CIDR:    item.CIDR,
+				Subnets: f.dumpListRec(item.NextNode, item.NextCtx),
+			})
+		}
+		return dumpNodes
+
+	case *nodes.CIDRLeaf:
+		return []DumpListNode[any]{{CIDR: n.Prefix()}}
+
+	default:
+		return nil
+	}
+
 }
 
 // Fprint writes a hierarchical tree diagram of the ordered CIDRs
@@ -642,7 +912,7 @@ func (f *FastACL) fprint(w io.Writer, is4 bool) error {
 		return err
 	}
 
-	return n.FprintRec(w, pathContext{Is4: is4}, "")
+	return n.FprintRec(w, nodes.PathContext{Is4: is4}, "")
 }
 
 // dump the table structure and all the nodes to w.
@@ -653,7 +923,7 @@ func (f *FastACL) dump(w io.Writer) {
 		fmt.Fprintf(w, "### IPv4: size(%d), subnodes(%d), prefixes(%d), fringes(%d), leaves(%d)",
 			f.size4, stats.SubNodes, stats.Prefixes, stats.Fringes, stats.Leaves)
 
-		f.root4.DumpRec(w, stridePath{}, 0, true)
+		f.root4.DumpRec(w, nodes.PathContext{Is4: true})
 	}
 
 	if f.size6 > 0 {
@@ -662,7 +932,7 @@ func (f *FastACL) dump(w io.Writer) {
 		fmt.Fprintf(w, "### IPv6: size(%d), subnodes(%d), prefixes(%d), fringes(%d), leaves(%d)",
 			f.size6, stats.SubNodes, stats.Prefixes, stats.Fringes, stats.Leaves)
 
-		f.root6.DumpRec(w, stridePath{}, 0, false)
+		f.root6.DumpRec(w, nodes.PathContext{Is4: false})
 	}
 }
 

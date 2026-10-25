@@ -174,8 +174,22 @@ func (ta *Table[V]) Union(tb Table[V]) {
 	maps.Copy(*ta, tb)
 }
 
+// Contains reports whether any stored prefix in the golden table covers the given IP address.
+func (t Table[V]) Contains(addr netip.Addr) bool {
+	// strip zone identifier from ipv6
+	addr = addr.WithZone("")
+	for pfx := range t {
+		if pfx.Contains(addr) {
+			return true
+		}
+	}
+	return false
+}
+
 // Lookup performs a Longest Prefix Match (LPM) for the given IP address.
 func (t Table[V]) Lookup(addr netip.Addr) (val V, ok bool) {
+	// strip zone identifier from ipv6
+	addr = addr.WithZone("")
 	bestLen := -1
 
 	for pfx, v := range t {

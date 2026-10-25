@@ -6,17 +6,9 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/gaissmai/bart/internal/nodes"
 	"github.com/gaissmai/bart/internal/tests/golden"
 )
-
-// randomBytes generates a byte slice of the specified length n
-// filled with pseudo-random data using the provided *rand.Rand instance.
-func randomBytes(prng *rand.Rand, buf []byte) []byte {
-	for i := range len(buf) {
-		buf[i] = byte(prng.UintN(256))
-	}
-	return buf
-}
 
 // extractPfxs4 extracts as many valid IPv4 netip.Prefix values as possible
 // from a raw, randomized byte slice.
@@ -405,6 +397,207 @@ func FuzzFastACL_Clone_Differential(f *testing.F) {
 		clone.Delete(probe)
 		if clone.Equal(facl) {
 			t.Fatal("Equal after delete: Clone()")
+		}
+	})
+}
+
+func FuzzFastACL_Equal(f *testing.F) {
+	const maxData = 4096
+	// Seed corpus
+	f.Add(seedPfx4, seedPfx6)
+
+	f.Fuzz(func(t *testing.T, pfx4Data, pfx6Data []byte) {
+		t.Parallel()
+
+		// Clamp payload if it exceeds the threshold.
+		if len(pfx4Data) > maxData {
+			pfx4Data = pfx4Data[:maxData]
+		}
+		if len(pfx6Data) > maxData {
+			pfx6Data = pfx6Data[:maxData]
+		}
+
+		pfxs4 := extractPfxs4(pfx4Data)
+		pfxs6 := extractPfxs6(pfx6Data)
+
+		facl := new(FastACL)
+
+		pfxs := slices.Concat(pfxs4, pfxs6)
+		if len(pfxs) == 0 {
+			return
+		}
+
+		for _, p := range pfxs {
+			facl.Insert(p)
+		}
+
+		pfxs4 = slices.Collect(facl.All4())
+		pfxs6 = slices.Collect(facl.All6())
+
+		facl1 := new(FastACL)
+		facl2 := new(FastACL)
+
+		mid4 := len(pfxs4) / 2
+		mid6 := len(pfxs6) / 2
+
+		for _, pfx := range slices.Concat(pfxs4[:mid4], pfxs6[:mid6]) {
+			facl1.Insert(pfx)
+		}
+		for _, pfx := range slices.Concat(pfxs4[mid4:], pfxs6[mid6:]) {
+			facl2.Insert(pfx)
+		}
+
+		if facl1.Equal(facl2) {
+			t.Fatal("Equal after separating pfxs")
+		}
+	})
+}
+
+// FuzzFastACL_DumpList fuzzes DumpList4 and DumpList6 using structured byte payloads
+// and verifies structural invariants on the resulting dump trees.
+func FuzzFastACL_DumpList(f *testing.F) {
+	const maxData = 512
+	f.Add(seedPfx4, seedPfx6)
+
+	f.Fuzz(func(t *testing.T, pfx4Data, pfx6Data []byte) {
+		t.Parallel()
+
+		if len(pfx4Data) > maxData {
+			pfx4Data = pfx4Data[:maxData]
+		}
+		if len(pfx6Data) > maxData {
+			pfx6Data = pfx6Data[:maxData]
+		}
+
+		pfxs4 := extractPfxs4(pfx4Data)
+		pfxs6 := extractPfxs6(pfx6Data)
+
+		f4 := new(FastACL)
+		f6 := new(FastACL)
+		for _, pfx := range pfxs4 {
+			f4.Insert(pfx)
+		}
+		for _, pfx := range pfxs6 {
+			f6.Insert(pfx)
+		}
+
+		list4 := f4.DumpList4()
+		gotNodes4 := verifyDumpListInvariants(t, list4, true)
+		if gotNodes4 != f4.Size4() {
+			t.Fatalf("mismatch in number of nodes, expected %d, got %d", f4.Size4(), gotNodes4)
+		}
+
+		list6 := f6.DumpList6()
+		gotNodes6 := verifyDumpListInvariants(t, list6, false)
+		if gotNodes6 != f6.Size6() {
+			t.Fatalf("mismatch in number of nodes, expected %d, got %d", f6.Size6(), gotNodes6)
+		}
+
+	})
+}
+
+// verifyDumpListInvariants recursively checks structural correctness of the dump tree.
+func verifyDumpListInvariants(t *testing.T, listNodes []DumpListNode[any], is4 bool) int {
+	t.Helper()
+
+	var count int
+	var prevCIDR netip.Prefix
+
+	for i, node := range listNodes {
+		count++
+		if !node.CIDR.IsValid() {
+			t.Fatalf("dumped node contains invalid prefix at index %d", i)
+		}
+		if is4 && !node.CIDR.Addr().Is4() {
+			t.Fatalf("DumpList4 returned non-IPv4 prefix: %v", node.CIDR)
+		}
+		if !is4 && !node.CIDR.Addr().Is6() {
+			t.Fatalf("DumpList6 returned non-IPv6 prefix: %v", node.CIDR)
+		}
+
+		if i > 0 {
+			if nodes.CmpPrefix(prevCIDR, node.CIDR) >= 0 {
+				t.Fatalf("unsorted siblings detected: %v followed by %v", prevCIDR, node.CIDR)
+			}
+
+			if prevCIDR.Overlaps(node.CIDR) {
+				t.Fatalf("overlapping siblings detected: %v overlaps %v", prevCIDR, node.CIDR)
+			}
+		}
+		prevCIDR = node.CIDR
+
+		if len(node.Subnets) > 0 {
+			for _, sub := range node.Subnets {
+				if sub.CIDR.Bits() <= node.CIDR.Bits() {
+					t.Fatalf("invalid hierarchy: child %v is not more specific than parent %v", sub.CIDR, node.CIDR)
+				}
+
+				if nodes.CmpPrefix(node.CIDR, sub.CIDR) >= 0 {
+					t.Fatalf("child must compare after parent: %v >= %v", node.CIDR, sub.CIDR)
+				}
+
+				if !node.CIDR.Overlaps(sub.CIDR) {
+					t.Fatalf("parent and child must overlap: %v !overlaps %v", node.CIDR, sub.CIDR)
+				}
+
+				if !node.CIDR.Contains(sub.CIDR.Addr()) {
+					t.Fatalf("parent must contain child: %v !cobtains %v", node.CIDR, sub.CIDR.Addr())
+				}
+			}
+
+			count += verifyDumpListInvariants(t, node.Subnets, is4)
+		}
+	}
+
+	return count
+}
+
+// FuzzFastACL_Has fuzz-tests the exact-prefix lookup implementation of FastACL
+// for both IPv4 and IPv6 prefixes, ensuring correctness and absence of panics.
+func FuzzFastACL_Has(f *testing.F) {
+	const maxData = 512
+	f.Add(seedPfx4, seedPfx6)
+
+	f.Fuzz(func(t *testing.T, pfx4Data, pfx6Data []byte) {
+		t.Parallel()
+
+		// Limit payload size to keep fuzzing iterations fast and efficient.
+		if len(pfx4Data) > maxData {
+			pfx4Data = pfx4Data[:maxData]
+		}
+		if len(pfx6Data) > maxData {
+			pfx6Data = pfx6Data[:maxData]
+		}
+
+		// Extract valid prefix slices from randomized bytes.
+		pfxs4 := extractPfxs4(pfx4Data)
+		pfxs6 := extractPfxs6(pfx6Data)
+
+		f4 := new(FastACL)
+		f6 := new(FastACL)
+
+		// Insert all extracted IPv4 prefixes.
+		for _, pfx := range pfxs4 {
+			f4.Insert(pfx)
+		}
+
+		// Insert all extracted IPv6 prefixes.
+		for _, pfx := range pfxs6 {
+			f6.Insert(pfx)
+		}
+
+		// Invariant: Every successfully inserted IPv4 prefix must be found by Has.
+		for _, pfx := range pfxs4 {
+			if !f4.Has(pfx) {
+				t.Errorf("IPv4 prefix %v was inserted but not found by Has", pfx)
+			}
+		}
+
+		// Invariant: Every successfully inserted IPv6 prefix must be found by Has.
+		for _, pfx := range pfxs6 {
+			if !f6.Has(pfx) {
+				t.Errorf("IPv6 prefix %v was inserted but not found by Has", pfx)
+			}
 		}
 	})
 }
