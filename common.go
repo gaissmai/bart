@@ -4,21 +4,15 @@
 // Package bart provides high-performance Balanced Routing Tables (BART)
 // for fast IP-to-CIDR lookups on IPv4 and IPv6 addresses.
 //
-// BART offers three table variants optimized for different use cases:
+// BART offers two table variants optimized for different use cases:
 //
-//   - Lite:  Memory-optimized with popcount-compressed sparse arrays
-//   - Table: Full-featured with popcount-compressed sparse arrays
-//   - Fast:  Speed-optimized with additional rank caching
+//   - Lite:  memory-optimized for ACLs
+//   - Table: full-featured routing table
 //
 // The implementation is based on Knuth's ART algorithm with novel
 // optimizations for memory efficiency and lookup speed.
 //
-// `Table` and `Lite` use popcount compression for memory efficiency, while
-// `Fast` trades additional memory and slower updates for maximum lookup
-// speed: a child-rank cache is maintained on every insert/delete, so
-// lookups avoid popcount but updates pay the caching cost.
-//
-// BART excels at efficient set operations on routing tables including Union,
+// BART excels also for efficient set operations on routing tables including Union,
 // Overlaps, Equal, Subnets, and Supernets with optimal complexity, making it
 // ideal for large-scale IP prefix matching in ACLs, RIBs, FIBs, firewalls,
 // and routers.

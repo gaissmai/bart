@@ -162,6 +162,7 @@ func TestRank0(t *testing.T) {
 
 	for _, tt := range indexSets {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			a := newArray(tt.idxs...)
 			checkInvariants(t, a)
 
@@ -189,6 +190,7 @@ func TestGetMustGet(t *testing.T) {
 
 	for _, tt := range indexSets {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			a := newArray(tt.idxs...)
 			want := modelOf(tt.idxs...)
 
@@ -231,6 +233,7 @@ func TestInsertAt(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			a := new(Array256[int])
 			want := make(map[uint8]int)
 
@@ -277,6 +280,7 @@ func TestDeleteAt(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			a := newArray(tt.initial...)
 			want := modelOf(tt.initial...)
 			assertMatches(t, a, want) // sanity check of the starting point
@@ -301,6 +305,7 @@ func TestCopy(t *testing.T) {
 	t.Parallel()
 
 	t.Run("nil receiver", func(t *testing.T) {
+		t.Parallel()
 		var a *Array256[int]
 		if got := a.Copy(); got != nil {
 			t.Errorf("Copy() of nil = %v, want nil", got)
@@ -309,6 +314,7 @@ func TestCopy(t *testing.T) {
 
 	for _, tt := range indexSets {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			orig := newArray(tt.idxs...)
 			origWant := modelOf(tt.idxs...)
 
@@ -347,6 +353,7 @@ func TestForbiddenMutators(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			a := newArray(1, 2, 3)
 
 			func() {
@@ -385,6 +392,7 @@ func TestRandomOps(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			prng := rand.New(rand.NewPCG(tt.seed, tt.seed))
 
 			a := new(Array256[int])

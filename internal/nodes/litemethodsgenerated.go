@@ -20,6 +20,11 @@ import (
 	"github.com/gaissmai/bart/internal/value"
 )
 
+// ChildCount returns the number of slots used in this node.
+func (n *LiteNode[V]) ChildCount() int {
+	return len(n.Children.Items)
+}
+
 // IsEmpty returns true if the node contains no routing entries (prefixes)
 // and no child nodes. Empty nodes are candidates for compression or removal
 // during trie optimization.
@@ -30,9 +35,42 @@ func (n *LiteNode[V]) IsEmpty() bool {
 	return n.PrefixCount() == 0 && n.ChildCount() == 0
 }
 
-// ChildCount returns the number of slots used in this node.
-func (n *LiteNode[V]) ChildCount() int {
-	return n.Children.Len()
+// InsertChild adds a child node at the specified address (0-255).
+// The child can be a *BartNode[V], *LeafNode[V], or *FringeNode[V].
+// Returns true if a child already existed at that address.
+func (n *LiteNode[V]) InsertChild(addr uint8, child any) (exists bool) {
+	return n.Children.InsertAt(addr, child)
+}
+
+// GetChild retrieves the child node at the specified address.
+// Returns the child and true if found, or nil and false if not present.
+func (n *LiteNode[V]) GetChild(addr uint8) (any, bool) {
+	return n.Children.Get(addr)
+}
+
+// MustGetChild retrieves the child at the specified address, panicking if not found.
+// This method should only be used when the caller is certain the child exists.
+func (n *LiteNode[V]) MustGetChild(addr uint8) any {
+	return n.Children.MustGet(addr)
+}
+
+// DeleteChild removes the child node at the specified address.
+// This operation is idempotent - removing a non-existent child is safe.
+func (n *LiteNode[V]) DeleteChild(addr uint8) (exists bool) {
+	_, exists = n.Children.DeleteAt(addr)
+	return
+}
+
+// AllIndices returns an iterator over all prefix entries.
+// Each iteration yields the prefix index (uint8) and its associated value (V).
+func (n *LiteNode[V]) AllIndices() iter.Seq2[uint8, V] {
+	return func(yield func(uint8, V) bool) {
+		for idx := range n.Prefixes.All() {
+			if !yield(idx, n.MustGetPrefix(idx)) {
+				return
+			}
+		}
+	}
 }
 
 // AllChildren returns an iterator over all child nodes.
@@ -584,6 +622,30 @@ func (n *LiteNode[V]) Get(pfx netip.Prefix) (val V, exists bool) {
 // toward its possible ancestors.
 func (n *LiteNode[V]) Contains(idx uint8) bool {
 	return n.Prefixes.Overlaps(&lpm.LookupTbl[idx])
+}
+
+// LookupIdx performs a longest-prefix match (LPM) lookup for the given index (idx)
+// within the 8-bit stride-based prefix table at this trie depth.
+//
+// The function returns the matched base index, associated value, and true if a
+// matching prefix exists at this level; otherwise, ok is false.
+//
+// Internally, the prefix table is organized as a complete binary tree (CBT) indexed
+// via the baseIndex function. Unlike the original ART algorithm, this implementation
+// does not use an allotment-based approach. Instead, it performs CBT backtracking
+// using a bitset-based operation with a precomputed backtracking pattern specific to idx.
+func (n *LiteNode[V]) LookupIdx(idx uint8) (top uint8, val V, ok bool) {
+	// top is the idx of the longest-prefix-match
+	if top, ok = n.Prefixes.AndTop(&lpm.LookupTbl[idx]); ok {
+		return top, n.MustGetPrefix(top), true
+	}
+	return top, val, ok
+}
+
+// Lookup is just a simple wrapper for LookupIdx.
+func (n *LiteNode[V]) Lookup(idx uint8) (val V, ok bool) {
+	_, val, ok = n.LookupIdx(idx)
+	return val, ok
 }
 
 // Modify performs an in-place modification of a prefix using the provided callback function.

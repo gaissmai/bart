@@ -41,9 +41,7 @@ func TestInlineBitSet256Functions(t *testing.T) {
 		"bitset.(*BitSet256).And",
 		"bitset.(*BitSet256).AndTop",
 		"bitset.(*BitSet256).Overlaps",
-		//
 		"bitset.(*BitSet256).OnesCount",
-		"bitset.(*BitSet256).Rank",
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

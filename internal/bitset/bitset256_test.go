@@ -1264,7 +1264,7 @@ func BenchmarkAndTop(b *testing.B) {
 		}
 
 		for i := uint8(0); b.Loop(); i++ {
-			aa[i&3].Overlaps(&aa[(i+1)&3])
+			aa[i&3].AndTop(&aa[(i+1)&3])
 		}
 	})
 

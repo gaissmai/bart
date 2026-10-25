@@ -110,6 +110,14 @@ func newFilled(idxs []uint8) *Array256[int] {
 	return a
 }
 
+// getUnfused is the previous implementation of Get: Test followed by rank0.
+func getUnfused[T any](a *Array256[T], i uint8) (value T, ok bool) {
+	if a.Test(i) {
+		return a.Items[a.rank0(i)], true
+	}
+	return
+}
+
 type ordering struct {
 	name string
 	idxs []uint8
@@ -170,6 +178,12 @@ func BenchmarkArray256Get(b *testing.B) {
 					if a.Test(idx) {
 						sinkInt = a.MustGet(idx)
 					}
+				}
+			})
+
+			b.Run(prefix+"/form=Get/impl=unfused", func(b *testing.B) {
+				for i := 0; b.Loop(); i++ {
+					sinkInt, sinkBool = getUnfused(a, probes[i&probeMask])
 				}
 			})
 		}

@@ -25,7 +25,6 @@ fi
 # Mapping: TABLE_TYPE -> NODE_TYPE
 declare -A NODE_TYPES=(
     ["Table"]="BartNode"
-    ["Fast"]="FastNode"
     ["liteTable"]="LiteNode"
 )
 

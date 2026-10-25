@@ -4,12 +4,9 @@
 package nodes
 
 import (
-	"iter"
-
 	"github.com/gaissmai/bart/internal/allot"
 	"github.com/gaissmai/bart/internal/art"
 	"github.com/gaissmai/bart/internal/bitset"
-	"github.com/gaissmai/bart/internal/lpm"
 	"github.com/gaissmai/bart/internal/sparse"
 )
 
@@ -18,17 +15,14 @@ import (
 type LiteNode[V any] struct {
 	Children sparse.Array256[any]
 	Prefixes struct {
-		// BitSet256 tracks the presence of prefixes at this level.
 		bitset.BitSet256
-		// Count maintains the current number of set bits, updated on modification
-		// to avoid expensive population counting.
-		Count uint16
+		count uint16
 	}
 }
 
 // PrefixCount returns the number of prefixes stored in this node.
 func (n *LiteNode[V]) PrefixCount() int {
-	return int(n.Prefixes.Count)
+	return int(n.Prefixes.count)
 }
 
 // InsertPrefix adds a routing entry at the specified index.
@@ -39,7 +33,7 @@ func (n *LiteNode[V]) InsertPrefix(idx uint8, _ V) (exists bool) {
 		return exists
 	}
 	n.Prefixes.Set(idx)
-	n.Prefixes.Count++
+	n.Prefixes.count++
 	return exists
 }
 
@@ -50,7 +44,7 @@ func (n *LiteNode[V]) DeletePrefix(idx uint8) (exists bool) {
 		return false
 	}
 	n.Prefixes.Clear(idx)
-	n.Prefixes.Count--
+	n.Prefixes.count--
 	return true
 }
 
@@ -62,67 +56,6 @@ func (n *LiteNode[V]) GetPrefix(idx uint8) (_ V, exists bool) {
 
 func (n *LiteNode[V]) MustGetPrefix(idx uint8) (_ V) {
 	// no docstring by intention
-	return
-}
-
-// AllIndices returns an iterator over all prefix entries.
-// Each iteration yields the prefix index (uint8) and its associated value (V).
-func (n *LiteNode[V]) AllIndices() iter.Seq2[uint8, V] {
-	var zero V
-	return func(yield func(uint8, V) bool) {
-		for idx := range n.Prefixes.All() {
-			if !yield(idx, zero) {
-				return
-			}
-		}
-	}
-}
-
-// InsertChild adds a child node at the specified address (0-255).
-// The child can be a *LiteNode[V], *LeafNode, or *FringeNode.
-// Returns true if a child already existed at that address.
-func (n *LiteNode[V]) InsertChild(addr uint8, child any) (exists bool) {
-	_, exists = n.Children.InsertAt(addr, child)
-	return
-}
-
-// GetChild retrieves the child node at the specified address.
-// Returns the child and true if found, or nil and false if not present.
-func (n *LiteNode[V]) GetChild(addr uint8) (any, bool) {
-	return n.Children.Get(addr)
-}
-
-// MustGetChild retrieves the child at the specified address, panicking if not found.
-// This method should only be used when the caller is certain the child exists.
-func (n *LiteNode[V]) MustGetChild(addr uint8) any {
-	return n.Children.MustGet(addr)
-}
-
-// DeleteChild removes the child node at the specified address.
-// This operation is idempotent - removing a non-existent child is safe.
-func (n *LiteNode[V]) DeleteChild(addr uint8) (exists bool) {
-	_, exists = n.Children.DeleteAt(addr)
-	return exists
-}
-
-// LookupIdx performs a longest-prefix match (LPM) lookup for the given index (idx)
-// within the 8-bit stride-based prefix table at this trie depth.
-//
-// The function returns the matched index and whether a matching prefix
-// exists at this level. The value type parameter exists only to satisfy interfaces.
-//
-// Internally, the prefix table is organized as a complete binary tree (CBT) indexed
-// via the baseIndex function. Unlike the original ART algorithm, this implementation
-// does not use an allotment-based approach. Instead, it performs CBT backtracking
-// using a bitset-based operation with a precomputed backtracking pattern specific to idx.
-func (n *LiteNode[V]) LookupIdx(idx uint8) (top uint8, _ V, ok bool) {
-	top, ok = n.Prefixes.AndTop(&lpm.LookupTbl[idx])
-	return
-}
-
-// Lookup is just a simple wrapper for LookupIdx.
-func (n *LiteNode[V]) Lookup(idx uint8) (_ V, ok bool) {
-	_, _, ok = n.LookupIdx(idx)
 	return
 }
 
@@ -194,7 +127,7 @@ func (n *LiteNode[V]) AggregateRec(path StridePath, depth int, is4 bool) (modifi
 
 	// #########################################################################################
 	// 2. Prefix Subsumption: Remove subnets in the bitset that are fully covered by a supernet.
-	oldPfxCount := n.Prefixes.Count
+	oldPfxCount := n.PrefixCount()
 	var pfxIdx uint8
 	var ok bool
 	for {
@@ -222,10 +155,10 @@ func (n *LiteNode[V]) AggregateRec(path StridePath, depth int, is4 bool) (modifi
 	}
 	// Recalculate prefix count after deletions
 	//nolint:gosec // G115: integer overflow conversion int -> uint16
-	n.Prefixes.Count = uint16(n.Prefixes.OnesCount())
+	n.Prefixes.count = uint16(n.Prefixes.OnesCount())
 
 	// Track number of subsumed prefixes removed
-	modified += int(oldPfxCount - n.Prefixes.Count)
+	modified += oldPfxCount - n.PrefixCount()
 
 	// ###########################################################################
 	// 3. Child Subsumption: Remove child nodes covered by any prefix in this node.
