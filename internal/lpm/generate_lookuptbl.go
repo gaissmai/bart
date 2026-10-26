@@ -5,35 +5,45 @@
 // Copyright (c) 2026 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
-// Package main generates a lookup table for longest-prefix-match (LPM) operations
-// in the BART routing table.
+// Package main generates the lookup table for longest-prefix-match (LPM)
+// operations in the BART routing table.
 //
-// This generator creates a precomputed lookup table (LookupTbl) that enables fast
-// prefix matching by replacing iterative backtracking with a single bitset intersection.
+// The generator creates a precomputed table (LookupTbl) that replaces the
+// iterative backtracking in the prefix tree of a node by a single bitset
+// operation.
 //
 // The core idea:
 //
-// In a complete binary tree representation of prefixes, finding the longest matching
-// prefix requires checking a node and all its ancestors (parent, grandparent, etc.).
-// Instead of iterating through ancestors at runtime (idx >>= 1 in a loop), this table
-// precomputes all ancestors for each index.
+// The prefixes of a node form a complete binary tree. A prefix matches an
+// address if the prefix itself or any of its ancestors (the less specific
+// prefixes of the same bit string) is stored in the node. Instead of walking
+// up the ancestors at runtime (idx >>= 1 in a loop), this table precomputes
+// the ancestors of every index.
 //
 // Binary tree structure:
-//   - Each index i has a parent at i>>1 (integer division by 2)
-//   - Index 1 is the root (represents the default route)
-//   - Indices 2-255 form a 7-level binary tree
+//   - Each index i has its parent at i>>1 (integer division by 2)
+//   - Index 1 is the root, the default route /0 of the stride
+//   - The children of index i are 2*i and 2*i+1, one bit more specific
+//   - Indices 1..255 are the prefixes /0 up to /7, a tree with 8 levels
+//   - An ancestor always has a smaller index than its descendants
 //
-// Example: Index 13 (binary: 0b1101) has ancestors:
-//   - 13 itself (0b1101)
-//   - 6  = 13>>1 (0b0110) - parent
-//   - 3  = 6>>1  (0b0011) - grandparent
-//   - 1  = 3>>1  (0b0001) - root
+// Example: Index 13 (binary 0b1101, the prefix 101/3) has itself and these
+// ancestors:
+//   - 13 itself (0b1101), the prefix 101/3
+//   - 6  = 13>>1 (0b0110), the parent, the prefix 10/2
+//   - 3  = 6>>1  (0b0011), the grandparent, the prefix 1/1
+//   - 1  = 3>>1  (0b0001), the root, the prefix /0
 //
-// With this table, checking if any ancestor exists in a node's prefix set becomes:
+// With this table, checking if the index or any of its ancestors exists in the
+// prefix set of a node becomes:
 //
 //	node.Prefixes.Overlaps(&LookupTbl[idx])
 //
-// instead of a loop with multiple Test() calls.
+// instead of a loop with multiple Test() calls. Because an ancestor always has
+// a smaller index than its descendants, the highest bit of the intersection
+// is the longest matching prefix:
+//
+//	node.Prefixes.AndTop(&LookupTbl[idx])
 package main
 
 import (
@@ -52,7 +62,8 @@ var (
 )
 
 // data holds the template variables for code generation.
-// The LookupTbl field is populated immediately with the generated table string
+// The LookupTbl field is initialized at program start with the generated
+// table string.
 var data = struct {
 	File      string
 	LookupTbl string
@@ -115,54 +126,43 @@ func main() {
 
 // genLookupTbl generates the lookup table as a formatted string.
 //
-// For each index i (1-255), the table stores a bitset containing:
-//   - i itself
-//   - all binary ancestors of i (i>>1, i>>2, i>>3, ...)
-//
-// Example: For index 13 (binary: 1101):
-//   - Set bit 13 (1101)
-//   - Set bit 6  (0110) = 13>>1
-//   - Set bit 3  (0011) = 6>>1
-//   - Set bit 1  (0001) = 3>>1
-//
-// This precomputation allows replacing a loop of bitset tests
-// with a single bitset intersection operation during longest-prefix-match.
-
-// genLookupTbl generates the lookup table as a formatted string.
-//
-// For each index i (1-255), the table stores a BitSet256 containing:
+// For each index i (1..255), the table stores a BitSet256 containing:
 //   - i itself (the current node)
 //   - all binary ancestors of i (obtained by repeatedly right-shifting: i>>1, i>>2, ...)
 //
-// The algorithm walks up the binary tree from each leaf to the root (index 1).
+// The algorithm walks up the binary tree from each index to the root (index 1).
 // Each right-shift operation (i >>= 1) moves from a child to its parent node:
 //   - Even indices (LSB=0) are left children: parent = i/2
 //   - Odd indices (LSB=1) are right children: parent = (i-1)/2
 //   - Both cases are handled by integer division via right-shift
 //
-// Example walkthrough for index 13 (binary: 0b00001101):
+// Example walkthrough for index 13 (binary 0b00001101):
 //
 //	Iteration 1: i=13 (0b00001101) => Set bit 13
 //	Iteration 2: i=6  (0b00000110) => Set bit 6  (parent of 13)
 //	Iteration 3: i=3  (0b00000011) => Set bit 3  (parent of 6)
 //	Iteration 4: i=1  (0b00000001) => Set bit 1  (root)
-//	Iteration 5: i=0  → Loop terminates
+//	Then i=0, the loop condition i > 0 fails and the loop terminates
 //
-// Result: BitSet256 with bits {1, 3, 6, 13} set
+// Result: BitSet256 with bits {1, 3, 6, 13} set. An index at depth d, counted
+// from the root as depth 0, has d+1 bits set, so at most 8 bits.
 //
-// This allows longest-prefix-match to be computed with a single bitset intersection:
+// This allows the longest-prefix-match to be computed with a single bitset
+// intersection:
 //
-//	// Fast O(1) check using precomputed ancestors
+//	// one bitset intersection using the precomputed ancestors
 //	return node.Prefixes.Overlaps(&LookupTbl[idx])
 //
 // instead of iterative backtracking:
 //
-//	// Slow O(log n) loop checking each ancestor individually
+//	// a loop with up to 8 single bit tests, each with a data dependent branch
 //	for ; idx > 0; idx >>= 1 {
 //	    if node.Prefixes.Test(idx) {
 //	        return true
 //	    }
 //	}
+//
+// Entry 0 is empty and marked as "invalid", no prefix maps to base index 0.
 //
 // The generated string is formatted for embedding into Go source code.
 func genLookupTbl() string {
@@ -183,7 +183,8 @@ func genLookupTbl() string {
 	// Index 0 is invalid (no valid prefix maps to 0)
 	fmt.Fprintf(&builder, "  /* idx: %3d */ %#v, // %s\n", 0, lookupTbl[0], "invalid")
 
-	// Format each valid index with its bitset and the list of set bits, e.g.
+	// Format each valid index with its bitset and the list of set bits.
+	// The printed type name is shortened by the formatting step later, e.g.
 	// /* idx:  13 */ {0x204a, 0x0, 0x0, 0x0}, // [1 3 6 13]
 	for idx := 1; idx < 256; idx++ {
 		fmt.Fprintf(&builder, "  /* idx: %3d */ %#v, // %v\n", idx, lookupTbl[idx], lookupTbl[idx].Bits())
@@ -192,15 +193,15 @@ func genLookupTbl() string {
 	return builder.String()
 }
 
-// codeTemplate is the Go source template for the generated lookuptbl_gen.go file.
-// It embeds the precomputed lookup table and includes comprehensive documentation
-// about its structure, usage, and performance benefits.
+// codeTemplate is the Go source template for the generated file
+// lookuptblgenerated.go. It embeds the precomputed lookup table and documents
+// its structure and usage.
 //
 // The template defines:
-//   - Package-level documentation explaining the LPM optimization
-//   - The LookupTbl variable with all 256 precomputed bitsets
-//   - Usage examples comparing the fast (Overlaps) vs slow (loop) approach
-//   - Warnings about not mutating the read-only table
+//   - the package documentation explaining the LPM optimization
+//   - the LookupTbl variable with all 256 precomputed bitsets
+//   - usage examples for the single bitset operations and the loop they replace
+//   - the warning not to mutate the read-only table
 const codeTemplate = `// Code generated by {{.File}}; DO NOT EDIT.
 
 // Copyright (c) 2026 Karl Gaissmaier
@@ -208,35 +209,45 @@ const codeTemplate = `// Code generated by {{.File}}; DO NOT EDIT.
 
 // Package lpm (longest-prefix-match) contains the lookup table with which
 // the backtracking for the lpm in the complete binary tree of the prefixes
-// can be replaced by a fast bitset operation.
+// of a node is replaced by a fast bitset operation.
 package lpm
 
-// LookupTbl is a precomputed read‑only table used in hot paths.
+// LookupTbl is a precomputed read-only table used in hot paths.
 //
-// It allows a one-shot bitset intersection algorithm:
-// Each entry i encodes i and all its binary ancestors (i, i>>1, i>>2, ...).
+// Each entry idx is the bitset of idx itself and all its binary ancestors
+// (idx, idx>>1, idx>>2, ..., 1). In the complete binary tree of the prefixes
+// of a node these are the prefix idx and all less specific prefixes that
+// cover it.
 //
-// idx must be the uint8 produced by art.OctetToIdx or art.PfxToIdx (0 is invalid).
+// idx must be a base index produced by art.OctetToIdx or art.PfxToIdx.
+// Index 0 is not a valid base index, its entry is empty and never matches.
 //
 // Usage:
 //
-//	func (n *bartNode[V]) contains(idx uint8) bool {
+// Is the prefix idx or any of its ancestors stored in the node?
+// One bitset intersection:
+//
+//	func (n *BartNode[V]) Contains(idx uint8) bool {
 //		return n.Prefixes.Overlaps(&lpm.LookupTbl[idx])
 //	}
 //
-// instead of a sequence of single bitset tests:
+// Which is the longest matching prefix? An ancestor always has a smaller
+// index than its descendants, so the highest bit of the intersection is the
+// longest match:
 //
-//	func (n *bartNode[V]) contains(idx uint8) bool {
-//		for ; idx > 0; idx >>= 1 {
-//			if n.prefixes.Test(idx) {
-//				return true
-//			}
+//	top, ok := n.Prefixes.AndTop(&lpm.LookupTbl[idx])
+//
+// Both replace a loop of single bit tests, each with a data dependent branch:
+//
+//	for ; idx > 0; idx >>= 1 {
+//		if n.Prefixes.Test(idx) {
+//			return true
 //		}
-//		return false
 //	}
+//	return false
 //
-// DO NOT MUTATE: Precomputed read‑only table used in hot paths.
+// DO NOT MUTATE the table.
 //
-//nolint:gochecknoglobals
+//nolint:gochecknoglobals // Precomputed read-only table used in hot paths.
 var LookupTbl = [256]bitset.BitSet256{
 {{.LookupTbl}} }`

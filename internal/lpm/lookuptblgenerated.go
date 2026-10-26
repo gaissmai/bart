@@ -5,38 +5,48 @@
 
 // Package lpm (longest-prefix-match) contains the lookup table with which
 // the backtracking for the lpm in the complete binary tree of the prefixes
-// can be replaced by a fast bitset operation.
+// of a node is replaced by a fast bitset operation.
 package lpm
 
 import "github.com/gaissmai/bart/internal/bitset"
 
-// LookupTbl is a precomputed read‑only table used in hot paths.
+// LookupTbl is a precomputed read-only table used in hot paths.
 //
-// It allows a one-shot bitset intersection algorithm:
-// Each entry i encodes i and all its binary ancestors (i>>1, i>>2, ...).
+// Each entry idx is the bitset of idx itself and all its binary ancestors
+// (idx, idx>>1, idx>>2, ..., 1). In the complete binary tree of the prefixes
+// of a node these are the prefix idx and all less specific prefixes that
+// cover it.
 //
-// idx must be the uint8 produced by art.OctetToIdx or art.PfxToIdx (0 is invalid).
+// idx must be a base index produced by art.OctetToIdx or art.PfxToIdx.
+// Index 0 is not a valid base index, its entry is empty and never matches.
 //
 // Usage:
 //
-//	func (n *bartNode[V]) contains(idx uint8) bool {
+// Is the prefix idx or any of its ancestors stored in the node?
+// One bitset intersection:
+//
+//	func (n *BartNode[V]) Contains(idx uint8) bool {
 //		return n.Prefixes.Overlaps(&lpm.LookupTbl[idx])
 //	}
 //
-// instead of a sequence of single bitset tests:
+// Which is the longest matching prefix? An ancestor always has a smaller
+// index than its descendants, so the highest bit of the intersection is the
+// longest match:
 //
-//	func (n *bartNode[V]) contains(idx uint8) bool {
-//		for ; idx > 0; idx >>= 1 {
-//			if n.prefixes.Test(idx) {
-//				return true
-//			}
+//	top, ok := n.Prefixes.AndTop(&lpm.LookupTbl[idx])
+//
+// Both replace a loop of single bit tests, each with a data dependent branch:
+//
+//	for ; idx > 0; idx >>= 1 {
+//		if n.Prefixes.Test(idx) {
+//			return true
 //		}
-//		return false
 //	}
+//	return false
 //
-// DO NOT MUTATE: Precomputed read‑only table used in hot paths.
+// DO NOT MUTATE the table.
 //
-//nolint:gochecknoglobals
+//nolint:gochecknoglobals // Precomputed read-only table used in hot paths.
 var LookupTbl = [256]bitset.BitSet256{
 	/* idx:   0 */ {0x0, 0x0, 0x0, 0x0}, // invalid
 	/* idx:   1 */ {0x2, 0x0, 0x0, 0x0}, // [1]
