@@ -91,7 +91,6 @@ func (a *Array256[T]) Clear(uint8) {
 //
 // The result is computed from the cumulative word counts in cum plus one
 // popcount of the bits below i in its own word.
-// branches.
 func (a *Array256[T]) rank0(i uint8) int {
 	wi := i >> 6
 	mask := uint64(1)<<(i&63) - 1
