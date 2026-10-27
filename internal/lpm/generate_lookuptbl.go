@@ -147,10 +147,9 @@ func main() {
 // Result: BitSet256 with bits {1, 3, 6, 13} set. An index at depth d, counted
 // from the root as depth 0, has d+1 bits set, so at most 8 bits.
 //
-// This allows the longest-prefix-match to be computed with a single bitset
-// intersection:
+// This allows checking for any match (contains) with a single bitset intersection:
 //
-//	// one bitset intersection using the precomputed ancestors
+//	// bitset intersection with the precomputed ancestors
 //	return node.Prefixes.Overlaps(&LookupTbl[idx])
 //
 // instead of iterative backtracking:
