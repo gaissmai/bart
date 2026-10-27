@@ -95,7 +95,6 @@ func TestInlineArray256Functions(t *testing.T) {
 
 	mustInline := []string{
 		// shape implementation, called by the wrappers below
-		"(*Array256[go.shape.interface {}]).rank0",
 		"(*Array256[go.shape.interface {}]).Get",
 		"(*Array256[go.shape.interface {}]).MustGet",
 
