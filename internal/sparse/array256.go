@@ -126,18 +126,19 @@ func (a *Array256[T]) decrCum(i uint8) {
 //
 //	BitSet256.Test(5):     true
 //	a.rank0(5):            1   (the set bit at index 2 lies below index 5)
-//
-// The word of the bitset is loaded once and used for both the presence test
-// and the rank, which also keeps the inline cost low.
 func (a *Array256[T]) Get(i uint8) (value T, ok bool) {
+	// The word of the bitset is loaded once and used for both the presence test
+	// and the rank, which also keeps the inline cost low.
 	wi := i >> 6
 	bit := uint64(1) << (i & 63)
 
+	// Test() manually inlined
 	w := a.BitSet256[wi]
 	if w&bit == 0 {
 		return
 	}
 
+	// rank0 manually inlined
 	return a.Items[int(a.cum[wi])+bits.OnesCount64(w&(bit-1))], true
 }
 
