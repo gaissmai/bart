@@ -18,12 +18,12 @@ import (
 // overhead for the common case where native addresses are used.
 // Users should unmap IPv4-in-IPv6 addresses to their native IPv4 form
 // (e.g., 192.0.2.1) before calling these methods.
-type liteTable[V any] struct {
+type liteTable[T any] struct {
 	// used by -copylocks checker from `go vet`.
 	_ [0]sync.Mutex
 
-	root4 nodes.LiteNode[V]
-	root6 nodes.LiteNode[V]
+	root4 nodes.LiteNode[T]
+	root6 nodes.LiteNode[T]
 
 	// the number of prefixes in the routing table
 	size4 int
@@ -32,7 +32,7 @@ type liteTable[V any] struct {
 
 // Aggregate compresses the table in-place by merging overlapping
 // and adjacent IP prefixes into their minimal covering CIDR blocks.
-func (l *liteTable[V]) Aggregate() {
+func (l *liteTable[T]) Aggregate() {
 	mod4 := l.root4.AggregateRec(nodes.StridePath{}, 0, true)
 	mod6 := l.root6.AggregateRec(nodes.StridePath{}, 0, false)
 

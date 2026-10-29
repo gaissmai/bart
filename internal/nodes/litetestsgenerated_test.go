@@ -20,8 +20,8 @@ import (
 )
 
 // helpers
-func (n *LiteNode[V]) all4() iter.Seq2[netip.Prefix, V] {
-	return func(yield func(netip.Prefix, V) bool) {
+func (n *LiteNode[T]) all4() iter.Seq2[netip.Prefix, T] {
+	return func(yield func(netip.Prefix, T) bool) {
 		if n == nil {
 			return
 		}
@@ -29,8 +29,8 @@ func (n *LiteNode[V]) all4() iter.Seq2[netip.Prefix, V] {
 	}
 }
 
-func (n *LiteNode[V]) all6() iter.Seq2[netip.Prefix, V] {
-	return func(yield func(netip.Prefix, V) bool) {
+func (n *LiteNode[T]) all6() iter.Seq2[netip.Prefix, T] {
+	return func(yield func(netip.Prefix, T) bool) {
 		if n == nil {
 			return
 		}
@@ -38,8 +38,8 @@ func (n *LiteNode[V]) all6() iter.Seq2[netip.Prefix, V] {
 	}
 }
 
-func (n *LiteNode[V]) allSorted4() iter.Seq2[netip.Prefix, V] {
-	return func(yield func(netip.Prefix, V) bool) {
+func (n *LiteNode[T]) allSorted4() iter.Seq2[netip.Prefix, T] {
+	return func(yield func(netip.Prefix, T) bool) {
 		if n == nil {
 			return
 		}
@@ -47,8 +47,8 @@ func (n *LiteNode[V]) allSorted4() iter.Seq2[netip.Prefix, V] {
 	}
 }
 
-func (n *LiteNode[V]) allSorted6() iter.Seq2[netip.Prefix, V] {
-	return func(yield func(netip.Prefix, V) bool) {
+func (n *LiteNode[T]) allSorted6() iter.Seq2[netip.Prefix, T] {
+	return func(yield func(netip.Prefix, T) bool) {
 		if n == nil {
 			return
 		}
@@ -607,7 +607,7 @@ func TestSubnets6_LiteNode(t *testing.T) {
 	}
 }
 
-// TestDump_EMPTY_STRUCT verifies that dump does not print values when V is a empty struct type.
+// TestDump_EMPTY_STRUCT verifies that dump does not print values when T is a empty struct type.
 func TestDump_EMPTY_STRUCT_LiteNode(t *testing.T) {
 	t.Parallel()
 
@@ -634,7 +634,7 @@ func TestDump_EMPTY_STRUCT_LiteNode(t *testing.T) {
 	}
 }
 
-// TestDump_NonEMPTY_STRUCT verifies that dump prints values when V is not a empty struct type.
+// TestDump_NonEMPTY_STRUCT verifies that dump prints values when T is not a empty struct type.
 func TestDump_NonEMPTY_STRUCT_LiteNode(t *testing.T) {
 	t.Parallel()
 

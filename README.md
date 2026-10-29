@@ -22,7 +22,7 @@ BART is implemented as a multibit trie with a fixed stride of 8 bits, using a fa
 
 BART provides two table variants optimized for different use cases:
 - **`bart.Lite`**: A payload-free variant optimized for minimal memory footprint.
-- **`bart.Table[V]`**: Stores associated payloads alongside routing prefixes.
+- **`bart.Table[T]`**: Stores associated payloads alongside routing prefixes.
 
 Both implementations share the same highly optimized core engine, using popcount-compressed sparse arrays for **level compression**. Combined with a **novel path and fringe compression**, this design reduces memory consumption by nearly two orders of magnitude compared to classical ART while maintaining identical, lightning-fast lookup times.
 
@@ -109,58 +109,58 @@ BART provides a rich API:
 ```go
 import "github.com/gaissmai/bart"
 
-type Table[V any] struct {
+type Table[T any] struct {
   // Has unexported fields.
 }
 
-func (t *Table[V]) Contains(netip.Addr) bool
-func (t *Table[V]) Lookup(netip.Addr) (V, bool)
+func (t *Table[T]) Contains(netip.Addr) bool
+func (t *Table[T]) Lookup(netip.Addr) (T, bool)
 
-func (t *Table[V]) LookupPrefix(netip.Prefix) (V, bool)
-func (t *Table[V]) LookupPrefixLPM(netip.Prefix) (netip.Prefix, V, bool)
+func (t *Table[T]) LookupPrefix(netip.Prefix) (T, bool)
+func (t *Table[T]) LookupPrefixLPM(netip.Prefix) (netip.Prefix, T, bool)
 
-func (t *Table[V]) Get(netip.Prefix) (V, bool)
-func (t *Table[V]) Insert(netip.Prefix, V)
-func (t *Table[V]) Delete(netip.Prefix)
-func (t *Table[V]) Modify(netip.Prefix, cb func(V, bool) (V, bool))
+func (t *Table[T]) Get(netip.Prefix) (T, bool)
+func (t *Table[T]) Insert(netip.Prefix, T)
+func (t *Table[T]) Delete(netip.Prefix)
+func (t *Table[T]) Modify(netip.Prefix, cb func(T, bool) (T, bool))
 
-func (t *Table[V]) InsertPersist(netip.Prefix, V) *Table[V]
-func (t *Table[V]) DeletePersist(netip.Prefix) *Table[V]
-func (t *Table[V]) ModifyPersist(netip.Prefix, cb func(V, bool) (V, bool)) *Table[V]
+func (t *Table[T]) InsertPersist(netip.Prefix, T) *Table[T]
+func (t *Table[T]) DeletePersist(netip.Prefix) *Table[T]
+func (t *Table[T]) ModifyPersist(netip.Prefix, cb func(T, bool) (T, bool)) *Table[T]
 
-func (t *Table[V]) Clone() *Table[V]
-func (t *Table[V]) Union(o *Table[V])
-func (t *Table[V]) UnionPersist(o *Table[V]) *Table[V]
+func (t *Table[T]) Clone() *Table[T]
+func (t *Table[T]) Union(o *Table[T])
+func (t *Table[T]) UnionPersist(o *Table[T]) *Table[T]
 
-func (t *Table[V]) OverlapsPrefix(netip.Prefix) bool
+func (t *Table[T]) OverlapsPrefix(netip.Prefix) bool
 
-func (t *Table[V]) Overlaps(o *Table[V]) bool
-func (t *Table[V]) Overlaps4(o *Table[V]) bool
-func (t *Table[V]) Overlaps6(o *Table[V]) bool
+func (t *Table[T]) Overlaps(o *Table[T]) bool
+func (t *Table[T]) Overlaps4(o *Table[T]) bool
+func (t *Table[T]) Overlaps6(o *Table[T]) bool
 
-func (t *Table[V]) Equal(o *Table[V]) bool
+func (t *Table[T]) Equal(o *Table[T]) bool
 
-func (t *Table[V]) Subnets(netip.Prefix) iter.Seq2[netip.Prefix, V]
-func (t *Table[V]) Supernets(netip.Prefix) iter.Seq2[netip.Prefix, V]
+func (t *Table[T]) Subnets(netip.Prefix) iter.Seq2[netip.Prefix, T]
+func (t *Table[T]) Supernets(netip.Prefix) iter.Seq2[netip.Prefix, T]
 
-func (t *Table[V]) All() iter.Seq2[netip.Prefix, V]
-func (t *Table[V]) All4() iter.Seq2[netip.Prefix, V]
-func (t *Table[V]) All6() iter.Seq2[netip.Prefix, V]
+func (t *Table[T]) All() iter.Seq2[netip.Prefix, T]
+func (t *Table[T]) All4() iter.Seq2[netip.Prefix, T]
+func (t *Table[T]) All6() iter.Seq2[netip.Prefix, T]
 
-func (t *Table[V]) AllSorted() iter.Seq2[netip.Prefix, V]
-func (t *Table[V]) AllSorted4() iter.Seq2[netip.Prefix, V]
-func (t *Table[V]) AllSorted6() iter.Seq2[netip.Prefix, V]
+func (t *Table[T]) AllSorted() iter.Seq2[netip.Prefix, T]
+func (t *Table[T]) AllSorted4() iter.Seq2[netip.Prefix, T]
+func (t *Table[T]) AllSorted6() iter.Seq2[netip.Prefix, T]
 
-func (t *Table[V]) Size() int
-func (t *Table[V]) Size4() int
-func (t *Table[V]) Size6() int
+func (t *Table[T]) Size() int
+func (t *Table[T]) Size4() int
+func (t *Table[T]) Size6() int
 
-func (t *Table[V]) Fprint(w io.Writer) error
-func (t *Table[V]) MarshalText() ([]byte, error)
-func (t *Table[V]) MarshalJSON() ([]byte, error)
+func (t *Table[T]) Fprint(w io.Writer) error
+func (t *Table[T]) MarshalText() ([]byte, error)
+func (t *Table[T]) MarshalJSON() ([]byte, error)
 
-func (t *Table[V]) DumpList4() []DumpListNode[V]
-func (t *Table[V]) DumpList6() []DumpListNode[V]
+func (t *Table[T]) DumpList4() []DumpListNode[T]
+func (t *Table[T]) DumpList6() []DumpListNode[T]
 ```
 
 ## Benchmarks
@@ -191,7 +191,7 @@ The package is pre-v1, allowing breaking changes if necessary to refine API desi
 
 ```go
 // Deprecated: use Table.
-type Fast[V any] = Table[V]
+type Fast[T any] = Table[T]
 ```
 
 Use `go fix` to migrate automatically:

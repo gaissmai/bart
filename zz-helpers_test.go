@@ -46,7 +46,7 @@ func (i *MyInt) Clone() *MyInt {
 	return &a
 }
 
-func countDumpListNodes[V any](nodes []DumpListNode[V]) int {
+func countDumpListNodes[T any](nodes []DumpListNode[T]) int {
 	count := len(nodes)
 	for _, node := range nodes {
 		count += countDumpListNodes(node.Subnets)
@@ -54,7 +54,7 @@ func countDumpListNodes[V any](nodes []DumpListNode[V]) int {
 	return count
 }
 
-func verifyAllIPv4Nodes[V any](t *testing.T, nodes []DumpListNode[V]) {
+func verifyAllIPv4Nodes[T any](t *testing.T, nodes []DumpListNode[T]) {
 	for i, node := range nodes {
 		if !node.CIDR.Addr().Is4() {
 			t.Errorf("Node %d is not IPv4 prefix: %v", i, node.CIDR)
@@ -64,7 +64,7 @@ func verifyAllIPv4Nodes[V any](t *testing.T, nodes []DumpListNode[V]) {
 	}
 }
 
-func verifyAllIPv6Nodes[V any](t *testing.T, nodes []DumpListNode[V]) {
+func verifyAllIPv6Nodes[T any](t *testing.T, nodes []DumpListNode[T]) {
 	for i, node := range nodes {
 		if !node.CIDR.Addr().Is6() {
 			t.Errorf("Node %d is not IPv6 prefix: %v", i, node.CIDR)
@@ -94,7 +94,7 @@ func noPanic(t *testing.T, name string, fn func()) {
 	fn()
 }
 
-func mustPanicRangeOverFunc[V any](t *testing.T, name string, fn any) {
+func mustPanicRangeOverFunc[T any](t *testing.T, name string, fn any) {
 	t.Helper()
 	defer func() {
 		if recover() == nil {
@@ -106,14 +106,14 @@ func mustPanicRangeOverFunc[V any](t *testing.T, name string, fn any) {
 	case func() iter.Seq[netip.Prefix]:
 		for range iterFunc() {
 		}
-	case func() iter.Seq2[netip.Prefix, V]:
+	case func() iter.Seq2[netip.Prefix, T]:
 		for range iterFunc() {
 		}
 	case func(netip.Prefix) iter.Seq[netip.Prefix]:
 		pfx := mpp("1.2.3.4/32")
 		for range iterFunc(pfx) {
 		}
-	case func(netip.Prefix) iter.Seq2[netip.Prefix, V]:
+	case func(netip.Prefix) iter.Seq2[netip.Prefix, T]:
 		pfx := mpp("1.2.3.4/32")
 		for range iterFunc(pfx) {
 		}

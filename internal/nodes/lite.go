@@ -12,7 +12,7 @@ import (
 
 // LiteNode is a space-optimized version of [BartNode] that tracks prefix existence
 // without storing associated values.
-type LiteNode[V any] struct {
+type LiteNode[T any] struct {
 	Children sparse.Array256[any]
 	Prefixes struct {
 		bitset.BitSet256
@@ -21,14 +21,14 @@ type LiteNode[V any] struct {
 }
 
 // PrefixCount returns the number of prefixes stored in this node.
-func (n *LiteNode[V]) PrefixCount() int {
+func (n *LiteNode[T]) PrefixCount() int {
 	return int(n.Prefixes.count)
 }
 
 // InsertPrefix adds a routing entry at the specified index.
 // It returns true if a prefix already existed at that index,
 // false if this is a new insertion.
-func (n *LiteNode[V]) InsertPrefix(idx uint8, _ V) (exists bool) {
+func (n *LiteNode[T]) InsertPrefix(idx uint8, _ T) (exists bool) {
 	if exists = n.Prefixes.Test(idx); exists {
 		return exists
 	}
@@ -39,7 +39,7 @@ func (n *LiteNode[V]) InsertPrefix(idx uint8, _ V) (exists bool) {
 
 // DeletePrefix removes the prefix at the specified index.
 // Returns true if the prefix existed, and false otherwise.
-func (n *LiteNode[V]) DeletePrefix(idx uint8) (exists bool) {
+func (n *LiteNode[T]) DeletePrefix(idx uint8) (exists bool) {
 	if exists = n.Prefixes.Test(idx); !exists {
 		return false
 	}
@@ -48,24 +48,24 @@ func (n *LiteNode[V]) DeletePrefix(idx uint8) (exists bool) {
 	return true
 }
 
-func (n *LiteNode[V]) GetPrefix(idx uint8) (_ V, exists bool) {
+func (n *LiteNode[T]) GetPrefix(idx uint8) (_ T, exists bool) {
 	// no docstring by intention
 	exists = n.Prefixes.Test(idx)
 	return
 }
 
-func (n *LiteNode[V]) MustGetPrefix(idx uint8) (_ V) {
+func (n *LiteNode[T]) MustGetPrefix(idx uint8) (_ T) {
 	// no docstring by intention
 	return
 }
 
 // CloneFlat returns a shallow copy of the current node.
-func (n *LiteNode[V]) CloneFlat(_ func(V) V) *LiteNode[V] {
+func (n *LiteNode[T]) CloneFlat(_ func(T) T) *LiteNode[T] {
 	if n == nil {
 		return nil
 	}
 
-	c := new(LiteNode[V])
+	c := new(LiteNode[T])
 
 	// copy simple values
 	c.Prefixes = n.Prefixes
@@ -111,13 +111,13 @@ func (n *LiteNode[V]) CloneFlat(_ func(V) V) *LiteNode[V] {
 // Returns modified, the number of structural mutation operations performed
 // during the aggregation pass. Note that pruning an entire child node counts
 // as a single mutation event, regardless of how many nested prefixes it contained.
-func (n *LiteNode[V]) AggregateRec(path StridePath, depth int, is4 bool) (modified int) {
-	var zero V
+func (n *LiteNode[T]) AggregateRec(path StridePath, depth int, is4 bool) (modified int) {
+	var zero T
 
 	// #########################################################################################
 	// 1. Default Route Purge: If node has default route, purge all prefixes and children.
 	if n.Prefixes.Test(1) {
-		*n = LiteNode[V]{}
+		*n = LiteNode[T]{}
 
 		// Restore default route in this node
 		n.InsertPrefix(1, zero)
@@ -186,7 +186,7 @@ func (n *LiteNode[V]) AggregateRec(path StridePath, depth int, is4 bool) (modifi
 	for i, addr := range n.Children.AllEnumerate() {
 		anyKid := n.Children.Items[i]
 
-		kid, ok := anyKid.(*LiteNode[V])
+		kid, ok := anyKid.(*LiteNode[T])
 		// Leaf or Fringe, skip over
 		if !ok {
 			continue
@@ -220,15 +220,15 @@ func (n *LiteNode[V]) AggregateRec(path StridePath, depth int, is4 bool) (modifi
 		case childCount == 1:
 			// Promote single grandchild to parent's child slot
 			switch grandKid := kid.Children.Items[0].(type) {
-			case *LiteNode[V]:
+			case *LiteNode[T]:
 				// Intermediate path node, leave as is
 				continue
 
-			case *LeafNode[V]:
+			case *LeafNode[T]:
 				// Promote LeafNode directly
 				n.Children.Items[i] = grandKid
 
-			case *FringeNode[V]:
+			case *FringeNode[T]:
 				// Convert FringeNode back to LeafNode and promote
 				fringeByte, _ := kid.Children.FirstSet()
 				fringePrefix := CidrForFringe(path[:], depth+1, is4, fringeByte)
@@ -245,11 +245,11 @@ func (n *LiteNode[V]) AggregateRec(path StridePath, depth int, is4 bool) (modifi
 	for addr := range alignedPairs.All() {
 		// addr, addr+1 is an aligned pair
 		anyKid := n.MustGetChild(addr)
-		if _, ok := anyKid.(*FringeNode[V]); !ok {
+		if _, ok := anyKid.(*FringeNode[T]); !ok {
 			continue
 		}
 		anyKid = n.MustGetChild(addr + 1)
-		if _, ok := anyKid.(*FringeNode[V]); !ok {
+		if _, ok := anyKid.(*FringeNode[T]); !ok {
 			continue
 		}
 

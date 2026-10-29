@@ -28,73 +28,73 @@ import (
 )
 
 type (
-	_NODE_TYPE[V any] struct{}
+	_NODE_TYPE[T any] struct{}
 
-	_TABLE_TYPE[V any] struct {
-		root4 _NODE_TYPE[V]
-		root6 _NODE_TYPE[V]
+	_TABLE_TYPE[T any] struct {
+		root4 _NODE_TYPE[T]
+		root6 _NODE_TYPE[T]
 	}
 )
 
-func (*_NODE_TYPE[V]) StatsRec() (_ nodes.StatsT) { return }
+func (*_NODE_TYPE[T]) StatsRec() (_ nodes.StatsT) { return }
 
-func (*_TABLE_TYPE[V]) rootNodeByVersion(bool) (_ *_NODE_TYPE[V])                  { return }
-func (*_TABLE_TYPE[V]) sizeUpdate(bool, int)                                       { return }
-func (*_TABLE_TYPE[V]) dump(io.Writer)                                             { return }
-func (*_TABLE_TYPE[V]) dumpString() (_ string)                                     { return }
-func (*_TABLE_TYPE[V]) fprint(io.Writer, bool) (_ error)                           { return }
-func (*_TABLE_TYPE[V]) Fprint(io.Writer) (_ error)                                 { return }
-func (*_TABLE_TYPE[V]) Size() (_ int)                                              { return }
-func (*_TABLE_TYPE[V]) Size4() (_ int)                                             { return }
-func (*_TABLE_TYPE[V]) Size6() (_ int)                                             { return }
-func (*_TABLE_TYPE[V]) Insert(netip.Prefix, V)                                     { return }
-func (*_TABLE_TYPE[V]) Get(netip.Prefix) (_ V, _ bool)                             { return }
-func (*_TABLE_TYPE[V]) Delete(netip.Prefix)                                        { return }
-func (*_TABLE_TYPE[V]) Modify(netip.Prefix, func(V, bool) (V, bool))               { return }
-func (*_TABLE_TYPE[V]) Clone() (_ *_TABLE_TYPE[V])                                 { return }
-func (*_TABLE_TYPE[V]) Union(*_TABLE_TYPE[V])                                      { return }
-func (*_TABLE_TYPE[V]) Equal(*_TABLE_TYPE[V]) (_ bool)                             { return }
-func (*_TABLE_TYPE[V]) OverlapsPrefix(netip.Prefix) (_ bool)                       { return }
-func (*_TABLE_TYPE[V]) Overlaps(*_TABLE_TYPE[V]) (_ bool)                          { return }
-func (*_TABLE_TYPE[V]) Overlaps4(*_TABLE_TYPE[V]) (_ bool)                         { return }
-func (*_TABLE_TYPE[V]) Overlaps6(*_TABLE_TYPE[V]) (_ bool)                         { return }
-func (*_TABLE_TYPE[V]) Contains(netip.Addr) (_ bool)                               { return }
-func (*_TABLE_TYPE[V]) Lookup(netip.Addr) (_ V, _ bool)                            { return }
-func (*_TABLE_TYPE[V]) LookupPrefix(netip.Prefix) (_ V, _ bool)                    { return }
-func (*_TABLE_TYPE[V]) LookupPrefixLPM(netip.Prefix) (_ netip.Prefix, _ V, _ bool) { return }
+func (*_TABLE_TYPE[T]) rootNodeByVersion(bool) (_ *_NODE_TYPE[T])                  { return }
+func (*_TABLE_TYPE[T]) sizeUpdate(bool, int)                                       { return }
+func (*_TABLE_TYPE[T]) dump(io.Writer)                                             { return }
+func (*_TABLE_TYPE[T]) dumpString() (_ string)                                     { return }
+func (*_TABLE_TYPE[T]) fprint(io.Writer, bool) (_ error)                           { return }
+func (*_TABLE_TYPE[T]) Fprint(io.Writer) (_ error)                                 { return }
+func (*_TABLE_TYPE[T]) Size() (_ int)                                              { return }
+func (*_TABLE_TYPE[T]) Size4() (_ int)                                             { return }
+func (*_TABLE_TYPE[T]) Size6() (_ int)                                             { return }
+func (*_TABLE_TYPE[T]) Insert(netip.Prefix, T)                                     { return }
+func (*_TABLE_TYPE[T]) Get(netip.Prefix) (_ T, _ bool)                             { return }
+func (*_TABLE_TYPE[T]) Delete(netip.Prefix)                                        { return }
+func (*_TABLE_TYPE[T]) Modify(netip.Prefix, func(T, bool) (T, bool))               { return }
+func (*_TABLE_TYPE[T]) Clone() (_ *_TABLE_TYPE[T])                                 { return }
+func (*_TABLE_TYPE[T]) Union(*_TABLE_TYPE[T])                                      { return }
+func (*_TABLE_TYPE[T]) Equal(*_TABLE_TYPE[T]) (_ bool)                             { return }
+func (*_TABLE_TYPE[T]) OverlapsPrefix(netip.Prefix) (_ bool)                       { return }
+func (*_TABLE_TYPE[T]) Overlaps(*_TABLE_TYPE[T]) (_ bool)                          { return }
+func (*_TABLE_TYPE[T]) Overlaps4(*_TABLE_TYPE[T]) (_ bool)                         { return }
+func (*_TABLE_TYPE[T]) Overlaps6(*_TABLE_TYPE[T]) (_ bool)                         { return }
+func (*_TABLE_TYPE[T]) Contains(netip.Addr) (_ bool)                               { return }
+func (*_TABLE_TYPE[T]) Lookup(netip.Addr) (_ T, _ bool)                            { return }
+func (*_TABLE_TYPE[T]) LookupPrefix(netip.Prefix) (_ T, _ bool)                    { return }
+func (*_TABLE_TYPE[T]) LookupPrefixLPM(netip.Prefix) (_ netip.Prefix, _ T, _ bool) { return }
 
-func (*_TABLE_TYPE[V]) InsertPersist(netip.Prefix, V) (_ *_TABLE_TYPE[V]) { return }
-func (*_TABLE_TYPE[V]) DeletePersist(netip.Prefix) (_ *_TABLE_TYPE[V])    { return }
-func (*_TABLE_TYPE[V]) UnionPersist(*_TABLE_TYPE[V]) (_ *_TABLE_TYPE[V])  { return }
-func (*_TABLE_TYPE[V]) ModifyPersist(netip.Prefix, func(V, bool) (V, bool)) (_ *_TABLE_TYPE[V]) {
+func (*_TABLE_TYPE[T]) InsertPersist(netip.Prefix, T) (_ *_TABLE_TYPE[T]) { return }
+func (*_TABLE_TYPE[T]) DeletePersist(netip.Prefix) (_ *_TABLE_TYPE[T])    { return }
+func (*_TABLE_TYPE[T]) UnionPersist(*_TABLE_TYPE[T]) (_ *_TABLE_TYPE[T])  { return }
+func (*_TABLE_TYPE[T]) ModifyPersist(netip.Prefix, func(T, bool) (T, bool)) (_ *_TABLE_TYPE[T]) {
 	return
 }
-func (*_TABLE_TYPE[V]) MarshalText() (_ []byte, _ error) { return }
-func (*_TABLE_TYPE[V]) MarshalJSON() (_ []byte, _ error) { return }
-func (*_TABLE_TYPE[V]) DumpList4() (_ []DumpListNode[V]) { return }
-func (*_TABLE_TYPE[V]) DumpList6() (_ []DumpListNode[V]) { return }
+func (*_TABLE_TYPE[T]) MarshalText() (_ []byte, _ error) { return }
+func (*_TABLE_TYPE[T]) MarshalJSON() (_ []byte, _ error) { return }
+func (*_TABLE_TYPE[T]) DumpList4() (_ []DumpListNode[T]) { return }
+func (*_TABLE_TYPE[T]) DumpList6() (_ []DumpListNode[T]) { return }
 
-func (*_TABLE_TYPE[V]) All() (_ iter.Seq2[netip.Prefix, V])  { return }
-func (*_TABLE_TYPE[V]) All4() (_ iter.Seq2[netip.Prefix, V]) { return }
-func (*_TABLE_TYPE[V]) All6() (_ iter.Seq2[netip.Prefix, V]) { return }
+func (*_TABLE_TYPE[T]) All() (_ iter.Seq2[netip.Prefix, T])  { return }
+func (*_TABLE_TYPE[T]) All4() (_ iter.Seq2[netip.Prefix, T]) { return }
+func (*_TABLE_TYPE[T]) All6() (_ iter.Seq2[netip.Prefix, T]) { return }
 
-func (*_TABLE_TYPE[V]) AllSorted() (_ iter.Seq2[netip.Prefix, V])  { return }
-func (*_TABLE_TYPE[V]) AllSorted4() (_ iter.Seq2[netip.Prefix, V]) { return }
-func (*_TABLE_TYPE[V]) AllSorted6() (_ iter.Seq2[netip.Prefix, V]) { return }
+func (*_TABLE_TYPE[T]) AllSorted() (_ iter.Seq2[netip.Prefix, T])  { return }
+func (*_TABLE_TYPE[T]) AllSorted4() (_ iter.Seq2[netip.Prefix, T]) { return }
+func (*_TABLE_TYPE[T]) AllSorted6() (_ iter.Seq2[netip.Prefix, T]) { return }
 
-func (*_TABLE_TYPE[V]) Subnets(netip.Prefix) (_ iter.Seq2[netip.Prefix, V])   { return }
-func (*_TABLE_TYPE[V]) Supernets(netip.Prefix) (_ iter.Seq2[netip.Prefix, V]) { return }
+func (*_TABLE_TYPE[T]) Subnets(netip.Prefix) (_ iter.Seq2[netip.Prefix, T])   { return }
+func (*_TABLE_TYPE[T]) Supernets(netip.Prefix) (_ iter.Seq2[netip.Prefix, T]) { return }
 
 // ### GENERATE DELETE END ###
 
 // ############ tests ################################
 
 // flatSorted, just a helper to compare with golden table.
-func (t *_TABLE_TYPE[V]) flatSorted() golden.TableSlice[V] {
-	flat := golden.TableSlice[V](make([]golden.Item[V], 0, t.Size()))
+func (t *_TABLE_TYPE[T]) flatSorted() golden.TableSlice[T] {
+	flat := golden.TableSlice[T](make([]golden.Item[T], 0, t.Size()))
 
 	for p, v := range t.AllSorted() {
-		flat = append(flat, golden.Item[V]{Pfx: p, Val: v})
+		flat = append(flat, golden.Item[T]{Pfx: p, Val: v})
 	}
 
 	return flat

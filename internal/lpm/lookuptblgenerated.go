@@ -25,7 +25,7 @@ import "github.com/gaissmai/bart/internal/bitset"
 // Is the prefix idx or any of its ancestors stored in the node?
 // One bitset intersection:
 //
-//	func (n *BartNode[V]) Contains(idx uint8) bool {
+//	func (n *BartNode[T]) Contains(idx uint8) bool {
 //		return n.Prefixes.Overlaps(&lpm.LookupTbl[idx])
 //	}
 //
