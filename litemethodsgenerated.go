@@ -177,9 +177,8 @@ LOOP:
 	return val, ok
 }
 
-// LookupPrefix performs a longest prefix match lookup for any address within
-// the given prefix. It finds the most specific routing table entry that would
-// match any address in the provided prefix range.
+// LookupPrefix performs a longest prefix match lookup for the given prefix.
+// It finds the most specific routing table entry that covers the whole prefix.
 //
 // This is functionally identical to LookupPrefixLPM but returns only the
 // associated value, not the matching prefix itself.
@@ -191,9 +190,8 @@ func (t *liteTable[T]) LookupPrefix(pfx netip.Prefix) (val T, ok bool) {
 	return val, ok
 }
 
-// LookupPrefixLPM performs a longest prefix match lookup for any address within
-// the given prefix. It finds the most specific routing table entry that would
-// match any address in the provided prefix range.
+// LookupPrefixLPM performs a longest prefix match lookup for the given prefix.
+// It finds the most specific routing table entry that covers the whole prefix.
 //
 // This is functionally identical to LookupPrefix but additionally returns the
 // matching LPM prefix itself along with the value.
@@ -207,6 +205,15 @@ func (t *liteTable[T]) LookupPrefixLPM(pfx netip.Prefix) (lpmPfx netip.Prefix, v
 	return t.lookupPrefixLPM(pfx, true)
 }
 
+// lookupPrefixLPM is the implementation of LookupPrefix and LookupPrefixLPM.
+//
+// The prefix is canonicalized first. The traversal stops at the stride of the
+// prefix length, at a missing child, or at a leaf or fringe that does not match.
+// A matching leaf or fringe is returned immediately. Otherwise the nodes on the
+// path are unwound for the longest match.
+//
+// withLPM selects whether the matching prefix is reconstructed and returned,
+// LookupPrefix does not need it and saves the work.
 func (t *liteTable[T]) lookupPrefixLPM(pfx netip.Prefix, withLPM bool) (lpmPfx netip.Prefix, val T, ok bool) {
 	if !pfx.IsValid() {
 		return lpmPfx, val, ok
@@ -430,7 +437,7 @@ func (t *liteTable[T]) Delete(pfx netip.Prefix) {
 //
 // This is an exact-match operation (no LPM). The prefix must match exactly
 // in both address and prefix length to be found. If pfx exists, the
-// associated value (zero value for Lite) and found=true is returned.
+// associated value (zero value for Lite) and exists=true is returned.
 // If pfx does not exist or pfx is invalid, the zero value for V and
 // exists=false is returned.
 //
@@ -549,8 +556,23 @@ func (t *liteTable[T]) Modify(pfx netip.Prefix, cb func(_ T, ok bool) (_ T, del 
 	t.sizeUpdate(is4, delta)
 }
 
-// ModifyPersist is similar to Modify but the receiver isn't modified and
-// a new *liteTable is returned.
+// ModifyPersist is similar to [liteTable.Modify] but the receiver isn't modified
+// and a new *liteTable is returned. The callback semantics are the same.
+//
+// If the prefix is invalid, or the callback decides on a no-op (the prefix does
+// not exist and the callback requests a deletion), the receiver is returned
+// unchanged.
+//
+// If the payload type T implements the Clone method, the callback receives a
+// clone of the existing value, so that it can modify the value without affecting
+// the receiver.
+//
+// If T does not implement the Clone method, the callback receives the existing
+// value without cloning. Pointers, slices, maps, and other referenced
+// data can still alias the receiver's payload. The callback must copy
+// such data before modifying it to avoid affecting the receiver.
+//
+// This operation uses copy-on-write, not a full [liteTable.Clone].
 func (t *liteTable[T]) ModifyPersist(pfx netip.Prefix, cb func(_ T, ok bool) (_ T, del bool)) *liteTable[T] {
 	if !pfx.IsValid() {
 		return t
@@ -631,6 +653,9 @@ func (t *liteTable[T]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, T] {
 //	for sub, val := range table.Subnets(netip.MustParsePrefix("10.0.0.0/8")) {
 //	    fmt.Println("Covered:", sub, "->", val)
 //	}
+//
+// pfx itself does not have to be stored in the table, all stored prefixes that
+// are covered by pfx are yielded.
 //
 // The iteration can be stopped early by breaking from the range loop.
 // Returns an empty iterator if the prefix is invalid.
@@ -735,7 +760,7 @@ func (t *liteTable[T]) Union(o *liteTable[T]) {
 	t.size6 += o.size6 - dup6
 }
 
-// UnionPersist is similar to [Union] but the receiver isn't modified.
+// UnionPersist is similar to [liteTable.Union] but the receiver isn't modified.
 //
 // All nodes touched during union are cloned and a new *liteTable is returned.
 // If o is empty, no nodes are touched and the receiver may be

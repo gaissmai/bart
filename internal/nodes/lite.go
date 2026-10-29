@@ -111,6 +111,10 @@ func (n *LiteNode[T]) CloneFlat(_ func(T) T) *LiteNode[T] {
 // Returns modified, the number of structural mutation operations performed
 // during the aggregation pass. Note that pruning an entire child node counts
 // as a single mutation event, regardless of how many nested prefixes it contained.
+// A node that holds the default route counts as one mutation, even if it consisted
+// of the default route only. The promotion of a single-entry child to a leaf or
+// fringe (step 4) is not counted, it does not change the number of prefixes. The
+// caller uses the value only to decide whether the size has to be recomputed.
 func (n *LiteNode[T]) AggregateRec(path StridePath, depth int, is4 bool) (modified int) {
 	var zero T
 

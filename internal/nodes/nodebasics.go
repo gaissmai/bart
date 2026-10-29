@@ -58,11 +58,11 @@ type StatsT struct {
 type nodeType byte
 
 const (
-	nullNode nodeType = iota // empty node
-	fullNode                 // prefixes and children or path-compressed prefixes
-	halfNode                 // no prefixes, only children and path-compressed prefixes
-	pathNode                 // only children, no prefix nor path-compressed prefixes
-	stopNode                 // no children, only prefixes or path-compressed prefixes
+	nullNode nodeType = iota // no prefixes, no children
+	fullNode                 // prefixes and sub-nodes
+	halfNode                 // no prefixes, sub-nodes and path-compressed leaves or fringes
+	pathNode                 // only sub-nodes, no prefixes, leaves or fringes
+	stopNode                 // no sub-nodes, only prefixes and/or leaves or fringes
 )
 
 // String implements Stringer for nodeType.
@@ -133,8 +133,10 @@ func CmpPrefix(a, b netip.Prefix) int {
 }
 
 // LeafNode represents a path-compressed routing entry that stores both prefix and value.
-// Leaf nodes are used when a prefix doesn't align with trie stride boundaries
-// and needs to be stored as a compressed path to save memory.
+// Leaf nodes hold prefixes that do not qualify as fringes at their position
+// in the trie (see [IsFringe]). This includes non-stride-aligned prefixes and
+// stride-aligned prefixes stored above their fringe position.
+// Storing the prefix as LeafNode avoids allocating intermediate trie nodes.
 type LeafNode[T any] struct {
 	Value  T
 	Prefix netip.Prefix
@@ -192,7 +194,7 @@ func CmpIndexRank(aIdx, bIdx uint8) int {
 // from the ART algorithm's complete binary tree representation.
 //
 // Parameters:
-//   - path: The stride path through the trie
+//   - octets: The octets of the path through the trie, the first depth octets are used
 //   - depth: Current depth in the trie
 //   - is4: True for IPv4 processing, false for IPv6
 //   - idx: The base index from the prefix table
@@ -290,7 +292,7 @@ func CidrForFringe(octets []byte, depth int, is4 bool, fringeByte uint8) netip.P
 //	2001:db8::/56  => strideCount:  7, modBits: 0 (fringe candidate)
 //
 //	/32 and /128 prefixes are special, they never form a new node,
-//	At the end of the trie (IPv4: depth 4, IPv6: depth 16) they are always
+//	At the last level of the trie (IPv4: depth 3, IPv6: depth 15) they are always
 //	inserted as a path‑compressed fringe.
 //
 // We are not splitting at /8, /16, ..., because this would mean that the
@@ -307,7 +309,7 @@ func DivMod8(pfxLen int) (strideCount int, modBits uint8) {
 	return pfxLen >> 3, uint8(pfxLen & 7)
 }
 
-// CloneLeaf creates and returns a copy of the leafNode receiver.
+// CloneLeaf creates and returns a copy of the LeafNode receiver.
 // If cloneFn is nil, the value is copied directly without modification.
 // Otherwise, cloneFn is applied to the value for deep cloning.
 // The prefix field is always copied as is.

@@ -21,6 +21,10 @@ import (
 // or alternatively, use ...Persist methods which return a modified copy
 // without altering the original table (copy-on-write).
 //
+// The ...Persist methods share all nodes that they do not modify with the
+// receiver. Do not mix them with the in-place mutators (Insert, Delete, Modify,
+// Union) on the receiver or on the returned table, call [Table.Clone] first.
+//
 // Performance note: Do not pass IPv4-in-IPv6 addresses (e.g., ::ffff:192.0.2.1)
 // as input. The methods do not perform automatic unmapping to avoid unnecessary
 // overhead for the common case where native addresses are used.
