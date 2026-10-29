@@ -33,7 +33,7 @@ type StridePath [MaxTreeDepth]uint8
 
 // TrieItem, a node has no path information about its predecessors,
 // we collect this during the recursive descent.
-type TrieItem[V any] struct {
+type TrieItem[T any] struct {
 	// for traversing, Path/Depth/Idx is needed to get the CIDR back from the trie.
 	Node  any // BartNode or LiteNode
 	Is4   bool
@@ -43,7 +43,7 @@ type TrieItem[V any] struct {
 
 	// for printing
 	Cidr netip.Prefix
-	Val  V
+	Val  T
 }
 
 // StatsT, only used for dump, tests and benchmarks
@@ -135,27 +135,27 @@ func CmpPrefix(a, b netip.Prefix) int {
 // LeafNode represents a path-compressed routing entry that stores both prefix and value.
 // Leaf nodes are used when a prefix doesn't align with trie stride boundaries
 // and needs to be stored as a compressed path to save memory.
-type LeafNode[V any] struct {
-	Value  V
+type LeafNode[T any] struct {
+	Value  T
 	Prefix netip.Prefix
 }
 
 // NewLeafNode creates a new leaf node with the specified prefix and value.
-func NewLeafNode[V any](pfx netip.Prefix, val V) *LeafNode[V] {
-	return &LeafNode[V]{Prefix: pfx, Value: val}
+func NewLeafNode[T any](pfx netip.Prefix, val T) *LeafNode[T] {
+	return &LeafNode[T]{Prefix: pfx, Value: val}
 }
 
 // FringeNode represents a path-compressed routing entry that stores only a value.
 // The prefix is implicitly defined by the node's position in the trie.
 // Fringe nodes are used for prefixes that align exactly with stride boundaries
 // (/8, /16, /24, etc.) to save memory by not storing redundant prefix information.
-type FringeNode[V any] struct {
-	Value V
+type FringeNode[T any] struct {
+	Value T
 }
 
 // NewFringeNode creates a new fringe node with the specified value.
-func NewFringeNode[V any](val V) *FringeNode[V] {
-	return &FringeNode[V]{Value: val}
+func NewFringeNode[T any](val T) *FringeNode[T] {
+	return &FringeNode[T]{Value: val}
 }
 
 // IsFringe determines whether a prefix qualifies as a "FringeNode".
@@ -311,27 +311,27 @@ func DivMod8(pfxLen int) (strideCount int, modBits uint8) {
 // If cloneFn is nil, the value is copied directly without modification.
 // Otherwise, cloneFn is applied to the value for deep cloning.
 // The prefix field is always copied as is.
-func (l *LeafNode[V]) CloneLeaf(cloneFn func(V) V) *LeafNode[V] {
+func (l *LeafNode[T]) CloneLeaf(cloneFn func(T) T) *LeafNode[T] {
 	if l == nil {
 		return nil
 	}
 
 	if cloneFn == nil {
-		return &LeafNode[V]{Prefix: l.Prefix, Value: l.Value}
+		return &LeafNode[T]{Prefix: l.Prefix, Value: l.Value}
 	}
-	return &LeafNode[V]{Prefix: l.Prefix, Value: cloneFn(l.Value)}
+	return &LeafNode[T]{Prefix: l.Prefix, Value: cloneFn(l.Value)}
 }
 
 // CloneFringe creates and returns a copy of the FringeNode receiver.
 // If cloneFn is nil, the value is copied directly without modification.
 // Otherwise, cloneFn is applied to the value for deep cloning.
-func (l *FringeNode[V]) CloneFringe(cloneFn func(V) V) *FringeNode[V] {
+func (l *FringeNode[T]) CloneFringe(cloneFn func(T) T) *FringeNode[T] {
 	if l == nil {
 		return nil
 	}
 
 	if cloneFn == nil {
-		return &FringeNode[V]{Value: l.Value}
+		return &FringeNode[T]{Value: l.Value}
 	}
-	return &FringeNode[V]{Value: cloneFn(l.Value)}
+	return &FringeNode[T]{Value: cloneFn(l.Value)}
 }

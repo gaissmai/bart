@@ -27,29 +27,29 @@ import (
 	"github.com/gaissmai/bart/internal/value"
 )
 
-type _NODE_TYPE[V any] struct{}
+type _NODE_TYPE[T any] struct{}
 
-func (n *_NODE_TYPE[V]) StatsRec() (_ StatsT)                                              { return }
-func (n *_NODE_TYPE[V]) dump(io.Writer, StridePath, int, bool)                             { return }
-func (n *_NODE_TYPE[V]) DumpRec(io.Writer, StridePath, int, bool)                          { return }
-func (n *_NODE_TYPE[V]) FprintRec(io.Writer, TrieItem[V], string) (_ error)                { return }
-func (n *_NODE_TYPE[V]) Insert(netip.Prefix, V, int) (_ bool)                              { return }
-func (n *_NODE_TYPE[V]) Delete(netip.Prefix) (_ bool)                                      { return }
-func (n *_NODE_TYPE[V]) InsertPersist(func(V) V, netip.Prefix, V, int) (_ bool)            { return }
-func (n *_NODE_TYPE[V]) DeletePersist(func(V) V, netip.Prefix) (_ bool)                    { return }
-func (n *_NODE_TYPE[V]) Subnets(netip.Prefix, func(netip.Prefix, V) bool)                  { return }
-func (n *_NODE_TYPE[V]) Supernets(netip.Prefix, func(netip.Prefix, V) bool)                { return }
-func (n *_NODE_TYPE[V]) AllRec(StridePath, int, bool, func(netip.Prefix, V) bool) (_ bool) { return }
+func (n *_NODE_TYPE[T]) StatsRec() (_ StatsT)                                              { return }
+func (n *_NODE_TYPE[T]) dump(io.Writer, StridePath, int, bool)                             { return }
+func (n *_NODE_TYPE[T]) DumpRec(io.Writer, StridePath, int, bool)                          { return }
+func (n *_NODE_TYPE[T]) FprintRec(io.Writer, TrieItem[T], string) (_ error)                { return }
+func (n *_NODE_TYPE[T]) Insert(netip.Prefix, T, int) (_ bool)                              { return }
+func (n *_NODE_TYPE[T]) Delete(netip.Prefix) (_ bool)                                      { return }
+func (n *_NODE_TYPE[T]) InsertPersist(func(T) T, netip.Prefix, T, int) (_ bool)            { return }
+func (n *_NODE_TYPE[T]) DeletePersist(func(T) T, netip.Prefix) (_ bool)                    { return }
+func (n *_NODE_TYPE[T]) Subnets(netip.Prefix, func(netip.Prefix, T) bool)                  { return }
+func (n *_NODE_TYPE[T]) Supernets(netip.Prefix, func(netip.Prefix, T) bool)                { return }
+func (n *_NODE_TYPE[T]) AllRec(StridePath, int, bool, func(netip.Prefix, T) bool) (_ bool) { return }
 
-func (n *_NODE_TYPE[V]) AllRecSorted(StridePath, int, bool, func(netip.Prefix, V) bool) (_ bool) {
+func (n *_NODE_TYPE[T]) AllRecSorted(StridePath, int, bool, func(netip.Prefix, T) bool) (_ bool) {
 	return
 }
 
 // ### GENERATE DELETE END ###
 
 // helpers
-func (n *_NODE_TYPE[V]) all4() iter.Seq2[netip.Prefix, V] {
-	return func(yield func(netip.Prefix, V) bool) {
+func (n *_NODE_TYPE[T]) all4() iter.Seq2[netip.Prefix, T] {
+	return func(yield func(netip.Prefix, T) bool) {
 		if n == nil {
 			return
 		}
@@ -57,8 +57,8 @@ func (n *_NODE_TYPE[V]) all4() iter.Seq2[netip.Prefix, V] {
 	}
 }
 
-func (n *_NODE_TYPE[V]) all6() iter.Seq2[netip.Prefix, V] {
-	return func(yield func(netip.Prefix, V) bool) {
+func (n *_NODE_TYPE[T]) all6() iter.Seq2[netip.Prefix, T] {
+	return func(yield func(netip.Prefix, T) bool) {
 		if n == nil {
 			return
 		}
@@ -66,8 +66,8 @@ func (n *_NODE_TYPE[V]) all6() iter.Seq2[netip.Prefix, V] {
 	}
 }
 
-func (n *_NODE_TYPE[V]) allSorted4() iter.Seq2[netip.Prefix, V] {
-	return func(yield func(netip.Prefix, V) bool) {
+func (n *_NODE_TYPE[T]) allSorted4() iter.Seq2[netip.Prefix, T] {
+	return func(yield func(netip.Prefix, T) bool) {
 		if n == nil {
 			return
 		}
@@ -75,8 +75,8 @@ func (n *_NODE_TYPE[V]) allSorted4() iter.Seq2[netip.Prefix, V] {
 	}
 }
 
-func (n *_NODE_TYPE[V]) allSorted6() iter.Seq2[netip.Prefix, V] {
-	return func(yield func(netip.Prefix, V) bool) {
+func (n *_NODE_TYPE[T]) allSorted6() iter.Seq2[netip.Prefix, T] {
+	return func(yield func(netip.Prefix, T) bool) {
 		if n == nil {
 			return
 		}
@@ -635,7 +635,7 @@ func TestSubnets6__NODE_TYPE(t *testing.T) {
 	}
 }
 
-// TestDump_EMPTY_STRUCT verifies that dump does not print values when V is a empty struct type.
+// TestDump_EMPTY_STRUCT verifies that dump does not print values when T is a empty struct type.
 func TestDump_EMPTY_STRUCT__NODE_TYPE(t *testing.T) {
 	t.Parallel()
 
@@ -662,7 +662,7 @@ func TestDump_EMPTY_STRUCT__NODE_TYPE(t *testing.T) {
 	}
 }
 
-// TestDump_NonEMPTY_STRUCT verifies that dump prints values when V is not a empty struct type.
+// TestDump_NonEMPTY_STRUCT verifies that dump prints values when T is not a empty struct type.
 func TestDump_NonEMPTY_STRUCT__NODE_TYPE(t *testing.T) {
 	t.Parallel()
 

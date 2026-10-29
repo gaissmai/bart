@@ -180,9 +180,9 @@ func (l *Lite) ModifyPersist(pfx netip.Prefix, cb func(exists bool) (del bool)) 
 }
 
 // dropSeq2 converts a Seq2[netip.Prefix, V] into a Seq[netip.Prefix] by discarding the value.
-func dropSeq2[V any](seq2 iter.Seq2[netip.Prefix, V]) iter.Seq[netip.Prefix] {
+func dropSeq2[T any](seq2 iter.Seq2[netip.Prefix, T]) iter.Seq[netip.Prefix] {
 	return func(yield func(netip.Prefix) bool) {
-		seq2(func(p netip.Prefix, _ V) bool {
+		seq2(func(p netip.Prefix, _ T) bool {
 			return yield(p)
 		})
 	}

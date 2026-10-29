@@ -26,13 +26,13 @@ import (
 // overhead for the common case where native addresses are used.
 // Users should unmap IPv4-in-IPv6 addresses to their native IPv4 form
 // (e.g., 192.0.2.1) before calling these methods.
-type Table[V any] struct {
+type Table[T any] struct {
 	// used by -copylocks checker from `go vet`.
 	_ [0]sync.Mutex
 
 	// the root nodes, implemented as popcount compressed multibit tries
-	root4 nodes.BartNode[V]
-	root6 nodes.BartNode[V]
+	root4 nodes.BartNode[T]
+	root6 nodes.BartNode[T]
 
 	// the number of prefixes in the routing table
 	size4 int

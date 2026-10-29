@@ -21,11 +21,11 @@ import (
 // ############ tests ################################
 
 // flatSorted, just a helper to compare with golden table.
-func (t *Table[V]) flatSorted() golden.TableSlice[V] {
-	flat := golden.TableSlice[V](make([]golden.Item[V], 0, t.Size()))
+func (t *Table[T]) flatSorted() golden.TableSlice[T] {
+	flat := golden.TableSlice[T](make([]golden.Item[T], 0, t.Size()))
 
 	for p, v := range t.AllSorted() {
-		flat = append(flat, golden.Item[V]{Pfx: p, Val: v})
+		flat = append(flat, golden.Item[T]{Pfx: p, Val: v})
 	}
 
 	return flat

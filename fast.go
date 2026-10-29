@@ -11,4 +11,4 @@ package bart
 // "go fix ./..." rewrites the uses automatically.
 //
 //go:fix inline
-type Fast[V any] = Table[V]
+type Fast[T any] = Table[T]

@@ -54,8 +54,8 @@ type stridePath = nodes.StridePath
 
 // DumpListNode contains CIDR, Value and Subnets, representing the trie
 // in a sorted, recursive representation, especially useful for serialization.
-type DumpListNode[V any] struct {
+type DumpListNode[T any] struct {
 	CIDR    netip.Prefix      `json:"cidr"`
-	Value   V                 `json:"value"`
-	Subnets []DumpListNode[V] `json:"subnets,omitempty"`
+	Value   T                 `json:"value"`
+	Subnets []DumpListNode[T] `json:"subnets,omitempty"`
 }

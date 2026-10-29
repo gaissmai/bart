@@ -23,39 +23,39 @@ func cmpPrefix(a, b netip.Prefix) int {
 // Table is a un-optimized routing table implemented as a map of
 // prefix-value pairs. It serves as a simple, easy-to-verify golden reference
 // for testing complex routing table implementations (like BART).
-type Table[V any] map[netip.Prefix]V
+type Table[T any] map[netip.Prefix]T
 
 // Item represents a key-value pair stored in a Table.
-type Item[V any] struct {
+type Item[T any] struct {
 	Pfx netip.Prefix
-	Val V
+	Val T
 }
 
 // TableSlice represents an ordered or unordered sequence of prefix-value items.
-type TableSlice[V any] []Item[V]
+type TableSlice[T any] []Item[T]
 
 // FlatSorted returns all key-value pairs in the table as a slice,
 // sorted in ascending order by their IP prefix key.
-func (t Table[V]) FlatSorted() TableSlice[V] {
+func (t Table[T]) FlatSorted() TableSlice[T] {
 	if len(t) == 0 {
 		return nil
 	}
 
-	items := make([]Item[V], 0, len(t))
+	items := make([]Item[T], 0, len(t))
 	for pfx, val := range t {
-		items = append(items, Item[V]{Pfx: pfx, Val: val})
+		items = append(items, Item[T]{Pfx: pfx, Val: val})
 	}
 
-	slices.SortFunc(items, func(a, b Item[V]) int {
+	slices.SortFunc(items, func(a, b Item[T]) int {
 		return cmpPrefix(a.Pfx, b.Pfx)
 	})
 
-	return TableSlice[V](items)
+	return TableSlice[T](items)
 }
 
 // SortKeys extracts all IP prefixes from the slice and returns them as a new
 // slice sorted in ascending order.
-func (t TableSlice[V]) SortKeys() []netip.Prefix {
+func (t TableSlice[T]) SortKeys() []netip.Prefix {
 	if len(t) == 0 {
 		return nil
 	}
@@ -79,9 +79,9 @@ func (t TableSlice[V]) SortKeys() []netip.Prefix {
 //
 // Note: If V implements Equal(V) bool with a pointer receiver, the Equal
 // method should handle nil receivers gracefully.
-func (ta Table[V]) Equal(tb Table[V]) bool {
-	return maps.EqualFunc(ta, tb, func(v1, v2 V) bool {
-		if eq1, ok := any(v1).(interface{ Equal(V) bool }); ok {
+func (ta Table[T]) Equal(tb Table[T]) bool {
+	return maps.EqualFunc(ta, tb, func(v1, v2 T) bool {
+		if eq1, ok := any(v1).(interface{ Equal(T) bool }); ok {
 			return eq1.Equal(v2)
 		}
 		return any(v1) == any(v2)
@@ -91,19 +91,19 @@ func (ta Table[V]) Equal(tb Table[V]) bool {
 // Insert adds or updates a prefix-value mapping in the table.
 // The prefix is normalized (masked) before insertion.
 // If the table pointer or underlying map is nil, a new map is allocated.
-func (t *Table[V]) Insert(pfx netip.Prefix, val V) {
+func (t *Table[T]) Insert(pfx netip.Prefix, val T) {
 	if t == nil {
 		return
 	}
 	if *t == nil {
-		*t = make(Table[V])
+		*t = make(Table[T])
 	}
 	(*t)[pfx.Masked()] = val
 }
 
 // Delete removes the specified prefix from the table.
 // Returns true if the prefix was present and removed, false otherwise.
-func (t Table[V]) Delete(pfx netip.Prefix) (exists bool) {
+func (t Table[T]) Delete(pfx netip.Prefix) (exists bool) {
 	pfx = pfx.Masked()
 	if _, ok := t[pfx]; ok {
 		delete(t, pfx)
@@ -114,8 +114,8 @@ func (t Table[V]) Delete(pfx netip.Prefix) (exists bool) {
 
 // All returns an iterator of all prefix, value pairs currently present
 // in the table as iterator.
-func (t Table[V]) All() iter.Seq2[netip.Prefix, V] {
-	return func(yield func(pfx netip.Prefix, val V) bool) {
+func (t Table[T]) All() iter.Seq2[netip.Prefix, T] {
+	return func(yield func(pfx netip.Prefix, val T) bool) {
 		for pfx, val := range t {
 			if !yield(pfx, val) {
 				return
@@ -126,7 +126,7 @@ func (t Table[V]) All() iter.Seq2[netip.Prefix, V] {
 
 // AllKeys returns an iterator over all IP prefixes in the table.
 // The iteration order is non-deterministic, following map iteration semantics.
-func (t Table[V]) AllKeys() iter.Seq[netip.Prefix] {
+func (t Table[T]) AllKeys() iter.Seq[netip.Prefix] {
 	return func(yield func(pfx netip.Prefix) bool) {
 		for pfx := range t {
 			if !yield(pfx) {
@@ -137,7 +137,7 @@ func (t Table[V]) AllKeys() iter.Seq[netip.Prefix] {
 }
 
 // Get performs an exact match search for the given prefix.
-func (t Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
+func (t Table[T]) Get(pfx netip.Prefix) (val T, ok bool) {
 	val, ok = t[pfx.Masked()]
 	return
 }
@@ -145,12 +145,12 @@ func (t Table[V]) Get(pfx netip.Prefix) (val V, ok bool) {
 // Update modifies an existing prefix or inserts a new one using a callback function.
 // The callback receives the current value (or zero value) and a boolean indicating
 // whether the prefix was found. Returns the newly set value.
-func (t *Table[V]) Update(pfx netip.Prefix, cb func(V, bool) V) (val V) {
+func (t *Table[T]) Update(pfx netip.Prefix, cb func(T, bool) T) (val T) {
 	if t == nil {
 		return
 	}
 	if *t == nil {
-		*t = make(Table[V])
+		*t = make(Table[T])
 	}
 
 	pfx = pfx.Masked()
@@ -163,19 +163,19 @@ func (t *Table[V]) Update(pfx netip.Prefix, cb func(V, bool) V) (val V) {
 }
 
 // Union merges entries from tb into ta. Entries in tb override matching prefixes in ta.
-func (ta *Table[V]) Union(tb Table[V]) {
+func (ta *Table[T]) Union(tb Table[T]) {
 	if ta == nil {
 		return
 	}
 	if *ta == nil {
-		*ta = make(Table[V])
+		*ta = make(Table[T])
 	}
 
 	maps.Copy(*ta, tb)
 }
 
 // Lookup performs a Longest Prefix Match (LPM) for the given IP address.
-func (t Table[V]) Lookup(addr netip.Addr) (val V, ok bool) {
+func (t Table[T]) Lookup(addr netip.Addr) (val T, ok bool) {
 	bestLen := -1
 
 	for pfx, v := range t {
@@ -190,14 +190,14 @@ func (t Table[V]) Lookup(addr netip.Addr) (val V, ok bool) {
 
 // LookupPrefix performs a Longest Prefix Match (LPM) for a covering prefix.
 // It returns the value associated with the most specific prefix that covers pfx.
-func (t Table[V]) LookupPrefix(pfx netip.Prefix) (val V, ok bool) {
+func (t Table[T]) LookupPrefix(pfx netip.Prefix) (val T, ok bool) {
 	_, val, ok = t.LookupPrefixLPM(pfx)
 	return val, ok
 }
 
 // LookupPrefixLPM performs a Longest Prefix Match (LPM) for a covering prefix.
 // It returns the matched covering prefix, its associated value, and a boolean status.
-func (t Table[V]) LookupPrefixLPM(searchPfx netip.Prefix) (lpm netip.Prefix, val V, ok bool) {
+func (t Table[T]) LookupPrefixLPM(searchPfx netip.Prefix) (lpm netip.Prefix, val T, ok bool) {
 	searchPfx = searchPfx.Masked()
 	bestLen := -1
 
@@ -215,7 +215,7 @@ func (t Table[V]) LookupPrefixLPM(searchPfx netip.Prefix) (lpm netip.Prefix, val
 
 // Subnets returns all prefixes in the table that are subnets of (covered by) pfx,
 // sorted in canonical prefix order.
-func (t Table[V]) Subnets(searchPfx netip.Prefix) []netip.Prefix {
+func (t Table[T]) Subnets(searchPfx netip.Prefix) []netip.Prefix {
 	searchPfx = searchPfx.Masked()
 	var result []netip.Prefix
 
@@ -230,7 +230,7 @@ func (t Table[V]) Subnets(searchPfx netip.Prefix) []netip.Prefix {
 
 // Supernets returns all covering prefixes (supernets) for pfx contained in the table,
 // ordered from most-specific to least-specific (longest to shortest mask length).
-func (t Table[V]) Supernets(searchPfx netip.Prefix) []netip.Prefix {
+func (t Table[T]) Supernets(searchPfx netip.Prefix) []netip.Prefix {
 	searchPfx = searchPfx.Masked()
 	var result []netip.Prefix
 
@@ -245,7 +245,7 @@ func (t Table[V]) Supernets(searchPfx netip.Prefix) []netip.Prefix {
 }
 
 // OverlapsPrefix reports whether any prefix in the table overlaps with pfx.
-func (t Table[V]) OverlapsPrefix(searchPfx netip.Prefix) bool {
+func (t Table[T]) OverlapsPrefix(searchPfx netip.Prefix) bool {
 	searchPfx = searchPfx.Masked()
 	for pfx := range t {
 		if pfx.Overlaps(searchPfx) {
@@ -256,7 +256,7 @@ func (t Table[V]) OverlapsPrefix(searchPfx netip.Prefix) bool {
 }
 
 // Overlaps reports whether any prefix in ta overlaps with any prefix in tb.
-func (ta Table[V]) Overlaps(tb Table[V]) bool {
+func (ta Table[T]) Overlaps(tb Table[T]) bool {
 	for aPfx := range ta {
 		for bPfx := range tb {
 			if aPfx.Overlaps(bPfx) {
@@ -270,12 +270,12 @@ func (ta Table[V]) Overlaps(tb Table[V]) bool {
 // Aggregate compresses the Table in-place by merging overlapping and
 // adjacent IP prefixes into their minimal covering CIDR blocks.
 // Values are zeoed out.
-func (t Table[V]) Aggregate() {
+func (t Table[T]) Aggregate() {
 	if len(t) == 0 {
 		return
 	}
 
-	var zero V
+	var zero T
 
 	currentPfxs := make([]netip.Prefix, 0, len(t))
 
