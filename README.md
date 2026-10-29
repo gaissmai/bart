@@ -96,10 +96,10 @@ See the concurrent test examples for reference:
 
 Beyond high-performance prefix matching, BART provides a rich suite of advanced set operations and structural queries designed for routing daemons and firewalls:
 
-- **Overlap Detection**: Instantly check whether routing tables overlap in just a few nanoseconds.
+- **Prefix Aggregation**: Compact and minimize ACL prefix lists.
+- **Overlap Detection**: Check whether routing tables overlap in just a few nanoseconds.
+- **Hierarchical Queries**: Traverse subnets and supernets in sorted order.
 - **Table Unions**: Efficiently merge routing tables.
-- **Prefix Aggregation**: Compact and minimize ACL or routing prefix lists in-place.
-- **Hierarchical Queries**: Traverse subnets and supernets.
 - **Canonical Iteration**: Stream prefixes in sorted order.
 
 ## API
