@@ -2,7 +2,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/gaissmai/bart.svg)](https://pkg.go.dev/github.com/gaissmai/bart#section-documentation)
 [![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/gaissmai/bart)](https://coderabbit.ai)
 [![Mentioned in Awesome Go](https://awesome.re/mentioned-badge-flat.svg)](https://github.com/avelino/awesome-go#networking)
-[![CI](https://github.com/gaissmai/bart/actions/workflows/go.yml/badge.svg)](https://github.com/avelino/awesome-go)
+[![CI](https://github.com/gaissmai/bart/actions/workflows/go.yml/badge.svg)](https://github.com/gaissmai/bart/actions/workflows/go.yml)
 [![Coverage Status](https://coveralls.io/repos/github/gaissmai/bart/badge.svg)](https://coveralls.io/github/gaissmai/bart)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 [![Stand With Ukraine](https://raw.githubusercontent.com/vshymanskyy/StandWithUkraine/main/badges/StandWithUkraine.svg)](https://stand-with-ukraine.pp.ua)
@@ -68,6 +68,27 @@ func main() {
 }
 ```
 
+## API
+
+BART provides a rich API for `Table[T]` and `Lite`:
+
+- **Prefix Aggregation**: Very fast compaction of ACLs using `Aggregate` (only for `Lite`).
+- **Containment Queries**: Extremely fast containment queries for ACLs (`Contains`).
+- **Lookups**: Extremely fast longest-prefix matching for routing tables (`Lookup`, ...).
+- **CRUD & Mutations**: Very fast mutating updates (`Insert`, `Delete`, ...) as well as immutable variants.
+- **Overlap Operations**: Extremely fast overlap detection (Overlaps, ...).
+- **Iteration**: Stream all table entries (`All`, ...) with iterators, sorted or unsorted.
+- **Subnets & Supernets**: Stream topologies (`Subnets`, `Supernets`) with iterators in sorted order.
+- **Serialization**: Hierarchical tree diagram of the ordered CIDRs.
+
+## Concurrency Model
+
+Readers can access immutable table snapshots lock-free. Writers synchronize via a mutex, load the current snapshot, use the `Persist` methods to build a modified copy, and publish the returned table through an atomic pointer. In-place updates such as `Insert` and `Delete` instead require a lock shared by readers and writers.
+
+See the concurrent test examples for reference:
+- [ExampleLite](example_lite_concurrent_test.go)
+- [ExampleTable](example_table_concurrent_test.go)
+
 ## Bitset Efficiency
 
 The BART algorithm relies on fixed-size (256-bit) bit vectors and precomputed lookup tables. Lookups execute entirely via cache-resident bitmask operations accelerated by CPU instructions like `POPCNT`, `LZCNT`, and `TZCNT`.
@@ -78,90 +99,11 @@ For maximum performance, specify your CPU feature set at compile time:
 # Example for AMD64, choose v2/v3/v4 to match your CPU features.
 GOAMD64=v3 go build
 
-# On ARM64, Go auto-selects available CPU instructions.
+# On ARM64, the default target is v8.0. Set GOARM64 for newer targets, for example:
+GOARM64=v8.2,lse go build
 ```
 
-Loops over these bitsets are fully unrolled by the compiler, ensuring predictable
-memory access and efficient CPU pipeline utilization.
-
-## Concurrency Model
-
-Readers can access the table completely lock-free. Writers synchronize via a mutex so that only one writer modifies the table at a time, avoiding complex Compare-And-Swap (CAS) loops that degrade performance under heavy contention.
-
-See the concurrent test examples for reference:
-- [ExampleLite](example_lite_concurrent_test.go)
-- [ExampleTable](example_table_concurrent_test.go)
-
-## Advanced Operations & Use Cases
-
-Beyond high-performance prefix matching, BART provides a rich suite of advanced set operations and structural queries designed for routing daemons and firewalls:
-
-- **Prefix Aggregation**: Compact and minimize ACL prefix lists.
-- **Overlap Detection**: Check whether routing tables overlap in just a few nanoseconds.
-- **Hierarchical Queries**: Traverse subnets and supernets in sorted order.
-- **Table Unions**: Efficiently merge routing tables.
-- **Canonical Iteration**: Stream prefixes in sorted order.
-
-## API
-
-BART provides a rich API:
-
-```go
-import "github.com/gaissmai/bart"
-
-type Table[T any] struct {
-  // Has unexported fields.
-}
-
-func (t *Table[T]) Contains(netip.Addr) bool
-func (t *Table[T]) Lookup(netip.Addr) (T, bool)
-
-func (t *Table[T]) LookupPrefix(netip.Prefix) (T, bool)
-func (t *Table[T]) LookupPrefixLPM(netip.Prefix) (netip.Prefix, T, bool)
-
-func (t *Table[T]) Get(netip.Prefix) (T, bool)
-func (t *Table[T]) Insert(netip.Prefix, T)
-func (t *Table[T]) Delete(netip.Prefix)
-func (t *Table[T]) Modify(netip.Prefix, cb func(T, bool) (T, bool))
-
-func (t *Table[T]) InsertPersist(netip.Prefix, T) *Table[T]
-func (t *Table[T]) DeletePersist(netip.Prefix) *Table[T]
-func (t *Table[T]) ModifyPersist(netip.Prefix, cb func(T, bool) (T, bool)) *Table[T]
-
-func (t *Table[T]) Clone() *Table[T]
-func (t *Table[T]) Union(o *Table[T])
-func (t *Table[T]) UnionPersist(o *Table[T]) *Table[T]
-
-func (t *Table[T]) OverlapsPrefix(netip.Prefix) bool
-
-func (t *Table[T]) Overlaps(o *Table[T]) bool
-func (t *Table[T]) Overlaps4(o *Table[T]) bool
-func (t *Table[T]) Overlaps6(o *Table[T]) bool
-
-func (t *Table[T]) Equal(o *Table[T]) bool
-
-func (t *Table[T]) Subnets(netip.Prefix) iter.Seq2[netip.Prefix, T]
-func (t *Table[T]) Supernets(netip.Prefix) iter.Seq2[netip.Prefix, T]
-
-func (t *Table[T]) All() iter.Seq2[netip.Prefix, T]
-func (t *Table[T]) All4() iter.Seq2[netip.Prefix, T]
-func (t *Table[T]) All6() iter.Seq2[netip.Prefix, T]
-
-func (t *Table[T]) AllSorted() iter.Seq2[netip.Prefix, T]
-func (t *Table[T]) AllSorted4() iter.Seq2[netip.Prefix, T]
-func (t *Table[T]) AllSorted6() iter.Seq2[netip.Prefix, T]
-
-func (t *Table[T]) Size() int
-func (t *Table[T]) Size4() int
-func (t *Table[T]) Size6() int
-
-func (t *Table[T]) Fprint(w io.Writer) error
-func (t *Table[T]) MarshalText() ([]byte, error)
-func (t *Table[T]) MarshalJSON() ([]byte, error)
-
-func (t *Table[T]) DumpList4() []DumpListNode[T]
-func (t *Table[T]) DumpList6() []DumpListNode[T]
-```
+Loops over these fixed-size bitsets (`[4]uint64`) are unrolled, ensuring efficient CPU pipeline utilization. Despite unrolling, all bitset functions are inlined by the Go compiler, which is essential for performance on hot paths.
 
 ## Benchmarks
 
@@ -194,7 +136,7 @@ The package is pre-v1, allowing breaking changes if necessary to refine API desi
 type Fast[T any] = Table[T]
 ```
 
-Use `go fix` to migrate automatically:
+With Go 1.26 or later, use `go fix` to migrate automatically:
 
 ```text
 go get github.com/gaissmai/bart@latest
@@ -213,7 +155,7 @@ Please open an issue for discussion before sending a pull request.
 Standing on the shoulders of giants. Credits go to:
 - the engineering team at Tailscale,
 - Daniel Lemire for his inspiring blog,
-- Donald E. Knuth for the Allotment Routing Table [ART](https://github.com/hariguchi/art/tree/master/orig) algorithm, and
+- Donald E. Knuth for the Allotment Routing Table ([ART](https://github.com/hariguchi/art/tree/master/orig)) algorithm, and
 - Yoichi Hariguchi who [deciphered it](https://github.com/hariguchi/art/blob/master/docs/art.pdf).
 
 ## License
