@@ -1,48 +1,34 @@
 ![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/gaissmai/bart)
 [![Go Reference](https://pkg.go.dev/badge/github.com/gaissmai/bart.svg)](https://pkg.go.dev/github.com/gaissmai/bart#section-documentation)
 [![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/gaissmai/bart)](https://coderabbit.ai)
-[![Mentioned in Awesome Go](https://awesome.re/mentioned-badge-flat.svg)](https://github.com/avelino/awesome-go)
-[![CI](https://github.com/gaissmai/bart/actions/workflows/go.yml/badge.svg)](https://github.com/gaissmai/bart/actions/workflows/go.yml)
+[![Mentioned in Awesome Go](https://awesome.re/mentioned-badge-flat.svg)](https://github.com/avelino/awesome-go#networking)
+[![CI](https://github.com/gaissmai/bart/actions/workflows/go.yml/badge.svg)](https://github.com/avelino/awesome-go)
 [![Coverage Status](https://coveralls.io/repos/github/gaissmai/bart/badge.svg)](https://coveralls.io/github/gaissmai/bart)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 [![Stand With Ukraine](https://raw.githubusercontent.com/vshymanskyy/StandWithUkraine/main/badges/StandWithUkraine.svg)](https://stand-with-ukraine.pp.ua)
 
 # package bart
 
-The bart package provides some **Balanced Routing Tables (BART)** for
-fastest IP-to-CIDR lookups and related tasks such as:
+The `bart` package provides **Balanced Routing Tables (BART)** for high-performance IP-to-CIDR lookups and prefix management:
 
-- **ACL** determine extremely fast whether an IP address matches any of millions of CIDR rules.
-- **RIB** handle very large routing tables with low memory overhead, while keeping lookups fast.
-- **FIB** high-speed lookups, achieve LPM in constant-time for packet forwarding in the datapath.
+- **ACL**: Determine extremely fast whether an IP address matches any of millions of CIDR rules.
+- **RIB**: Handle very large routing tables with low memory overhead while keeping lookups fast.
 
-BART is designed for workloads where both speed and/or memory efficiency matter,
-making it a best fit for firewalls, routers, or any system that needs large-scale
-IP prefix matching.
+BART is designed for workloads where speed and memory efficiency matter most, making it ideal for firewalls, routers, and network telemetry systems.
 
 ## Overview
 
-BART is implemented as a multibit trie with a fixed stride of 8 bits,
-using a fast mapping function derived from Donald E. Knuth’s
-**Allotment Routing Table** (ART) algorithm, to map the possible prefixes
-at each level into a complete binary tree.
+BART is implemented as a multibit trie with a fixed stride of 8 bits, using a fast mapping function derived from Donald E. Knuth’s **Allotment Routing Table** (ART) algorithm to map prefixes at each trie level into a complete binary tree.
 
-BART implements two different routing tables, each optimized for specific
-use cases:
-- **bart.Lite**
-- **bart.Table**
+BART provides two table variants optimized for different use cases:
+- **`bart.Lite`**: A payload-free variant optimized for minimal memory footprint.
+- **`bart.Table[V]`**: Stores associated payloads alongside routing prefixes.
 
-For **bart.Table** this binary tree is represented with popcount‑compressed
-sparse arrays for **level compression**.
-Combined with a **novel path and fringe compression**, this design reduces
-memory consumption by nearly two orders of magnitude compared to classical ART.
-
-**bart.Lite** is a special form of **bart.Table**, but without a payload, and therefore
-has the lowest memory overhead while maintaining the same lookup times.
+Both implementations share the same highly optimized core engine, using popcount-compressed sparse arrays for **level compression**. Combined with a **novel path and fringe compression**, this design reduces memory consumption by nearly two orders of magnitude compared to classical ART while maintaining identical, lightning-fast lookup times.
 
 ## Getting Started
 
-### Example: simple ACL with bart.Lite
+### Example: Simple ACL with `bart.Lite`
 
 ```go
 package main
@@ -50,6 +36,7 @@ package main
 import (
   "fmt"
   "net/netip"
+
   "github.com/gaissmai/bart"
 )
 
@@ -83,55 +70,41 @@ func main() {
 
 ## Bitset Efficiency
 
-The BART algorithm is based on a fixed-size (256) bit vector and precomputed lookup tables.
-Lookups are executed entirely with fast, cache-resident bitmask operations, which
-modern CPUs accelerate using specialized instructions such as POPCNT, LZCNT, and TZCNT.
+The BART algorithm relies on fixed-size (256-bit) bit vectors and precomputed lookup tables. Lookups execute entirely via cache-resident bitmask operations accelerated by CPU instructions like `POPCNT`, `LZCNT`, and `TZCNT`.
 
-For maximum performance, specify the CPU feature set when compiling.
-See the [Go minimum requirements](https://go.dev/wiki/MinimumRequirements#architectures) for details.
+For maximum performance, specify your CPU feature set at compile time:
 
 ```bash
 # Example for AMD64, choose v2/v3/v4 to match your CPU features.
 GOAMD64=v3 go build
 
-# On ARM64, Go auto-selects CPU instructions.
-
+# On ARM64, Go auto-selects available CPU instructions.
 ```
-Loops over these fixed-size bitsets are unrolled for additional speed,
-ensuring predictable memory access and efficient use of CPU pipelines.
 
-## Concurrency model
+Loops over these bitsets are fully unrolled by the compiler, ensuring predictable
+memory access and efficient CPU pipeline utilization.
 
-There are examples demonstrating how to use bart concurrently with multiple readers and writers.
-Readers can always access the table lock‑free. Writers synchronize with a mutex so that only one writer
-modifies the persistent table at a time, without relying on CAS, which can be problematic with multiple
-long‑running writers.
+## Concurrency Model
 
-The combination of lock-free concurrency, fast lookup and update times and low memory consumption
-provides clear advantages for any routing daemon.
+Readers can access the table completely lock-free. Writers synchronize via a mutex so that only one writer modifies the table at a time, avoiding complex Compare-And-Swap (CAS) loops that degrade performance under heavy contention.
 
-But as always, it depends on the specific use case.
-
-See the concurrent tests for concrete examples of this pattern:
+See the concurrent test examples for reference:
 - [ExampleLite](example_lite_concurrent_test.go)
 - [ExampleTable](example_table_concurrent_test.go)
 
+## Advanced Operations & Use Cases
 
-## Additional Use Cases
+Beyond high-performance prefix matching, BART provides a rich suite of advanced set operations and structural queries designed for routing daemons and firewalls:
 
-Beyond high-performance prefix matching, BART also excels at detecting overlaps
-between two routing tables.
-In internal benchmarks the check runs in a few nanoseconds per query with zero
-heap allocations on a modern CPU.
+- **Overlap Detection**: Instantly check whether routing tables overlap in just a few nanoseconds.
+- **Table Unions**: Efficiently merge routing tables.
+- **Prefix Aggregation**: Compact and minimize ACL or routing prefix lists in-place.
+- **Hierarchical Queries**: Traverse subnets and supernets.
+- **Canonical Iteration**: Stream prefixes in sorted order.
 
 ## API
 
-BART has a rich API for CRUD, lookup, comparison, iteration,
-serialization and persistence.
-
-**Lite** deviates from the common API since it carries no payload.
-Additionally, **Lite** provides specialized methods like `Aggregate`
-to compact ACL prefixes in-place.
+BART provides a rich API:
 
 ```go
 import "github.com/gaissmai/bart"
@@ -192,11 +165,9 @@ func (t *Table[V]) DumpList6() []DumpListNode[V]
 
 ## Benchmarks
 
-Please see the extensive [benchmarks](https://github.com/gaissmai/iprbench)
-comparing `bart` with other IP routing table implementations.
+Please see the extensive [benchmarks](https://github.com/gaissmai/iprbench) comparing `bart` with other IP routing table implementations.
 
-Just a teaser, `Lite.Contains` against the Tier1 full
-Internet routing table with random IP address probes:
+Query performance of `Lite.Contains` against the Tier-1 full Internet routing table with random IP address probes:
 
 ```text
 $ GOAMD64=v3 go test -run=^$ -bench=FullLite/Contains$ -cpu=1
@@ -204,40 +175,31 @@ goos: linux
 goarch: amd64
 pkg: github.com/gaissmai/bart
 cpu: AMD EPYC 9275F 24-Core Processor
-BenchmarkFullLiteMatch4/Contains         	134873065	         8.933 ns/op
-BenchmarkFullLiteMatch6/Contains         	82965392	        14.14 ns/op
-BenchmarkFullLiteMiss4/Contains          	120155722	         9.998 ns/op
-BenchmarkFullLiteMiss6/Contains          	93057260	        12.56 ns/op
+BenchmarkFullLiteMatch4/Contains         134873065             8.933 ns/op
+BenchmarkFullLiteMatch6/Contains          82965392             14.14 ns/op
+BenchmarkFullLiteMiss4/Contains          120155722             9.998 ns/op
+BenchmarkFullLiteMiss6/Contains           93057260             12.56 ns/op
 ```
 
 ## Compatibility Guarantees
 
-The package is currently released as a pre-v1 version, which gives the author the freedom to break
-backward compatibility to help improve the API as he learns which initial design decisions would need
-to be revisited to better support the use cases that the library solves for.
-
-These occurrences are expected to be rare in frequency and the API is already quite stable.
+The package is pre-v1, allowing breaking changes if necessary to refine API design. Such changes are rare.
 
 ### Deprecated: `bart.Fast`
 
-`bart.Fast` is deprecated and no longer a separate table type. Every node now
-carries a compact rank cache in its sparse arrays, which makes the additional
-256 bytes per node of `bart.Fast` obsolete. `bart.Table` has the identical API.
-
-`bart.Fast` remains as a type alias for `bart.Table`, so existing code keeps
-compiling:
+`bart.Fast` is deprecated and is now a type alias for `bart.Table`:
 
 ```go
 // Deprecated: use Table.
 type Fast[V any] = Table[V]
 ```
 
-With Go 1.26 or later, `go fix` migrates your code automatically:
+Use `go fix` to migrate automatically:
 
 ```text
 go get github.com/gaissmai/bart@latest
-go fix -diff ./...   # preview the changes
-go fix ./...         # apply them
+go fix -diff ./...    # preview changes
+go fix ./...          # apply changes
 ```
 
 The alias will be removed in a future release.
@@ -248,17 +210,12 @@ Please open an issue for discussion before sending a pull request.
 
 ## Credit
 
-Standing on the shoulders of giants.
+Standing on the shoulders of giants. Credits go to:
+- the engineering team at Tailscale,
+- Daniel Lemire for his inspiring blog,
+- Donald E. Knuth for the Allotment Routing Table [ART](https://github.com/hariguchi/art/tree/master/orig) algorithm, and
+- Yoichi Hariguchi who [deciphered it](https://github.com/hariguchi/art/blob/master/docs/art.pdf).
 
-Credits for many inspirations go to
-
-- the clever folks at Tailscale,
-- to Daniel Lemire for his inspiring blog,
-- to Donald E. Knuth for the Allotment Routing Table [ART](https://github.com/hariguchi/art/tree/master/orig) algorithm and
-- to Yoichi Hariguchi who [deciphered it](https://github.com/hariguchi/art/blob/master/docs/art.pdf) for us mere mortals
-
-And last but not least to the Go team who do a wonderful job!
-
-## LICENSE
+## License
 
 MIT
