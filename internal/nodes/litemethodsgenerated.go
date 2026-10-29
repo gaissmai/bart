@@ -35,8 +35,9 @@ func (n *LiteNode[T]) IsEmpty() bool {
 	return n.PrefixCount() == 0 && n.ChildCount() == 0
 }
 
-// InsertChild adds a child node at the specified address (0-255).
-// The child can be a *BartNode[T], *LeafNode[T], or *FringeNode[T].
+// InsertChild adds a child at the specified address (0-255) or replaces the
+// child that already exists there.
+// The child can be a *LiteNode[T], *LeafNode[T], or *FringeNode[T].
 // Returns true if a child already existed at that address.
 func (n *LiteNode[T]) InsertChild(addr uint8, child any) (exists bool) {
 	return n.Children.InsertAt(addr, child)
@@ -189,11 +190,15 @@ func (n *LiteNode[T]) Insert(pfx netip.Prefix, val T, depth int) (exists bool) {
 // InsertPersist adds or updates a network prefix and its associated value in the trie
 // using Copy-On-Write (COW) semantics. Traversal begins at the specified byte depth.
 //
-// Unlike [Insert], InsertPersist ensures structural integrity of the existing tree
+// Unlike [LiteNode.Insert], InsertPersist ensures structural integrity of the existing tree
 // by cloning internal nodes along the descent path (Copy-On-Write) before mutation.
 //
+// Precondition: the receiver n is a private copy, for example the root node
+// cloned with CloneFlat by the caller. InsertPersist clones only the nodes below
+// n, n itself, including its leaf and fringe children, is modified in place.
+//
 // Parameters:
-//   - cloneFn: The function used to clone values (T).
+//   - cloneFn: The function used to clone values (T), nil copies the values as they are.
 //   - pfx: The network prefix to insert (must be in canonical/masked form).
 //   - val: The value to associate with the prefix.
 //   - depth: The current depth in the trie (0-based byte index).
@@ -293,9 +298,15 @@ func (n *LiteNode[T]) InsertPersist(cloneFn func(T) T, pfx netip.Prefix, val T, 
 // This ensures the trie remains memory-efficient by collapsing redundant intermediate
 // nodes back into path-compressed LeafNodes or FringeNodes whenever possible.
 //
+// The receiver n is the node in which the entry was deleted. A node with more
+// than one entry (prefix, leaf, fringe or child node) is significant and ends
+// the unwinding. A node with a single prefix, leaf or fringe is removed and the
+// entry is re-inserted into the parent, where it is compressed again.
+// A single child node can not be compressed, the unwinding stops there.
+//
 // Parameters:
-//   - stack: Array of parent nodes to process during bottom-up unwinding.
-//   - octets: The full path of octets leading to the current node.
+//   - stack: The ancestors of n, from the root (first element) to the parent of n (last element).
+//   - octets: The octets of the deleted prefix, the path leading to the current node.
 //   - is4: True for IPv4 processing, false for IPv6.
 func (n *LiteNode[T]) PurgeAndCompress(stack []*LiteNode[T], octets []uint8, is4 bool) {
 	// Iterate backwards through the ancestor stack to prune nodes from the bottom up.
@@ -457,9 +468,12 @@ func (n *LiteNode[T]) Delete(pfx netip.Prefix) (exists bool) {
 // It returns true if the prefix existed, false if it was not found. The prefix must be in
 // canonical (masked) form.
 //
-// Like [Delete], this method uses path compression. However, DeletePersist ensures
+// Like [LiteNode.Delete], this method uses path compression. However, DeletePersist ensures
 // the structural integrity of the existing tree by cloning internal nodes along the
 // descent path (COW) before mutation.
+//
+// Precondition: the receiver n is a private copy, for example the root node
+// cloned with CloneFlat by the caller, see [LiteNode.InsertPersist].
 //
 // After a successful deletion, PurgeAndCompress walks the ancestor stack to prune
 // now-empty nodes and restore path compression upward.
@@ -610,16 +624,16 @@ func (n *LiteNode[T]) Get(pfx netip.Prefix) (val T, exists bool) {
 	panic("unreachable")
 }
 
-// Contains returns true if an index (idx) has any matching longest-prefix
-// in the current node’s prefix table.
+// Contains reports whether the prefix table of the node holds idx itself or any
+// of its ancestors in the complete binary tree, i.e. whether any stored prefix
+// of this node covers the base index idx.
 //
-// This function performs a presence check without retrieving the associated value.
-// It is faster than a full lookup, as it only tests for intersection with the
-// backtracking bitset for the given index.
+// It is a presence check: it does not find the longest match and does not
+// retrieve a value. This makes it faster than [LiteNode.LookupIdx], it is a
+// single bitset intersection with the precomputed ancestors of idx, see
+// lpm.LookupTbl.
 //
-// The prefix table is structured as a complete binary tree (CBT), and LPM testing
-// is done via a bitset operation that maps the traversal path from the given index
-// toward its possible ancestors.
+// idx must be a valid base index (1..255), see art.PfxToIdx and art.OctetToIdx.
 func (n *LiteNode[T]) Contains(idx uint8) bool {
 	return n.Prefixes.Overlaps(&lpm.LookupTbl[idx])
 }
@@ -631,9 +645,11 @@ func (n *LiteNode[T]) Contains(idx uint8) bool {
 // matching prefix exists at this level; otherwise, ok is false.
 //
 // Internally, the prefix table is organized as a complete binary tree (CBT) indexed
-// via the baseIndex function. Unlike the original ART algorithm, this implementation
-// does not use an allotment-based approach. Instead, it performs CBT backtracking
-// using a bitset-based operation with a precomputed backtracking pattern specific to idx.
+// via the baseIndex function. Unlike the original ART algorithm, which stores the
+// result of the longest-prefix match in every cell of an allotment table, this
+// implementation computes it on demand: the highest bit of the intersection of
+// the prefixes with lpm.LookupTbl[idx] is the longest match, because an ancestor
+// always has a smaller index than its descendants.
 func (n *LiteNode[T]) LookupIdx(idx uint8) (top uint8, val T, ok bool) {
 	// top is the idx of the longest-prefix-match
 	if top, ok = n.Prefixes.AndTop(&lpm.LookupTbl[idx]); ok {
@@ -832,7 +848,13 @@ func (n *LiteNode[T]) Modify(pfx netip.Prefix, cb func(val T, found bool) (_ T, 
 // structurally and semantically identical, false otherwise.
 //
 // The comparison handles different node types (internal nodes, leafNodes, fringeNodes)
-// and uses the equal function for value comparisons to support custom equality logic.
+// and uses [value.Equal] for the value comparisons, which supports a custom Equal
+// method of T.
+//
+// The structure of the trie is canonical: path compression is always complete and
+// independent of the order of the insertions and deletions. Two tries with the
+// same prefixes have therefore the same structure, so the structural comparison
+// is also a semantic comparison.
 func (n *LiteNode[T]) EqualRec(o *LiteNode[T]) bool {
 	if n == nil || o == nil {
 		return n == o
@@ -1047,7 +1069,7 @@ func (n *LiteNode[T]) dump(w io.Writer, path StridePath, depth int, is4 bool) {
 }
 
 // DumpString traverses the trie to the node at the specified depth along the given
-// octet path and returns its string representation via Dump.
+// octet path and returns its string representation via dump.
 //
 // If the path is invalid or encounters an unexpected node type during traversal,
 // it returns an error message string instead.
@@ -1087,7 +1109,7 @@ func (n *LiteNode[T]) DumpString(octets []uint8, depth int, is4 bool) string {
 // It inspects immediate statistics (prefix count, child count, node, leaf and
 // fringe counts) for the node and returns:
 //   - nullNode: no prefixes and no children
-//   - stopNode: has children but no subnodes (nodes == 0)
+//   - stopNode: no subnodes, only prefixes and/or path-compressed leaves and fringes
 //   - halfNode: contains at least one leaf or fringe and also has subnodes, but
 //     no prefixes
 //   - fullNode: has prefixes and also has subnodes
@@ -1241,9 +1263,22 @@ func (n *LiteNode[T]) FprintRec(w io.Writer, parent TrieItem[T], pad string) err
 	return nil
 }
 
-// DirectItemsRec, returns the direct covered items by parent.
-// It's a complex recursive function, you have to know the data structure
-// by heart to understand this function!
+// DirectItemsRec returns the items that are directly covered by the parent: the
+// items whose longest covering prefix, apart from the item itself, is the parent.
+// It is the building block for the tree views of the table, see FprintRec and DumpList.
+//
+// parentIdx is the base index of a prefix in this node, the items directly below
+// this prefix are returned. parentIdx 0 selects the items that are covered by no
+// prefix of this node, they belong to the parent of this node. A prefix or a child
+// is directly covered if the longest match of its own parent index (idx>>1,
+// respectively the host index of the child address) is the parentIdx.
+//
+// The items of child nodes are collected recursively. Leaves and fringes end the
+// recursion, their TrieItem carries only the prefix and the value, no node, path,
+// depth or index. The items are not sorted.
+//
+// path and depth are the location of this node in the trie, is4 selects the
+// address family.
 func (n *LiteNode[T]) DirectItemsRec(parentIdx uint8, path StridePath, depth int, is4 bool) (directItems []TrieItem[T]) {
 	// recursion stop condition
 	if n == nil || n.IsEmpty() {
@@ -1343,6 +1378,11 @@ func (n *LiteNode[T]) DirectItemsRec(parentIdx uint8, path StridePath, depth int
 //
 // The merge operation is destructive on the receiver n, but leaves the source node o unchanged.
 //
+// Parameters:
+//   - cloneFn: clones the values taken from o, nil means plain assignment.
+//   - o: the node to merge into n, it is not modified.
+//   - depth: the depth of n and o in the trie.
+//
 // Returns the number of duplicate prefixes that were overwritten during merging.
 func (n *LiteNode[T]) UnionRec(cloneFn func(T) T, o *LiteNode[T], depth int) (duplicates int) {
 	if cloneFn == nil {
@@ -1374,7 +1414,16 @@ func (n *LiteNode[T]) UnionRec(cloneFn func(T) T, o *LiteNode[T], depth int) (du
 	return duplicates
 }
 
-// UnionRecPersist is similar to unionRec but performs an immutable union of nodes.
+// UnionRecPersist is similar to [LiteNode.UnionRec], but keeps the nodes that are
+// shared with other tries intact: child nodes of n that are modified are cloned
+// first (Copy-On-Write).
+//
+// Precondition: the receiver n is a private copy, for example the root node
+// cloned with CloneFlat by the caller. n itself, including its leaf and fringe
+// children, is modified in place. The nodes below n that are not touched by the
+// union stay shared with the original trie. The other node o is never modified.
+//
+// Returns the number of duplicate prefixes that were overwritten during merging.
 func (n *LiteNode[T]) UnionRecPersist(cloneFn func(T) T, o *LiteNode[T], depth int) (duplicates int) {
 	if cloneFn == nil {
 		cloneFn = func(v T) T { return v }
@@ -1800,20 +1849,18 @@ func (n *LiteNode[T]) AllRecSorted(path StridePath, depth int, is4 bool, yield f
 	return true
 }
 
-// EachLookupPrefix performs a hierarchical lookup of all matching prefixes
-// in the current node’s 8-bit stride-based prefix table.
+// EachLookupPrefix yields all prefixes of this node that cover the base index
+// pfxIdx, from the most specific (pfxIdx itself) to the least specific (the
+// default route, index 1).
 //
-// The function walks up the trie-internal complete binary tree (CBT),
-// testing each possible prefix length mask (in decreasing order of specificity),
-// and invokes the yield function for every matching entry.
+// It walks up the complete binary tree of the prefix table by repeatedly halving
+// the index (pfxIdx>>1) and yields every prefix found on the way together with
+// its value. The CIDR of a prefix is reconstructed from ip and depth, only the
+// address bits of ip are used, it does not have to be masked.
 //
-// The given idx refers to the position for this stride's prefix and is used
-// to derive a backtracking path through the CBT by repeatedly halving the index.
-// At each step, if a prefix exists in the table, its corresponding CIDR is
-// reconstructed and yielded. If yield returns false, traversal stops early.
+// It returns false if yield stopped the iteration early, otherwise true.
 //
-// This function is intended for internal use during supernet traversal and
-// does not descend the trie further.
+// This function is used by Supernets, it does not descend the trie further.
 func (n *LiteNode[T]) EachLookupPrefix(ip netip.Addr, depth int, pfxIdx uint8, yield func(netip.Prefix, T) bool) (ok bool) {
 	for ; pfxIdx > 0; pfxIdx >>= 1 {
 		if n.Prefixes.Test(pfxIdx) {
@@ -2047,7 +2094,8 @@ LOOP:
 //   - yield: Callback function invoked for each subnet prefix/value pair
 //
 // The yield function receives prefix/value pairs and returns false to stop
-// the iteration early. If pfx doesn't exist in the trie, no prefixes are yielded.
+// the iteration early. pfx itself does not have to be stored in the trie, all
+// stored prefixes that are covered by pfx are yielded.
 func (n *LiteNode[T]) Subnets(pfx netip.Prefix, yield func(netip.Prefix, T) bool) {
 	// values derived from pfx
 	ip := pfx.Addr()
@@ -2104,11 +2152,12 @@ func (n *LiteNode[T]) Subnets(pfx netip.Prefix, yield func(netip.Prefix, T) bool
 // if any of their prefixes or descendants overlap.
 //
 // The implementation checks for:
-// 1. Direct overlapping prefixes on this node level
-// 2. Prefixes in one node overlapping with children in the other
-// 3. Matching child addresses in both nodes, which are recursively compared
+//  1. Direct overlapping prefixes on this node level
+//  2. Prefixes in one node overlapping with children in the other
+//  3. Matching child addresses in both nodes, which are recursively compared
 //
-// All 12 possible type combinations for child entries (node, leaf, fringe) are supported.
+// All 9 possible type combinations for the child entries (node, leaf, fringe)
+// of both nodes are supported, see [LiteNode.OverlapsTwoChildren].
 //
 // The function is optimized for early exit on first match and uses heuristics to
 // choose between set-based and loop-based matching for performance.
@@ -2241,7 +2290,7 @@ func (n *LiteNode[T]) OverlapsChildrenIn(o *LiteNode[T]) bool {
 // between node n and node o recursively.
 //
 // For each shared address, the corresponding child nodes (of any type)
-// are compared using LiteNodeOverlapsTwoChildren, which handles all
+// are compared using [LiteNode.OverlapsTwoChildren], which handles all
 // node/leaf/fringe combinations.
 func (n *LiteNode[T]) OverlapsSameChildren(o *LiteNode[T], depth int) bool {
 	// intersect the child bitsets from n with o
@@ -2277,6 +2326,10 @@ func (n *LiteNode[T]) OverlapsSameChildren(o *LiteNode[T], depth int) bool {
 //
 // This function underlies the top-level OverlapsPrefix behavior and handles details of
 // trie traversal across varying prefix lengths and compression levels.
+//
+// depth is the depth of this node in the trie. It must not be greater than the
+// stride count of pfx (pfxLen/8), otherwise the function panics. pfx must be in
+// canonical (masked) form.
 func (n *LiteNode[T]) OverlapsPrefixAtDepth(pfx netip.Prefix, depth int) bool {
 	ip := pfx.Addr()
 	pfxLen := pfx.Bits()

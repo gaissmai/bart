@@ -18,6 +18,11 @@ import (
 // A Lite table must not be copied by value; always pass by pointer.
 // Nil pointers as receivers or arguments are forbidden and will panic.
 //
+// The ...Persist methods return a modified copy and share all nodes that they
+// do not modify with the receiver. Do not mix them with the in-place mutators
+// (Insert, Delete, Modify, Union, Aggregate) on the receiver or on the returned
+// table, call [Lite.Clone] first.
+//
 // Performance note: Do not pass IPv4-in-IPv6 addresses (e.g., ::ffff:192.0.2.1)
 // as input. The methods do not perform automatic unmapping to avoid unnecessary
 // overhead for the common case where native addresses are used.
@@ -103,7 +108,7 @@ func (l *Lite) Insert(pfx netip.Prefix) {
 func (l *Lite) InsertPersist(pfx netip.Prefix) *Lite {
 	lp := l.liteTable.InsertPersist(pfx, struct{}{})
 	if lp == &l.liteTable {
-		// pfx is invalid or didn't exist
+		// pfx is invalid
 		return l
 	}
 	//nolint:govet // copy of *lp is here by intention
@@ -171,7 +176,7 @@ func (l *Lite) ModifyPersist(pfx netip.Prefix, cb func(exists bool) (del bool)) 
 
 	lp := l.liteTable.ModifyPersist(pfx, cbWrapper)
 	if lp == &l.liteTable {
-		// pfx is invalid or didn't exist
+		// pfx is invalid or the callback decided on a no-op
 		return l
 	}
 
@@ -199,6 +204,14 @@ func dropSeq2[T any](seq2 iter.Seq2[netip.Prefix, T]) iter.Seq[netip.Prefix] {
 //  2. Adjacent: Sibling prefixes of equal length that completely cover their
 //     common parent (e.g., 192.168.0.0/25 and 192.168.0.128/25) are combined
 //     into a single supernet (192.168.0.0/24).
+//
+// Aggregation preserves the results of Contains and Lookup, but not the exact
+// content of the table: Get, Size, Subnets and Supernets reflect the aggregated
+// prefixes, the original prefixes can not be restored.
+//
+// Aggregate modifies the table in place, like Insert. If the table shares nodes
+// with another table because of the ...Persist methods, call [Lite.Clone] first,
+// otherwise the other table is changed as well.
 func (l *Lite) Aggregate() {
 	l.liteTable.Aggregate()
 }
@@ -215,7 +228,7 @@ func (l *Lite) Union(o *Lite) {
 	l.liteTable.Union(&o.liteTable)
 }
 
-// UnionPersist is similar to [Union] but the receiver isn't modified.
+// UnionPersist is similar to [Lite.Union] but the receiver isn't modified.
 //
 // All nodes touched during union are cloned and a new *Lite is returned.
 // If o is empty, no nodes are touched and the receiver may be
