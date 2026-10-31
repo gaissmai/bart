@@ -192,7 +192,7 @@ func genAllotTables() (prefix, fringe [256]bitset.BitSet256) {
 // The formatting step later shortens the type name in the generated file.
 // For example, idx 13 (the prefix 101/3) of the PfxRoutesLookupTbl becomes
 //
-//	/* idx:  13 */ {0xf000000c002000, 0xff0000000000, 0x0, 0xffff0000}, // [13, 26, 27, 52, 53, ... ]
+//	/* idx:  13 */ {0xf000000c002000, 0xff0000000000, 0x0, 0xffff0000}, // [13→26→27→52→53→...]
 //
 // A list with fewer than 10 set bits is printed completely, e.g. "[0 1]".
 // A longer list is cut after the first five bits and ends with "... ]",
@@ -209,19 +209,20 @@ func asString(tbl [256]bitset.BitSet256) string {
 	fmt.Fprintf(&builder, "  /* idx: %3d */ %#v, // %s\n", 0, tbl[0], "invalid")
 
 	// Format each valid index with its bitset and the list of set bits, e.g.
-	// /* idx:  13 */ {0xf000000c002000, 0xff0000000000, 0x0, 0xffff0000}, // [13, 26, 27, 52, 53, ... ]
 	for idx := 1; idx < 256; idx++ {
 		fmt.Fprintf(&builder, "  /* idx: %3d */ %#v, // ", idx, tbl[idx])
 
 		bits := tbl[idx].Bits()
 		if len(bits) < 10 {
-			fmt.Fprintf(&builder, "%v\n", bits)
+			fmt1 := fmt.Sprintf("%v", bits)
+			fmt2 := strings.Join(strings.Split(fmt1, " "), "→") // [1←3←6←13]
+			fmt.Fprintf(&builder, "%s\n", fmt2)
 		} else {
 			fmt.Fprint(&builder, "[")
 			for _, bit := range bits[:5] {
-				fmt.Fprintf(&builder, "%d, ", bit)
+				fmt.Fprintf(&builder, "%d→", bit)
 			}
-			fmt.Fprintln(&builder, "... ]")
+			fmt.Fprintln(&builder, "...]")
 		}
 	}
 
