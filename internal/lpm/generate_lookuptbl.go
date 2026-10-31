@@ -183,10 +183,12 @@ func genLookupTbl() string {
 	fmt.Fprintf(&builder, "  /* idx: %3d */ %#v, // %s\n", 0, lookupTbl[0], "invalid")
 
 	// Format each valid index with its bitset and the list of set bits.
-	// The printed type name is shortened by the formatting step later, e.g.
-	// /* idx:  13 */ {0x204a, 0x0, 0x0, 0x0}, // [1 3 6 13]
 	for idx := 1; idx < 256; idx++ {
-		fmt.Fprintf(&builder, "  /* idx: %3d */ %#v, // %v\n", idx, lookupTbl[idx], lookupTbl[idx].Bits())
+		fmt1 := fmt.Sprintf("%v", lookupTbl[idx].Bits())    // [1 3 6 13]
+		fmt2 := strings.Join(strings.Split(fmt1, " "), "←") // [1←3←6←13]
+
+		//  /* idx:  13 */ {0x204a, 0x0, 0x0, 0x0}, // [1←3←6←13]
+		fmt.Fprintf(&builder, "  /* idx: %3d */ %#v, // %v\n", idx, lookupTbl[idx], fmt2)
 	}
 
 	return builder.String()
