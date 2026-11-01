@@ -7,6 +7,7 @@ package bart
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -2912,5 +2913,208 @@ func TestTableEqualCloneDense_Table(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestTableUnionSelfAndEmpty tests Union and UnionPersist with an empty table
+// and with the table itself as argument, nothing changes.
+func TestTableUnionSelfAndEmpty_Table(t *testing.T) {
+	t.Parallel()
+
+	pfxs := []netip.Prefix{
+		mpp("10.0.0.0/8"), mpp("10.1.0.0/16"), mpp("10.1.2.0/24"),
+		mpp("2001:db8::/32"), mpp("2001:db8:1::/48"),
+	}
+
+	tests := []struct {
+		name string
+		do   func(tbl, empty *Table[int]) *Table[int]
+	}{
+		{"Union with an empty table", func(tbl, empty *Table[int]) *Table[int] {
+			tbl.Union(empty)
+			return tbl
+		}},
+		{"Union with itself", func(tbl, _ *Table[int]) *Table[int] {
+			tbl.Union(tbl)
+			return tbl
+		}},
+		{"UnionPersist with an empty table", func(tbl, empty *Table[int]) *Table[int] {
+			return tbl.UnionPersist(empty)
+		}},
+		{"UnionPersist with itself", func(tbl, _ *Table[int]) *Table[int] {
+			return tbl.UnionPersist(tbl)
+		}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tbl := modelBuild_Table(pfxs, 100)
+			snap := tbl.dumpStructure()
+
+			got := tt.do(tbl, new(Table[int]))
+
+			if tbl.dumpStructure() != snap {
+				t.Fatal("the receiver was modified")
+			}
+
+			if got.Size() != len(pfxs) || !got.Equal(tbl) {
+				t.Fatal("the result is not equal to the receiver")
+			}
+		})
+	}
+}
+
+// TestTableEqualDifferences tests that Equal finds the difference of tables with
+// the same number of prefixes in every place where the nodes are compared: the
+// prefixes of a node, the child slots, and the kind of the children, node, leaf
+// and fringe. Tables with different sizes are not compared node by node.
+func TestTableEqualDifferences_Table(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range modelEqualCases {
+		for _, is4 := range []bool{true, false} {
+			t.Run(modelName(tt.name, is4), func(t *testing.T) {
+				t.Parallel()
+
+				pfxsA, pfxsB := modelPrefixes(is4, tt.a), modelPrefixes(is4, tt.b)
+				goldA, goldB := modelGold(pfxsA, 1), modelGold(pfxsB, 1)
+
+				// the sizes must be equal, otherwise Equal does not compare the nodes
+				if len(goldA) != len(goldB) {
+					t.Fatalf("error in the test table: the sizes are %d and %d", len(goldA), len(goldB))
+				}
+
+				if goldA.Equal(goldB) {
+					t.Fatal("error in the test table: the tables are equal")
+				}
+
+				a, b := modelBuild_Table(pfxsA, 1), modelBuild_Table(pfxsB, 1)
+
+				// both directions, the difference of the kind of a child is
+				// found from both sides
+				if a.Equal(b) {
+					t.Error("a.Equal(b) = true, want false")
+				}
+
+				if b.Equal(a) {
+					t.Error("b.Equal(a) = true, want false")
+				}
+			})
+		}
+	}
+}
+
+// TestTableEqualValues tests that Equal compares the values of every kind of
+// entry: the prefix table of a node, a node, a leaf and a fringe. A liteTable
+// has no payload, the same prefixes with different values are equal.
+func TestTableEqualValues_Table(t *testing.T) {
+	t.Parallel()
+
+	_, isLite := any(new(Table[int])).(*liteTable[int])
+
+	for _, tt := range modelValueCases {
+		for _, is4 := range []bool{true, false} {
+			t.Run(modelName(tt.name, is4), func(t *testing.T) {
+				t.Parallel()
+
+				pfxs := modelPrefixes(is4, tt.specs)
+
+				a, b := modelBuild_Table(pfxs, 1), modelBuild_Table(pfxs, 1001)
+
+				if got := a.Equal(b); got != isLite {
+					t.Errorf("Equal() with different values = %v, want %v", got, isLite)
+				}
+
+				if got := b.Equal(a); got != isLite {
+					t.Errorf("Equal() with different values, swapped = %v, want %v", got, isLite)
+				}
+			})
+		}
+	}
+}
+
+// TestTableEqualSharedNodes tests Equal for tables that share nodes: an
+// InsertPersist of a prefix with its own value gives an equal table that shares
+// all untouched nodes with the original, the comparison of the shared nodes is a
+// shortcut.
+func TestTableEqualSharedNodes_Table(t *testing.T) {
+	t.Parallel()
+
+	for _, cfg := range modelConfigs {
+		t.Run(cfg.name, func(t *testing.T) {
+			t.Parallel()
+
+			for seed := range modelSeeds() {
+				prng := rand.New(rand.NewPCG(uint64(seed), 48))
+
+				pfxs := random.NestedPrefixes(prng, cfg.is4, cfg.pool, 1+prng.IntN(cfg.maxN), true)
+				gold := modelGold(pfxs, 100)
+				tbl := modelBuild_Table(pfxs, 100)
+
+				pfx := pfxs[prng.IntN(len(pfxs))]
+				same := tbl.InsertPersist(pfx, gold[pfx])
+
+				if !tbl.Equal(same) || !same.Equal(tbl) {
+					t.Fatalf("seed %d: InsertPersist of %s with its own value gives an unequal table", seed, pfx)
+				}
+			}
+		})
+	}
+}
+
+// TestTableFprintErrors tests that Fprint returns the error of the writer, for
+// every position of the failure: the header and every line of the IPv4 tree and
+// of the IPv6 tree.
+func TestTableFprintErrors_Table(t *testing.T) {
+	t.Parallel()
+
+	tbl := new(Table[int])
+
+	for i, s := range []string{
+		"10.0.0.0/8", "10.1.0.0/16", "10.1.2.0/24", "192.168.0.0/16",
+		"2001:db8::/32", "2001:db8:1::/48", "fe80::/10",
+	} {
+		tbl.Insert(mpp(s), i)
+	}
+
+	// count the writes of a successful Fprint
+	counter := &modelFailWriter{failAt: -1}
+	if err := tbl.Fprint(counter); err != nil {
+		t.Fatalf("Fprint() = %v, want no error", err)
+	}
+
+	// two headers and at least one line per prefix
+	if counter.writes < 2+7 {
+		t.Fatalf("Fprint() made %d writes, the test needs more", counter.writes)
+	}
+
+	for failAt := range counter.writes {
+		w := &modelFailWriter{failAt: failAt}
+
+		if err := tbl.Fprint(w); !errors.Is(err, errModelWrite) {
+			t.Errorf("Fprint() with a failing write #%d = %v, want the error of the writer", failAt, err)
+		}
+	}
+
+	if err := tbl.Fprint(nil); err == nil {
+		t.Error("Fprint(nil) = nil, want an error")
+	}
+}
+
+// TestTableMarshalJSONError tests that MarshalJSON returns the error of the
+// JSON encoder, here for a payload type that can not be marshaled.
+func TestTableMarshalJSONError_Table(t *testing.T) {
+	t.Parallel()
+
+	tbl := new(Table[func()])
+	tbl.Insert(mpp("10.0.0.0/8"), nil)
+
+	_, err := tbl.MarshalJSON()
+
+	var unsupported *json.UnsupportedTypeError
+	if !errors.As(err, &unsupported) {
+		t.Fatalf("MarshalJSON() = %v, want a *json.UnsupportedTypeError", err)
 	}
 }

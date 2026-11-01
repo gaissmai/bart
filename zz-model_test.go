@@ -4,6 +4,7 @@
 package bart
 
 import (
+	"errors"
 	"math/rand/v2"
 	"net/netip"
 	"regexp"
@@ -155,35 +156,30 @@ func modelStridePrefixes() (inRoot, belowTen []netip.Prefix) {
 // the kinds of entries below the slot 10 of the root node: a child node, a leaf
 // (path-compressed prefix) or a fringe (path-compressed prefix on a stride border).
 // A node with two fringes below
-var modelNode1 = []modelSpec{{10, 1, 16}, {10, 2, 16}}
-var modelNode2 = []modelSpec{{10, 3, 16}, {10, 4, 16}}
-
-// shares 10.2.0.0/16 with modelNode1
-var modelNode1x = []modelSpec{{10, 2, 16}, {10, 9, 16}}
-
-// a leaf, 10.2.0.0/15 covers 10.2 and 10.3
-var modelLeaf1 = []modelSpec{{10, 2, 15}}
-var modelLeaf2 = []modelSpec{{10, 6, 15}}
-
-// a leaf inside of modelLeaf1
-var modelLeaf3 = []modelSpec{{10, 3, 17}}
-
-// a fringe, 10.0.0.0/8
-var modelFringe1 = []modelSpec{{10, 0, 8}}
-
-// nodes that store the prefix of a leaf or of a fringe in their prefix table
-var modelNodeWithLeaf1 = []modelSpec{{10, 2, 15}, {10, 6, 15}}
-var modelNodeWithFringe1 = []modelSpec{{10, 0, 8}, {10, 1, 16}}
-
-// prefixes in the prefix table of the root node, they cover the first octets
-// 8..15, 16..23, 0..31 and 32..63
-var modelStrideA = []modelSpec{{8, 0, 5}}
-var modelStrideB = []modelSpec{{16, 0, 5}}
-var modelStrideC = []modelSpec{{0, 0, 3}}
-var modelStrideD = []modelSpec{{32, 0, 3}}
-
-// a table with nested prefixes down to a host route
-var modelStored1 = []modelSpec{{0, 0, 0}, {10, 0, 8}, {10, 1, 16}, {10, 2, 15}, {10, 2, 24}, {10, 2, 32}}
+var (
+	modelNode1 = []modelSpec{{10, 1, 16}, {10, 2, 16}}
+	modelNode2 = []modelSpec{{10, 3, 16}, {10, 4, 16}}
+	// shares 10.2.0.0/16 with modelNode1
+	modelNode1x = []modelSpec{{10, 2, 16}, {10, 9, 16}}
+	// a leaf, 10.2.0.0/15 covers 10.2 and 10.3
+	modelLeaf1 = []modelSpec{{10, 2, 15}}
+	modelLeaf2 = []modelSpec{{10, 6, 15}}
+	// a leaf inside of modelLeaf1
+	modelLeaf3 = []modelSpec{{10, 3, 17}}
+	// a fringe, 10.0.0.0/8
+	modelFringe1 = []modelSpec{{10, 0, 8}}
+	// nodes that store the prefix of a leaf or of a fringe in their prefix table
+	modelNodeWithLeaf1   = []modelSpec{{10, 2, 15}, {10, 6, 15}}
+	modelNodeWithFringe1 = []modelSpec{{10, 0, 8}, {10, 1, 16}}
+	// prefixes in the prefix table of the root node, they cover the first octets
+	// 8..15, 16..23, 0..31 and 32..63
+	modelStrideA = []modelSpec{{8, 0, 5}}
+	modelStrideB = []modelSpec{{16, 0, 5}}
+	modelStrideC = []modelSpec{{0, 0, 3}}
+	modelStrideD = []modelSpec{{32, 0, 3}}
+	// a table with nested prefixes down to a host route
+	modelStored1 = []modelSpec{{0, 0, 0}, {10, 0, 8}, {10, 1, 16}, {10, 2, 15}, {10, 2, 24}, {10, 2, 32}}
+)
 
 // modelUnionCases are the 12 combinations of the children of a node that Union
 // handles, the entry of this table and the entry of the other table: nothing,
@@ -260,63 +256,132 @@ var modelEdgeCases = []struct {
 	subnets, supernets []modelSpec
 }{
 	{
-		"default route table, probe the default route", modelStored1, modelSpec{0, 0, 0},
+		"default route table, probe the default route", modelStored1,
+		modelSpec{0, 0, 0},
 		[]modelSpec{{0, 0, 0}, {10, 0, 8}, {10, 1, 16}, {10, 2, 15}, {10, 2, 24}, {10, 2, 32}},
 		[]modelSpec{{0, 0, 0}},
 	},
 	{
-		"probe is stored, shorter supernets exist", modelStored1, modelSpec{10, 0, 8},
+		"probe is stored, shorter supernets exist", modelStored1,
+		modelSpec{10, 0, 8},
 		[]modelSpec{{10, 0, 8}, {10, 1, 16}, {10, 2, 15}, {10, 2, 24}, {10, 2, 32}},
 		[]modelSpec{{10, 0, 8}, {0, 0, 0}},
 	},
 	{
-		"probe is not stored, covers stored prefixes", modelStored1, modelSpec{10, 2, 16},
+		"probe is not stored, covers stored prefixes", modelStored1,
+		modelSpec{10, 2, 16},
 		[]modelSpec{{10, 2, 24}, {10, 2, 32}},
 		[]modelSpec{{10, 2, 15}, {10, 0, 8}, {0, 0, 0}},
 	},
 	{
-		"probe is a host route that is stored", modelStored1, modelSpec{10, 2, 32},
+		"probe is a host route that is stored", modelStored1,
+		modelSpec{10, 2, 32},
 		[]modelSpec{{10, 2, 32}},
 		[]modelSpec{{10, 2, 32}, {10, 2, 24}, {10, 2, 15}, {10, 0, 8}, {0, 0, 0}},
 	},
 	{
-		"probe is disjoint from all but the default route", modelStored1, modelSpec{11, 0, 8},
+		"probe is disjoint from all but the default route", modelStored1,
+		modelSpec{11, 0, 8},
 		nil,
 		[]modelSpec{{0, 0, 0}},
 	},
 	{
-		"probe is a host route that is not stored", modelStored1, modelSpec{10, 3, 32},
+		"probe is a host route that is not stored", modelStored1,
+		modelSpec{10, 3, 32},
 		nil,
 		[]modelSpec{{10, 2, 15}, {10, 0, 8}, {0, 0, 0}},
 	},
 	{
-		"probe is wider than every stored prefix", []modelSpec{{10, 1, 16}, {10, 2, 16}}, modelSpec{10, 0, 8},
+		"probe is wider than every stored prefix",
+		[]modelSpec{{10, 1, 16}, {10, 2, 16}},
+		modelSpec{10, 0, 8},
 		[]modelSpec{{10, 1, 16}, {10, 2, 16}},
 		nil,
 	},
 	{
-		"probe is wider and no default route exists", []modelSpec{{10, 1, 16}, {10, 2, 16}}, modelSpec{0, 0, 0},
+		"probe is wider and no default route exists",
+		[]modelSpec{{10, 1, 16}, {10, 2, 16}},
+		modelSpec{0, 0, 0},
 		[]modelSpec{{10, 1, 16}, {10, 2, 16}},
 		nil,
 	},
 	{
-		"nested /31 and /32", []modelSpec{{10, 1, 31}, {10, 1, 32}}, modelSpec{10, 1, 30},
+		"nested /31 and /32",
+		[]modelSpec{{10, 1, 31}, {10, 1, 32}},
+		modelSpec{10, 1, 30},
 		[]modelSpec{{10, 1, 31}, {10, 1, 32}},
 		nil,
 	},
 	{
-		"nested /31 and /32, probe /32", []modelSpec{{10, 1, 31}, {10, 1, 32}}, modelSpec{10, 1, 32},
+		"nested /31 and /32, probe /32",
+		[]modelSpec{{10, 1, 31}, {10, 1, 32}},
+		modelSpec{10, 1, 32},
 		[]modelSpec{{10, 1, 32}},
 		[]modelSpec{{10, 1, 32}, {10, 1, 31}},
 	},
 	{
-		"nested /31 and /32, probe /31", []modelSpec{{10, 1, 31}, {10, 1, 32}}, modelSpec{10, 1, 31},
+		"nested /31 and /32, probe /31",
+		[]modelSpec{{10, 1, 31}, {10, 1, 32}},
+		modelSpec{10, 1, 31},
 		[]modelSpec{{10, 1, 31}, {10, 1, 32}},
 		[]modelSpec{{10, 1, 31}},
 	},
 	{
-		"empty table", nil, modelSpec{0, 0, 0},
+		"empty table", nil,
+		modelSpec{0, 0, 0},
 		nil,
 		nil,
 	},
+}
+
+// modelEqualCases are pairs of tables with the same number of prefixes, that
+// differ in the structure: in the prefixes of a node, in the child slots and in
+// the kind of the children. The size check of Equal does not hide the difference.
+var modelEqualCases = []struct {
+	name string
+	a, b []modelSpec
+}{
+	{"leaf and node swapped between two slots", []modelSpec{{10, 2, 15}, {11, 1, 16}, {11, 2, 16}}, []modelSpec{{10, 1, 16}, {10, 2, 16}, {11, 2, 15}}},
+	{"fringe and node swapped between two slots", []modelSpec{{10, 0, 8}, {11, 1, 16}, {11, 2, 16}}, []modelSpec{{10, 1, 16}, {10, 2, 16}, {11, 0, 8}}},
+	{"leaf against fringe", []modelSpec{{10, 2, 15}}, []modelSpec{{10, 0, 8}}},
+	{"leaves with different prefixes", []modelSpec{{10, 2, 15}}, []modelSpec{{10, 4, 15}}},
+	{"nodes with different prefix tables", []modelSpec{{10, 2, 15}, {10, 6, 15}}, []modelSpec{{10, 2, 15}, {10, 4, 15}}},
+	{"node with default route against node without", []modelSpec{{10, 0, 8}, {10, 1, 16}}, []modelSpec{{10, 1, 16}, {10, 2, 16}}},
+	{"different child slots", []modelSpec{{10, 0, 8}}, []modelSpec{{11, 0, 8}}},
+	{"different prefix tables in the root", []modelSpec{{8, 0, 5}}, []modelSpec{{16, 0, 5}}},
+}
+
+// modelValueCases are the kinds of entries for the comparison of the values
+// by Equal: the prefix table of a node, a node, a leaf and a fringe.
+var modelValueCases = []struct {
+	name  string
+	specs []modelSpec
+}{
+	{"prefix table", modelStrideA},
+	{"fringe", modelFringe1},
+	{"leaf", modelLeaf1},
+	{"node with fringes", modelNode1},
+	{"node with the default route", modelNodeWithFringe1},
+	{"node with prefixes", modelNodeWithLeaf1},
+}
+
+// errModelWrite is the error of the modelFailWriter.
+var errModelWrite = errors.New("model: write failed")
+
+// modelFailWriter is an io.Writer that fails at the write number failAt,
+// counted from 0. It never fails for a negative failAt. It counts the writes.
+type modelFailWriter struct {
+	failAt int
+	writes int
+}
+
+func (w *modelFailWriter) Write(p []byte) (int, error) {
+	n := w.writes
+	w.writes++
+
+	if n == w.failAt {
+		return 0, errModelWrite
+	}
+
+	return len(p), nil
 }
