@@ -29,6 +29,8 @@ import (
 
 type _NODE_TYPE[T any] struct{}
 
+func (n *_NODE_TYPE[T]) hasType() (_ nodeType)                                             { return }
+func (n *_NODE_TYPE[T]) Stats() (_ StatsT)                                                 { return }
 func (n *_NODE_TYPE[T]) StatsRec() (_ StatsT)                                              { return }
 func (n *_NODE_TYPE[T]) dump(io.Writer, StridePath, int, bool)                             { return }
 func (n *_NODE_TYPE[T]) DumpRec(io.Writer, StridePath, int, bool)                          { return }
@@ -1266,5 +1268,166 @@ func TestSupernetsExtra__NODE_TYPE(t *testing.T) {
 	})
 	if len(yielded) != 1 || yielded[0] != mpp("10.0.0.0/8") {
 		t.Errorf("expected only 10.0.0.0/8, got %v", yielded)
+	}
+}
+
+// TestHasType tests the classification of a node into the node types that the
+// dump shows, every branch of hasType: prefixes, leaves, fringes and sub-nodes
+// in all relevant combinations. The Stats of a case document the structure of
+// the node and guard that the case builds the intended structure.
+func TestHasType__NODE_TYPE(t *testing.T) {
+	t.Parallel()
+
+	const (
+		prefix = "10.0.0.0/7"  // in the prefix table of the root node
+		leaf   = "12.2.0.0/15" // a leaf at the slot 12
+		fringe = "13.0.0.0/8"  // a fringe at the slot 13
+	)
+
+	// two prefixes that diverge below the first octet make a sub-node, path
+	// compression can not stop at a leaf: a sub-node at the slot 11 and one at the slot 12
+	subNode := []string{"11.30.40.0/24", "11.30.50.0/24"}
+	subNode2 := []string{"12.20.30.0/24", "12.20.40.0/24"}
+
+	tests := []struct {
+		name      string
+		pfxs      []string
+		want      nodeType
+		wantName  string
+		wantStats StatsT
+	}{
+		{
+			name:      "null",
+			pfxs:      nil,
+			want:      nullNode,
+			wantName:  "NULL",
+			wantStats: StatsT{},
+		},
+		{
+			name:      "stop: a prefix",
+			pfxs:      []string{prefix},
+			want:      stopNode,
+			wantName:  "STOP",
+			wantStats: StatsT{Prefixes: 1},
+		},
+		{
+			name:      "stop: a leaf",
+			pfxs:      []string{leaf},
+			want:      stopNode,
+			wantName:  "STOP",
+			wantStats: StatsT{Children: 1, Leaves: 1},
+		},
+		{
+			name:      "stop: a fringe",
+			pfxs:      []string{fringe},
+			want:      stopNode,
+			wantName:  "STOP",
+			wantStats: StatsT{Children: 1, Fringes: 1},
+		},
+		{
+			name:      "stop: a prefix, a leaf and a fringe",
+			pfxs:      []string{prefix, leaf, fringe},
+			want:      stopNode,
+			wantName:  "STOP",
+			wantStats: StatsT{Prefixes: 1, Children: 2, Leaves: 1, Fringes: 1},
+		},
+		{
+			name:      "path: only a sub-node",
+			pfxs:      subNode,
+			want:      pathNode,
+			wantName:  "PATH",
+			wantStats: StatsT{Children: 1, SubNodes: 1},
+		},
+		{
+			name:      "path: two sub-nodes",
+			pfxs:      slices.Concat(subNode, subNode2),
+			want:      pathNode,
+			wantName:  "PATH",
+			wantStats: StatsT{Children: 2, SubNodes: 2},
+		},
+		{
+			name:      "half: a leaf and a sub-node",
+			pfxs:      slices.Concat([]string{leaf}, subNode),
+			want:      halfNode,
+			wantName:  "HALF",
+			wantStats: StatsT{Children: 2, SubNodes: 1, Leaves: 1},
+		},
+		{
+			name:      "half: a fringe and a sub-node",
+			pfxs:      slices.Concat([]string{fringe}, subNode),
+			want:      halfNode,
+			wantName:  "HALF",
+			wantStats: StatsT{Children: 2, SubNodes: 1, Fringes: 1},
+		},
+		{
+			name:      "half: a leaf, a fringe and a sub-node",
+			pfxs:      slices.Concat([]string{leaf, fringe}, subNode),
+			want:      halfNode,
+			wantName:  "HALF",
+			wantStats: StatsT{Children: 3, SubNodes: 1, Leaves: 1, Fringes: 1},
+		},
+		{
+			name:      "full: a prefix and a sub-node",
+			pfxs:      slices.Concat([]string{prefix}, subNode),
+			want:      fullNode,
+			wantName:  "FULL",
+			wantStats: StatsT{Prefixes: 1, Children: 1, SubNodes: 1},
+		},
+		{
+			name:      "full: a prefix, a leaf and a sub-node",
+			pfxs:      slices.Concat([]string{prefix, leaf}, subNode),
+			want:      fullNode,
+			wantName:  "FULL",
+			wantStats: StatsT{Prefixes: 1, Children: 2, SubNodes: 1, Leaves: 1},
+		},
+		{
+			name:      "full: a prefix, a fringe and a sub-node",
+			pfxs:      slices.Concat([]string{prefix, fringe}, subNode),
+			want:      fullNode,
+			wantName:  "FULL",
+			wantStats: StatsT{Prefixes: 1, Children: 2, SubNodes: 1, Fringes: 1},
+		},
+		{
+			name:      "full: a prefix, a leaf, a fringe and a sub-node",
+			pfxs:      slices.Concat([]string{prefix, leaf, fringe}, subNode),
+			want:      fullNode,
+			wantName:  "FULL",
+			wantStats: StatsT{Prefixes: 1, Children: 3, SubNodes: 1, Leaves: 1, Fringes: 1},
+		},
+		{
+			name:      "full: the default route and a sub-node",
+			pfxs:      slices.Concat([]string{"0.0.0.0/0"}, subNode),
+			want:      fullNode,
+			wantName:  "FULL",
+			wantStats: StatsT{Prefixes: 1, Children: 1, SubNodes: 1},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			n := new(_NODE_TYPE[int])
+			for _, s := range tt.pfxs {
+				n.Insert(mpp(s), 42, 0)
+			}
+
+			if got := n.Stats(); got != tt.wantStats {
+				t.Fatalf("Stats() = %+v, want %+v, the test case does not build the intended structure", got, tt.wantStats)
+			}
+
+			if got := n.hasType(); got != tt.want {
+				t.Errorf("hasType() = %s, want %s", got, tt.want)
+			}
+
+			if got := tt.want.String(); got != tt.wantName {
+				t.Errorf("String() = %q, want %q", got, tt.wantName)
+			}
+
+			// the dump shows the type, also of an empty node
+			if dump := n.DumpString(nil, 0, true); !strings.Contains(dump, "["+tt.wantName+"]") {
+				t.Errorf("DumpString() does not show the node type %s:\n%s", tt.wantName, dump)
+			}
+		})
 	}
 }
