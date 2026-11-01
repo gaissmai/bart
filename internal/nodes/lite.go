@@ -60,6 +60,17 @@ func (n *LiteNode[T]) MustGetPrefix(idx uint8) (_ T) {
 }
 
 // CloneFlat returns a shallow copy of the current node.
+//
+// Unlike [BartNode.CloneFlat], it does not clone leaf and fringe children;
+// they are shared with the original node. This is safe because the Lite table
+// has no payload: the value of a leaf or fringe is a struct{}, assigning it
+// writes no memory, and the prefix of a leaf is never modified in place.
+// A payload with a size greater than zero would make the sharing visible, as
+// an in-place value overwrite would change the original as well.
+//
+// The cloneFn parameter is unused and ignored (passed as nil or a dummy function)
+// and exists solely to maintain signature compatibility with [BartNode.CloneFlat],
+// enabling unified method generation from shared code templates.
 func (n *LiteNode[T]) CloneFlat(_ func(T) T) *LiteNode[T] {
 	if n == nil {
 		return nil
