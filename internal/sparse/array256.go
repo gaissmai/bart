@@ -151,11 +151,6 @@ func (a *Array256[T]) MustGet(i uint8) T {
 	return a.Items[a.rank0(i)]
 }
 
-// Len returns the number of items in the sparse array.
-func (a *Array256[T]) Len() int {
-	return len(a.Items)
-}
-
 // Copy returns a shallow copy of the Array, including the rank cache.
 // The elements are copied using assignment, this is no deep clone.
 // The copy has its own backing array for Items, so inserting into or
