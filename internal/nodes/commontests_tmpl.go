@@ -3,7 +3,7 @@
 // Copyright (c) 2026 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
-//go:generate ../../scripts/generate-node-tests.sh
+//go:generate go run ../../scripts/gen.go node-tests
 
 package nodes
 
