@@ -7,7 +7,10 @@ package bart
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
+	"maps"
 	"math/rand/v2"
 	"net/netip"
 	"slices"
@@ -2308,5 +2311,810 @@ func TestTableExtra_Table(t *testing.T) {
 	})
 	if t5 != t4 {
 		t.Error("expected same table pointer for no-op ModifyPersist")
+	}
+}
+
+// ############ model tests ##########################
+//
+// The model tests compare the table with the golden table and check three
+// properties that a comparison of the content alone does not see:
+//
+//   - the structure is canonical: after any sequence of operations the table
+//     has the same structure as a table that was freshly built from the same
+//     prefixes. A wrongly compressed trie still returns the right lookup
+//     results, but wastes memory and breaks Equal.
+//   - the ...Persist methods leave the original table unchanged: structure,
+//     values and sizes.
+//   - the size counters are correct, also after a Union with duplicates.
+//
+// The random tests use prefixes made of a small pool of byte values, so that
+// they collide, overlap and nest, see random.NestedPrefixes. The helpers and
+// the test data are in zz-model_test.go.
+
+// dumpStructure is dumpString for the comparison of structures.
+//
+// The leaves and fringes of a liteTable have no payload that matters, they are
+// shared on purpose between a node and its clone, see LiteNode.CloneFlat. This
+// is invisible for the struct{} payload of the public Lite table, but the dump
+// shows the values if the liteTable is instantiated with int, as the tests do.
+// Therefore the payload of the leaves and fringes is removed from the dump of
+// a liteTable.
+func (t *Table[T]) dumpStructure() string {
+	s := t.dumpString()
+
+	if _, isLite := any(t).(*liteTable[T]); isLite {
+		return modelStripPayload(s)
+	}
+
+	return s
+}
+
+// modelBuild_Table builds a table, the prefixes are inserted in the given
+// order with the values base, base+1, ...
+func modelBuild_Table(pfxs []netip.Prefix, base int) *Table[int] {
+	tbl := new(Table[int])
+
+	for i, pfx := range pfxs {
+		tbl.Insert(pfx, base+i)
+	}
+
+	return tbl
+}
+
+// modelFresh_Table builds a table from the golden table, the prefixes are
+// inserted in random order.
+func modelFresh_Table(gold golden.Table[int], prng *rand.Rand) *Table[int] {
+	pfxs := gold.FlatSorted().SortKeys()
+	prng.Shuffle(len(pfxs), func(i, j int) { pfxs[i], pfxs[j] = pfxs[j], pfxs[i] })
+
+	tbl := new(Table[int])
+
+	for _, pfx := range pfxs {
+		tbl.Insert(pfx, gold[pfx])
+	}
+
+	return tbl
+}
+
+// modelCheck_Table verifies the table against the golden table: the size,
+// the content in canonical order, the values (not for a liteTable, it has no
+// payload) and the canonical structure: the table must have the same structure
+// as a table that was freshly built from the golden table.
+func modelCheck_Table(tb testing.TB, what string, tbl *Table[int], gold golden.Table[int], isLite bool, prng *rand.Rand) {
+	tb.Helper()
+
+	if got, want := tbl.Size(), len(gold); got != want {
+		tb.Fatalf("%s: Size() = %d, want %d", what, got, want)
+	}
+
+	goldFlat, tblFlat := gold.FlatSorted(), tbl.flatSorted()
+
+	if isLite {
+		if !slices.Equal(goldFlat.SortKeys(), tblFlat.SortKeys()) {
+			tb.Fatalf("%s: the prefixes differ from the golden table", what)
+		}
+	} else if !slices.Equal(goldFlat, tblFlat) {
+		tb.Fatalf("%s: the content differs from the golden table", what)
+	}
+
+	got, want := tbl.dumpStructure(), modelFresh_Table(gold, prng).dumpStructure()
+	if got != want {
+		tb.Fatalf("%s: the structure differs from a freshly built table, it is not canonical:\n%s\nwant:\n%s", what, got, want)
+	}
+}
+
+// modelUnionCheck_Table verifies Union and UnionPersist for the tables
+// made of pfxsA and pfxsB: content, structure and size of the result, the other
+// table is unchanged, and for UnionPersist the receiver is unchanged too.
+func modelUnionCheck_Table(t *testing.T, what string, pfxsA, pfxsB []netip.Prefix, isLite bool, prng *rand.Rand) {
+	t.Helper()
+
+	// the values of the second table differ from those of the first,
+	// the second wins at a duplicate
+	gold := modelUnion(modelGold(pfxsA, 100), modelGold(pfxsB, 200))
+
+	// in place
+	a, b := modelBuild_Table(pfxsA, 100), modelBuild_Table(pfxsB, 200)
+	bSnap := b.dumpStructure()
+
+	a.Union(b)
+	modelCheck_Table(t, what+": Union", a, gold, isLite, prng)
+
+	if b.dumpStructure() != bSnap {
+		t.Fatalf("%s: Union modified the other table", what)
+	}
+
+	// persistent
+	a, b = modelBuild_Table(pfxsA, 100), modelBuild_Table(pfxsB, 200)
+	aSnap, bSnap := a.dumpStructure(), b.dumpStructure()
+
+	p := a.UnionPersist(b)
+	modelCheck_Table(t, what+": UnionPersist", p, gold, isLite, prng)
+
+	if a.dumpStructure() != aSnap {
+		t.Fatalf("%s: UnionPersist modified the receiver (copy-on-write violated)", what)
+	}
+
+	if b.dumpStructure() != bSnap {
+		t.Fatalf("%s: UnionPersist modified the other table", what)
+	}
+}
+
+// TestTableUnionCombinations tests the 12 combinations of the children of a
+// node that Union has to handle, for IPv4 and IPv6, with and without duplicates.
+func TestTableUnionCombinations_Table(t *testing.T) {
+	t.Parallel()
+
+	_, isLite := any(new(Table[int])).(*liteTable[int])
+
+	for _, tt := range modelUnionCases {
+		for _, is4 := range []bool{true, false} {
+			t.Run(modelName(tt.name, is4), func(t *testing.T) {
+				t.Parallel()
+
+				pfxsA, pfxsB := modelPrefixes(is4, tt.a), modelPrefixes(is4, tt.b)
+
+				// the number of duplicates in the test table must be right
+				goldA, goldB := modelGold(pfxsA, 100), modelGold(pfxsB, 200)
+				if dups := len(goldA) + len(goldB) - len(modelUnion(goldA, goldB)); dups != tt.dups {
+					t.Fatalf("error in the test table: %d duplicates, want %d", dups, tt.dups)
+				}
+
+				prng := rand.New(rand.NewPCG(1, 2))
+				modelUnionCheck_Table(t, "Union", pfxsA, pfxsB, isLite, prng)
+			})
+		}
+	}
+}
+
+// TestTableUnionDense tests Union with random tables that overlap and nest.
+func TestTableUnionDense_Table(t *testing.T) {
+	t.Parallel()
+
+	_, isLite := any(new(Table[int])).(*liteTable[int])
+
+	for _, cfg := range modelConfigs {
+		t.Run(cfg.name, func(t *testing.T) {
+			t.Parallel()
+
+			for seed := range modelSeeds() {
+				prng := rand.New(rand.NewPCG(uint64(seed), 42))
+
+				pfxsA := random.NestedPrefixes(prng, cfg.is4, cfg.pool, prng.IntN(cfg.maxN+1), true)
+				pfxsB := modelRelated(prng, cfg, pfxsA)
+
+				modelUnionCheck_Table(t, fmt.Sprintf("seed %d", seed), pfxsA, pfxsB, isLite, prng)
+			}
+		})
+	}
+}
+
+// TestTablePersistIsolation tests that InsertPersist and DeletePersist return
+// the right table and leave the original table unchanged, including the
+// leaves and fringes that are shared between the tables.
+func TestTablePersistIsolation_Table(t *testing.T) {
+	t.Parallel()
+
+	_, isLite := any(new(Table[int])).(*liteTable[int])
+
+	for _, cfg := range modelConfigs {
+		t.Run(cfg.name, func(t *testing.T) {
+			t.Parallel()
+
+			for seed := range modelSeeds() {
+				prng := rand.New(rand.NewPCG(uint64(seed), 43))
+				what := fmt.Sprintf("seed %d", seed)
+
+				pfxs := random.NestedPrefixes(prng, cfg.is4, cfg.pool, prng.IntN(cfg.maxN+1), true)
+				gold := modelGold(pfxs, 100)
+
+				tbl := modelBuild_Table(pfxs, 100)
+				snap := tbl.dumpStructure()
+
+				for range 5 {
+					pfx := random.NestedPrefixes(prng, cfg.is4, cfg.pool, 1, false)[0]
+					val := prng.IntN(1_000_000)
+
+					// InsertPersist
+					goldIns := maps.Clone(gold)
+					goldIns.Insert(pfx, val)
+
+					ins := tbl.InsertPersist(pfx, val)
+					modelCheck_Table(t, fmt.Sprintf("%s: InsertPersist(%s)", what, pfx), ins, goldIns, isLite, prng)
+
+					if tbl.dumpStructure() != snap {
+						t.Fatalf("%s: InsertPersist(%s) modified the original table (copy-on-write violated)", what, pfx)
+					}
+
+					// DeletePersist of an existing prefix most of the time
+					del := pfx
+					if len(pfxs) > 0 && prng.IntN(10) < 7 {
+						del = pfxs[prng.IntN(len(pfxs))]
+					}
+
+					deleted := tbl.DeletePersist(del)
+
+					if _, exists := gold[del]; exists {
+						goldDel := maps.Clone(gold)
+						goldDel.Delete(del)
+
+						modelCheck_Table(t, fmt.Sprintf("%s: DeletePersist(%s)", what, del), deleted, goldDel, isLite, prng)
+					} else if deleted != tbl {
+						t.Fatalf("%s: DeletePersist(%s) of a missing prefix must return the receiver", what, del)
+					}
+
+					if tbl.dumpStructure() != snap {
+						t.Fatalf("%s: DeletePersist(%s) modified the original table (copy-on-write violated)", what, del)
+					}
+				}
+			}
+		})
+	}
+}
+
+// TestTableMixedOperations applies random sequences of inserts and deletes,
+// in place and persistent, and compares the table with the golden table now
+// and then, including the canonical structure.
+func TestTableMixedOperations_Table(t *testing.T) {
+	t.Parallel()
+
+	_, isLite := any(new(Table[int])).(*liteTable[int])
+
+	for _, cfg := range modelConfigs {
+		t.Run(cfg.name, func(t *testing.T) {
+			t.Parallel()
+
+			for seed := range modelSeeds() {
+				prng := rand.New(rand.NewPCG(uint64(seed), 44))
+
+				gold := make(golden.Table[int])
+				tbl := new(Table[int])
+
+				for op := range 120 {
+					pfx := random.NestedPrefixes(prng, cfg.is4, cfg.pool, 1, false)[0]
+					val := prng.IntN(1_000_000)
+
+					// half of the deletes hit an existing prefix
+					del := pfx
+					if len(gold) > 0 && prng.IntN(2) == 0 {
+						keys := gold.FlatSorted().SortKeys()
+						del = keys[prng.IntN(len(keys))]
+					}
+
+					switch prng.IntN(4) {
+					case 0:
+						tbl.Insert(pfx, val)
+						gold.Insert(pfx, val)
+					case 1:
+						tbl.Delete(del)
+						gold.Delete(del)
+					case 2:
+						// the former table is not used anymore, it does not matter
+						// that the persistent table shares nodes with it
+						tbl = tbl.InsertPersist(pfx, val)
+						gold.Insert(pfx, val)
+					default:
+						tbl = tbl.DeletePersist(del)
+						gold.Delete(del)
+					}
+
+					if op%10 == 9 {
+						modelCheck_Table(t, fmt.Sprintf("seed %d, op %d", seed, op), tbl, gold, isLite, prng)
+					}
+				}
+			}
+		})
+	}
+}
+
+// TestTableOverlapsCombinations tests Overlaps and OverlapsPrefix for the
+// combinations of node, leaf, fringe and prefix table entries.
+func TestTableOverlapsCombinations_Table(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range modelOverlapCases {
+		for _, is4 := range []bool{true, false} {
+			t.Run(modelName(tt.name, is4), func(t *testing.T) {
+				t.Parallel()
+
+				pfxsA, pfxsB := modelPrefixes(is4, tt.a), modelPrefixes(is4, tt.b)
+				goldA, goldB := modelGold(pfxsA, 1), modelGold(pfxsB, 1)
+
+				// the expectation in the test table must agree with the golden table
+				if got := goldA.Overlaps(goldB); got != tt.want {
+					t.Fatalf("error in the test table: the golden table says %v, want %v", got, tt.want)
+				}
+
+				a, b := modelBuild_Table(pfxsA, 1), modelBuild_Table(pfxsB, 1)
+
+				if got := a.Overlaps(b); got != tt.want {
+					t.Errorf("Overlaps() = %v, want %v", got, tt.want)
+				}
+
+				if got := b.Overlaps(a); got != tt.want {
+					t.Errorf("Overlaps() with swapped tables = %v, want %v", got, tt.want)
+				}
+
+				for _, pfx := range pfxsB {
+					if got, want := a.OverlapsPrefix(pfx), goldA.OverlapsPrefix(pfx); got != want {
+						t.Errorf("OverlapsPrefix(%s) = %v, want %v", pfx, got, want)
+					}
+				}
+
+				for _, pfx := range pfxsA {
+					if got, want := b.OverlapsPrefix(pfx), goldB.OverlapsPrefix(pfx); got != want {
+						t.Errorf("OverlapsPrefix(%s) of the other table = %v, want %v", pfx, got, want)
+					}
+				}
+			})
+		}
+	}
+}
+
+// TestTableOverlapsSinglePrefixPairs tests Overlaps for two tables with ONE
+// prefix each: all pairs of the 255 prefixes in the prefix table of the root
+// node, then random pairs including the prefixes below the octet 10 (leaves
+// and a fringe). It is often only the containment of the prefix of one table in
+// the prefix of the other table that makes the overlap. An exhaustive test finds
+// a direction that is missing, random tables hit it rarely.
+func TestTableOverlapsSinglePrefixPairs_Table(t *testing.T) {
+	t.Parallel()
+
+	inRoot, belowTen := modelStridePrefixes()
+	all := slices.Concat(inRoot, belowTen)
+
+	tables := make(map[netip.Prefix]*Table[int], len(all))
+
+	for i, pfx := range all {
+		tbl := new(Table[int])
+		tbl.Insert(pfx, i)
+		tables[pfx] = tbl
+	}
+
+	for _, p := range inRoot {
+		for _, q := range inRoot {
+			if got, want := tables[p].Overlaps(tables[q]), p.Overlaps(q); got != want {
+				t.Fatalf("{%s}.Overlaps({%s}) = %v, want %v", p, q, got, want)
+			}
+		}
+	}
+
+	prng := rand.New(rand.NewPCG(99, 99))
+
+	for range 20_000 {
+		p, q := all[prng.IntN(len(all))], all[prng.IntN(len(all))]
+
+		if got, want := tables[p].Overlaps(tables[q]), p.Overlaps(q); got != want {
+			t.Fatalf("{%s}.Overlaps({%s}) = %v, want %v", p, q, got, want)
+		}
+	}
+}
+
+// TestTableOverlapsDense tests Overlaps and OverlapsPrefix with small random
+// tables that overlap and nest, many of them have only a few prefixes.
+func TestTableOverlapsDense_Table(t *testing.T) {
+	t.Parallel()
+
+	for _, is4 := range []bool{true, false} {
+		t.Run(modelName("dense", is4), func(t *testing.T) {
+			t.Parallel()
+
+			var overlapping, disjoint int
+
+			for seed := range modelSeeds() * 2 {
+				prng := rand.New(rand.NewPCG(uint64(seed), 45))
+
+				poolA := modelOverlapPools[prng.IntN(len(modelOverlapPools))]
+				poolB := modelOverlapPools[prng.IntN(len(modelOverlapPools))]
+
+				pfxsA := random.NestedPrefixes(prng, is4, poolA, prng.IntN(9), prng.IntN(3) == 0)
+				pfxsB := random.NestedPrefixes(prng, is4, poolB, prng.IntN(9), prng.IntN(3) == 0)
+
+				goldA, goldB := modelGold(pfxsA, 1), modelGold(pfxsB, 1)
+				a, b := modelBuild_Table(pfxsA, 1), modelBuild_Table(pfxsB, 1)
+
+				want := goldA.Overlaps(goldB)
+				if want {
+					overlapping++
+				} else {
+					disjoint++
+				}
+
+				if got := a.Overlaps(b); got != want {
+					t.Fatalf("seed %d: Overlaps() = %v, want %v\na: %v\nb: %v", seed, got, want, pfxsA, pfxsB)
+				}
+
+				if got := b.Overlaps(a); got != want {
+					t.Fatalf("seed %d: Overlaps() with swapped tables = %v, want %v", seed, got, want)
+				}
+
+				for range 8 {
+					probe := random.NestedPrefixes(prng, is4, modelOverlapPools[prng.IntN(len(modelOverlapPools))], 1, false)[0]
+
+					if got, want := a.OverlapsPrefix(probe), goldA.OverlapsPrefix(probe); got != want {
+						t.Fatalf("seed %d: OverlapsPrefix(%s) = %v, want %v", seed, probe, got, want)
+					}
+				}
+			}
+
+			// the test is only meaningful if both outcomes occur
+			if overlapping == 0 || disjoint == 0 {
+				t.Errorf("unbalanced random cases: %d overlapping, %d disjoint", overlapping, disjoint)
+			}
+		})
+	}
+}
+
+// TestTableSubnetsSupernetsEdgeCases tests Subnets and Supernets with explicit
+// expectations: the probe is stored or not, a host route, wider than all stored
+// prefixes, disjoint, with and without a default route.
+func TestTableSubnetsSupernetsEdgeCases_Table(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range modelEdgeCases {
+		for _, is4 := range []bool{true, false} {
+			t.Run(modelName(tt.name, is4), func(t *testing.T) {
+				t.Parallel()
+
+				pfxs := modelPrefixes(is4, tt.stored)
+				gold := modelGold(pfxs, 1)
+				tbl := modelBuild_Table(pfxs, 1)
+
+				probe := tt.probe.pfx(is4)
+				wantSub, wantSuper := modelPrefixes(is4, tt.subnets), modelPrefixes(is4, tt.supernets)
+
+				// the expectations in the test table must agree with the golden table
+				if got := gold.Subnets(probe); !slices.Equal(got, wantSub) {
+					t.Fatalf("error in the test table: the golden table says subnets %v, want %v", got, wantSub)
+				}
+
+				if got := gold.Supernets(probe); !slices.Equal(got, wantSuper) {
+					t.Fatalf("error in the test table: the golden table says supernets %v, want %v", got, wantSuper)
+				}
+
+				var gotSub, gotSuper []netip.Prefix
+
+				for pfx := range tbl.Subnets(probe) {
+					gotSub = append(gotSub, pfx)
+				}
+
+				for pfx := range tbl.Supernets(probe) {
+					gotSuper = append(gotSuper, pfx)
+				}
+
+				if !slices.Equal(gotSub, wantSub) {
+					t.Errorf("Subnets(%s) = %v, want %v", probe, gotSub, wantSub)
+				}
+
+				if !slices.Equal(gotSuper, wantSuper) {
+					t.Errorf("Supernets(%s) = %v, want %v", probe, gotSuper, wantSuper)
+				}
+			})
+		}
+	}
+}
+
+// TestTableSubnetsSupernetsDense tests Subnets and Supernets with random tables
+// that overlap and nest, for stored prefixes, random prefixes and the default
+// route as probe. The probes are not necessarily stored in the table.
+func TestTableSubnetsSupernetsDense_Table(t *testing.T) {
+	t.Parallel()
+
+	_, isLite := any(new(Table[int])).(*liteTable[int])
+
+	for _, cfg := range modelConfigs {
+		t.Run(cfg.name, func(t *testing.T) {
+			t.Parallel()
+
+			for seed := range modelSeeds() {
+				prng := rand.New(rand.NewPCG(uint64(seed), 46))
+
+				pfxs := random.NestedPrefixes(prng, cfg.is4, cfg.pool, prng.IntN(cfg.maxN+1), true)
+				gold := modelGold(pfxs, 1)
+				tbl := modelBuild_Table(pfxs, 1)
+
+				modelCheck_Table(t, fmt.Sprintf("seed %d", seed), tbl, gold, isLite, prng)
+
+				probes := []netip.Prefix{modelPfx(cfg.is4, 0, 0, 0)}
+				probes = append(probes, pfxs[:min(15, len(pfxs))]...)
+				probes = append(probes, random.NestedPrefixes(prng, cfg.is4, cfg.pool, 15, false)...)
+
+				for _, probe := range probes {
+					var gotSub, gotSuper []netip.Prefix
+
+					for pfx := range tbl.Subnets(probe) {
+						gotSub = append(gotSub, pfx)
+					}
+
+					for pfx := range tbl.Supernets(probe) {
+						gotSuper = append(gotSuper, pfx)
+					}
+
+					if want := gold.Subnets(probe); !slices.Equal(gotSub, want) {
+						t.Fatalf("seed %d: Subnets(%s) = %v, want %v", seed, probe, gotSub, want)
+					}
+
+					if want := gold.Supernets(probe); !slices.Equal(gotSuper, want) {
+						t.Fatalf("seed %d: Supernets(%s) = %v, want %v", seed, probe, gotSuper, want)
+					}
+				}
+			}
+		})
+	}
+}
+
+// TestTableEqualCloneDense tests Equal and Clone with random tables: the same
+// prefixes inserted in different orders are equal and have the same structure,
+// a table with one prefix less or one value different is not equal, and a clone
+// is equal and independent of the original.
+func TestTableEqualCloneDense_Table(t *testing.T) {
+	t.Parallel()
+
+	_, isLite := any(new(Table[int])).(*liteTable[int])
+
+	for _, cfg := range modelConfigs {
+		t.Run(cfg.name, func(t *testing.T) {
+			t.Parallel()
+
+			for seed := range modelSeeds() {
+				prng := rand.New(rand.NewPCG(uint64(seed), 47))
+
+				pfxs := random.NestedPrefixes(prng, cfg.is4, cfg.pool, prng.IntN(cfg.maxN+1), true)
+				gold := modelGold(pfxs, 100)
+
+				x, y := modelFresh_Table(gold, prng), modelFresh_Table(gold, prng)
+
+				if !x.Equal(y) || !y.Equal(x) {
+					t.Fatalf("seed %d: tables with the same prefixes are not equal", seed)
+				}
+
+				if x.dumpStructure() != y.dumpStructure() {
+					t.Fatalf("seed %d: tables with the same prefixes have different structures", seed)
+				}
+
+				if len(pfxs) > 0 {
+					pfx := pfxs[prng.IntN(len(pfxs))]
+
+					less := maps.Clone(gold)
+					less.Delete(pfx)
+
+					if z := modelFresh_Table(less, prng); x.Equal(z) || z.Equal(x) {
+						t.Fatalf("seed %d: tables are equal, but one has the prefix %s less", seed, pfx)
+					}
+
+					// a liteTable has no values that can differ
+					if !isLite {
+						diff := maps.Clone(gold)
+						diff.Insert(pfx, gold[pfx]+1)
+
+						if z := modelFresh_Table(diff, prng); x.Equal(z) || z.Equal(x) {
+							t.Fatalf("seed %d: tables are equal, but the value of %s differs", seed, pfx)
+						}
+					}
+				}
+
+				c := x.Clone()
+				if !c.Equal(x) {
+					t.Fatalf("seed %d: the clone is not equal to the original", seed)
+				}
+
+				snap := x.dumpStructure()
+
+				for range 6 {
+					c.Insert(random.NestedPrefixes(prng, cfg.is4, cfg.pool, 1, false)[0], 1)
+				}
+
+				for _, pfx := range pfxs[:min(4, len(pfxs))] {
+					c.Delete(pfx)
+				}
+
+				if x.dumpStructure() != snap {
+					t.Fatalf("seed %d: modifying the clone changed the original table", seed)
+				}
+			}
+		})
+	}
+}
+
+// TestTableUnionSelfAndEmpty tests Union and UnionPersist with an empty table
+// and with the table itself as argument, nothing changes.
+func TestTableUnionSelfAndEmpty_Table(t *testing.T) {
+	t.Parallel()
+
+	pfxs := []netip.Prefix{
+		mpp("10.0.0.0/8"), mpp("10.1.0.0/16"), mpp("10.1.2.0/24"),
+		mpp("2001:db8::/32"), mpp("2001:db8:1::/48"),
+	}
+
+	tests := []struct {
+		name string
+		do   func(tbl, empty *Table[int]) *Table[int]
+	}{
+		{"Union with an empty table", func(tbl, empty *Table[int]) *Table[int] {
+			tbl.Union(empty)
+			return tbl
+		}},
+		{"Union with itself", func(tbl, _ *Table[int]) *Table[int] {
+			tbl.Union(tbl)
+			return tbl
+		}},
+		{"UnionPersist with an empty table", func(tbl, empty *Table[int]) *Table[int] {
+			return tbl.UnionPersist(empty)
+		}},
+		{"UnionPersist with itself", func(tbl, _ *Table[int]) *Table[int] {
+			return tbl.UnionPersist(tbl)
+		}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tbl := modelBuild_Table(pfxs, 100)
+			snap := tbl.dumpStructure()
+
+			got := tt.do(tbl, new(Table[int]))
+
+			if tbl.dumpStructure() != snap {
+				t.Fatal("the receiver was modified")
+			}
+
+			if got.Size() != len(pfxs) || !got.Equal(tbl) {
+				t.Fatal("the result is not equal to the receiver")
+			}
+		})
+	}
+}
+
+// TestTableEqualDifferences tests that Equal finds the difference of tables with
+// the same number of prefixes in every place where the nodes are compared: the
+// prefixes of a node, the child slots, and the kind of the children, node, leaf
+// and fringe. Tables with different sizes are not compared node by node.
+func TestTableEqualDifferences_Table(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range modelEqualCases {
+		for _, is4 := range []bool{true, false} {
+			t.Run(modelName(tt.name, is4), func(t *testing.T) {
+				t.Parallel()
+
+				pfxsA, pfxsB := modelPrefixes(is4, tt.a), modelPrefixes(is4, tt.b)
+				goldA, goldB := modelGold(pfxsA, 1), modelGold(pfxsB, 1)
+
+				// the sizes must be equal, otherwise Equal does not compare the nodes
+				if len(goldA) != len(goldB) {
+					t.Fatalf("error in the test table: the sizes are %d and %d", len(goldA), len(goldB))
+				}
+
+				if goldA.Equal(goldB) {
+					t.Fatal("error in the test table: the tables are equal")
+				}
+
+				a, b := modelBuild_Table(pfxsA, 1), modelBuild_Table(pfxsB, 1)
+
+				// both directions, the difference of the kind of a child is
+				// found from both sides
+				if a.Equal(b) {
+					t.Error("a.Equal(b) = true, want false")
+				}
+
+				if b.Equal(a) {
+					t.Error("b.Equal(a) = true, want false")
+				}
+			})
+		}
+	}
+}
+
+// TestTableEqualValues tests that Equal compares the values of every kind of
+// entry: the prefix table of a node, a node, a leaf and a fringe. A liteTable
+// has no payload, the same prefixes with different values are equal.
+func TestTableEqualValues_Table(t *testing.T) {
+	t.Parallel()
+
+	_, isLite := any(new(Table[int])).(*liteTable[int])
+
+	for _, tt := range modelValueCases {
+		for _, is4 := range []bool{true, false} {
+			t.Run(modelName(tt.name, is4), func(t *testing.T) {
+				t.Parallel()
+
+				pfxs := modelPrefixes(is4, tt.specs)
+
+				a, b := modelBuild_Table(pfxs, 1), modelBuild_Table(pfxs, 1001)
+
+				if got := a.Equal(b); got != isLite {
+					t.Errorf("Equal() with different values = %v, want %v", got, isLite)
+				}
+
+				if got := b.Equal(a); got != isLite {
+					t.Errorf("Equal() with different values, swapped = %v, want %v", got, isLite)
+				}
+			})
+		}
+	}
+}
+
+// TestTableEqualSharedNodes tests Equal for tables that share nodes: an
+// InsertPersist of a prefix with its own value gives an equal table that shares
+// all untouched nodes with the original, the comparison of the shared nodes is a
+// shortcut.
+func TestTableEqualSharedNodes_Table(t *testing.T) {
+	t.Parallel()
+
+	for _, cfg := range modelConfigs {
+		t.Run(cfg.name, func(t *testing.T) {
+			t.Parallel()
+
+			for seed := range modelSeeds() {
+				prng := rand.New(rand.NewPCG(uint64(seed), 48))
+
+				pfxs := random.NestedPrefixes(prng, cfg.is4, cfg.pool, 1+prng.IntN(cfg.maxN), true)
+				gold := modelGold(pfxs, 100)
+				tbl := modelBuild_Table(pfxs, 100)
+
+				pfx := pfxs[prng.IntN(len(pfxs))]
+				same := tbl.InsertPersist(pfx, gold[pfx])
+
+				if !tbl.Equal(same) || !same.Equal(tbl) {
+					t.Fatalf("seed %d: InsertPersist of %s with its own value gives an unequal table", seed, pfx)
+				}
+			}
+		})
+	}
+}
+
+// TestTableFprintErrors tests that Fprint returns the error of the writer, for
+// every position of the failure: the header and every line of the IPv4 tree and
+// of the IPv6 tree.
+func TestTableFprintErrors_Table(t *testing.T) {
+	t.Parallel()
+
+	tbl := new(Table[int])
+
+	for i, s := range []string{
+		"10.0.0.0/8", "10.1.0.0/16", "10.1.2.0/24", "192.168.0.0/16",
+		"2001:db8::/32", "2001:db8:1::/48", "fe80::/10",
+	} {
+		tbl.Insert(mpp(s), i)
+	}
+
+	// count the writes of a successful Fprint
+	counter := &modelFailWriter{failAt: -1}
+	if err := tbl.Fprint(counter); err != nil {
+		t.Fatalf("Fprint() = %v, want no error", err)
+	}
+
+	// two headers and at least one line per prefix
+	if counter.writes < 2+7 {
+		t.Fatalf("Fprint() made %d writes, the test needs more", counter.writes)
+	}
+
+	for failAt := range counter.writes {
+		w := &modelFailWriter{failAt: failAt}
+
+		if err := tbl.Fprint(w); !errors.Is(err, errModelWrite) {
+			t.Errorf("Fprint() with a failing write #%d = %v, want the error of the writer", failAt, err)
+		}
+	}
+
+	if err := tbl.Fprint(nil); err == nil {
+		t.Error("Fprint(nil) = nil, want an error")
+	}
+}
+
+// TestTableMarshalJSONError tests that MarshalJSON returns the error of the
+// JSON encoder, here for a payload type that can not be marshaled.
+func TestTableMarshalJSONError_Table(t *testing.T) {
+	t.Parallel()
+
+	tbl := new(Table[func()])
+	tbl.Insert(mpp("10.0.0.0/8"), nil)
+
+	_, err := tbl.MarshalJSON()
+
+	var unsupported *json.UnsupportedTypeError
+	if !errors.As(err, &unsupported) {
+		t.Fatalf("MarshalJSON() = %v, want a *json.UnsupportedTypeError", err)
 	}
 }

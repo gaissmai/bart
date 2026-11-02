@@ -3,7 +3,7 @@
 // Copyright (c) 2026 Karl Gaissmaier
 // SPDX-License-Identifier: MIT
 
-//go:generate ../../scripts/generate-node-methods.sh
+//go:generate go run ../../scripts/gen.go node-methods
 
 package nodes
 
@@ -1158,10 +1158,10 @@ func (n *_NODE_TYPE[T]) DumpString(octets []uint8, depth int, is4 bool) string {
 // fringe counts) for the node and returns:
 //   - nullNode: no prefixes and no children
 //   - stopNode: no subnodes, only prefixes and/or path-compressed leaves and fringes
+//   - pathNode: has subnodes only (no prefixes, leaves, or fringes)
 //   - halfNode: contains at least one leaf or fringe and also has subnodes, but
 //     no prefixes
 //   - fullNode: has prefixes and also has subnodes
-//   - pathNode: has subnodes only (no prefixes, leaves, or fringes)
 //
 // The order of these checks is significant to ensure the correct classification.
 func (n *_NODE_TYPE[T]) hasType() nodeType {
@@ -1173,15 +1173,12 @@ func (n *_NODE_TYPE[T]) hasType() nodeType {
 		return nullNode
 	case s.SubNodes == 0:
 		return stopNode
-	case (s.Leaves > 0 || s.Fringes > 0) && s.SubNodes > 0 && s.Prefixes == 0:
-		return halfNode
-	case (s.Prefixes > 0 || s.Leaves > 0 || s.Fringes > 0) && s.SubNodes > 0:
-		return fullNode
-	case (s.Prefixes == 0 && s.Leaves == 0 && s.Fringes == 0) && s.SubNodes > 0:
-		return pathNode
+	case s.Prefixes == 0 && s.Leaves == 0 && s.Fringes == 0:
+		return pathNode // only sub-nodes
+	case s.Prefixes == 0:
+		return halfNode // sub-nodes plus leaves or fringes
 	default:
-		panic(fmt.Sprintf("UNREACHABLE: pfx: %d, chld: %d, node: %d, leaf: %d, fringe: %d",
-			s.Prefixes, s.Children, s.SubNodes, s.Leaves, s.Fringes))
+		return fullNode // prefixes and sub-nodes
 	}
 }
 
