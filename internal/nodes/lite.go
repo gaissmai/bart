@@ -198,8 +198,8 @@ func (n *LiteNode[T]) AggregateRec(path StridePath, depth int, is4 bool) (modifi
 
 	// #########################################################
 	// 4. Recursive Descent: Top-down compression of child nodes
-	for addr, anyKid := range n.Children.All() {
-		kid, ok := anyKid.(*LiteNode[T])
+	for addr, anyKidPtr := range n.Children.AllPtr() {
+		kid, ok := (*anyKidPtr).(*LiteNode[T])
 		// Leaf or Fringe, skip over
 		if !ok {
 			continue
@@ -222,12 +222,12 @@ func (n *LiteNode[T]) AggregateRec(path StridePath, depth int, is4 bool) (modifi
 		case pfxCount == 1:
 			// Promote single prefix to FringeNode or LeafNode
 			if kid.Prefixes.Test(1) {
-				n.InsertChild(addr, NewFringeNode(zero))
+				*anyKidPtr = NewFringeNode(zero)
 			} else {
 				// Convert prefix back to LeafNode and promote
 				idx, _ := kid.Prefixes.FirstSet()
 				leafPrefix := CidrFromPath(path[:], depth+1, is4, idx)
-				n.InsertChild(addr, NewLeafNode(leafPrefix, zero))
+				*anyKidPtr = NewLeafNode(leafPrefix, zero)
 			}
 
 		case childCount == 1:
@@ -239,13 +239,13 @@ func (n *LiteNode[T]) AggregateRec(path StridePath, depth int, is4 bool) (modifi
 
 			case *LeafNode[T]:
 				// Promote LeafNode directly
-				n.InsertChild(addr, grandKid)
+				*anyKidPtr = grandKid
 
 			case *FringeNode[T]:
 				// Convert FringeNode back to LeafNode and promote
 				fringeByte, _ := kid.Children.FirstSet()
 				fringePrefix := CidrForFringe(path[:], depth+1, is4, fringeByte)
-				n.InsertChild(addr, NewLeafNode(fringePrefix, zero))
+				*anyKidPtr = NewLeafNode(fringePrefix, zero)
 			}
 		}
 	}

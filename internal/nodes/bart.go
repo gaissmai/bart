@@ -91,18 +91,18 @@ func (n *BartNode[T]) CloneFlat(cloneFn func(T) T) *BartNode[T] {
 	// copy ...
 	c.Children = *(n.Children.Copy())
 
-	// Iterate over children to flat clone leaf/fringe nodes;
+	// Iterate over children to clone leaf/fringe nodes;
 	// for *BartNode[T] children, keep shallow references (no recursive clone)
-	for addr, anyKid := range c.Children.All() {
-		switch kid := anyKid.(type) {
+	for _, anyKidPtr := range c.Children.AllPtr() {
+		switch kid := (*anyKidPtr).(type) {
 		case *BartNode[T]:
 			// Shallow copy
 		case *LeafNode[T]:
 			// Clone leaf nodes, applying cloneFn as needed
-			c.InsertChild(addr, kid.CloneLeaf(cloneFn))
+			*anyKidPtr = kid.CloneLeaf(cloneFn)
 		case *FringeNode[T]:
 			// Clone fringe nodes, applying cloneFn as needed
-			c.InsertChild(addr, kid.CloneFringe(cloneFn))
+			*anyKidPtr = kid.CloneFringe(cloneFn)
 		default:
 			panic("logic error, wrong node type")
 		}
