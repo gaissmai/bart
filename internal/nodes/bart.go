@@ -39,7 +39,7 @@ type BartNode[T any] struct {
 
 // PrefixCount returns the number of prefixes stored in this node.
 func (n *BartNode[T]) PrefixCount() int {
-	return len(n.Prefixes.Items)
+	return n.Prefixes.Len()
 }
 
 // InsertPrefix adds or updates a routing entry at the specified index with the given value.
@@ -85,31 +85,24 @@ func (n *BartNode[T]) CloneFlat(cloneFn func(T) T) *BartNode[T] {
 
 	c := new(BartNode[T])
 
-	// copy ...
-	c.Prefixes = *(n.Prefixes.Copy())
-
-	// ... and clone the values
-	if cloneFn != nil {
-		for i, v := range c.Prefixes.Items {
-			c.Prefixes.Items[i] = cloneFn(v)
-		}
-	}
+	// clone the prefixes
+	c.Prefixes = *(n.Prefixes.Clone(cloneFn))
 
 	// copy ...
 	c.Children = *(n.Children.Copy())
 
 	// Iterate over children to flat clone leaf/fringe nodes;
 	// for *BartNode[T] children, keep shallow references (no recursive clone)
-	for i, anyKid := range c.Children.Items {
+	for addr, anyKid := range c.Children.All() {
 		switch kid := anyKid.(type) {
 		case *BartNode[T]:
 			// Shallow copy
 		case *LeafNode[T]:
 			// Clone leaf nodes, applying cloneFn as needed
-			c.Children.Items[i] = kid.CloneLeaf(cloneFn)
+			c.InsertChild(addr, kid.CloneLeaf(cloneFn))
 		case *FringeNode[T]:
 			// Clone fringe nodes, applying cloneFn as needed
-			c.Children.Items[i] = kid.CloneFringe(cloneFn)
+			c.InsertChild(addr, kid.CloneFringe(cloneFn))
 		default:
 			panic("logic error, wrong node type")
 		}

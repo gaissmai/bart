@@ -8,21 +8,22 @@
 // where only a small subset of possible keys contain actual data.
 //
 // Internally, an Array256 combines a fixed-size BitSet256 with
-// a compact packed Items slice. The bitset tracks which key slots
-// are occupied, while the Items slice stores the associated payloads.
-// The position of a payload in Items is the number of set bits below
+// a compact packed items slice. The bitset tracks which key slots
+// are occupied, while the items slice stores the associated payloads.
+// The position of a payload in items is the number of set bits below
 // its key, the rank. To keep this mapping cheap, the Array256 carries a
 // tiny rank cache with the cumulative popcounts of the bitset words, so
 // that a rank needs one popcount instead of four.
 //
 // Lookup is O(1). Insertion and deletion are O(1) for the bitset and the
-// rank cache and O(n) only for shifting the items in Items.
+// rank cache and O(n) only for shifting the items in items.
 //
 // This module avoids memory allocations where possible and provides
 // predictable performance even under heavy insert/delete workloads.
 package sparse
 
 import (
+	"iter"
 	"math/bits"
 
 	"github.com/gaissmai/bart/internal/bitset"
@@ -32,19 +33,19 @@ import (
 //
 // Internally, it consists of:
 //   - a BitSet256, where each set bit marks a present slot (i.e., key i used)
-//   - a compact Items slice, which stores the payloads only for the set bits
+//   - a compact items slice, which stores the payloads only for the set bits
 //   - a rank cache, the cumulative popcounts of the bitset words
 //
 // Each occupied index i ∈ [0..255] can be tested using .Test(i).
-// The position of its item within Items is the number of set bits below i.
+// The position of its item within items is the number of set bits below i.
 //
 // Invariants, maintained by InsertAt and DeleteAt:
-//   - len(Items) equals the number of set bits in the BitSet256
-//   - Items[k] is the item of the k-th set bit, counted in ascending index order
+//   - len(items) equals the number of set bits in the BitSet256
+//   - items[k] is the item of the k-th set bit, counted in ascending index order
 //   - cum[w] equals the number of set bits in the bitset words below word w,
 //     hence cum[0] is always 0 and no cum value exceeds 192
 //
-// Callers may read Items and replace its elements in place, but must never
+// Callers may read items and replace its elements in place, but must never
 // append to, reslice or reorder it. Direct mutation of the underlying bitset
 // (via Set, Clear) is forbidden and will panic,
 // because it would break the invariants above.
@@ -60,10 +61,10 @@ import (
 // Example layout:
 //
 //	BitSet256:   [0 1 0 0 0 1 ...]   // bits 1 and 5 set
-//	Items:       [T1, T2]            // a.Items[0] <-> key 1, a.Items[1] <-> key 5
+//	items:       [T1, T2]            // a.items[0] <-> key 1, a.items[1] <-> key 5
 type Array256[T any] struct {
 	bitset.BitSet256
-	Items []T
+	items []T
 
 	// cum is the rank cache: cum[w] is the number of set bits in the words
 	// below w. It is read by rank0 and updated by InsertAt and DeleteAt.
@@ -71,23 +72,28 @@ type Array256[T any] struct {
 	cum [4]uint8
 }
 
-// Set panics. The bitset is internally coupled with Items[] and the rank cache.
+// Set panics. The bitset is internally coupled with items[] and the rank cache.
 // Use InsertAt to add or overwrite at index i.
 func (a *Array256[T]) Set(uint8) {
 	panic("forbidden, use InsertAt")
 }
 
-// Clear panics. The bitset is internally coupled with Items[] and the rank cache.
+// Clear panics. The bitset is internally coupled with items[] and the rank cache.
 // Use DeleteAt to remove index i.
 func (a *Array256[T]) Clear(uint8) {
 	panic("forbidden, use DeleteAt")
 }
 
+// Len returns the number of elements in a.
+func (a *Array256[T]) Len() int {
+	return len(a.items)
+}
+
 // rank0 returns the number of set bits strictly below index i.
 //
-// If the bit for i is set, rank0(i) is the position of its item in Items.
+// If the bit for i is set, rank0(i) is the position of its item in items.
 // If the bit for i is not set, rank0(i) is the position at which an item
-// for i must be inserted to keep Items ordered by index.
+// for i must be inserted to keep items ordered by index.
 //
 // The result is computed from the cumulative word counts in cum plus one
 // popcount of the bits below i in its own word.
@@ -117,11 +123,11 @@ func (a *Array256[T]) decrCum(i uint8) {
 //
 // If the bit for i is not set, ok is false and value is the zero-value of T.
 //
-// example: a.Get(5) -> a.Items[1]
+// example: a.Get(5) -> a.items[1]
 //
 //	                        ⬇
 //	BitSet256:   [0|0|1|0|0|1|0|...|1] <- 3 bits set
-//	Items:       [*|*|*]               <- len(Items) = 3
+//	items:       [*|*|*]               <- len(items) = 3
 //	                ⬆
 //
 //	BitSet256.Test(5):     true
@@ -139,7 +145,7 @@ func (a *Array256[T]) Get(i uint8) (value T, ok bool) {
 	}
 
 	// rank0 manually inlined
-	return a.Items[int(a.cum[wi])+bits.OnesCount64(w&(bit-1))], true
+	return a.items[int(a.cum[wi])+bits.OnesCount64(w&(bit-1))], true
 }
 
 // MustGet returns the value at index i without checking if it exists.
@@ -148,12 +154,28 @@ func (a *Array256[T]) Get(i uint8) (value T, ok bool) {
 // item of the next higher set bit, or panics if there is none. Intended
 // only for tight, validated loops.
 func (a *Array256[T]) MustGet(i uint8) T {
-	return a.Items[a.rank0(i)]
+	return a.items[a.rank0(i)]
+}
+
+// MustGetFirst returns the value at index 0 without checking if it exists.
+func (a *Array256[T]) MustGetFirst() T {
+	return a.items[0]
+}
+
+// All returns a pair iterator yielding the array index and the corresponding value.
+func (a *Array256[T]) All() iter.Seq2[uint8, T] {
+	return func(yield func(uint8, T) bool) {
+		for i, idx := range a.AllEnumerate() {
+			if !yield(idx, a.items[i]) {
+				return
+			}
+		}
+	}
 }
 
 // Copy returns a shallow copy of the Array, including the rank cache.
 // The elements are copied using assignment, this is no deep clone.
-// The copy has its own backing array for Items, so inserting into or
+// The copy has its own backing array for items, so inserting into or
 // deleting from either array does not affect the other.
 //
 // Copy on a nil receiver returns nil.
@@ -164,10 +186,37 @@ func (a *Array256[T]) Copy() *Array256[T] {
 
 	c := &Array256[T]{
 		BitSet256: a.BitSet256,
-		Items:     make([]T, len(a.Items)),
+		items:     make([]T, len(a.items)),
 		cum:       a.cum,
 	}
-	copy(c.Items, a.Items)
+	copy(c.items, a.items)
+	return c
+}
+
+// Clone returns a copy of the Array, optionally performing deep copies of values
+// if cloneFn is not nil..
+func (a *Array256[T]) Clone(cloneFn func(T) T) *Array256[T] {
+	if a == nil {
+		return nil
+	}
+
+	c := &Array256[T]{
+		BitSet256: a.BitSet256,
+		items:     make([]T, len(a.items)),
+		cum:       a.cum,
+	}
+
+	// just copy the values
+	if cloneFn == nil {
+		copy(c.items, a.items)
+		return c
+	}
+
+	// cloning the values
+	for i, val := range a.items {
+		c.items[i] = cloneFn(val)
+	}
+
 	return c
 }
 
@@ -178,12 +227,12 @@ func (a *Array256[T]) Copy() *Array256[T] {
 // and exists=true is returned.
 //
 // If the slot is new, the bit for i is set, the rank cache is updated and the
-// value is inserted into Items at its sorted position, shifting the following
+// value is inserted into items at its sorted position, shifting the following
 // items one slot to the right. exists=false is returned.
 func (a *Array256[T]) InsertAt(i uint8, value T) (exists bool) {
 	// slot exists, just overwrite value
 	if a.Test(i) {
-		a.Items[a.rank0(i)] = value
+		a.items[a.rank0(i)] = value
 		return true
 	}
 
@@ -219,7 +268,7 @@ func (a *Array256[T]) DeleteAt(i uint8) (value T, exists bool) {
 	return value, true
 }
 
-// insertItem inserts a new element at the given index position i in the Items slice,
+// insertItem inserts a new element at the given index position i in the items slice,
 // shifting all following elements one position to the right to make space.
 //
 // This method must be called with the correct insertion index - that is,
@@ -230,49 +279,49 @@ func (a *Array256[T]) DeleteAt(i uint8) (value T, exists bool) {
 //
 // Example (inserting at rank0 == 2):
 //
-//	Items before: [A B C D]
+//	items before: [A B C D]
 //	After insertItem(2, X): [A B X C D]
 //
-// Panics if i is out of range (i < 0 or i > len(Items)).
+// Panics if i is out of range (i < 0 or i > len(items)).
 func (a *Array256[T]) insertItem(i int, item T) {
-	if len(a.Items) < cap(a.Items) {
-		a.Items = a.Items[:len(a.Items)+1] // fast resize, no alloc
+	if len(a.items) < cap(a.items) {
+		a.items = a.items[:len(a.items)+1] // fast resize, no alloc
 	} else {
 		var zero T
-		a.Items = append(a.Items, zero) // append one item, mostly enlarge cap by more than one item
+		a.items = append(a.items, zero) // append one item, mostly enlarge cap by more than one item
 	}
 
-	_ = a.Items[i]                   // BCE
-	copy(a.Items[i+1:], a.Items[i:]) // shift one slot right, starting at [i]
-	a.Items[i] = item                // insert new item at [i]
+	_ = a.items[i]                   // BCE
+	copy(a.items[i+1:], a.items[i:]) // shift one slot right, starting at [i]
+	a.items[i] = item                // insert new item at [i]
 }
 
-// deleteItem removes the item at index i from the Items slice and returns it,
+// deleteItem removes the item at index i from the items slice and returns it,
 // shifting all subsequent items one position to the left,
 // and clearing the final (now duplicate) slot.
 //
-// This is used to remove Items[i] in response to a BitSet256.Clear(i)
+// This is used to remove items[i] in response to a BitSet256.Clear(i)
 // operation, where i is guaranteed to be set and valid.
 //
 // Example (deleting rank0 == 1):
 //
-//	Items before: [A B C D]
+//	items before: [A B C D]
 //	After deleteItem(1): [A C D]
 //
 // The tail item is explicitly cleared (assigned the zero-value of T)
 // to avoid holding references (important for GC with pointer types).
 //
-// Panics if i is out of range (i < 0 or i >= len(Items)).
+// Panics if i is out of range (i < 0 or i >= len(items)).
 func (a *Array256[T]) deleteItem(i int) (item T) {
 	var zero T
 
-	item = a.Items[i]
-	copy(a.Items[i:], a.Items[i+1:]) // shift left, overwrite item at [i]
+	item = a.items[i]
+	copy(a.items[i:], a.items[i+1:]) // shift left, overwrite item at [i]
 
-	nl := len(a.Items) - 1 // new len
+	nl := len(a.items) - 1 // new len
 
-	a.Items[nl] = zero     // clear the tail item
-	a.Items = a.Items[:nl] // new len, cap is unchanged
+	a.items[nl] = zero     // clear the tail item
+	a.items = a.items[:nl] // new len, cap is unchanged
 
 	return item
 }

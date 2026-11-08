@@ -221,14 +221,14 @@ func TestLiteNode_Iterators(t *testing.T) {
 
 	// AllChildren
 	childCount := 0
-	for _, child := range n.AllChildren() {
+	for _, child := range n.Children.All() {
 		childCount++
 		if child == nil {
-			t.Error("AllChildren yielded nil child")
+			t.Error("n.Children.All yielded nil child")
 		}
 	}
 	if childCount != len(addrs) {
-		t.Errorf("AllChildren count=%d, want %d", childCount, len(addrs))
+		t.Errorf("n.Children.All count=%d, want %d", childCount, len(addrs))
 	}
 }
 

@@ -137,14 +137,14 @@ func TestBartNode_Iterators(t *testing.T) {
 	}
 
 	count := 0
-	for _, child := range n.AllChildren() {
+	for _, child := range n.Children.All() {
 		count++
 		if child == nil {
-			t.Error("AllChildren yielded nil child")
+			t.Error("n.Children.All yielded nil child")
 		}
 	}
 	if count != len(addrs) {
-		t.Errorf("AllChildren count=%d, want %d", count, len(addrs))
+		t.Errorf("n.Children.All count=%d, want %d", count, len(addrs))
 	}
 }
 
