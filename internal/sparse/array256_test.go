@@ -4,6 +4,7 @@
 package sparse
 
 import (
+	"maps"
 	"math/bits"
 	"math/rand/v2"
 	"slices"
@@ -83,8 +84,8 @@ func firstPresent(m map[uint8]int) (uint8, bool) {
 func checkInvariants[T any](t *testing.T, a *Array256[T]) {
 	t.Helper()
 
-	if got, want := len(a.items), a.OnesCount(); got != want {
-		t.Fatalf("len(items) = %d, want OnesCount() = %d", got, want)
+	if got, want := a.Len(), a.OnesCount(); got != want {
+		t.Fatalf("Len() = %d, want OnesCount() = %d", got, want)
 	}
 
 	var wantCum [4]uint8
@@ -112,8 +113,8 @@ func assertMatches(t *testing.T, a *Array256[int], want map[uint8]int) {
 	}
 	slices.Sort(idxs)
 
-	if len(a.items) != len(idxs) {
-		t.Fatalf("len(items) = %d, want %d", len(a.items), len(idxs))
+	if a.Len() != len(idxs) {
+		t.Fatalf("Len() = %d, want %d", a.Len(), len(idxs))
 	}
 
 	for pos, i := range idxs {
@@ -180,6 +181,43 @@ func TestRank0(t *testing.T) {
 				if got := a.rank0(idx); got != want {
 					t.Errorf("rank0(%d) = %d, want %d", idx, got, want)
 				}
+			}
+		})
+	}
+}
+
+// TestMustGetFirst verifies that MustGetFirst correctly retrieves the value
+// associated with the lowest present index (the first element in items).
+func TestMustGetFirst(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		idxs []uint8
+	}{
+		{"single element at zero", []uint8{0}},
+		{"single element non-zero", []uint8{42}},
+		{"multiple sorted indices", []uint8{5, 10, 20}},
+		{"multiple unsorted indices", []uint8{50, 10, 5, 20}},
+		{"across word boundaries", []uint8{64, 128, 192}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			a := newArray(tt.idxs...)
+
+			// Determine the minimum index which corresponds to items[0]
+			minIdx := tt.idxs[0]
+			for _, idx := range tt.idxs {
+				if idx < minIdx {
+					minIdx = idx
+				}
+			}
+
+			wantVal := valueFor(minIdx)
+			if gotVal := a.MustGetFirst(); gotVal != wantVal {
+				t.Errorf("MustGetFirst() = %v, want %v", gotVal, wantVal)
 			}
 		})
 	}
@@ -338,6 +376,141 @@ func TestCopy(t *testing.T) {
 			assertMatches(t, orig, origWant) // the original must be untouched
 		})
 	}
+}
+
+// TestClone verifies the behavior of Clone with and without a custom clone function,
+// ensuring nil safety, proper shallow/deep copying semantics, and isolation from mutations.
+func TestClone(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil receiver", func(t *testing.T) {
+		t.Parallel()
+		var a *Array256[int]
+		if got := a.Clone(nil); got != nil {
+			t.Errorf("Clone(nil) of nil = %v, want nil", got)
+		}
+		if got := a.Clone(func(v int) int { return v * 2 }); got != nil {
+			t.Errorf("Clone(cloneFn) of nil = %v, want nil", got)
+		}
+	})
+
+	t.Run("nil cloneFn acts as copy", func(t *testing.T) {
+		t.Parallel()
+		for _, tt := range indexSets {
+			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+				orig := newArray(tt.idxs...)
+				origWant := modelOf(tt.idxs...)
+
+				cp := orig.Clone(nil)
+				assertMatches(t, cp, origWant)
+			})
+		}
+	})
+
+	t.Run("with cloneFn transformation", func(t *testing.T) {
+		t.Parallel()
+		for _, tt := range indexSets {
+			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+				orig := newArray(tt.idxs...)
+				origWant := modelOf(tt.idxs...)
+
+				// cloneFn scales each value by 2 to simulate a deep copy/transformation
+				cloneFn := func(v int) int {
+					return v * 2
+				}
+
+				cp := orig.Clone(cloneFn)
+
+				cloneWant := make(map[uint8]int, len(origWant))
+				for k, v := range origWant {
+					cloneWant[k] = cloneFn(v)
+				}
+
+				assertMatches(t, cp, cloneWant)
+				assertMatches(t, orig, origWant) // original remains completely unaffected
+			})
+		}
+	})
+}
+
+// TestAll verifies the iter.Seq2 iterator returned by All, ensuring all index-value
+// pairs are correctly yielded in ascending order and early loop termination is supported.
+func TestAll(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range indexSets {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			a := newArray(tt.idxs...)
+			want := modelOf(tt.idxs...)
+
+			got := maps.Collect(a.All())
+			if !maps.Equal(got, want) {
+				t.Fatalf("All() result isn't equal to want")
+			}
+		})
+	}
+
+	t.Run("early termination", func(t *testing.T) {
+		t.Parallel()
+		a := newArray(10, 20, 30, 40, 50)
+		count := 0
+		for range a.All() {
+			count++
+			break // terminate early after the first yielded element
+		}
+		if count != 1 {
+			t.Errorf("expected 1 iteration after break, got %d", count)
+		}
+	})
+}
+
+// TestAllPtr verifies the iter.Seq2 iterator returned by AllPtr, ensuring all index-value
+// pointer pairs are correctly yielded in ascending order, allows in-place mutation,
+// and supports early loop termination.
+func TestAllPtr(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range indexSets {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			a := newArray(tt.idxs...)
+			want := modelOf(tt.idxs...)
+
+			// Test reading and in-place mutation via AllPtr
+			for idx, valPtr := range a.AllPtr() {
+				wantVal, ok := want[idx]
+				if !ok || *valPtr != wantVal {
+					t.Errorf("AllPtr() yielded unexpected value at %d: got %v, want %v", idx, *valPtr, wantVal)
+				}
+				// Mutate the slot in-place by doubling the value
+				*valPtr *= 2
+			}
+
+			// Verify that the mutations were correctly applied in the sparse array
+			for idx, wantVal := range want {
+				gotVal, ok := a.Get(idx)
+				if !ok || gotVal != wantVal*2 {
+					t.Errorf("After AllPtr mutation, Get(%d) = %v, want %v", idx, gotVal, wantVal*2)
+				}
+			}
+		})
+	}
+
+	t.Run("early termination", func(t *testing.T) {
+		t.Parallel()
+		a := newArray(10, 20, 30, 40, 50)
+		count := 0
+		for range a.AllPtr() {
+			count++
+			break // terminate early after the first yielded element
+		}
+		if count != 1 {
+			t.Errorf("expected 1 iteration after break, got %d", count)
+		}
+	})
 }
 
 func TestForbiddenMutators(t *testing.T) {

@@ -157,16 +157,57 @@ func (a *Array256[T]) MustGet(i uint8) T {
 	return a.items[a.rank0(i)]
 }
 
-// MustGetFirst returns the value at index 0 without checking if it exists.
+// MustGetFirst returns the value of the first (lowest) populated element
+// in the sparse array without checking if the array is empty.
+//
+// It directly accesses a.items[0], corresponding to the item at the lowest set bit
+// in the underlying BitSet256.
+//
+// Performance Warning: This method is intended exclusively for tight, performance-critical
+// loops where the caller has already guaranteed that the array is non-empty (e.g., via Len() > 0).
+// Calling MustGetFirst on an empty Array256 will cause a runtime panic (index out of range).
 func (a *Array256[T]) MustGetFirst() T {
 	return a.items[0]
 }
 
-// All returns a pair iterator yielding the array index and the corresponding value.
+// All returns a pair iterator (`iter.Seq2[uint8, T]`) yielding the sparse index
+// (uint8) and the corresponding value (T) for each occupied slot in strictly ascending order.
+//
+// It enables idiomatic range-over-func loops:
+//
+//	for idx, val := range a.All() {
+//	    // ...
+//	}
+//
+// The iteration safely supports early termination via `break` or `return`.
+// Direct mutation of the array elements during iteration is permitted, but structural
+// modifications (InsertAt, DeleteAt) must not be performed while iterating.
 func (a *Array256[T]) All() iter.Seq2[uint8, T] {
 	return func(yield func(uint8, T) bool) {
 		for i, idx := range a.AllEnumerate() {
 			if !yield(idx, a.items[i]) {
+				return
+			}
+		}
+	}
+}
+
+// AllPtr returns a pair iterator yielding the sparse index (uint8) and a mutable pointer
+// to the corresponding value (*T) for each occupied slot in strictly ascending order.
+//
+// Yielding pointers allows callers to directly inspect, mutate, or overwrite
+// the array slots in-place during iteration without requiring a separate lookup:
+//
+//	for idx, valPtr := range a.AllPtr() {
+//	    *valPtr = computeNewValue(*valPtr) // overwrite the slot in-place
+//	}
+//
+// The iteration safely supports early termination via `break` or `return`.
+// Structural modifications (InsertAt, DeleteAt) must not be performed while iterating.
+func (a *Array256[T]) AllPtr() iter.Seq2[uint8, *T] {
+	return func(yield func(uint8, *T) bool) {
+		for i, idx := range a.AllEnumerate() {
+			if !yield(idx, &a.items[i]) {
 				return
 			}
 		}
