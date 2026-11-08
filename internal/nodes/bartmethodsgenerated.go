@@ -22,7 +22,7 @@ import (
 
 // ChildCount returns the number of slots used in this node.
 func (n *BartNode[T]) ChildCount() int {
-	return len(n.Children.Items)
+	return n.Children.Len()
 }
 
 // IsEmpty returns true if the node contains no routing entries (prefixes)
@@ -68,18 +68,6 @@ func (n *BartNode[T]) AllIndices() iter.Seq2[uint8, T] {
 	return func(yield func(uint8, T) bool) {
 		for idx := range n.Prefixes.All() {
 			if !yield(idx, n.MustGetPrefix(idx)) {
-				return
-			}
-		}
-	}
-}
-
-// AllChildren returns an iterator over all child nodes.
-// Each iteration yields the child's address (uint8) and the child node (any).
-func (n *BartNode[T]) AllChildren() iter.Seq2[uint8, any] {
-	return func(yield func(addr uint8, child any) bool) {
-		for i, addr := range n.Children.AllEnumerate() {
-			if !yield(addr, n.Children.Items[i]) {
 				return
 			}
 		}
@@ -329,7 +317,7 @@ func (n *BartNode[T]) PurgeAndCompress(stack []*BartNode[T], octets []uint8, is4
 		case childCount == 1:
 			// The node has exactly one child. We determine if it is a path node,
 			// a compressed LeafNode, or a compressed FringeNode.
-			anyKid := n.Children.Items[0]
+			anyKid := n.Children.MustGetFirst()
 
 			switch kid := anyKid.(type) {
 			case *BartNode[T]:
@@ -878,7 +866,7 @@ func (n *BartNode[T]) EqualRec(o *BartNode[T]) bool {
 		}
 	}
 
-	for addr, nKid := range n.AllChildren() {
+	for addr, nKid := range n.Children.All() {
 		oKid := o.MustGetChild(addr) // MustGet is ok, bitsets are equal
 
 		switch nKid := nKid.(type) {
@@ -950,7 +938,7 @@ func (n *BartNode[T]) DumpRec(w io.Writer, path StridePath, depth int, is4 bool)
 	n.dump(w, path, depth, is4)
 
 	// node may have children, rec-descent down
-	for addr, child := range n.AllChildren() {
+	for addr, child := range n.Children.All() {
 		if kid, ok := child.(*BartNode[T]); ok {
 			path[depth] = addr
 			kid.DumpRec(w, path, depth+1, is4)
@@ -1011,7 +999,7 @@ func (n *BartNode[T]) dump(w io.Writer, path StridePath, depth int, is4 bool) {
 		fringeAddrs := make([]uint8, 0, cc)
 
 		// the node has recursive child nodes or path-compressed leaves
-		for addr, child := range n.AllChildren() {
+		for addr, child := range n.Children.All() {
 			allAddrs = append(allAddrs, addr)
 
 			switch child.(type) {
@@ -1159,7 +1147,7 @@ func (n *BartNode[T]) Stats() (s StatsT) {
 	s.Prefixes = n.PrefixCount()
 	s.Children = n.ChildCount()
 
-	for _, child := range n.AllChildren() {
+	for _, child := range n.Children.All() {
 		switch child.(type) {
 		case *BartNode[T]:
 			s.SubNodes++
@@ -1196,7 +1184,7 @@ func (n *BartNode[T]) StatsRec() (s StatsT) {
 	s.Leaves = 0
 	s.Fringes = 0
 
-	for _, child := range n.AllChildren() {
+	for _, child := range n.Children.All() {
 		switch kid := child.(type) {
 		case *BartNode[T]:
 			// rec-descent
@@ -1335,7 +1323,7 @@ func (n *BartNode[T]) DirectItemsRec(parentIdx uint8, path StridePath, depth int
 	}
 
 	// children:
-	for addr, child := range n.AllChildren() {
+	for addr, child := range n.Children.All() {
 		hostIdx := art.OctetToIdx(addr)
 
 		// do a longest-prefix-match
@@ -1456,16 +1444,12 @@ func (n *BartNode[T]) UnionRecPersist(cloneFn func(T) T, o *BartNode[T], depth i
 		}
 	}
 
-	// for all child addrs in other node do ...
-	i := 0
-	for addr := range o.Children.All() {
-		otherChild := o.Children.Items[i]
+	// for all addrs and child in other node do ...
+	for addr, otherChild := range o.Children.All() {
 		thisChild, thisExists := n.GetChild(addr)
 
 		// Use helper function to handle all 4x3 combinations
 		duplicates += n.handleMatrixPersist(cloneFn, thisExists, thisChild, otherChild, addr, depth)
-
-		i++
 	}
 
 	return duplicates
@@ -1740,9 +1724,7 @@ func (n *BartNode[T]) AllRec(path StridePath, depth int, is4 bool, yield func(ne
 	}
 
 	// for all children (nodes and leaves) in this node do ...
-	i := 0
-	for addr := range n.Children.All() {
-		anyKid := n.Children.Items[i]
+	for addr, anyKid := range n.Children.All() {
 		switch kid := anyKid.(type) {
 		case *BartNode[T]:
 			// rec-descent with this node
@@ -1768,8 +1750,6 @@ func (n *BartNode[T]) AllRec(path StridePath, depth int, is4 bool, yield func(ne
 		default:
 			panic("logic error, wrong node type")
 		}
-
-		i++
 	}
 
 	return true
@@ -2495,9 +2475,9 @@ func (n *BartNode[T]) CloneRec(cloneFn func(T) T) *BartNode[T] {
 	c := n.CloneFlat(cloneFn)
 
 	// Recursively clone all child nodes of type *BartNode[T]
-	for i, kidAny := range c.Children.Items {
+	for addr, kidAny := range c.Children.All() {
 		if kid, ok := kidAny.(*BartNode[T]); ok {
-			c.Children.Items[i] = kid.CloneRec(cloneFn)
+			c.InsertChild(addr, kid.CloneRec(cloneFn))
 		}
 	}
 

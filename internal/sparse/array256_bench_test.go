@@ -113,7 +113,7 @@ func newFilled(idxs []uint8) *Array256[int] {
 // getUnfused is the previous implementation of Get: Test followed by rank0.
 func getUnfused[T any](a *Array256[T], i uint8) (value T, ok bool) {
 	if a.Test(i) {
-		return a.Items[a.rank0(i)], true
+		return a.items[a.rank0(i)], true
 	}
 	return
 }
@@ -227,9 +227,9 @@ func BenchmarkArray256MustGet(b *testing.B) {
 // BenchmarkArray256InsertAt measures inserting new slots and overwriting
 // existing ones.
 //
-//   - op=grow-alloc: from empty to n items, the Items slice has to grow
+//   - op=grow-alloc: from empty to n items, the items slice has to grow
 //     (allocations included, see allocs/op).
-//   - op=grow: the same, but the capacity of Items is reused, so only the
+//   - op=grow: the same, but the capacity of items is reused, so only the
 //     shifting of the items and the update of the rank cache is measured.
 //     The orders differ in the amount of shifting: ascending appends at
 //     the end, descending always inserts at the front.
@@ -251,7 +251,7 @@ func BenchmarkArray256InsertAt(b *testing.B) {
 			k := 0
 			for b.Loop() {
 				if k == n {
-					a = Array256[int]{} // drop the backing array, Items has to grow again
+					a = Array256[int]{} // drop the backing array, items has to grow again
 					k = 0
 				}
 				sinkBool = a.InsertAt(order[k], k)
@@ -263,12 +263,12 @@ func BenchmarkArray256InsertAt(b *testing.B) {
 			idxs := o.idxs
 
 			b.Run(fmt.Sprintf("n=%d/op=grow/order=%s", n, o.name), func(b *testing.B) {
-				a := Array256[int]{Items: make([]int, 0, n)}
+				a := Array256[int]{items: make([]int, 0, n)}
 				k := 0
 				for b.Loop() {
 					if k == n {
-						// clear bitset and rank cache, keep the capacity of Items
-						a = Array256[int]{Items: a.Items[:0]}
+						// clear bitset and rank cache, keep the capacity of items
+						a = Array256[int]{items: a.items[:0]}
 						k = 0
 					}
 					sinkBool = a.InsertAt(idxs[k], k)
@@ -313,11 +313,11 @@ func BenchmarkArray256DeleteAt(b *testing.B) {
 				k := 0
 				for b.Loop() {
 					if k == n {
-						// restore the full array, reuse the backing array of Items
+						// restore the full array, reuse the backing array of items
 						a.BitSet256 = full.BitSet256
 						a.cum = full.cum
-						a.Items = a.Items[:n]
-						copy(a.Items, full.Items)
+						a.items = a.items[:n]
+						copy(a.items, full.items)
 						k = 0
 					}
 					sinkInt, sinkBool = a.DeleteAt(idxs[k])

@@ -79,12 +79,12 @@ func firstPresent(m map[uint8]int) (uint8, bool) {
 	return 0, false
 }
 
-// checkInvariants verifies the coupling between bitset, rank cache and Items.
+// checkInvariants verifies the coupling between bitset, rank cache and items.
 func checkInvariants[T any](t *testing.T, a *Array256[T]) {
 	t.Helper()
 
-	if got, want := len(a.Items), a.OnesCount(); got != want {
-		t.Fatalf("len(Items) = %d, want OnesCount() = %d", got, want)
+	if got, want := len(a.items), a.OnesCount(); got != want {
+		t.Fatalf("len(items) = %d, want OnesCount() = %d", got, want)
 	}
 
 	var wantCum [4]uint8
@@ -112,13 +112,13 @@ func assertMatches(t *testing.T, a *Array256[int], want map[uint8]int) {
 	}
 	slices.Sort(idxs)
 
-	if len(a.Items) != len(idxs) {
-		t.Fatalf("len(Items) = %d, want %d", len(a.Items), len(idxs))
+	if len(a.items) != len(idxs) {
+		t.Fatalf("len(items) = %d, want %d", len(a.items), len(idxs))
 	}
 
 	for pos, i := range idxs {
-		if a.Items[pos] != want[i] {
-			t.Fatalf("Items[%d] = %d, want %d (index %d)", pos, a.Items[pos], want[i], i)
+		if a.items[pos] != want[i] {
+			t.Fatalf("items[%d] = %d, want %d (index %d)", pos, a.items[pos], want[i], i)
 		}
 	}
 
@@ -173,7 +173,7 @@ func TestRank0(t *testing.T) {
 			for i := range 256 {
 				idx := uint8(i)
 
-				// for a set bit this is its position in Items,
+				// for a set bit this is its position in items,
 				// for a clear bit it is the insertion position
 				want, _ := slices.BinarySearch(sorted, idx)
 
