@@ -45,10 +45,8 @@ import (
 //   - cum[w] equals the number of set bits in the bitset words below word w,
 //     hence cum[0] is always 0 and no cum value exceeds 192
 //
-// Callers may read items and replace its elements in place, but must never
-// append to, reslice or reorder it. Direct mutation of the underlying bitset
-// (via Set, Clear) is forbidden and will panic,
-// because it would break the invariants above.
+// Direct mutation of the embedded bitsetBitSet256 (via Set, Clear) is
+// forbidden and will panic, because it would break the invariants above.
 //
 // This structure allows extremely fast and compact prefix-based routing,
 // highly efficient child-node containers in prefix tries, or memory-safe
@@ -60,8 +58,8 @@ import (
 //
 // Example layout:
 //
-//	BitSet256:   [0 1 0 0 0 1 ...]   // bits 1 and 5 set
-//	items:       [T1, T2]            // a.items[0] <-> key 1, a.items[1] <-> key 5
+//	BitSet256:   [0 1 0 0 0 1 0..]   // bits 1 and 5 set
+//	items:       [T0, T1]            // a.items[0] <-> key 1, a.items[1] <-> key 5
 type Array256[T any] struct {
 	bitset.BitSet256
 	items []T
@@ -157,14 +155,12 @@ func (a *Array256[T]) MustGet(i uint8) T {
 	return a.items[a.rank0(i)]
 }
 
-// MustGetFirst returns the value of the first (lowest) populated element
+// MustGetFirst returns the value of the first (lowest) populated item
 // in the sparse array without checking if the array is empty.
 //
 // It directly accesses a.items[0], corresponding to the item at the lowest set bit
 // in the underlying BitSet256.
 //
-// Performance Warning: This method is intended exclusively for tight, performance-critical
-// loops where the caller has already guaranteed that the array is non-empty (e.g., via Len() > 0).
 // Calling MustGetFirst on an empty Array256 will cause a runtime panic (index out of range).
 func (a *Array256[T]) MustGetFirst() T {
 	return a.items[0]
@@ -180,8 +176,6 @@ func (a *Array256[T]) MustGetFirst() T {
 //	}
 //
 // The iteration safely supports early termination via `break` or `return`.
-// Direct mutation of the array elements during iteration is permitted, but structural
-// modifications (InsertAt, DeleteAt) must not be performed while iterating.
 func (a *Array256[T]) All() iter.Seq2[uint8, T] {
 	return func(yield func(uint8, T) bool) {
 		for i, idx := range a.AllEnumerate() {
@@ -195,15 +189,14 @@ func (a *Array256[T]) All() iter.Seq2[uint8, T] {
 // AllPtr returns a pair iterator yielding the sparse index (uint8) and a mutable pointer
 // to the corresponding value (*T) for each occupied slot in strictly ascending order.
 //
-// Yielding pointers allows callers to directly inspect, mutate, or overwrite
-// the array slots in-place during iteration without requiring a separate lookup:
+// Yielding pointers allows callers to directly overwrite the array slots in-place
+// during iteration without requiring a separate lookup:
 //
 //	for idx, valPtr := range a.AllPtr() {
 //	    *valPtr = computeNewValue(*valPtr) // overwrite the slot in-place
 //	}
 //
 // The iteration safely supports early termination via `break` or `return`.
-// Structural modifications (InsertAt, DeleteAt) must not be performed while iterating.
 func (a *Array256[T]) AllPtr() iter.Seq2[uint8, *T] {
 	return func(yield func(uint8, *T) bool) {
 		for i, idx := range a.AllEnumerate() {
@@ -235,7 +228,7 @@ func (a *Array256[T]) Copy() *Array256[T] {
 }
 
 // Clone returns a copy of the Array, optionally performing deep copies of values
-// if cloneFn is not nil..
+// if cloneFn is not nil.
 func (a *Array256[T]) Clone(cloneFn func(T) T) *Array256[T] {
 	if a == nil {
 		return nil
