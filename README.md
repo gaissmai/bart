@@ -11,20 +11,20 @@
 
 The `bart` package provides **Balanced Routing Tables (BART)** for high-performance IP-to-CIDR lookups and prefix management:
 
-- **ACL**: Determine extremely fast whether an IP address matches any of millions of CIDR rules.
-- **RIB**: Handle very large routing tables with low memory overhead while keeping lookups fast.
+- **ACL** (access control lists): quickly decide whether an IP address matches any of millions of CIDR rules.
+- **RIB** (routing information bases): handle very large routing tables with low memory overhead and fast lookups.
 
-BART is designed for workloads where speed and memory efficiency matter most, making it ideal for firewalls, routers, and network telemetry systems.
+BART is designed for workloads where speed and memory efficiency matter most, which makes it well suited for firewalls, routers, and network telemetry systems.
 
 ## Overview
 
-BART is implemented as a multibit trie with a fixed stride of 8 bits, using a fast mapping function derived from Donald E. Knuth’s **Allotment Routing Table** (ART) algorithm to map prefixes at each trie level into a complete binary tree.
+BART is a multibit trie with a fixed stride of 8 bits. A fast mapping function, derived from Donald E. Knuth’s **Allotment Routing Table** (ART) algorithm, maps the prefixes of each trie level into a complete binary tree.
 
-BART provides two table variants optimized for different use cases:
-- **`bart.Lite`**: A payload-free variant optimized for minimal memory footprint.
-- **`bart.Table[T]`**: Stores associated payloads alongside routing prefixes.
+BART offers two table variants for different use cases:
+- **`bart.Lite`**: a payload-free variant with a minimal memory footprint.
+- **`bart.Table[T]`**: stores a payload of type `T` with each prefix.
 
-Both implementations share the same highly optimized core engine, using popcount-compressed sparse arrays for **level compression**. Combined with a **novel path and fringe compression**, this design reduces memory consumption by nearly two orders of magnitude compared to classical ART while maintaining identical, lightning-fast lookup times.
+Both variants share the same optimized core. Popcount-compressed sparse arrays provide **level compression**, and a **novel path and fringe compression** reduces the memory consumption further. Compared to classical ART, the memory consumption drops by nearly two orders of magnitude, while the lookup times remain comparable.
 
 ## Getting Started
 
@@ -51,7 +51,7 @@ func main() {
   allowList.Insert(p("2001:db8::/32"))
   allowList.Insert(p("10.0.0.0/24"))
 
-  // Test some IPs with Contains (longest-prefix match)
+  // Check some IPs: Contains reports whether any prefix covers the address
   testIPs := []netip.Addr{
     a("192.168.1.100"), // allowed (matches 192.168.0.0/16)
     a("2001:db8::1"),   // allowed (matches 2001:db8::/32)
@@ -70,30 +70,30 @@ func main() {
 
 ## API
 
-BART provides a rich API for `Table[T]` and `Lite`:
+BART offers a rich API for `Table[T]` and `Lite`:
 
-- **Prefix Aggregation**: Very fast compaction of ACLs using `Aggregate` (only for `Lite`).
-- **Containment Queries**: Extremely fast containment queries for ACLs (`Contains`).
-- **Lookups**: Extremely fast longest-prefix matching for routing tables (`Lookup`, ...).
-- **CRUD & Mutations**: Very fast mutating updates (`Insert`, `Delete`, ...) as well as immutable variants.
-- **Overlap Operations**: Extremely fast overlap detection (Overlaps, ...).
-- **Iteration**: Stream all table entries (`All`, ...) with iterators, sorted or unsorted.
-- **Subnets & Supernets**: Stream topologies (`Subnets`, `Supernets`) with iterators in sorted order.
-- **Serialization**: Hierarchical tree diagram of the ordered CIDRs.
+- **Prefix aggregation**: fast compaction of ACLs with `Aggregate` (`Lite` only).
+- **Containment queries**: fast membership tests for ACLs with `Contains`.
+- **Lookups**: fast longest-prefix matching for routing tables with `Lookup` and related methods.
+- **Modification**: in-place updates (`Insert`, `Delete`, ...) and persistent copy-on-write variants (`InsertPersist`, `DeletePersist`, ...).
+- **Overlap detection**: fast checks with `Overlaps` and related methods.
+- **Iteration**: iterators over all entries, sorted or unsorted (`All`, `AllSorted`, ...).
+- **Subnets and supernets**: iterators over the subnets in CIDR order (`Subnets`) and over the supernets from the most to the least specific (`Supernets`).
+- **Serialization**: a hierarchical tree diagram and a JSON dump of the ordered CIDRs.
 
 ## Concurrency Model
 
-Readers can access immutable table snapshots lock-free. Writers synchronize via a mutex, load the current snapshot, use the `Persist` methods to build a modified copy, and publish the returned table through an atomic pointer. In-place updates such as `Insert` and `Delete` instead require a lock shared by readers and writers.
+Readers can use immutable table snapshots without any locking. Writers serialize their updates with a mutex: a writer loads the current snapshot, builds a modified copy with the `Persist` methods, and publishes the returned table through an atomic pointer. In-place updates such as `Insert` and `Delete` require a lock that is shared by readers and writers.
 
-See the concurrent test examples for reference:
+See the concurrent examples:
 - [ExampleLite](example_lite_concurrent_test.go)
 - [ExampleTable](example_table_concurrent_test.go)
 
 ## Bitset Efficiency
 
-The BART algorithm relies on fixed-size (256-bit) bit vectors and precomputed lookup tables. Lookups execute entirely via cache-resident bitmask operations accelerated by CPU instructions like `POPCNT`, `LZCNT`, and `TZCNT`.
+BART is built on fixed-size (256-bit) bit vectors and precomputed lookup tables. A lookup consists mainly of bitmask operations, which the CPU executes with instructions like `POPCNT`, `LZCNT`, and `TZCNT`.
 
-For maximum performance, specify your CPU feature set at compile time:
+For best performance, tell the compiler the feature level of your CPU at build time:
 
 ```bash
 # Example for AMD64, choose v2/v3/v4 to match your CPU features.
@@ -103,13 +103,13 @@ GOAMD64=v3 go build
 GOARM64=v8.2,lse go build
 ```
 
-Loops over these fixed-size bitsets (`[4]uint64`) are unrolled, ensuring efficient CPU pipeline utilization. Despite unrolling, all bitset functions are inlined by the Go compiler, which is essential for performance on hot paths.
+In hot-path operations on these fixed-size bitsets (`[4]uint64`), loops are unrolled by hand where this still allows the functions to be inlined, which keeps the CPU pipeline busy.
 
 ## Benchmarks
 
-Please see the extensive [benchmarks](https://github.com/gaissmai/iprbench) comparing `bart` with other IP routing table implementations.
+The [benchmarks](https://github.com/gaissmai/iprbench) compare `bart` extensively with other IP routing table implementations.
 
-Query performance of `Lite.Contains` against the Tier-1 full Internet routing table with random IP address probes:
+Query performance of `Lite.Contains` against the Tier-1 full Internet routing table, probed with random IP addresses:
 
 ```text
 $ GOAMD64=v3 go test -run=^$ -bench=FullLite/Contains$ -cpu=1
@@ -125,7 +125,7 @@ BenchmarkFullLiteMiss6/Contains           93057260             12.56 ns/op
 
 ## Compatibility Guarantees
 
-The package is pre-v1, allowing breaking changes if necessary to refine API design. Such changes are rare.
+The package is pre-v1. Breaking changes are possible if they improve the API, but they are rare.
 
 ### Deprecated: `bart.Fast`
 
@@ -136,7 +136,7 @@ The package is pre-v1, allowing breaking changes if necessary to refine API desi
 type Fast[T any] = Table[T]
 ```
 
-With Go 1.26 or later, use `go fix` to migrate automatically:
+With Go 1.26 or later, `go fix` migrates your code automatically:
 
 ```text
 go get github.com/gaissmai/bart@latest
@@ -148,7 +148,7 @@ The alias will be removed in a future release.
 
 ## Contribution
 
-Please open an issue for discussion before sending a pull request.
+Please open an issue to discuss your idea before sending a pull request.
 
 ## Credit
 
@@ -156,7 +156,7 @@ Standing on the shoulders of giants. Credits go to:
 - the engineering team at Tailscale,
 - Daniel Lemire for his inspiring blog,
 - Donald E. Knuth for the Allotment Routing Table ([ART](https://github.com/hariguchi/art/tree/master/orig)) algorithm, and
-- Yoichi Hariguchi who [deciphered it](https://github.com/hariguchi/art/blob/master/docs/art.pdf).
+- Yoichi Hariguchi, who [deciphered it](https://github.com/hariguchi/art/blob/master/docs/art.pdf).
 
 ## License
 
