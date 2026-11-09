@@ -20,10 +20,6 @@ import (
 //    the cost of data dependent branches.
 //  - The "fixed" probe repeats one index. It is the fully predictable best
 //    case and only meant as a lower bound.
-//  - The reads are compared against the former implementation based on
-//    BitSet256.Rank (impl=rank) in the same binary, so that both variants
-//    run under identical conditions. The writes have no in-binary reference,
-//    compare them across commits with benchstat.
 //  - Every benchmark runs for several fill levels, from a sparse trie node
 //    to a completely full one.
 // #####################################################
@@ -56,15 +52,6 @@ func pick(prng *rand.Rand, n int) []uint8 {
 		idxs[k] = uint8(perm[k])
 	}
 	return idxs
-}
-
-// allIndices returns all indices [0..255] in ascending order.
-func allIndices() []uint8 {
-	s := make([]uint8, 256)
-	for i := range s {
-		s[i] = uint8(i)
-	}
-	return s
 }
 
 // absentOf returns the indices in [0..255] that are not in present.
@@ -110,14 +97,6 @@ func newFilled(idxs []uint8) *Array256[int] {
 	return a
 }
 
-// getUnfused is the previous implementation of Get: Test followed by rank0.
-func getUnfused[T any](a *Array256[T], i uint8) (value T, ok bool) {
-	if a.Test(i) {
-		return a.items[a.rank0(i)], true
-	}
-	return
-}
-
 type ordering struct {
 	name string
 	idxs []uint8
@@ -144,9 +123,8 @@ func orderingsOf(random []uint8) []ordering {
 // #####################################################
 
 // BenchmarkArray256Get measures the lookup of a slot, with Get and with the
-// Test+MustGet pair used by the trie traversal, each against the former
-// Rank based implementation.
-func BenchmarkArray256Get(b *testing.B) {
+// Test+MustGet pair used by the trie traversal.
+func BenchmarkArray256Read(b *testing.B) {
 	for _, n := range fills {
 		prng := rand.New(rand.NewPCG(uint64(n), 1))
 
@@ -158,7 +136,6 @@ func BenchmarkArray256Get(b *testing.B) {
 			probes []uint8
 		}{
 			{"hit", probesFrom(prng, present)},
-			{"mixed", probesFrom(prng, allIndices())}, // hits and misses
 			{"fixed", fixedProbes(present[0])},
 		}
 
@@ -166,54 +143,24 @@ func BenchmarkArray256Get(b *testing.B) {
 			probes := ps.probes
 			prefix := fmt.Sprintf("n=%d/probe=%s", n, ps.name)
 
-			b.Run(prefix+"/form=Get/impl=cum", func(b *testing.B) {
+			b.Run(prefix+"/form=MustGet", func(b *testing.B) {
+				for i := 0; b.Loop(); i++ {
+					sinkInt = a.MustGet(probes[i&probeMask])
+				}
+			})
+
+			b.Run(prefix+"/form=Get", func(b *testing.B) {
 				for i := 0; b.Loop(); i++ {
 					sinkInt, sinkBool = a.Get(probes[i&probeMask])
 				}
 			})
 
-			b.Run(prefix+"/form=Test+MustGet/impl=cum", func(b *testing.B) {
+			b.Run(prefix+"/form=Test+MustGet", func(b *testing.B) {
 				for i := 0; b.Loop(); i++ {
 					idx := probes[i&probeMask]
 					if a.Test(idx) {
 						sinkInt = a.MustGet(idx)
 					}
-				}
-			})
-
-			b.Run(prefix+"/form=Get/impl=unfused", func(b *testing.B) {
-				for i := 0; b.Loop(); i++ {
-					sinkInt, sinkBool = getUnfused(a, probes[i&probeMask])
-				}
-			})
-		}
-	}
-}
-
-// BenchmarkArray256MustGet measures MustGet in isolation, only with indices
-// that are present.
-func BenchmarkArray256MustGet(b *testing.B) {
-	for _, n := range fills {
-		prng := rand.New(rand.NewPCG(uint64(n), 2))
-
-		present := pick(prng, n)
-		a := newFilled(present)
-
-		probeSets := []struct {
-			name   string
-			probes []uint8
-		}{
-			{"hit", probesFrom(prng, present)},
-			{"fixed", fixedProbes(present[0])},
-		}
-
-		for _, ps := range probeSets {
-			probes := ps.probes
-			prefix := fmt.Sprintf("n=%d/probe=%s", n, ps.name)
-
-			b.Run(prefix+"/impl=cum", func(b *testing.B) {
-				for i := 0; b.Loop(); i++ {
-					sinkInt = a.MustGet(probes[i&probeMask])
 				}
 			})
 		}
