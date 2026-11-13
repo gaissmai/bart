@@ -256,7 +256,7 @@ func BenchmarkArray256DeleteAt(b *testing.B) {
 			idxs := o.idxs
 
 			b.Run(fmt.Sprintf("n=%d/op=shrink/order=%s", n, o.name), func(b *testing.B) {
-				a := full.Copy()
+				a := full.Clone(nil)
 				k := 0
 				for b.Loop() {
 					if k == n {
@@ -277,7 +277,7 @@ func BenchmarkArray256DeleteAt(b *testing.B) {
 			probes := probesFrom(prng, absent)
 
 			b.Run(fmt.Sprintf("n=%d/op=absent", n), func(b *testing.B) {
-				a := full.Copy()
+				a := full.Clone(nil)
 				for i := 0; b.Loop(); i++ {
 					sinkInt, sinkBool = a.DeleteAt(probes[i&probeMask])
 				}

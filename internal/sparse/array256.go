@@ -176,6 +176,8 @@ func (a *Array256[T]) MustGetFirst() T {
 //	}
 //
 // The iteration safely supports early termination via `break` or `return`.
+//
+// Structural modifications (InsertAt, DeleteAt) must not be performed while iterating.
 func (a *Array256[T]) All() iter.Seq2[uint8, T] {
 	return func(yield func(uint8, T) bool) {
 		for i, idx := range a.AllEnumerate() {
@@ -189,14 +191,16 @@ func (a *Array256[T]) All() iter.Seq2[uint8, T] {
 // AllPtr returns a pair iterator yielding the sparse index (uint8) and a mutable pointer
 // to the corresponding value (*T) for each occupied slot in strictly ascending order.
 //
-// Yielding pointers allows callers to directly overwrite the array slots in-place
-// during iteration without requiring a separate lookup:
+// Yielding pointers allows callers to directly inspect, mutate, or overwrite
+// the array slots in-place during iteration without requiring a separate lookup:
 //
 //	for idx, valPtr := range a.AllPtr() {
 //	    *valPtr = computeNewValue(*valPtr) // overwrite the slot in-place
 //	}
 //
 // The iteration safely supports early termination via `break` or `return`.
+//
+// Structural modifications (InsertAt, DeleteAt) must not be performed while iterating.
 func (a *Array256[T]) AllPtr() iter.Seq2[uint8, *T] {
 	return func(yield func(uint8, *T) bool) {
 		for i, idx := range a.AllEnumerate() {
@@ -207,28 +211,8 @@ func (a *Array256[T]) AllPtr() iter.Seq2[uint8, *T] {
 	}
 }
 
-// Copy returns a shallow copy of the Array, including the rank cache.
-// The elements are copied using assignment, this is no deep clone.
-// The copy has its own backing array for items, so inserting into or
-// deleting from either array does not affect the other.
-//
-// Copy on a nil receiver returns nil.
-func (a *Array256[T]) Copy() *Array256[T] {
-	if a == nil {
-		return nil
-	}
-
-	c := &Array256[T]{
-		BitSet256: a.BitSet256,
-		items:     make([]T, len(a.items)),
-		cum:       a.cum,
-	}
-	copy(c.items, a.items)
-	return c
-}
-
-// Clone returns a copy of the Array, optionally performing deep copies of values
-// if cloneFn is not nil.
+// Clone returns a copy of the Array, optionally cloning the values if cloneFn is not nil.
+// Cloning a nil receiver returns nil.
 func (a *Array256[T]) Clone(cloneFn func(T) T) *Array256[T] {
 	if a == nil {
 		return nil

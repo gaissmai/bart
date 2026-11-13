@@ -81,8 +81,8 @@ func (n *LiteNode[T]) CloneFlat(_ func(T) T) *LiteNode[T] {
 	// copy simple values
 	c.Prefixes = n.Prefixes
 
-	// sparse array
-	c.Children = *(n.Children.Copy())
+	// copy the children
+	c.Children = *(n.Children.Clone(nil))
 
 	// no values to copy
 	return c
