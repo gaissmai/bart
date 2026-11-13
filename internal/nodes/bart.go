@@ -89,7 +89,7 @@ func (n *BartNode[T]) CloneFlat(cloneFn func(T) T) *BartNode[T] {
 	c.Prefixes = *(n.Prefixes.Clone(cloneFn))
 
 	// copy ...
-	c.Children = *(n.Children.Copy())
+	c.Children = *(n.Children.Clone(nil))
 
 	// Iterate over children to clone leaf/fringe nodes;
 	// for *BartNode[T] children, keep shallow references (no recursive clone)

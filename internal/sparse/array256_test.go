@@ -339,45 +339,6 @@ func TestDeleteAt(t *testing.T) {
 	}
 }
 
-func TestCopy(t *testing.T) {
-	t.Parallel()
-
-	t.Run("nil receiver", func(t *testing.T) {
-		t.Parallel()
-		var a *Array256[int]
-		if got := a.Copy(); got != nil {
-			t.Errorf("Copy() of nil = %v, want nil", got)
-		}
-	})
-
-	for _, tt := range indexSets {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			orig := newArray(tt.idxs...)
-			origWant := modelOf(tt.idxs...)
-
-			cp := orig.Copy()
-			assertMatches(t, cp, origWant)
-
-			// mutate the copy only
-			cpWant := modelOf(tt.idxs...)
-
-			if extra, ok := firstAbsent(origWant); ok {
-				cp.InsertAt(extra, valueFor(extra))
-				cpWant[extra] = valueFor(extra)
-			}
-
-			if first, ok := firstPresent(origWant); ok {
-				cp.DeleteAt(first)
-				delete(cpWant, first)
-			}
-
-			assertMatches(t, cp, cpWant)
-			assertMatches(t, orig, origWant) // the original must be untouched
-		})
-	}
-}
-
 // TestClone verifies the behavior of Clone with and without a custom clone function,
 // ensuring nil safety, proper shallow/deep copying semantics, and isolation from mutations.
 func TestClone(t *testing.T) {
@@ -404,6 +365,22 @@ func TestClone(t *testing.T) {
 
 				cp := orig.Clone(nil)
 				assertMatches(t, cp, origWant)
+
+				// mutate the copy only
+				cpWant := modelOf(tt.idxs...)
+
+				if extra, ok := firstAbsent(origWant); ok {
+					cp.InsertAt(extra, valueFor(extra))
+					cpWant[extra] = valueFor(extra)
+				}
+
+				if first, ok := firstPresent(origWant); ok {
+					cp.DeleteAt(first)
+					delete(cpWant, first)
+				}
+
+				assertMatches(t, cp, cpWant)
+				assertMatches(t, orig, origWant) // the original must be untouched
 			})
 		}
 	})
