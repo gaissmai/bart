@@ -159,15 +159,16 @@ func (n *LiteNode[T]) AggregateRec(path StridePath, depth int, is4 bool) (modifi
 		// Find all prefixes covered by pfxIdx using the allotment lookup table
 		covered := n.Prefixes.And(&allot.PfxRoutesLookupTbl[pfxIdx])
 
-		// Clear all covered prefixes, including pfxIdx itself
-		n.Prefixes.BitSet256 = n.Prefixes.Xor(&covered)
+		// clear pfxIdx itself from covered bitset
+		covered.Clear(pfxIdx)
 
-		// Re-enable cleared pfxIdx
-		n.Prefixes.Set(pfxIdx)
+		// Clear all covered prefixes, not including pfxIdx itself
+		n.Prefixes.BitSet256 = n.Prefixes.Xor(&covered)
 
 		// Advance index to search for the next prefix
 		pfxIdx++
 	}
+
 	// Recalculate prefix count after deletions
 	//nolint:gosec // G115: integer overflow conversion int -> uint16
 	n.Prefixes.count = uint16(n.Prefixes.OnesCount())
