@@ -676,13 +676,18 @@ func (t *_TABLE_TYPE[T]) ModifyPersist(pfx netip.Prefix, cb func(_ T, ok bool) (
 // The iteration can be stopped early by breaking from the range loop.
 // Returns an empty iterator if the prefix is invalid.
 func (t *_TABLE_TYPE[T]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, T] {
-	return func(yield func(netip.Prefix, T) bool) {
-		if !pfx.IsValid() {
-			return
-		}
+	// Guard clause: Early exit before any processing or closure allocation logic.
+	if !pfx.IsValid() {
+		return func(func(netip.Prefix, T) bool) {}
+	}
 
-		// canonicalize the prefix
-		pfx = pfx.Masked()
+	// Canonicalize prefix into a NEW variable.
+	// This enables the compiler to capture canonicalPfx by value instead of by ref,
+	// avoiding the 'moved to heap: pfx' allocation.
+	canonicalPfx := pfx.Masked()
+
+	return func(yield func(netip.Prefix, T) bool) {
+		pfx := canonicalPfx
 
 		is4 := pfx.Addr().Is4()
 		n := t.rootNodeByVersion(is4)
@@ -708,12 +713,18 @@ func (t *_TABLE_TYPE[T]) Supernets(pfx netip.Prefix) iter.Seq2[netip.Prefix, T] 
 // The iteration can be stopped early by breaking from the range loop.
 // Returns an empty iterator if the prefix is invalid.
 func (t *_TABLE_TYPE[T]) Subnets(pfx netip.Prefix) iter.Seq2[netip.Prefix, T] {
-	return func(yield func(netip.Prefix, T) bool) {
-		if !pfx.IsValid() {
-			return
-		}
+	// Guard clause: Early exit before any processing or closure allocation logic.
+	if !pfx.IsValid() {
+		return func(func(netip.Prefix, T) bool) {}
+	}
 
-		pfx = pfx.Masked()
+	// Canonicalize prefix into a NEW variable.
+	// This enables the compiler to capture canonicalPfx by value instead of by ref,
+	// avoiding the 'moved to heap: pfx' allocation.
+	canonicalPfx := pfx.Masked()
+
+	return func(yield func(netip.Prefix, T) bool) {
+		pfx := canonicalPfx
 		is4 := pfx.Addr().Is4()
 
 		n := t.rootNodeByVersion(is4)
