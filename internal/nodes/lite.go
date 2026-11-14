@@ -173,8 +173,10 @@ func (n *LiteNode[T]) AggregateRec(path StridePath, depth int, is4 bool) (modifi
 	//nolint:gosec // G115: integer overflow conversion int -> uint16
 	n.Prefixes.count = uint16(n.Prefixes.OnesCount())
 
-	// Track number of subsumed prefixes removed
-	modified += oldPfxCount - n.PrefixCount()
+	// increment modified after removal
+	if oldPfxCount != n.PrefixCount() {
+		modified++
+	}
 
 	// ###########################################################################
 	// 3. Child Subsumption: Remove child nodes covered by any prefix in this node.
@@ -194,8 +196,10 @@ func (n *LiteNode[T]) AggregateRec(path StridePath, depth int, is4 bool) (modifi
 		n.DeleteChild(addr)
 	}
 
-	// Track total number of subsumed children removed
-	modified += oldChildCount - n.ChildCount()
+	// increment modified after removal
+	if oldChildCount != n.ChildCount() {
+		modified++
+	}
 
 	// #########################################################
 	// 4. Recursive Descent: Top-down compression of child nodes
