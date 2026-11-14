@@ -98,6 +98,10 @@ func (f *Table[T]) Contains(ip netip.Addr) bool {
 //
 // Any IPv6 zone identifier is stripped and has no effect on the lookup result.
 func (t *Table[T]) Lookup(ip netip.Addr) (val T, ok bool) {
+	if !ip.IsValid() {
+		return
+	}
+
 	is4 := ip.Is4()
 	octets := ip.AsSlice()
 	n := t.rootNodeByVersion(is4)
@@ -148,14 +152,6 @@ LOOP:
 			// reached a path compressed prefix, stop traversing
 			break LOOP
 		}
-	}
-
-	// Hot-path optimization: delay ip.IsValid() check until after traversal.
-	// Fast path: if a Fringe or Leaf matches early in LOOP, we return without ever checking IsValid().
-	// Slow path: for invalid IPs, range over nil octets is a no-op (stack[0] stays nil).
-	// We validate now before backtracking to avoid a nil pointer panic on n.PrefixCount().
-	if !ip.IsValid() {
-		return val, ok
 	}
 
 	// start backtracking, unwind the stack, bounds check eliminated
