@@ -1623,9 +1623,11 @@ func (n *_NODE_TYPE[T]) handleMatrix(persist bool, cloneFn func(T) T, thisExists
 //
 // The traversal order is not defined. This implementation favors simplicity
 // and runtime efficiency over consistency of iteration sequence.
-func (n *_NODE_TYPE[T]) AllRec(path StridePath, depth int, is4 bool, yield func(netip.Prefix, T) bool) bool {
+func (n *_NODE_TYPE[T]) AllRec(ptx PathContext, yield func(netip.Prefix, T) bool) bool {
 	for idx := range n.Prefixes.All() {
-		cidr := CidrFromPath(path[:], depth, is4, idx)
+		ptx.Slot = idx
+		cidr := ptx.PrefixAsCIDR()
+
 		val := n.MustGetPrefix(idx)
 
 		// callback for this prefix and val
@@ -1637,24 +1639,31 @@ func (n *_NODE_TYPE[T]) AllRec(path StridePath, depth int, is4 bool, yield func(
 
 	// for all children (nodes and leaves) in this node do ...
 	for addr, anyKid := range n.Children.All() {
+		ptx.Slot = addr
+
 		switch kid := anyKid.(type) {
 		case *_NODE_TYPE[T]:
 			// rec-descent with this node
-			path[depth] = addr
-			if !kid.AllRec(path, depth+1, is4, yield) {
+			nextPtx := ptx
+			nextPtx.Path[ptx.Depth] = ptx.Slot
+			nextPtx.Depth++
+
+			if !kid.AllRec(nextPtx, yield) {
 				// early exit
 				return false
 			}
+
 		case *LeafNode[T]:
 			// callback for this leaf
 			if !yield(kid.Prefix, kid.Value) {
 				// early exit
 				return false
 			}
+
 		case *FringeNode[T]:
-			fringePfx := CidrForFringe(path[:], depth, is4, addr)
+			cidr := ptx.FringeAsCIDR()
 			// callback for this fringe
-			if !yield(fringePfx, kid.Value) {
+			if !yield(cidr, kid.Value) {
 				// early exit
 				return false
 			}

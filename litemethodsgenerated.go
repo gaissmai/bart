@@ -894,21 +894,21 @@ func (t *liteTable[T]) Size6() int {
 // prematurely terminate the iteration.
 func (t *liteTable[T]) All() iter.Seq2[netip.Prefix, T] {
 	return func(yield func(netip.Prefix, T) bool) {
-		_ = t.root4.AllRec(stridePath{}, 0, true, yield) && t.root6.AllRec(stridePath{}, 0, false, yield)
+		_ = t.root4.AllRec(nodes.PathContext{Is4: true}, yield) && t.root6.AllRec(nodes.PathContext{Is4: false}, yield)
 	}
 }
 
 // All4 is like [liteTable.All] but only for the v4 routing table.
 func (t *liteTable[T]) All4() iter.Seq2[netip.Prefix, T] {
 	return func(yield func(netip.Prefix, T) bool) {
-		_ = t.root4.AllRec(stridePath{}, 0, true, yield)
+		_ = t.root4.AllRec(nodes.PathContext{Is4: true}, yield)
 	}
 }
 
 // All6 is like [liteTable.All] but only for the v6 routing table.
 func (t *liteTable[T]) All6() iter.Seq2[netip.Prefix, T] {
 	return func(yield func(netip.Prefix, T) bool) {
-		_ = t.root6.AllRec(stridePath{}, 0, false, yield)
+		_ = t.root6.AllRec(nodes.PathContext{Is4: false}, yield)
 	}
 }
 

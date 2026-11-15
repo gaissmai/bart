@@ -942,21 +942,21 @@ func (t *_TABLE_TYPE[T]) Size6() int {
 // prematurely terminate the iteration.
 func (t *_TABLE_TYPE[T]) All() iter.Seq2[netip.Prefix, T] {
 	return func(yield func(netip.Prefix, T) bool) {
-		_ = t.root4.AllRec(stridePath{}, 0, true, yield) && t.root6.AllRec(stridePath{}, 0, false, yield)
+		_ = t.root4.AllRec(nodes.PathContext{Is4: true}, yield) && t.root6.AllRec(nodes.PathContext{Is4: false}, yield)
 	}
 }
 
 // All4 is like [_TABLE_TYPE.All] but only for the v4 routing table.
 func (t *_TABLE_TYPE[T]) All4() iter.Seq2[netip.Prefix, T] {
 	return func(yield func(netip.Prefix, T) bool) {
-		_ = t.root4.AllRec(stridePath{}, 0, true, yield)
+		_ = t.root4.AllRec(nodes.PathContext{Is4: true}, yield)
 	}
 }
 
 // All6 is like [_TABLE_TYPE.All] but only for the v6 routing table.
 func (t *_TABLE_TYPE[T]) All6() iter.Seq2[netip.Prefix, T] {
 	return func(yield func(netip.Prefix, T) bool) {
-		_ = t.root6.AllRec(stridePath{}, 0, false, yield)
+		_ = t.root6.AllRec(nodes.PathContext{Is4: false}, yield)
 	}
 }
 

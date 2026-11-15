@@ -29,19 +29,19 @@ import (
 
 type _NODE_TYPE[T any] struct{}
 
-func (n *_NODE_TYPE[T]) hasType() (_ nodeType)                                             { return }
-func (n *_NODE_TYPE[T]) Stats() (_ StatsT)                                                 { return }
-func (n *_NODE_TYPE[T]) StatsRec() (_ StatsT)                                              { return }
-func (n *_NODE_TYPE[T]) dump(io.Writer, StridePath, int, bool)                             { return }
-func (n *_NODE_TYPE[T]) DumpRec(io.Writer, StridePath, int, bool)                          { return }
-func (n *_NODE_TYPE[T]) FprintRec(io.Writer, TrieItem[T], string) (_ error)                { return }
-func (n *_NODE_TYPE[T]) Insert(netip.Prefix, T, int) (_ bool)                              { return }
-func (n *_NODE_TYPE[T]) Delete(netip.Prefix) (_ bool)                                      { return }
-func (n *_NODE_TYPE[T]) InsertPersist(func(T) T, netip.Prefix, T, int) (_ bool)            { return }
-func (n *_NODE_TYPE[T]) DeletePersist(func(T) T, netip.Prefix) (_ bool)                    { return }
-func (n *_NODE_TYPE[T]) Subnets(netip.Prefix, func(netip.Prefix, T) bool)                  { return }
-func (n *_NODE_TYPE[T]) Supernets(netip.Prefix, func(netip.Prefix, T) bool)                { return }
-func (n *_NODE_TYPE[T]) AllRec(StridePath, int, bool, func(netip.Prefix, T) bool) (_ bool) { return }
+func (n *_NODE_TYPE[T]) hasType() (_ nodeType)                                   { return }
+func (n *_NODE_TYPE[T]) Stats() (_ StatsT)                                       { return }
+func (n *_NODE_TYPE[T]) StatsRec() (_ StatsT)                                    { return }
+func (n *_NODE_TYPE[T]) dump(io.Writer, StridePath, int, bool)                   { return }
+func (n *_NODE_TYPE[T]) DumpRec(io.Writer, StridePath, int, bool)                { return }
+func (n *_NODE_TYPE[T]) FprintRec(io.Writer, TrieItem[T], string) (_ error)      { return }
+func (n *_NODE_TYPE[T]) Insert(netip.Prefix, T, int) (_ bool)                    { return }
+func (n *_NODE_TYPE[T]) Delete(netip.Prefix) (_ bool)                            { return }
+func (n *_NODE_TYPE[T]) InsertPersist(func(T) T, netip.Prefix, T, int) (_ bool)  { return }
+func (n *_NODE_TYPE[T]) DeletePersist(func(T) T, netip.Prefix) (_ bool)          { return }
+func (n *_NODE_TYPE[T]) Subnets(netip.Prefix, func(netip.Prefix, T) bool)        { return }
+func (n *_NODE_TYPE[T]) Supernets(netip.Prefix, func(netip.Prefix, T) bool)      { return }
+func (n *_NODE_TYPE[T]) AllRec(PathContext, func(netip.Prefix, T) bool) (_ bool) { return }
 
 func (n *_NODE_TYPE[T]) AllRecSorted(StridePath, int, bool, func(netip.Prefix, T) bool) (_ bool) {
 	return
@@ -55,7 +55,7 @@ func (n *_NODE_TYPE[T]) all4() iter.Seq2[netip.Prefix, T] {
 		if n == nil {
 			return
 		}
-		_ = n.AllRec(StridePath{}, 0, true, yield)
+		_ = n.AllRec(PathContext{Is4: true}, yield)
 	}
 }
 
@@ -64,7 +64,7 @@ func (n *_NODE_TYPE[T]) all6() iter.Seq2[netip.Prefix, T] {
 		if n == nil {
 			return
 		}
-		_ = n.AllRec(StridePath{}, 0, false, yield)
+		_ = n.AllRec(PathContext{Is4: false}, yield)
 	}
 }
 

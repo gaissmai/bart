@@ -444,7 +444,7 @@ func TestBartNode_AllRec_and_AllRecSorted(t *testing.T) {
 
 	// AllRec: presence
 	var got []netip.Prefix
-	n.AllRec(StridePath{}, 0, true, func(p netip.Prefix, _ int) bool {
+	n.AllRec(PathContext{Is4: true}, func(p netip.Prefix, _ int) bool {
 		got = append(got, p)
 		return true
 	})
