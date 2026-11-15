@@ -1610,6 +1610,27 @@ func (n *_NODE_TYPE[T]) handleMatrix(persist bool, cloneFn func(T) T, thisExists
 	}
 }
 
+// Helper to process and yield any child node type (inner node, leaf, or fringe).
+func (n *_NODE_TYPE[T]) yieldChild(ptx PathContext, yield func(netip.Prefix, T) bool) bool {
+	switch kid := n.MustGetChild(ptx.Slot).(type) {
+	case *_NODE_TYPE[T]:
+		nextPtx := ptx
+		nextPtx.Path[ptx.Depth] = ptx.Slot
+		nextPtx.Depth++
+		return kid.AllRec(nextPtx, yield)
+
+	case *FringeNode[T]:
+		cidr := ptx.FringeAsCIDR()
+		return yield(cidr, kid.Value)
+
+	case *LeafNode[T]:
+		return yield(kid.Prefix, kid.Value)
+
+	default:
+		panic("logic error: unknown child node type")
+	}
+}
+
 // AllRec recursively traverses the trie starting at the current node,
 // applying the provided yield function to every stored prefix and value.
 //
@@ -1639,40 +1660,11 @@ func (n *_NODE_TYPE[T]) AllRec(ptx PathContext, yield func(netip.Prefix, T) bool
 	}
 
 	// for all children (nodes and leaves) in this node do ...
-	for addr, anyKid := range n.Children.All() {
+	for addr := range n.Children.All() {
 		ptx.Slot = addr
-
-		switch kid := anyKid.(type) {
-		case *_NODE_TYPE[T]:
-			// rec-descent with this node
-			nextPtx := ptx
-			nextPtx.Path[ptx.Depth] = ptx.Slot
-			nextPtx.Depth++
-
-			if !kid.AllRec(nextPtx, yield) {
-				// early exit
-				return false
-			}
-
-		case *LeafNode[T]:
-			// callback for this leaf
-			if !yield(kid.Prefix, kid.Value) {
-				// early exit
-				return false
-			}
-
-		case *FringeNode[T]:
-			cidr := ptx.FringeAsCIDR()
-			// callback for this fringe
-			if !yield(cidr, kid.Value) {
-				// early exit
-				return false
-			}
-
-		default:
-			panic("logic error, wrong node type")
+		if !n.yieldChild(ptx, yield) {
+			return false
 		}
-
 	}
 
 	return true
