@@ -58,14 +58,8 @@ func (n *_NODE_TYPE[T]) Supernets(netip.Prefix, func(netip.Prefix, T) bool)     
 func (n *_NODE_TYPE[T]) Subnets(netip.Prefix, func(netip.Prefix, T) bool)                { return }
 func (n *_NODE_TYPE[T]) DumpRec(io.Writer, stridePath, int, bool)                        { return }
 func (n *_NODE_TYPE[T]) FprintRec(io.Writer, nodes.TrieItem[T], string) (_ error)        { return }
-
-func (n *_NODE_TYPE[T]) AllRec(stridePath, int, bool, func(netip.Prefix, T) bool) (_ bool) {
-	return
-}
-
-func (n *_NODE_TYPE[T]) AllRecSorted(stridePath, int, bool, func(netip.Prefix, T) bool) (_ bool) {
-	return
-}
+func (n *_NODE_TYPE[T]) AllRec(PathContext, func(netip.Prefix, T) bool) (_ bool)         { return }
+func (n *_NODE_TYPE[T]) AllRecSorted(PathContext, func(netip.Prefix, T) bool) (_ bool)   { return }
 
 // ### GENERATE DELETE END ###
 
@@ -964,22 +958,22 @@ func (t *_TABLE_TYPE[T]) All6() iter.Seq2[netip.Prefix, T] {
 // CIDR prefix sort order.
 func (t *_TABLE_TYPE[T]) AllSorted() iter.Seq2[netip.Prefix, T] {
 	return func(yield func(netip.Prefix, T) bool) {
-		_ = t.root4.AllRecSorted(stridePath{}, 0, true, yield) &&
-			t.root6.AllRecSorted(stridePath{}, 0, false, yield)
+		_ = t.root4.AllRecSorted(nodes.PathContext{Is4: true}, yield) &&
+			t.root6.AllRecSorted(nodes.PathContext{Is4: false}, yield)
 	}
 }
 
 // AllSorted4 is like [_TABLE_TYPE.AllSorted] but only for the v4 routing table.
 func (t *_TABLE_TYPE[T]) AllSorted4() iter.Seq2[netip.Prefix, T] {
 	return func(yield func(netip.Prefix, T) bool) {
-		_ = t.root4.AllRecSorted(stridePath{}, 0, true, yield)
+		_ = t.root4.AllRecSorted(nodes.PathContext{Is4: true}, yield)
 	}
 }
 
 // AllSorted6 is like [_TABLE_TYPE.AllSorted] but only for the v6 routing table.
 func (t *_TABLE_TYPE[T]) AllSorted6() iter.Seq2[netip.Prefix, T] {
 	return func(yield func(netip.Prefix, T) bool) {
-		_ = t.root6.AllRecSorted(stridePath{}, 0, false, yield)
+		_ = t.root6.AllRecSorted(nodes.PathContext{Is4: false}, yield)
 	}
 }
 

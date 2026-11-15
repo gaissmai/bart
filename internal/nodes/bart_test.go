@@ -454,7 +454,7 @@ func TestBartNode_AllRec_and_AllRecSorted(t *testing.T) {
 
 	// AllRecSorted: verify sorted
 	var sorted []netip.Prefix
-	n.AllRecSorted(StridePath{}, 0, true, func(p netip.Prefix, _ int) bool {
+	n.AllRecSorted(PathContext{Is4: true}, func(p netip.Prefix, _ int) bool {
 		sorted = append(sorted, p)
 		return true
 	})

@@ -43,7 +43,7 @@ func (n *BartNode[T]) allSorted4() iter.Seq2[netip.Prefix, T] {
 		if n == nil {
 			return
 		}
-		_ = n.AllRecSorted(StridePath{}, 0, true, yield)
+		_ = n.AllRecSorted(PathContext{Is4: true}, yield)
 	}
 }
 
@@ -52,7 +52,7 @@ func (n *BartNode[T]) allSorted6() iter.Seq2[netip.Prefix, T] {
 		if n == nil {
 			return
 		}
-		_ = n.AllRecSorted(StridePath{}, 0, false, yield)
+		_ = n.AllRecSorted(PathContext{Is4: false}, yield)
 	}
 }
 

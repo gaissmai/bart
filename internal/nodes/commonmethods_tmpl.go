@@ -24,12 +24,13 @@ import (
 	"github.com/gaissmai/bart/internal/art"
 	"github.com/gaissmai/bart/internal/bitset"
 	"github.com/gaissmai/bart/internal/lpm"
+	"github.com/gaissmai/bart/internal/sparse"
 	"github.com/gaissmai/bart/internal/value"
 )
 
 type _NODE_TYPE[T any] struct {
-	Prefixes bitset.BitSet256
-	Children bitset.BitSet256
+	Prefixes sparse.Array256[T] // or struct { bitset.BitSet256, ... }
+	Children sparse.Array256[T]
 }
 
 func (n *_NODE_TYPE[T]) PrefixCount() int                   { return }
@@ -1677,6 +1678,27 @@ func (n *_NODE_TYPE[T]) AllRec(ptx PathContext, yield func(netip.Prefix, T) bool
 	return true
 }
 
+// Helper to process and yield any child node type (inner node, leaf, or fringe).
+func (n *_NODE_TYPE[T]) yieldChildSorted(ptx PathContext, yield func(netip.Prefix, T) bool) bool {
+	switch kid := n.MustGetChild(ptx.Slot).(type) {
+	case *_NODE_TYPE[T]:
+		nextPtx := ptx
+		nextPtx.Path[ptx.Depth] = ptx.Slot
+		nextPtx.Depth++
+		return kid.AllRecSorted(nextPtx, yield)
+
+	case *FringeNode[T]:
+		cidr := ptx.FringeAsCIDR()
+		return yield(cidr, kid.Value)
+
+	case *LeafNode[T]:
+		return yield(kid.Prefix, kid.Value)
+
+	default:
+		panic("logic error: unknown child node type")
+	}
+}
+
 // AllRecSorted recursively traverses the trie in prefix-sorted order and applies
 // the given yield function to each stored prefix and value.
 //
@@ -1696,38 +1718,13 @@ func (n *_NODE_TYPE[T]) AllRec(ptx PathContext, yield func(netip.Prefix, T) bool
 // The order is stable and predictable, making the function suitable for use cases
 // like table exports, comparisons or serialization.
 //
-// Parameters:
-//   - path: the current traversal path through the trie
-//   - depth: current depth in the trie (0-based)
-//   - is4: true for IPv4 processing, false for IPv6
-//   - yield: callback function invoked for each prefix/value pair
-//
-// Returns false if yield function requests early termination.
-func (n *_NODE_TYPE[T]) AllRecSorted(path StridePath, depth int, is4 bool, yield func(netip.Prefix, T) bool) bool {
+// Returns false if the yield function requests early termination.
+func (n *_NODE_TYPE[T]) AllRecSorted(ptx PathContext, yield func(netip.Prefix, T) bool) bool {
 	allIndices := n.Prefixes.AppendBits(make([]uint8, 0, n.PrefixCount()))
 	allChildAddrs := n.Children.AppendBits(make([]uint8, 0, n.ChildCount()))
 
 	// Sort local prefix indices into canonical CIDR rank order.
 	slices.SortFunc(allIndices, CmpIndexRank)
-
-	// Helper to process and yield any child node type (inner node, leaf, or fringe).
-	yieldChild := func(addr uint8) bool {
-		switch kid := n.MustGetChild(addr).(type) {
-		case *_NODE_TYPE[T]:
-			path[depth] = addr
-			return kid.AllRecSorted(path, depth+1, is4, yield)
-
-		case *LeafNode[T]:
-			return yield(kid.Prefix, kid.Value)
-
-		case *FringeNode[T]:
-			fringePfx := CidrForFringe(path[:], depth, is4, addr)
-			return yield(fringePfx, kid.Value)
-
-		default:
-			panic("logic error: unknown child node type")
-		}
-	}
 
 	childCursor := 0
 
@@ -1742,14 +1739,16 @@ func (n *_NODE_TYPE[T]) AllRecSorted(path StridePath, depth int, is4 bool, yield
 				break
 			}
 
-			if !yieldChild(childAddr) {
+			ptx.Slot = childAddr
+			if !n.yieldChildSorted(ptx, yield) {
 				return false
 			}
 			childCursor++
 		}
 
 		// Yield the local prefix for this index.
-		cidr := CidrFromPath(path[:], depth, is4, pfxIdx)
+		ptx.Slot = pfxIdx
+		cidr := ptx.PrefixAsCIDR()
 		if !yield(cidr, n.MustGetPrefix(pfxIdx)) {
 			return false
 		}
@@ -1757,7 +1756,8 @@ func (n *_NODE_TYPE[T]) AllRecSorted(path StridePath, depth int, is4 bool, yield
 
 	// Yield remaining child subtrees strictly positioned after all local prefixes.
 	for _, addr := range allChildAddrs[childCursor:] {
-		if !yieldChild(addr) {
+		ptx.Slot = addr
+		if !n.yieldChildSorted(ptx, yield) {
 			return false
 		}
 	}
@@ -1806,41 +1806,18 @@ func (n *_NODE_TYPE[T]) EachLookupPrefix(ip netip.Addr, depth int, pfxIdx uint8,
 // to guarantee deterministic ordering across stride boundaries.
 //
 // Expects the node to be at the path location specified by octets/depth.
-func (n *_NODE_TYPE[T]) EachSubnet(octets []byte, depth int, is4 bool, pfxIdx uint8, yield func(netip.Prefix, T) bool) bool {
-	// octets as array, needed below more than once
-	var path StridePath
-	copy(path[:], octets)
-
+func (n *_NODE_TYPE[T]) EachSubnet(ptx PathContext, yield func(netip.Prefix, T) bool) bool {
 	var tmp bitset.BitSet256
 
 	// bitset & node entries against precomputed allot tables for pfxIdx.
-	tmp = n.Prefixes.And(&allot.PfxRoutesLookupTbl[pfxIdx])
+	tmp = n.Prefixes.And(&allot.PfxRoutesLookupTbl[ptx.Slot])
 	allCoveredIndices := tmp.AppendBits(make([]uint8, 0, tmp.OnesCount()))
 
-	tmp = n.Children.And(&allot.FringeRoutesLookupTbl[pfxIdx])
+	tmp = n.Children.And(&allot.FringeRoutesLookupTbl[ptx.Slot])
 	allCoveredChildAddrs := tmp.AppendBits(make([]uint8, 0, tmp.OnesCount()))
 
 	// Sort covered prefix indices into canonical CIDR order.
 	slices.SortFunc(allCoveredIndices, CmpIndexRank)
-
-	// Helper to process and yield child entries (nodes, leaves, or fringes).
-	yieldChild := func(addr uint8) bool {
-		switch kid := n.MustGetChild(addr).(type) {
-		case *_NODE_TYPE[T]:
-			path[depth] = addr
-			return kid.AllRecSorted(path, depth+1, is4, yield)
-
-		case *LeafNode[T]:
-			return yield(kid.Prefix, kid.Value)
-
-		case *FringeNode[T]:
-			fringePfx := CidrForFringe(path[:], depth, is4, addr)
-			return yield(fringePfx, kid.Value)
-
-		default:
-			panic("logic error: unknown child node type")
-		}
-	}
 
 	addrCursor := 0
 
@@ -1855,14 +1832,16 @@ func (n *_NODE_TYPE[T]) EachSubnet(octets []byte, depth int, is4 bool, pfxIdx ui
 				break
 			}
 
-			if !yieldChild(addr) {
+			ptx.Slot = addr
+			if !n.yieldChildSorted(ptx, yield) {
 				return false
 			}
 			addrCursor++
 		}
 
 		// Yield the local prefix entry itself.
-		cidr := CidrFromPath(path[:], depth, is4, pfxIdx)
+		ptx.Slot = pfxIdx
+		cidr := ptx.PrefixAsCIDR()
 		if !yield(cidr, n.MustGetPrefix(pfxIdx)) {
 			return false
 		}
@@ -1870,7 +1849,8 @@ func (n *_NODE_TYPE[T]) EachSubnet(octets []byte, depth int, is4 bool, pfxIdx ui
 
 	// Yield remaining child subtrees strictly after all local prefixes.
 	for _, addr := range allCoveredChildAddrs[addrCursor:] {
-		if !yieldChild(addr) {
+		ptx.Slot = addr
+		if !n.yieldChildSorted(ptx, yield) {
 			return false
 		}
 	}
@@ -2027,7 +2007,8 @@ func (n *_NODE_TYPE[T]) Subnets(pfx netip.Prefix, yield func(netip.Prefix, T) bo
 		// so those are handled below via the fringe/leaf path.
 		if depth == strideCount {
 			idx := art.PfxToIdx(octet, modBits)
-			n.EachSubnet(octets, depth, is4, idx, yield)
+			ptx := NewPathContext(octets, depth, idx, is4)
+			n.EachSubnet(*ptx, yield)
 			return
 		}
 

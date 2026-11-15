@@ -916,22 +916,22 @@ func (t *Table[T]) All6() iter.Seq2[netip.Prefix, T] {
 // CIDR prefix sort order.
 func (t *Table[T]) AllSorted() iter.Seq2[netip.Prefix, T] {
 	return func(yield func(netip.Prefix, T) bool) {
-		_ = t.root4.AllRecSorted(stridePath{}, 0, true, yield) &&
-			t.root6.AllRecSorted(stridePath{}, 0, false, yield)
+		_ = t.root4.AllRecSorted(nodes.PathContext{Is4: true}, yield) &&
+			t.root6.AllRecSorted(nodes.PathContext{Is4: false}, yield)
 	}
 }
 
 // AllSorted4 is like [Table.AllSorted] but only for the v4 routing table.
 func (t *Table[T]) AllSorted4() iter.Seq2[netip.Prefix, T] {
 	return func(yield func(netip.Prefix, T) bool) {
-		_ = t.root4.AllRecSorted(stridePath{}, 0, true, yield)
+		_ = t.root4.AllRecSorted(nodes.PathContext{Is4: true}, yield)
 	}
 }
 
 // AllSorted6 is like [Table.AllSorted] but only for the v6 routing table.
 func (t *Table[T]) AllSorted6() iter.Seq2[netip.Prefix, T] {
 	return func(yield func(netip.Prefix, T) bool) {
-		_ = t.root6.AllRecSorted(stridePath{}, 0, false, yield)
+		_ = t.root6.AllRecSorted(nodes.PathContext{Is4: false}, yield)
 	}
 }
 
