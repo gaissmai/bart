@@ -297,14 +297,10 @@ func (n *BartNode[T]) InsertPersist(cloneFn func(T) T, pfx netip.Prefix, val T, 
 //   - octets: The octets of the deleted prefix, the path leading to the current node.
 //   - is4: True for IPv4 processing, false for IPv6.
 func (n *BartNode[T]) PurgeAndCompress(stack []*BartNode[T], octets []uint8, is4 bool) {
-	// Iterate backwards through the ancestor stack to prune nodes from the bottom up.
-	for depth := len(stack) - 1; depth >= 0; depth-- {
-		parent := stack[depth]
-		octet := octets[depth]
+	// Unwind parent ancestor stack bottom-up to collapse redundant path nodes.
+	for depth, parent := range slices.Backward(stack) {
 
-		// Check if the current node is redundant.
-		// A node may be redundant if it contains exactly one entry (either a prefix or
-		// a compressed child node).
+		// A node may be redundant if it contains exactly one entry (either a prefix or a compressed child node).
 		pfxCount := n.PrefixCount()
 		childCount := n.ChildCount()
 
@@ -312,6 +308,8 @@ func (n *BartNode[T]) PurgeAndCompress(stack []*BartNode[T], octets []uint8, is4
 		if pfxCount+childCount > 1 {
 			return
 		}
+
+		octet := octets[depth]
 
 		switch {
 		case childCount == 1:
@@ -330,32 +328,25 @@ func (n *BartNode[T]) PurgeAndCompress(stack []*BartNode[T], octets []uint8, is4
 				parent.DeleteChild(octet)
 				parent.Insert(kid.Prefix, kid.Value, depth)
 			case *FringeNode[T]:
-				// The child is a compressed FringeNode. Prune the current node
-				// and re-insert the fringe as a leaf into the parent.
+				// Elevate the single fringe entry to the parent level as a path-compressed leaf.
+				addr, _ := n.Children.FirstSet()
+				ptx := NewPathContext(octets, depth+1, addr, is4)
+				cidr := ptx.FringeAsCIDR()
+
 				parent.DeleteChild(octet)
-
-				// Reconstruct the full prefix for the fringe, as path compression
-				// requires the entire CIDR path, not just the remainder.
-				// depth is the parent's depth, so we offset by 1 for the kid's position.
-				singleAddr, _ := n.Children.FirstSet()
-				fringePfx := CidrForFringe(octets, depth+1, is4, singleAddr)
-
-				parent.Insert(fringePfx, kid.Value, depth)
+				parent.Insert(cidr, kid.Value, depth)
 			}
 
 		case pfxCount == 1:
-			// The node has exactly one prefix. Prune the node and elevate the
-			// prefix to the parent level as a leaf/fringe.
-			parent.DeleteChild(octet)
-
-			// Retrieve the single prefix stored in this node.
+			// Elevate the single CBT local prefix to the parent level as a path-compressed leaf.
 			idx, _ := n.Prefixes.FirstSet()
 			val := n.MustGetPrefix(idx)
 
-			// Reconstruct the prefix from the path for re-insertion.
-			pfx := CidrFromPath(octets, depth+1, is4, idx)
+			ptx := NewPathContext(octets, depth+1, idx, is4)
+			cidr := ptx.PrefixAsCIDR()
 
-			parent.Insert(pfx, val, depth)
+			parent.DeleteChild(octet)
+			parent.Insert(cidr, val, depth)
 		default:
 			panic("unreachable")
 		}
