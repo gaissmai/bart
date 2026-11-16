@@ -52,8 +52,8 @@ type PathContext struct {
 	Is4 bool
 }
 
-func NewPathContext(octets []byte, depth int, slot uint8, is4 bool) *PathContext {
-	ptx := &PathContext{
+func NewPathContext(octets []byte, depth int, slot uint8, is4 bool) PathContext {
+	ptx := PathContext{
 		Depth: depth,
 		Slot:  slot,
 		Is4:   is4,
@@ -62,6 +62,10 @@ func NewPathContext(octets []byte, depth int, slot uint8, is4 bool) *PathContext
 		copy(ptx.Path[:], octets)
 	}
 	return ptx
+}
+
+func (ptx *PathContext) Clone() PathContext {
+	return *ptx
 }
 
 func (ptx *PathContext) FringeAsCIDR() netip.Prefix {

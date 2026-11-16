@@ -894,7 +894,8 @@ func (t *liteTable[T]) Size6() int {
 // prematurely terminate the iteration.
 func (t *liteTable[T]) All() iter.Seq2[netip.Prefix, T] {
 	return func(yield func(netip.Prefix, T) bool) {
-		_ = t.root4.AllRec(nodes.PathContext{Is4: true}, yield) && t.root6.AllRec(nodes.PathContext{Is4: false}, yield)
+		_ = t.root4.AllRec(nodes.PathContext{Is4: true}, yield) &&
+			t.root6.AllRec(nodes.PathContext{Is4: false}, yield)
 	}
 }
 

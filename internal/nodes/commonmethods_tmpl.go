@@ -1614,7 +1614,7 @@ func (n *_NODE_TYPE[T]) handleMatrix(persist bool, cloneFn func(T) T, thisExists
 func (n *_NODE_TYPE[T]) yieldChild(ptx PathContext, yield func(netip.Prefix, T) bool) bool {
 	switch kid := n.MustGetChild(ptx.Slot).(type) {
 	case *_NODE_TYPE[T]:
-		nextPtx := ptx
+		nextPtx := ptx.Clone()
 		nextPtx.Path[ptx.Depth] = ptx.Slot
 		nextPtx.Depth++
 		return kid.AllRec(nextPtx, yield)
@@ -1674,7 +1674,7 @@ func (n *_NODE_TYPE[T]) AllRec(ptx PathContext, yield func(netip.Prefix, T) bool
 func (n *_NODE_TYPE[T]) yieldChildSorted(ptx PathContext, yield func(netip.Prefix, T) bool) bool {
 	switch kid := n.MustGetChild(ptx.Slot).(type) {
 	case *_NODE_TYPE[T]:
-		nextPtx := ptx
+		nextPtx := ptx.Clone()
 		nextPtx.Path[ptx.Depth] = ptx.Slot
 		nextPtx.Depth++
 		return kid.AllRecSorted(nextPtx, yield)
@@ -1769,15 +1769,14 @@ func (n *_NODE_TYPE[T]) AllRecSorted(ptx PathContext, yield func(netip.Prefix, T
 // It returns false if yield stopped the iteration early, otherwise true.
 //
 // This function is used by Supernets, it does not descend the trie further.
-func (n *_NODE_TYPE[T]) EachLookupPrefix(ip netip.Addr, depth int, pfxIdx uint8, yield func(netip.Prefix, T) bool) (ok bool) {
-	for ; pfxIdx > 0; pfxIdx >>= 1 {
-		if n.Prefixes.Test(pfxIdx) {
-			val := n.MustGetPrefix(pfxIdx)
+func (n *_NODE_TYPE[T]) EachLookupPrefix(ptx PathContext, yield func(netip.Prefix, T) bool) (ok bool) {
+	for idx := ptx.Slot; idx > 0; idx >>= 1 {
+		if n.Prefixes.Test(idx) {
+			val := n.MustGetPrefix(idx)
 
 			// get the CIDR back
-			_, pfxLen := art.IdxToPfx(pfxIdx)
-			cidr, _ := ip.Prefix(depth<<3 + int(pfxLen))
-
+			ptx.Slot = idx
+			cidr := ptx.PrefixAsCIDR()
 			if !yield(cidr, val) {
 				return false
 			}
@@ -1919,13 +1918,14 @@ LOOP:
 			break LOOP
 
 		case *FringeNode[T]:
-			fringePfx := CidrForFringe(octets, depth, is4, octet)
-			if fringePfx.Bits() > pfx.Bits() {
+			ptx := NewPathContext(octets, depth, octet, is4)
+			cidr := ptx.FringeAsCIDR()
+			if cidr.Bits() > pfx.Bits() {
 				break LOOP
 			}
 
-			if fringePfx.Overlaps(pfx) {
-				if !yield(fringePfx, kid.Value) {
+			if cidr.Overlaps(pfx) {
+				if !yield(cidr, kid.Value) {
 					// early exit
 					return
 				}
@@ -1960,7 +1960,7 @@ LOOP:
 		}
 
 		// yield all the matching prefixes, not just the lpm
-		if !n.EachLookupPrefix(ip, depth, idx, yield) {
+		if !n.EachLookupPrefix(NewPathContext(octets, depth, idx, is4), yield) {
 			// early exit
 			return
 		}
@@ -2000,7 +2000,7 @@ func (n *_NODE_TYPE[T]) Subnets(pfx netip.Prefix, yield func(netip.Prefix, T) bo
 		if depth == strideCount {
 			idx := art.PfxToIdx(octet, modBits)
 			ptx := NewPathContext(octets, depth, idx, is4)
-			n.EachSubnet(*ptx, yield)
+			n.EachSubnet(ptx, yield)
 			return
 		}
 
