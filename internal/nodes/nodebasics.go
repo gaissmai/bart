@@ -52,6 +52,9 @@ type PathContext struct {
 	Is4 bool
 }
 
+// NewPathContext instantiates and returns a new PathContext initialized with the given
+// octet path, stride depth, local slot index, and address family indicator (is4).
+// If octets are provided, they are copied into the path buffer.
 func NewPathContext(octets []byte, depth int, slot uint8, is4 bool) PathContext {
 	ptx := PathContext{
 		Depth: depth,
@@ -64,20 +67,28 @@ func NewPathContext(octets []byte, depth int, slot uint8, is4 bool) PathContext 
 	return ptx
 }
 
+// Clone returns a shallow copy of the PathContext value.
 func (ptx *PathContext) Clone() PathContext {
 	return *ptx
 }
 
+// FringeAsCIDR reconstructs and returns the netip.Prefix for a stride-aligned fringe entry
+// based on the current PathContext state.
 func (ptx *PathContext) FringeAsCIDR() netip.Prefix {
 	isPrefix := false
 	return ptx.asCIDR(isPrefix)
 }
 
+// PrefixAsCIDR reconstructs and returns the netip.Prefix for a local CBT prefix index
+// based on the current PathContext state.
 func (ptx *PathContext) PrefixAsCIDR() netip.Prefix {
 	isPrefix := true
 	return ptx.asCIDR(isPrefix)
 }
 
+// asCIDR is an internal helper that constructs a netip.Prefix from the current PathContext state,
+// differentiating between local prefix indices and fringe nodes based on the isPrefix flag.
+// It handles path canonicalization and zero-allocation address construction.
 func (ptx *PathContext) asCIDR(isPrefix bool) netip.Prefix {
 	// Default bit length calculation for stride-aligned fringe entries (/8, /16, /24, etc.).
 	bits := (ptx.Depth + 1) << 3
@@ -108,8 +119,8 @@ func (ptx *PathContext) asCIDR(isPrefix bool) netip.Prefix {
 	return netip.PrefixFrom(ip, bits)
 }
 
-// TrieItem, TODO a node has no path information about its predecessors,
-// we collect this during the recursive descent.
+// TrieItem holds traversal metadata and associated values used when reconstructing
+// hierarchical tree views and listing routes during trie inspection.
 type TrieItem[T any] struct {
 	// for traversing, Path/Depth/Idx is needed to get the CIDR back from the trie.
 	Node  any // BartNode or LiteNode
@@ -123,7 +134,8 @@ type TrieItem[T any] struct {
 	Val  T
 }
 
-// StatsT, only used for dump, tests and benchmarks
+// StatsT holds statistics and entity counts (prefixes, children, sub-nodes, leaves, and fringes)
+// for trie nodes, used for debugging, dumping, testing, and benchmarking.
 type StatsT struct {
 	Prefixes int
 	Children int
@@ -132,6 +144,8 @@ type StatsT struct {
 	Fringes  int
 }
 
+// nodeType represents the structural classification of a trie node based on its contents
+// (prefixes, sub-nodes, leaves, and fringes).
 type nodeType byte
 
 const (

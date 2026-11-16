@@ -1610,7 +1610,9 @@ func (n *_NODE_TYPE[T]) handleMatrix(persist bool, cloneFn func(T) T, thisExists
 	}
 }
 
-// Helper to process and yield any child node type (inner node, leaf, or fringe).
+// yieldChild processes and yields a child entry at ptx.Slot during recursive AllRec traversal.
+// It handles internal subnodes with recursive descent, leaf nodes, and fringe nodes,
+// reconstructing CIDRs on-the-fly and returning false if the yield callback requests early termination.
 func (n *_NODE_TYPE[T]) yieldChild(ptx PathContext, yield func(netip.Prefix, T) bool) bool {
 	switch kid := n.MustGetChild(ptx.Slot).(type) {
 	case *_NODE_TYPE[T]:
@@ -1670,7 +1672,9 @@ func (n *_NODE_TYPE[T]) AllRec(ptx PathContext, yield func(netip.Prefix, T) bool
 	return true
 }
 
-// Helper to process and yield any child node type (inner node, leaf, or fringe).
+// yieldChildSorted processes and yields a child entry at ptx.Slot during recursive AllRecSorted traversal.
+// It handles internal subnodes, leaf nodes, and fringe nodes in canonical sorted order,
+// returning false if the yield callback requests early termination.
 func (n *_NODE_TYPE[T]) yieldChildSorted(ptx PathContext, yield func(netip.Prefix, T) bool) bool {
 	switch kid := n.MustGetChild(ptx.Slot).(type) {
 	case *_NODE_TYPE[T]:
