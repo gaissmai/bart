@@ -58,14 +58,8 @@ func (n *_NODE_TYPE[T]) Supernets(netip.Prefix, func(netip.Prefix, T) bool)     
 func (n *_NODE_TYPE[T]) Subnets(netip.Prefix, func(netip.Prefix, T) bool)                { return }
 func (n *_NODE_TYPE[T]) DumpRec(io.Writer, stridePath, int, bool)                        { return }
 func (n *_NODE_TYPE[T]) FprintRec(io.Writer, nodes.TrieItem[T], string) (_ error)        { return }
-
-func (n *_NODE_TYPE[T]) AllRec(stridePath, int, bool, func(netip.Prefix, T) bool) (_ bool) {
-	return
-}
-
-func (n *_NODE_TYPE[T]) AllRecSorted(stridePath, int, bool, func(netip.Prefix, T) bool) (_ bool) {
-	return
-}
+func (n *_NODE_TYPE[T]) AllRec(PathContext, func(netip.Prefix, T) bool) (_ bool)         { return }
+func (n *_NODE_TYPE[T]) AllRecSorted(PathContext, func(netip.Prefix, T) bool) (_ bool)   { return }
 
 // ### GENERATE DELETE END ###
 
@@ -146,6 +140,10 @@ func (f *_TABLE_TYPE[T]) Contains(ip netip.Addr) bool {
 //
 // Any IPv6 zone identifier is stripped and has no effect on the lookup result.
 func (t *_TABLE_TYPE[T]) Lookup(ip netip.Addr) (val T, ok bool) {
+	if !ip.IsValid() {
+		return
+	}
+
 	is4 := ip.Is4()
 	octets := ip.AsSlice()
 	n := t.rootNodeByVersion(is4)
@@ -196,14 +194,6 @@ LOOP:
 			// reached a path compressed prefix, stop traversing
 			break LOOP
 		}
-	}
-
-	// Hot-path optimization: delay ip.IsValid() check until after traversal.
-	// Fast path: if a Fringe or Leaf matches early in LOOP, we return without ever checking IsValid().
-	// Slow path: for invalid IPs, range over nil octets is a no-op (stack[0] stays nil).
-	// We validate now before backtracking to avoid a nil pointer panic on n.PrefixCount().
-	if !ip.IsValid() {
-		return val, ok
 	}
 
 	// start backtracking, unwind the stack, bounds check eliminated
@@ -946,21 +936,22 @@ func (t *_TABLE_TYPE[T]) Size6() int {
 // prematurely terminate the iteration.
 func (t *_TABLE_TYPE[T]) All() iter.Seq2[netip.Prefix, T] {
 	return func(yield func(netip.Prefix, T) bool) {
-		_ = t.root4.AllRec(stridePath{}, 0, true, yield) && t.root6.AllRec(stridePath{}, 0, false, yield)
+		_ = t.root4.AllRec(nodes.PathContext{Is4: true}, yield) &&
+			t.root6.AllRec(nodes.PathContext{Is4: false}, yield)
 	}
 }
 
 // All4 is like [_TABLE_TYPE.All] but only for the v4 routing table.
 func (t *_TABLE_TYPE[T]) All4() iter.Seq2[netip.Prefix, T] {
 	return func(yield func(netip.Prefix, T) bool) {
-		_ = t.root4.AllRec(stridePath{}, 0, true, yield)
+		_ = t.root4.AllRec(nodes.PathContext{Is4: true}, yield)
 	}
 }
 
 // All6 is like [_TABLE_TYPE.All] but only for the v6 routing table.
 func (t *_TABLE_TYPE[T]) All6() iter.Seq2[netip.Prefix, T] {
 	return func(yield func(netip.Prefix, T) bool) {
-		_ = t.root6.AllRec(stridePath{}, 0, false, yield)
+		_ = t.root6.AllRec(nodes.PathContext{Is4: false}, yield)
 	}
 }
 
@@ -968,22 +959,22 @@ func (t *_TABLE_TYPE[T]) All6() iter.Seq2[netip.Prefix, T] {
 // CIDR prefix sort order.
 func (t *_TABLE_TYPE[T]) AllSorted() iter.Seq2[netip.Prefix, T] {
 	return func(yield func(netip.Prefix, T) bool) {
-		_ = t.root4.AllRecSorted(stridePath{}, 0, true, yield) &&
-			t.root6.AllRecSorted(stridePath{}, 0, false, yield)
+		_ = t.root4.AllRecSorted(nodes.PathContext{Is4: true}, yield) &&
+			t.root6.AllRecSorted(nodes.PathContext{Is4: false}, yield)
 	}
 }
 
 // AllSorted4 is like [_TABLE_TYPE.AllSorted] but only for the v4 routing table.
 func (t *_TABLE_TYPE[T]) AllSorted4() iter.Seq2[netip.Prefix, T] {
 	return func(yield func(netip.Prefix, T) bool) {
-		_ = t.root4.AllRecSorted(stridePath{}, 0, true, yield)
+		_ = t.root4.AllRecSorted(nodes.PathContext{Is4: true}, yield)
 	}
 }
 
 // AllSorted6 is like [_TABLE_TYPE.AllSorted] but only for the v6 routing table.
 func (t *_TABLE_TYPE[T]) AllSorted6() iter.Seq2[netip.Prefix, T] {
 	return func(yield func(netip.Prefix, T) bool) {
-		_ = t.root6.AllRecSorted(stridePath{}, 0, false, yield)
+		_ = t.root6.AllRecSorted(nodes.PathContext{Is4: false}, yield)
 	}
 }
 

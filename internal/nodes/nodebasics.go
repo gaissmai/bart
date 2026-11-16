@@ -31,8 +31,96 @@ const DepthMask = MaxTreeDepth - 1
 // StridePath represents a path through the trie, with a maximum depth of 16 octets for IPv6.
 type StridePath [MaxTreeDepth]uint8
 
-// TrieItem, a node has no path information about its predecessors,
-// we collect this during the recursive descent.
+// PathContext encapsulates the active traversal state, stride history,
+// and local node position required during recursive trie evaluation.
+//
+// It tracks path segments across stride boundaries while maintaining
+// the active CBT (Complete Binary Tree) prefix index or octet address
+// within local nodes.
+type PathContext struct {
+	// Path contains the accumulated octet path traversed through the trie.
+	Path StridePath
+
+	// Depth represents the current stride level or byte depth in the trie.
+	Depth int
+
+	// Slot stores the active local position, representing either a 1-based CBT prefix
+	// index (1..255) or a 0-based stride octet address (0..255).
+	Slot uint8
+
+	// Is4 indicates whether the context evaluates an IPv4 (true) or IPv6 (false) address space.
+	Is4 bool
+}
+
+// NewPathContext instantiates and returns a new PathContext initialized with the given
+// octet path, stride depth, local slot index, and address family indicator (is4).
+// If octets are provided, they are copied into the path buffer.
+func NewPathContext(octets []byte, depth int, slot uint8, is4 bool) PathContext {
+	ptx := PathContext{
+		Depth: depth,
+		Slot:  slot,
+		Is4:   is4,
+	}
+	if octets != nil {
+		copy(ptx.Path[:], octets)
+	}
+	return ptx
+}
+
+// Clone returns a shallow copy of the PathContext value.
+func (ptx *PathContext) Clone() PathContext {
+	return *ptx
+}
+
+// FringeAsCIDR reconstructs and returns the netip.Prefix for a stride-aligned fringe entry
+// based on the current PathContext state.
+func (ptx *PathContext) FringeAsCIDR() netip.Prefix {
+	isPrefix := false
+	return ptx.asCIDR(isPrefix)
+}
+
+// PrefixAsCIDR reconstructs and returns the netip.Prefix for a local CBT prefix index
+// based on the current PathContext state.
+func (ptx *PathContext) PrefixAsCIDR() netip.Prefix {
+	isPrefix := true
+	return ptx.asCIDR(isPrefix)
+}
+
+// asCIDR is an internal helper that constructs a netip.Prefix from the current PathContext state,
+// differentiating between local prefix indices and fringe nodes based on the isPrefix flag.
+// It handles path canonicalization and zero-allocation address construction.
+func (ptx *PathContext) asCIDR(isPrefix bool) netip.Prefix {
+	// Default bit length calculation for stride-aligned fringe entries (/8, /16, /24, etc.).
+	bits := (ptx.Depth + 1) << 3
+	octet := ptx.Slot
+
+	if isPrefix {
+		var pfxLen uint8
+		// Retrieve the last octet byte and prefix length inside the stride from CBT index.
+		octet, pfxLen = art.IdxToPfx(ptx.Slot)
+		bits = ptx.Depth<<3 + int(pfxLen)
+	}
+
+	// Set byte in path at current depth with last octet.
+	ptx.Path[ptx.Depth] = octet
+
+	// Canonicalize: clear non-canonical trailing octets.
+	clear(ptx.Path[ptx.Depth+1:])
+
+	// Reconstruct netip.Addr directly from array values without heap allocation.
+	var ip netip.Addr
+	if ptx.Is4 {
+		ip = netip.AddrFrom4([4]byte(ptx.Path[:4]))
+	} else {
+		ip = netip.AddrFrom16(ptx.Path)
+	}
+
+	// PrefixFrom does not allocate and assumes host bits are zeroed.
+	return netip.PrefixFrom(ip, bits)
+}
+
+// TrieItem holds traversal metadata and associated values used when reconstructing
+// hierarchical tree views and listing routes during trie inspection.
 type TrieItem[T any] struct {
 	// for traversing, Path/Depth/Idx is needed to get the CIDR back from the trie.
 	Node  any // BartNode or LiteNode
@@ -46,7 +134,8 @@ type TrieItem[T any] struct {
 	Val  T
 }
 
-// StatsT, only used for dump, tests and benchmarks
+// StatsT holds statistics and entity counts (prefixes, children, sub-nodes, leaves, and fringes)
+// for trie nodes, used for debugging, dumping, testing, and benchmarking.
 type StatsT struct {
 	Prefixes int
 	Children int
@@ -55,6 +144,8 @@ type StatsT struct {
 	Fringes  int
 }
 
+// nodeType represents the structural classification of a trie node based on its contents
+// (prefixes, sub-nodes, leaves, and fringes).
 type nodeType byte
 
 const (
